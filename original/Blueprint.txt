@@ -1,0 +1,64 @@
+APPLEVIS iOS APP — MASTER BLUEPRINT v2026.0.0
+
+Core:
+Accessibility-first, VoiceOver optimized, low vision friendly, state-aware app.
+
+Tabs:
+1. Home (default)
+2. Community
+3. Podcasts
+4. Apps
+5. Explore
+6. Profile
+
+Key Systems:
+- Since Last Visit
+- Continue (resume system)
+- Notifications (single sound system)
+- Offline caching
+- iCloud + Account sync
+- Actions rotor
+- Contextual help
+
+Community:
+- Segments: All (default), Apple, Non-Apple, Following
+- Thread tracking (unread, last read)
+- Actions: Reply, Mark as Read, Follow, Bookmark, Share
+
+Podcasts:
+- Queue, Downloads, Resume
+- Magic Tap support
+- Actions: Play, Queue, Download, Show Notes, Bookmark, Share
+
+Apps:
+- Platform filtering
+- Saved apps + updates
+
+Explore:
+- Guides, Blogs, Collections
+- Clean reading + discussion links
+
+Profile:
+- Account
+- Saved / Following
+- Notifications
+- Preferences
+- Sound & Haptics
+- Sync & Data
+- Help & Support (Guide + FAQ)
+
+Notifications:
+- Single sound (None / Mouse / Apple Crunch)
+- Core + optional categories
+- Grouped notifications
+
+Offline:
+- Cached content
+- Retention settings
+
+Accessibility:
+- Full compliance with Web Content Accessibility Guidelines (WCAG) 2.1
+- Honors all iOS settings
+- VoiceOver optimized navigation
+- Focus clarity
+- Clean structure

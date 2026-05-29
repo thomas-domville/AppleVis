@@ -1,0 +1,336 @@
+APPLEVIS iOS APP — COMPREHENSIVE USER GUIDE
+
+TABLE OF CONTENTS
+
+1. Introduction
+2. Accessibility Overview
+3. Getting Started
+4. Understanding Navigation
+5. Home Tab (Detailed)
+6. Community Tab (Detailed)
+7. Threads and Replies
+8. Podcasts Tab (Detailed)
+9. Apps Tab (Detailed)
+10. Explore Tab (Detailed)
+11. Profile Tab (Detailed)
+12. Notifications and Badges
+13. Offline Usage
+14. VoiceOver Guide (Gestures and Rotor)
+15. Tips for Efficient Use
+16. Frequently Asked Questions
+
+---
+
+1. INTRODUCTION
+
+Welcome to the AppleVis iOS app.
+
+This app is designed specifically for:
+- VoiceOver users
+- Braille users
+- Low vision users
+
+With the app, you can:
+- Read and participate in forums
+- Listen to podcasts
+- Discover apps
+- Read guides and articles
+
+---
+
+2. ACCESSIBILITY OVERVIEW
+
+The app respects all iOS accessibility settings:
+
+- VoiceOver
+- Dynamic Type (text size)
+- Dark Mode
+- Reduce Motion
+- Increased Contrast
+
+The app does NOT override these settings.
+
+---
+
+3. GETTING STARTED
+
+When you open the app:
+
+- You land on the Home tab
+- You can browse without signing in
+- Signing in allows posting, replying, saving, and syncing
+
+Navigation is done through tabs at the bottom:
+Home, Community, Podcasts, Apps, Explore, Profile
+
+---
+
+4. UNDERSTANDING NAVIGATION
+
+Each screen is structured:
+
+- Screen title
+- Sections (Headings)
+- Lists of items
+
+VoiceOver users can:
+- Swipe right/left to move
+- Use rotor to jump by headings or actions
+
+---
+
+5. HOME TAB (DETAILED)
+
+The Home tab shows what matters most.
+
+Sections:
+
+Since Last Visit:
+- Forums: number of new posts/replies
+- Podcasts: number of new episodes
+- Apps: number of updates
+
+Example:
+“Forums — 5 new”
+
+Double tap to open Community filtered to unread.
+
+Continue:
+- Resume threads (opens at first unread)
+- Resume podcasts
+- Resume browsing apps or guides
+
+Forum Activity:
+- Active discussions
+- Threads with new replies
+
+Podcasts:
+- Continue listening
+- New episodes
+
+Apps:
+- Updated apps
+
+---
+
+6. COMMUNITY TAB (DETAILED)
+
+Segments (top left):
+- All (default)
+- Apple
+- Non-Apple
+- Following
+
+Top right:
+- Search
+
+Below:
+- Filter button
+
+Thread list shows:
+- Title
+- Category
+- Reply count
+- Unread count
+- Last update
+
+Example:
+“Thread title, 12 replies, 3 unread”
+
+---
+
+7. THREADS AND REPLIES
+
+Opening a thread:
+- Automatically jumps to first unread comment
+
+Markers:
+- “Last read” shows where you left off
+
+Actions (Rotor):
+- Reply
+- Jump to first unread
+- Mark as read
+- Follow / Unfollow
+- Bookmark
+- Share
+
+Replying:
+- Activate Reply
+- Enter text
+- Submit
+
+---
+
+8. PODCASTS TAB (DETAILED)
+
+Sections:
+- Continue Listening
+- Queue
+- New Episodes
+- All Episodes
+
+Episode status:
+- New
+- In Progress
+- Played
+
+Actions:
+- Play / Resume
+- Add to Queue
+- Download
+- Show Notes
+- Bookmark
+- Share
+
+Magic Tap:
+- Play or pause audio
+
+---
+
+9. APPS TAB (DETAILED)
+
+Top:
+- Platform selector (All, iOS, macOS, watchOS, tvOS)
+- Search
+- Filter
+
+List shows:
+- App name
+- Platform
+- Update status
+
+Actions:
+- Open
+- Bookmark
+- Share
+- Follow (optional)
+
+---
+
+10. EXPLORE TAB (DETAILED)
+
+Sections:
+- Featured
+- Guides
+- Blogs
+- Collections
+
+Actions:
+- Read
+- Bookmark
+- Share
+- View Discussion
+
+---
+
+11. PROFILE TAB (DETAILED)
+
+Sections:
+- Account (Sign in/out)
+- Continue
+- Saved
+- Following
+- Activity
+- Notifications
+- Preferences
+- Sound & Haptics
+- Sync & Data
+- Help & Support
+- About
+
+Help & Support includes:
+- User Guide
+- FAQ
+- Contact
+
+---
+
+12. NOTIFICATIONS AND BADGES
+
+Badge:
+- Number on app icon shows total new items
+
+Notifications include:
+- New posts
+- Replies
+- Followed thread activity
+- New podcasts
+- New apps
+
+Sound:
+- None
+- The Mouse (default)
+- Apple Crunch
+
+---
+
+13. OFFLINE USAGE
+
+Available offline:
+- Saved threads
+- Cached content
+
+Not available:
+- Posting
+- Replying
+
+Settings:
+- Choose how long to keep offline content
+
+---
+
+14. VOICEOVER HELPFUL HINTS
+
+Actions (swipe up/down):
+- Quick actions like Reply or Bookmark
+
+Magic Tap:
+- Play/Pause podcasts
+
+---
+
+15. TIPS FOR EFFICIENT USE
+
+- Use Home to catch up quickly
+- Use rotor actions to save time
+- Follow threads to track activity
+- Use Continue to resume instantly
+
+---
+
+16. FREQUENTLY ASKED QUESTIONS
+
+Q: Do I need an account?
+A: No, but it is required to post or reply.
+
+Q: How do I reply?
+A: Open a thread and use the Reply action.
+
+Q: How do I find new content?
+A: Use the Home tab under “Since Last Visit.”
+
+Q: How do badges work?
+A: The number shows how many new items you have.
+
+Q: Can I listen offline?
+A: Yes, download podcasts.
+
+Q: How do I save items?
+A: Use Bookmark actions.
+
+Q: Can I use the app offline?
+A: Yes, for previously viewed content.
+
+Q: How do I change notification sound?
+A: Profile → Sound & Haptics.
+
+Q: How do I contact support?
+A: Profile → Help & Support.
+
+Q: What is “Jump to First Unread”?
+A: It takes you to new comments in a thread.
+
+---
+
+END OF GUIDE

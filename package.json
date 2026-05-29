@@ -1,0 +1,41 @@
+{
+  "name": "applevis-expo",
+  "version": "2026.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "ios": "expo run:ios",
+    "android": "expo run:android",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "latest",
+    "@react-native-async-storage/async-storage": "latest",
+    "@react-navigation/native": "latest",
+    "expo": "latest",
+    "expo-av": "latest",
+    "expo-blur": "latest",
+    "expo-constants": "latest",
+    "expo-haptics": "latest",
+    "expo-linking": "latest",
+    "expo-notifications": "latest",
+    "expo-router": "latest",
+    "expo-secure-store": "latest",
+    "expo-splash-screen": "latest",
+    "expo-status-bar": "latest",
+    "expo-system-ui": "latest",
+    "lottie-react-native": "latest",
+    "react": "latest",
+    "react-native": "latest",
+    "react-native-gesture-handler": "latest",
+    "react-native-reanimated": "latest",
+    "react-native-safe-area-context": "latest",
+    "react-native-screens": "latest"
+  },
+  "devDependencies": {
+    "@types/react": "latest",
+    "typescript": "latest"
+  }
+}

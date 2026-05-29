@@ -1,0 +1,61 @@
+APPLEVIS iOS APP — ARCHITECTURE v2026.0.0
+
+Frontend:
+- SwiftUI
+- MVVM pattern
+
+Backend:
+- Drupal 11 (JSON:API + custom endpoints)
+
+Core Models:
+- User
+- Thread
+- Comment
+- PodcastEpisode
+- AppEntry
+- Guide
+- Progress (thread + podcast)
+
+API Layers:
+1. Drupal JSON:API (content)
+2. /api/mobile (custom endpoints)
+
+Key Endpoints:
+- /home
+- /community
+- /threads/{id}
+- /threads/{id}/comments
+- /threads/{id}/follow
+- /threads/{id}/bookmark
+
+State:
+- ThreadProgress
+- EpisodeProgress
+- VisitState
+
+Sync:
+- iCloud: preferences, progress
+- Account: posts, follows, bookmarks
+
+Offline:
+- Cached lists + threads
+- Expiration rules
+
+Notifications:
+- APNs
+- Grouped delivery
+- User preference filtering
+
+Storage:
+- Local DB (CoreData)
+- Keychain (auth)
+
+Audio:
+- AVFoundation
+- Notification sounds (Mouse, Apple Crunch)
+
+Accessibility:
+- Full compliance with Web Content Accessibility Guidelines (WCAG) 2.1
+- VoiceOver optimized structure
+- Rotor actions
+- Minimal UI complexity

@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "AppleVis",
+    "slug": "applevis",
+    "version": "2026.1.0",
+    "orientation": "default",
+    "icon": "./assets/icons/app-icon.png",
+    "scheme": "applevis",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A84FF"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.applevis.app",
+      "infoPlist": {
+        "UIBackgroundModes": ["audio", "remote-notification"],
+        "NSMicrophoneUsageDescription": "AppleVis does not record audio. This placeholder is only needed if future podcast voice features are added.",
+        "NSUserTrackingUsageDescription": "AppleVis does not track you across apps or websites."
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-av",
+      "expo-notifications"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -1,0 +1,727 @@
+APPLEVIS IOS APP — DEVELOPER-READY SPEC v2026.0.0
+
+Document Purpose:
+This document converts the AppleVis iOS app blueprint into a practical developer specification. It defines screens, data models, API needs, interaction behavior, accessibility behavior, offline behavior, notification rules, and core edge cases.
+
+Product Summary:
+The AppleVis iOS app is a native SwiftUI app for AppleVis.com, backed by Drupal 11. It is designed first for VoiceOver users, braille users, and low vision users. The app must fully comply with Web Content Accessibility Guidelines (WCAG) 2.1 and Apple's App Review guidelines, respect iOS system accessibility settings, and avoid overriding global accessibility preferences.
+
+Primary Goals:
+- Provide a fast native AppleVis experience.
+- Make forums/community easy to follow.
+- Provide a personalized Home dashboard.
+- Support podcasts with queue, downloads, and playback progress.
+- Support app discovery and saved/followed app tracking.
+- Provide accessible reading for guides, blogs, and tutorials.
+- Support account sign-in for posting, replying, following, bookmarking, and submitting content.
+- Support iCloud syncing for personal progress/preferences.
+- Support offline caching.
+
+FINAL TAB ORDER
+
+1. Home
+2. Community
+3. Podcasts
+4. Apps
+5. Explore
+6. Profile
+
+The Home tab is the default launch tab.
+
+GLOBAL DESIGN RULES
+
+- Fully comply with Web Content Accessibility Guidelines (WCAG) 2.1 
+- Fully comply with Apple's App Review guidelines
+- Respect iOS Dynamic Type.
+- Respect Dark Mode.
+- Respect Reduce Motion.
+- Respect Increased Contrast.
+- Do not rely on color alone.
+- Use clear labels: New, Unread, Updated, Downloaded, In Progress.
+- Use consistent layouts across tabs.
+- Use single-column scrollable layouts.
+- Avoid nested scroll views.
+- Avoid unnecessary animations.
+- Use clear headings for VoiceOver navigation.
+- Make every row actionable and clearly labeled.
+- Use custom actions/rotor actions for quick commands.
+
+APP ARCHITECTURE
+
+Frontend:
+- SwiftUI
+- MVVM or similar architecture
+- Local persistence using Core Data, SwiftData, or equivalent
+- Keychain for auth token storage
+- CloudKit/iCloud for user progress/preferences sync
+- AVFoundation for podcast playback
+- APNs for notifications
+
+Backend:
+- Drupal 11
+- Drupal JSON:API for standard content
+- Custom /api/mobile endpoints for app-specific data aggregation, personalization, read state, badge counts, notifications, bookmarks, follows, and posting.
+
+AUTHENTICATION
+
+Anonymous users may:
+- Browse Home
+- Browse Community
+- Read threads/comments
+- Browse Apps
+- Listen to Podcasts
+- Read Explore content
+
+Signed-in users may:
+- Post new threads
+- Reply to threads
+- Follow threads
+- Bookmark content to their account
+- Submit app/content entries
+- Receive account-based notifications
+
+Auth storage:
+- Store auth token securely in Keychain.
+- Use HTTPS only.
+- Provide Sign Out.
+- On auth expiration, prompt the user to sign in again.
+
+CORE DATA MODELS
+
+User:
+- id: String
+- username: String
+- displayName: String
+- email: String?
+- avatarURL: String?
+- roles: [String]
+- isSignedIn: Bool
+
+Thread:
+- id: String
+- title: String
+- bodyPreview: String
+- author: UserSummary
+- category: Category
+- segment: String // all, apple, nonApple
+- contentType: String // forum, blog, guide, app, bug, podcast
+- createdAt: Date
+- updatedAt: Date
+- lastActivityAt: Date
+- replyCount: Int
+- unreadCount: Int
+- isFollowed: Bool
+- isBookmarked: Bool
+- isParticipated: Bool
+- firstUnreadCommentId: String?
+
+Comment:
+- id: String
+- threadId: String
+- author: UserSummary
+- body: String
+- createdAt: Date
+- updatedAt: Date?
+- parentCommentId: String?
+- isNewSinceLastRead: Bool
+
+ThreadProgress:
+- threadId: String
+- lastReadCommentId: String?
+- lastReadAt: Date?
+- firstUnreadCommentId: String?
+- unreadCount: Int
+
+PodcastEpisode:
+- id: String
+- title: String
+- showName: String
+- description: String
+- showNotes: String?
+- audioURL: String
+- duration: TimeInterval
+- publishedAt: Date
+- isNew: Bool
+- isBookmarked: Bool
+- isDownloaded: Bool
+- isQueued: Bool
+- playbackPosition: TimeInterval
+- playbackState: String // new, inProgress, played
+
+AppEntry:
+- id: String
+- name: String
+- platform: String // iOS, macOS, watchOS, tvOS
+- category: Category
+- description: String
+- accessibilitySummary: String?
+- developerName: String?
+- appStoreURL: String?
+- lastUpdatedAt: Date
+- isNew: Bool
+- isUpdatedSinceViewed: Bool
+- isBookmarked: Bool
+- isFollowed: Bool
+
+ExploreItem:
+- id: String
+- title: String
+- type: String // guide, blog, collection
+- summary: String
+- body: String
+- author: UserSummary?
+- publishedAt: Date
+- updatedAt: Date?
+- discussionThreadId: String?
+- isBookmarked: Bool
+
+VisitState:
+- lastAppOpenedAt: Date
+- lastHomeViewedAt: Date
+- lastCommunityViewedAt: Date
+- lastPodcastsViewedAt: Date
+- lastAppsViewedAt: Date
+- lastExploreViewedAt: Date
+
+NotificationPreference:
+- newPosts: Bool
+- repliesToMyPosts: Bool
+- followedThreadActivity: Bool
+- allComments: Bool
+- newPodcastEpisodes: Bool
+- newAppSubmissions: Bool
+- appUpdates: Bool
+- guidesBlogs: Bool
+- summaryNotifications: Bool
+- nudgeReminders: Bool
+- notificationSound: String // none, theMouse, appleCrunch
+
+HOME TAB SPEC
+
+Purpose:
+The Home tab is the default dashboard. It answers:
+- What is new since last visit?
+- Where did I leave off?
+- What is active right now?
+
+Sections:
+1. Since Last Visit
+2. Continue
+3. Forum Activity
+4. Podcasts
+5. Apps
+
+Home API:
+GET /api/mobile/home
+
+Query:
+- since: ISO timestamp
+- userId/deviceId inferred from auth/device state
+
+Response:
+- sinceLastVisit summary
+- continueItems
+- forumActivity
+- podcastActivity
+- appActivity
+
+Home behavior:
+- Load cached Home immediately.
+- Refresh from API.
+- If offline, show cached Home with offline notice.
+- If no new activity, show “You’re all caught up.”
+- If user taps Forums count, open Community filtered to unread/new.
+- If user taps Podcasts count, open Podcasts filtered to New Episodes.
+- If user taps Apps count, open Apps filtered to Updated/New.
+
+VoiceOver:
+- Home screen title announced.
+- Each section is a heading.
+- Since Last Visit rows read as: “Forums, 5 new items since last visit, button.”
+- Continue rows read as: “Continue reading, [thread title], 3 unread replies, button.”
+
+COMMUNITY TAB SPEC
+
+Default segment:
+- All
+
+Segments:
+- All
+- Apple
+- Non-Apple
+- Following
+
+Top row:
+- Left: Segment selector
+- Right: Search
+
+Below:
+- Filter button
+
+Community API:
+GET /api/mobile/community
+
+Query:
+- segment=all|apple|nonApple|following
+- categoryId optional
+- contentType optional
+- filter=unread|participated|followed optional
+- sort=latestActivity|newest|mostReplies
+- page
+- limit
+
+Response:
+- threads: [Thread]
+- pagination metadata
+- counts
+
+Community list sections:
+- Since Last Visit
+- Followed Threads
+- Active Discussions
+- Latest Threads
+
+Thread row:
+- Title
+- Category
+- Content type
+- Author
+- Last activity
+- Reply count
+- Unread count
+- Followed/bookmarked state
+
+Thread row VoiceOver label:
+“[Title], [category], [content type], [replyCount] replies, [unreadCount] unread, updated [relative time].”
+
+Thread row actions:
+- Reply
+- Jump to First Unread
+- Mark as Read
+- Follow / Unfollow
+- Bookmark / Remove Bookmark
+- Share
+- Copy Link
+
+Thread detail API:
+GET /api/mobile/threads/{threadId}
+
+Response:
+- thread
+- original post
+- comments
+- progress
+- permissions:
+  - canReply
+  - canEdit
+  - canModerate
+
+Thread detail behavior:
+- If firstUnreadCommentId exists, open at first unread comment.
+- If no unread, open near top or last stored position.
+- Show Last Read marker.
+- Provide Jump to First Unread, Jump to Latest, Jump to Top.
+- Reply requires sign-in.
+- If offline, allow reading cached content but disable reply/post actions.
+
+Mark read API:
+POST /api/mobile/threads/{threadId}/mark-read
+
+Body:
+- lastReadCommentId
+- readAt
+
+Reply API:
+POST /api/mobile/threads/{threadId}/comments
+
+Body:
+- body
+
+Create thread API:
+POST /api/mobile/threads
+
+Body:
+- title
+- body
+- categoryId
+- segment
+
+Follow API:
+POST /api/mobile/threads/{threadId}/follow
+DELETE /api/mobile/threads/{threadId}/follow
+
+Bookmark API:
+POST /api/mobile/threads/{threadId}/bookmark
+DELETE /api/mobile/threads/{threadId}/bookmark
+
+PODCASTS TAB SPEC
+
+Top row:
+- View selector: All, Shows, Queue, Downloads, Unplayed
+- Search
+
+Sections:
+- Continue Listening
+- Queue
+- New Episodes
+- All Episodes
+
+Podcast row fields:
+- Title
+- Show name
+- Duration
+- Published date
+- Playback state
+- Download state
+- Queue state
+
+Podcast row VoiceOver label:
+“[Episode title], [show name], [duration], [state], [download state].”
+
+Podcast actions:
+- Play / Resume
+- Add to Queue / Remove from Queue
+- Download / Remove Download
+- Mark as Played / Mark as Unplayed
+- Show Notes
+- Bookmark / Remove Bookmark
+- Share
+
+Magic Tap:
+- Two-finger double tap toggles Play/Pause globally when audio is available.
+
+Playback behavior:
+- Save playback position regularly.
+- Mark episode played around 90 percent completion.
+- Sync playback progress with iCloud.
+- Downloads available offline.
+- Removing a download requires confirmation.
+
+APPS TAB SPEC
+
+Top row:
+- Platform selector: All, iOS, macOS, watchOS, tvOS
+- Search
+
+Below:
+- Filter button
+
+Filters:
+- Category
+- Latest
+- Recently Updated
+- Saved
+- Followed
+
+App row fields:
+- App name
+- Platform
+- Category
+- Updated state
+- Accessibility summary if available
+
+App row VoiceOver label:
+“[App name], [platform], [category], [updated/new status].”
+
+App actions:
+- Open
+- Bookmark / Remove Bookmark
+- Share
+- Follow App / Unfollow App
+- View Comments
+
+EXPLORE TAB SPEC
+
+Purpose:
+Structured non-discussion content.
+
+Sections:
+- Featured
+- Guides & Tutorials
+- Blogs & Articles
+- Collections
+
+Explore item actions:
+- Read
+- Bookmark / Remove Bookmark
+- Share
+- View Discussion
+- Copy Link
+
+Explore behavior:
+- Clean reading screen.
+- Use headings.
+- Provide link to related discussion when available.
+- Content can be cached for offline reading.
+
+PROFILE TAB SPEC
+
+Sections:
+1. Account
+2. Continue
+3. Saved
+4. Following
+5. Activity
+6. Notifications
+7. Preferences
+8. Sound & Haptics
+9. Sync & Data
+10. Submit Content
+11. Help & Support
+12. About
+
+Account:
+- Signed out: Sign In, Create Account, explanation of benefits
+- Signed in: username, sign out, account details
+
+Saved:
+- Threads
+- Apps
+- Guides
+- Podcasts
+
+Help & Support:
+- User Guide
+- FAQ
+- Contact AppleVis
+
+Contact:
+- In-app form preferred
+- Include app version automatically
+- Optional device info if user consents
+
+NOTIFICATIONS SPEC
+
+Single notification sound setting:
+- None
+- The Mouse (default)
+- Apple Crunch
+
+Default enabled notifications:
+- New posts
+- Replies to your posts
+- Followed thread activity
+- New podcast episodes
+- New app submissions
+
+Optional notifications:
+- All comments
+- App updates
+- Guides/blogs
+- Summary notifications
+- Nudge reminders
+
+Notification text examples:
+- “New post: [Thread Title] by [Username].”
+- “3 new replies in: [Thread Title].”
+- “New podcast: [Episode Title] is now available.”
+- “New app added: [App Name].”
+
+Badge:
+- App icon badge shows total new items based on enabled notification categories.
+- Home tab shows category breakdown.
+
+Notification behavior:
+- Group related notifications.
+- Do not spam one notification per comment unless user explicitly enables all comments.
+- Opening notification navigates directly to relevant content.
+- Threads open to first unread.
+
+OFFLINE SPEC
+
+Offline content:
+- Cached Home
+- Cached Community lists
+- Cached opened threads/comments
+- Saved items
+- Downloaded podcasts
+- Explore articles/guides
+
+Not available offline:
+- Posting
+- Replying
+- Submitting content
+- Fetching new data
+
+Offline settings:
+Profile > Sync & Data:
+- Keep offline content for 1 day
+- 3 days
+- 7 days default
+- 30 days
+- Until manually cleared
+
+Storage:
+- Show storage usage.
+- Provide Clear Cache.
+- Always preserve user-saved downloaded podcasts unless user deletes them.
+
+SOUND & HAPTICS SPEC
+
+Settings:
+- Sound Effects On/Off
+- Notification Sound: None, The Mouse, Apple Crunch
+- Haptics On/Off
+
+Sound rule:
+- Use one selected notification sound for all notification types.
+- Do not assign different sounds per category in v2026.0.0.
+
+In-app sounds:
+- Optional and minimal.
+- Must not interrupt VoiceOver.
+- Provide setting to disable.
+
+ACTIONS ROTOR SPEC
+
+General rules:
+- 5 to 7 actions maximum per item.
+- Use conditional replacement instead of adding more actions.
+- Keep wording consistent.
+
+Standard labels:
+- Bookmark / Remove Bookmark
+- Follow / Unfollow
+- Mark as Read / Mark as Unread
+- Mark as Played / Mark as Unplayed
+- Add to Queue / Remove from Queue
+- Download / Remove Download
+
+VOICEOVER SPEC
+
+Default behavior:
+- Use headings for section titles.
+- Group row content into one accessible element.
+- Provide custom actions on rows.
+- Provide immediate feedback after actions.
+- Avoid overly verbose labels.
+
+Custom rotor options:
+- Sections
+- Unread Items
+- Followed Threads
+- New Content
+
+VoiceOver settings:
+- Jump behavior: First unread default, or top
+- Announcements On/Off
+- Rotor options toggles
+- Navigation style: Standard or Simplified
+
+Thread VoiceOver behavior:
+- Announce thread title, reply count, unread count.
+- Announce when jumped to first unread.
+- Announce Last Read marker.
+- Each comment should be a clear accessible unit.
+
+LOW VISION SPEC
+
+- No in-app overrides of global iOS accessibility settings.
+
+Design-level requirements:
+- Fully comply with Web Content Accessibility Guidelines (WCAG) 2.1
+- Fully comply with Apple's App Review guidelines
+- Respect Dynamic Type.
+- Respect Dark Mode.
+- Respect Increase Contrast.
+- Respect Reduce Motion.
+- Use strong visual structure.
+- Use explicit text labels for status.
+- Do not rely on icons or color alone.
+- Provide generous spacing and tap targets.
+- Keep layouts linear and predictable.
+- Use visible focus/selection states where appropriate.
+
+CONTEXTUAL HELP SPEC
+
+Purpose:
+Teach users features without blocking them.
+
+Types:
+- First-time tips
+- Smart nudges
+- Context hints
+
+Examples:
+- Home: “This is your Home. Check Since Last Visit to catch up quickly.”
+- Community: “Swipe up or down on a thread for quick actions like Reply or Follow.”
+- Podcasts: “Use Magic Tap to play or pause.”
+
+Behavior:
+- Tips shown once.
+- Dismissible.
+- Store seen state locally and sync via iCloud.
+- Provide Reset Tips in settings.
+- Do not trap VoiceOver focus.
+
+ERROR AND EMPTY STATES
+
+General:
+- Every empty state must explain what happened and what the user can do next.
+
+Examples:
+- No new Home activity: “You’re all caught up.”
+- Offline: “You’re offline. Showing saved content.”
+- Not signed in: “Sign in to reply.”
+- Failed load: “Could not load content. Try again.”
+
+PERFORMANCE REQUIREMENTS
+
+- Home must load cached data quickly.
+- Refresh network data in background.
+- Avoid blocking UI while syncing.
+- Podcast playback should remain responsive.
+- Thread lists should paginate.
+
+MINIMUM API ENDPOINTS FOR v2026.0.0
+
+GET /api/mobile/home
+GET /api/mobile/badge-count
+GET /api/mobile/community
+GET /api/mobile/threads/{id}
+POST /api/mobile/threads/{id}/mark-read
+POST /api/mobile/threads/{id}/comments
+POST /api/mobile/threads
+POST /api/mobile/threads/{id}/follow
+DELETE /api/mobile/threads/{id}/follow
+POST /api/mobile/threads/{id}/bookmark
+DELETE /api/mobile/threads/{id}/bookmark
+GET /api/mobile/podcasts
+GET /api/mobile/apps
+GET /api/mobile/explore
+GET /api/mobile/profile
+POST /api/mobile/notifications/preferences
+POST /api/mobile/device-token
+
+BUILD MILESTONE SUGGESTION
+
+Milestone 1:
+- Tab shell
+- Home static UI
+- Community list static UI
+- Accessibility labels
+
+Milestone 2:
+- Drupal API integration
+- Home + Community real data
+- Thread detail
+
+Milestone 3:
+- Auth
+- Reply/post
+- Follow/bookmark
+
+Milestone 4:
+- Podcasts playback, queue, downloads
+
+Milestone 5:
+- Offline caching
+- iCloud sync
+
+Milestone 6:
+- Notifications, sounds, badges
+
+Milestone 7:
+- User Guide, FAQ, contextual help
+
+END OF SPEC
