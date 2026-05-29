@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@expo/vector-icons": "latest",
-    "@react-native-async-storage/async-storage": "latest",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/native": "latest",
     "expo": "latest",
     "expo-av": "latest",
@@ -27,11 +27,11 @@
     "expo-status-bar": "latest",
     "expo-system-ui": "latest",
     "lottie-react-native": "latest",
-    "react": "latest",
+    "react": "19.2.3",
     "react-native": "latest",
-    "react-native-gesture-handler": "latest",
-    "react-native-reanimated": "latest",
-    "react-native-safe-area-context": "latest",
+    "react-native-gesture-handler": "~2.31.1",
+    "react-native-reanimated": "4.3.1",
+    "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "latest"
   },
   "devDependencies": {

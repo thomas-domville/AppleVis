@@ -8,7 +8,7 @@ export default function SettingsDetail() {
   const { title } = useLocalSearchParams<{ title: string }>();
   const section = settingsSections.find((item) => item.title === title) ?? settingsSections[0];
   return (
-    <Screen title={section.title}>
+    <Screen title={section.title} showSettings={false}>
       <ScrollView>
         {section.items.map((item) => (
           <View key={item} accessible accessibilityRole="button" accessibilityLabel={item} style={styles.cardSmall}>
