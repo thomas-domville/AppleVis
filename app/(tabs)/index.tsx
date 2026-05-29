@@ -1,68 +1,90 @@
+import { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { Screen } from '../../src/components/Screen';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
+import { persistence } from '../../src/services/persistence';
 import { styles } from '../../src/theme/styles';
 
 export default function Home() {
+  const [lastVisit, setLastVisit] = useState<string | null>(null);
+
+  useEffect(() => {
+    persistence.getLastVisit().then(setLastVisit);
+    // Stamp visit on first open so "Since Last Visit" starts working
+    persistence.stampVisit();
+  }, []);
+
+  function formatLastVisit(iso: string | null): string {
+    if (!iso) return 'your first visit — welcome!';
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffH = Math.floor(diffMs / 3600000);
+    if (diffH < 1) return 'less than an hour ago';
+    if (diffH < 24) return `${diffH} hour${diffH === 1 ? '' : 's'} ago`;
+    const diffD = Math.floor(diffH / 24);
+    return `${diffD} day${diffD === 1 ? '' : 's'} ago`;
+  }
+
   return (
     <Screen title="Home">
-      <ScrollView>
+      <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.lede}>
-          Good evening. Resume where you left off or jump into what changed since your last visit.
+          Last visit: {formatLastVisit(lastVisit)}
         </Text>
 
         <AccessibleCard
           title="Since Last Visit"
-          meta="3 unread forum topics, 2 new podcast episodes, and 4 app updates."
-          actions={['Open', 'Mark All Read']}
+          meta="Open Forums and choose Since Last Visit to see everything that changed."
+          actions={['Open Forums', 'Mark All Read']}
         />
 
         <AccessibleCard
           title="Resume Where You Left Off"
-          meta="Forums. AppleVis app feedback and suggestions. Last item read restored by content ID."
+          meta="Your reading position and podcast position are saved and synced via iCloud."
           actions={['Resume', 'Jump to New Activity']}
         />
 
         <AccessibleCard
           title="Saved"
-          meta="Saved topics, podcasts, apps, and resources in one place."
+          meta="Your saved topics, podcasts, apps, and resources — stored in iCloud across all your Apple devices."
           actions={['Open Saved', 'Search Saved']}
         />
 
         <AccessibleCard
           title="Continue Listening"
-          meta="AppleVis Podcast. 12 minutes remaining."
+          meta="Your podcast queue and playback position are saved and synced via iCloud."
           actions={['Play', 'Play Next', 'Download']}
         />
 
         <AccessibleCard
           title="New Forum Activity"
-          meta="3 new topics and 8 new replies in forums you follow or have read."
-          actions={['Open Forums', 'Mark All Read', 'Open Since Last Visit']}
+          meta="Visit the Forums tab and choose Recent or Since Last Visit to see new topics."
+          actions={['Open Forums', 'Open Since Last Visit']}
         />
 
         <AccessibleCard
           title="New Podcast Episodes"
-          meta="2 new episodes available. AppleVis Podcast and AppleVis Extra."
-          actions={['Play Latest', 'Open Podcasts', 'Download All']}
+          meta="Open the Podcasts tab to see and play the latest episodes."
+          actions={['Open Podcasts', 'Play Latest']}
         />
 
         <AccessibleCard
           title="Recently Updated Apps"
-          meta="4 app updates in the AppleVis directory. Be My Eyes, Seeing AI, and 2 more."
-          actions={['Open Apps', 'View Updates', 'Save All']}
+          meta="Browse the Apps tab to see recently updated app listings."
+          actions={['Open Apps', 'View Updates']}
         />
 
         <AccessibleCard
           title="New Resources and Guides"
-          meta="1 new guide and 2 updated articles in Resources."
+          meta="Visit the Resources tab to see new guides, tutorials, and articles."
           actions={['Open Resources', 'Save', 'Share']}
         />
 
         <AccessibleCard
           title="Notifications"
-          meta="You have 2 unread notifications. Tap to review."
-          actions={['Open Notifications', 'Mark All Read', 'Notification Settings']}
+          meta="Push notifications for forum replies and new episodes will appear here once your account is set up."
+          actions={['Open Notifications', 'Notification Settings']}
         />
 
         <View style={{ height: 96 }} />

@@ -1,85 +1,127 @@
+/**
+ * Persistence layer
+ *
+ * iCloud-synced (via icloudStorage):
+ *   saved item IDs, followed topic IDs, read topic IDs, podcast positions,
+ *   settings, last visit timestamp
+ *
+ * Device-local only (via AsyncStorage):
+ *   downloaded episode file paths (device-specific paths are meaningless on
+ *   another device), podcast queue (session data)
+ */
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { icloudStorage } from './icloudStorage';
 import type { SavedItem, ListResumeState } from '../types/content';
 
-const K = {
-  SAVED_ITEMS: 'applevis:savedItems',
-  PODCAST_POSITIONS: 'applevis:podcastPositions',
+// ── iCloud keys ───────────────────────────────────────────────────────────────
+const CK = {
+  SAVED_ITEMS:    'applevis:savedItems',
+  FOLLOWED_IDS:   'applevis:followedIds',
+  READ_IDS:       'applevis:readIds',
+  POD_POSITIONS:  'applevis:podcastPositions',
+  SETTINGS:       'applevis:settings',
+  LAST_VISIT:     'applevis:lastVisit',
   LIST_POSITIONS: 'applevis:listPositions',
-  FORUM_FILTER: 'applevis:forumFilter',
-  SETTINGS: 'applevis:settings',
-  LAST_VISIT: 'applevis:lastVisit',
-  DOWNLOADED_EPISODES: 'applevis:downloadedEpisodes',
-  QUEUE: 'applevis:queue',
 };
 
-async function get<T>(key: string, fallback: T): Promise<T> {
+// ── AsyncStorage keys (device-local) ──────────────────────────────────────────
+const LK = {
+  DOWNLOADS: 'applevis:downloads',
+  QUEUE:     'applevis:queue',
+};
+
+async function localGet<T>(key: string, fallback: T): Promise<T> {
   try {
-    const raw = await AsyncStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
+    const v = await AsyncStorage.getItem(key);
+    return v ? (JSON.parse(v) as T) : fallback;
+  } catch { return fallback; }
 }
 
-async function set<T>(key: string, value: T): Promise<void> {
-  try {
-    await AsyncStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Storage failure is non-fatal
-  }
+async function localSet<T>(key: string, value: T): Promise<void> {
+  try { await AsyncStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
 export const persistence = {
-  // Saved items
-  getSavedItems: () => get<SavedItem[]>(K.SAVED_ITEMS, []),
+
+  // ── Saved items (iCloud) ──────────────────────────────────────────────────
+
+  getSavedItems: () => icloudStorage.getJSON<SavedItem[]>(CK.SAVED_ITEMS, []),
 
   async saveItem(item: SavedItem): Promise<SavedItem[]> {
     const existing = await persistence.getSavedItems();
     const updated = existing.some((s) => s.id === item.id) ? existing : [item, ...existing];
-    await set(K.SAVED_ITEMS, updated);
+    await icloudStorage.setJSON(CK.SAVED_ITEMS, updated);
     return updated;
   },
 
   async unsaveItem(id: string): Promise<SavedItem[]> {
     const existing = await persistence.getSavedItems();
     const updated = existing.filter((s) => s.id !== id);
-    await set(K.SAVED_ITEMS, updated);
+    await icloudStorage.setJSON(CK.SAVED_ITEMS, updated);
     return updated;
   },
 
-  async isSaved(id: string): Promise<boolean> {
-    const items = await persistence.getSavedItems();
-    return items.some((s) => s.id === id);
-  },
+  isSaved: (id: string) => icloudStorage.isInSet(CK.SAVED_ITEMS + ':ids', id),
 
-  // Podcast playback positions (episode id → seconds)
-  getPodcastPositions: () => get<Record<string, number>>(K.PODCAST_POSITIONS, {}),
+  // ── Followed topic IDs (iCloud) ───────────────────────────────────────────
+
+  getFollowedIds: () => icloudStorage.getSet(CK.FOLLOWED_IDS),
+
+  followTopic: (id: string) => icloudStorage.addToSet(CK.FOLLOWED_IDS, id),
+
+  unfollowTopic: (id: string) => icloudStorage.removeFromSet(CK.FOLLOWED_IDS, id),
+
+  isFollowing: (id: string) => icloudStorage.isInSet(CK.FOLLOWED_IDS, id),
+
+  // ── Read topic IDs (iCloud) ───────────────────────────────────────────────
+  // Any topic the user has opened is considered read.
+
+  getReadIds: () => icloudStorage.getSet(CK.READ_IDS),
+
+  markRead: (id: string) => icloudStorage.addToSet(CK.READ_IDS, id),
+
+  isRead: (id: string) => icloudStorage.isInSet(CK.READ_IDS, id),
+
+  // ── Podcast playback positions (iCloud) ───────────────────────────────────
+
+  getPodcastPositions: () =>
+    icloudStorage.getJSON<Record<string, number>>(CK.POD_POSITIONS, {}),
 
   async savePodcastPosition(episodeId: string, positionSeconds: number): Promise<void> {
     const positions = await persistence.getPodcastPositions();
-    await set(K.PODCAST_POSITIONS, { ...positions, [episodeId]: positionSeconds });
+    await icloudStorage.setJSON(CK.POD_POSITIONS, { ...positions, [episodeId]: positionSeconds });
   },
 
   async clearPodcastPosition(episodeId: string): Promise<void> {
     const positions = await persistence.getPodcastPositions();
     const { [episodeId]: _, ...rest } = positions;
-    await set(K.PODCAST_POSITIONS, rest);
+    await icloudStorage.setJSON(CK.POD_POSITIONS, rest);
   },
 
-  // List resume positions per tab
-  getListPositions: () => get<Record<string, ListResumeState>>(K.LIST_POSITIONS, {}),
+  // ── Last visit timestamp (iCloud) ─────────────────────────────────────────
+  // Stored as an ISO-8601 string. Used for "Since Last Visit" forum filter.
+  // Updated whenever the app goes to background.
+
+  getLastVisit: () => icloudStorage.getString(CK.LAST_VISIT),
+
+  stampVisit(): Promise<void> {
+    return icloudStorage.setString(CK.LAST_VISIT, new Date().toISOString());
+  },
+
+  // ── List resume positions (iCloud) ────────────────────────────────────────
+
+  getListPositions: () =>
+    icloudStorage.getJSON<Record<string, ListResumeState>>(CK.LIST_POSITIONS, {}),
 
   async saveListPosition(state: ListResumeState): Promise<void> {
     const positions = await persistence.getListPositions();
-    await set(K.LIST_POSITIONS, { ...positions, [state.tab]: state });
+    await icloudStorage.setJSON(CK.LIST_POSITIONS, { ...positions, [state.tab]: state });
   },
 
-  // Forum filter
-  getForumFilter: () => get<string>(K.FORUM_FILTER, 'Recent'),
-  setForumFilter: (filter: string) => set(K.FORUM_FILTER, filter),
+  // ── Settings (iCloud) ─────────────────────────────────────────────────────
 
-  // Settings (key-value store)
-  getSettings: () => get<Record<string, unknown>>(K.SETTINGS, {}),
+  getSettings: () => icloudStorage.getJSON<Record<string, unknown>>(CK.SETTINGS, {}),
 
   async getSetting<T>(key: string, fallback: T): Promise<T> {
     const settings = await persistence.getSettings();
@@ -88,34 +130,31 @@ export const persistence = {
 
   async setSetting(key: string, value: unknown): Promise<void> {
     const settings = await persistence.getSettings();
-    await set(K.SETTINGS, { ...settings, [key]: value });
+    await icloudStorage.setJSON(CK.SETTINGS, { ...settings, [key]: value });
   },
 
-  // Last visit timestamp
-  getLastVisit: () => get<string | null>(K.LAST_VISIT, null),
-  setLastVisit: (isoDate: string) => set(K.LAST_VISIT, isoDate),
-  stampVisit: () => persistence.setLastVisit(new Date().toISOString()),
+  // ── Downloaded episodes (device-local) ────────────────────────────────────
 
-  // Downloaded episodes (episode id → local file URI)
-  getDownloadedEpisodes: () => get<Record<string, string>>(K.DOWNLOADED_EPISODES, {}),
+  getDownloadedEpisodes: () => localGet<Record<string, string>>(LK.DOWNLOADS, {}),
 
   async saveDownloadedEpisode(episodeId: string, localUri: string): Promise<void> {
     const downloads = await persistence.getDownloadedEpisodes();
-    await set(K.DOWNLOADED_EPISODES, { ...downloads, [episodeId]: localUri });
+    await localSet(LK.DOWNLOADS, { ...downloads, [episodeId]: localUri });
   },
 
   async removeDownloadedEpisode(episodeId: string): Promise<void> {
     const downloads = await persistence.getDownloadedEpisodes();
     const { [episodeId]: _, ...rest } = downloads;
-    await set(K.DOWNLOADED_EPISODES, rest);
+    await localSet(LK.DOWNLOADS, rest);
   },
 
-  async isDownloaded(episodeId: string): Promise<boolean> {
+  isDownloaded: async (episodeId: string): Promise<boolean> => {
     const downloads = await persistence.getDownloadedEpisodes();
     return episodeId in downloads;
   },
 
-  // Playback queue
-  getQueue: () => get<string[]>(K.QUEUE, []),
-  setQueue: (episodeIds: string[]) => set(K.QUEUE, episodeIds),
+  // ── Podcast queue (device-local, session data) ────────────────────────────
+
+  getQueue: () => localGet<string[]>(LK.QUEUE, []),
+  setQueue: (ids: string[]) => localSet(LK.QUEUE, ids),
 };

@@ -138,13 +138,22 @@ function mapResource(node: JsonApiNode): Resource {
 export const api = {
 
   forums: {
-    async list(filter: string, page = 0) {
-      // Anonymous: returns all topics sorted by changed date.
-      // "Unread" / "Following" / "Since Last Visit" filters require auth — fall back to Recent.
-      const sort = '-changed';
-      const res = await jsonApi<JsonApiCollection>(
-        `/node/forum?sort=${sort}&${pageParams(page)}`,
-      );
+    async list(filter: string, page = 0, sinceDate?: string) {
+      // "Since Last Visit" — pass the stored iCloud timestamp as a date filter.
+      // Drupal JSON:API date filter syntax:
+      //   filter[changed][condition][path]=changed
+      //   filter[changed][condition][operator]=%3E  (URL-encoded >)
+      //   filter[changed][condition][value]=ISO-date
+      const sort = filter === 'New' ? '-created' : '-changed';
+      let path = `/node/forum?sort=${sort}&${pageParams(page)}`;
+      if (sinceDate) {
+        const encoded = encodeURIComponent(sinceDate);
+        path +=
+          `&filter[since][condition][path]=changed` +
+          `&filter[since][condition][operator]=%3E` +
+          `&filter[since][condition][value]=${encoded}`;
+      }
+      const res = await jsonApi<JsonApiCollection>(path);
       if (!res.ok) return res;
       return { ok: true as const, data: res.data.data.map(mapForum) };
     },

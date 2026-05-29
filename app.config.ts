@@ -70,6 +70,7 @@ const config = {
     './plugins/withNowPlaying',
     './plugins/withWidgetKit',
     './plugins/withLiveActivities',
+    './plugins/withiCloudKVS',
   ],
 
   experiments: {
