@@ -3,5 +3,11 @@
   "compilerOptions": {
     "strict": true,
     "ignoreDeprecations": "5.0"
-  }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
 }

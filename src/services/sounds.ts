@@ -9,7 +9,7 @@ type SoundKey = 'refreshStart' | 'refreshComplete';
 // open-section for "begin" (subtle ping), download-complete for "done".
 // When the Sounds & Haptics setting is implemented, gate playback on
 // persistence.getSetting('appSounds', true) here.
-const ASSETS: Record<SoundKey, ReturnType<typeof require>> = {
+const ASSETS: Record<SoundKey, number> = {
   refreshStart:    require('../../assets/sounds/open-section.wav'),
   refreshComplete: require('../../assets/sounds/download-complete.wav'),
 };
