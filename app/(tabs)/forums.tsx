@@ -12,9 +12,10 @@ import { useHandoff } from '../../src/hooks/useHandoff';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { translateContent, donateSiriActivity, readAloud, summariseText, simplifyText } from '../../src/services/intelligenceService';
-import { styles, colors } from '../../src/theme/styles';
+import { useTheme } from '../../src/contexts/ThemeContext';
 
 export default function Forums() {
+  const { colors, styles } = useTheme();
   const auth  = useAuth();
   const forum = useForumState();
   const saved = useSavedItems('forumTopic');

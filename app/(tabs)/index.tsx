@@ -6,7 +6,7 @@ import { AccessibleCard } from '../../src/components/AccessibleCard';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { persistence } from '../../src/services/persistence';
 import { useHandoff } from '../../src/hooks/useHandoff';
-import { colors, styles } from '../../src/theme/styles';
+import { useTheme } from '../../src/contexts/ThemeContext';
 
 function getGreetingKey(): 'home.greeting.morning' | 'home.greeting.afternoon' | 'home.greeting.evening' | 'home.greeting.night' {
   const hour = new Date().getHours();
@@ -17,6 +17,7 @@ function getGreetingKey(): 'home.greeting.morning' | 'home.greeting.afternoon' |
 }
 
 export default function Home() {
+  const { colors, styles } = useTheme();
   const auth       = useAuth();
   const { t }      = useTranslation();
   const [lastVisit, setLastVisit] = useState<string | null>(null);

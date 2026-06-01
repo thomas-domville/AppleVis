@@ -6,9 +6,10 @@ import { useSearch } from '../src/hooks/useSearch';
 import { useLanguageDetection } from '../src/hooks/useLanguageDetection';
 import { TranslationBanner } from '../src/components/TranslationBanner';
 import { translateContent, readAloud } from '../src/services/intelligenceService';
-import { colors, styles } from '../src/theme/styles';
+import { useTheme } from '../src/contexts/ThemeContext';
 
 export default function SearchScreen() {
+  const { colors, styles } = useTheme();
   const { results, loading, error, hasQuery, totalCount, search, clear } = useSearch();
   const inputRef   = useRef<TextInput>(null);
   const queryRef   = useRef('');

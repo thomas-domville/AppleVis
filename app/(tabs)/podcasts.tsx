@@ -13,7 +13,7 @@ import { readAloud, donateSiriActivity } from '../../src/services/intelligenceSe
 import { trackMeaningfulAction } from '../../src/services/reviewPrompt';
 import { startPodcastLiveActivity, updatePodcastLiveActivity, endPodcastLiveActivity } from '../../src/native/nativeModules';
 import { SPEED_OPTIONS, SLEEP_TIMER_OPTIONS } from '../../src/hooks/usePodcastPlayer';
-import { colors, styles } from '../../src/theme/styles';
+import { useTheme } from '../../src/contexts/ThemeContext';
 import type { PodcastEpisode } from '../../src/types/content';
 
 function formatTime(seconds: number): string {
@@ -30,6 +30,7 @@ function formatDuration(seconds: number): string {
 }
 
 export default function Podcasts() {
+  const { colors, styles } = useTheme();
   const player         = usePlayer();
   const list           = usePodcastList();
   const { showToast }  = useToast();

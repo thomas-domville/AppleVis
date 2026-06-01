@@ -3,7 +3,7 @@ import { SafeAreaView, Text, View } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { RefreshBar } from './RefreshBar';
-import { styles } from '../theme/styles';
+import { useTheme } from '../contexts/ThemeContext';
 
 type Props = {
   title: string;
@@ -14,8 +14,9 @@ type Props = {
 };
 
 export function Screen({ title, children, showSettings = true, showSearch = false, refreshing }: Props) {
-  const router   = useRouter();
-  const { t }    = useTranslation();
+  const router        = useRouter();
+  const { t }         = useTranslation();
+  const { colors, styles } = useTheme();
 
   return (
     <SafeAreaView
@@ -31,14 +32,14 @@ export function Screen({ title, children, showSettings = true, showSearch = fals
               <Link href="/search" accessibilityRole="button"
                 accessibilityLabel={t('screen.a11ySearch')}
                 accessibilityHint={t('screen.a11ySearchHint')}>
-                <Text style={{ fontSize: 17, color: '#0A84FF', fontWeight: '700' }}>{t('common.search')}</Text>
+                <Text style={{ fontSize: 17, color: colors.accent, fontWeight: '700' }}>{t('common.search')}</Text>
               </Link>
             ) : null}
             {showSettings ? (
               <Link href="/settings" accessibilityRole="button"
                 accessibilityLabel={t('screen.a11ySettings')}
                 accessibilityHint={t('screen.a11ySettingsHint')}>
-                <Text style={{ fontSize: 17, color: '#0A84FF', fontWeight: '700' }}>{t('common.settings')}</Text>
+                <Text style={{ fontSize: 17, color: colors.accent, fontWeight: '700' }}>{t('common.settings')}</Text>
               </Link>
             ) : null}
           </View>

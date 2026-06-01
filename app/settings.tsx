@@ -14,9 +14,10 @@ import { useAuth } from '../src/contexts/AuthContext';
 import { useToast } from '../src/contexts/ToastContext';
 import { useFocusRestore } from '../src/hooks/useFocusRestore';
 import { settingsSections } from '../src/data/settings';
-import { colors, styles } from '../src/theme/styles';
+import { useTheme } from '../src/contexts/ThemeContext';
 
 export default function Settings() {
+  const { colors, styles } = useTheme();
   const router = useRouter();
   const auth = useAuth();
   const { showToast } = useToast();

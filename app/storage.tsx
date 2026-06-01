@@ -6,7 +6,7 @@ import { contentCache } from '../src/services/contentCache';
 import { deleteAllDownloads } from '../src/services/downloads';
 import { persistence } from '../src/services/persistence';
 import { useStorageStats } from '../src/hooks/useStorageStats';
-import { colors, styles } from '../src/theme/styles';
+import { useTheme } from '../src/contexts/ThemeContext';
 
 type RetentionOption = {
   label: string;
@@ -22,6 +22,7 @@ const RETENTION_OPTIONS: RetentionOption[] = [
 ];
 
 export default function StorageScreen() {
+  const { colors, styles } = useTheme();
   const { showToast } = useToast();
   const stats = useStorageStats();
   const [retention, setRetention] = useState<string>('3months');
@@ -112,10 +113,10 @@ export default function StorageScreen() {
             <ActivityIndicator color={colors.appleVisBlue} style={{ marginVertical: 12 }} />
           ) : (
             <>
-              <StorageRow label="Downloaded episodes" value={stats.formattedDownloads} />
-              <StorageRow label="Cached content"      value={stats.formattedCache} />
+              <StorageRow colors={colors} label="Downloaded episodes" value={stats.formattedDownloads} />
+              <StorageRow colors={colors} label="Cached content"      value={stats.formattedCache} />
               <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 8 }} />
-              <StorageRow label="Total" value={stats.formattedTotal} bold />
+              <StorageRow colors={colors} label="Total" value={stats.formattedTotal} bold />
             </>
           )}
         </View>
@@ -165,18 +166,21 @@ export default function StorageScreen() {
           </Text>
           <View style={{ gap: 10 }}>
             <ClearButton
+              colors={colors}
               label="Clear Downloads"
               subtitle={stats.isLoading ? '…' : stats.formattedDownloads}
               disabled={stats.isLoading || stats.downloadsBytes === 0}
               onPress={confirmClearDownloads}
             />
             <ClearButton
+              colors={colors}
               label="Clear Cache"
               subtitle={stats.isLoading ? '…' : stats.formattedCache}
               disabled={stats.isLoading || stats.cacheBytes === 0}
               onPress={confirmClearCache}
             />
             <ClearButton
+              colors={colors}
               label="Clear All"
               subtitle={stats.isLoading ? '…' : stats.formattedTotal}
               disabled={stats.isLoading || (stats.downloadsBytes === 0 && stats.cacheBytes === 0)}
@@ -192,7 +196,7 @@ export default function StorageScreen() {
   );
 }
 
-function StorageRow({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+function StorageRow({ colors, label, value, bold }: { colors: ReturnType<typeof useTheme>['colors']; label: string; value: string; bold?: boolean }) {
   return (
     <View
       style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 5 }}
@@ -210,8 +214,9 @@ function StorageRow({ label, value, bold }: { label: string; value: string; bold
 }
 
 function ClearButton({
-  label, subtitle, disabled, onPress, destructive,
+  colors, label, subtitle, disabled, onPress, destructive,
 }: {
+  colors: ReturnType<typeof useTheme>['colors'];
   label: string;
   subtitle: string;
   disabled: boolean;

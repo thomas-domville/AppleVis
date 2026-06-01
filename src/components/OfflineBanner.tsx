@@ -1,10 +1,7 @@
-import { AccessibilityInfo, Text, View } from 'react-native';
 import { useEffect } from 'react';
+import { AccessibilityInfo, Text, View } from 'react-native';
 
-type Props = {
-  fromCache: boolean;
-  cachedAt?: number;
-};
+type Props = { fromCache: boolean; cachedAt?: number };
 
 function formatAge(ms: number): string {
   const minutes = Math.floor(ms / 60_000);
@@ -21,12 +18,8 @@ export function OfflineBanner({ fromCache, cachedAt }: Props) {
     ? `Showing saved content from ${age}. Pull down to refresh when online.`
     : 'Showing saved content. Pull down to refresh when online.';
 
-  // Announce to VoiceOver the moment cached data appears, using the same
-  // reliable mechanism as the toast system.
   useEffect(() => {
-    if (fromCache) {
-      AccessibilityInfo.announceForAccessibility(label);
-    }
+    if (fromCache) AccessibilityInfo.announceForAccessibility(label);
   }, [fromCache, label]);
 
   if (!fromCache) return null;
@@ -37,13 +30,7 @@ export function OfflineBanner({ fromCache, cachedAt }: Props) {
       accessibilityRole="alert"
       accessibilityLiveRegion="assertive"
       accessibilityLabel={label}
-      style={{
-        backgroundColor: '#FFF8E1',
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        marginBottom: 12,
-      }}
+      style={{ backgroundColor: '#FFF8E1', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12 }}
     >
       <Text style={{ fontSize: 14, lineHeight: 20, color: '#856404' }}>{label}</Text>
     </View>

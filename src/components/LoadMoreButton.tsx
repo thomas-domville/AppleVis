@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { colors } from '../theme/styles';
+import { useTheme } from '../contexts/ThemeContext';
 
 type Props = {
   hasMore: boolean;
@@ -8,6 +8,7 @@ type Props = {
 };
 
 export function LoadMoreButton({ hasMore, isLoadingMore, onPress }: Props) {
+  const { colors } = useTheme();
   if (!hasMore && !isLoadingMore) return null;
 
   return (
@@ -20,7 +21,7 @@ export function LoadMoreButton({ hasMore, isLoadingMore, onPress }: Props) {
         accessibilityLabel={isLoadingMore ? 'Loading more, please wait' : 'Load more'}
         accessibilityState={{ disabled: isLoadingMore }}
         style={{
-          backgroundColor: '#E8F1FF',
+          backgroundColor: colors.pill,
           borderRadius: 999,
           paddingHorizontal: 24,
           paddingVertical: 12,
@@ -29,8 +30,8 @@ export function LoadMoreButton({ hasMore, isLoadingMore, onPress }: Props) {
         }}
       >
         {isLoadingMore
-          ? <ActivityIndicator color={colors.appleVisBlue} />
-          : <Text style={{ color: colors.appleVisBlue, fontWeight: '700', fontSize: 15 }}>Load More</Text>
+          ? <ActivityIndicator color={colors.accent} />
+          : <Text style={{ color: colors.pillText, fontWeight: '700', fontSize: 15 }}>Load More</Text>
         }
       </Pressable>
     </View>

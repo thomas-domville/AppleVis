@@ -10,9 +10,10 @@ import { useFocusRestore } from '../../src/hooks/useFocusRestore';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
 import { translateContent, donateSiriActivity, readAloud, summariseText, simplifyText, accessibilityConsensus } from '../../src/services/intelligenceService';
-import { styles, colors } from '../../src/theme/styles';
+import { useTheme } from '../../src/contexts/ThemeContext';
 
 export default function Apps() {
+  const { colors, styles } = useTheme();
   const list           = useAppList();
   const { showToast }  = useToast();
   useRefreshFeedback(list.refreshing, 'Apps', list.loading,
