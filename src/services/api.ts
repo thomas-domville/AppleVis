@@ -9,14 +9,13 @@
  * NEEDS BUILDING: push tokens, flag/save/follow, account sync, account deletion
  */
 
-import type { ForumTopic, PodcastEpisode, AppListing, Resource } from '../types/content';
+import type { ForumTopic, PodcastEpisode, AppListing, Resource, PaginatedResult } from '../types/content';
 
-const BASE = 'https://www.applevis.com';
-const JSONAPI = `${BASE}/jsonapi`;
+const BASE             = 'https://www.applevis.com';
+const JSONAPI          = `${BASE}/jsonapi`;
+const FETCH_TIMEOUT_MS = 10_000;
 
-// Drupal stores files at sites/default/files/
 function fileUri(drupalUri: string): string {
-  // converts "public://podcasts/ep.mp3" → "https://www.applevis.com/sites/default/files/podcasts/ep.mp3"
   return drupalUri.replace('public://', `${BASE}/sites/default/files/`);
 }
 
@@ -25,30 +24,46 @@ function fileUri(drupalUri: string): string {
 type JsonApiResult<T> = { ok: true; data: T } | { ok: false; error: string; status?: number };
 
 async function jsonApi<T>(path: string, options?: RequestInit): Promise<JsonApiResult<T>> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
     const res = await fetch(`${JSONAPI}${path}`, {
       headers: { Accept: 'application/vnd.api+json', 'Content-Type': 'application/vnd.api+json' },
       ...options,
+      signal: ctrl.signal,
     });
     if (!res.ok) return { ok: false, error: `HTTP ${res.status}`, status: res.status };
     const json = await res.json() as T;
     return { ok: true, data: json };
   } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      return { ok: false, error: 'Request timed out.' };
+    }
     return { ok: false, error: err instanceof Error ? err.message : 'Network error' };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
 async function drupalRest<T>(path: string, options?: RequestInit): Promise<JsonApiResult<T>> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
     const res = await fetch(`${BASE}${path}`, {
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       ...options,
+      signal: ctrl.signal,
     });
     if (!res.ok) return { ok: false, error: `HTTP ${res.status}`, status: res.status };
     const json = await res.json() as T;
     return { ok: true, data: json };
   } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      return { ok: false, error: 'Request timed out.' };
+    }
     return { ok: false, error: err instanceof Error ? err.message : 'Network error' };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -59,6 +74,11 @@ type JsonApiCollection = { data: JsonApiNode[]; included?: JsonApiNode[]; links?
 
 function pageParams(page: number, limit = 20): string {
   return `page[limit]=${limit}&page[offset]=${page * limit}`;
+}
+
+function hasNextPage(collection: JsonApiCollection): boolean {
+  // Drupal JSON:API includes a `links.next` object when another page exists.
+  return !!collection.links?.next;
 }
 
 // ─── Forums ───────────────────────────────────────────────────────────────────
@@ -73,9 +93,9 @@ function mapForum(node: JsonApiNode): ForumTopic {
     createdAt: a.created ?? '',
     lastActivityAt: a.changed ?? '',
     replyCount: a.comment_forum?.comment_count ?? 0,
-    isUnread: false,      // requires user auth — not available anonymously
-    isFollowing: false,   // requires user auth
-    isSaved: false,       // local persistence handles this
+    isUnread: false,
+    isFollowing: false,
+    isSaved: false,
   };
 }
 
@@ -83,19 +103,15 @@ function mapForum(node: JsonApiNode): ForumTopic {
 
 function mapPodcast(node: JsonApiNode, included: JsonApiNode[] = []): PodcastEpisode {
   const a = node.attributes;
-
-  // Find the audio file via the field_podcast relationship
-  const fileId = node.relationships?.field_podcast?.data?.id as string | undefined;
+  const fileId  = node.relationships?.field_podcast?.data?.id as string | undefined;
   const fileNode = fileId ? included.find((n) => n.id === fileId) : undefined;
-  const rawUri = fileNode?.attributes?.uri?.value as string | undefined;
-  const audioUrl = rawUri ? fileUri(rawUri) : '';
-
+  const rawUri  = fileNode?.attributes?.uri?.value as string | undefined;
   return {
     id: node.id,
     title: a.title ?? '',
     showTitle: 'AppleVis Podcast',
-    audioUrl,
-    duration: 0,          // duration not stored in Drupal — comes from the audio file metadata
+    audioUrl: rawUri ? fileUri(rawUri) : '',
+    duration: 0,
     publishedAt: a.created ?? '',
     description: a.body?.value ?? '',
   };
@@ -105,7 +121,6 @@ function mapPodcast(node: JsonApiNode, included: JsonApiNode[] = []): PodcastEpi
 
 function mapApp(node: JsonApiNode): AppListing {
   const a = node.attributes;
-  const appStoreUrl = a.field_link2?.uri ?? a.field_link3?.uri ?? '';
   return {
     id: node.id,
     name: a.title ?? '',
@@ -114,7 +129,7 @@ function mapApp(node: JsonApiNode): AppListing {
     category: '',
     reviewCount: a.comment_node_ios_app_directory?.comment_count ?? 0,
     lastUpdatedAt: a.changed ?? '',
-    appStoreUrl,
+    appStoreUrl: a.field_link2?.uri ?? a.field_link3?.uri ?? '',
     summary: a.body?.summary ?? a.body?.value ?? '',
   };
 }
@@ -139,11 +154,6 @@ export const api = {
 
   forums: {
     async list(filter: string, page = 0, sinceDate?: string) {
-      // "Since Last Visit" — pass the stored iCloud timestamp as a date filter.
-      // Drupal JSON:API date filter syntax:
-      //   filter[changed][condition][path]=changed
-      //   filter[changed][condition][operator]=%3E  (URL-encoded >)
-      //   filter[changed][condition][value]=ISO-date
       const sort = filter === 'New' ? '-created' : '-changed';
       let path = `/node/forum?sort=${sort}&${pageParams(page)}`;
       if (sinceDate) {
@@ -155,7 +165,33 @@ export const api = {
       }
       const res = await jsonApi<JsonApiCollection>(path);
       if (!res.ok) return res;
-      return { ok: true as const, data: res.data.data.map(mapForum) };
+      return {
+        ok: true as const,
+        data: { items: res.data.data.map(mapForum), hasMore: hasNextPage(res.data) } satisfies PaginatedResult<ForumTopic>,
+      };
+    },
+
+    // Fetch a batch of topics by their UUIDs in a single request.
+    // Used by the "Following" filter to avoid N individual calls.
+    // Capped at 50 IDs to keep URL length manageable.
+    async topicsById(ids: string[]) {
+      if (ids.length === 0) return { ok: true as const, data: { items: [], hasMore: false } satisfies PaginatedResult<ForumTopic> };
+      const capped = ids.slice(0, 50);
+      const valueParams = capped
+        .map((id, i) => `filter[ids][condition][value][${i}]=${encodeURIComponent(id)}`)
+        .join('&');
+      const path =
+        `/node/forum` +
+        `?filter[ids][condition][path]=id` +
+        `&filter[ids][condition][operator]=IN` +
+        `&${valueParams}` +
+        `&page[limit]=${capped.length}`;
+      const res = await jsonApi<JsonApiCollection>(path);
+      if (!res.ok) return res;
+      return {
+        ok: true as const,
+        data: { items: res.data.data.map(mapForum), hasMore: false } satisfies PaginatedResult<ForumTopic>,
+      };
     },
 
     async topic(id: string) {
@@ -164,36 +200,28 @@ export const api = {
       return { ok: true as const, data: mapForum(res.data.data) };
     },
 
-    // ── Requires developer to build (returns 404 today) ──
     markRead: (id: string, token: string) =>
-      drupalRest<void>(`/node/${id}/flag/read`, {
-        method: 'POST',
-        headers: { 'X-CSRF-Token': token },
-      }),
+      drupalRest<void>(`/node/${id}/flag/read`, { method: 'POST', headers: { 'X-CSRF-Token': token } }),
 
     follow: (id: string, token: string) =>
-      drupalRest<void>(`/node/${id}/flag/follow_content`, {
-        method: 'POST',
-        headers: { 'X-CSRF-Token': token },
-      }),
+      drupalRest<void>(`/node/${id}/flag/follow_content`, { method: 'POST', headers: { 'X-CSRF-Token': token } }),
 
     unfollow: (id: string, token: string) =>
-      drupalRest<void>(`/node/${id}/flag/follow_content`, {
-        method: 'DELETE',
-        headers: { 'X-CSRF-Token': token },
-      }),
+      drupalRest<void>(`/node/${id}/flag/follow_content`, { method: 'DELETE', headers: { 'X-CSRF-Token': token } }),
   },
 
   podcasts: {
     async episodes(page = 0) {
-      // include=field_podcast fetches the audio file in the same request
       const res = await jsonApi<JsonApiCollection>(
         `/node/podcast?sort=-created&include=field_podcast&${pageParams(page)}`,
       );
       if (!res.ok) return res;
       return {
         ok: true as const,
-        data: res.data.data.map((n) => mapPodcast(n, res.data.included ?? [])),
+        data: {
+          items: res.data.data.map((n) => mapPodcast(n, res.data.included ?? [])),
+          hasMore: hasNextPage(res.data),
+        } satisfies PaginatedResult<PodcastEpisode>,
       };
     },
 
@@ -205,7 +233,6 @@ export const api = {
       return { ok: true as const, data: mapPodcast(res.data.data, res.data.included ?? []) };
     },
 
-    // ── Requires developer to build ──
     transcript: (id: string) =>
       drupalRest<{ text: string; vttUrl?: string }>(`/api/v1/podcasts/episodes/${id}/transcript`),
   },
@@ -216,7 +243,10 @@ export const api = {
         `/node/ios_app_directory?sort=-changed&${pageParams(page)}`,
       );
       if (!res.ok) return res;
-      return { ok: true as const, data: res.data.data.map(mapApp) };
+      return {
+        ok: true as const,
+        data: { items: res.data.data.map(mapApp), hasMore: hasNextPage(res.data) } satisfies PaginatedResult<AppListing>,
+      };
     },
 
     async listing(id: string) {
@@ -230,7 +260,10 @@ export const api = {
         `/node/ios_app_directory?sort=-changed&${pageParams(page)}`,
       );
       if (!res.ok) return res;
-      return { ok: true as const, data: res.data.data.map(mapApp) };
+      return {
+        ok: true as const,
+        data: { items: res.data.data.map(mapApp), hasMore: hasNextPage(res.data) } satisfies PaginatedResult<AppListing>,
+      };
     },
   },
 
@@ -240,7 +273,10 @@ export const api = {
         `/node/guides?sort=-changed&${pageParams(page)}`,
       );
       if (!res.ok) return res;
-      return { ok: true as const, data: res.data.data.map(mapResource) };
+      return {
+        ok: true as const,
+        data: { items: res.data.data.map(mapResource), hasMore: hasNextPage(res.data) } satisfies PaginatedResult<Resource>,
+      };
     },
 
     async item(id: string) {
@@ -250,9 +286,38 @@ export const api = {
     },
   },
 
+  // ─── Search ──────────────────────────────────────────────────────────────────
+
+  search: {
+    async forums(query: string) {
+      const q = encodeURIComponent(query.trim());
+      const res = await jsonApi<JsonApiCollection>(
+        `/node/forum?filter[title][operator]=CONTAINS&filter[title][value]=${q}&sort=-changed&page[limit]=10`,
+      );
+      if (!res.ok) return res;
+      return { ok: true as const, data: { items: res.data.data.map(mapForum), hasMore: false } satisfies PaginatedResult<ForumTopic> };
+    },
+
+    async apps(query: string) {
+      const q = encodeURIComponent(query.trim());
+      const res = await jsonApi<JsonApiCollection>(
+        `/node/ios_app_directory?filter[title][operator]=CONTAINS&filter[title][value]=${q}&sort=-changed&page[limit]=10`,
+      );
+      if (!res.ok) return res;
+      return { ok: true as const, data: { items: res.data.data.map(mapApp), hasMore: false } satisfies PaginatedResult<AppListing> };
+    },
+
+    async resources(query: string) {
+      const q = encodeURIComponent(query.trim());
+      const res = await jsonApi<JsonApiCollection>(
+        `/node/guides?filter[title][operator]=CONTAINS&filter[title][value]=${q}&sort=-changed&page[limit]=10`,
+      );
+      if (!res.ok) return res;
+      return { ok: true as const, data: { items: res.data.data.map(mapResource), hasMore: false } satisfies PaginatedResult<Resource> };
+    },
+  },
+
   // ─── Authentication ──────────────────────────────────────────────────────────
-  // STATUS: POST /user/login?_format=json returns 500 — developer must fix this.
-  // The session token endpoint works; the login handler has a server-side error.
 
   account: {
     async getSessionToken(): Promise<string> {
@@ -263,10 +328,7 @@ export const api = {
     async signIn(email: string, password: string) {
       return drupalRest<{ current_user: { uid: string; name: string }; csrf_token: string; logout_token: string }>(
         `/user/login?_format=json`,
-        {
-          method: 'POST',
-          body: JSON.stringify({ name: email, pass: password }),
-        },
+        { method: 'POST', body: JSON.stringify({ name: email, pass: password }) },
       );
     },
 
@@ -276,34 +338,24 @@ export const api = {
       });
     },
 
-    // ── Requires developer to build ──
     registerPushToken: (token: string, csrfToken: string) =>
       drupalRest<void>(`/api/v1/account/push-token`, {
-        method: 'POST',
-        headers: { 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify({ token }),
+        method: 'POST', headers: { 'X-CSRF-Token': csrfToken }, body: JSON.stringify({ token }),
       }),
 
     removePushToken: (token: string, csrfToken: string) =>
       drupalRest<void>(`/api/v1/account/push-token`, {
-        method: 'DELETE',
-        headers: { 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify({ token }),
+        method: 'DELETE', headers: { 'X-CSRF-Token': csrfToken }, body: JSON.stringify({ token }),
       }),
 
-    // Required by App Store — developer must build this endpoint
     deleteAccount: (csrfToken: string) =>
       drupalRest<void>(`/api/v1/account`, {
-        method: 'DELETE',
-        headers: { 'X-CSRF-Token': csrfToken },
+        method: 'DELETE', headers: { 'X-CSRF-Token': csrfToken },
       }),
 
-    // Sync saved items / positions — developer must build this endpoint
     sync: (csrfToken: string, payload: Record<string, unknown>) =>
       drupalRest<{ syncedAt: string }>(`/api/v1/account/sync`, {
-        method: 'POST',
-        headers: { 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify(payload),
+        method: 'POST', headers: { 'X-CSRF-Token': csrfToken }, body: JSON.stringify(payload),
       }),
   },
 };

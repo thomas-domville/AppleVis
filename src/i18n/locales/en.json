@@ -1,0 +1,226 @@
+{
+  "tabs": {
+    "home": "Home",
+    "forums": "Forums",
+    "podcasts": "Podcasts",
+    "apps": "Apps",
+    "resources": "Resources"
+  },
+  "common": {
+    "loading": "Loading…",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "gotIt": "Got It",
+    "save": "Save",
+    "share": "Share",
+    "search": "Search",
+    "settings": "Settings",
+    "copyLink": "Copy Link",
+    "open": "Open",
+    "close": "Close",
+    "viewGuidelines": "View Guidelines",
+    "translate": "Translate",
+    "readAloud": "Read Aloud",
+    "summarise": "Summarise",
+    "simplify": "Simplify"
+  },
+  "actions": {
+    "open": "Open",
+    "readAloud": "Read Aloud",
+    "translate": "Translate",
+    "summarise": "Summarise",
+    "simplify": "Simplify",
+    "share": "Share",
+    "save": "Save",
+    "copyLink": "Copy Link",
+    "openAppPage": "Open App Page",
+    "saveApp": "Save App",
+    "viewReviews": "View Reviews",
+    "summariseReviews": "Summarise Reviews",
+    "accessibilityConsensus": "Accessibility Consensus",
+    "saveTopic": "Save Topic",
+    "unsaveTopic": "Unsave Topic",
+    "followTopic": "Follow Topic",
+    "unfollowTopic": "Unfollow Topic",
+    "signInToFollow": "Sign in to Follow",
+    "markAsRead": "Mark as Read",
+    "play": "Play",
+    "pause": "Pause",
+    "readDescriptionAloud": "Read description aloud",
+    "playNext": "Play next",
+    "addToQueue": "Add to queue",
+    "saveEpisode": "Save episode",
+    "download": "Download"
+  },
+  "home": {
+    "greeting": {
+      "morning": "Good morning",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening",
+      "night": "Good night"
+    },
+    "lastVisit": "Last visit",
+    "firstVisit": "your first visit — welcome!"
+  },
+  "forums": {
+    "loading": "Loading {{filter}}…",
+    "noTopics": "No topics",
+    "pullToRefresh": "Pull to refresh forums",
+    "filters": {
+      "recent": "Recent",
+      "new": "New",
+      "unread": "Unread",
+      "following": "Following",
+      "saved": "Saved",
+      "sinceLastVisit": "Since Last Visit"
+    },
+    "filterDesc": {
+      "sinceLastVisit": "Topics that changed since you last opened AppleVis.",
+      "unread": "Topics you have not opened yet on this device.",
+      "following": "Topics you are following. Saved locally and synced via iCloud.",
+      "saved": "Topics you saved for later. Synced via iCloud."
+    },
+    "error": "Could not load topics",
+    "noTopicsEmpty": {
+      "unread": "You are all caught up.",
+      "following": "You are not following any topics yet.",
+      "saved": "You have not saved any topics yet.",
+      "sinceLastVisit": "No new activity since your last visit."
+    }
+  },
+  "podcasts": {
+    "episodes": "Episodes",
+    "loading": "Loading episodes…",
+    "noEpisodes": "No episodes yet",
+    "error": "Could not load episodes",
+    "pullToRefresh": "Pull to refresh podcast episodes",
+    "play": "Play",
+    "pause": "Pause",
+    "skipBack": "Skip back {{seconds}} seconds",
+    "skipForward": "Skip forward {{seconds}} seconds",
+    "speed": "Speed",
+    "sleepTimer": "Sleep Timer",
+    "sleepTimerRemaining": "Sleep Timer — {{time}} remaining",
+    "cancelSleepTimer": "Cancel sleep timer",
+    "chapters": "Chapters",
+    "jumpToChapter": "Jump to chapter: {{title}}, starts at {{time}}",
+    "queue": "Queue",
+    "currentlyLoaded": "Currently loaded."
+  },
+  "apps": {
+    "loading": "Loading apps…",
+    "noApps": "No apps yet",
+    "error": "Could not load apps",
+    "pullToRefresh": "Pull to refresh apps",
+    "reviews": "{{count}} reviews",
+    "updated": "Updated {{date}}"
+  },
+  "resources": {
+    "loading": "Loading resources…",
+    "noResources": "No resources yet",
+    "error": "Could not load resources",
+    "pullToRefresh": "Pull to refresh resources",
+    "updated": "Updated {{date}}"
+  },
+  "search": {
+    "placeholder": "Search forums, apps, resources…",
+    "accessibilityHint": "Type to search forum topics, app listings, and resources.",
+    "searching": "Searching…",
+    "noResults": "No results",
+    "noResultsHint": "Try different keywords or check your spelling.",
+    "intro": "Search across forum topics, app directory listings, and resources. Results appear as you type.",
+    "resultCount_one": "{{count}} result found",
+    "resultCount_other": "{{count}} results found",
+    "sectionForums": "Forum Topics ({{count}})",
+    "sectionApps": "Apps ({{count}})",
+    "sectionResources": "Resources ({{count}})"
+  },
+  "settings": {
+    "checkingAccount": "Checking account…",
+    "signedIn": "Signed in to AppleVis",
+    "email": "Email",
+    "emailPlaceholder": "Email address",
+    "password": "Password",
+    "signingIn": "Signing in, please wait",
+    "credentialsHint": "Use your AppleVis website email and password.",
+    "groupedNote": "Settings are grouped so VoiceOver users do not have to swipe through one long list of switches.",
+    "storageCache": "Storage & Cache",
+    "storageCacheDesc": "Manage downloads, cached content, and retention policy.",
+    "a11ySignIn": "Sign in to AppleVis",
+    "a11ySignOut": "Sign out of AppleVis",
+    "a11ySignOutHint": "Removes your account from this device.",
+    "a11yOpenSection": "Opens this settings category.",
+    "a11yStorageHint": "Opens Storage and Cache settings."
+  },
+  "storage": {
+    "storageUsed": "Storage Used",
+    "downloadedEpisodes": "Downloaded episodes",
+    "cachedContent": "Cached content",
+    "total": "Total",
+    "cacheRetention": "Cache Retention",
+    "cacheRetentionDesc": "How long to keep cached content before automatically removing it.",
+    "clearStorage": "Clear Storage",
+    "clearStorageDesc": "Downloads stay until deleted here. Cached content re-downloads automatically when you open each section.",
+    "clearDownloads": "Clear Downloads",
+    "clearCache": "Clear Cache",
+    "clearAll": "Clear All",
+    "retention3months": "3 Months",
+    "retention6months": "6 Months",
+    "retention12months": "12 Months",
+    "retentionForever": "Forever",
+    "confirmClearDownloads": "This will remove {{size}} of downloaded podcast episodes from this device.",
+    "confirmClearCache": "This will remove {{size}} of cached content. It will be re-downloaded next time you open each section.",
+    "confirmClearAll": "This will remove {{size}} including all downloads and cached content."
+  },
+  "offline": {
+    "withAge": "Showing saved content from {{age}}. Pull down to refresh when online.",
+    "noAge": "Showing saved content. Pull down to refresh when online."
+  },
+  "auth": {
+    "welcomeBack": "Welcome back, {{name}}!",
+    "signedOut": "Signed out.",
+    "sessionExpired": "Your session expired. Please sign in again.",
+    "enterEmail": "Please enter your email address.",
+    "enterPassword": "Please enter your password."
+  },
+  "toast": {
+    "cacheCleared": "Cache cleared.",
+    "downloadsCleared": "Downloads cleared.",
+    "allCleared": "All storage cleared.",
+    "retentionUpdated": "Cache retention updated.",
+    "topicSaved": "Topic saved.",
+    "topicUnsaved": "Removed from saved.",
+    "addedToQueue": "Added to queue.",
+    "playingNext": "Playing next: {{title}}",
+    "signInRequired": "Sign in required. Visit Settings to sign in.",
+    "saveComing": "Save coming soon.",
+    "downloadComing": "Download coming soon.",
+    "summariseComing": "Summarisation will be available when Apple Intelligence Foundation Models support is added.",
+    "simplifyComing": "Plain-language simplification coming when Apple Intelligence Foundation Models support is added.",
+    "consensusComing": "Accessibility consensus coming when Apple Intelligence Foundation Models support is added."
+  },
+  "refresh": {
+    "refreshing": "Refreshing {{label}}",
+    "updated": "{{label}} updated",
+    "loaded": "{{label}} loaded"
+  },
+  "loadMore": {
+    "button": "Load more",
+    "loading": "Loading more…"
+  },
+  "writingTools": {
+    "tip": "Apple Intelligence: select text you type to proofread, rewrite, or translate using Writing Tools.",
+    "a11yLabel": "Apple Intelligence tip: select any text you type to proofread, rewrite, shorten, or translate it using Writing Tools."
+  },
+  "translationBanner": {
+    "message": "Your message appears to be in another language. AppleVis is an English community — would you like to translate it before posting?",
+    "translate": "Translate",
+    "postAsIs": "Post as-is"
+  },
+  "screen": {
+    "a11ySearch": "Search AppleVis",
+    "a11ySearchHint": "Opens search to find forum topics, apps, and resources.",
+    "a11ySettings": "Settings and profile",
+    "a11ySettingsHint": "Opens AppleVis settings, profile, help, and support."
+  }
+}

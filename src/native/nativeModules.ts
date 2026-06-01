@@ -1,0 +1,268 @@
+/**
+ * Native iOS feature stubs
+ *
+ * Every function here is a no-op until a native Expo module (or config plugin)
+ * implements the Swift/Objective-C bridge. Each stub documents:
+ *   • What the feature does for the user
+ *   • The exact Swift API to call
+ *   • Any entitlements / Info.plist keys required
+ *
+ * To activate: create an Expo config plugin that adds the Swift files,
+ * links the module, and wires it via NativeModules.
+ */
+
+// ─── Live Activities ──────────────────────────────────────────────────────────
+
+export type PodcastLiveActivityState = {
+  episodeTitle: string;
+  showTitle: string;
+  isPlaying: boolean;
+  position: number;    // seconds
+  duration: number;    // seconds
+  artworkUrl?: string;
+};
+
+/**
+ * Starts a Live Activity on the Dynamic Island and Lock Screen showing
+ * the currently-playing podcast episode with playback controls.
+ *
+ * Native side (Swift, requires iOS 16.2+, ActivityKit):
+ *
+ *   import ActivityKit
+ *
+ *   struct PodcastAttributes: ActivityAttributes {
+ *     struct ContentState: Codable, Hashable {
+ *       var episodeTitle: String
+ *       var showTitle: String
+ *       var isPlaying: Bool
+ *       var position: Double
+ *       var duration: Double
+ *     }
+ *     var artworkUrl: String?
+ *   }
+ *
+ *   // Start:
+ *   let attr  = PodcastAttributes(artworkUrl: state.artworkUrl)
+ *   let cs    = PodcastAttributes.ContentState(...)
+ *   let activity = try Activity<PodcastAttributes>.request(
+ *     attributes: attr,
+ *     contentState: cs,
+ *     pushType: nil
+ *   )
+ *
+ *   // Update:
+ *   await activity.update(using: newContentState)
+ *
+ *   // End:
+ *   await activity.end(dismissalPolicy: .immediate)
+ *
+ * Info.plist: NSSupportsLiveActivities = YES
+ */
+export function startPodcastLiveActivity(_state: PodcastLiveActivityState): void {
+  if (__DEV__) console.log('[NativeModules] startPodcastLiveActivity — native module not yet built.');
+}
+
+export function updatePodcastLiveActivity(_state: PodcastLiveActivityState): void {
+  if (__DEV__) console.log('[NativeModules] updatePodcastLiveActivity — native module not yet built.');
+}
+
+export function endPodcastLiveActivity(): void {
+  if (__DEV__) console.log('[NativeModules] endPodcastLiveActivity — native module not yet built.');
+}
+
+// ─── Widgets ──────────────────────────────────────────────────────────────────
+
+export type WidgetSnapshot = {
+  unreadTopicCount: number;
+  latestPodcastTitle: string;
+  latestPodcastDate: string;
+  newSinceLastVisit: number;
+};
+
+/**
+ * Writes widget data to the shared App Group container so the WidgetKit
+ * extension can read it and refresh the home/lock screen widgets.
+ *
+ * Planned widgets:
+ *   • Small  — unread topic count badge
+ *   • Medium — latest podcast episode + unread count
+ *   • Large  — "What's New" digest (new topics, new episodes, updated apps)
+ *   • Lock Screen — unread count or now-playing episode title
+ *
+ * Native side (Swift, requires WidgetKit + App Group entitlement):
+ *
+ *   import WidgetKit
+ *
+ *   // Write to shared container:
+ *   let defaults = UserDefaults(suiteName: "group.com.applevis.app")
+ *   defaults?.set(snapshot.unreadTopicCount, forKey: "unreadTopicCount")
+ *   defaults?.set(snapshot.latestPodcastTitle, forKey: "latestPodcastTitle")
+ *
+ *   // Tell WidgetKit to reload:
+ *   WidgetCenter.shared.reloadAllTimelines()
+ *
+ * Entitlements: com.apple.security.application-groups = ["group.com.applevis.app"]
+ */
+export function updateWidgetSnapshot(_snapshot: WidgetSnapshot): void {
+  if (__DEV__) console.log('[NativeModules] updateWidgetSnapshot — native module not yet built.');
+}
+
+// ─── Focus Filter ─────────────────────────────────────────────────────────────
+
+export type FocusFilterConfig = {
+  /** Which notification types to allow through during this Focus. */
+  allowedCategories: ('forumReply' | 'mention' | 'newEpisode' | 'appUpdate')[];
+};
+
+/**
+ * Registers an App Intent that appears in Settings → Focus → [mode] → App Filters,
+ * letting users choose which AppleVis notification categories break through
+ * their Focus mode (e.g. allow Mentions but mute everything else).
+ *
+ * Native side (Swift, requires AppIntents + UserNotifications):
+ *
+ *   import AppIntents
+ *
+ *   struct AppleVisFocusFilterIntent: SetFocusFilterIntent {
+ *     static var title: LocalizedStringResource = "AppleVis"
+ *     static var description = IntentDescription(
+ *       "Choose which AppleVis notifications to allow during Focus."
+ *     )
+ *
+ *     @Parameter(title: "Allowed notification categories")
+ *     var allowedCategories: [NotificationCategory]
+ *
+ *     func perform() async throws -> some IntentResult {
+ *       // Persist allowedCategories; use in UNUserNotificationCenter delegate
+ *       // to filter outgoing notifications.
+ *       return .result()
+ *     }
+ *   }
+ *
+ * Info.plist: no extra keys needed beyond existing notification entitlements.
+ */
+export function registerFocusFilter(_config: FocusFilterConfig): void {
+  if (__DEV__) console.log('[NativeModules] registerFocusFilter — native module not yet built.');
+}
+
+// ─── Share Extension ──────────────────────────────────────────────────────────
+
+export type SharedItem = {
+  url?: string;
+  text?: string;
+  title?: string;
+};
+
+/**
+ * Receives items shared into AppleVis from other apps (Safari, Mail, etc.).
+ * The Share Extension target handles the incoming item and deep-links into
+ * the main app to save, discuss, or look up the content.
+ *
+ * Use cases:
+ *   • Share a website URL → save it as an AppleVis resource / start a forum topic
+ *   • Share text → pre-fill a forum reply
+ *   • Share an App Store link → look up the app on AppleVis
+ *
+ * Native side (Swift — separate Xcode target: NSExtension, NSExtensionPointIdentifier
+ *              = com.apple.share-services):
+ *
+ *   class ShareViewController: UIViewController {
+ *     override func viewDidLoad() {
+ *       guard let item = extensionContext?.inputItems.first as? NSExtensionItem,
+ *             let provider = item.attachments?.first else { return }
+ *
+ *       if provider.hasItemConformingToTypeIdentifier("public.url") {
+ *         provider.loadItem(forTypeIdentifier: "public.url") { url, _ in
+ *           // Deep-link: applevis://share?url=...
+ *           let appURL = URL(string: "applevis://share?url=\(url)")!
+ *           self.extensionContext?.open(appURL)
+ *         }
+ *       }
+ *     }
+ *   }
+ *
+ * The main app handles applevis://share?url= in its URL scheme handler.
+ * App Group entitlement needed to pass data between extension and main app.
+ */
+export function handleIncomingShare(_item: SharedItem): void {
+  if (__DEV__) console.log('[NativeModules] handleIncomingShare — native module not yet built.', _item);
+}
+
+// ─── Vision Framework — Image Description ────────────────────────────────────
+
+/**
+ * Generates an accessibility description for an image URL using the on-device
+ * Vision framework. Result should be set as the image's accessibilityLabel.
+ *
+ * Use cases:
+ *   • Screenshots embedded in forum posts
+ *   • App store artwork in the app directory
+ *   • Any UIImage the user encounters without an existing alt-text
+ *
+ * Native side (Swift, requires iOS 15+ VNRecognizeTextRequest / VNGenerateImageFeaturePrintRequest
+ *              + iOS 18 Visual Intelligence APIs):
+ *
+ *   import Vision
+ *
+ *   func describeImage(url: URL) async throws -> String {
+ *     // Download image
+ *     let (data, _) = try await URLSession.shared.data(from: url)
+ *     guard let cgImage = UIImage(data: data)?.cgImage else { return "" }
+ *
+ *     // iOS 18+: VNGenerateImageCaptionRequest (if available)
+ *     if #available(iOS 18.0, *) {
+ *       let request = VNGenerateImageCaptionRequest()
+ *       let handler = VNImageRequestHandler(cgImage: cgImage)
+ *       try handler.perform([request])
+ *       return request.results?.first?.caption ?? ""
+ *     }
+ *
+ *     // Fallback: OCR text recognition for screenshots
+ *     let textRequest = VNRecognizeTextRequest()
+ *     textRequest.recognitionLevel = .accurate
+ *     let textHandler = VNImageRequestHandler(cgImage: cgImage)
+ *     try textHandler.perform([textRequest])
+ *     let text = textRequest.results?
+ *       .compactMap { $0.topCandidates(1).first?.string }
+ *       .joined(separator: " ") ?? ""
+ *     return text.isEmpty ? "Image" : "Screenshot containing: \(text)"
+ *   }
+ *
+ * Privacy: all processing is on-device. No image data leaves the device.
+ * Info.plist: no extra keys needed (Vision is a system framework).
+ */
+export async function describeImage(_imageUrl: string): Promise<string | null> {
+  if (__DEV__) console.log('[NativeModules] describeImage — native module not yet built.');
+  return null;
+}
+
+// ─── Natural Language Search Enhancement ─────────────────────────────────────
+
+/**
+ * Expands a natural language search query into structured search terms.
+ * E.g. "recent VoiceOver tips" → ["VoiceOver", "accessibility", "tips", "tutorial"]
+ *
+ * Native side (Swift, NaturalLanguage framework):
+ *
+ *   import NaturalLanguage
+ *
+ *   func expandQuery(_ query: String) -> [String] {
+ *     let tagger = NLTagger(tagSchemes: [.lexicalClass, .nameType])
+ *     tagger.string = query
+ *     var terms: [String] = []
+ *     tagger.enumerateTags(in: query.startIndex..<query.endIndex,
+ *                          unit: .word, scheme: .lexicalClass) { tag, range in
+ *       if tag != .determiner && tag != .preposition {
+ *         terms.append(String(query[range]))
+ *       }
+ *       return true
+ *     }
+ *     return terms
+ *   }
+ *
+ * Can also use Foundation Models to suggest related search terms.
+ */
+export async function expandSearchQuery(_query: string): Promise<string[]> {
+  if (__DEV__) console.log('[NativeModules] expandSearchQuery — native module not yet built.');
+  return [_query];
+}

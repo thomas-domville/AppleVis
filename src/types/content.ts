@@ -1,5 +1,7 @@
 export type ContentKind = 'forumTopic' | 'podcastEpisode' | 'appListing' | 'resource';
 
+export type PaginatedResult<T> = { items: T[]; hasMore: boolean };
+
 export type SavedItem = {
   id: string;
   kind: ContentKind;
