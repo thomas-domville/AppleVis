@@ -35,14 +35,14 @@ export const settingsSections = [
     'Share Extension (coming) — share any web URL or text into AppleVis from Safari or other apps to save it or start a forum topic; requires Share Extension Xcode target',
     'How to add shortcuts now: open Shortcuts app → + → Search apps → AppleVis (available once App Intents are built)',
   ]},
-  { title: ‘Posting Guidelines’, description: ‘How guideline reminders work while composing posts and replies.’, items: [
-    ‘While you compose a post or reply, the app checks your draft against the AppleVis posting guidelines and shows a friendly reminder if something looks off — it never stops you from posting.’,
-    ‘Reminders are advisory only. Your post button stays enabled at all times. Tap "Got It" to dismiss a reminder or "View Guidelines" to read the full rules.’,
-    ‘Rule-based checks (always active): detects all-caps, email addresses in text, referral/affiliate links, self-promotion language, advertising phrases, announcements needing prior approval, AI-generated content without disclosure, low-value replies, multiple topics in one post, repetitive/spam content.’,
-    ‘AI-assisted checks (coming with Apple Intelligence Foundation Models): more nuanced review including off-topic posts, subtle disrespect, and context-aware guideline matching — all on-device and private.’,
-    ‘VoiceOver: when a new reminder appears, it is announced automatically so you never miss it.’,
-    ‘To view the full posting guidelines: visit applevis.com/help/guidelines or tap "View Guidelines" on any reminder banner.’,
+  { title: 'Posting Guidelines', description: 'How guideline reminders work while composing posts and replies.', items: [
+    'While you compose a post or reply, the app checks your draft against the AppleVis posting guidelines and shows a friendly reminder if something looks off — it never stops you from posting.',
+    'Reminders are advisory only. Your post button stays enabled at all times. Tap "Got It" to dismiss a reminder or "View Guidelines" to read the full rules.',
+    'Rule-based checks (always active): detects all-caps, email addresses in text, referral/affiliate links, self-promotion language, advertising phrases, announcements needing prior approval, AI-generated content without disclosure, low-value replies, multiple topics in one post, repetitive/spam content.',
+    'AI-assisted checks (coming with Apple Intelligence Foundation Models): more nuanced review including off-topic posts, subtle disrespect, and context-aware guideline matching — all on-device and private.',
+    'VoiceOver: when a new reminder appears, it is announced automatically so you never miss it.',
+    'To view the full posting guidelines: visit applevis.com/help/guidelines or tap "View Guidelines" on any reminder banner.',
   ]},
-  { title: ‘Help & Support’, description: ‘User guide, FAQ, contact support, bug reports, feedback, and AppleVis website links.’, items: [‘User Guide’, ‘FAQ’, ‘What’s New’, ‘Accessibility Guide’, ‘Podcast Player Guide’, ‘Contact AppleVis’, ‘Report a Bug’, ‘Send Feedback’, ‘Suggest a Feature’, ‘Visit AppleVis Website’] },
+  { title: 'Help & Support', description: 'User guide, FAQ, contact support, bug reports, feedback, and AppleVis website links.', items: ['User Guide', 'FAQ', "What's New", 'Accessibility Guide', 'Podcast Player Guide', 'Contact AppleVis', 'Report a Bug', 'Send Feedback', 'Suggest a Feature', 'Visit AppleVis Website'] },
   { title: 'About AppleVis', description: 'Version, credits, privacy policy, terms, and open source licenses.', items: ['Version 2026.1.0', 'Build Number', 'Credits', 'Privacy Policy', 'Terms of Use', 'Open Source Licenses'] }
 ];

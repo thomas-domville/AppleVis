@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { AccessibilityActionEvent, Text, View } from 'react-native';
+import { AccessibilityActionEvent, ActionSheetIOS, Platform, Pressable, Text, View } from 'react-native';
 import { styles } from '../theme/styles';
 
 type Props = {
@@ -14,6 +14,10 @@ type Props = {
  * forwardRef allows parent screens to hold a ref to the underlying View,
  * which is needed by useFocusRestore to return VoiceOver focus after
  * a child screen is dismissed.
+ *
+ * Long-pressing the card shows the same actions as the VoiceOver custom-action
+ * rotor in a native iOS contextual action sheet (UIContextMenuInteraction
+ * equivalent for React Native).
  */
 export const AccessibleCard = forwardRef<View, Props>(
   function AccessibleCard({ title, meta, hint = 'Double tap to open.', actions = [], onAction }, ref) {
@@ -21,8 +25,26 @@ export const AccessibleCard = forwardRef<View, Props>(
       onAction?.(event.nativeEvent.actionName);
     }
 
+    function handleLongPress() {
+      if (actions.length === 0 || !onAction) return;
+
+      if (Platform.OS === 'ios') {
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            title,
+            options: ['Cancel', ...actions],
+            cancelButtonIndex: 0,
+          },
+          (buttonIndex) => {
+            if (buttonIndex === 0) return;
+            onAction(actions[buttonIndex - 1]);
+          },
+        );
+      }
+    }
+
     return (
-      <View
+      <Pressable
         ref={ref}
         accessible
         accessibilityRole="button"
@@ -30,11 +52,17 @@ export const AccessibleCard = forwardRef<View, Props>(
         accessibilityHint={hint}
         accessibilityActions={actions.map((name) => ({ name, label: name }))}
         onAccessibilityAction={handleAccessibilityAction}
-        style={styles.card}
+        onPress={() => onAction?.('Open')}
+        onLongPress={handleLongPress}
+        delayLongPress={500}
+        style={({ pressed }) => [
+          styles.card,
+          pressed && { opacity: 0.85 },
+        ]}
       >
         <Text style={styles.cardTitle}>{title}</Text>
         <Text style={styles.cardMeta}>{meta}</Text>
-      </View>
+      </Pressable>
     );
   },
 );

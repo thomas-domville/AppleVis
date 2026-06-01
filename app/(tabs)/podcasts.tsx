@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../../src/components/Screen';
@@ -7,8 +7,10 @@ import { LoadMoreButton } from '../../src/components/LoadMoreButton';
 import { usePlayer } from '../../src/contexts/PlayerContext';
 import { usePodcastList } from '../../src/hooks/usePodcastList';
 import { useRefreshFeedback } from '../../src/hooks/useRefreshFeedback';
+import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
 import { readAloud, donateSiriActivity } from '../../src/services/intelligenceService';
+import { trackMeaningfulAction } from '../../src/services/reviewPrompt';
 import { startPodcastLiveActivity, updatePodcastLiveActivity, endPodcastLiveActivity } from '../../src/native/nativeModules';
 import { SPEED_OPTIONS, SLEEP_TIMER_OPTIONS } from '../../src/hooks/usePodcastPlayer';
 import { colors, styles } from '../../src/theme/styles';
@@ -34,6 +36,32 @@ export default function Podcasts() {
   const firstEpisodeRef = useRef<View | null>(null);
   useRefreshFeedback(list.refreshing, 'Podcasts', list.loading,
     () => firstEpisodeRef.current);
+
+  useHandoff(
+    player.episode
+      ? {
+          activityType: 'com.applevis.app.playEpisode',
+          title: player.episode.title,
+          webpageURL: 'https://www.applevis.com/podcast',
+          userInfo: { episodeId: player.episode.id },
+        }
+      : {
+          activityType: 'com.applevis.app.viewPodcasts',
+          title: 'AppleVis Podcasts',
+          webpageURL: 'https://www.applevis.com/podcast',
+        },
+  );
+
+  // Track episode completion for the App Store review prompt.
+  const lastEpisodeId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!player.episode || player.duration <= 0) return;
+    const nearEnd = player.position >= player.duration - 10;
+    if (nearEnd && lastEpisodeId.current !== player.episode.id) {
+      lastEpisodeId.current = player.episode.id;
+      trackMeaningfulAction().catch(() => {});
+    }
+  }, [player.position, player.duration, player.episode]);
 
   const isCurrentEpisode = (id: string) => player.episode?.id === id;
   const progress = player.duration > 0 ? player.position / player.duration : 0;

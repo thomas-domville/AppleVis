@@ -15,16 +15,44 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.applevis.app",
+      "associatedDomains": [
+        "applinks:www.applevis.com",
+        "applinks:applevis.com"
+      ],
+      "entitlements": {
+        "com.apple.developer.associated-domains": [
+          "applinks:www.applevis.com",
+          "applinks:applevis.com"
+        ]
+      },
       "infoPlist": {
-        "UIBackgroundModes": ["audio", "remote-notification"],
+        "UIBackgroundModes": ["audio", "remote-notification", "fetch"],
         "NSMicrophoneUsageDescription": "AppleVis does not record audio. This placeholder is only needed if future podcast voice features are added.",
-        "NSUserTrackingUsageDescription": "AppleVis does not track you across apps or websites."
+        "NSUserTrackingUsageDescription": "AppleVis does not track you across apps or websites.",
+        "NSUserActivityTypes": [
+          "com.applevis.app.viewForums",
+          "com.applevis.app.viewApps",
+          "com.applevis.app.viewPodcasts",
+          "com.applevis.app.viewResources",
+          "com.applevis.app.viewTopic",
+          "com.applevis.app.viewApp",
+          "com.applevis.app.playEpisode",
+          "com.applevis.app.viewResource"
+        ]
       }
     },
     "plugins": [
       "expo-router",
       "expo-av",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "privacyManifestFile": "./assets/PrivacyInfo.xcprivacy"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

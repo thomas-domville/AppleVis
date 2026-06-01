@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
 import { Screen } from '../../src/components/Screen';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
 import { OfflineBanner } from '../../src/components/OfflineBanner';
@@ -8,6 +8,7 @@ import { useForumState, FORUM_FILTERS } from '../../src/hooks/useForumState';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
 import { useRefreshFeedback } from '../../src/hooks/useRefreshFeedback';
 import { useFocusRestore } from '../../src/hooks/useFocusRestore';
+import { useHandoff } from '../../src/hooks/useHandoff';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { translateContent, donateSiriActivity, readAloud, summariseText, simplifyText } from '../../src/services/intelligenceService';
@@ -18,10 +19,14 @@ export default function Forums() {
   const forum = useForumState();
   const saved = useSavedItems('forumTopic');
   const { showToast } = useToast();
-  // VoiceOver focus restore: track each topic card by ID so we can return
-  // focus to the exact card the user came from when a detail screen is dismissed.
   const topicRefs = useRef<Map<string, View>>(new Map());
   const { save }  = useFocusRestore();
+
+  useHandoff({
+    activityType: 'com.applevis.app.viewForums',
+    title: 'AppleVis Forums',
+    webpageURL: 'https://www.applevis.com/forum',
+  });
 
   useRefreshFeedback(forum.refreshing, 'Forums', forum.loading,
     () => topicRefs.current.get(forum.topics[0]?.id ?? '') ?? null);
@@ -64,6 +69,11 @@ export default function Forums() {
         saved.save({ id: topicId, kind: 'forumTopic', title: topicTitle, savedAt: new Date().toISOString() });
         showToast('Topic saved.', 'success');
       }
+    } else if (actionName === 'Share') {
+      Share.share({
+        title: topicTitle,
+        message: `${topicTitle} — https://www.applevis.com/forum`,
+      }).catch(() => {});
     }
   }
 

@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
 import { Screen } from '../../src/components/Screen';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
 import { OfflineBanner } from '../../src/components/OfflineBanner';
@@ -7,6 +7,7 @@ import { LoadMoreButton } from '../../src/components/LoadMoreButton';
 import { useAppList } from '../../src/hooks/useAppList';
 import { useRefreshFeedback } from '../../src/hooks/useRefreshFeedback';
 import { useFocusRestore } from '../../src/hooks/useFocusRestore';
+import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
 import { translateContent, donateSiriActivity, readAloud, summariseText, simplifyText, accessibilityConsensus } from '../../src/services/intelligenceService';
 import { styles, colors } from '../../src/theme/styles';
@@ -18,6 +19,12 @@ export default function Apps() {
     () => appRefs.current.get(list.apps[0]?.id ?? '') ?? null);
   const appRefs = useRef<Map<string, View>>(new Map());
   const { save } = useFocusRestore();
+
+  useHandoff({
+    activityType: 'com.applevis.app.viewApps',
+    title: 'AppleVis App Directory',
+    webpageURL: 'https://www.applevis.com/accessibility-apps',
+  });
 
   return (
     <Screen title="Apps" refreshing={list.refreshing} showSearch>
@@ -104,6 +111,11 @@ export default function Apps() {
                   if (s) showToast(s, 'success');
                   else showToast('Plain-language simplification coming when Apple Intelligence Foundation Models support is added.', 'warning');
                 });
+              } else if (action === 'Share') {
+                Share.share({
+                  title: app.name,
+                  message: `${app.name} on AppleVis — https://www.applevis.com/accessibility-apps`,
+                }).catch(() => {});
               }
             }}
           />

@@ -5,6 +5,7 @@ import { Screen } from '../../src/components/Screen';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { persistence } from '../../src/services/persistence';
+import { useHandoff } from '../../src/hooks/useHandoff';
 import { colors, styles } from '../../src/theme/styles';
 
 function getGreetingKey(): 'home.greeting.morning' | 'home.greeting.afternoon' | 'home.greeting.evening' | 'home.greeting.night' {
@@ -19,6 +20,12 @@ export default function Home() {
   const auth       = useAuth();
   const { t }      = useTranslation();
   const [lastVisit, setLastVisit] = useState<string | null>(null);
+
+  useHandoff({
+    activityType: 'com.applevis.app.viewForums',
+    title: 'AppleVis',
+    webpageURL: 'https://www.applevis.com',
+  });
 
   useEffect(() => {
     persistence.getLastVisit().then(setLastVisit);

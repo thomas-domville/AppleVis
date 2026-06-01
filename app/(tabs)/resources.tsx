@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Clipboard, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
 import { Screen } from '../../src/components/Screen';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
 import { OfflineBanner } from '../../src/components/OfflineBanner';
@@ -7,6 +7,7 @@ import { LoadMoreButton } from '../../src/components/LoadMoreButton';
 import { useResourceList } from '../../src/hooks/useResourceList';
 import { useRefreshFeedback } from '../../src/hooks/useRefreshFeedback';
 import { useFocusRestore } from '../../src/hooks/useFocusRestore';
+import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
 import { translateContent, readAloud, summariseText, simplifyText } from '../../src/services/intelligenceService';
 import { styles, colors } from '../../src/theme/styles';
@@ -18,6 +19,12 @@ export default function Resources() {
     () => resourceRefs.current.get(list.resources[0]?.id ?? '') ?? null);
   const resourceRefs = useRef<Map<string, View>>(new Map());
   const { save }     = useFocusRestore();
+
+  useHandoff({
+    activityType: 'com.applevis.app.viewResources',
+    title: 'AppleVis Resources',
+    webpageURL: 'https://www.applevis.com/resources',
+  });
 
   return (
     <Screen title="Resources" refreshing={list.refreshing} showSearch>
@@ -93,6 +100,14 @@ export default function Resources() {
                   if (s) showToast(s, 'success');
                   else showToast('Plain-language simplification coming when Apple Intelligence Foundation Models support is added.', 'warning');
                 });
+              } else if (action === 'Share') {
+                Share.share({
+                  title: item.title,
+                  message: `${item.title} — https://www.applevis.com/resources`,
+                }).catch(() => {});
+              } else if (action === 'Copy Link') {
+                Clipboard.setString(`https://www.applevis.com/resources`);
+                showToast('Link copied.', 'success');
               }
             }}
           />

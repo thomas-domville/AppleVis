@@ -236,6 +236,129 @@ export async function describeImage(_imageUrl: string): Promise<string | null> {
   return null;
 }
 
+// ─── Handoff / NSUserActivity ─────────────────────────────────────────────────
+
+export type HandoffActivity = {
+  /** Reverse-DNS activity type, must be listed in Info.plist NSUserActivityTypes. */
+  activityType: string;
+  /** Human-readable title shown on the receiving device. */
+  title: string;
+  /** Corresponding applevis.com URL — used as Handoff fallback on Mac when app not installed. */
+  webpageURL?: string;
+  /** Arbitrary key-value payload passed to the receiving device. */
+  userInfo?: Record<string, string>;
+};
+
+/**
+ * Advertises the user's current activity to nearby Apple devices via Handoff.
+ * The receiving device shows an app-switcher icon; tapping it opens the app
+ * and resumes from where the user left off.
+ *
+ * Native side (Swift, must run on main thread):
+ *
+ *   let activity = NSUserActivity(activityType: activity.activityType)
+ *   activity.title       = activity.title
+ *   activity.isEligibleForHandoff = true
+ *   activity.isEligibleForSearch  = true          // also indexes in Spotlight
+ *   if let urlStr = activity.webpageURL,
+ *      let url   = URL(string: urlStr) {
+ *     activity.webpageURL = url
+ *   }
+ *   activity.userInfo = activity.userInfo as [AnyHashable: Any]?
+ *   activity.becomeCurrent()
+ *
+ * To receive on the destination device, implement in AppDelegate:
+ *   func application(_ app, continue userActivity: NSUserActivity, ...) -> Bool
+ *   Then deep-link using userActivity.activityType and userActivity.userInfo.
+ *
+ * Info.plist: NSUserActivityTypes array (already in app.json).
+ * Entitlements: com.apple.developer.associated-domains (already in app.json).
+ */
+export function advertiseHandoff(_activity: HandoffActivity): void {
+  if (__DEV__) console.log('[NativeModules] advertiseHandoff — native module not yet built.', _activity.activityType);
+}
+
+/**
+ * Resigns the current NSUserActivity so Handoff no longer shows on nearby devices.
+ * Call when the user navigates away from the screen or the app backgrounds.
+ *
+ * Native side:
+ *   currentActivity?.resignCurrent()
+ */
+export function resignHandoff(): void {
+  if (__DEV__) console.log('[NativeModules] resignHandoff — native module not yet built.');
+}
+
+// ─── Keyboard Shortcuts (iPadOS hardware keyboard) ────────────────────────────
+
+export type KeyboardShortcut = {
+  /** The key letter, e.g. "f" for ⌘F. */
+  input: string;
+  modifierFlags: ('command' | 'shift' | 'alternate' | 'control')[];
+  /** Description shown in the keyboard shortcut overlay (hold ⌘). */
+  discoverabilityTitle: string;
+  /** Identifier used to dispatch the action in JS. */
+  identifier: string;
+};
+
+/**
+ * Registers application-level keyboard shortcuts visible in the iPadOS
+ * keyboard shortcut overlay (hold ⌘ while app is in focus).
+ *
+ * Native side (Swift, UIKeyCommand):
+ *
+ *   override var keyCommands: [UIKeyCommand]? {
+ *     return shortcuts.map { s in
+ *       UIKeyCommand(
+ *         title: s.discoverabilityTitle,
+ *         action: #selector(handleKeyCommand(_:)),
+ *         input: s.input,
+ *         modifierFlags: s.modifierFlags
+ *       )
+ *     }
+ *   }
+ *
+ *   @objc func handleKeyCommand(_ command: UIKeyCommand) {
+ *     // Send identifier back to JS via event emitter
+ *     sendEvent("onKeyCommand", ["identifier": command.title])
+ *   }
+ *
+ * Subscribe to the "onKeyCommand" event on the JS side to handle shortcuts.
+ *
+ * Default shortcuts to register:
+ *   ⌘F  — Search
+ *   ⌘R  — Refresh
+ *   ⌘1  — Forums tab
+ *   ⌘2  — Apps tab
+ *   ⌘3  — Podcasts tab
+ *   ⌘4  — Resources tab
+ *   ⌘,  — Settings
+ */
+export function registerKeyboardShortcuts(_shortcuts: KeyboardShortcut[]): void {
+  if (__DEV__) console.log('[NativeModules] registerKeyboardShortcuts — native module not yet built.', _shortcuts.length);
+}
+
+// ─── Increase Contrast (iOS Accessibility) ────────────────────────────────────
+
+/**
+ * Returns true when the user has enabled "Increase Contrast" in
+ * Settings → Accessibility → Display & Text Size.
+ *
+ * React Native does not expose UIAccessibilityIsHighContrastEnabled() directly.
+ *
+ * Native side (Swift):
+ *   UIAccessibility.isHighContrastEnabled  // iOS 13+
+ *   NotificationCenter.default.addObserver(
+ *     forName: UIAccessibility.highContrastStatusDidChangeNotification, ...
+ *   )
+ *
+ * Wire as an event emitter so the JS layer can subscribe via a hook.
+ */
+export async function isIncreaseContrastEnabled(): Promise<boolean> {
+  if (__DEV__) console.log('[NativeModules] isIncreaseContrastEnabled — native module not yet built.');
+  return false;
+}
+
 // ─── Natural Language Search Enhancement ─────────────────────────────────────
 
 /**

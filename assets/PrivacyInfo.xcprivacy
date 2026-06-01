@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  PrivacyInfo.xcprivacy — Apple Privacy Manifest (required for App Store submission)
+  https://developer.apple.com/documentation/bundleresources/privacy-manifest-files
+
+  HOW TO ACTIVATE:
+  In managed Expo, add expo-build-properties to your plugins in app.json:
+    ["expo-build-properties", { "ios": { "privacyManifests": { ... } } }]
+  OR place this file at ios/<AppName>/PrivacyInfo.xcprivacy after `expo prebuild`.
+
+  This manifest covers APIs used by the app and its Expo/React Native dependencies.
+  Review and update when adding new native libraries.
+-->
+<plist version="1.0">
+<dict>
+  <!-- ── Collected Data Types ──────────────────────────────────────────────── -->
+  <!-- AppleVis does not collect any data for tracking purposes. -->
+  <key>NSPrivacyTracking</key>
+  <false/>
+
+  <!-- No tracking domains used. -->
+  <key>NSPrivacyTrackingDomains</key>
+  <array/>
+
+  <!-- Data collected and linked to the user's identity -->
+  <key>NSPrivacyCollectedDataTypes</key>
+  <array>
+    <!-- Account credentials: username / session token stored in Keychain (SecureStore) -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeEmailAddress</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+    <!-- iCloud sync: saved items, forum reads, podcast positions -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeOtherUserContent</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+    <!-- Push notification token — sent to applevis.com server only -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeDeviceID</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+  </array>
+
+  <!-- ── Required Reason APIs ──────────────────────────────────────────────── -->
+  <key>NSPrivacyAccessedAPITypes</key>
+  <array>
+
+    <!-- NSUserDefaults — used by AsyncStorage, expo-constants, expo-localization -->
+    <dict>
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <!-- CA92.1: Accessed from app and app extensions that are members of the same App Group -->
+        <string>CA92.1</string>
+      </array>
+    </dict>
+
+    <!-- File timestamp APIs — used by expo-file-system for cache management -->
+    <dict>
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <!-- C617.1: Accessed to display to the user (e.g. cache date shown in Offline Banner) -->
+        <string>C617.1</string>
+        <!-- 0A2A.1: Accessed to manage files within the app's container -->
+        <string>0A2A.1</string>
+      </array>
+    </dict>
+
+    <!-- Disk space APIs — used by expo-file-system when writing cache files -->
+    <dict>
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <!-- 85F4.1: Accessed to manage files within the app's container -->
+        <string>85F4.1</string>
+      </array>
+    </dict>
+
+    <!-- System boot time — used by some React Native internals / networking -->
+    <dict>
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <!-- 35F9.1: Accessed to measure time on-device for debugging / performance -->
+        <string>35F9.1</string>
+      </array>
+    </dict>
+
+  </array>
+</dict>
+</plist>
