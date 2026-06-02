@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Screen } from '../../src/components/Screen';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
 import { OfflineBanner } from '../../src/components/OfflineBanner';
@@ -13,6 +14,7 @@ import { translateContent, donateSiriActivity, readAloud, summariseText, simplif
 import { useTheme } from '../../src/contexts/ThemeContext';
 
 export default function Apps() {
+  const router         = useRouter();
   const { colors, styles } = useTheme();
   const list           = useAppList();
   const { showToast }  = useToast();
@@ -93,6 +95,7 @@ export default function Apps() {
               if (action === 'Open App Page') {
                 save(appRefs.current.get(app.id) ?? null);
                 donateSiriActivity({ type: 'searchApps', query: app.name });
+                router.push({ pathname: '/app-detail/[id]' as any, params: { id: app.id, name: app.name } });
               } else if (action === 'Read Aloud') {
                 readAloud([app.name, app.summary].filter(Boolean).join('. '));
               } else if (action === 'Translate') {

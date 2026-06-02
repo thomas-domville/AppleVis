@@ -9,7 +9,7 @@
  * NEEDS BUILDING: push tokens, flag/save/follow, account sync, account deletion
  */
 
-import type { ForumTopic, PodcastEpisode, AppListing, Resource, PaginatedResult } from '../types/content';
+import type { ForumTopic, ForumReply, ForumTopicDetail, AppListing, AppDetail, AppReview, Resource, ResourceDetail, PodcastEpisode, PaginatedResult } from '../types/content';
 
 const BASE             = 'https://www.applevis.com';
 const JSONAPI          = `${BASE}/jsonapi`;
@@ -134,6 +134,33 @@ function mapApp(node: JsonApiNode): AppListing {
   };
 }
 
+// ─── Forum replies / comments ────────────────────────────────────────────────
+
+function mapComment(node: JsonApiNode): ForumReply {
+  const a = node.attributes;
+  return {
+    id: node.id,
+    authorName: (a.name as string | undefined) ?? 'Community Member',
+    authorId: (node.relationships?.uid?.data as { id: string } | undefined)?.id ?? '',
+    body: (a.comment_body?.processed ?? a.comment_body?.value ?? '') as string,
+    createdAt: (a.created ?? '') as string,
+  };
+}
+
+// ─── App reviews ─────────────────────────────────────────────────────────────
+
+function mapAppReview(node: JsonApiNode): AppReview {
+  const a = node.attributes;
+  return {
+    id: node.id,
+    authorName: (a.name as string | undefined) ?? 'Community Member',
+    body: (a.comment_body?.processed ?? a.comment_body?.value ?? '') as string,
+    createdAt: (a.created ?? '') as string,
+    appVersion: (a.field_app_version ?? undefined) as string | undefined,
+    platform: (a.field_platform ?? undefined) as string | undefined,
+  };
+}
+
 // ─── Resources / Guides ──────────────────────────────────────────────────────
 
 function mapResource(node: JsonApiNode): Resource {
@@ -200,6 +227,62 @@ export const api = {
       return { ok: true as const, data: mapForum(res.data.data) };
     },
 
+    /**
+     * Fetch a single topic with its full body text and all replies.
+     *
+     * NOTE TO DRUPAL DEVELOPER:
+     *   Confirm the comment entity type name and filter path.
+     *   Common: /jsonapi/comment/comment?filter[entity_id.id]=[uuid]
+     *   May need: &sort=created&page[limit]=100&include=uid
+     *   The topic body comes from node.attributes.body.value (or .processed).
+     */
+    async topicDetail(id: string): Promise<
+      { ok: true; data: ForumTopicDetail } | { ok: false; error: string }
+    > {
+      const [topicRes, commentsRes] = await Promise.all([
+        jsonApi<{ data: JsonApiNode }>(`/node/forum/${id}`),
+        jsonApi<JsonApiCollection>(`/comment/comment?filter[entity_id.id]=${id}&sort=created&page[limit]=100`),
+      ]);
+
+      if (!topicRes.ok) return topicRes;
+
+      const topic = mapForum(topicRes.data.data);
+      const body = String(topicRes.data.data.attributes.body?.value ?? topicRes.data.data.attributes.body?.processed ?? '');
+      const url = `${BASE}${topicRes.data.data.attributes.path?.alias ?? `/node/${topicRes.data.data.attributes.drupal_internal__nid}`}`;
+      const replies: ForumReply[] = commentsRes.ok ? commentsRes.data.data.map(mapComment) : [];
+
+      return { ok: true, data: { ...topic, body, replies, url } };
+    },
+
+    /**
+     * Submit a reply to a forum topic.
+     *
+     * NOTE TO DRUPAL DEVELOPER:
+     *   Confirm: comment content type name, field names, entity relationship type.
+     *   Standard Drupal JSON:API comment POST:
+     *     type: 'comment--comment' (may differ per content type)
+     *     relationships.entity_id: { type: 'node--forum', id: topicId }
+     */
+    async submitReply(topicId: string, body: string, csrfToken: string) {
+      return jsonApi<{ data: JsonApiNode }>('/comment/comment', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({
+          data: {
+            type: 'comment--comment',
+            attributes: {
+              subject: 'Reply',
+              comment_body: { value: body, format: 'basic_html' },
+            },
+            relationships: {
+              entity_id: { data: { type: 'node--forum', id: topicId } },
+              comment_type: { data: { type: 'comment_type--comment_type', id: 'comment' } },
+            },
+          },
+        }),
+      });
+    },
+
     markRead: (id: string, token: string) =>
       drupalRest<void>(`/node/${id}/flag/read`, { method: 'POST', headers: { 'X-CSRF-Token': token } }),
 
@@ -255,6 +338,27 @@ export const api = {
       return { ok: true as const, data: mapApp(res.data.data) };
     },
 
+    /**
+     * Fetch a single app listing with its full body and all reviews.
+     * NOTE TO DRUPAL DEVELOPER: confirm comment entity type for app reviews.
+     */
+    async detail(id: string): Promise<
+      { ok: true; data: AppDetail } | { ok: false; error: string }
+    > {
+      const [appRes, reviewsRes] = await Promise.all([
+        jsonApi<{ data: JsonApiNode }>(`/node/ios_app_directory/${id}`),
+        jsonApi<JsonApiCollection>(`/comment/comment?filter[entity_id.id]=${id}&sort=-created&page[limit]=50`),
+      ]);
+
+      if (!appRes.ok) return appRes;
+
+      const app = mapApp(appRes.data.data);
+      const body = String(appRes.data.data.attributes.body?.value ?? appRes.data.data.attributes.body?.processed ?? '');
+      const reviews: AppReview[] = reviewsRes.ok ? reviewsRes.data.data.map(mapAppReview) : [];
+
+      return { ok: true, data: { ...app, body, reviews } };
+    },
+
     async updates(page = 0) {
       const res = await jsonApi<JsonApiCollection>(
         `/node/ios_app_directory?sort=-changed&${pageParams(page)}`,
@@ -283,6 +387,21 @@ export const api = {
       const res = await jsonApi<{ data: JsonApiNode }>(`/node/guides/${id}`);
       if (!res.ok) return res;
       return { ok: true as const, data: mapResource(res.data.data) };
+    },
+
+    /**
+     * Fetch a resource with its full body text.
+     * NOTE TO DRUPAL DEVELOPER: confirm body field name for guides content type.
+     */
+    async detail(id: string): Promise<
+      { ok: true; data: ResourceDetail } | { ok: false; error: string }
+    > {
+      const res = await jsonApi<{ data: JsonApiNode }>(`/node/guides/${id}`);
+      if (!res.ok) return res;
+      const resource = mapResource(res.data.data);
+      const body = String(res.data.data.attributes.body?.value ?? res.data.data.attributes.body?.processed ?? '');
+      const authorName = String(res.data.data.attributes.field_author ?? '');
+      return { ok: true, data: { ...resource, body, authorName: authorName || undefined } };
     },
   },
 

@@ -46,7 +46,44 @@ function SettingCard({ item }: { item: SettingItem }) {
   const badge = statusLabel(item.status);
   const isNavigable = item.type === 'nav' || item.type === 'link';
 
+  // Map well-known setting IDs to dedicated interactive screens
+  const INTERACTIVE_ROUTES: Record<string, string> = {
+    theme:                  '/settings-appearance',
+    cardDensity:            '/settings-appearance',
+    announcementLevel:      '/settings-accessibility',
+    focusRestoration:       '/settings-accessibility',
+    notifForumReplies:      '/settings-notifications',
+    notifMentions:          '/settings-notifications',
+    notifNewTopics:         '/settings-notifications',
+    notifFollowedTopics:    '/settings-notifications',
+    notifNewEpisodes:       '/settings-notifications',
+    notifAppUpdates:        '/settings-notifications',
+    notifNewResources:      '/settings-notifications',
+    notifAnnouncements:     '/settings-notifications',
+    notifSound:             '/settings-notifications',
+    podcastSpeed:           '/settings-podcast',
+    podcastSkipBack:        '/settings-podcast',
+    podcastSkipForward:     '/settings-podcast',
+    podcastAutoPlay:        '/settings-podcast',
+    podcastSleepTimer:      '/settings-podcast',
+    podcastVoiceBoost:      '/settings-podcast',
+    podcastEQ:              '/settings-podcast',
+    podcastAutoDownload:    '/settings-podcast',
+    podcastAutoDelete:      '/settings-podcast',
+    helpGettingStarted:     '/help',
+    helpVoiceOver:          '/help',
+    helpForums:             '/help',
+    helpApps:               '/help',
+    helpPodcasts:           '/help',
+    helpResources:          '/help',
+    helpIntelligence:       '/help',
+    helpFAQ:                '/help',
+    helpGuidelines:         '/help',
+  };
+
   function handlePress() {
+    const interactiveRoute = INTERACTIVE_ROUTES[item.id];
+    if (interactiveRoute) { router.push(interactiveRoute as any); return; }
     if (item.route) router.push(item.route as any);
   }
 

@@ -88,16 +88,26 @@ export default function Settings() {
             <Text style={[styles.cardMeta, { marginBottom: 2 }]}>{getGreeting()}</Text>
             <Text style={styles.cardTitle}>{auth.user?.name}</Text>
             <Text style={[styles.cardMeta, { marginBottom: 14 }]}>Signed in to AppleVis</Text>
-            <Pressable
-              onPress={handleSignOut}
-              accessible accessibilityRole="button"
-              accessibilityLabel="Sign out of AppleVis"
-              accessibilityHint="Removes your account session from this device."
-              style={{ alignSelf: 'flex-start', backgroundColor: '#FFEAEA',
-                borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 }}
-            >
-              <Text style={{ color: '#B91C1C', fontWeight: '700', fontSize: 15 }}>Sign Out</Text>
-            </Pressable>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable
+                onPress={() => router.push('/profile' as any)}
+                accessible accessibilityRole="button" accessibilityLabel="View your profile"
+                style={{ backgroundColor: colors.pill, borderRadius: 10,
+                  paddingHorizontal: 16, paddingVertical: 10 }}
+              >
+                <Text style={{ color: colors.pillText, fontWeight: '700', fontSize: 15 }}>Profile</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleSignOut}
+                accessible accessibilityRole="button"
+                accessibilityLabel="Sign out of AppleVis"
+                accessibilityHint="Removes your account session from this device."
+                style={{ backgroundColor: '#FFEAEA', borderRadius: 10,
+                  paddingHorizontal: 16, paddingVertical: 10 }}
+              >
+                <Text style={{ color: '#B91C1C', fontWeight: '700', fontSize: 15 }}>Sign Out</Text>
+              </Pressable>
+            </View>
           </View>
         ) : !showForm ? (
           <View style={[styles.card, { marginBottom: 4 }]}>

@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Screen } from '../../src/components/Screen';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
 import { OfflineBanner } from '../../src/components/OfflineBanner';
@@ -15,6 +16,7 @@ import { translateContent, donateSiriActivity, readAloud, summariseText, simplif
 import { useTheme } from '../../src/contexts/ThemeContext';
 
 export default function Forums() {
+  const router = useRouter();
   const { colors, styles } = useTheme();
   const auth  = useAuth();
   const forum = useForumState();
@@ -36,7 +38,7 @@ export default function Forums() {
     if (actionName === 'Open') {
       save(topicRefs.current.get(topicId) ?? null);
       donateSiriActivity({ type: 'openForums' });
-      // router.push(`/topic/${topicId}`); — wire in when detail screen exists
+      router.push({ pathname: '/topic/[id]' as any, params: { id: topicId, title: topicTitle } });
     } else if (actionName === 'Translate') {
       const topic = forum.topics.find((t) => t.id === topicId);
       translateContent([topicTitle, topic?.meta ?? ''].filter(Boolean).join('\n'), topicTitle);

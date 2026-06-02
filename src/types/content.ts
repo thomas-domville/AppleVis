@@ -71,3 +71,48 @@ export type Resource = {
   updatedAt: string;
   url: string;
 };
+
+export type ForumReply = {
+  id: string;
+  authorName: string;
+  authorId: string;
+  body: string;
+  createdAt: string;
+  isNew?: boolean;
+};
+
+export type ForumTopicDetail = ForumTopic & {
+  body: string;
+  replies: ForumReply[];
+  url: string;
+};
+
+export type AppReview = {
+  id: string;
+  authorName: string;
+  rating?: number;
+  body: string;
+  createdAt: string;
+  appVersion?: string;
+  platform?: string;
+};
+
+export type AppDetail = AppListing & {
+  body: string;
+  reviews: AppReview[];
+  accessibilityRating?: number;
+};
+
+export type ResourceDetail = Resource & {
+  body: string;
+  authorName?: string;
+};
+
+export type UserProfile = {
+  uid: string;
+  name: string;
+  email: string;
+  memberSince: string;
+  postCount: number;
+  profileUrl: string;
+};

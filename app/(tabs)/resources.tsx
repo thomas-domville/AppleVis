@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { ActivityIndicator, Clipboard, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Screen } from '../../src/components/Screen';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
 import { OfflineBanner } from '../../src/components/OfflineBanner';
@@ -13,6 +14,7 @@ import { translateContent, readAloud, summariseText, simplifyText } from '../../
 import { useTheme } from '../../src/contexts/ThemeContext';
 
 export default function Resources() {
+  const router        = useRouter();
   const { colors, styles } = useTheme();
   const list          = useResourceList();
   const { showToast } = useToast();
@@ -87,6 +89,7 @@ export default function Resources() {
             onAction={(action) => {
               if (action === 'Open') {
                 save(resourceRefs.current.get(item.id) ?? null);
+                router.push({ pathname: '/resource-detail/[id]' as any, params: { id: item.id, title: item.title, url: item.url } });
               } else if (action === 'Read Aloud') {
                 readAloud([item.title, item.summary].filter(Boolean).join('. '));
               } else if (action === 'Translate') {
