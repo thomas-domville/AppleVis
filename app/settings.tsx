@@ -169,10 +169,6 @@ export default function Settings() {
           </View>
         )}
 
-        <Text style={[styles.lede, { marginTop: 8 }]}>
-          Every setting includes a full description and example — tap any section to read them.
-        </Text>
-
         {SETTINGS_SECTIONS.map((section) => (
           <Pressable
             key={section.id}
@@ -182,8 +178,17 @@ export default function Settings() {
             }}
             onPress={() => {
               save(sectionRefs.current.get(section.id) ?? null);
-              if (section.id === 'about') {
-                router.push('/about' as any);
+              const directRoutes: Record<string, string> = {
+                appearance:    '/settings-appearance',
+                accessibility: '/settings-accessibility',
+                notifications: '/settings-notifications',
+                podcasts:      '/settings-podcast',
+                about:         '/about',
+                help:          '/help',
+              };
+              const route = directRoutes[section.id];
+              if (route) {
+                router.push(route as any);
               } else {
                 router.push({ pathname: '/settings-detail', params: { sectionId: section.id } });
               }

@@ -30,6 +30,20 @@ export function Screen({ title, children, showSettings = true, showSearch = fals
     >
       <View style={styles.content}>
 
+        {/* Back button — shown automatically on any pushed screen */}
+        {router.canGoBack() && (
+          <Pressable
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            hitSlop={8}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginBottom: 2, alignSelf: 'flex-start' }}
+          >
+            <Ionicons name="chevron-back" size={20} color={colors.accent} accessibilityElementsHidden />
+            <Text style={{ fontSize: 17, color: colors.accent, fontWeight: '400' }}>Back</Text>
+          </Pressable>
+        )}
+
         {/* Screen title */}
         <Text accessibilityRole="header" style={styles.title}>{title}</Text>
 
