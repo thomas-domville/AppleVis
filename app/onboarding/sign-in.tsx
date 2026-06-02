@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, findNodeHandle, Pressable, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, findNodeHandle, Linking, Pressable, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { WizardLayout } from '../../src/components/WizardLayout';
 
+const REGISTER_URL = 'https://www.applevis.com/user/register';
+
 export default function SignInStep() {
   const { colors }       = useTheme();
   const auth             = useAuth();
   const { showToast }    = useToast();
-  const [email,    setEmail]    = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [busy,     setBusy]     = useState(false);
-  const emailRef = useRef<TextInput>(null);
+  const usernameRef = useRef<TextInput>(null);
 
   // If already signed in (session restored), auto-advance.
   useEffect(() => {
@@ -22,28 +24,33 @@ export default function SignInStep() {
     }
   }, [auth.isLoading, auth.isSignedIn]);
 
-  // Focus email field on mount.
+  // Focus username field on mount.
   useEffect(() => {
     const t = setTimeout(() => {
-      const node = emailRef.current ? findNodeHandle(emailRef.current) : null;
+      const node = usernameRef.current ? findNodeHandle(usernameRef.current) : null;
       if (node) AccessibilityInfo.setAccessibilityFocus(node);
     }, 500);
     return () => clearTimeout(t);
   }, []);
 
   const handleSignIn = useCallback(async () => {
-    if (!email.trim()) { showToast('Please enter your email address.', 'error'); return; }
-    if (!password)     { showToast('Please enter your password.', 'error'); return; }
+    if (!username.trim()) { showToast('Please enter your username or email address.', 'error'); return; }
+    if (!password)        { showToast('Please enter your password.', 'error'); return; }
     setBusy(true);
-    const result = await auth.signIn(email, password);
-    setBusy(false);
-    if (result.ok) {
-      showToast(`Welcome, ${auth.user?.name ?? 'you'}!`, 'success');
-      router.push('/onboarding/theme');
-    } else {
-      showToast(result.error ?? 'Sign in failed. Please try again.', 'error');
+    try {
+      const result = await auth.signIn(username.trim(), password);
+      if (result.ok) {
+        showToast(`Welcome, ${auth.user?.name ?? 'back'}!`, 'success');
+        router.push('/onboarding/theme');
+      } else {
+        showToast(result.error ?? 'Sign in failed. Please try again.', 'error');
+      }
+    } catch {
+      showToast('Something went wrong. Please check your connection and try again.', 'error');
+    } finally {
+      setBusy(false);
     }
-  }, [email, password, auth, showToast]);
+  }, [username, password, auth, showToast]);
 
   const inputStyle = {
     borderWidth: 1.5, borderColor: colors.inputBorder, borderRadius: 12,
@@ -56,12 +63,12 @@ export default function SignInStep() {
       step={2}
       totalSteps={5}
       title="Sign in to your account"
-      description="Sign in to post in the forums, follow topics, and receive push notifications. You can also continue as a guest and sign in later from Settings."
+      description="Sign in to post in the forums, follow topics, and receive push notifications."
       onNext={handleSignIn}
       nextLabel={busy ? 'Signing in…' : 'Sign In'}
       nextDisabled={busy}
     >
-      {/* What signing in unlocks */}
+      {/* Benefits */}
       <View style={{ backgroundColor: colors.card, borderRadius: 14, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: colors.border }}>
         <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 8 }}>
           With an account you can:
@@ -77,34 +84,49 @@ export default function SignInStep() {
             {'• '}{item}
           </Text>
         ))}
-        <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 6 }}>
-          {"Don't have an account? Visit applevis.com to register — it's free."}
-        </Text>
+
+        {/* Sign up link */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, gap: 4 }}>
+          <Text style={{ fontSize: 14, color: colors.textSecondary }}>
+            {"Don't have an account?"}
+          </Text>
+          <Pressable
+            onPress={() => Linking.openURL(REGISTER_URL)}
+            accessible
+            accessibilityRole="link"
+            accessibilityLabel="Sign up for a free AppleVis account"
+            accessibilityHint="Opens the AppleVis registration page in your browser"
+          >
+            <Text style={{ fontSize: 14, color: colors.accent, fontWeight: '600' }}>
+              Sign up for free
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
-      {/* Email */}
+      {/* Username or email */}
       <View style={{ marginBottom: 14 }}>
         <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 6 }}>
-          Email address
+          Username or email
         </Text>
         <TextInput
-          ref={emailRef}
-          value={email}
-          onChangeText={setEmail}
+          ref={usernameRef}
+          value={username}
+          onChangeText={setUsername}
           autoCapitalize="none"
           autoCorrect={false}
-          keyboardType="email-address"
-          textContentType="emailAddress"
+          keyboardType="default"
+          textContentType="username"
           returnKeyType="next"
           accessible
-          accessibilityLabel="Email address"
-          accessibilityHint="Enter the email address you use on applevis.com"
+          accessibilityLabel="Username or email"
+          accessibilityHint="Enter your AppleVis username or email address"
           style={inputStyle}
         />
       </View>
 
       {/* Password */}
-      <View style={{ marginBottom: 24 }}>
+      <View style={{ marginBottom: 20 }}>
         <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 6 }}>
           Password
         </Text>
@@ -122,22 +144,22 @@ export default function SignInStep() {
       </View>
 
       {busy && (
-        <View style={{ alignItems: 'center', marginBottom: 16 }}>
+        <View style={{ alignItems: 'center', marginBottom: 16 }} accessible accessibilityLabel="Signing in, please wait">
           <ActivityIndicator color={colors.accent} />
         </View>
       )}
 
-      {/* Continue without signing in */}
+      {/* Skip sign-in and continue to next step */}
       <Pressable
         onPress={() => router.push('/onboarding/theme')}
         accessible
         accessibilityRole="button"
-        accessibilityLabel="Continue without signing in"
+        accessibilityLabel="Next: skip sign in for now"
         accessibilityHint="You can sign in later from the Settings tab."
-        style={{ alignItems: 'center', paddingVertical: 4 }}
+        style={{ alignItems: 'center', paddingVertical: 10 }}
       >
         <Text style={{ color: colors.accent, fontSize: 16, fontWeight: '600' }}>
-          Continue without signing in
+          Skip for now — continue to next step →
         </Text>
       </Pressable>
     </WizardLayout>
