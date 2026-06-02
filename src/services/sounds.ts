@@ -41,9 +41,15 @@ export const sounds = {
   refreshComplete: (): Promise<void> => play('refreshComplete'),
 
   // Call once on app start so first-play has no loading delay.
+  // Loads audio into cache without playing it.
   async preload(): Promise<void> {
     await Promise.allSettled(
-      (Object.keys(ASSETS) as SoundKey[]).map((key) => play(key)),
+      (Object.keys(ASSETS) as SoundKey[]).map(async (key) => {
+        if (!cache[key]) {
+          const { sound } = await Audio.Sound.createAsync(ASSETS[key], { shouldPlay: false });
+          cache[key] = sound;
+        }
+      }),
     );
   },
 };

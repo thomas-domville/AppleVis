@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useRef } from 'react';
-import { AccessibilityInfo, findNodeHandle, Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, Pressable, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { onboarding } from '../services/onboarding';
 import { router } from 'expo-router';

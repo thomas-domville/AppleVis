@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
-import { SafeAreaView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { RefreshBar } from './RefreshBar';

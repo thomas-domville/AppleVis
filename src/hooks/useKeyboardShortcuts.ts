@@ -57,12 +57,16 @@ export const APP_KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   },
 ];
 
+let _shortcutsRegistered = false;
+
 /**
  * Registers keyboard shortcuts for iPadOS hardware keyboard.
  * Call once at app startup from _layout.tsx.
  */
 export function useKeyboardShortcuts() {
   useEffect(() => {
+    if (_shortcutsRegistered) return;
+    _shortcutsRegistered = true;
     registerKeyboardShortcuts(APP_KEYBOARD_SHORTCUTS);
   }, []);
 }
