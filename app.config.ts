@@ -1,7 +1,7 @@
 const config = {
   name: 'AppleVis',
   slug: 'applevis',
-  version: '2026.0.1.1',
+  version: '2026.0.1.2',
   orientation: 'default',
   icon: './assets/icons/app-icon.png',
   scheme: 'applevis',
@@ -17,7 +17,7 @@ const config = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'com.applevis.app',
-    buildNumber: '2',
+    buildNumber: '3',
     minimumOsVersion: '16.0',
     usesNonExemptEncryption: false,
     requireFullScreen: false,
@@ -58,7 +58,7 @@ const config = {
 
   android: {
     package: 'com.applevis.app',
-    versionCode: 1,
+    versionCode: 2,
     adaptiveIcon: {
       foregroundImage: './assets/icons/app-icon.png',
       backgroundColor: '#0A84FF',

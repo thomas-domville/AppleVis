@@ -10,80 +10,74 @@ type ChangeItem = {
   tag: 'New' | 'Improved' | 'Fixed';
 };
 
-const CURRENT_VERSION = '2026.0.1.1';
+const CURRENT_VERSION = '2026.0.1.2';
 
 const CHANGES: ChangeItem[] = [
   {
-    icon: 'chatbubbles-outline',
+    icon: 'chevron-back-outline',
     tag: 'New',
-    title: 'Forum Topic Detail',
-    description: 'Tap any forum topic to read the full thread. See all replies with author names, dates, and content. VoiceOver reads each reply as a complete element.',
+    title: 'Back Button on Every Screen',
+    description: 'Every settings page, topic view, and detail screen now shows a Back button at the top left so you can always find your way back without hunting for it.',
   },
   {
-    icon: 'create-outline',
-    tag: 'New',
-    title: 'Reply to Forum Topics',
-    description: 'Post replies directly from the app. The posting guidelines checker, Writing Tools tip, and non-English detection all work in the compose screen. Requires sign-in.',
+    icon: 'funnel-outline',
+    tag: 'Improved',
+    title: 'Forum Filter is One Tap, Not Six Swipes',
+    description: 'The row of six filter buttons (Recent, New, Unread, etc.) has been replaced with a single button showing your current choice. Tap it to open a list and pick a different one. Much less swiping with VoiceOver.',
   },
   {
-    icon: 'apps-outline',
-    tag: 'New',
-    title: 'App Detail Screen',
-    description: 'Tap any app listing to see the full description, developer details, and all community accessibility reviews. Accessibility Consensus available on each app detail page.',
+    icon: 'speedometer-outline',
+    tag: 'Improved',
+    title: 'Podcast Speed is One Tap Too',
+    description: 'The nine playback speed buttons have been replaced the same way — one button shows the current speed, tap to change it.',
   },
   {
-    icon: 'library-outline',
-    tag: 'New',
-    title: 'Resource Detail Screen',
-    description: 'Read complete articles and guides inside the app. Long articles are rendered with proper paragraph spacing. "Open in Safari" available for any resource.',
+    icon: 'headset-outline',
+    tag: 'Improved',
+    title: 'VoiceOver Tabs Now Say Their Position',
+    description: 'VoiceOver now reads each tab as "Home, 1 of 5" or "Forums, 2 of 5" — the same way any Apple app announces tabs. Previously it just said the tab name with no position.',
+  },
+  {
+    icon: 'search-outline',
+    tag: 'Fixed',
+    title: 'Search and Settings Buttons No Longer Repeat',
+    description: 'VoiceOver was announcing the Search and Settings buttons twice — once as a group and once as a link. They now each announce once, cleanly, as a button.',
   },
   {
     icon: 'person-outline',
-    tag: 'New',
-    title: 'Profile Screen',
-    description: 'View your saved items count, link to your applevis.com profile, and sign out from your profile. Accessible via the Profile button on the signed-in Settings card.',
-  },
-  {
-    icon: 'radio-outline',
-    tag: 'New',
-    title: 'Podcast Settings (Interactive)',
-    description: 'All podcast defaults now have working controls: playback speed, skip times, auto-play next, sleep timer, voice enhancement, EQ preset, auto-download, and auto-delete. Changes persist across sessions.',
-  },
-  {
-    icon: 'notifications-outline',
-    tag: 'New',
-    title: 'Notification Settings (Interactive)',
-    description: 'All 8 notification categories now have real toggle switches. Sound picker has a tap-to-preview button. "Allow Notifications" button triggers the system permission dialog.',
-  },
-  {
-    icon: 'color-palette-outline',
-    tag: 'New',
-    title: 'Appearance Settings (Interactive)',
-    description: 'Full 13-theme picker and card density selector now live in Settings → Appearance. Themes apply instantly as you tap each option, the same as in the onboarding wizard.',
-  },
-  {
-    icon: 'accessibility-outline',
-    tag: 'New',
-    title: 'Accessibility Settings (Interactive)',
-    description: 'VoiceOver Detail Level (Simple / Normal / All) is now a live picker in Settings → Accessibility. Each option shows a VoiceOver preview string so you know exactly what you will hear.',
-  },
-  {
-    icon: 'information-circle-outline',
-    tag: 'New',
-    title: 'About Screen',
-    description: 'A dedicated About screen showing app version, build number, iOS version, device model, and active accessibility settings. "Copy Support Information" button lets you paste all of this into a bug report with one tap.',
+    tag: 'Improved',
+    title: 'Forum Topics Now Say Who Posted Them',
+    description: 'When VoiceOver Detail Level is set to "All" in Accessibility Settings, VoiceOver now reads the name of the person who posted a topic — for example "VoiceOver Tips. By JohnDoe. 5 replies."',
   },
   {
     icon: 'settings-outline',
-    tag: 'Improved',
-    title: 'Settings Navigation',
-    description: 'Settings sections now route to dedicated interactive screens instead of informational cards. The INTERACTIVE_ROUTES map connects all relevant setting items to their functional screens.',
+    tag: 'Fixed',
+    title: 'Settings Pages Now Open the Real Controls',
+    description: 'Tapping Appearance, Accessibility, Notifications, or Podcasts in Settings now goes straight to the page where you can actually make changes. Before, it opened a description page instead.',
   },
   {
-    icon: 'shield-checkmark-outline',
+    icon: 'toggle-outline',
+    tag: 'Fixed',
+    title: 'Your Settings Now Actually Take Effect',
+    description: 'Six settings that were being saved but had no effect are now wired up: your default forum filter, card size (Comfortable or Compact), notification toggles, silence notifications option, podcast auto-play, and default sleep timer.',
+  },
+  {
+    icon: 'log-in-outline',
     tag: 'Improved',
-    title: 'API Layer',
-    description: 'Extended with topicDetail, submitReply, app detail, and resource detail endpoints. Each new API method includes notes for the Drupal developer on endpoint and filter path confirmation.',
+    title: 'Sign In Accepts Username or Email',
+    description: 'The sign-in screen now accepts either your AppleVis username or your email address, not just email. There is also a direct link to create a free account, and a "Skip for now" button so you can explore the app first.',
+  },
+  {
+    icon: 'person-add-outline',
+    tag: 'Fixed',
+    title: 'Sign In Now Works',
+    description: 'A server issue that was preventing sign-in has been fixed. You can now log in with your AppleVis account.',
+  },
+  {
+    icon: 'phone-portrait-outline',
+    tag: 'Fixed',
+    title: 'App Opens Correctly in Expo Go',
+    description: 'The app now opens without a blank white screen. A startup sound that was playing by accident has also been silenced.',
   },
 ];
 
@@ -109,7 +103,7 @@ export default function WhatsNew() {
             Version {CURRENT_VERSION}
           </Text>
           <Text style={{ fontSize: 16, color: colors.textSecondary, textAlign: 'center', lineHeight: 23 }}>
-            Full content screens, interactive settings, profile, and a complete About screen.
+            Accessibility improvements, bug fixes, and settings that actually work.
           </Text>
         </View>
 
@@ -148,22 +142,21 @@ export default function WhatsNew() {
 
         {/* Previous version note */}
         <View style={[styles.card, { backgroundColor: colors.pill, borderColor: colors.border, borderWidth: 1 }]}
-          accessible accessibilityLabel="Previous version. Version 2026.0.1 included: theme system, onboarding wizard, push notifications, Handoff, Universal Links, Dynamic Type support, VoiceOver detail levels, accessibility preferences, background fetch, App Store review prompt, settings overhaul, help centre, and podcast player defaults.">
+          accessible accessibilityLabel="Also in version 2026.0.1.1: forum topic detail, reply to topics, app detail screen, resource detail screen, profile screen, interactive podcast and notification settings, appearance and accessibility settings.">
           <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
             textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>
-            Also in 2026.0.1
+            Also in 2026.0.1.1
           </Text>
           {[
-            '13-theme system including Mouse, High Contrast, Nebula, and more',
-            'Onboarding wizard with theme, VoiceOver level, and notification setup',
-            'Push notifications with 8 categories and native action buttons',
-            'Handoff -- continue reading or listening on nearby Apple devices',
-            'Universal Links from applevis.com open directly in the app',
-            'VoiceOver detail levels: Simple, Normal, and All',
-            'Dynamic Type, Reduce Motion, Bold Text respected automatically',
-            'Background content refresh every 15 minutes',
-            'App Store review prompt after podcast episode completion',
-            'Complete Help centre with 9 sections and 30+ FAQ answers',
+            'Read full forum threads with all replies inside the app',
+            'Post replies to forum topics directly from the app',
+            'Full app listings with all community reviews',
+            'Read complete guides and articles inside the app',
+            'Profile screen with saved items and sign-out',
+            'Podcast settings with working controls for speed, skip times, and more',
+            'Notification settings with real on/off toggles for each category',
+            'Theme and card size settings with instant preview',
+            'VoiceOver Detail Level setting — choose Simple, Normal, or All',
           ].map((item) => (
             <View key={item} style={{ flexDirection: 'row', gap: 8, marginBottom: 6 }}
               accessible accessibilityLabel={item}>
