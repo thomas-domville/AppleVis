@@ -182,7 +182,11 @@ export default function Settings() {
             }}
             onPress={() => {
               save(sectionRefs.current.get(section.id) ?? null);
-              router.push({ pathname: '/settings-detail', params: { sectionId: section.id } });
+              if (section.id === 'about') {
+                router.push('/about' as any);
+              } else {
+                router.push({ pathname: '/settings-detail', params: { sectionId: section.id } });
+              }
             }}
             accessible
             accessibilityRole="button"

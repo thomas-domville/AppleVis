@@ -79,6 +79,12 @@ function SettingCard({ item }: { item: SettingItem }) {
     helpIntelligence:       '/help',
     helpFAQ:                '/help',
     helpGuidelines:         '/help',
+    version:                '/about',
+    whatsNew:               '/whats-new',
+    credits:                '/about',
+    privacyPolicyAbout:     '/about',
+    termsOfUse:             '/about',
+    openSource:             '/about',
   };
 
   function handlePress() {
