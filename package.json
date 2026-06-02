@@ -1,6 +1,6 @@
 {
   "name": "applevis-expo",
-  "version": "2026.1.0",
+  "version": "2026.0.1",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {

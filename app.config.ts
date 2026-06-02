@@ -1,11 +1,12 @@
 const config = {
   name: 'AppleVis',
   slug: 'applevis',
-  version: '2026.1.0',
+  version: '2026.0.1',
   orientation: 'default',
   icon: './assets/icons/app-icon.png',
   scheme: 'applevis',
   userInterfaceStyle: 'automatic',
+  newArchEnabled: true,
 
   splash: {
     image: './assets/images/splash.png',
@@ -17,28 +18,42 @@ const config = {
     supportsTablet: true,
     bundleIdentifier: 'com.applevis.app',
     buildNumber: '1',
+    minimumOsVersion: '16.0',
+    usesNonExemptEncryption: false,
     requireFullScreen: false,
-    infoPlist: {
-      // Background modes
-      UIBackgroundModes: ['audio', 'remote-notification', 'fetch', 'processing'],
-      // Privacy descriptions
-      NSMicrophoneUsageDescription:
-        'AppleVis does not record audio. Required only if future voice features are added.',
-      NSUserTrackingUsageDescription:
-        'AppleVis does not track you across apps or websites.',
-      // Live Activities
-      NSSupportsLiveActivities: true,
-      NSSupportsLiveActivitiesFrequentUpdates: true,
-      // Siri
-      NSSiriUsageDescription: 'Use Siri to control AppleVis podcast playback and check your forums.',
-    },
+    associatedDomains: [
+      'applinks:www.applevis.com',
+      'applinks:applevis.com',
+    ],
     entitlements: {
-      // App Groups — shared between main app, widget, and watch
       'com.apple.security.application-groups': ['group.com.applevis.app'],
-      // Siri
       'com.apple.developer.siri': true,
     },
-    associatedDomains: ['applinks:www.applevis.com'],
+    infoPlist: {
+      UIBackgroundModes: ['audio', 'remote-notification', 'fetch', 'processing'],
+      NSMicrophoneUsageDescription:
+        'Required by the audio framework used for podcast playback. AppleVis does not record audio.',
+      NSUserTrackingUsageDescription:
+        'AppleVis does not track you across apps or websites.',
+      NSSiriUsageDescription:
+        'Use Siri to open forums, play podcasts, and check what is new on AppleVis.',
+      NSSupportsLiveActivities: true,
+      NSSupportsLiveActivitiesFrequentUpdates: true,
+      CFBundleLocalizations: [
+        'en', 'es', 'fr', 'de', 'pt', 'it', 'ja', 'ko', 'nl',
+        'zh-Hans', 'ar', 'fa', 'hi',
+      ],
+      NSUserActivityTypes: [
+        'com.applevis.app.viewForums',
+        'com.applevis.app.viewApps',
+        'com.applevis.app.viewPodcasts',
+        'com.applevis.app.viewResources',
+        'com.applevis.app.viewTopic',
+        'com.applevis.app.viewApp',
+        'com.applevis.app.playEpisode',
+        'com.applevis.app.viewResource',
+      ],
+    },
   },
 
   android: {
@@ -60,17 +75,38 @@ const config = {
   plugins: [
     'expo-router',
     'expo-av',
-    // Notification sounds are loaded at runtime via expo-av; sound files with spaces
-    // in their names cannot be registered as Android resources.
     'expo-notifications',
     'expo-secure-store',
     'expo-background-fetch',
     'expo-task-manager',
-    // Custom native config plugins
-    './plugins/withNowPlaying',
-    './plugins/withWidgetKit',
-    './plugins/withLiveActivities',
-    './plugins/withiCloudKVS',
+    './plugins/withPrivacyManifest',
+    [
+      'expo-build-properties',
+      {
+        ios: {
+          privacyManifests: {
+            NSPrivacyAccessedAPITypes: [
+              {
+                NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryUserDefaults',
+                NSPrivacyAccessedAPITypeReasons: ['CA92.1'],
+              },
+              {
+                NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryFileTimestamp',
+                NSPrivacyAccessedAPITypeReasons: ['C617.1', '0A2A.1'],
+              },
+              {
+                NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryDiskSpace',
+                NSPrivacyAccessedAPITypeReasons: ['85F4.1'],
+              },
+              {
+                NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategorySystemBootTime',
+                NSPrivacyAccessedAPITypeReasons: ['35F9.1'],
+              },
+            ],
+          },
+        },
+      },
+    ],
   ],
 
   experiments: {

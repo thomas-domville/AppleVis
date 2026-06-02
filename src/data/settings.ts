@@ -44,5 +44,5 @@ export const settingsSections = [
     'To view the full posting guidelines: visit applevis.com/help/guidelines or tap "View Guidelines" on any reminder banner.',
   ]},
   { title: 'Help & Support', description: 'User guide, FAQ, contact support, bug reports, feedback, and AppleVis website links.', items: ['User Guide', 'FAQ', "What's New", 'Accessibility Guide', 'Podcast Player Guide', 'Contact AppleVis', 'Report a Bug', 'Send Feedback', 'Suggest a Feature', 'Visit AppleVis Website'] },
-  { title: 'About AppleVis', description: 'Version, credits, privacy policy, terms, and open source licenses.', items: ['Version 2026.1.0', 'Build Number', 'Credits', 'Privacy Policy', 'Terms of Use', 'Open Source Licenses'] }
+  { title: 'About AppleVis', description: 'Version, credits, privacy policy, terms, and open source licenses.', items: ['Version 2026.0.1', 'Build Number', 'Credits', 'Privacy Policy', 'Terms of Use', 'Open Source Licenses'] }
 ];

@@ -626,7 +626,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         id: 'version',
         label: 'Version',
         description: 'The current version of the AppleVis app installed on this device.',
-        example: 'Version 2026.1.0 — the first number is the year, the second is the release within that year.',
+        example: 'Version 2026.0.1 — beta series. 2026.0.x = beta builds; 2026.1.x = public release.',
         type: 'info',
         status: 'live',
       },
