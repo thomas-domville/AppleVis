@@ -42,20 +42,8 @@ async function registerCategories() {
   ]);
 }
 
-function configureForegroundBehavior() {
-  Notifications.setNotificationHandler({
-    handleNotification: async (notification) => {
-      const category = notification.request.content.categoryIdentifier;
-      return {
-        shouldShowBanner: true,
-        shouldShowList:   true,
-        shouldPlaySound:  category !== 'appUpdate' && category !== 'announcement',
-        shouldSetBadge:   true,
-        priority:         Notifications.AndroidNotificationPriority.HIGH,
-      };
-    },
-  });
-}
+// Foreground notification handler is now set reactively in AppServices (_layout.tsx)
+// so it can respond to notificationPrefs and notificationSound preference changes.
 
 export async function requestNotificationPermissions(): Promise<boolean> {
   if (Platform.OS !== 'ios' && Platform.OS !== 'android') return false;
@@ -102,6 +90,5 @@ export function handleNotificationResponse(response: Notifications.NotificationR
 }
 
 export async function setupNotifications() {
-  configureForegroundBehavior();
   await registerCategories();
 }

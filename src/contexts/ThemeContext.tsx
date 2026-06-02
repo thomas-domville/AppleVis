@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createStyles } from '../theme/styles';
+import { usePreferences } from './PreferencesContext';
 import { THEMES, DEFAULT_THEME_ID } from '../theme/themes';
 import type { ThemeId, ThemeColors } from '../theme/themes';
 
@@ -20,6 +21,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useColorScheme();
   const [themeId, setThemeId] = useState<ThemeId>(DEFAULT_THEME_ID);
+  const { cardDensity } = usePreferences();
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((saved) => {
@@ -44,7 +46,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return THEMES[themeId].isDark;
   }, [themeId, systemScheme]);
 
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors, cardDensity), [colors, cardDensity]);
 
   const value = useMemo<ThemeContextValue>(
     () => ({ themeId, colors, styles, isDark, setTheme }),

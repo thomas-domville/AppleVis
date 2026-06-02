@@ -7,6 +7,7 @@ import { apiHealth } from '../services/apiHealth';
 import { authEvents } from '../services/authEvents';
 import { persistence } from '../services/persistence';
 import { useToast } from '../contexts/ToastContext';
+import { usePreferences } from '../contexts/PreferencesContext';
 import type { ForumTopic } from '../types/content';
 
 export type ForumFilter = 'Recent' | 'New' | 'Unread' | 'Since Last Visit' | 'Following' | 'Saved';
@@ -16,8 +17,9 @@ const MAX_FOLLOWING = 50;
 
 export function useForumState() {
   const { showToast } = useToast();
+  const { defaultForumFilter } = usePreferences();
 
-  const [filter, setFilterState]         = useState<ForumFilter>('Recent');
+  const [filter, setFilterState]         = useState<ForumFilter>(defaultForumFilter);
   const [topics, setTopics]               = useState<ForumTopic[]>([]);
   const [loading, setLoading]             = useState(true);
   const [refreshing, setRefreshing]       = useState(false);

@@ -17,12 +17,23 @@ import { registerBackgroundFetch } from '../src/tasks/backgroundFetch';
 import { onboarding } from '../src/services/onboarding';
 import { useKeyboardShortcuts } from '../src/hooks/useKeyboardShortcuts';
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
-import { PreferencesProvider } from '../src/contexts/PreferencesContext';
+import { PreferencesProvider, usePreferences } from '../src/contexts/PreferencesContext';
 import { ToastProvider, useToast } from '../src/contexts/ToastContext';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 
 // Keep splash visible until onboarding check + initial data load finishes.
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+const CATEGORY_PREF_MAP: Record<string, keyof import('../src/contexts/PreferencesContext').NotificationPrefs> = {
+  forumReply:    'forumReplies',
+  mention:       'mentions',
+  newTopic:      'newTopics',
+  followedTopic: 'followedTopics',
+  newEpisode:    'newEpisodes',
+  appUpdate:     'appUpdates',
+  newResource:   'newResources',
+  announcement:  'announcements',
+};
 
 function AuthExpiryHandler() {
   const auth = useAuth();
@@ -38,6 +49,25 @@ function AuthExpiryHandler() {
 
 function AppServices() {
   useKeyboardShortcuts();
+  const { notificationPrefs, notificationSound } = usePreferences();
+
+  // Reactive foreground notification handler — re-registers when prefs change.
+  useEffect(() => {
+    Notifications.setNotificationHandler({
+      handleNotification: async (notification) => {
+        const category = notification.request.content.categoryIdentifier ?? '';
+        const prefKey  = CATEGORY_PREF_MAP[category];
+        const enabled  = prefKey ? notificationPrefs[prefKey] : true;
+        return {
+          shouldShowBanner: enabled,
+          shouldShowList:   enabled,
+          shouldPlaySound:  enabled && notificationSound !== 'none',
+          shouldSetBadge:   enabled,
+          priority:         Notifications.AndroidNotificationPriority.HIGH,
+        };
+      },
+    });
+  }, [notificationPrefs, notificationSound]);
 
   useEffect(() => {
     setupNotifications().catch(() => {});
@@ -66,7 +96,6 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
       .finally(() => { SplashScreen.hideAsync().catch(() => {}); });
   }, []);
 
-  // Navigate only after children (Stack) have mounted and rendered.
   useEffect(() => {
     if (redirectTo) router.replace(redirectTo as any);
   }, [redirectTo]);
@@ -88,14 +117,13 @@ export default function RootLayout() {
     apiHealth.probe();
     cachedApi.prefetchAll();
     sounds.preload();
-    // Fallback: ensure splash is hidden even if OnboardingGate's finally doesn't fire.
     const t = setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 3000);
     return () => clearTimeout(t);
   }, []);
 
   return (
-    <ThemeProvider>
-      <PreferencesProvider>
+    <PreferencesProvider>
+      <ThemeProvider>
         <ToastProvider>
           <AuthProvider>
             <AuthExpiryHandler />
@@ -106,7 +134,7 @@ export default function RootLayout() {
             </OnboardingGate>
           </AuthProvider>
         </ToastProvider>
-      </PreferencesProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </PreferencesProvider>
   );
 }

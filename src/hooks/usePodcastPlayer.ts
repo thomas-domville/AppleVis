@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PodcastEpisode, Chapter } from '../types/content';
 import { persistence } from '../services/persistence';
 import { getLocalUri } from '../services/downloads';
+import { usePreferences } from '../contexts/PreferencesContext';
 
 export type PlaybackSpeed = 0.5 | 0.75 | 1.0 | 1.25 | 1.5 | 1.75 | 2.0 | 2.5 | 3.0;
 export const SPEED_OPTIONS: PlaybackSpeed[] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0];
@@ -54,6 +55,7 @@ export function usePodcastPlayer() {
   const soundRef = useRef<Audio.Sound | null>(null);
   const sleepRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [state, setState] = useState<PlayerState>(DEFAULT);
+  const { podcastAutoPlay, podcastSleepTimer } = usePreferences();
 
   const patch = useCallback((updates: Partial<PlayerState>) => {
     setState((prev) => ({ ...prev, ...updates }));
@@ -104,7 +106,7 @@ export function usePodcastPlayer() {
       }
       const [next, ...rest] = prev.queue;
       if (next) {
-        loadEpisode(next, true);
+        loadEpisode(next, podcastAutoPlay);
         return { ...prev, queue: rest, sleepTimerRemaining: null };
       }
       return { ...prev, isPlaying: false, sleepTimerRemaining: null };
@@ -152,6 +154,11 @@ export function usePodcastPlayer() {
           position: savedPosition,
           currentChapter: resolveChapter(episode, savedPosition),
         });
+      }
+
+      // Apply default sleep timer when playback starts (if no timer already running).
+      if (autoPlay && podcastSleepTimer !== null && sleepRef.current === null) {
+        startSleepTimer(podcastSleepTimer);
       }
     } catch (err) {
       patch({ isLoading: false, error: err instanceof Error ? err.message : 'Playback error' });
