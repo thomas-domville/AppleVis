@@ -37,14 +37,14 @@ export default function Home() {
 
   function formatLastVisit(iso: string | null): string {
     if (!iso) return t('home.firstVisit');
-    const rtf     = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
-    // eslint-disable-next-line react-hooks/purity
     const diffMs  = Date.now() - new Date(iso).getTime();
     const diffMin = Math.floor(diffMs / 60_000);
-    if (diffMin < 60)  return rtf.format(-diffMin, 'minute');
+    if (diffMin < 1)  return 'just now';
+    if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? '' : 's'} ago`;
     const diffH = Math.floor(diffMin / 60);
-    if (diffH   < 24)  return rtf.format(-diffH,   'hour');
-    return               rtf.format(-Math.floor(diffH / 24), 'day');
+    if (diffH < 24)   return `${diffH} hour${diffH === 1 ? '' : 's'} ago`;
+    const diffD = Math.floor(diffH / 24);
+    return              `${diffD} day${diffD === 1 ? '' : 's'} ago`;
   }
 
   const greeting     = t(getGreetingKey());
