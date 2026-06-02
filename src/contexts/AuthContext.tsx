@@ -60,7 +60,7 @@ async function loadSession(): Promise<AuthUser | null> {
 
 export function friendlySignInError(rawError: string): string {
   if (rawError.includes('500')) {
-    return 'Sign in is temporarily unavailable — the server needs a fix from your developer. Try again later.';
+    return 'Sign in is temporarily unavailable. Please try again later.';
   }
   if (rawError.includes('400') || rawError.includes('403')) {
     return 'Incorrect email or password. Please try again.';

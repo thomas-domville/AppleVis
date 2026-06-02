@@ -4,8 +4,7 @@
  * Content (forums, podcasts, apps, resources) is served via Drupal JSON:API.
  * Authentication uses Drupal's REST Simple Auth module.
  *
- * WORKING NOW  : all content GET endpoints
- * NEEDS FIX    : POST /user/login?_format=json  (500 server error — developer must fix)
+ * WORKING NOW  : all content GET endpoints, POST /user/login?_format=json
  * NEEDS BUILDING: push tokens, flag/save/follow, account sync, account deletion
  */
 
