@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../../src/components/Screen';
+import { FilterPicker } from '../../src/components/FilterPicker';
 import { OfflineBanner } from '../../src/components/OfflineBanner';
 import { LoadMoreButton } from '../../src/components/LoadMoreButton';
 import { usePlayer } from '../../src/contexts/PlayerContext';
@@ -181,21 +182,12 @@ export default function Podcasts() {
             </View>
 
             {/* Speed */}
-            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 8 }}>Speed</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {SPEED_OPTIONS.map((s) => (
-                  <Pressable key={s} onPress={() => player.setSpeed(s)} accessible accessibilityRole="button"
-                    accessibilityLabel={`${s}x speed${player.speed === s ? ', selected' : ''}`}
-                    style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
-                      backgroundColor: player.speed === s ? colors.appleVisBlue : '#E8F1FF' }}>
-                    <Text style={{ color: player.speed === s ? '#FFF' : colors.appleVisBlue, fontWeight: '700', fontSize: 14 }}>
-                      {s}×
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </ScrollView>
+            <FilterPicker
+              label="Playback Speed"
+              value={`${player.speed}×`}
+              options={SPEED_OPTIONS.map((s) => `${s}×`) as readonly string[]}
+              onChange={(label) => player.setSpeed(parseFloat(label) as typeof SPEED_OPTIONS[number])}
+            />
 
             {/* Sleep timer */}
             <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 8 }}>
