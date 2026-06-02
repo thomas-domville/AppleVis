@@ -44,7 +44,8 @@
     "react-native-gesture-handler": "~2.31.1",
     "react-native-reanimated": "4.3.1",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-screens": "latest"
+    "react-native-screens": "latest",
+    "react-native-worklets": "^0.8.3"
   },
   "devDependencies": {
     "@types/react": "latest",
