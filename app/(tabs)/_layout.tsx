@@ -21,6 +21,8 @@ const tabLabels: Record<string, string> = {
   resources: 'Resources',
 };
 
+const TAB_ORDER = ['index', 'forums', 'podcasts', 'apps', 'resources'];
+
 function ThemedTabs() {
   const { colors } = useTheme();
 
@@ -36,7 +38,7 @@ function ThemedTabs() {
         ),
         tabBarLabelStyle: { fontSize: 12 },
         headerShown: false,
-        tabBarAccessibilityLabel: `${tabLabels[route.name] ?? route.name} tab`,
+        tabBarAccessibilityLabel: `${tabLabels[route.name] ?? route.name}, ${TAB_ORDER.indexOf(route.name) + 1} of ${TAB_ORDER.length}`,
         tabBarStyle: {
           ...(Platform.OS === 'ios' ? { position: 'absolute' as const } : {}),
           backgroundColor: colors.card,
