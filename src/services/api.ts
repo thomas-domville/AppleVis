@@ -82,13 +82,18 @@ function hasNextPage(collection: JsonApiCollection): boolean {
 
 // ─── Forums ───────────────────────────────────────────────────────────────────
 
-function mapForum(node: JsonApiNode): ForumTopic {
+function mapForum(node: JsonApiNode, included: JsonApiNode[] = []): ForumTopic {
   const a = node.attributes;
+  const uidId = (node.relationships?.uid?.data as { id?: string } | undefined)?.id;
+  const userNode = uidId ? included.find((n) => n.id === uidId) : undefined;
+  const authorName = String(
+    userNode?.attributes?.display_name ?? userNode?.attributes?.name ?? '',
+  );
   return {
     id: node.id,
     title: a.title ?? '',
     meta: `${a.comment_forum?.comment_count ?? 0} replies · ${new Date(a.changed).toLocaleDateString()}`,
-    authorName: '',
+    authorName,
     createdAt: a.created ?? '',
     lastActivityAt: a.changed ?? '',
     replyCount: a.comment_forum?.comment_count ?? 0,
@@ -181,7 +186,7 @@ export const api = {
   forums: {
     async list(filter: string, page = 0, sinceDate?: string) {
       const sort = filter === 'New' ? '-created' : '-changed';
-      let path = `/node/forum?sort=${sort}&${pageParams(page)}`;
+      let path = `/node/forum?sort=${sort}&${pageParams(page)}&include=uid`;
       if (sinceDate) {
         const encoded = encodeURIComponent(sinceDate);
         path +=
@@ -193,7 +198,7 @@ export const api = {
       if (!res.ok) return res;
       return {
         ok: true as const,
-        data: { items: res.data.data.map(mapForum), hasMore: hasNextPage(res.data) } satisfies PaginatedResult<ForumTopic>,
+        data: { items: res.data.data.map((n) => mapForum(n, res.data.included ?? [])), hasMore: hasNextPage(res.data) } satisfies PaginatedResult<ForumTopic>,
       };
     },
 
@@ -211,19 +216,20 @@ export const api = {
         `?filter[ids][condition][path]=id` +
         `&filter[ids][condition][operator]=IN` +
         `&${valueParams}` +
-        `&page[limit]=${capped.length}`;
+        `&page[limit]=${capped.length}` +
+        `&include=uid`;
       const res = await jsonApi<JsonApiCollection>(path);
       if (!res.ok) return res;
       return {
         ok: true as const,
-        data: { items: res.data.data.map(mapForum), hasMore: false } satisfies PaginatedResult<ForumTopic>,
+        data: { items: res.data.data.map((n) => mapForum(n, res.data.included ?? [])), hasMore: false } satisfies PaginatedResult<ForumTopic>,
       };
     },
 
     async topic(id: string) {
-      const res = await jsonApi<{ data: JsonApiNode }>(`/node/forum/${id}`);
+      const res = await jsonApi<JsonApiCollection & { data: JsonApiNode }>(`/node/forum/${id}?include=uid`);
       if (!res.ok) return res;
-      return { ok: true as const, data: mapForum(res.data.data) };
+      return { ok: true as const, data: mapForum(res.data.data, res.data.included ?? []) };
     },
 
     /**
@@ -413,7 +419,7 @@ export const api = {
         `/node/forum?filter[title][operator]=CONTAINS&filter[title][value]=${q}&sort=-changed&page[limit]=10`,
       );
       if (!res.ok) return res;
-      return { ok: true as const, data: { items: res.data.data.map(mapForum), hasMore: false } satisfies PaginatedResult<ForumTopic> };
+      return { ok: true as const, data: { items: res.data.data.map((n) => mapForum(n, res.data.included ?? [])), hasMore: false } satisfies PaginatedResult<ForumTopic> };
     },
 
     async apps(query: string) {

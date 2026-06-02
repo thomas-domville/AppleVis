@@ -167,6 +167,7 @@ export default function Forums() {
               else topicRefs.current.delete(topic.id);
             }}
             title={topic.title}
+            authorLabel={topic.authorName ? `By ${topic.authorName}` : undefined}
             meta={[
               topic.isUnread    ? 'Unread'    : null,
               topic.isFollowing ? 'Following' : null,

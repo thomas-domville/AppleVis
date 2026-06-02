@@ -6,20 +6,30 @@ import { usePreferences } from '../contexts/PreferencesContext';
 type Props = {
   title: string;
   meta: string;
+  /** Author / submitter name — announced in 'all' level only. Pass e.g. "By JohnDoe". */
+  authorLabel?: string;
   hint?: string;
   actions?: string[];
   onAction?: (actionName: string) => void;
 };
 
 export const AccessibleCard = forwardRef<View, Props>(
-  function AccessibleCard({ title, meta, hint = 'Double tap to open.', actions = [], onAction }, ref) {
-    const { styles }           = useTheme();
+  function AccessibleCard({ title, meta, authorLabel, hint = 'Double tap to open.', actions = [], onAction }, ref) {
+    const { styles }            = useTheme();
     const { announcementLevel } = usePreferences();
 
-    // Build the VoiceOver label from the announcement level preference.
-    const label = announcementLevel === 'simple'
-      ? title
-      : [title, meta].filter(Boolean).join('. ');
+    // Three announcement levels:
+    //   simple — title only, no hint (quick scanning)
+    //   normal — title + meta, with hint
+    //   all    — title + author + meta, with hint (default)
+    let label: string;
+    if (announcementLevel === 'simple') {
+      label = title;
+    } else if (announcementLevel === 'all' && authorLabel) {
+      label = [title, authorLabel, meta].filter(Boolean).join('. ');
+    } else {
+      label = [title, meta].filter(Boolean).join('. ');
+    }
 
     const resolvedHint = announcementLevel === 'simple' ? undefined : hint;
 
