@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Share, Text, 
 import { useRouter } from 'expo-router';
 import { Screen } from '../../src/components/Screen';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
+import { FilterPicker } from '../../src/components/FilterPicker';
 import { OfflineBanner } from '../../src/components/OfflineBanner';
 import { LoadMoreButton } from '../../src/components/LoadMoreButton';
 import { useForumState, FORUM_FILTERS } from '../../src/hooks/useForumState';
@@ -93,32 +94,13 @@ export default function Forums() {
           />
         }
       >
-        {/* Filter bar */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          accessibilityLabel="Forum filters"
-          accessibilityRole="tablist"
-          style={{ marginBottom: 16 }}
-          contentContainerStyle={{ gap: 8, paddingRight: 4 }}
-        >
-          {FORUM_FILTERS.map((f) => {
-            const isActive = f === forum.filter;
-            return (
-              <Pressable
-                key={f}
-                onPress={() => forum.setFilter(f)}
-                accessible
-                accessibilityRole="tab"
-                accessibilityLabel={f}
-                accessibilityState={{ selected: isActive }}
-                style={[styles.pill, isActive && { backgroundColor: colors.appleVisBlue }]}
-              >
-                <Text style={[styles.pillText, isActive && { color: '#FFFFFF' }]}>{f}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        {/* Filter picker */}
+        <FilterPicker
+          label="Filter Forums"
+          value={forum.filter}
+          options={FORUM_FILTERS}
+          onChange={forum.setFilter}
+        />
 
         <OfflineBanner fromCache={forum.fromCache} cachedAt={forum.cachedAt} />
 
