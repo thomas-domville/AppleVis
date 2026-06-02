@@ -85,7 +85,6 @@ const SPEED_OPTIONS: { value: PlaybackSpeed; label: string }[] = [
 
 const SKIP_BACK_OPTIONS   = [{ value: 5, label: '5s' }, { value: 10, label: '10s' }, { value: 15, label: '15s' }, { value: 30, label: '30s' }];
 const SKIP_FWD_OPTIONS    = [{ value: 15, label: '15s' }, { value: 30, label: '30s' }, { value: 45, label: '45s' }, { value: 60, label: '60s' }];
-const SLEEP_TIMER_OPTIONS = [{ value: null as null, label: 'Off' }, { value: 15, label: '15m' }, { value: 30, label: '30m' }, { value: 45, label: '45m' }, { value: 60, label: '60m' }];
 const EQ_OPTIONS: { value: PodcastEQPreset; label: string }[] = [
   { value: 'flat', label: 'Flat' }, { value: 'speech', label: 'Speech' },
   { value: 'bassBoost', label: 'Bass' }, { value: 'trebleBoost', label: 'Treble' },

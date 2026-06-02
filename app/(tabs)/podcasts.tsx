@@ -11,7 +11,7 @@ import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
 import { readAloud, donateSiriActivity } from '../../src/services/intelligenceService';
 import { trackMeaningfulAction } from '../../src/services/reviewPrompt';
-import { startPodcastLiveActivity, updatePodcastLiveActivity, endPodcastLiveActivity } from '../../src/native/nativeModules';
+import { startPodcastLiveActivity } from '../../src/native/nativeModules';
 import { SPEED_OPTIONS, SLEEP_TIMER_OPTIONS } from '../../src/hooks/usePodcastPlayer';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { PodcastEpisode } from '../../src/types/content';

@@ -13,6 +13,9 @@ function formatAge(ms: number): string {
 }
 
 export function OfflineBanner({ fromCache, cachedAt }: Props) {
+  // Date.now() is intentional here: we compute cache age once when the banner
+  // mounts with a stable cachedAt prop. The value is correct for its lifetime.
+  // eslint-disable-next-line react-hooks/purity
   const age   = cachedAt != null ? formatAge(Date.now() - cachedAt) : null;
   const label = age
     ? `Showing saved content from ${age}. Pull down to refresh when online.`

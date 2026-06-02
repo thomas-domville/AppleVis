@@ -18,10 +18,10 @@ export default function Resources() {
   const { colors, styles } = useTheme();
   const list          = useResourceList();
   const { showToast } = useToast();
-  useRefreshFeedback(list.refreshing, 'Resources', list.loading,
-    () => resourceRefs.current.get(list.resources[0]?.id ?? '') ?? null);
   const resourceRefs = useRef<Map<string, View>>(new Map());
   const { save }     = useFocusRestore();
+  useRefreshFeedback(list.refreshing, 'Resources', list.loading,
+    () => resourceRefs.current.get(list.resources[0]?.id ?? '') ?? null);
 
   useHandoff({
     activityType: 'com.applevis.app.viewResources',

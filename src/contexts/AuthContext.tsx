@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { api } from '../services/api';
+import { getExpoPushToken } from '../services/notifications';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -98,6 +99,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
       await saveSession(newUser);
       setUser(newUser);
+
+      // Register device push token with server so targeted notifications work.
+      // Best-effort — sign-in succeeds regardless of token registration outcome.
+      getExpoPushToken().then((token) => {
+        if (token) api.account.registerPushToken(token, csrf_token).catch(() => {});
+      }).catch(() => {});
+
       return { ok: true };
     },
     [],

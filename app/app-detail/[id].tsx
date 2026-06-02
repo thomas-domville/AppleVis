@@ -7,7 +7,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
 import { useHandoff } from '../../src/hooks/useHandoff';
-import { readAloud, translateContent, summariseText, accessibilityConsensus } from '../../src/services/intelligenceService';
+import { readAloud, accessibilityConsensus } from '../../src/services/intelligenceService';
 import { api } from '../../src/services/api';
 import type { AppDetail, AppReview } from '../../src/types/content';
 
@@ -80,6 +80,9 @@ export default function AppDetailScreen() {
     api.apps.detail(id).then((res) => {
       setLoading(false);
       if (res.ok) setApp(res.data); else setError(res.error);
+    }).catch((err: unknown) => {
+      setLoading(false);
+      setError(err instanceof Error ? err.message : 'Unexpected error');
     });
   }, [id]);
 

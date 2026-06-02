@@ -48,6 +48,13 @@
   },
   "devDependencies": {
     "@types/react": "latest",
+    "@typescript-eslint/eslint-plugin": "^8.60.1",
+    "@typescript-eslint/parser": "^8.60.1",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-native": "^5.0.0",
+    "eslint-plugin-react-native-a11y": "^3.5.1",
     "typescript": "latest"
   }
 }

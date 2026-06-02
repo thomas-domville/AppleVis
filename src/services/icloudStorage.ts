@@ -50,7 +50,7 @@ async function remove(key: string): Promise<void> {
     } else {
       await AsyncStorage.removeItem(key);
     }
-  } catch {}
+  } catch (_e) { /* non-critical */ }
 }
 
 export const icloudStorage = {

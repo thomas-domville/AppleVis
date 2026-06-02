@@ -22,7 +22,7 @@ const tabLabels: Record<string, string> = {
 };
 
 function ThemedTabs() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   return (
     <Tabs

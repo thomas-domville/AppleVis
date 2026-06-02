@@ -48,7 +48,7 @@ export const contentCache = {
     try {
       const entry: CacheEntry<T> = { data, fetchedAt: Date.now() };
       await AsyncStorage.setItem(PREFIX + key, JSON.stringify(entry));
-    } catch {}
+    } catch (_e) { /* non-critical */ }
   },
 
   // Returns 'fresh', 'stale', or 'expired' for a given entry and cache key.
@@ -76,7 +76,7 @@ export const contentCache = {
       const target = PREFIX + (keyPrefix ?? '');
       const toRemove = allKeys.filter((k) => k.startsWith(target));
       if (toRemove.length > 0) await AsyncStorage.multiRemove(toRemove);
-    } catch {}
+    } catch (_e) { /* non-critical */ }
   },
 
   // Returns the total number of cached entries (for display in Settings).
@@ -116,9 +116,9 @@ export const contentCache = {
         try {
           const entry = JSON.parse(value) as CacheEntry<unknown>;
           if (now - entry.fetchedAt > maxAgeMs) toRemove.push(key);
-        } catch {}
+        } catch (_e) { /* non-critical */ }
       }
       if (toRemove.length > 0) await AsyncStorage.multiRemove(toRemove);
-    } catch {}
+    } catch (_e) { /* non-critical */ }
   },
 };

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { WizardLayout } from '../../src/components/WizardLayout';

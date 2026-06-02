@@ -120,7 +120,7 @@ export default function About() {
             <Ionicons name="sparkles" size={20} color={colors.accentText} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.cardTitle, { marginBottom: 1 }]}>What's New</Text>
+            <Text style={[styles.cardTitle, { marginBottom: 1 }]}>{"What's New"}</Text>
             <Text style={styles.cardMeta}>See what changed in version {APP_VERSION}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />

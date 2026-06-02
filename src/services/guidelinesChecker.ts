@@ -32,7 +32,7 @@ export function checkGuidelines(text: string): GuidelineWarning[] {
 
   // ── Personal information (email address) ─────────────────────────────────
   // Guideline: "it is recommended that you not include email addresses"
-  if (/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/.test(text)) {
+  if (/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(text)) {
     warnings.push({
       id: 'personal-info',
       rule: 'Personal Information',

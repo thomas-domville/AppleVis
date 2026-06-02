@@ -9,10 +9,14 @@ type SoundKey = 'refreshStart' | 'refreshComplete';
 // open-section for "begin" (subtle ping), download-complete for "done".
 // When the Sounds & Haptics setting is implemented, gate playback on
 // persistence.getSetting('appSounds', true) here.
+// React Native asset bundling requires require() — ES import is not supported
+// for audio files resolved at runtime by the Metro bundler.
+/* eslint-disable @typescript-eslint/no-require-imports */
 const ASSETS: Record<SoundKey, number> = {
   refreshStart:    require('../../assets/sounds/open-section.wav'),
   refreshComplete: require('../../assets/sounds/download-complete.wav'),
 };
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 // ─── Module-level cache ───────────────────────────────────────────────────────
 
@@ -27,7 +31,7 @@ async function play(key: SoundKey): Promise<void> {
     // Rewind to start so rapid successive calls work correctly.
     await cache[key]!.setPositionAsync(0);
     await cache[key]!.playAsync();
-  } catch {}
+  } catch (_e) { /* non-critical */ }
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────

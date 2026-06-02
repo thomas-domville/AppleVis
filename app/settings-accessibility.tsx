@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Screen } from '../src/components/Screen';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { usePreferences } from '../src/contexts/PreferencesContext';

@@ -83,14 +83,14 @@ export async function readAloud(text: string): Promise<void> {
     const speaking = await Speech.isSpeakingAsync();
     if (speaking) await Speech.stop();
     Speech.speak(text, { language: 'en-US', rate: 0.92, pitch: 1.0 });
-  } catch {}
+  } catch (_e) { /* non-critical */ }
 }
 
 export async function stopReading(): Promise<void> {
   try {
     const speaking = await Speech.isSpeakingAsync();
     if (speaking) await Speech.stop();
-  } catch {}
+  } catch (_e) { /* non-critical */ }
 }
 
 export async function isReading(): Promise<boolean> {

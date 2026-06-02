@@ -39,7 +39,7 @@ async function localGet<T>(key: string, fallback: T): Promise<T> {
 }
 
 async function localSet<T>(key: string, value: T): Promise<void> {
-  try { await AsyncStorage.setItem(key, JSON.stringify(value)); } catch {}
+  try { await AsyncStorage.setItem(key, JSON.stringify(value)); } catch (_e) { /* non-critical */ }
 }
 
 export const persistence = {

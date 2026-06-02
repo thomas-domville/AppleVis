@@ -18,10 +18,10 @@ export default function Apps() {
   const { colors, styles } = useTheme();
   const list           = useAppList();
   const { showToast }  = useToast();
-  useRefreshFeedback(list.refreshing, 'Apps', list.loading,
-    () => appRefs.current.get(list.apps[0]?.id ?? '') ?? null);
   const appRefs = useRef<Map<string, View>>(new Map());
   const { save } = useFocusRestore();
+  useRefreshFeedback(list.refreshing, 'Apps', list.loading,
+    () => appRefs.current.get(list.apps[0]?.id ?? '') ?? null);
 
   useHandoff({
     activityType: 'com.applevis.app.viewApps',

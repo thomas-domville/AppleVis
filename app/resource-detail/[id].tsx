@@ -7,7 +7,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
 import { useHandoff } from '../../src/hooks/useHandoff';
-import { readAloud, translateContent, summariseText, simplifyText } from '../../src/services/intelligenceService';
+import { readAloud, translateContent, summariseText } from '../../src/services/intelligenceService';
 import { api } from '../../src/services/api';
 import type { ResourceDetail } from '../../src/types/content';
 
@@ -64,6 +64,9 @@ export default function ResourceDetailScreen() {
     api.resources.detail(id).then((res) => {
       setLoading(false);
       if (res.ok) setResource(res.data); else setError(res.error);
+    }).catch((err: unknown) => {
+      setLoading(false);
+      setError(err instanceof Error ? err.message : 'Unexpected error');
     });
   }, [id]);
 

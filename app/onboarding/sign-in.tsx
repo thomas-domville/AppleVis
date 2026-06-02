@@ -78,7 +78,7 @@ export default function SignInStep() {
           </Text>
         ))}
         <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 6 }}>
-          Don't have an account? Visit applevis.com to register — it's free.
+          {"Don't have an account? Visit applevis.com to register — it's free."}
         </Text>
       </View>
 

@@ -10,6 +10,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -52,8 +53,13 @@ const TAB_BAR_HEIGHT = 49;
 
 function ToastDisplay({ toast, onDone }: { toast: ToastMessage; onDone: () => void }) {
   const insets = useSafeAreaInsets();
-  const opacity    = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(16)).current;
+  // useMemo with empty deps creates the Animated.Value once per component
+  // instance. Using useState(() => ...) would also work but useMemo is more
+  // semantically clear that this is a derived value, not state.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const opacity    = useMemo(() => new Animated.Value(0),  []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const translateY = useMemo(() => new Animated.Value(16), []);
 
   useEffect(() => {
     // ── VoiceOver: most reliable way to ensure the message is spoken ──

@@ -87,6 +87,9 @@ export default function TopicDetail() {
       } else {
         setError(res.error);
       }
+    }).catch((err: unknown) => {
+      setLoading(false);
+      setError(err instanceof Error ? err.message : 'Unexpected error');
     });
   }, [id]);
 

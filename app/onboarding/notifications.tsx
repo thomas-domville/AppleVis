@@ -51,7 +51,7 @@ export default function NotificationsStep() {
   async function previewSound(id: NotificationSound) {
     if (id === 'none') return;
     // Play the closest available sound as a preview
-    try { await sounds.refreshComplete(); } catch {}
+    try { await sounds.refreshComplete(); } catch (_e) { /* preview is non-critical */ }
   }
 
   async function handleAllow() {
@@ -65,8 +65,6 @@ export default function NotificationsStep() {
     }
     router.push('/onboarding/ready');
   }
-
-  const anyEnabled = Object.values(notificationPrefs).some(Boolean);
 
   return (
     <WizardLayout

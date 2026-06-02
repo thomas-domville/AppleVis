@@ -158,7 +158,7 @@ function SettingCard({ item }: { item: SettingItem }) {
 
 export default function SettingsDetail() {
   const { sectionId, title } = useLocalSearchParams<{ sectionId?: string; title?: string }>();
-  const { colors, styles } = useTheme();
+  const { colors } = useTheme();
 
   const section = sectionId
     ? SETTINGS_SECTIONS.find((s) => s.id === sectionId)

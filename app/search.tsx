@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, ScrollView, Text, TextInput, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Screen } from '../src/components/Screen';
 import { AccessibleCard } from '../src/components/AccessibleCard';
 import { useSearch } from '../src/hooks/useSearch';
@@ -9,11 +10,15 @@ import { translateContent, readAloud } from '../src/services/intelligenceService
 import { useTheme } from '../src/contexts/ThemeContext';
 
 export default function SearchScreen() {
+  const router = useRouter();
   const { colors, styles } = useTheme();
-  const { results, loading, error, hasQuery, totalCount, search, clear } = useSearch();
+  const { results, loading, error, hasQuery, totalCount, search } = useSearch();
   const inputRef   = useRef<TextInput>(null);
   const queryRef   = useRef('');
-  const { isNonEnglish, isConfident } = useLanguageDetection(queryRef.current);
+  // Separate state for language detection so the hook receives a stable
+  // render-time value, not a ref (refs must not be read during render).
+  const [detectionQuery, setDetectionQuery] = useState('');
+  const { isNonEnglish, isConfident } = useLanguageDetection(detectionQuery);
 
   // Auto-focus the input on mount.
   useEffect(() => {
@@ -37,6 +42,7 @@ export default function SearchScreen() {
 
   function handleChange(text: string) {
     queryRef.current = text;
+    setDetectionQuery(text);
     search(text);
   }
 
@@ -125,6 +131,7 @@ export default function SearchScreen() {
                 meta={topic.meta}
                 actions={['Open', 'Read Aloud', 'Translate']}
                 onAction={(action) => {
+                  if (action === 'Open') router.push({ pathname: '/topic/[id]' as any, params: { id: topic.id, title: topic.title } });
                   if (action === 'Read Aloud') readAloud(`${topic.title}. ${topic.meta}`);
                   if (action === 'Translate')  translateContent(`${topic.title}\n${topic.meta}`, topic.title);
                 }}
@@ -152,6 +159,7 @@ export default function SearchScreen() {
                 ].filter(Boolean).join(' · ')}
                 actions={['Open App Page', 'Read Aloud', 'Translate']}
                 onAction={(action) => {
+                  if (action === 'Open App Page') router.push({ pathname: '/app-detail/[id]' as any, params: { id: app.id, name: app.name } });
                   if (action === 'Read Aloud') readAloud(`${app.name}. ${app.summary}`);
                   if (action === 'Translate')  translateContent(`${app.name}\n\n${app.summary}`, app.name);
                 }}
@@ -176,6 +184,7 @@ export default function SearchScreen() {
                 meta={`${item.kind} · Updated ${new Date(item.updatedAt).toLocaleDateString()}`}
                 actions={['Open', 'Read Aloud', 'Translate']}
                 onAction={(action) => {
+                  if (action === 'Open') router.push({ pathname: '/resource-detail/[id]' as any, params: { id: item.id, title: item.title, url: item.url } });
                   if (action === 'Read Aloud') readAloud(`${item.title}. ${item.summary}`);
                   if (action === 'Translate')  translateContent(`${item.title}\n\n${item.summary}`, item.title);
                 }}
