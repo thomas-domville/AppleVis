@@ -15,8 +15,8 @@ const CATEGORIES: CategoryDef[] = [
   { key: 'newTopics',      label: 'New Topics',                description: 'When new forum discussions are started.' },
   { key: 'followedTopics', label: 'Followed Topic Activity',   description: 'New replies in topics you are following.' },
   { key: 'newEpisodes',    label: 'New Podcast Episodes',      description: 'When a new AppleVis podcast episode is published.' },
-  { key: 'appUpdates',     label: 'App Updates & New Listings',description: 'When apps in the directory are updated or added.' },
-  { key: 'newResources',   label: 'New Resources & Guides',    description: 'When new articles or tutorials are published.' },
+  { key: 'appUpdates',     label: 'New App Directory Entries',  description: 'When new app directory entries are published or existing ones are updated.' },
+  { key: 'newResources',   label: 'New Guides & Blog Posts',    description: 'When new guides or blog posts are published.' },
   { key: 'announcements',  label: 'AppleVis Announcements',    description: 'Important news from the AppleVis team.' },
 ];
 
@@ -37,7 +37,8 @@ export default function NotificationSettings() {
   }
 
   async function previewSound(id: NotificationSound) {
-    if (id !== 'none') await sounds.refreshComplete().catch(() => {});
+    if (id === 'mouseSqueak') await sounds.mouseSqueak().catch(() => {});
+    else if (id === 'appleCrunch') await sounds.appleCrunch().catch(() => {});
   }
 
   async function handleRequestPermissions() {
@@ -115,7 +116,7 @@ export default function NotificationSettings() {
             <Pressable
               key={id}
               onPress={() => { setNotificationSound(id); previewSound(id); }}
-              accessible accessibilityRole="radio"
+              accessible accessibilityRole="none"
               accessibilityState={{ selected: isSelected }}
               accessibilityLabel={`${label}${isSelected ? ', selected' : ''}`}
               accessibilityHint={`${description}${id !== 'none' ? ' Double tap to preview.' : ''}`}

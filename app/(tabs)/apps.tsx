@@ -12,10 +12,12 @@ import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
 import { translateContent, donateSiriActivity, readAloud, summariseText, simplifyText, accessibilityConsensus } from '../../src/services/intelligenceService';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 
 export default function Apps() {
   const router         = useRouter();
   const { colors, styles } = useTheme();
+  const { screenReaderEnabled } = useAccessibilityPreferences();
   const list           = useAppList();
   const { showToast }  = useToast();
   const appRefs = useRef<Map<string, View>>(new Map());
@@ -30,7 +32,7 @@ export default function Apps() {
   });
 
   return (
-    <Screen title="Apps" refreshing={list.refreshing} showSearch>
+    <Screen title="Apps" refreshing={list.refreshing} showSearch showBack={false}>
       <ScrollView
         refreshControl={
           <RefreshControl
@@ -90,7 +92,7 @@ export default function Apps() {
               app.reviewCount > 0 ? `${app.reviewCount} reviews` : null,
               `Updated ${new Date(app.lastUpdatedAt).toLocaleDateString()}`,
             ].filter(Boolean).join(' · ')}
-            actions={['Open App Page', 'Save App', 'Read Aloud', 'Translate', 'Summarise Reviews', 'Accessibility Consensus', 'Simplify', 'Share', 'View Reviews']}
+            actions={['Open App Page', 'Save App', ...(!screenReaderEnabled ? ['Read Aloud'] : []), 'Translate', 'Summarise Reviews', 'Accessibility Consensus', 'Simplify', 'Share', 'View Reviews']}
             onAction={(action) => {
               if (action === 'Open App Page') {
                 save(appRefs.current.get(app.id) ?? null);

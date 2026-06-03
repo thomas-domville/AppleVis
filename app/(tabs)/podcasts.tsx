@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { Screen } from '../../src/components/Screen';
 import { FilterPicker } from '../../src/components/FilterPicker';
 import { OfflineBanner } from '../../src/components/OfflineBanner';
@@ -15,6 +16,7 @@ import { trackMeaningfulAction } from '../../src/services/reviewPrompt';
 import { startPodcastLiveActivity } from '../../src/native/nativeModules';
 import { SPEED_OPTIONS, SLEEP_TIMER_OPTIONS } from '../../src/hooks/usePodcastPlayer';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 import type { PodcastEpisode } from '../../src/types/content';
 
 function formatTime(seconds: number): string {
@@ -31,7 +33,9 @@ function formatDuration(seconds: number): string {
 }
 
 export default function Podcasts() {
+  const router         = useRouter();
   const { colors, styles } = useTheme();
+  const { screenReaderEnabled } = useAccessibilityPreferences();
   const player         = usePlayer();
   const list           = usePodcastList();
   const { showToast }  = useToast();
@@ -69,6 +73,22 @@ export default function Podcasts() {
   const progress = player.duration > 0 ? player.position / player.duration : 0;
   const durationKnown = player.duration > 0;
 
+  function navigateToEpisode(episode: PodcastEpisode) {
+    router.push({
+      pathname: '/episode/[id]' as any,
+      params: {
+        id: episode.id,
+        title: episode.title,
+        showTitle: episode.showTitle,
+        description: episode.description ?? '',
+        artworkUrl: episode.artworkUrl ?? '',
+        publishedAt: episode.publishedAt ?? '',
+        duration: String(episode.duration),
+        audioUrl: episode.audioUrl,
+      },
+    });
+  }
+
   function handleEpisodeAction(episode: PodcastEpisode, actionName: string) {
     if (actionName === 'play') {
       player.loadEpisode(episode, true);
@@ -80,6 +100,7 @@ export default function Podcasts() {
         position: 0,
         duration: episode.duration,
       });
+      navigateToEpisode(episode);
     } else if (actionName === 'read_aloud') {
       readAloud([episode.title, episode.showTitle, episode.description].filter(Boolean).join('. '));
     } else if (actionName === 'play_next') {
@@ -96,7 +117,7 @@ export default function Podcasts() {
   }
 
   return (
-    <Screen title="Podcasts" refreshing={list.refreshing}>
+    <Screen title="Podcasts" refreshing={list.refreshing} showBack={false}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -264,8 +285,21 @@ export default function Podcasts() {
           const isCurrent = isCurrentEpisode(episode.id);
           const durationLabel = formatDuration(episode.duration);
           return (
-            <View
+            <Pressable
               key={episode.id}
+              onPress={() => router.push({
+                pathname: '/episode/[id]' as any,
+                params: {
+                  id: episode.id,
+                  title: episode.title,
+                  showTitle: episode.showTitle,
+                  description: episode.description ?? '',
+                  artworkUrl: episode.artworkUrl ?? '',
+                  publishedAt: episode.publishedAt ?? '',
+                  duration: String(episode.duration),
+                  audioUrl: episode.audioUrl,
+                },
+              })}
               accessible
               accessibilityRole="none"
               accessibilityLabel={[
@@ -274,9 +308,10 @@ export default function Podcasts() {
                 durationLabel,
                 isCurrent ? 'Currently loaded.' : null,
               ].filter(Boolean).join('. ')}
+              accessibilityHint="Double tap to open episode details and player"
               accessibilityActions={[
                 { name: 'play',         label: 'Play' },
-                { name: 'read_aloud',   label: 'Read description aloud' },
+                ...(!screenReaderEnabled ? [{ name: 'read_aloud', label: 'Read description aloud' }] : []),
                 { name: 'play_next',    label: 'Play next' },
                 { name: 'add_to_queue', label: 'Add to queue' },
                 { name: 'save',         label: 'Save episode' },
@@ -313,7 +348,7 @@ export default function Podcasts() {
                   <Text style={{ color: colors.appleVisBlue, fontWeight: '700', fontSize: 14 }}>Queue</Text>
                 </Pressable>
               </View>
-            </View>
+            </Pressable>
           );
         })}
 

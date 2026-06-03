@@ -13,6 +13,13 @@ import type { ForumTopic, ForumReply, ForumTopicDetail, AppListing, AppDetail, A
 const BASE             = 'https://www.applevis.com';
 const JSONAPI          = `${BASE}/jsonapi`;
 const FETCH_TIMEOUT_MS = 10_000;
+const APP_UA           = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 AppleVis/2026';
+const COMMON_HEADERS   = {
+  'User-Agent':      APP_UA,
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Origin':          BASE,
+  'Referer':         `${BASE}/`,
+};
 
 function fileUri(drupalUri: string): string {
   return drupalUri.replace('public://', `${BASE}/sites/default/files/`);
@@ -27,7 +34,7 @@ async function jsonApi<T>(path: string, options?: RequestInit): Promise<JsonApiR
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
     const res = await fetch(`${JSONAPI}${path}`, {
-      headers: { Accept: 'application/vnd.api+json', 'Content-Type': 'application/vnd.api+json' },
+      headers: { ...COMMON_HEADERS, Accept: 'application/vnd.api+json', 'Content-Type': 'application/vnd.api+json' },
       ...options,
       signal: ctrl.signal,
     });
@@ -49,7 +56,7 @@ async function drupalRest<T>(path: string, options?: RequestInit): Promise<JsonA
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
     const res = await fetch(`${BASE}${path}`, {
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      headers: { ...COMMON_HEADERS, Accept: 'application/json', 'Content-Type': 'application/json', 'Referer': `${BASE}/user/login` },
       ...options,
       signal: ctrl.signal,
     });

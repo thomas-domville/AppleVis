@@ -52,7 +52,7 @@ export default function Home() {
   const lastVisitStr = formatLastVisit(lastVisit);
 
   return (
-    <Screen title="Home" showSearch>
+    <Screen title="Home" showSearch showBack={false}>
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {auth.isSignedIn && name ? (

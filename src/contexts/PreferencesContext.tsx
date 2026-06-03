@@ -48,6 +48,7 @@ const KEYS = {
   podcastEQ:            '@applevis_podcast_eq',
   podcastAutoDownload:  '@applevis_podcast_auto_download',
   podcastAutoDelete:    '@applevis_podcast_auto_delete',
+  podcastTrimSilence:   '@applevis_podcast_trim_silence',
 };
 
 type PreferencesContextValue = {
@@ -94,6 +95,9 @@ type PreferencesContextValue = {
   podcastAutoDelete:    PodcastAutoDelete;
   setPodcastAutoDelete: (v: PodcastAutoDelete) => void;
 
+  podcastTrimSilence:    boolean;
+  setPodcastTrimSilence: (v: boolean) => void;
+
   /** True while preferences are being loaded from storage. */
   isLoading: boolean;
 };
@@ -116,6 +120,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const [podcastEQ,           setPodcastEQState]           = useState<PodcastEQPreset>('flat');
   const [podcastAutoDownload, setPodcastAutoDownloadState] = useState<PodcastAutoDownload>('off');
   const [podcastAutoDelete,   setPodcastAutoDeleteState]   = useState<PodcastAutoDelete>('off');
+  const [podcastTrimSilence,  setPodcastTrimSilenceState]  = useState<boolean>(false);
 
   useEffect(() => {
     Promise.all([
@@ -133,7 +138,8 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       AsyncStorage.getItem(KEYS.podcastEQ),
       AsyncStorage.getItem(KEYS.podcastAutoDownload),
       AsyncStorage.getItem(KEYS.podcastAutoDelete),
-    ]).then(([level, filter, density, prefs, sound, speed, skipB, skipF, autoPlay, sleep, vBoost, eq, autoDl, autoDel]) => {
+      AsyncStorage.getItem(KEYS.podcastTrimSilence),
+    ]).then(([level, filter, density, prefs, sound, speed, skipB, skipF, autoPlay, sleep, vBoost, eq, autoDl, autoDel, trimSilence]) => {
       if (level)    setAnnouncementLevelState(level as AnnouncementLevel);
       if (filter)   setDefaultForumFilterState(filter as DefaultForumFilter);
       if (density)  setCardDensityState(density as CardDensity);
@@ -147,7 +153,8 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       if (vBoost)   setPodcastVoiceBoostState(vBoost === 'true');
       if (eq)       setPodcastEQState(eq as PodcastEQPreset);
       if (autoDl)   setPodcastAutoDownloadState(autoDl as PodcastAutoDownload);
-      if (autoDel)  setPodcastAutoDeleteState(autoDel as PodcastAutoDelete);
+      if (autoDel)     setPodcastAutoDeleteState(autoDel as PodcastAutoDelete);
+      if (trimSilence) setPodcastTrimSilenceState(trimSilence === 'true');
     }).finally(() => setIsLoading(false));
   }, []);
 
@@ -212,6 +219,10 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     setPodcastAutoDeleteState(v);
     AsyncStorage.setItem(KEYS.podcastAutoDelete, v).catch(() => {});
   }, []);
+  const setPodcastTrimSilence = useCallback((v: boolean) => {
+    setPodcastTrimSilenceState(v);
+    AsyncStorage.setItem(KEYS.podcastTrimSilence, String(v)).catch(() => {});
+  }, []);
 
   const value = useMemo<PreferencesContextValue>(() => ({
     announcementLevel,  setAnnouncementLevel,
@@ -228,17 +239,19 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     podcastEQ,           setPodcastEQ,
     podcastAutoDownload, setPodcastAutoDownload,
     podcastAutoDelete,   setPodcastAutoDelete,
+    podcastTrimSilence,  setPodcastTrimSilence,
     isLoading,
   }), [
     announcementLevel, defaultForumFilter, cardDensity,
     notificationPrefs, notificationSound,
     podcastSpeed, podcastSkipBack, podcastSkipForward, podcastAutoPlay,
-    podcastSleepTimer, podcastVoiceBoost, podcastEQ, podcastAutoDownload, podcastAutoDelete,
+    podcastSleepTimer, podcastVoiceBoost, podcastEQ, podcastAutoDownload, podcastAutoDelete, podcastTrimSilence,
     isLoading,
     setAnnouncementLevel, setDefaultForumFilter, setCardDensity,
     setNotificationPrefs, setNotificationSound,
     setPodcastSpeed, setPodcastSkipBack, setPodcastSkipForward, setPodcastAutoPlay,
     setPodcastSleepTimer, setPodcastVoiceBoost, setPodcastEQ, setPodcastAutoDownload, setPodcastAutoDelete,
+    setPodcastTrimSilence,
   ]);
 
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;

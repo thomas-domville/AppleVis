@@ -1,4 +1,4 @@
-import { Clipboard, Dimensions, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Clipboard, Dimensions, Image, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
@@ -88,20 +88,21 @@ export default function About() {
         {/* Brand card */}
         <View style={[styles.card, { alignItems: 'center', paddingVertical: 28 }]}
           accessible
-          accessibilityLabel={`AppleVis. Version ${APP_VERSION}, Build ${BUILD_NUMBER}. A community for blind, low-vision, and sighted Apple users.`}>
-          <View style={{ width: 72, height: 72, borderRadius: 18,
-            backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center',
-            marginBottom: 14 }} accessibilityElementsHidden>
-            <Text style={{ fontSize: 36 }}>🐭</Text>
+          accessibilityLabel={`AppleVis — a Be My Eyes company. Version ${APP_VERSION}, Build ${BUILD_NUMBER}. The premier community for blind, DeafBlind, and low vision Apple users.`}>
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 12,
+            paddingHorizontal: 16, paddingVertical: 12, marginBottom: 16 }}
+            accessibilityElementsHidden>
+            <Image
+              source={require('../assets/images/applevis-logo.png')}
+              style={{ width: 200, height: 57 }}
+              resizeMode="contain"
+            />
           </View>
-          <Text style={{ fontSize: 24, fontWeight: '800', color: colors.text, marginBottom: 4 }}>
-            AppleVis
-          </Text>
           <Text style={{ fontSize: 15, color: colors.textSecondary, marginBottom: 2 }}>
             Version {APP_VERSION} (Build {BUILD_NUMBER})
           </Text>
-          <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center' }}>
-            A community for blind, low-vision, and sighted Apple users.
+          <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20 }}>
+            The premier community for blind, DeafBlind, and{'\n'}low vision Apple users.
           </Text>
         </View>
 
@@ -110,7 +111,7 @@ export default function About() {
           onPress={() => router.push('/whats-new' as any)}
           accessible accessibilityRole="button"
           accessibilityLabel="What's New in this version"
-          accessibilityHint="Shows a summary of features and changes in version 2026.0.1.1."
+          accessibilityHint={`Shows a summary of features and changes in version ${APP_VERSION}.`}
           style={({ pressed }) => [styles.card, { flexDirection: 'row', alignItems: 'center',
             gap: 12, marginBottom: 8 }, pressed && { opacity: 0.85 }]}
         >

@@ -138,7 +138,7 @@ export default function StorageScreen() {
                     key={opt.value}
                     onPress={() => applyRetention(opt.value)}
                     accessible
-                    accessibilityRole="radio"
+                    accessibilityRole="none"
                     accessibilityLabel={opt.label}
                     accessibilityState={{ selected }}
                     style={{

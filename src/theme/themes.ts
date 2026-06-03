@@ -415,9 +415,9 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
 };
 
 export const THEME_GROUPS: { id: ThemeGroup; label: string }[] = [
-  { id: 'standard',     label: 'Standard' },
-  { id: 'applevis',     label: 'AppleVis' },
   { id: 'accessibility', label: 'Accessibility' },
+  { id: 'applevis',     label: 'AppleVis' },
+  { id: 'standard',     label: 'Standard' },
 ];
 
 export const ALL_THEME_IDS = Object.keys(THEMES) as ThemeId[];

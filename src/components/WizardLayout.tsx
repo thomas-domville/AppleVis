@@ -16,11 +16,13 @@ type Props = {
   nextDisabled?: boolean;
   /** Hide the skip link (e.g. on the final ready screen). */
   hideSkip?: boolean;
+  /** Hide the step progress dots and step count (e.g. on the summary screen). */
+  hideStepIndicator?: boolean;
 };
 
 export function WizardLayout({
   step, totalSteps, title, description, children,
-  onNext, nextLabel = 'Next', nextDisabled = false, hideSkip = false,
+  onNext, nextLabel = 'Next', nextDisabled = false, hideSkip = false, hideStepIndicator = false,
 }: Props) {
   const { colors } = useTheme();
   const headingRef = useRef<Text>(null);
@@ -47,30 +49,32 @@ export function WizardLayout({
         showsVerticalScrollIndicator={false}
       >
         {/* ── Progress dots ──────────────────────────────────────────────── */}
-        <View
-          style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 32 }}
-          accessible
-          accessibilityLabel={`Step ${step} of ${totalSteps}`}
-        >
-          {Array.from({ length: totalSteps }).map((_, i) => (
-            <View
-              key={i}
-              style={{
-                width: i + 1 === step ? 24 : 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: i + 1 === step ? colors.accent : colors.border,
-              }}
-            />
-          ))}
-        </View>
+        {!hideStepIndicator && (
+          <View
+            style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 32 }}
+            accessible
+            accessibilityLabel={`Step ${step} of ${totalSteps}`}
+          >
+            {Array.from({ length: totalSteps }).map((_, i) => (
+              <View
+                key={i}
+                style={{
+                  width: i + 1 === step ? 24 : 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: i + 1 === step ? colors.accent : colors.border,
+                }}
+              />
+            ))}
+          </View>
+        )}
 
         {/* ── Step heading ────────────────────────────────────────────────── */}
         <Text
           ref={headingRef}
           accessibilityRole="header"
           accessible
-          accessibilityLabel={`${title}. Step ${step} of ${totalSteps}.`}
+          accessibilityLabel={hideStepIndicator ? title : `${title}. Step ${step} of ${totalSteps}.`}
           style={{ fontSize: 30, fontWeight: '800', color: colors.text, marginBottom: 10, lineHeight: 36 }}
         >
           {title}

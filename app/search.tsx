@@ -8,10 +8,12 @@ import { useLanguageDetection } from '../src/hooks/useLanguageDetection';
 import { TranslationBanner } from '../src/components/TranslationBanner';
 import { translateContent, readAloud } from '../src/services/intelligenceService';
 import { useTheme } from '../src/contexts/ThemeContext';
+import { useAccessibilityPreferences } from '../src/hooks/useAccessibilityPreferences';
 
 export default function SearchScreen() {
   const router = useRouter();
   const { colors, styles } = useTheme();
+  const { screenReaderEnabled } = useAccessibilityPreferences();
   const { results, loading, error, hasQuery, totalCount, search } = useSearch();
   const inputRef   = useRef<TextInput>(null);
   const queryRef   = useRef('');
@@ -129,7 +131,7 @@ export default function SearchScreen() {
                 key={topic.id}
                 title={topic.title}
                 meta={topic.meta}
-                actions={['Open', 'Read Aloud', 'Translate']}
+                actions={['Open', ...(!screenReaderEnabled ? ['Read Aloud'] : []), 'Translate']}
                 onAction={(action) => {
                   if (action === 'Open') router.push({ pathname: '/topic/[id]' as any, params: { id: topic.id, title: topic.title } });
                   if (action === 'Read Aloud') readAloud(`${topic.title}. ${topic.meta}`);
@@ -157,7 +159,7 @@ export default function SearchScreen() {
                   app.developer   || null,
                   app.reviewCount > 0 ? `${app.reviewCount} reviews` : null,
                 ].filter(Boolean).join(' · ')}
-                actions={['Open App Page', 'Read Aloud', 'Translate']}
+                actions={['Open App Page', ...(!screenReaderEnabled ? ['Read Aloud'] : []), 'Translate']}
                 onAction={(action) => {
                   if (action === 'Open App Page') router.push({ pathname: '/app-detail/[id]' as any, params: { id: app.id, name: app.name } });
                   if (action === 'Read Aloud') readAloud(`${app.name}. ${app.summary}`);
@@ -182,7 +184,7 @@ export default function SearchScreen() {
                 key={item.id}
                 title={item.title}
                 meta={`${item.kind} · Updated ${new Date(item.updatedAt).toLocaleDateString()}`}
-                actions={['Open', 'Read Aloud', 'Translate']}
+                actions={['Open', ...(!screenReaderEnabled ? ['Read Aloud'] : []), 'Translate']}
                 onAction={(action) => {
                   if (action === 'Open') router.push({ pathname: '/resource-detail/[id]' as any, params: { id: item.id, title: item.title, url: item.url } });
                   if (action === 'Read Aloud') readAloud(`${item.title}. ${item.summary}`);

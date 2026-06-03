@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
@@ -34,10 +34,11 @@ export default function ReadyStep() {
       step={5}
       totalSteps={5}
       title="You're all set!"
-      description="AppleVis is ready. Everything you set up here can be changed any time in the Settings tab."
+      description="You're now part of the premier community for blind, DeafBlind, and low vision Apple users. Everything you chose here can be changed any time in Settings."
       onNext={() => router.replace('/(tabs)')}
       nextLabel="Start Exploring"
       hideSkip
+      hideStepIndicator
     >
       {/* Summary card */}
       <View style={{
@@ -62,7 +63,7 @@ export default function ReadyStep() {
       </Text>
       {[
         { icon: '💬', text: 'Forums — browse recent topics, follow discussions, and post your own.' },
-        { icon: '📱', text: 'Apps — find accessibility reviews for thousands of iOS and macOS apps.' },
+        { icon: '📱', text: 'App Directories — find accessibility reviews for thousands of iOS and macOS apps.' },
         { icon: '🎙️', text: 'Podcasts — listen to AppleVis episodes with the built-in accessible player.' },
         { icon: '📖', text: 'Resources — guides, tutorials, and how-to articles for every skill level.' },
       ].map(({ icon, text }) => (
@@ -72,6 +73,17 @@ export default function ReadyStep() {
           <Text style={{ flex: 1, fontSize: 15, color: colors.textSecondary, lineHeight: 22 }}>{text}</Text>
         </View>
       ))}
+      {/* Brand close */}
+      <View style={{ alignItems: 'center', marginTop: 16, paddingVertical: 20,
+        backgroundColor: '#ffffff', borderRadius: 14 }}
+        accessible accessibilityLabel="AppleVis — a Be My Eyes company">
+        <Image
+          source={require('../../assets/images/applevis-logo.png')}
+          style={{ width: 200, height: 57 }}
+          resizeMode="contain"
+          accessibilityElementsHidden
+        />
+      </View>
     </WizardLayout>
   );
 }

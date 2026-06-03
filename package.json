@@ -4,7 +4,8 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "start": "expo start",
+    "start": "expo start --lan",
+    "start:new": "cross-env EXPO_PUBLIC_RESET_ONBOARDING=true expo start --lan",
     "ios": "expo run:ios",
     "android": "expo run:android",
     "web": "expo start --web",
@@ -51,6 +52,7 @@
     "@types/react": "~19.1.10",
     "@typescript-eslint/eslint-plugin": "^8.60.1",
     "@typescript-eslint/parser": "^8.60.1",
+    "cross-env": "^10.1.0",
     "eslint": "^8.57.1",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",

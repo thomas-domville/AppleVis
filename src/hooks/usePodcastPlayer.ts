@@ -218,6 +218,22 @@ export function usePodcastPlayer() {
     patch({ queue: [] });
   }
 
+  function moveQueueItemUp(id: string) {
+    const idx = state.queue.findIndex((e) => e.id === id);
+    if (idx <= 0) return;
+    const q = [...state.queue];
+    [q[idx - 1], q[idx]] = [q[idx], q[idx - 1]];
+    patch({ queue: q });
+  }
+
+  function moveQueueItemDown(id: string) {
+    const idx = state.queue.findIndex((e) => e.id === id);
+    if (idx < 0 || idx >= state.queue.length - 1) return;
+    const q = [...state.queue];
+    [q[idx], q[idx + 1]] = [q[idx + 1], q[idx]];
+    patch({ queue: q });
+  }
+
   function startSleepTimer(minutes: number) {
     if (sleepRef.current) clearInterval(sleepRef.current);
     patch({ sleepTimerRemaining: minutes * 60 });
@@ -265,6 +281,8 @@ export function usePodcastPlayer() {
     playNext,
     removeFromQueue,
     clearQueue,
+    moveQueueItemUp,
+    moveQueueItemDown,
     startSleepTimer,
     cancelSleepTimer,
     setSkipTimes,

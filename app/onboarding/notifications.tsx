@@ -21,8 +21,8 @@ const CATEGORIES: CategoryRow[] = [
   { key: 'newTopics',      label: 'New Topics',                description: 'When new forum discussions are started.' },
   { key: 'followedTopics', label: 'Followed Topic Activity',   description: 'New replies on topics you are following.' },
   { key: 'newEpisodes',    label: 'New Podcast Episodes',      description: 'When a new AppleVis podcast episode is published.' },
-  { key: 'appUpdates',     label: 'App Updates & New Listings',description: 'When apps in the directory are updated or added.' },
-  { key: 'newResources',   label: 'New Resources & Guides',    description: 'When new articles, guides, or tutorials are published.' },
+  { key: 'appUpdates',     label: 'New App Directory Entries',  description: 'When new app directory entries are published or existing ones are updated.' },
+  { key: 'newResources',   label: 'New Guides & Blog Posts',    description: 'When new guides or blog posts are published.' },
   { key: 'announcements',  label: 'AppleVis Announcements',    description: 'Important news and updates from the AppleVis team.' },
 ];
 
@@ -50,8 +50,10 @@ export default function NotificationsStep() {
 
   async function previewSound(id: NotificationSound) {
     if (id === 'none') return;
-    // Play the closest available sound as a preview
-    try { await sounds.refreshComplete(); } catch (_e) { /* preview is non-critical */ }
+    try {
+      if (id === 'mouseSqueak') await sounds.mouseSqueak();
+      else if (id === 'appleCrunch') await sounds.appleCrunch();
+    } catch (_e) { /* preview is non-critical */ }
   }
 
   async function handleAllow() {
@@ -128,7 +130,7 @@ export default function NotificationsStep() {
             key={id}
             onPress={() => { setNotificationSound(id); previewSound(id); }}
             accessible
-            accessibilityRole="radio"
+            accessibilityRole="none"
             accessibilityState={{ selected: isSelected }}
             accessibilityLabel={`${label}${isSelected ? ', selected' : ''}`}
             accessibilityHint={description + (id !== 'none' ? ' Double tap to preview.' : '')}

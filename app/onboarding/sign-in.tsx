@@ -71,7 +71,7 @@ export default function SignInStep() {
       {/* Benefits */}
       <View style={{ backgroundColor: colors.card, borderRadius: 14, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: colors.border }}>
         <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 8 }}>
-          With an account you can:
+          With a free AppleVis account you can:
         </Text>
         {[
           'Post and reply in the forums',

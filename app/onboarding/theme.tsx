@@ -43,8 +43,10 @@ export default function ThemeStep() {
         if (groupThemes.length === 0) return null;
         return (
           <View key={groupId} style={{ marginBottom: 20 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
-              textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>
+            <Text
+              accessibilityRole="header"
+              style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
+                textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>
               {groupLabel}
             </Text>
 
@@ -56,9 +58,9 @@ export default function ThemeStep() {
                   key={id}
                   onPress={() => pick(id)}
                   accessible
-                  accessibilityRole="radio"
+                  accessibilityRole="none"
                   accessibilityState={{ selected: isSelected }}
-                  accessibilityLabel={`${theme.name}${isSelected ? ', currently selected' : ''}`}
+                  accessibilityLabel={theme.name}
                   accessibilityHint={`${theme.description} ${theme.example}`}
                   style={{
                     backgroundColor: colors.card,

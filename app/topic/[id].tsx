@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../../src/components/Screen';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
@@ -59,6 +60,7 @@ export default function TopicDetail() {
   const { id, title: paramTitle } = useLocalSearchParams<{ id: string; title?: string }>();
   const router           = useRouter();
   const { colors, styles } = useTheme();
+  const { screenReaderEnabled } = useAccessibilityPreferences();
   const auth             = useAuth();
   const { showToast }    = useToast();
   const saved            = useSavedItems('forumTopic');
@@ -175,15 +177,17 @@ export default function TopicDetail() {
                   </Text>
                 </Pressable>
 
-                <Pressable
-                  onPress={() => topic && readAloud(`${topic.title}. ${stripHtml(topic.body)}`)}
-                  accessible accessibilityRole="button" accessibilityLabel="Read topic aloud"
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
-                    backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 }}
-                >
-                  <Ionicons name="volume-medium-outline" size={14} color={colors.pillText} />
-                  <Text style={{ color: colors.pillText, fontWeight: '600', fontSize: 13 }}>Read Aloud</Text>
-                </Pressable>
+                {!screenReaderEnabled && (
+                  <Pressable
+                    onPress={() => topic && readAloud(`${topic.title}. ${stripHtml(topic.body)}`)}
+                    accessible accessibilityRole="button" accessibilityLabel="Read topic aloud"
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+                      backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 }}
+                  >
+                    <Ionicons name="volume-medium-outline" size={14} color={colors.pillText} />
+                    <Text style={{ color: colors.pillText, fontWeight: '600', fontSize: 13 }}>Read Aloud</Text>
+                  </Pressable>
+                )}
 
                 <Pressable
                   onPress={() => topic && translateContent(`${topic.title}\n\n${stripHtml(topic.body)}`, topic.title)}

@@ -12,10 +12,11 @@ type Props = {
   children: ReactNode;
   showSettings?: boolean;
   showSearch?: boolean;
+  showBack?: boolean;
   refreshing?: boolean;
 };
 
-export function Screen({ title, children, showSettings = true, showSearch = false, refreshing }: Props) {
+export function Screen({ title, children, showSettings = true, showSearch = false, showBack = true, refreshing }: Props) {
   const router             = useRouter();
   const { t }              = useTranslation();
   const { colors, styles } = useTheme();
@@ -30,8 +31,8 @@ export function Screen({ title, children, showSettings = true, showSearch = fals
     >
       <View style={styles.content}>
 
-        {/* Back button — shown automatically on any pushed screen */}
-        {router.canGoBack() && (
+        {/* Back button — shown on pushed screens, suppressed on tab root screens */}
+        {showBack && router.canGoBack() && (
           <Pressable
             onPress={() => router.back()}
             accessibilityRole="button"

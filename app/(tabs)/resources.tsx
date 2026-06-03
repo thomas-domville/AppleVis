@@ -12,10 +12,12 @@ import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
 import { translateContent, readAloud, summariseText, simplifyText } from '../../src/services/intelligenceService';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 
 export default function Resources() {
   const router        = useRouter();
   const { colors, styles } = useTheme();
+  const { screenReaderEnabled } = useAccessibilityPreferences();
   const list          = useResourceList();
   const { showToast } = useToast();
   const resourceRefs = useRef<Map<string, View>>(new Map());
@@ -30,7 +32,7 @@ export default function Resources() {
   });
 
   return (
-    <Screen title="Resources" refreshing={list.refreshing} showSearch>
+    <Screen title="Resources" refreshing={list.refreshing} showSearch showBack={false}>
       <ScrollView
         refreshControl={
           <RefreshControl
@@ -85,7 +87,7 @@ export default function Resources() {
             }}
             title={item.title}
             meta={[item.kind, `Updated ${new Date(item.updatedAt).toLocaleDateString()}`].join(' · ')}
-            actions={['Open', 'Save', 'Read Aloud', 'Translate', 'Summarise', 'Simplify', 'Share', 'Copy Link']}
+            actions={['Open', 'Save', ...(!screenReaderEnabled ? ['Read Aloud'] : []), 'Translate', 'Summarise', 'Simplify', 'Share', 'Copy Link']}
             onAction={(action) => {
               if (action === 'Open') {
                 save(resourceRefs.current.get(item.id) ?? null);

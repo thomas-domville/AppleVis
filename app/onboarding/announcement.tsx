@@ -65,7 +65,7 @@ export default function AnnouncementStep() {
             key={opt.id}
             onPress={() => setAnnouncementLevel(opt.id)}
             accessible
-            accessibilityRole="radio"
+            accessibilityRole="none"
             accessibilityState={{ selected: isSelected }}
             accessibilityLabel={`${opt.label} — ${opt.badge}. ${opt.description}`}
             accessibilityHint={`VoiceOver example: ${opt.preview}`}

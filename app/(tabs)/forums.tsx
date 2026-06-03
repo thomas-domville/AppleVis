@@ -15,10 +15,12 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { translateContent, donateSiriActivity, readAloud, summariseText, simplifyText } from '../../src/services/intelligenceService';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 
 export default function Forums() {
   const router = useRouter();
   const { colors, styles } = useTheme();
+  const { screenReaderEnabled } = useAccessibilityPreferences();
   const auth  = useAuth();
   const forum = useForumState();
   const saved = useSavedItems('forumTopic');
@@ -82,7 +84,7 @@ export default function Forums() {
   }
 
   return (
-    <Screen title="Forums" refreshing={forum.refreshing} showSearch>
+    <Screen title="Forums" refreshing={forum.refreshing} showSearch showBack={false}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -181,7 +183,7 @@ export default function Forums() {
                 ? (topic.isFollowing ? 'Unfollow Topic' : 'Follow Topic')
                 : 'Sign in to Follow',
               'Mark as Read',
-              'Read Aloud',
+              ...(!screenReaderEnabled ? ['Read Aloud'] : []),
               'Translate',
               'Summarise',
               'Simplify',

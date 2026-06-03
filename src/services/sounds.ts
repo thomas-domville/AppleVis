@@ -2,7 +2,7 @@ import { Audio } from 'expo-av';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type SoundKey = 'refreshStart' | 'refreshComplete';
+type SoundKey = 'refreshStart' | 'refreshComplete' | 'mouseSqueak' | 'appleCrunch';
 
 // ─── Asset map ────────────────────────────────────────────────────────────────
 
@@ -15,6 +15,8 @@ type SoundKey = 'refreshStart' | 'refreshComplete';
 const ASSETS: Record<SoundKey, number> = {
   refreshStart:    require('../../assets/sounds/open-section.wav'),
   refreshComplete: require('../../assets/sounds/download-complete.wav'),
+  mouseSqueak:     require('../../assets/sounds/Mouse Squeak.wav'),
+  appleCrunch:     require('../../assets/sounds/Apple Crunch.wav'),
 };
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -39,6 +41,8 @@ async function play(key: SoundKey): Promise<void> {
 export const sounds = {
   refreshStart:    (): Promise<void> => play('refreshStart'),
   refreshComplete: (): Promise<void> => play('refreshComplete'),
+  mouseSqueak:     (): Promise<void> => play('mouseSqueak'),
+  appleCrunch:     (): Promise<void> => play('appleCrunch'),
 
   // Call once on app start so first-play has no loading delay.
   // Loads audio into cache without playing it.

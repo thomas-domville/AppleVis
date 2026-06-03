@@ -20,6 +20,7 @@ import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
 import { PreferencesProvider, usePreferences } from '../src/contexts/PreferencesContext';
 import { ToastProvider, useToast } from '../src/contexts/ToastContext';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
+import { PlayerProvider } from '../src/contexts/PlayerContext';
 
 // Keep splash visible until onboarding check + initial data load finishes.
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -86,11 +87,17 @@ function AppServices() {
   return null;
 }
 
+const FORCE_NEW = process.env.EXPO_PUBLIC_RESET_ONBOARDING === 'true';
+
 function OnboardingGate({ children }: { children: React.ReactNode }) {
   const [redirectTo, setRedirectTo] = useState<string | null>(null);
 
   useEffect(() => {
-    onboarding.isComplete()
+    const check = FORCE_NEW
+      ? onboarding.reset().then(() => onboarding.isComplete())
+      : onboarding.isComplete();
+
+    check
       .then((done) => { if (!done) setRedirectTo('/onboarding'); })
       .catch(() => {})
       .finally(() => { SplashScreen.hideAsync().catch(() => {}); });
@@ -126,12 +133,14 @@ export default function RootLayout() {
       <ThemeProvider>
         <ToastProvider>
           <AuthProvider>
-            <AuthExpiryHandler />
-            <AppServices />
-            <ThemedStatusBar />
-            <OnboardingGate>
-              <Stack screenOptions={{ headerShown: false }} />
-            </OnboardingGate>
+            <PlayerProvider>
+              <AuthExpiryHandler />
+              <AppServices />
+              <ThemedStatusBar />
+              <OnboardingGate>
+                <Stack screenOptions={{ headerShown: false }} />
+              </OnboardingGate>
+            </PlayerProvider>
           </AuthProvider>
         </ToastProvider>
       </ThemeProvider>

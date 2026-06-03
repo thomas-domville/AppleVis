@@ -1,7 +1,6 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform } from 'react-native';
-import { PlayerProvider } from '../../src/contexts/PlayerContext';
+import { Platform, Pressable } from 'react-native';
 import { MiniPlayer } from '../../src/components/MiniPlayer';
 import { useTheme } from '../../src/contexts/ThemeContext';
 
@@ -39,6 +38,7 @@ function ThemedTabs() {
         tabBarLabelStyle: { fontSize: 12 },
         headerShown: false,
         tabBarAccessibilityLabel: `${tabLabels[route.name] ?? route.name}, ${TAB_ORDER.indexOf(route.name) + 1} of ${TAB_ORDER.length}`,
+        tabBarButton: (props) => <Pressable {...props} accessibilityRole="tab" />,
         tabBarStyle: {
           ...(Platform.OS === 'ios' ? { position: 'absolute' as const } : {}),
           backgroundColor: colors.card,
@@ -59,9 +59,9 @@ function ThemedTabs() {
 
 export default function TabLayout() {
   return (
-    <PlayerProvider>
+    <>
       <ThemedTabs />
       <MiniPlayer />
-    </PlayerProvider>
+    </>
   );
 }

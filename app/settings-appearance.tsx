@@ -43,7 +43,7 @@ export default function AppearanceSettings() {
             <Pressable
               key={value}
               onPress={() => setCardDensity(value)}
-              accessible accessibilityRole="radio"
+              accessible accessibilityRole="none"
               accessibilityState={{ selected: isSelected }}
               accessibilityLabel={`${label}. ${description}${isSelected ? '. Selected.' : ''}`}
               style={[styles.cardSmall, {
@@ -86,7 +86,7 @@ export default function AppearanceSettings() {
                   <Pressable
                     key={id}
                     onPress={() => setTheme(id)}
-                    accessible accessibilityRole="radio"
+                    accessible accessibilityRole="none"
                     accessibilityState={{ selected: isSelected }}
                     accessibilityLabel={`${theme.name}${isSelected ? ', selected' : ''}`}
                     accessibilityHint={`${theme.description} ${theme.example}`}

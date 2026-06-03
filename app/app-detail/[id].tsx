@@ -4,6 +4,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../../src/components/Screen';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 import { useToast } from '../../src/contexts/ToastContext';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
 import { useHandoff } from '../../src/hooks/useHandoff';
@@ -62,6 +63,7 @@ function ReviewCard({ review, colors, styles }: {
 export default function AppDetailScreen() {
   const { id, name: paramName } = useLocalSearchParams<{ id: string; name?: string }>();
   const { colors, styles } = useTheme();
+  const { screenReaderEnabled } = useAccessibilityPreferences();
   const { showToast }      = useToast();
   const saved              = useSavedItems('appListing');
 
@@ -190,15 +192,17 @@ export default function AppDetailScreen() {
                   </Pressable>
                 ) : null}
 
-                <Pressable
-                  onPress={() => readAloud(`${app.name}. ${stripHtml(app.summary)}`)}
-                  accessible accessibilityRole="button" accessibilityLabel="Read description aloud"
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
-                    backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 }}
-                >
-                  <Ionicons name="volume-medium-outline" size={14} color={colors.pillText} />
-                  <Text style={{ color: colors.pillText, fontWeight: '600', fontSize: 13 }}>Read Aloud</Text>
-                </Pressable>
+                {!screenReaderEnabled && (
+                  <Pressable
+                    onPress={() => readAloud(`${app.name}. ${stripHtml(app.summary)}`)}
+                    accessible accessibilityRole="button" accessibilityLabel="Read description aloud"
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+                      backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 }}
+                  >
+                    <Ionicons name="volume-medium-outline" size={14} color={colors.pillText} />
+                    <Text style={{ color: colors.pillText, fontWeight: '600', fontSize: 13 }}>Read Aloud</Text>
+                  </Pressable>
+                )}
 
                 <Pressable
                   onPress={() => accessibilityConsensus(app.reviews.map((r) => r.body)).then((s) => {

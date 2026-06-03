@@ -57,7 +57,7 @@ function PickerRow<T extends string | number>({ label, description, value, optio
             <Pressable
               key={String(opt.value)}
               onPress={() => onSelect(opt.value)}
-              accessible accessibilityRole="radio"
+              accessible accessibilityRole="none"
               accessibilityState={{ selected: isSelected }}
               accessibilityLabel={`${opt.label}${isSelected ? ', selected' : ''}`}
               style={{
@@ -132,6 +132,10 @@ export default function PodcastSettings() {
           colors={colors} styles={styles} />
 
         <SectionHeader label="Audio" colors={colors} />
+        <ToggleRow label="Trim Silence"
+          description="Skips over silent gaps in episodes to save time. Requires a future native update to take effect."
+          value={prefs.podcastTrimSilence} onValueChange={prefs.setPodcastTrimSilence}
+          colors={colors} styles={styles} />
         <ToggleRow label="Voice Enhancement"
           description="Boosts speech frequencies -- makes podcast voices clearer without raising overall volume."
           value={prefs.podcastVoiceBoost} onValueChange={prefs.setPodcastVoiceBoost}
