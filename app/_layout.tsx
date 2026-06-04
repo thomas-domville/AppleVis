@@ -1,6 +1,6 @@
 import '../src/i18n';
-import { useEffect, useState } from 'react';
-import { I18nManager, Platform } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { I18nManager, Platform, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -20,7 +20,7 @@ import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
 import { PreferencesProvider, usePreferences } from '../src/contexts/PreferencesContext';
 import { ToastProvider, useToast } from '../src/contexts/ToastContext';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
-import { PlayerProvider } from '../src/contexts/PlayerContext';
+import { PlayerProvider, usePlayer } from '../src/contexts/PlayerContext';
 
 // Keep splash visible until onboarding check + initial data load finishes.
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -115,6 +115,18 @@ function ThemedStatusBar() {
   return <StatusBar style={isDark ? 'light' : 'dark'} />;
 }
 
+// Catches VoiceOver two-finger double-tap (magic tap) from any screen.
+// Only acts when an episode is loaded; otherwise lets iOS handle it.
+function MagicTapWrapper({ children }: { children: React.ReactNode }) {
+  const player = usePlayer();
+  const onMagicTap = useCallback(() => {
+    if (!player.episode) return;
+    if (player.isPlaying) player.pause();
+    else player.play();
+  }, [player]);
+  return <View style={{ flex: 1 }} onMagicTap={onMagicTap}>{children}</View>;
+}
+
 export default function RootLayout() {
   useEffect(() => {
     if (Platform.OS === 'ios' || Platform.OS === 'android') {
@@ -137,9 +149,11 @@ export default function RootLayout() {
               <AuthExpiryHandler />
               <AppServices />
               <ThemedStatusBar />
-              <OnboardingGate>
-                <Stack screenOptions={{ headerShown: false }} />
-              </OnboardingGate>
+              <MagicTapWrapper>
+                <OnboardingGate>
+                  <Stack screenOptions={{ headerShown: false }} />
+                </OnboardingGate>
+              </MagicTapWrapper>
             </PlayerProvider>
           </AuthProvider>
         </ToastProvider>
