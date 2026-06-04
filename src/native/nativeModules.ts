@@ -403,3 +403,128 @@ export function deindexSpotlightItem(id: string): Promise<void> {
 export function deindexAllSpotlight(): Promise<void> {
   return NativeModules.AppleVisSpotlight?.deindexAll() ?? Promise.resolve();
 }
+
+// ─── Now Playing info (lock screen / Control Center) ─────────────────────────
+
+export type NowPlayingInfo = {
+  title: string;
+  artist: string;
+  artworkUrl?: string;
+  duration: number;
+  elapsedTime: number;
+  playbackRate: number;
+};
+
+/**
+ * Pushes episode metadata to MPNowPlayingInfoCenter so the lock screen,
+ * Control Center, and AirPlay receivers display the correct title, show name,
+ * artwork and scrubber position.
+ *
+ * Artwork is fetched asynchronously by the native layer using the URL;
+ * passing null skips artwork (title + artist still appear immediately).
+ */
+export function updateNowPlayingInfo(info: NowPlayingInfo): void {
+  NativeModules.AppleVisNowPlaying?.updateNowPlaying(
+    info.title,
+    info.artist,
+    info.artist,           // albumTitle = show name
+    info.duration,
+    info.elapsedTime,
+    info.playbackRate,
+    info.playbackRate > 0, // isPlaying
+    null,                  // artworkData — native side handles URL fetch separately
+  );
+}
+
+/** Clears Now Playing info when playback ends or the player is unloaded. */
+export function clearNowPlayingInfo(): void {
+  NativeModules.AppleVisNowPlaying?.clearNowPlaying();
+}
+
+/**
+ * Registers MPRemoteCommandCenter handlers so play/pause/skip work from
+ * the lock screen, Control Center, AirPods double-tap, and CarPlay.
+ * Pass callbacks that call the corresponding player methods.
+ */
+export function setupRemoteCommands(opts: {
+  onPlay:         () => void;
+  onPause:        () => void;
+  onSkipBackward: () => void;
+  onSkipForward:  () => void;
+  onSeek:         (seconds: number) => void;
+  skipBackInterval:   number;
+  skipForwardInterval: number;
+}): void {
+  NativeModules.AppleVisNowPlaying?.setupRemoteCommands(
+    () => opts.onPlay(),
+    () => opts.onPause(),
+    () => opts.onSkipBackward(),
+    () => opts.onSkipForward(),
+    ([pos]: number[]) => opts.onSeek(pos),
+    opts.skipBackInterval,
+    opts.skipForwardInterval,
+  );
+}
+
+// ─── AudioEffects (AVAudioEngine — voice boost + trim silence) ────────────────
+
+/**
+ * Applies voice boost equalisation to enhance speech clarity and
+ * normalises volume across episodes. Uses AVAudioEngine with an
+ * AVAudioUnitEQ targeting the 300 Hz–4 kHz speech frequency range.
+ *
+ * Native side: ios-native/AudioEffects/AppleVisAudioEffects.swift
+ */
+export function setVoiceBoostEnabled(enabled: boolean): void {
+  NativeModules.AppleVisAudioEffects?.setVoiceBoost(enabled);
+}
+
+/**
+ * Enables or disables silence trimming. The native layer monitors the
+ * audio level via an AVAudioMixerNode tap; when the signal drops below
+ * a threshold for ≥ 200 ms it advances the playback position by 0.5 s.
+ *
+ * Native side: ios-native/AudioEffects/AppleVisAudioEffects.swift
+ */
+export function setTrimSilenceEnabled(enabled: boolean): void {
+  NativeModules.AppleVisAudioEffects?.setTrimSilence(enabled);
+}
+
+// ─── CarPlay ──────────────────────────────────────────────────────────────────
+
+/**
+ * Pushes the latest episode list to the CarPlay browsable template so
+ * the in-car display reflects current podcast content.
+ *
+ * Call after the feed loads or refreshes.
+ *
+ * Native side: ios-native/CarPlay/AppleVisCarPlayDelegate.swift
+ */
+export type CarPlayEpisodeItem = {
+  id: string;
+  title: string;
+  showTitle: string;
+  duration: number;
+  isDownloaded: boolean;
+};
+
+export function updateCarPlayEpisodes(episodes: CarPlayEpisodeItem[]): void {
+  NativeModules.AppleVisCarPlay?.updateEpisodes(episodes);
+}
+
+// ─── AirPlay / Audio Route Picker ────────────────────────────────────────────
+
+/**
+ * Presents the system AirPlay / Bluetooth audio output route picker sheet.
+ * Allows users to switch playback to AirPods, hearing aids, Apple TV, etc.
+ *
+ * Native side (Swift, AVKit):
+ *   AVRoutePickerView — system picker for audio/video output routes.
+ *   Works by briefly attaching a hidden AVRoutePickerView to the key window
+ *   and triggering its internal UIButton programmatically.
+ *
+ * iOS only — no-op on Android.
+ */
+export function showAirPlayPicker(): void {
+  NativeModules.AppleVisRoutePicker?.showPicker();
+}

@@ -288,7 +288,25 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     ],
   },
 
-  // ── 5. Podcasts ───────────────────────────────────────────────────────────────
+  // ── 5. Forums ────────────────────────────────────────────────────────────────
+  {
+    id: 'forums',
+    title: 'Forums',
+    description: 'Default forum view and browsing preferences.',
+    icon: 'chatbubbles-outline',
+    items: [
+      {
+        id: 'defaultForumFilter',
+        label: 'Default Forum View',
+        description: 'Which filter is active when you open the Forums tab.',
+        example: 'Set to "Since Last Visit" and the Forums tab always opens showing only topics that changed since you were last in the app — no manual filter switching needed.',
+        type: 'picker',
+        status: 'live',
+      },
+    ],
+  },
+
+  // ── 6. Podcasts ───────────────────────────────────────────────────────────────
   {
     id: 'podcasts',
     title: 'Podcasts',
@@ -615,63 +633,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     ],
   },
 
-  // ── 10. About ─────────────────────────────────────────────────────────────────
-  {
-    id: 'about',
-    title: 'About AppleVis',
-    description: 'Version, credits, licences, and what\'s new.',
-    icon: 'information-circle-outline',
-    items: [
-      {
-        id: 'version',
-        label: 'Version',
-        description: 'The current version of the AppleVis app installed on this device.',
-        example: 'Version 2026.0.1.1 (Build 2) — beta series. 2026.0.x.x = beta patch; 2026.1.x = public release.',
-        type: 'info',
-        status: 'live',
-      },
-      {
-        id: 'whatsNew',
-        label: "What's New",
-        description: 'A summary of what was added or improved in the current version.',
-        example: 'Lists features added in this release: new themes, the onboarding wizard, expanded notifications, Help centre, podcast defaults.',
-        type: 'nav',
-        status: 'live',
-      },
-      {
-        id: 'credits',
-        label: 'Credits',
-        description: 'The people and contributors behind AppleVis.',
-        example: 'The AppleVis community, the editorial team, and the developers who built the app.',
-        type: 'nav',
-        status: 'live',
-      },
-      {
-        id: 'privacyPolicyAbout',
-        label: 'Privacy Policy',
-        description: 'The full AppleVis privacy policy.',
-        example: 'Opens applevis.com/privacy in Safari.',
-        type: 'link',
-        status: 'live',
-      },
-      {
-        id: 'termsOfUse',
-        label: 'Terms of Use',
-        description: 'The terms governing use of the AppleVis website and app.',
-        example: 'Opens applevis.com/terms in Safari.',
-        type: 'link',
-        status: 'live',
-      },
-      {
-        id: 'openSource',
-        label: 'Open Source Licences',
-        description: 'Acknowledges the open source libraries used in the app and their licences.',
-        example: 'Lists Expo, React Native, i18next, react-native-reanimated, and other dependencies with their licence types.',
-        type: 'nav',
-        status: 'live',
-      },
-    ],
-  },
 ];
 
 /** Quick lookup by section id */

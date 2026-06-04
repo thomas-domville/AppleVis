@@ -62,11 +62,6 @@ export default function Settings() {
     }
   }
 
-  async function handleSignOut() {
-    await auth.signOut();
-    showToast('Signed out.', 'success');
-  }
-
   const inputStyle = {
     borderWidth: 1.5, borderColor: colors.inputBorder, borderRadius: 10,
     paddingHorizontal: 14, paddingVertical: 12,
@@ -84,31 +79,27 @@ export default function Settings() {
             <Text style={styles.cardMeta}>Checking account…</Text>
           </View>
         ) : auth.isSignedIn ? (
-          <View style={[styles.card, { marginBottom: 4 }]}>
-            <Text style={[styles.cardMeta, { marginBottom: 2 }]}>{getGreeting()}</Text>
-            <Text style={styles.cardTitle}>{auth.user?.name}</Text>
-            <Text style={[styles.cardMeta, { marginBottom: 14 }]}>Signed in to AppleVis</Text>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <Pressable
-                onPress={() => router.push('/profile' as any)}
-                accessible accessibilityRole="button" accessibilityLabel="View your profile"
-                style={{ backgroundColor: colors.pill, borderRadius: 10,
-                  paddingHorizontal: 16, paddingVertical: 10 }}
-              >
-                <Text style={{ color: colors.pillText, fontWeight: '700', fontSize: 15 }}>Profile</Text>
-              </Pressable>
-              <Pressable
-                onPress={handleSignOut}
-                accessible accessibilityRole="button"
-                accessibilityLabel="Sign out of AppleVis"
-                accessibilityHint="Removes your account session from this device."
-                style={{ backgroundColor: '#FFEAEA', borderRadius: 10,
-                  paddingHorizontal: 16, paddingVertical: 10 }}
-              >
-                <Text style={{ color: '#B91C1C', fontWeight: '700', fontSize: 15 }}>Sign Out</Text>
-              </Pressable>
+          <Pressable
+            onPress={() => router.push('/profile' as any)}
+            accessible accessibilityRole="button"
+            accessibilityLabel={`Signed in as ${auth.user?.name}. Double tap to open Profile.`}
+            accessibilityHint="Opens your profile, saved items, account settings, and About AppleVis."
+            style={({ pressed }) => [styles.card, { marginBottom: 4, flexDirection: 'row',
+              alignItems: 'center', gap: 14 }, pressed && { opacity: 0.85 }]}
+          >
+            <View style={{ width: 44, height: 44, borderRadius: 22,
+              backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}
+              accessibilityElementsHidden>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: colors.accentText }}>
+                {auth.user?.name?.charAt(0).toUpperCase() ?? '?'}
+              </Text>
             </View>
-          </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardTitle}>{auth.user?.name}</Text>
+              <Text style={styles.cardMeta}>{getGreeting()} — tap to view your profile</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} accessibilityElementsHidden />
+          </Pressable>
         ) : !showForm ? (
           <View style={[styles.card, { marginBottom: 4 }]}>
             <Text style={styles.cardTitle}>Sign In</Text>
@@ -182,8 +173,8 @@ export default function Settings() {
                 appearance:    '/settings-appearance',
                 accessibility: '/settings-accessibility',
                 notifications: '/settings-notifications',
+                forums:        '/settings-forums',
                 podcasts:      '/settings-podcast',
-                about:         '/about',
                 help:          '/help',
               };
               const route = directRoutes[section.id];

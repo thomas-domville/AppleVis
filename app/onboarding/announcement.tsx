@@ -18,7 +18,7 @@ const OPTIONS: Option[] = [
     id: 'simple',
     label: 'Simple',
     badge: 'Minimal',
-    description: 'VoiceOver reads only the title of each item. Fast to navigate — details are a swipe away.',
+    description: 'Shows only the title of each item. Fast to navigate — details are a swipe away.',
     preview: '"iOS 18 VoiceOver Tips"',
   },
   {
@@ -45,16 +45,16 @@ export default function AnnouncementStep() {
     <WizardLayout
       step={4}
       totalSteps={5}
-      title="VoiceOver detail level"
-      description="Choose how much information VoiceOver reads when it lands on a forum topic, app, or podcast episode. You can change this any time in Settings → Accessibility."
+      title="Item detail level"
+      description="Choose how much detail AppleVis shows when you navigate forum topics, apps, and podcast episodes. If you use VoiceOver — Apple's built-in screen reader for blind and low-vision users — this also controls what it announces aloud. You can change this any time in Settings → Accessibility."
       onNext={() => router.push('/onboarding/notifications')}
     >
       {/* System settings note */}
       <View style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14,
         borderWidth: 1, borderColor: colors.border, marginBottom: 22 }}>
         <Text style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 20 }}>
-          Dynamic Type, Reduce Motion, Bold Text, and other iOS accessibility settings are
-          already applied automatically — no setup needed here.
+          iOS accessibility settings like larger text, bold text, and reduced motion are
+          respected automatically — no setup needed here.
         </Text>
       </View>
 
@@ -68,7 +68,7 @@ export default function AnnouncementStep() {
             accessibilityRole="none"
             accessibilityState={{ selected: isSelected }}
             accessibilityLabel={`${opt.label} — ${opt.badge}. ${opt.description}`}
-            accessibilityHint={`VoiceOver example: ${opt.preview}`}
+            accessibilityHint={`Example: ${opt.preview}`}
             style={{
               backgroundColor: colors.card,
               borderRadius: 14,
@@ -102,7 +102,7 @@ export default function AnnouncementStep() {
               padding: 10, borderWidth: 1, borderColor: colors.border }}>
               <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary,
                 textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
-                VoiceOver reads:
+                Example:
               </Text>
               <Text style={{ fontSize: 14, color: colors.text, lineHeight: 20, fontStyle: 'italic' }}>
                 {opt.preview}

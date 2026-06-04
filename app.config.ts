@@ -86,6 +86,9 @@ const config = {
     './plugins/withWidgetKit',
     './plugins/withSpotlight',
     './plugins/withSiri',
+    './plugins/withRoutePicker',
+    './plugins/withAudioEffects',
+    './plugins/withCarPlay',
     [
       'expo-build-properties',
       {

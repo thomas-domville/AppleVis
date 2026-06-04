@@ -12,7 +12,17 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { icloudStorage } from './icloudStorage';
-import type { SavedItem, ListResumeState } from '../types/content';
+import type { SavedItem, ListResumeState, PodcastEpisode } from '../types/content';
+import type { PlaybackSpeed } from '../hooks/usePodcastPlayer';
+
+export type PlayHistoryEntry = {
+  id: string;
+  title: string;
+  showTitle: string;
+  artworkUrl?: string;
+  duration: number;
+  playedAt: string; // ISO-8601
+};
 
 // ── iCloud keys ───────────────────────────────────────────────────────────────
 const CK = {
@@ -27,8 +37,11 @@ const CK = {
 
 // ── AsyncStorage keys (device-local) ──────────────────────────────────────────
 const LK = {
-  DOWNLOADS: 'applevis:downloads',
-  QUEUE:     'applevis:queue',
+  DOWNLOADS:     'applevis:downloads',
+  EPISODE_META:  'applevis:episodeMeta',
+  QUEUE:         'applevis:queue',
+  PLAY_HISTORY:  'applevis:playHistory',
+  SHOW_SPEEDS:   'applevis:showSpeeds',
 };
 
 async function localGet<T>(key: string, fallback: T): Promise<T> {
@@ -146,6 +159,25 @@ export const persistence = {
     const downloads = await persistence.getDownloadedEpisodes();
     const { [episodeId]: _, ...rest } = downloads;
     await localSet(LK.DOWNLOADS, rest);
+    await persistence.removeDownloadedEpisodeMeta(episodeId);
+  },
+
+  // ── Downloaded episode metadata (device-local) ───────────────────────────
+  // Stores the full PodcastEpisode object so the Downloads view can display
+  // title, duration, etc. even for episodes no longer in the API feed.
+
+  getDownloadedEpisodesMeta: () =>
+    localGet<Record<string, PodcastEpisode>>(LK.EPISODE_META, {}),
+
+  async saveDownloadedEpisodeMeta(episode: PodcastEpisode): Promise<void> {
+    const meta = await persistence.getDownloadedEpisodesMeta();
+    await localSet(LK.EPISODE_META, { ...meta, [episode.id]: episode });
+  },
+
+  async removeDownloadedEpisodeMeta(episodeId: string): Promise<void> {
+    const meta = await persistence.getDownloadedEpisodesMeta();
+    const { [episodeId]: _, ...rest } = meta;
+    await localSet(LK.EPISODE_META, rest);
   },
 
   isDownloaded: async (episodeId: string): Promise<boolean> => {
@@ -157,4 +189,45 @@ export const persistence = {
 
   getQueue: () => localGet<string[]>(LK.QUEUE, []),
   setQueue: (ids: string[]) => localSet(LK.QUEUE, ids),
+
+  // ── Play history (device-local, capped at 100 entries) ───────────────────
+  // Stores the most recent 100 completed episodes, newest first.
+
+  getPlayHistory: () => localGet<PlayHistoryEntry[]>(LK.PLAY_HISTORY, []),
+
+  async addToPlayHistory(episode: PodcastEpisode): Promise<void> {
+    const existing = await persistence.getPlayHistory();
+    const entry: PlayHistoryEntry = {
+      id:         episode.id,
+      title:      episode.title,
+      showTitle:  episode.showTitle,
+      artworkUrl: episode.artworkUrl,
+      duration:   episode.duration,
+      playedAt:   new Date().toISOString(),
+    };
+    // Remove any existing entry for the same episode, then prepend and cap at 100.
+    const updated = [entry, ...existing.filter(e => e.id !== episode.id)].slice(0, 100);
+    await localSet(LK.PLAY_HISTORY, updated);
+  },
+
+  async clearPlayHistory(): Promise<void> {
+    await localSet(LK.PLAY_HISTORY, []);
+  },
+
+  // ── Per-show playback speed (device-local) ────────────────────────────────
+  // Records the last-used speed per show title so Apple Podcasts–style per-show
+  // speed memory works. Keyed by showTitle; syncing these across devices is not
+  // worth the iCloud write-rate cost.
+
+  getShowSpeeds: () => localGet<Record<string, PlaybackSpeed>>(LK.SHOW_SPEEDS, {}),
+
+  async saveShowSpeed(showTitle: string, speed: PlaybackSpeed): Promise<void> {
+    const existing = await persistence.getShowSpeeds();
+    await localSet(LK.SHOW_SPEEDS, { ...existing, [showTitle]: speed });
+  },
+
+  async getShowSpeed(showTitle: string): Promise<PlaybackSpeed | null> {
+    const speeds = await persistence.getShowSpeeds();
+    return speeds[showTitle] ?? null;
+  },
 };

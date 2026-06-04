@@ -76,7 +76,7 @@ export default function SignInStep() {
         {[
           'Post and reply in the forums',
           'Follow topics and get notified of replies',
-          'Receive push notifications for new episodes, app updates, and mentions',
+          'Receive push notifications for new episodes, new app entries, and mentions',
           'Sync your saved items across devices via iCloud',
         ].map((item) => (
           <Text key={item} accessible accessibilityLabel={item}

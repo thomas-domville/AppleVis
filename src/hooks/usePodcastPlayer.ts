@@ -1,13 +1,20 @@
 import { Audio, AVPlaybackStatus } from 'expo-av';
+import { AccessibilityInfo, Platform } from 'react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PodcastEpisode, Chapter } from '../types/content';
 import { persistence } from '../services/persistence';
 import { getLocalUri } from '../services/downloads';
 import { usePreferences } from '../contexts/PreferencesContext';
+import {
+  updateNowPlayingInfo, clearNowPlayingInfo,
+  setupRemoteCommands, setVoiceBoostEnabled, setTrimSilenceEnabled,
+} from '../native/nativeModules';
 
 export type PlaybackSpeed = 0.5 | 0.75 | 1.0 | 1.25 | 1.5 | 1.75 | 2.0 | 2.5 | 3.0;
 export const SPEED_OPTIONS: PlaybackSpeed[] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0];
 export const SLEEP_TIMER_OPTIONS = [15, 30, 45, 60, 90] as const;
+// Sentinel value meaning "stop at end of this episode"
+export const SLEEP_END_OF_EPISODE = -1 as const;
 
 export interface PlayerState {
   episode: PodcastEpisode | null;
@@ -21,6 +28,7 @@ export interface PlayerState {
   skipForwardSeconds: number;
   volume: number;
   sleepTimerRemaining: number | null;
+  sleepAtEndOfEpisode: boolean;
   queue: PodcastEpisode[];
   currentChapter: Chapter | null;
   error: string | null;
@@ -38,6 +46,7 @@ const DEFAULT: PlayerState = {
   skipForwardSeconds: 30,
   volume: 1.0,
   sleepTimerRemaining: null,
+  sleepAtEndOfEpisode: false,
   queue: [],
   currentChapter: null,
   error: null,
@@ -54,12 +63,63 @@ function resolveChapter(episode: PodcastEpisode | null, positionSeconds: number)
 export function usePodcastPlayer() {
   const soundRef = useRef<Audio.Sound | null>(null);
   const sleepRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const nowPlayingTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [state, setState] = useState<PlayerState>(DEFAULT);
-  const { podcastAutoPlay, podcastSleepTimer } = usePreferences();
+  const {
+    podcastAutoPlay, podcastSleepTimer, podcastSpeed, setPodcastSpeed,
+    podcastSkipBack, podcastSkipForward, podcastResumeRewind,
+    podcastVoiceBoost, podcastTrimSilence,
+  } = usePreferences();
 
   const patch = useCallback((updates: Partial<PlayerState>) => {
     setState((prev) => ({ ...prev, ...updates }));
   }, []);
+
+  // Stable ref so remote command callbacks never go stale.
+  const actionsRef = useRef({
+    play: () => soundRef.current?.playAsync(),
+    pause: async () => {
+      await soundRef.current?.pauseAsync();
+    },
+    skipBack: async () => {
+      const s = await soundRef.current?.getStatusAsync();
+      if (s?.isLoaded) {
+        await soundRef.current?.setPositionAsync(Math.max(0, s.positionMillis - state.skipBackSeconds * 1000));
+      }
+    },
+    skipForward: async () => {
+      const s = await soundRef.current?.getStatusAsync();
+      if (s?.isLoaded) {
+        const dur = s.durationMillis ?? 0;
+        await soundRef.current?.setPositionAsync(Math.min(dur, s.positionMillis + state.skipForwardSeconds * 1000));
+      }
+    },
+    seekTo: (seconds: number) => soundRef.current?.setPositionAsync(seconds * 1000),
+  });
+
+  // Register lock screen / AirPods / CarPlay remote commands once, re-register on skip interval change.
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    setupRemoteCommands({
+      onPlay:         () => actionsRef.current.play(),
+      onPause:        () => actionsRef.current.pause(),
+      onSkipBackward: () => actionsRef.current.skipBack(),
+      onSkipForward:  () => actionsRef.current.skipForward(),
+      onSeek:         (s) => actionsRef.current.seekTo(s),
+      skipBackInterval:    podcastSkipBack,
+      skipForwardInterval: podcastSkipForward,
+    });
+  }, [podcastSkipBack, podcastSkipForward]);
+
+  // Sync voice boost native state with preference.
+  useEffect(() => {
+    if (Platform.OS === 'ios') setVoiceBoostEnabled(podcastVoiceBoost);
+  }, [podcastVoiceBoost]);
+
+  // Sync trim silence native state with preference.
+  useEffect(() => {
+    if (Platform.OS === 'ios') setTrimSilenceEnabled(podcastTrimSilence);
+  }, [podcastTrimSilence]);
 
   useEffect(() => {
     Audio.setAudioModeAsync({
@@ -72,8 +132,43 @@ export function usePodcastPlayer() {
     return () => {
       soundRef.current?.unloadAsync();
       if (sleepRef.current) clearInterval(sleepRef.current);
+      if (nowPlayingTickRef.current) clearInterval(nowPlayingTickRef.current);
+      if (Platform.OS === 'ios') clearNowPlayingInfo();
     };
   }, []);
+
+  // Keep skip interval state in sync with saved preferences.
+  useEffect(() => {
+    patch({ skipBackSeconds: podcastSkipBack, skipForwardSeconds: podcastSkipForward });
+  }, [podcastSkipBack, podcastSkipForward, patch]);
+
+  // Push elapsed time to lock screen every 5 seconds while playing.
+  useEffect(() => {
+    if (nowPlayingTickRef.current) {
+      clearInterval(nowPlayingTickRef.current);
+      nowPlayingTickRef.current = null;
+    }
+    if (state.isPlaying && state.episode && Platform.OS === 'ios') {
+      nowPlayingTickRef.current = setInterval(() => {
+        setState(prev => {
+          if (prev.episode && Platform.OS === 'ios') {
+            updateNowPlayingInfo({
+              title:       prev.episode.title,
+              artist:      prev.episode.showTitle,
+              artworkUrl:  prev.episode.artworkUrl,
+              duration:    prev.duration,
+              elapsedTime: prev.position,
+              playbackRate: prev.speed,
+            });
+          }
+          return prev;
+        });
+      }, 5000);
+    }
+    return () => {
+      if (nowPlayingTickRef.current) clearInterval(nowPlayingTickRef.current);
+    };
+  }, [state.isPlaying, state.episode]);
 
   function onPlaybackStatus(status: AVPlaybackStatus) {
     if (!status.isLoaded) {
@@ -99,16 +194,31 @@ export function usePodcastPlayer() {
     setState((prev) => {
       if (prev.episode) {
         persistence.clearPodcastPosition(prev.episode.id);
+        persistence.addToPlayHistory(prev.episode).catch(() => {});
       }
       if (sleepRef.current) {
         clearInterval(sleepRef.current);
         sleepRef.current = null;
       }
+
+      // Sleep at end of episode — pause and clear the flag.
+      if (prev.sleepAtEndOfEpisode) {
+        soundRef.current?.pauseAsync();
+        if (Platform.OS === 'ios') clearNowPlayingInfo();
+        AccessibilityInfo.announceForAccessibility('Sleep timer: episode ended, playback stopped.');
+        return { ...prev, isPlaying: false, sleepTimerRemaining: null, sleepAtEndOfEpisode: false };
+      }
+
       const [next, ...rest] = prev.queue;
       if (next) {
         loadEpisode(next, podcastAutoPlay);
+        if (Platform.OS === 'ios') {
+          AccessibilityInfo.announceForAccessibility(`Now playing: ${next.title}`);
+        }
         return { ...prev, queue: rest, sleepTimerRemaining: null };
       }
+
+      if (Platform.OS === 'ios') clearNowPlayingInfo();
       return { ...prev, isPlaying: false, sleepTimerRemaining: null };
     });
   }
@@ -124,19 +234,29 @@ export function usePodcastPlayer() {
       soundRef.current = null;
     }
 
-    patch({ isLoading: true, error: null, episode, position: 0, duration: episode.duration });
+    // Resolve speed: check per-show saved speed first, then fall back to global pref.
+    const showSpeed = await persistence.getShowSpeed(episode.showTitle);
+    const resolvedSpeed = showSpeed ?? podcastSpeed;
+
+    patch({ isLoading: true, error: null, episode, position: 0, duration: episode.duration, speed: resolvedSpeed });
 
     try {
       const localUri = await getLocalUri(episode.id);
       const uri = localUri ?? episode.audioUrl;
       const savedPositions = await persistence.getPodcastPositions();
-      const savedPosition = savedPositions[episode.id] ?? 0;
+      const rawPosition = savedPositions[episode.id] ?? 0;
+
+      // Resume rewind: subtract N seconds so the listener re-hears the last bit
+      // of context after returning to a partially-played episode.
+      const savedPosition = rawPosition > 0 && podcastResumeRewind > 0
+        ? Math.max(0, rawPosition - podcastResumeRewind)
+        : rawPosition;
 
       const { sound, status } = await Audio.Sound.createAsync(
         { uri },
         {
           shouldPlay: autoPlay,
-          rate: state.speed,
+          rate: resolvedSpeed,
           volume: state.volume,
           positionMillis: savedPosition * 1000,
           progressUpdateIntervalMillis: 500,
@@ -146,13 +266,30 @@ export function usePodcastPlayer() {
 
       soundRef.current = sound;
 
+      const actualDuration = status.isLoaded && status.durationMillis
+        ? status.durationMillis / 1000
+        : episode.duration;
+
       if (status.isLoaded) {
         patch({
           isLoading: false,
           isPlaying: autoPlay,
-          duration: status.durationMillis ? status.durationMillis / 1000 : episode.duration,
+          duration: actualDuration,
           position: savedPosition,
           currentChapter: resolveChapter(episode, savedPosition),
+          speed: resolvedSpeed,
+        });
+      }
+
+      // Push initial Now Playing metadata to lock screen.
+      if (Platform.OS === 'ios') {
+        updateNowPlayingInfo({
+          title:        episode.title,
+          artist:       episode.showTitle,
+          artworkUrl:   episode.artworkUrl,
+          duration:     actualDuration,
+          elapsedTime:  savedPosition,
+          playbackRate: resolvedSpeed,
         });
       }
 
@@ -188,13 +325,18 @@ export function usePodcastPlayer() {
 
   async function seekTo(seconds: number) {
     const clamped = Math.max(0, Math.min(state.duration, seconds));
-    patch({ position: clamped }); // optimistic update so VoiceOver adjustable sees the change immediately
+    patch({ position: clamped });
     await soundRef.current?.setPositionAsync(clamped * 1000);
   }
 
   async function setSpeed(speed: PlaybackSpeed) {
     await soundRef.current?.setRateAsync(speed, true);
     patch({ speed });
+    setPodcastSpeed(speed);
+    // Also remember this speed for the current show.
+    if (state.episode?.showTitle) {
+      persistence.saveShowSpeed(state.episode.showTitle, speed).catch(() => {});
+    }
   }
 
   async function setVolume(volume: number) {
@@ -237,7 +379,11 @@ export function usePodcastPlayer() {
 
   function startSleepTimer(minutes: number) {
     if (sleepRef.current) clearInterval(sleepRef.current);
-    patch({ sleepTimerRemaining: minutes * 60 });
+    if (minutes === SLEEP_END_OF_EPISODE) {
+      patch({ sleepAtEndOfEpisode: true, sleepTimerRemaining: null });
+      return;
+    }
+    patch({ sleepAtEndOfEpisode: false, sleepTimerRemaining: minutes * 60 });
     sleepRef.current = setInterval(() => {
       setState((prev) => {
         const remaining = (prev.sleepTimerRemaining ?? 0) - 1;
@@ -245,6 +391,7 @@ export function usePodcastPlayer() {
           clearInterval(sleepRef.current!);
           sleepRef.current = null;
           soundRef.current?.pauseAsync();
+          AccessibilityInfo.announceForAccessibility('Sleep timer ended. Playback paused.');
           return { ...prev, sleepTimerRemaining: null, isPlaying: false };
         }
         return { ...prev, sleepTimerRemaining: remaining };
@@ -257,7 +404,7 @@ export function usePodcastPlayer() {
       clearInterval(sleepRef.current);
       sleepRef.current = null;
     }
-    patch({ sleepTimerRemaining: null });
+    patch({ sleepTimerRemaining: null, sleepAtEndOfEpisode: false });
   }
 
   function setSkipTimes(back: number, forward: number) {

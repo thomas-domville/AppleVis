@@ -112,19 +112,74 @@ function mapForum(node: JsonApiNode, included: JsonApiNode[] = []): ForumTopic {
 
 // ─── Podcasts ─────────────────────────────────────────────────────────────────
 
+// NOTE TO DRUPAL DEVELOPER:
+//   Please confirm the exact field names for:
+//   (1) Episode duration in seconds  — tried: field_duration, field_podcast_duration, field_episode_duration
+//   (2) Episode artwork/thumbnail    — tried: field_image, field_artwork, field_thumbnail
+//   (3) Transcript URL               — tried: field_transcript_url, field_vtt_url
+//   (4) Chapter markers              — needs a relationship include (e.g. field_chapters → paragraph)
+//       Each chapter paragraph should expose: title (string) and field_start_time (float, seconds)
+//   Update mapPodcast and the episodes() query below once confirmed.
+
 function mapPodcast(node: JsonApiNode, included: JsonApiNode[] = []): PodcastEpisode {
   const a = node.attributes;
-  const fileId  = node.relationships?.field_podcast?.data?.id as string | undefined;
+
+  // Audio file
+  const fileId   = node.relationships?.field_podcast?.data?.id as string | undefined;
   const fileNode = fileId ? included.find((n) => n.id === fileId) : undefined;
-  const rawUri  = fileNode?.attributes?.uri?.value as string | undefined;
+  const rawUri   = fileNode?.attributes?.uri?.value as string | undefined;
+
+  // Duration — try common Drupal field names; falls back to 0 until confirmed
+  const rawDuration =
+    a.field_duration ??
+    a.field_podcast_duration ??
+    a.field_episode_duration ??
+    fileNode?.attributes?.field_duration ??
+    0;
+  const duration = typeof rawDuration === 'number' ? rawDuration
+    : typeof rawDuration === 'string' ? (parseFloat(rawDuration) || 0)
+    : 0;
+
+  // Artwork — try common field names; omitted until confirmed
+  const imageId = (
+    (node.relationships?.field_image?.data as { id?: string } | undefined)?.id ??
+    (node.relationships?.field_artwork?.data as { id?: string } | undefined)?.id ??
+    (node.relationships?.field_thumbnail?.data as { id?: string } | undefined)?.id
+  );
+  const imageNode  = imageId ? included.find((n) => n.id === imageId) : undefined;
+  const rawImgUri  = imageNode?.attributes?.uri?.value as string | undefined;
+  const artworkUrl = rawImgUri ? fileUri(rawImgUri) : undefined;
+
+  // Transcript URL — try common field names
+  const transcriptUrl = (a.field_transcript_url ?? a.field_vtt_url) as string | undefined;
+
+  // Chapters — mapped when field_chapters relationship is included in the query.
+  // NOTE TO DRUPAL DEVELOPER: add &include=field_chapters to the episodes query
+  // and add field_chapters paragraphs with title + field_start_time attributes.
+  const chapterRefs = (node.relationships?.field_chapters?.data as { id: string }[] | undefined) ?? [];
+  const chapters = chapterRefs.length > 0
+    ? chapterRefs
+        .map((ref) => included.find((n) => n.id === ref.id))
+        .filter((n): n is JsonApiNode => !!n)
+        .map((n) => ({
+          title: String(n.attributes.title ?? n.attributes.field_title ?? ''),
+          startTime: parseFloat(String(n.attributes.field_start_time ?? n.attributes.field_time ?? 0)) || 0,
+        }))
+        .filter((c) => c.title)
+        .sort((a, b) => a.startTime - b.startTime)
+    : undefined;
+
   return {
     id: node.id,
     title: a.title ?? '',
     showTitle: 'AppleVis Podcast',
     audioUrl: rawUri ? fileUri(rawUri) : '',
-    duration: 0,
+    duration,
     publishedAt: a.created ?? '',
     description: a.body?.value ?? '',
+    artworkUrl,
+    transcriptUrl: transcriptUrl || undefined,
+    chapters,
   };
 }
 
@@ -307,8 +362,11 @@ export const api = {
 
   podcasts: {
     async episodes(page = 0) {
+      // include=field_podcast fetches the audio file (for audioUrl)
+      // include=field_chapters fetches chapter paragraph entities (mapped in mapPodcast)
+      // NOTE TO DRUPAL DEVELOPER: add field_image to include once artwork field name is confirmed
       const res = await jsonApi<JsonApiCollection>(
-        `/node/podcast?sort=-created&include=field_podcast&${pageParams(page)}`,
+        `/node/podcast?sort=-created&include=field_podcast,field_chapters&${pageParams(page)}`,
       );
       if (!res.ok) return res;
       return {

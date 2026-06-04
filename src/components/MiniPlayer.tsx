@@ -1,35 +1,47 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { BlurView } from 'expo-blur';
 import { usePlayer } from '../contexts/PlayerContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useReduceTransparency } from '../hooks/useReduceTransparency';
 
 const TAB_BAR_HEIGHT = 49;
 const MINI_HEIGHT    = 68;
 
+const containerStyle = {
+  position: 'absolute' as const,
+  left: 0, right: 0,
+  height: MINI_HEIGHT,
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  paddingHorizontal: 16,
+  gap: 12,
+  overflow: 'hidden' as const,
+};
+
 export function MiniPlayer() {
-  const player = usePlayer();
-  const insets = useSafeAreaInsets();
-  const { colors, isDark } = useTheme();
+  const player             = usePlayer();
+  const insets             = useSafeAreaInsets();
+  const { colors, isDark, themeId } = useTheme();
+  const reduceTransparency = useReduceTransparency();
 
   if (!player.episode) return null;
 
-  const bottomOffset = TAB_BAR_HEIGHT + insets.bottom;
-  const progress = player.duration > 0 ? player.position / player.duration : 0;
+  const bottomOffset   = TAB_BAR_HEIGHT + insets.bottom;
+  const progress       = player.duration > 0 ? player.position / player.duration : 0;
+  const isHighContrast = themeId === 'highContrastLight' || themeId === 'highContrastDark';
+  const useGlass       = !reduceTransparency && !isHighContrast;
 
-  // Always use a dark surface so the mini-player floats above light content;
-  // in already-dark themes use the card colour to stay consistent.
-  const bg = isDark ? colors.card : '#1C1C1E';
-  const textCol  = '#FFFFFF';
-  const metaCol  = '#8E8E93';
-  const barBg    = '#48484A';
+  const textCol = '#FFFFFF';
+  const metaCol = '#AEAEB2';
+  const barBg   = '#48484A';
 
-  return (
+  const content = (
     <Pressable
-      style={{ position: 'absolute', bottom: bottomOffset, left: 0, right: 0, height: MINI_HEIGHT,
-        backgroundColor: bg, flexDirection: 'row', alignItems: 'center',
-        paddingHorizontal: 16, gap: 12, borderTopWidth: 1, borderTopColor: colors.border }}
+      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, height: MINI_HEIGHT,
+        paddingHorizontal: 16 }}
       onPress={() => router.push('/(tabs)/podcasts')}
       accessible
       accessibilityRole="button"
@@ -55,7 +67,8 @@ export function MiniPlayer() {
           {player.episode.showTitle}
         </Text>
         <View style={{ height: 2, backgroundColor: barBg, borderRadius: 1, marginTop: 6 }} accessible={false}>
-          <View style={{ height: 2, backgroundColor: colors.accent, borderRadius: 1, width: `${Math.round(progress * 100)}%` }} />
+          <View style={{ height: 2, backgroundColor: colors.accent, borderRadius: 1,
+            width: `${Math.round(progress * 100)}%` }} />
         </View>
       </View>
 
@@ -72,5 +85,28 @@ export function MiniPlayer() {
         <Ionicons name="play-skip-forward" size={24} color={textCol} />
       </Pressable>
     </Pressable>
+  );
+
+  if (useGlass) {
+    return (
+      <BlurView
+        intensity={85}
+        tint="systemMaterialDark"
+        style={[containerStyle, { bottom: bottomOffset,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: 'rgba(255,255,255,0.15)' }]}
+      >
+        {content}
+      </BlurView>
+    );
+  }
+
+  // Solid fallback: dark surface so the player is always legible above light content.
+  const bg = isDark ? colors.card : '#1C1C1E';
+  return (
+    <View style={[containerStyle, { bottom: bottomOffset, backgroundColor: bg,
+      borderTopWidth: 1, borderTopColor: colors.border }]}>
+      {content}
+    </View>
   );
 }

@@ -1,5 +1,6 @@
 import { Paths, File, Directory } from 'expo-file-system';
 import { persistence } from './persistence';
+import type { PodcastEpisode } from '../types/content';
 
 function getDownloadsDir(): Directory {
   const dir = new Directory(Paths.document, 'applevis-podcasts');
@@ -10,6 +11,7 @@ function getDownloadsDir(): Directory {
 export async function downloadEpisode(
   episodeId: string,
   audioUrl: string,
+  episode?: PodcastEpisode,
   onProgress?: (progress: number) => void,
 ): Promise<{ ok: boolean; localUri?: string; error?: string }> {
   try {
@@ -18,6 +20,7 @@ export async function downloadEpisode(
 
     if (localFile.exists) {
       await persistence.saveDownloadedEpisode(episodeId, localFile.uri);
+      if (episode) await persistence.saveDownloadedEpisodeMeta(episode);
       return { ok: true, localUri: localFile.uri };
     }
 
@@ -25,6 +28,7 @@ export async function downloadEpisode(
     // onProgress is accepted for future wiring via DownloadTask.
     const downloaded = await File.downloadFileAsync(audioUrl, localFile);
     await persistence.saveDownloadedEpisode(episodeId, downloaded.uri);
+    if (episode) await persistence.saveDownloadedEpisodeMeta(episode);
     return { ok: true, localUri: downloaded.uri };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Unknown download error' };

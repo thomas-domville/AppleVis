@@ -14,6 +14,7 @@ import { authEvents } from '../src/services/authEvents';
 import { setupNotifications, handleNotificationResponse } from '../src/services/notifications';
 import { handleIncomingUrl } from '../src/services/universalLinks';
 import { registerBackgroundFetch } from '../src/tasks/backgroundFetch';
+import { registerBackgroundTasks } from '../src/services/backgroundFetch';
 import { onboarding } from '../src/services/onboarding';
 import { useKeyboardShortcuts } from '../src/hooks/useKeyboardShortcuts';
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
@@ -74,6 +75,7 @@ function AppServices() {
     setupNotifications().catch(() => {});
     if (Platform.OS === 'ios' || Platform.OS === 'android') {
       registerBackgroundFetch().catch(() => {});
+      registerBackgroundTasks().catch(() => {});
     }
 
     const notifSub = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);

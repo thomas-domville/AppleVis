@@ -1,8 +1,10 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform, Pressable } from 'react-native';
+import { Platform, Pressable, StyleSheet } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { MiniPlayer } from '../../src/components/MiniPlayer';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useReduceTransparency } from '../../src/hooks/useReduceTransparency';
 
 const iconMap: Record<string, string> = {
   index:     'home-outline',
@@ -23,7 +25,11 @@ const tabLabels: Record<string, string> = {
 const TAB_ORDER = ['index', 'forums', 'podcasts', 'apps', 'resources'];
 
 function ThemedTabs() {
-  const { colors } = useTheme();
+  const { colors, isDark, themeId } = useTheme();
+  const reduceTransparency          = useReduceTransparency();
+
+  const isHighContrast = themeId === 'highContrastLight' || themeId === 'highContrastDark';
+  const useGlass       = Platform.OS === 'ios' && !reduceTransparency && !isHighContrast;
 
   return (
     <Tabs
@@ -38,13 +44,35 @@ function ThemedTabs() {
         tabBarLabelStyle: { fontSize: 12 },
         headerShown: false,
         tabBarAccessibilityLabel: `${tabLabels[route.name] ?? route.name}, ${TAB_ORDER.indexOf(route.name) + 1} of ${TAB_ORDER.length}`,
-        tabBarButton: (props) => <Pressable {...props} accessibilityRole="tab" />,
+        tabBarButton: ({ children, style, onPress, onLongPress, accessibilityLabel, accessibilityState }) => (
+          <Pressable
+            onPress={onPress}
+            onLongPress={onLongPress}
+            style={style}
+            accessible
+            accessibilityRole="tab"
+            accessibilityLabel={accessibilityLabel}
+            accessibilityState={accessibilityState}
+          >
+            {children}
+          </Pressable>
+        ),
         tabBarStyle: {
-          ...(Platform.OS === 'ios' ? { position: 'absolute' as const } : {}),
-          backgroundColor: colors.card,
-          borderTopColor: colors.border,
+          position: 'absolute' as const,
+          backgroundColor: useGlass ? 'transparent' : colors.card,
+          borderTopColor:  useGlass ? 'transparent' : colors.border,
+          elevation: 0,
         },
-        tabBarActiveTintColor: colors.accent,
+        tabBarBackground: useGlass
+          ? () => (
+              <BlurView
+                intensity={80}
+                tint={isDark ? 'systemMaterialDark' : 'systemMaterialLight'}
+                style={StyleSheet.absoluteFill}
+              />
+            )
+          : undefined,
+        tabBarActiveTintColor:   colors.accent,
         tabBarInactiveTintColor: colors.textSecondary,
       })}
     >

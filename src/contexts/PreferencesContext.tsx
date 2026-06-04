@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { persistence } from '../services/persistence';
 
 export type AnnouncementLevel = 'simple' | 'normal' | 'all';
 export type DefaultForumFilter = 'Recent' | 'Since Last Visit' | 'Unread';
@@ -8,6 +9,7 @@ export type PlaybackSpeed = 0.5 | 0.75 | 1.0 | 1.25 | 1.5 | 1.75 | 2.0 | 2.5 | 3
 export type PodcastEQPreset = 'flat' | 'speech' | 'bassBoost' | 'trebleBoost';
 export type PodcastAutoDownload = 'off' | 'wifiOnly' | 'always';
 export type PodcastAutoDelete = 'off' | '1day' | '1week';
+export type PodcastResumeRewind = 0 | 10 | 15 | 30;
 
 export type NotificationPrefs = {
   forumReplies:   boolean;
@@ -50,6 +52,7 @@ const KEYS = {
   podcastAutoDownload:        '@applevis_podcast_auto_download',
   podcastAutoDelete:          '@applevis_podcast_auto_delete',
   podcastTrimSilence:         '@applevis_podcast_trim_silence',
+  podcastResumeRewind:        '@applevis_podcast_resume_rewind',
 };
 
 type PreferencesContextValue = {
@@ -102,6 +105,9 @@ type PreferencesContextValue = {
   podcastTrimSilence:    boolean;
   setPodcastTrimSilence: (v: boolean) => void;
 
+  podcastResumeRewind:    PodcastResumeRewind;
+  setPodcastResumeRewind: (v: PodcastResumeRewind) => void;
+
   /** True while preferences are being loaded from storage. */
   isLoading: boolean;
 };
@@ -117,7 +123,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const [notificationSound,           setNotificationSoundState]           = useState<NotificationSound>('mouseSqueak');
   const [nonEnglishDetectionEnabled,  setNonEnglishDetectionEnabledState]  = useState<boolean>(true);
   const [podcastSpeed,        setPodcastSpeedState]        = useState<PlaybackSpeed>(1.0);
-  const [podcastSkipBack,     setPodcastSkipBackState]     = useState<number>(10);
+  const [podcastSkipBack,     setPodcastSkipBackState]     = useState<number>(15);
   const [podcastSkipForward,  setPodcastSkipForwardState]  = useState<number>(30);
   const [podcastAutoPlay,     setPodcastAutoPlayState]     = useState<boolean>(true);
   const [podcastSleepTimer,   setPodcastSleepTimerState]   = useState<number | null>(null);
@@ -125,44 +131,56 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const [podcastEQ,           setPodcastEQState]           = useState<PodcastEQPreset>('flat');
   const [podcastAutoDownload, setPodcastAutoDownloadState] = useState<PodcastAutoDownload>('off');
   const [podcastAutoDelete,   setPodcastAutoDeleteState]   = useState<PodcastAutoDelete>('off');
-  const [podcastTrimSilence,  setPodcastTrimSilenceState]  = useState<boolean>(false);
+  const [podcastTrimSilence,    setPodcastTrimSilenceState]    = useState<boolean>(false);
+  const [podcastResumeRewind,   setPodcastResumeRewindState]   = useState<PodcastResumeRewind>(15);
 
   useEffect(() => {
-    Promise.all([
+    const uiLoads = Promise.all([
       AsyncStorage.getItem(KEYS.announcementLevel),
       AsyncStorage.getItem(KEYS.defaultForumFilter),
       AsyncStorage.getItem(KEYS.cardDensity),
       AsyncStorage.getItem(KEYS.notificationPrefs),
       AsyncStorage.getItem(KEYS.notificationSound),
       AsyncStorage.getItem(KEYS.nonEnglishDetectionEnabled),
-      AsyncStorage.getItem(KEYS.podcastSpeed),
-      AsyncStorage.getItem(KEYS.podcastSkipBack),
-      AsyncStorage.getItem(KEYS.podcastSkipForward),
-      AsyncStorage.getItem(KEYS.podcastAutoPlay),
-      AsyncStorage.getItem(KEYS.podcastSleepTimer),
-      AsyncStorage.getItem(KEYS.podcastVoiceBoost),
-      AsyncStorage.getItem(KEYS.podcastEQ),
-      AsyncStorage.getItem(KEYS.podcastAutoDownload),
-      AsyncStorage.getItem(KEYS.podcastAutoDelete),
-      AsyncStorage.getItem(KEYS.podcastTrimSilence),
-    ]).then(([level, filter, density, prefs, sound, nonEnglish, speed, skipB, skipF, autoPlay, sleep, vBoost, eq, autoDl, autoDel, trimSilence]) => {
-      if (level)      setAnnouncementLevelState(level as AnnouncementLevel);
-      if (filter)     setDefaultForumFilterState(filter as DefaultForumFilter);
-      if (density)    setCardDensityState(density as CardDensity);
-      if (prefs)      setNotificationPrefsState(JSON.parse(prefs) as NotificationPrefs);
-      if (sound)      setNotificationSoundState(sound as NotificationSound);
-      if (nonEnglish) setNonEnglishDetectionEnabledState(nonEnglish === 'true');
-      if (speed)      setPodcastSpeedState(parseFloat(speed) as PlaybackSpeed);
-      if (skipB)    setPodcastSkipBackState(parseInt(skipB, 10));
-      if (skipF)    setPodcastSkipForwardState(parseInt(skipF, 10));
-      if (autoPlay) setPodcastAutoPlayState(autoPlay === 'true');
-      if (sleep)    setPodcastSleepTimerState(sleep === 'null' ? null : parseInt(sleep, 10));
-      if (vBoost)   setPodcastVoiceBoostState(vBoost === 'true');
-      if (eq)       setPodcastEQState(eq as PodcastEQPreset);
-      if (autoDl)   setPodcastAutoDownloadState(autoDl as PodcastAutoDownload);
-      if (autoDel)     setPodcastAutoDeleteState(autoDel as PodcastAutoDelete);
-      if (trimSilence) setPodcastTrimSilenceState(trimSilence === 'true');
-    }).finally(() => setIsLoading(false));
+    ]);
+
+    const podcastLoads = Promise.all([
+      persistence.getSetting<PlaybackSpeed>(KEYS.podcastSpeed, 1.0),
+      persistence.getSetting<number>(KEYS.podcastSkipBack, 15),
+      persistence.getSetting<number>(KEYS.podcastSkipForward, 30),
+      persistence.getSetting<boolean>(KEYS.podcastAutoPlay, true),
+      persistence.getSetting<number | null>(KEYS.podcastSleepTimer, null),
+      persistence.getSetting<boolean>(KEYS.podcastVoiceBoost, false),
+      persistence.getSetting<PodcastEQPreset>(KEYS.podcastEQ, 'flat'),
+      persistence.getSetting<PodcastAutoDownload>(KEYS.podcastAutoDownload, 'off'),
+      persistence.getSetting<PodcastAutoDelete>(KEYS.podcastAutoDelete, 'off'),
+      persistence.getSetting<boolean>(KEYS.podcastTrimSilence, false),
+      persistence.getSetting<PodcastResumeRewind>(KEYS.podcastResumeRewind, 15),
+    ]);
+
+    Promise.all([uiLoads, podcastLoads])
+      .then(([[level, filter, density, prefs, sound, nonEnglish],
+              [speed, skipB, skipF, autoPlay, sleep, vBoost, eq, autoDl, autoDel, trimSilence, resumeRewind]]) => {
+        if (level)      setAnnouncementLevelState(level as AnnouncementLevel);
+        if (filter)     setDefaultForumFilterState(filter as DefaultForumFilter);
+        if (density)    setCardDensityState(density as CardDensity);
+        if (prefs)      setNotificationPrefsState(JSON.parse(prefs) as NotificationPrefs);
+        if (sound)      setNotificationSoundState(sound as NotificationSound);
+        if (nonEnglish) setNonEnglishDetectionEnabledState(nonEnglish === 'true');
+
+        setPodcastSpeedState(speed);
+        setPodcastSkipBackState(skipB);
+        setPodcastSkipForwardState(skipF);
+        setPodcastAutoPlayState(autoPlay);
+        setPodcastSleepTimerState(sleep);
+        setPodcastVoiceBoostState(vBoost);
+        setPodcastEQState(eq);
+        setPodcastAutoDownloadState(autoDl);
+        setPodcastAutoDeleteState(autoDel);
+        setPodcastTrimSilenceState(trimSilence);
+        setPodcastResumeRewindState(resumeRewind);
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
   const setAnnouncementLevel = useCallback((v: AnnouncementLevel) => {
@@ -197,43 +215,47 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
 
   const setPodcastSpeed = useCallback((v: PlaybackSpeed) => {
     setPodcastSpeedState(v);
-    AsyncStorage.setItem(KEYS.podcastSpeed, String(v)).catch(() => {});
+    persistence.setSetting(KEYS.podcastSpeed, v).catch(() => {});
   }, []);
   const setPodcastSkipBack = useCallback((v: number) => {
     setPodcastSkipBackState(v);
-    AsyncStorage.setItem(KEYS.podcastSkipBack, String(v)).catch(() => {});
+    persistence.setSetting(KEYS.podcastSkipBack, v).catch(() => {});
   }, []);
   const setPodcastSkipForward = useCallback((v: number) => {
     setPodcastSkipForwardState(v);
-    AsyncStorage.setItem(KEYS.podcastSkipForward, String(v)).catch(() => {});
+    persistence.setSetting(KEYS.podcastSkipForward, v).catch(() => {});
   }, []);
   const setPodcastAutoPlay = useCallback((v: boolean) => {
     setPodcastAutoPlayState(v);
-    AsyncStorage.setItem(KEYS.podcastAutoPlay, String(v)).catch(() => {});
+    persistence.setSetting(KEYS.podcastAutoPlay, v).catch(() => {});
   }, []);
   const setPodcastSleepTimer = useCallback((v: number | null) => {
     setPodcastSleepTimerState(v);
-    AsyncStorage.setItem(KEYS.podcastSleepTimer, String(v)).catch(() => {});
+    persistence.setSetting(KEYS.podcastSleepTimer, v).catch(() => {});
   }, []);
   const setPodcastVoiceBoost = useCallback((v: boolean) => {
     setPodcastVoiceBoostState(v);
-    AsyncStorage.setItem(KEYS.podcastVoiceBoost, String(v)).catch(() => {});
+    persistence.setSetting(KEYS.podcastVoiceBoost, v).catch(() => {});
   }, []);
   const setPodcastEQ = useCallback((v: PodcastEQPreset) => {
     setPodcastEQState(v);
-    AsyncStorage.setItem(KEYS.podcastEQ, v).catch(() => {});
+    persistence.setSetting(KEYS.podcastEQ, v).catch(() => {});
   }, []);
   const setPodcastAutoDownload = useCallback((v: PodcastAutoDownload) => {
     setPodcastAutoDownloadState(v);
-    AsyncStorage.setItem(KEYS.podcastAutoDownload, v).catch(() => {});
+    persistence.setSetting(KEYS.podcastAutoDownload, v).catch(() => {});
   }, []);
   const setPodcastAutoDelete = useCallback((v: PodcastAutoDelete) => {
     setPodcastAutoDeleteState(v);
-    AsyncStorage.setItem(KEYS.podcastAutoDelete, v).catch(() => {});
+    persistence.setSetting(KEYS.podcastAutoDelete, v).catch(() => {});
   }, []);
   const setPodcastTrimSilence = useCallback((v: boolean) => {
     setPodcastTrimSilenceState(v);
-    AsyncStorage.setItem(KEYS.podcastTrimSilence, String(v)).catch(() => {});
+    persistence.setSetting(KEYS.podcastTrimSilence, v).catch(() => {});
+  }, []);
+  const setPodcastResumeRewind = useCallback((v: PodcastResumeRewind) => {
+    setPodcastResumeRewindState(v);
+    persistence.setSetting(KEYS.podcastResumeRewind, v).catch(() => {});
   }, []);
 
   const value = useMemo<PreferencesContextValue>(() => ({
@@ -251,8 +273,9 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     podcastVoiceBoost,   setPodcastVoiceBoost,
     podcastEQ,           setPodcastEQ,
     podcastAutoDownload, setPodcastAutoDownload,
-    podcastAutoDelete,   setPodcastAutoDelete,
-    podcastTrimSilence,  setPodcastTrimSilence,
+    podcastAutoDelete,    setPodcastAutoDelete,
+    podcastTrimSilence,   setPodcastTrimSilence,
+    podcastResumeRewind,  setPodcastResumeRewind,
     isLoading,
   }), [
     announcementLevel, defaultForumFilter, cardDensity,
@@ -264,7 +287,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     setNotificationPrefs, setNotificationSound, setNonEnglishDetectionEnabled,
     setPodcastSpeed, setPodcastSkipBack, setPodcastSkipForward, setPodcastAutoPlay,
     setPodcastSleepTimer, setPodcastVoiceBoost, setPodcastEQ, setPodcastAutoDownload, setPodcastAutoDelete,
-    setPodcastTrimSilence,
+    setPodcastTrimSilence, podcastResumeRewind, setPodcastResumeRewind,
   ]);
 
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;

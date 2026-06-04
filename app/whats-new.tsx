@@ -14,6 +14,42 @@ const CURRENT_VERSION = '2026.0.1.2';
 
 const CHANGES: ChangeItem[] = [
   {
+    icon: 'person-circle-outline',
+    tag: 'Improved',
+    title: 'Profile Now Includes About',
+    description: 'Everything that was in the separate About screen — version number, device info, What\'s New, copy support info, privacy policy, credits — now lives inside your Profile. Settings is now purely a settings screen. Sign Out has moved to Profile too.',
+  },
+  {
+    icon: 'options-outline',
+    tag: 'Improved',
+    title: 'Podcast Settings Are Much Less Swipeable',
+    description: 'Playback Speed and Sleep Timer now open a list — tap once to pick your value. Skip Back, Skip Forward, EQ, Auto-Download, and Auto-Delete use compact segmented buttons. A new Resume Rewind setting has also been added to the Queue section.',
+  },
+  {
+    icon: 'chatbubbles-outline',
+    tag: 'New',
+    title: 'Forums Has Its Own Settings Page',
+    description: 'A new Forums section in Settings lets you choose which view the Forums tab opens on by default — Recent, Since Last Visit, or Unread. No more switching the filter every time you open the app.',
+  },
+  {
+    icon: 'search-outline',
+    tag: 'New',
+    title: 'Search on Forums, Apps, and Resources',
+    description: 'All three tabs now have a search bar at the top. Type to filter by title, author, developer, category, or resource type. Results update as you type.',
+  },
+  {
+    icon: 'funnel-outline',
+    tag: 'New',
+    title: 'Sort and Filter Bar on Every Tab',
+    description: 'Forums, Apps, Resources, and Podcasts all now have the same action bar: a sort button showing the current order, a filter button (by category, type, or show), and a count of visible results. Opening one closes the other automatically.',
+  },
+  {
+    icon: 'water-outline',
+    tag: 'New',
+    title: 'Liquid Glass on iOS',
+    description: 'Sort sheets, filter sheets, the mini player, and the tab bar now use the iOS frosted-glass blur effect. It turns off automatically if you have Reduce Transparency enabled in iOS Accessibility Settings, or if you use a High Contrast theme.',
+  },
+  {
     icon: 'chevron-back-outline',
     tag: 'New',
     title: 'Back Button on Every Screen',
@@ -103,7 +139,7 @@ export default function WhatsNew() {
             Version {CURRENT_VERSION}
           </Text>
           <Text style={{ fontSize: 16, color: colors.textSecondary, textAlign: 'center', lineHeight: 23 }}>
-            Accessibility improvements, bug fixes, and settings that actually work.
+            Search, sort, glass UI, smarter settings, and a unified Profile.
           </Text>
         </View>
 
@@ -140,7 +176,32 @@ export default function WhatsNew() {
           );
         })}
 
-        {/* Previous version note */}
+        {/* Previous version notes */}
+        <View style={[styles.card, { backgroundColor: colors.pill, borderColor: colors.border, borderWidth: 1, marginBottom: 10 }]}
+          accessible accessibilityLabel="Also in version 2026.0.1.2: back buttons, forum filter pill, podcast speed pill, VoiceOver tab positions, sign-in fixes, settings routing fixes.">
+          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
+            textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>
+            Also in 2026.0.1.2
+          </Text>
+          {[
+            'Back button added to every settings, detail, and sub-screen',
+            'Forum filter replaced with a single pill — one tap to switch',
+            'Podcast speed replaced with a single pill — one tap to change',
+            'VoiceOver now reads tab position (e.g. "Forums, 2 of 5")',
+            'Settings pages now open the real interactive controls',
+            'Six settings that were saved but ignored are now wired up',
+            'Sign in now accepts username or email, and actually works',
+            'Magic tap (two-finger double tap) plays and pauses podcasts',
+            'Episode detail screen with show notes, chapters, and actions',
+          ].map((item) => (
+            <View key={item} style={{ flexDirection: 'row', gap: 8, marginBottom: 6 }}
+              accessible accessibilityLabel={item}>
+              <Text style={{ color: colors.accent, fontSize: 15 }} accessibilityElementsHidden>•</Text>
+              <Text style={{ flex: 1, fontSize: 14, color: colors.textSecondary, lineHeight: 20 }}>{item}</Text>
+            </View>
+          ))}
+        </View>
+
         <View style={[styles.card, { backgroundColor: colors.pill, borderColor: colors.border, borderWidth: 1 }]}
           accessible accessibilityLabel="Also in version 2026.0.1.1: forum topic detail, reply to topics, app detail screen, resource detail screen, profile screen, interactive podcast and notification settings, appearance and accessibility settings.">
           <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
@@ -152,7 +213,6 @@ export default function WhatsNew() {
             'Post replies to forum topics directly from the app',
             'Full app listings with all community reviews',
             'Read complete guides and articles inside the app',
-            'Profile screen with saved items and sign-out',
             'Podcast settings with working controls for speed, skip times, and more',
             'Notification settings with real on/off toggles for each category',
             'Theme and card size settings with instant preview',

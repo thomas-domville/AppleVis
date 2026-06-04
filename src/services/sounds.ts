@@ -1,4 +1,4 @@
-import { Audio } from 'expo-av';
+import { Audio, InterruptionModeIOS } from 'expo-av';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,15 +24,46 @@ const ASSETS: Record<SoundKey, number> = {
 
 const cache: Partial<Record<SoundKey, Audio.Sound>> = {};
 
+// Keys that are played as standalone previews (not background music/podcasts).
+// These temporarily claim the Playback audio session so they use media volume,
+// not the ringer volume, which is often much lower.
+const PREVIEW_KEYS = new Set<SoundKey>(['mouseSqueak', 'appleCrunch']);
+
 async function play(key: SoundKey): Promise<void> {
   try {
+    const isPreview = PREVIEW_KEYS.has(key);
+
+    if (isPreview) {
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+        shouldDuckAndroid: false,
+        staysActiveInBackground: false,
+      });
+    }
+
     if (!cache[key]) {
-      const { sound } = await Audio.Sound.createAsync(ASSETS[key]);
+      const { sound } = await Audio.Sound.createAsync(ASSETS[key], { volume: 1.0 });
       cache[key] = sound;
     }
-    // Rewind to start so rapid successive calls work correctly.
+    await cache[key]!.setVolumeAsync(1.0);
     await cache[key]!.setPositionAsync(0);
     await cache[key]!.playAsync();
+
+    if (isPreview) {
+      // Restore ambient mode after the clip finishes so the podcast player
+      // isn't affected. 3 s covers the longest preview clip with headroom.
+      setTimeout(async () => {
+        try {
+          await Audio.setAudioModeAsync({
+            playsInSilentModeIOS: false,
+            interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
+            shouldDuckAndroid: true,
+            staysActiveInBackground: false,
+          });
+        } catch (_e) { /* non-critical */ }
+      }, 3000);
+    }
   } catch (_e) { /* non-critical */ }
 }
 
