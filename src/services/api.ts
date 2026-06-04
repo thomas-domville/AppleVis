@@ -479,10 +479,33 @@ export const api = {
         method: 'DELETE', headers: { 'X-CSRF-Token': csrfToken }, body: JSON.stringify({ token }),
       }),
 
-    deleteAccount: (csrfToken: string) =>
-      drupalRest<void>(`/api/v1/account`, {
-        method: 'DELETE', headers: { 'X-CSRF-Token': csrfToken },
-      }),
+    async deleteAccount(csrfToken: string): Promise<JsonApiResult<undefined>> {
+      // Step 1 — resolve the authenticated user's UUID from the JSON:API root.
+      const meRes = await jsonApi<{ meta?: { links?: { me?: { meta?: { id?: string } } } } }>('', {
+        headers: { 'X-CSRF-Token': csrfToken },
+      });
+      if (!meRes.ok) return meRes;
+      const uuid = meRes.data?.meta?.links?.me?.meta?.id;
+      if (!uuid) return { ok: false, error: 'Could not resolve account ID from server.' };
+
+      // Step 2 — DELETE /jsonapi/user/user/{uuid}. Drupal returns 204 No Content on success.
+      const ctrl  = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+      try {
+        const res = await fetch(`${JSONAPI}/user/user/${uuid}`, {
+          method: 'DELETE',
+          headers: { ...COMMON_HEADERS, 'Content-Type': 'application/vnd.api+json', 'X-CSRF-Token': csrfToken },
+          signal: ctrl.signal,
+        });
+        if (!res.ok) return { ok: false, error: `HTTP ${res.status}`, status: res.status };
+        return { ok: true, data: undefined };
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return { ok: false, error: 'Request timed out.' };
+        return { ok: false, error: err instanceof Error ? err.message : 'Network error' };
+      } finally {
+        clearTimeout(timer);
+      }
+    },
 
     sync: (csrfToken: string, payload: Record<string, unknown>) =>
       drupalRest<{ syncedAt: string }>(`/api/v1/account/sync`, {

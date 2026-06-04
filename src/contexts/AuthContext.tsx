@@ -19,6 +19,7 @@ type AuthContextValue = {
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<{ ok: boolean; error?: string }>;
 };
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextValue>({
   isLoading: true,
   signIn: async () => ({ ok: false, error: 'Not ready' }),
   signOut: async () => {},
+  deleteAccount: async () => ({ ok: false, error: 'Not ready' }),
 });
 
 export function useAuth(): AuthContextValue {
@@ -113,16 +115,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     if (user) {
-      // Best-effort server logout — don't block on failure
       await api.account.signOut(user.logoutToken).catch(() => {});
     }
     await clearSession();
     setUser(null);
   }, [user]);
 
+  const deleteAccount = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
+    if (!user) return { ok: false, error: 'Not signed in.' };
+    const result = await api.account.deleteAccount(user.csrfToken);
+    if (!result.ok) return { ok: false, error: result.error };
+    await clearSession();
+    setUser(null);
+    return { ok: true };
+  }, [user]);
+
   return (
     <AuthContext.Provider
-      value={{ isSignedIn: user !== null, user, isLoading, signIn, signOut }}
+      value={{ isSignedIn: user !== null, user, isLoading, signIn, signOut, deleteAccount }}
     >
       {children}
     </AuthContext.Provider>

@@ -44,7 +44,6 @@ function SettingCard({ item }: { item: SettingItem }) {
   const { colors, styles } = useTheme();
   const router = useRouter();
   const badge = statusLabel(item.status);
-  const isNavigable = item.type === 'nav' || item.type === 'link';
 
   // Map well-known setting IDs to dedicated interactive screens
   const INTERACTIVE_ROUTES: Record<string, string> = {
@@ -85,10 +84,25 @@ function SettingCard({ item }: { item: SettingItem }) {
     privacyPolicyAbout:     '/about',
     termsOfUse:             '/about',
     openSource:             '/about',
+    deleteAccount:          '/delete-account',
+    // Intelligence & Siri — all items open the dedicated intelligence screen
+    readAloud:              '/settings-intelligence',
+    translate:              '/settings-intelligence',
+    nonEnglishDetection:    '/settings-intelligence',
+    summarise:              '/settings-intelligence',
+    simplify:               '/settings-intelligence',
+    consensus:              '/settings-intelligence',
+    siriForums:             '/settings-intelligence',
+    siriPodcast:            '/settings-intelligence',
+    liveActivities:         '/settings-intelligence',
+    widgets:                '/settings-intelligence',
+    spotlight:              '/settings-intelligence',
   };
 
+  const interactiveRoute = INTERACTIVE_ROUTES[item.id];
+  const isNavigable = item.type === 'nav' || item.type === 'link' || !!interactiveRoute;
+
   function handlePress() {
-    const interactiveRoute = INTERACTIVE_ROUTES[item.id];
     if (interactiveRoute) { router.push(interactiveRoute as any); return; }
     if (item.route) router.push(item.route as any);
   }

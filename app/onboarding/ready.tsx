@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Image, Text, View } from 'react-native';
+import { Image, Linking, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
@@ -73,6 +73,24 @@ export default function ReadyStep() {
           <Text style={{ flex: 1, fontSize: 15, color: colors.textSecondary, lineHeight: 22 }}>{text}</Text>
         </View>
       ))}
+      {/* Be My Eyes link */}
+      <Pressable
+        onPress={() => Linking.openURL('https://apps.apple.com/us/app/be-my-eyes/id905177575')}
+        accessible
+        accessibilityRole="link"
+        accessibilityLabel="Get free visual assistance with the Be My Eyes app"
+        accessibilityHint="Opens the Be My Eyes app page in the App Store"
+        style={({ pressed }) => ({
+          flexDirection: 'row', alignItems: 'center', gap: 10,
+          marginBottom: 24, opacity: pressed ? 0.6 : 1,
+        })}
+      >
+        <Text style={{ fontSize: 20 }} accessibilityElementsHidden>👁️</Text>
+        <Text style={{ flex: 1, fontSize: 15, color: colors.appleVisBlue, lineHeight: 22, textDecorationLine: 'underline' }}>
+          Get free visual assistance with the Be My Eyes app
+        </Text>
+      </Pressable>
+
       {/* Brand close */}
       <View style={{ alignItems: 'center', marginTop: 16, paddingVertical: 20,
         backgroundColor: '#ffffff', borderRadius: 14 }}

@@ -80,6 +80,12 @@ const config = {
     'expo-background-fetch',
     'expo-task-manager',
     './plugins/withPrivacyManifest',
+    './plugins/withNowPlaying',
+    './plugins/withiCloudKVS',
+    './plugins/withLiveActivities',
+    './plugins/withWidgetKit',
+    './plugins/withSpotlight',
+    './plugins/withSiri',
     [
       'expo-build-properties',
       {

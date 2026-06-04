@@ -17,6 +17,7 @@ import { startPodcastLiveActivity } from '../../src/native/nativeModules';
 import { SPEED_OPTIONS, SLEEP_TIMER_OPTIONS } from '../../src/hooks/usePodcastPlayer';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
+import { useEpisodeMeta } from '../../src/hooks/useEpisodeMeta';
 import type { PodcastEpisode } from '../../src/types/content';
 
 function formatTime(seconds: number): string {
@@ -32,12 +33,71 @@ function formatDuration(seconds: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m} min`;
 }
 
+function formatPublishedDate(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  } catch { return ''; }
+}
+
+function buildEpisodeLabel(
+  episode: PodcastEpisode,
+  isCurrent: boolean,
+  currentPosition: number,
+  currentDuration: number,
+  savedPositions: Record<string, number>,
+  downloaded: Record<string, string>,
+  downloading: Set<string>,
+  queue: PodcastEpisode[],
+): string {
+  const parts: string[] = [episode.title, episode.showTitle];
+
+  const dur = formatDuration(episode.duration);
+  if (dur) parts.push(dur);
+
+  if (episode.publishedAt) {
+    const date = formatPublishedDate(episode.publishedAt);
+    if (date) parts.push(`Published ${date}`);
+  }
+
+  if (isCurrent && currentDuration > 0 && currentPosition > 30) {
+    parts.push(`Played ${Math.floor(currentPosition / 60)} of ${Math.floor(currentDuration / 60)} minutes`);
+    parts.push('Currently loaded');
+  } else {
+    const savedPos = savedPositions[episode.id];
+    if (savedPos && savedPos > 30 && episode.duration > 0) {
+      parts.push(`Played ${Math.floor(savedPos / 60)} of ${Math.floor(episode.duration / 60)} minutes`);
+    }
+    if (isCurrent) parts.push('Currently loaded');
+  }
+
+  const queueIndex = queue.findIndex(q => q.id === episode.id);
+  if (queueIndex >= 0) parts.push(`In queue, position ${queueIndex + 1}`);
+
+  if (downloading.has(episode.id)) {
+    parts.push('Downloading');
+  } else if (episode.id in downloaded) {
+    parts.push('Downloaded');
+  }
+
+  if (episode.transcriptUrl) parts.push('Transcript available');
+
+  if (episode.chapters && episode.chapters.length > 0) {
+    const c = episode.chapters.length;
+    parts.push(`${c} ${c === 1 ? 'chapter' : 'chapters'}`);
+  }
+
+  return parts.join('. ');
+}
+
 export default function Podcasts() {
   const router         = useRouter();
   const { colors, styles } = useTheme();
   const { screenReaderEnabled } = useAccessibilityPreferences();
   const player         = usePlayer();
   const list           = usePodcastList();
+  const meta           = useEpisodeMeta();
   const { showToast }  = useToast();
   const firstEpisodeRef = useRef<View | null>(null);
   useRefreshFeedback(list.refreshing, 'Podcasts', list.loading,
@@ -96,6 +156,7 @@ export default function Podcasts() {
       startPodcastLiveActivity({
         episodeTitle: episode.title,
         showTitle: episode.showTitle,
+        episodeId: String(episode.id),
         isPlaying: true,
         position: 0,
         duration: episode.duration,
@@ -112,7 +173,18 @@ export default function Podcasts() {
     } else if (actionName === 'save') {
       showToast('Save coming soon.', 'warning');
     } else if (actionName === 'download') {
-      showToast('Download coming soon.', 'warning');
+      if (meta.downloading.has(episode.id)) {
+        showToast('Download already in progress.', 'warning');
+      } else if (episode.id in meta.downloaded) {
+        meta.removeDownload(episode.id);
+        showToast('Download removed.', 'success');
+      } else {
+        showToast('Downloading…', 'success');
+        meta.startDownload(episode.id, episode.audioUrl).then(result => {
+          if (!result.ok) showToast('Download failed.', 'error');
+          else showToast('Download complete.', 'success');
+        });
+      }
     }
   }
 
@@ -283,7 +355,6 @@ export default function Podcasts() {
 
         {!list.loading && list.episodes.map((episode, index) => {
           const isCurrent = isCurrentEpisode(episode.id);
-          const durationLabel = formatDuration(episode.duration);
           return (
             <Pressable
               key={episode.id}
@@ -302,12 +373,16 @@ export default function Podcasts() {
               })}
               accessible
               accessibilityRole="none"
-              accessibilityLabel={[
-                episode.title,
-                episode.showTitle,
-                durationLabel,
-                isCurrent ? 'Currently loaded.' : null,
-              ].filter(Boolean).join('. ')}
+              accessibilityLabel={buildEpisodeLabel(
+                episode,
+                isCurrent,
+                player.position,
+                player.duration,
+                meta.positions,
+                meta.downloaded,
+                meta.downloading,
+                player.queue,
+              )}
               accessibilityHint="Double tap to open episode details and player"
               accessibilityActions={[
                 { name: 'play',         label: 'Play' },
@@ -315,7 +390,12 @@ export default function Podcasts() {
                 { name: 'play_next',    label: 'Play next' },
                 { name: 'add_to_queue', label: 'Add to queue' },
                 { name: 'save',         label: 'Save episode' },
-                { name: 'download',     label: 'Download' },
+                {
+                  name: 'download',
+                  label: meta.downloading.has(episode.id) ? 'Downloading…'
+                       : episode.id in meta.downloaded    ? 'Delete download'
+                       : 'Download',
+                },
               ]}
               onAccessibilityAction={(e) => handleEpisodeAction(episode, e.nativeEvent.actionName)}
               ref={(el) => { if (index === 0) firstEpisodeRef.current = el; }}
@@ -323,7 +403,7 @@ export default function Podcasts() {
             >
               <Text style={styles.cardTitle}>{episode.title}</Text>
               <Text style={[styles.cardMeta, { marginBottom: 10 }]}>
-                {episode.showTitle}{durationLabel ? ` · ${durationLabel}` : ''}
+                {episode.showTitle}{episode.duration > 0 ? ` · ${formatDuration(episode.duration)}` : ''}
               </Text>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <Pressable

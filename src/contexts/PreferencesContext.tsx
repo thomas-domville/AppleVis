@@ -34,21 +34,22 @@ const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
 };
 
 const KEYS = {
-  announcementLevel:    '@applevis_announcement_level',
-  defaultForumFilter:   '@applevis_default_forum_filter',
-  cardDensity:          '@applevis_card_density',
-  notificationPrefs:    '@applevis_notification_prefs',
-  notificationSound:    '@applevis_notification_sound',
-  podcastSpeed:         '@applevis_podcast_speed',
-  podcastSkipBack:      '@applevis_podcast_skip_back',
-  podcastSkipForward:   '@applevis_podcast_skip_forward',
-  podcastAutoPlay:      '@applevis_podcast_auto_play',
-  podcastSleepTimer:    '@applevis_podcast_sleep_timer',
-  podcastVoiceBoost:    '@applevis_podcast_voice_boost',
-  podcastEQ:            '@applevis_podcast_eq',
-  podcastAutoDownload:  '@applevis_podcast_auto_download',
-  podcastAutoDelete:    '@applevis_podcast_auto_delete',
-  podcastTrimSilence:   '@applevis_podcast_trim_silence',
+  announcementLevel:          '@applevis_announcement_level',
+  defaultForumFilter:         '@applevis_default_forum_filter',
+  cardDensity:                '@applevis_card_density',
+  notificationPrefs:          '@applevis_notification_prefs',
+  notificationSound:          '@applevis_notification_sound',
+  nonEnglishDetectionEnabled: '@applevis_non_english_detection',
+  podcastSpeed:               '@applevis_podcast_speed',
+  podcastSkipBack:            '@applevis_podcast_skip_back',
+  podcastSkipForward:         '@applevis_podcast_skip_forward',
+  podcastAutoPlay:            '@applevis_podcast_auto_play',
+  podcastSleepTimer:          '@applevis_podcast_sleep_timer',
+  podcastVoiceBoost:          '@applevis_podcast_voice_boost',
+  podcastEQ:                  '@applevis_podcast_eq',
+  podcastAutoDownload:        '@applevis_podcast_auto_download',
+  podcastAutoDelete:          '@applevis_podcast_auto_delete',
+  podcastTrimSilence:         '@applevis_podcast_trim_silence',
 };
 
 type PreferencesContextValue = {
@@ -66,6 +67,9 @@ type PreferencesContextValue = {
 
   notificationSound:    NotificationSound;
   setNotificationSound: (v: NotificationSound) => void;
+
+  nonEnglishDetectionEnabled:    boolean;
+  setNonEnglishDetectionEnabled: (v: boolean) => void;
 
   // ── Podcast player defaults ────────────────────────────────────────────────
   podcastSpeed:         PlaybackSpeed;
@@ -109,8 +113,9 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const [announcementLevel,   setAnnouncementLevelState]   = useState<AnnouncementLevel>('all');
   const [defaultForumFilter,  setDefaultForumFilterState]  = useState<DefaultForumFilter>('Recent');
   const [cardDensity,         setCardDensityState]         = useState<CardDensity>('comfortable');
-  const [notificationPrefs,   setNotificationPrefsState]   = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
-  const [notificationSound,   setNotificationSoundState]   = useState<NotificationSound>('mouseSqueak');
+  const [notificationPrefs,           setNotificationPrefsState]           = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
+  const [notificationSound,           setNotificationSoundState]           = useState<NotificationSound>('mouseSqueak');
+  const [nonEnglishDetectionEnabled,  setNonEnglishDetectionEnabledState]  = useState<boolean>(true);
   const [podcastSpeed,        setPodcastSpeedState]        = useState<PlaybackSpeed>(1.0);
   const [podcastSkipBack,     setPodcastSkipBackState]     = useState<number>(10);
   const [podcastSkipForward,  setPodcastSkipForwardState]  = useState<number>(30);
@@ -129,6 +134,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       AsyncStorage.getItem(KEYS.cardDensity),
       AsyncStorage.getItem(KEYS.notificationPrefs),
       AsyncStorage.getItem(KEYS.notificationSound),
+      AsyncStorage.getItem(KEYS.nonEnglishDetectionEnabled),
       AsyncStorage.getItem(KEYS.podcastSpeed),
       AsyncStorage.getItem(KEYS.podcastSkipBack),
       AsyncStorage.getItem(KEYS.podcastSkipForward),
@@ -139,13 +145,14 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       AsyncStorage.getItem(KEYS.podcastAutoDownload),
       AsyncStorage.getItem(KEYS.podcastAutoDelete),
       AsyncStorage.getItem(KEYS.podcastTrimSilence),
-    ]).then(([level, filter, density, prefs, sound, speed, skipB, skipF, autoPlay, sleep, vBoost, eq, autoDl, autoDel, trimSilence]) => {
-      if (level)    setAnnouncementLevelState(level as AnnouncementLevel);
-      if (filter)   setDefaultForumFilterState(filter as DefaultForumFilter);
-      if (density)  setCardDensityState(density as CardDensity);
-      if (prefs)    setNotificationPrefsState(JSON.parse(prefs) as NotificationPrefs);
-      if (sound)    setNotificationSoundState(sound as NotificationSound);
-      if (speed)    setPodcastSpeedState(parseFloat(speed) as PlaybackSpeed);
+    ]).then(([level, filter, density, prefs, sound, nonEnglish, speed, skipB, skipF, autoPlay, sleep, vBoost, eq, autoDl, autoDel, trimSilence]) => {
+      if (level)      setAnnouncementLevelState(level as AnnouncementLevel);
+      if (filter)     setDefaultForumFilterState(filter as DefaultForumFilter);
+      if (density)    setCardDensityState(density as CardDensity);
+      if (prefs)      setNotificationPrefsState(JSON.parse(prefs) as NotificationPrefs);
+      if (sound)      setNotificationSoundState(sound as NotificationSound);
+      if (nonEnglish) setNonEnglishDetectionEnabledState(nonEnglish === 'true');
+      if (speed)      setPodcastSpeedState(parseFloat(speed) as PlaybackSpeed);
       if (skipB)    setPodcastSkipBackState(parseInt(skipB, 10));
       if (skipF)    setPodcastSkipForwardState(parseInt(skipF, 10));
       if (autoPlay) setPodcastAutoPlayState(autoPlay === 'true');
@@ -181,6 +188,11 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const setNotificationSound = useCallback((v: NotificationSound) => {
     setNotificationSoundState(v);
     AsyncStorage.setItem(KEYS.notificationSound, v).catch(() => {});
+  }, []);
+
+  const setNonEnglishDetectionEnabled = useCallback((v: boolean) => {
+    setNonEnglishDetectionEnabledState(v);
+    AsyncStorage.setItem(KEYS.nonEnglishDetectionEnabled, String(v)).catch(() => {});
   }, []);
 
   const setPodcastSpeed = useCallback((v: PlaybackSpeed) => {
@@ -230,6 +242,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     cardDensity,        setCardDensity,
     notificationPrefs,  setNotificationPrefs,
     notificationSound,  setNotificationSound,
+    nonEnglishDetectionEnabled, setNonEnglishDetectionEnabled,
     podcastSpeed,        setPodcastSpeed,
     podcastSkipBack,     setPodcastSkipBack,
     podcastSkipForward,  setPodcastSkipForward,
@@ -243,12 +256,12 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     isLoading,
   }), [
     announcementLevel, defaultForumFilter, cardDensity,
-    notificationPrefs, notificationSound,
+    notificationPrefs, notificationSound, nonEnglishDetectionEnabled,
     podcastSpeed, podcastSkipBack, podcastSkipForward, podcastAutoPlay,
     podcastSleepTimer, podcastVoiceBoost, podcastEQ, podcastAutoDownload, podcastAutoDelete, podcastTrimSilence,
     isLoading,
     setAnnouncementLevel, setDefaultForumFilter, setCardDensity,
-    setNotificationPrefs, setNotificationSound,
+    setNotificationPrefs, setNotificationSound, setNonEnglishDetectionEnabled,
     setPodcastSpeed, setPodcastSkipBack, setPodcastSkipForward, setPodcastAutoPlay,
     setPodcastSleepTimer, setPodcastVoiceBoost, setPodcastEQ, setPodcastAutoDownload, setPodcastAutoDelete,
     setPodcastTrimSilence,

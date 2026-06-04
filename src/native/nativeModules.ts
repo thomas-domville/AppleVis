@@ -1,25 +1,16 @@
-/**
- * Native iOS feature stubs
- *
- * Every function here is a no-op until a native Expo module (or config plugin)
- * implements the Swift/Objective-C bridge. Each stub documents:
- *   • What the feature does for the user
- *   • The exact Swift API to call
- *   • Any entitlements / Info.plist keys required
- *
- * To activate: create an Expo config plugin that adds the Swift files,
- * links the module, and wires it via NativeModules.
- */
+import { NativeModules } from 'react-native';
 
 // ─── Live Activities ──────────────────────────────────────────────────────────
 
 export type PodcastLiveActivityState = {
   episodeTitle: string;
   showTitle: string;
+  episodeId: string;
   isPlaying: boolean;
-  position: number;    // seconds
-  duration: number;    // seconds
-  artworkUrl?: string;
+  position: number;       // seconds
+  duration: number;       // seconds
+  speed?: number;         // default 1.0
+  chapterTitle?: string;
 };
 
 /**
@@ -58,25 +49,26 @@ export type PodcastLiveActivityState = {
  *
  * Info.plist: NSSupportsLiveActivities = YES
  */
-export function startPodcastLiveActivity(_state: PodcastLiveActivityState): void {
-  if (__DEV__) console.log('[NativeModules] startPodcastLiveActivity — native module not yet built.');
+export function startPodcastLiveActivity(state: PodcastLiveActivityState): void {
+  NativeModules.AppleVisLiveActivityController?.start(state);
 }
 
-export function updatePodcastLiveActivity(_state: PodcastLiveActivityState): void {
-  if (__DEV__) console.log('[NativeModules] updatePodcastLiveActivity — native module not yet built.');
+export function updatePodcastLiveActivity(state: PodcastLiveActivityState): void {
+  NativeModules.AppleVisLiveActivityController?.update(state);
 }
 
 export function endPodcastLiveActivity(): void {
-  if (__DEV__) console.log('[NativeModules] endPodcastLiveActivity — native module not yet built.');
+  NativeModules.AppleVisLiveActivityController?.end();
 }
 
 // ─── Widgets ──────────────────────────────────────────────────────────────────
 
 export type WidgetSnapshot = {
-  unreadTopicCount: number;
-  latestPodcastTitle: string;
-  latestPodcastDate: string;
-  newSinceLastVisit: number;
+  nowPlayingTitle: string;
+  nowPlayingShow: string;
+  nowPlayingProgress: number;  // 0.0–1.0
+  unreadForumCount: number;
+  savedItemCount: number;
 };
 
 /**
@@ -103,8 +95,8 @@ export type WidgetSnapshot = {
  *
  * Entitlements: com.apple.security.application-groups = ["group.com.applevis.app"]
  */
-export function updateWidgetSnapshot(_snapshot: WidgetSnapshot): void {
-  if (__DEV__) console.log('[NativeModules] updateWidgetSnapshot — native module not yet built.');
+export function updateWidgetSnapshot(snapshot: WidgetSnapshot): void {
+  NativeModules.AppleVisWidgetDataWriter?.update(snapshot);
 }
 
 // ─── Focus Filter ─────────────────────────────────────────────────────────────
@@ -388,4 +380,26 @@ export async function isIncreaseContrastEnabled(): Promise<boolean> {
 export async function expandSearchQuery(_query: string): Promise<string[]> {
   if (__DEV__) console.log('[NativeModules] expandSearchQuery — native module not yet built.');
   return [_query];
+}
+
+// ─── Spotlight ────────────────────────────────────────────────────────────────
+
+export type SpotlightItem = {
+  id: string;
+  title: string;
+  description: string;
+  contentType: 'forumTopic' | 'podcast' | 'app' | 'resource';
+  url: string;
+};
+
+export function indexSpotlightItems(items: SpotlightItem[]): Promise<void> {
+  return NativeModules.AppleVisSpotlight?.index(items) ?? Promise.resolve();
+}
+
+export function deindexSpotlightItem(id: string): Promise<void> {
+  return NativeModules.AppleVisSpotlight?.deindex(id) ?? Promise.resolve();
+}
+
+export function deindexAllSpotlight(): Promise<void> {
+  return NativeModules.AppleVisSpotlight?.deindexAll() ?? Promise.resolve();
 }
