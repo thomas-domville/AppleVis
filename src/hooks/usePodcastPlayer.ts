@@ -188,6 +188,7 @@ export function usePodcastPlayer() {
 
   async function seekTo(seconds: number) {
     const clamped = Math.max(0, Math.min(state.duration, seconds));
+    patch({ position: clamped }); // optimistic update so VoiceOver adjustable sees the change immediately
     await soundRef.current?.setPositionAsync(clamped * 1000);
   }
 

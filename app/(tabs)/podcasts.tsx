@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef } from 'react';
+import { AccessibilityInfo, ActivityIndicator, findNodeHandle, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '../../src/components/Screen';
 import { FilterPicker } from '../../src/components/FilterPicker';
 import { OfflineBanner } from '../../src/components/OfflineBanner';
@@ -99,9 +99,22 @@ export default function Podcasts() {
   const list           = usePodcastList();
   const meta           = useEpisodeMeta();
   const { showToast }  = useToast();
-  const firstEpisodeRef = useRef<View | null>(null);
+  const firstEpisodeRef       = useRef<View | null>(null);
+  const episodeItemRefs       = useRef<Record<string, View | null>>({});
+  const lastTappedEpisodeId   = useRef<string | null>(null);
+
   useRefreshFeedback(list.refreshing, 'Podcasts', list.loading,
     () => firstEpisodeRef.current);
+
+  // Restore VoiceOver focus to the episode the user tapped when they navigate back
+  useFocusEffect(useCallback(() => {
+    const id = lastTappedEpisodeId.current;
+    if (!id) return;
+    const el = episodeItemRefs.current[id];
+    if (!el) return;
+    const handle = findNodeHandle(el);
+    if (handle) setTimeout(() => AccessibilityInfo.setAccessibilityFocus(handle), 400);
+  }, []));
 
   useHandoff(
     player.episode
@@ -134,6 +147,7 @@ export default function Podcasts() {
   const durationKnown = player.duration > 0;
 
   function navigateToEpisode(episode: PodcastEpisode) {
+    lastTappedEpisodeId.current = episode.id;
     router.push({
       pathname: '/episode/[id]' as any,
       params: {
@@ -225,8 +239,8 @@ export default function Podcasts() {
                   accessibilityLabel={`Playback position. ${formatTime(player.position)} of ${formatTime(player.duration)}.`}
                   accessibilityValue={{ min: 0, max: Math.round(player.duration), now: Math.round(player.position) }}
                   onAccessibilityAction={(e) => {
-                    if (e.nativeEvent.actionName === 'increment') player.seekTo(player.position + 10);
-                    if (e.nativeEvent.actionName === 'decrement') player.seekTo(player.position - 10);
+                    if (e.nativeEvent.actionName === 'increment') player.seekTo(player.position + 60);
+                    if (e.nativeEvent.actionName === 'decrement') player.seekTo(player.position - 60);
                   }}
                   style={{ marginBottom: 6 }}
                 >
@@ -358,19 +372,7 @@ export default function Podcasts() {
           return (
             <Pressable
               key={episode.id}
-              onPress={() => router.push({
-                pathname: '/episode/[id]' as any,
-                params: {
-                  id: episode.id,
-                  title: episode.title,
-                  showTitle: episode.showTitle,
-                  description: episode.description ?? '',
-                  artworkUrl: episode.artworkUrl ?? '',
-                  publishedAt: episode.publishedAt ?? '',
-                  duration: String(episode.duration),
-                  audioUrl: episode.audioUrl,
-                },
-              })}
+              onPress={() => navigateToEpisode(episode)}
               accessible
               accessibilityRole="none"
               accessibilityLabel={buildEpisodeLabel(
@@ -398,7 +400,7 @@ export default function Podcasts() {
                 },
               ]}
               onAccessibilityAction={(e) => handleEpisodeAction(episode, e.nativeEvent.actionName)}
-              ref={(el) => { if (index === 0) firstEpisodeRef.current = el; }}
+              ref={(el) => { episodeItemRefs.current[episode.id] = el; if (index === 0) firstEpisodeRef.current = el; }}
               style={[styles.card, isCurrent && { borderColor: colors.appleVisBlue, borderWidth: 2 }]}
             >
               <Text style={styles.cardTitle}>{episode.title}</Text>
