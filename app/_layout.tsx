@@ -153,7 +153,9 @@ export default function RootLayout() {
               <ThemedStatusBar />
               <MagicTapWrapper>
                 <OnboardingGate>
-                  <Stack screenOptions={{ headerShown: false }} />
+                  <Stack screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="player" options={{ presentation: 'modal' }} />
+                  </Stack>
                 </OnboardingGate>
               </MagicTapWrapper>
             </PlayerProvider>

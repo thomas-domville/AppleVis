@@ -313,6 +313,20 @@ export function usePodcastPlayer() {
     }
   }
 
+  async function stop() {
+    try {
+      const s = await soundRef.current?.getStatusAsync();
+      if (s?.isLoaded && state.episode) {
+        await persistence.savePodcastPosition(state.episode.id, s.positionMillis / 1000);
+      }
+    } catch {}
+    await soundRef.current?.unloadAsync().catch(() => {});
+    soundRef.current = null;
+    if (sleepRef.current) { clearInterval(sleepRef.current); sleepRef.current = null; }
+    if (Platform.OS === 'ios') clearNowPlayingInfo();
+    setState(DEFAULT);
+  }
+
   async function skipBack() {
     const pos = Math.max(0, state.position - state.skipBackSeconds);
     await soundRef.current?.setPositionAsync(pos * 1000);
@@ -420,6 +434,7 @@ export function usePodcastPlayer() {
     loadEpisode,
     play,
     pause,
+    stop,
     skipBack,
     skipForward,
     seekTo,
