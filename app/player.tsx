@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { AccessibilityInfo, Image, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -192,7 +192,10 @@ export default function PlayerScreen() {
         justifyContent: 'center', gap: 16, paddingHorizontal: 28 }}>
 
         <Pressable
-          onPress={() => player.setSpeed(nextSpeed)}
+          onPress={() => {
+            player.setSpeed(nextSpeed);
+            AccessibilityInfo.announceForAccessibility(`Speed ${nextSpeed}×`);
+          }}
           accessible
           accessibilityRole="button"
           accessibilityLabel={`Speed ${player.speed}×. Double tap to change to ${nextSpeed}×.`}

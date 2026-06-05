@@ -493,6 +493,7 @@ export default function EpisodeDetail() {
       await persistence.unsaveItem(params.id);
       setIsSaved(false);
       showToast('Removed from saved items');
+      AccessibilityInfo.announceForAccessibility('Episode removed from saved items');
     } else {
       await persistence.saveItem({
         id: params.id,
@@ -502,6 +503,7 @@ export default function EpisodeDetail() {
       });
       setIsSaved(true);
       showToast('Episode saved');
+      AccessibilityInfo.announceForAccessibility('Episode saved');
     }
   }
 
@@ -511,16 +513,20 @@ export default function EpisodeDetail() {
       await deleteDownload(params.id);
       setDownloadState('idle');
       showToast('Download removed');
+      AccessibilityInfo.announceForAccessibility('Download removed');
     } else if (downloadState === 'idle') {
       setDownloadState('downloading');
       showToast('Downloading episode…');
+      AccessibilityInfo.announceForAccessibility('Downloading episode');
       const result = await downloadEpisode(params.id, params.audioUrl, episode);
       if (result.ok) {
         setDownloadState('done');
         showToast('Download complete');
+        AccessibilityInfo.announceForAccessibility('Download complete');
       } else {
         setDownloadState('idle');
         showToast(`Download failed: ${result.error ?? 'Unknown error'}`, 'error');
+        AccessibilityInfo.announceForAccessibility('Download failed');
       }
     }
   }
@@ -720,10 +726,16 @@ export default function EpisodeDetail() {
                 accessibilityValue={{ text: `${player.speed}×` }}
                 accessibilityHint="Double tap to cycle speed. Swipe up to increase, swipe down to decrease."
                 onAccessibilityAction={(e) => {
-                  if (e.nativeEvent.actionName === 'increment' && speedIdx < SPEED_OPTIONS.length - 1)
-                    player.setSpeed(SPEED_OPTIONS[speedIdx + 1]);
-                  if (e.nativeEvent.actionName === 'decrement' && speedIdx > 0)
-                    player.setSpeed(SPEED_OPTIONS[speedIdx - 1]);
+                  if (e.nativeEvent.actionName === 'increment' && speedIdx < SPEED_OPTIONS.length - 1) {
+                    const next = SPEED_OPTIONS[speedIdx + 1];
+                    player.setSpeed(next);
+                    AccessibilityInfo.announceForAccessibility(`Speed ${next}×`);
+                  }
+                  if (e.nativeEvent.actionName === 'decrement' && speedIdx > 0) {
+                    const next = SPEED_OPTIONS[speedIdx - 1];
+                    player.setSpeed(next);
+                    AccessibilityInfo.announceForAccessibility(`Speed ${next}×`);
+                  }
                 }}
                 style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                   paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.border }}
@@ -749,8 +761,16 @@ export default function EpisodeDetail() {
                 accessibilityValue={{ text: volumePct, min: 0, max: 100, now: Math.round(player.volume * 100) }}
                 accessibilityHint="Swipe up to increase volume, swipe down to decrease"
                 onAccessibilityAction={(e) => {
-                  if (e.nativeEvent.actionName === 'increment') setVolumeIdx(volumeIdx + 1);
-                  if (e.nativeEvent.actionName === 'decrement') setVolumeIdx(volumeIdx - 1);
+                  if (e.nativeEvent.actionName === 'increment') {
+                    const newIdx = Math.min(volumeSteps.length - 1, volumeIdx + 1);
+                    setVolumeIdx(newIdx);
+                    AccessibilityInfo.announceForAccessibility(`Volume ${Math.round(volumeSteps[newIdx] * 100)}%`);
+                  }
+                  if (e.nativeEvent.actionName === 'decrement') {
+                    const newIdx = Math.max(0, volumeIdx - 1);
+                    setVolumeIdx(newIdx);
+                    AccessibilityInfo.announceForAccessibility(`Volume ${Math.round(volumeSteps[newIdx] * 100)}%`);
+                  }
                 }}
                 style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                   paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.border }}
@@ -793,10 +813,16 @@ export default function EpisodeDetail() {
                 accessibilityValue={{ text: sleepDisplayLabel }}
                 accessibilityHint="Swipe up to increase, swipe down to decrease or turn off. 'End of Episode' stops after the current episode finishes."
                 onAccessibilityAction={(e) => {
-                  if (e.nativeEvent.actionName === 'increment')
-                    applySleepIdx(Math.min(SLEEP_MINS.length - 1, sleepIdx + 1));
-                  if (e.nativeEvent.actionName === 'decrement')
-                    applySleepIdx(Math.max(0, sleepIdx - 1));
+                  if (e.nativeEvent.actionName === 'increment') {
+                    const newIdx = Math.min(SLEEP_MINS.length - 1, sleepIdx + 1);
+                    applySleepIdx(newIdx);
+                    AccessibilityInfo.announceForAccessibility(`Sleep timer: ${sleepLabel(SLEEP_MINS[newIdx])}`);
+                  }
+                  if (e.nativeEvent.actionName === 'decrement') {
+                    const newIdx = Math.max(0, sleepIdx - 1);
+                    applySleepIdx(newIdx);
+                    AccessibilityInfo.announceForAccessibility(`Sleep timer: ${sleepLabel(SLEEP_MINS[newIdx])}`);
+                  }
                 }}
                 style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                   paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.border }}
@@ -817,7 +843,11 @@ export default function EpisodeDetail() {
 
             {/* ── Trim silence ─────────────────────────────────────────────── */}
             <Pressable
-              onPress={() => setPodcastTrimSilence(!podcastTrimSilence)}
+              onPress={() => {
+                const next = !podcastTrimSilence;
+                setPodcastTrimSilence(next);
+                AccessibilityInfo.announceForAccessibility(`Trim Silence ${next ? 'on' : 'off'}`);
+              }}
               accessible
               accessibilityRole="switch"
               accessibilityState={{ checked: podcastTrimSilence }}
@@ -844,7 +874,11 @@ export default function EpisodeDetail() {
 
             {/* ── Voice Boost ──────────────────────────────────────────────── */}
             <Pressable
-              onPress={() => setPodcastVoiceBoost(!podcastVoiceBoost)}
+              onPress={() => {
+                const next = !podcastVoiceBoost;
+                setPodcastVoiceBoost(next);
+                AccessibilityInfo.announceForAccessibility(`Voice Boost ${next ? 'on' : 'off'}`);
+              }}
               accessible
               accessibilityRole="switch"
               accessibilityState={{ checked: podcastVoiceBoost }}
