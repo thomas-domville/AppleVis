@@ -27,7 +27,7 @@ export function Screen({ title, children, showSettings = true, showSearch = fals
     <SafeAreaView
       style={styles.screen}
       accessibilityLanguage="en"
-      onAccessibilityEscape={() => { if (router.canGoBack()) router.back(); }}
+      onAccessibilityEscape={() => { if (showBack && router.canGoBack()) router.back(); }}
     >
       <View style={styles.content}>
 
