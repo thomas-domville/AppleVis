@@ -66,6 +66,7 @@ export function usePodcastPlayer() {
   const nowPlayingTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const queueLoadedRef = useRef(false);
   const episodeRef    = useRef<PodcastEpisode | null>(null);
+  const volumeRef     = useRef(1.0);
   const [state, setState] = useState<PlayerState>(DEFAULT);
   const {
     podcastAutoPlay, podcastSleepTimer, podcastSpeed, setPodcastSpeed,
@@ -126,6 +127,18 @@ export function usePodcastPlayer() {
   // Keep a stable ref to the current episode so AppState callback never goes stale.
   useEffect(() => { episodeRef.current = state.episode; }, [state.episode]);
 
+  // On launch: restore saved volume and the last-played episode (paused at saved position).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    Promise.all([persistence.getVolume(), persistence.getLastEpisode()])
+      .then(([v, ep]) => {
+        volumeRef.current = v;
+        patch({ volume: v });
+        if (ep) loadEpisode(ep, false).catch(() => {});
+      })
+      .catch(() => {});
+  }, []);
+
   // Save playback position whenever the app moves to background or becomes inactive.
   // Covers force-close and home-button dismissal that bypass the pause/stop paths.
   useEffect(() => {
@@ -133,6 +146,7 @@ export function usePodcastPlayer() {
       if (nextState === 'background' || nextState === 'inactive') {
         const ep = episodeRef.current;
         if (!ep || !soundRef.current) return;
+        persistence.setLastEpisode(ep).catch(() => {});
         soundRef.current.getStatusAsync().then((s) => {
           if (s.isLoaded && episodeRef.current) {
             persistence.savePodcastPosition(episodeRef.current.id, s.positionMillis / 1000);
@@ -295,7 +309,7 @@ export function usePodcastPlayer() {
         {
           shouldPlay: autoPlay,
           rate: resolvedSpeed,
-          volume: state.volume,
+          volume: volumeRef.current,
           positionMillis: savedPosition * 1000,
           progressUpdateIntervalMillis: 500,
         },
@@ -362,6 +376,7 @@ export function usePodcastPlayer() {
     soundRef.current = null;
     if (sleepRef.current) { clearInterval(sleepRef.current); sleepRef.current = null; }
     if (Platform.OS === 'ios') clearNowPlayingInfo();
+    persistence.setLastEpisode(null).catch(() => {});
     setState(DEFAULT);
   }
 
@@ -393,8 +408,10 @@ export function usePodcastPlayer() {
 
   async function setVolume(volume: number) {
     const clamped = Math.max(0, Math.min(1, volume));
+    volumeRef.current = clamped;
     await soundRef.current?.setVolumeAsync(clamped);
     patch({ volume: clamped });
+    persistence.setVolume(clamped).catch(() => {});
   }
 
   function enqueue(episode: PodcastEpisode) {

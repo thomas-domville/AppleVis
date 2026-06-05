@@ -42,6 +42,8 @@ const LK = {
   QUEUE:         'applevis:queue',
   PLAY_HISTORY:  'applevis:playHistory',
   SHOW_SPEEDS:   'applevis:showSpeeds',
+  LAST_EPISODE:  'applevis:lastEpisode',
+  VOLUME:        'applevis:volume',
 };
 
 async function localGet<T>(key: string, fallback: T): Promise<T> {
@@ -189,6 +191,18 @@ export const persistence = {
 
   getQueue: () => localGet<PodcastEpisode[]>(LK.QUEUE, []),
   setQueue: (queue: PodcastEpisode[]) => localSet(LK.QUEUE, queue),
+
+  // ── Last played episode (device-local) ────────────────────────────────────
+  // Restored on launch so the mini-player reappears at the saved position.
+  // Cleared when the user explicitly stops/dismisses the player.
+
+  getLastEpisode: () => localGet<PodcastEpisode | null>(LK.LAST_EPISODE, null),
+  setLastEpisode: (ep: PodcastEpisode | null) => localSet(LK.LAST_EPISODE, ep),
+
+  // ── In-app volume (device-local) ─────────────────────────────────────────
+
+  getVolume: () => localGet<number>(LK.VOLUME, 1.0),
+  setVolume: (v: number) => localSet(LK.VOLUME, v),
 
   // ── Play history (device-local, capped at 100 entries) ───────────────────
   // Stores the most recent 100 completed episodes, newest first.
