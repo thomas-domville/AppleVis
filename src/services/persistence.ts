@@ -44,6 +44,7 @@ const LK = {
   SHOW_SPEEDS:   'applevis:showSpeeds',
   LAST_EPISODE:  'applevis:lastEpisode',
   VOLUME:        'applevis:volume',
+  SAVED_META:    'applevis:savedEpisodeMeta',
 };
 
 async function localGet<T>(key: string, fallback: T): Promise<T> {
@@ -162,6 +163,23 @@ export const persistence = {
     const { [episodeId]: _, ...rest } = downloads;
     await localSet(LK.DOWNLOADS, rest);
     await persistence.removeDownloadedEpisodeMeta(episodeId);
+  },
+
+  // ── Saved episode metadata (device-local) ────────────────────────────────
+  // Stores full PodcastEpisode objects so the Saved view can display
+  // title, duration, etc. even for episodes no longer in the API feed.
+
+  getSavedEpisodeMeta: () => localGet<Record<string, PodcastEpisode>>(LK.SAVED_META, {}),
+
+  async saveSavedEpisodeMeta(episode: PodcastEpisode): Promise<void> {
+    const meta = await persistence.getSavedEpisodeMeta();
+    await localSet(LK.SAVED_META, { ...meta, [episode.id]: episode });
+  },
+
+  async removeSavedEpisodeMeta(episodeId: string): Promise<void> {
+    const meta = await persistence.getSavedEpisodeMeta();
+    const { [episodeId]: _, ...rest } = meta;
+    await localSet(LK.SAVED_META, rest);
   },
 
   // ── Downloaded episode metadata (device-local) ───────────────────────────

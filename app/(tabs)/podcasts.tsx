@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AccessibilityInfo, ActivityIndicator, Animated,
-  findNodeHandle, PanResponder, Pressable,
-  RefreshControl, ScrollView, Text, TextInput, View,
+  AccessibilityInfo, ActionSheetIOS, ActivityIndicator, Animated,
+  findNodeHandle, PanResponder, Platform, Pressable,
+  RefreshControl, ScrollView, Share, Text, TextInput, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -28,8 +28,32 @@ import { deleteAllDownloads } from '../../src/services/downloads';
 import type { PodcastEpisode } from '../../src/types/content';
 
 // ─── Filter constants ─────────────────────────────────────────────────────────
-const PODCAST_FILTERS = ['Latest', 'In Progress', 'Downloads', 'Queue', 'History'] as const;
+const PODCAST_FILTERS = ['Latest', 'In Progress', 'Downloads', 'Saved', 'Queue', 'History'] as const;
 type PodcastFilter = typeof PODCAST_FILTERS[number];
+
+// ─── Sort types ───────────────────────────────────────────────────────────────
+type SavedSort     = 'newest-saved' | 'oldest-saved' | 'newest-published' | 'oldest-published' | 'title-az' | 'shortest' | 'longest';
+type DownloadsSort = 'newest-published' | 'oldest-published' | 'title-az' | 'shortest' | 'longest';
+
+const SAVED_SORT_LABELS: Record<SavedSort, string> = {
+  'newest-saved':     'Newest Saved',
+  'oldest-saved':     'Oldest Saved',
+  'newest-published': 'Newest Published',
+  'oldest-published': 'Oldest Published',
+  'title-az':         'A–Z',
+  'shortest':         'Shortest',
+  'longest':          'Longest',
+};
+const SAVED_SORT_KEYS = Object.keys(SAVED_SORT_LABELS) as SavedSort[];
+
+const DOWNLOADS_SORT_LABELS: Record<DownloadsSort, string> = {
+  'newest-published': 'Newest Published',
+  'oldest-published': 'Oldest Published',
+  'title-az':         'A–Z',
+  'shortest':         'Shortest',
+  'longest':          'Longest',
+};
+const DOWNLOADS_SORT_KEYS = Object.keys(DOWNLOADS_SORT_LABELS) as DownloadsSort[];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatTime(seconds: number): string {
@@ -78,6 +102,7 @@ function buildEpisodeLabel(
   downloading: Set<string>,
   queue: PodcastEpisode[],
   isNew: boolean,
+  savedIds: Set<string>,
 ): string {
   const core: string[] = [];
   if (isNew) core.push('New');
@@ -109,6 +134,7 @@ function buildEpisodeLabel(
   if (queueIndex >= 0) core.push(`In queue, position ${queueIndex + 1}`);
   if (downloading.has(episode.id)) core.push('Downloading');
   else if (episode.id in downloaded) core.push('Downloaded');
+  if (savedIds.has(episode.id)) core.push('Saved');
   if (episode.transcriptUrl) core.push('Transcript available');
   if (episode.chapters?.length) {
     const c = episode.chapters.length;
@@ -121,9 +147,9 @@ function buildEpisodeLabel(
 // ─── Swipeable episode card ───────────────────────────────────────────────────
 function SwipeableEpisodeCard({
   episode, isCurrent, isPlaying, isNew, progress,
-  isQueued, isDownloaded, isDownloading,
+  isQueued, isDownloaded, isDownloading, isSaved,
   accessibilityLabel,
-  onPress, onPlay, onQueue, onDownload, onRef,
+  onPress, onPlay, onQueue, onDownload, onSave, onRef,
   colors, styles,
 }: {
   episode: PodcastEpisode;
@@ -134,11 +160,13 @@ function SwipeableEpisodeCard({
   isQueued: boolean;
   isDownloaded: boolean;
   isDownloading: boolean;
+  isSaved: boolean;
   accessibilityLabel: string;
   onPress: () => void;
   onPlay: () => void;
   onQueue: () => void;
   onDownload: () => void;
+  onSave: () => void;
   onRef?: (el: View | null) => void;
   colors: ReturnType<typeof useTheme>['colors'];
   styles: ReturnType<typeof useTheme>['styles'];
@@ -180,14 +208,14 @@ function SwipeableEpisodeCard({
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: 20 }} accessibilityElementsHidden>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Ionicons name={isQueued ? 'close-circle' : 'list'} size={20} color={colors.accent} />
+          <Ionicons name={isQueued ? 'remove-circle-outline' : 'add-circle-outline'} size={20} color={colors.accent} />
           <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>
-            {isQueued ? 'Remove' : 'Queue'}
+            {isQueued ? 'Remove from Queue' : 'Add to Queue'}
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>
-            {isDownloading ? 'Downloading…' : isDownloaded ? 'Delete' : 'Download'}
+            {isDownloading ? 'Downloading…' : isDownloaded ? 'Delete Download' : 'Download'}
           </Text>
           <Ionicons
             name={isDownloaded ? 'trash-outline' : 'arrow-down-circle-outline'}
@@ -210,11 +238,13 @@ function SwipeableEpisodeCard({
             { name: 'play',     label: isCurrent && isPlaying ? 'Pause' : 'Play' },
             { name: 'queue',    label: isQueued ? 'Remove from queue' : 'Add to queue' },
             { name: 'download', label: isDownloading ? 'Downloading…' : isDownloaded ? 'Delete download' : 'Download' },
+            { name: 'save',     label: isSaved ? 'Unsave' : 'Save' },
           ]}
           onAccessibilityAction={({ nativeEvent }) => {
             if (nativeEvent.actionName === 'play')     onPlay();
             if (nativeEvent.actionName === 'queue')    onQueue();
             if (nativeEvent.actionName === 'download') onDownload();
+            if (nativeEvent.actionName === 'save')     onSave();
           }}
           ref={onRef}
           style={[styles.card, isCurrent && { borderColor: colors.accent, borderWidth: 2 }]}
@@ -241,17 +271,17 @@ function SwipeableEpisodeCard({
             </View>
           )}
 
-          <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
             <Pressable
               onPress={onPlay}
               accessible accessibilityRole="button"
               accessibilityLabel={isCurrent && isPlaying ? 'Pause' : 'Play'}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                 backgroundColor: colors.accent, borderRadius: 8,
-                paddingHorizontal: 14, paddingVertical: 8 }}
+                paddingHorizontal: 12, paddingVertical: 8 }}
             >
-              <Ionicons name={isCurrent && isPlaying ? 'pause' : 'play'} size={16} color="#FFF" />
-              <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>
+              <Ionicons name={isCurrent && isPlaying ? 'pause' : 'play'} size={14} color="#FFF" accessibilityElementsHidden />
+              <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>
                 {isCurrent && isPlaying ? 'Pause' : 'Play'}
               </Text>
             </Pressable>
@@ -260,18 +290,37 @@ function SwipeableEpisodeCard({
               accessible
               accessibilityRole="button"
               accessibilityLabel={isQueued ? 'Remove from queue' : 'Add to queue'}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                 backgroundColor: isQueued ? colors.accent + '22' : colors.pill,
-                borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 }}
+                borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}
             >
               <Ionicons
-                name={isQueued ? 'checkmark-circle' : 'list'}
-                size={16}
+                name={isQueued ? 'remove-circle-outline' : 'add-circle-outline'}
+                size={14}
                 color={colors.accent}
                 accessibilityElementsHidden
               />
-              <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 14 }}>
-                {isQueued ? 'In Queue' : 'Queue'}
+              <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>
+                {isQueued ? 'Remove from Queue' : 'Add to Queue'}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={onSave}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={isSaved ? 'Unsave episode' : 'Save episode'}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+                backgroundColor: isSaved ? colors.accent + '22' : colors.pill,
+                borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}
+            >
+              <Ionicons
+                name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                size={14}
+                color={colors.accent}
+                accessibilityElementsHidden
+              />
+              <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>
+                {isSaved ? 'Unsave' : 'Save'}
               </Text>
             </Pressable>
           </View>
@@ -302,7 +351,7 @@ function EmptyState({ icon, title, subtitle, colors, styles }: {
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function Podcasts() {
   const router                   = useRouter();
-  const { colors, styles }       = useTheme();
+  const { colors, styles, isDark } = useTheme();
   const { screenReaderEnabled }  = useAccessibilityPreferences();
   const player                   = usePlayer();
   const list                     = usePodcastList();
@@ -310,10 +359,12 @@ export default function Podcasts() {
   const { showToast }            = useToast();
   const { announcementLevel, podcastAutoDelete } = usePreferences();
 
-  const [filter, setFilter]         = useState<PodcastFilter>('Latest');
+  const [filter, setFilter]           = useState<PodcastFilter>('Latest');
   const [searchQuery, setSearchQuery] = useState('');
-  const [lastVisit, setLastVisit]   = useState<Date | null>(null);
-  const [history, setHistory]       = useState<PlayHistoryEntry[]>([]);
+  const [lastVisit, setLastVisit]     = useState<Date | null>(null);
+  const [history, setHistory]         = useState<PlayHistoryEntry[]>([]);
+  const [savedSort,     setSavedSort]     = useState<SavedSort>('newest-saved');
+  const [downloadsSort, setDownloadsSort] = useState<DownloadsSort>('newest-published');
 
   const firstEpisodeRef     = useRef<View | null>(null);
   const episodeItemRefs     = useRef<Record<string, View | null>>({});
@@ -341,6 +392,17 @@ export default function Podcasts() {
       }).catch(() => {});
     }
   }, [podcastAutoDelete]);
+
+  // ── Load persisted sort preferences from iCloud ──────────────────────────
+  useEffect(() => {
+    Promise.all([
+      persistence.getSetting<SavedSort>('savedSort', 'newest-saved'),
+      persistence.getSetting<DownloadsSort>('downloadsSort', 'newest-published'),
+    ]).then(([ss, ds]) => {
+      setSavedSort(ss);
+      setDownloadsSort(ds);
+    }).catch(() => {});
+  }, []);
 
   // ── Refresh history when tab comes into focus ─────────────────────────────
   useFocusEffect(useCallback(() => {
@@ -413,9 +475,59 @@ export default function Podcasts() {
     }).sort((a, b) => (meta.positions[b.id] ?? 0) - (meta.positions[a.id] ?? 0)),
   [allKnownEpisodes, meta.positions]);
 
-  const downloadedEpisodes = useMemo(() =>
-    Object.values(allKnownEpisodes).filter(ep => ep.id in meta.downloaded),
-  [allKnownEpisodes, meta.downloaded]);
+  const downloadedEpisodes = useMemo(() => {
+    const episodes = Object.values(allKnownEpisodes).filter(ep => ep.id in meta.downloaded);
+    return [...episodes].sort((a, b) => {
+      switch (downloadsSort) {
+        case 'oldest-published':
+          return new Date(a.publishedAt ?? 0).getTime() - new Date(b.publishedAt ?? 0).getTime();
+        case 'title-az':
+          return a.title.localeCompare(b.title);
+        case 'shortest':
+          return a.duration - b.duration;
+        case 'longest':
+          return b.duration - a.duration;
+        default: // newest-published
+          return new Date(b.publishedAt ?? 0).getTime() - new Date(a.publishedAt ?? 0).getTime();
+      }
+    });
+  }, [allKnownEpisodes, meta.downloaded, downloadsSort]);
+
+  const savedEpisodes = useMemo(() => {
+    const seen = new Set<string>();
+    const items: PodcastEpisode[] = [];
+    Object.values(meta.savedMeta).forEach(ep => {
+      if (meta.savedIds.has(ep.id)) { items.push(ep); seen.add(ep.id); }
+    });
+    list.episodes.forEach(ep => {
+      if (meta.savedIds.has(ep.id) && !seen.has(ep.id)) items.push(ep);
+    });
+    const savedAtMap = new Map(meta.savedItems.map(s => [s.id, s.savedAt]));
+    return [...items].sort((a, b) => {
+      switch (savedSort) {
+        case 'oldest-saved': {
+          const aT = new Date(savedAtMap.get(a.id) ?? 0).getTime();
+          const bT = new Date(savedAtMap.get(b.id) ?? 0).getTime();
+          return aT - bT;
+        }
+        case 'newest-published':
+          return new Date(b.publishedAt ?? 0).getTime() - new Date(a.publishedAt ?? 0).getTime();
+        case 'oldest-published':
+          return new Date(a.publishedAt ?? 0).getTime() - new Date(b.publishedAt ?? 0).getTime();
+        case 'title-az':
+          return a.title.localeCompare(b.title);
+        case 'shortest':
+          return a.duration - b.duration;
+        case 'longest':
+          return b.duration - a.duration;
+        default: { // newest-saved
+          const aT = new Date(savedAtMap.get(a.id) ?? 0).getTime();
+          const bT = new Date(savedAtMap.get(b.id) ?? 0).getTime();
+          return bT - aT;
+        }
+      }
+    });
+  }, [meta.savedIds, meta.savedMeta, meta.savedItems, list.episodes, savedSort]);
 
   // Is an episode "new" (published since last visit)?
   const isNewEpisode = useCallback((ep: PodcastEpisode): boolean => {
@@ -474,6 +586,64 @@ export default function Podcasts() {
     }
   }
 
+  function handleSave(episode: PodcastEpisode) {
+    if (meta.savedIds.has(episode.id)) {
+      meta.unsaveEpisode(episode.id);
+      showToast('Episode unsaved.', 'success');
+    } else {
+      meta.saveEpisode(episode);
+      showToast('Episode saved.', 'success');
+    }
+  }
+
+  function handleShare(episode: PodcastEpisode) {
+    Share.share({
+      title: episode.title,
+      message: `${episode.title} — ${episode.showTitle}\n\nhttps://www.applevis.com/podcast`,
+    }).catch(() => {});
+  }
+
+  function handleMarkPlayed(episode: PodcastEpisode) {
+    const pos = episode.duration > 0 ? episode.duration : 9999;
+    persistence.addToPlayHistory(episode)
+      .then(() => persistence.savePodcastPosition(episode.id, pos))
+      .then(() => meta.reload())
+      .then(() => persistence.getPlayHistory())
+      .then(setHistory)
+      .catch(() => {});
+    showToast('Marked as played.', 'success');
+  }
+
+  function showSavedSortSheet() {
+    if (Platform.OS !== 'ios') return;
+    const labels = SAVED_SORT_KEYS.map(k => k === savedSort ? `✓ ${SAVED_SORT_LABELS[k]}` : SAVED_SORT_LABELS[k]);
+    ActionSheetIOS.showActionSheetWithOptions(
+      { title: 'Sort Saved Episodes', options: [...labels, 'Cancel'], cancelButtonIndex: SAVED_SORT_KEYS.length, userInterfaceStyle: isDark ? 'dark' : 'light' },
+      (index) => {
+        if (index < SAVED_SORT_KEYS.length) {
+          const next = SAVED_SORT_KEYS[index];
+          setSavedSort(next);
+          persistence.setSetting('savedSort', next).catch(() => {});
+        }
+      },
+    );
+  }
+
+  function showDownloadsSortSheet() {
+    if (Platform.OS !== 'ios') return;
+    const labels = DOWNLOADS_SORT_KEYS.map(k => k === downloadsSort ? `✓ ${DOWNLOADS_SORT_LABELS[k]}` : DOWNLOADS_SORT_LABELS[k]);
+    ActionSheetIOS.showActionSheetWithOptions(
+      { title: 'Sort Downloads', options: [...labels, 'Cancel'], cancelButtonIndex: DOWNLOADS_SORT_KEYS.length, userInterfaceStyle: isDark ? 'dark' : 'light' },
+      (index) => {
+        if (index < DOWNLOADS_SORT_KEYS.length) {
+          const next = DOWNLOADS_SORT_KEYS[index];
+          setDownloadsSort(next);
+          persistence.setSetting('downloadsSort', next).catch(() => {});
+        }
+      },
+    );
+  }
+
   function episodeLabel(episode: PodcastEpisode) {
     const isCurrent = isCurrentEpisode(episode.id);
     return buildEpisodeLabel(
@@ -481,7 +651,7 @@ export default function Podcasts() {
       isCurrent ? player.position : 0,
       isCurrent ? player.duration : 0,
       meta.positions, meta.downloaded, meta.downloading, player.queue,
-      isNewEpisode(episode),
+      isNewEpisode(episode), meta.savedIds,
     );
   }
 
@@ -635,6 +805,7 @@ export default function Podcasts() {
                   isQueued={epIsQueued}
                   isDownloaded={episode.id in meta.downloaded}
                   isDownloading={meta.downloading.has(episode.id)}
+                  isSaved={meta.savedIds.has(episode.id)}
                   accessibilityLabel={episodeLabel(episode)}
                   onPress={() => navigateToEpisode(episode)}
                   onPlay={() => playEpisode(episode)}
@@ -648,6 +819,7 @@ export default function Podcasts() {
                     }
                   }}
                   onDownload={() => handleDownload(episode)}
+                  onSave={() => handleSave(episode)}
                   onRef={el => {
                     episodeItemRefs.current[episode.id] = el;
                     if (index === 0) firstEpisodeRef.current = el;
@@ -687,6 +859,7 @@ export default function Podcasts() {
                     isQueued={player.queue.some(q => q.id === episode.id)}
                     isDownloaded={episode.id in meta.downloaded}
                     isDownloading={meta.downloading.has(episode.id)}
+                    isSaved={meta.savedIds.has(episode.id)}
                     accessibilityLabel={episodeLabel(episode)}
                     onPress={() => navigateToEpisode(episode)}
                     onPlay={() => playEpisode(episode)}
@@ -701,6 +874,7 @@ export default function Podcasts() {
                       }
                     }}
                     onDownload={() => handleDownload(episode)}
+                    onSave={() => handleSave(episode)}
                     colors={colors}
                     styles={styles}
                   />
@@ -714,57 +888,264 @@ export default function Podcasts() {
             ? <EmptyState icon="cloud-download-outline" title="No downloaded episodes"
                 subtitle="Download episodes to listen offline." colors={colors} styles={styles} />
             : <>
-                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 12 }}>
+                {/* Toolbar */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                   <Pressable
-                    onPress={async () => {
-                      await deleteAllDownloads();
-                      meta.reload();
-                      showToast('All downloads removed.', 'success');
-                    }}
+                    onPress={showDownloadsSortSheet}
+                    accessible accessibilityRole="button"
+                    accessibilityLabel={`Sort: ${DOWNLOADS_SORT_LABELS[downloadsSort]}. Activate to change sort order.`}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4,
+                      backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                    <Ionicons name="funnel-outline" size={13} color={colors.accent} accessibilityElementsHidden />
+                    <Text style={{ fontSize: 13, color: colors.accent, fontWeight: '600' }}>{DOWNLOADS_SORT_LABELS[downloadsSort]}</Text>
+                    <Ionicons name="chevron-down" size={12} color={colors.accent} accessibilityElementsHidden />
+                  </Pressable>
+                  <View style={{ flex: 1 }} accessibilityElementsHidden />
+                  <Pressable
+                    onPress={async () => { await deleteAllDownloads(); meta.reload(); showToast('All downloads removed.', 'success'); }}
                     accessible accessibilityRole="button" accessibilityLabel="Remove all downloads"
-                    style={{ paddingHorizontal: 12, paddingVertical: 6,
-                      backgroundColor: colors.pill, borderRadius: 8 }}>
+                    style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: colors.pill, borderRadius: 8 }}>
                     <Text style={{ fontSize: 13, color: '#FF3B30', fontWeight: '600' }}>Remove All</Text>
                   </Pressable>
                 </View>
 
                 {downloadedEpisodes.map(episode => {
                   const isCurrent = isCurrentEpisode(episode.id);
+                  const isQueued  = player.queue.some(q => q.id === episode.id);
+                  const isSaved   = meta.savedIds.has(episode.id);
                   return (
                     <View key={episode.id} style={styles.card}>
                       <Pressable
                         onPress={() => navigateToEpisode(episode)}
                         accessible accessibilityRole="none"
                         accessibilityLabel={[episodeLabel(episode), 'Downloaded'].join('. ')}
-                        accessibilityHint="Double tap to open episode details"
+                        accessibilityHint="Double tap to open episode details."
+                        accessibilityActions={[
+                          { name: 'play',   label: isCurrent && player.isPlaying ? 'Pause' : 'Play' },
+                          { name: 'queue',  label: isQueued ? 'Remove from queue' : 'Add to queue' },
+                          { name: 'save',   label: isSaved ? 'Unsave' : 'Save' },
+                          { name: 'remove', label: 'Remove download' },
+                        ]}
+                        onAccessibilityAction={({ nativeEvent }) => {
+                          switch (nativeEvent.actionName) {
+                            case 'play':   playEpisode(episode); break;
+                            case 'queue':  isQueued ? (player.removeFromQueue(episode.id), showToast('Removed from queue.', 'success')) : (player.enqueue(episode), showToast('Added to queue.', 'success')); break;
+                            case 'save':   handleSave(episode); break;
+                            case 'remove': meta.removeDownload(episode.id); showToast('Download removed.', 'success'); break;
+                          }
+                        }}
                       >
                         <Text style={styles.cardTitle}>{episode.title}</Text>
                         <Text style={[styles.cardMeta, { marginBottom: 10 }]}>
                           {episode.showTitle}
                           {episode.duration > 0 ? ` · ${formatDuration(episode.duration)}` : ''}
+                          {episode.publishedAt ? `  ·  ${formatPublishedDate(episode.publishedAt)}` : ''}
                         </Text>
                       </Pressable>
-                      <View style={{ flexDirection: 'row', gap: 10, marginTop: 2 }}>
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 2 }}>
                         <Pressable onPress={() => playEpisode(episode)}
                           accessible accessibilityRole="button"
                           accessibilityLabel={isCurrent && player.isPlaying ? 'Pause' : 'Play'}
-                          style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                             backgroundColor: colors.accent, borderRadius: 8,
-                            paddingHorizontal: 14, paddingVertical: 8 }}>
-                          <Ionicons name={isCurrent && player.isPlaying ? 'pause' : 'play'}
-                            size={16} color="#FFF" />
-                          <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>
+                            paddingHorizontal: 14, paddingVertical: 8, flex: 1 }}>
+                          <Ionicons name={isCurrent && player.isPlaying ? 'pause' : 'play'} size={14} color="#FFF" accessibilityElementsHidden />
+                          <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>
                             {isCurrent && player.isPlaying ? 'Pause' : 'Play'}
                           </Text>
                         </Pressable>
-                        <Pressable onPress={() => { meta.removeDownload(episode.id);
-                            showToast('Download removed.', 'success'); }}
+                        <Pressable
+                          onPress={() => { if (isQueued) { player.removeFromQueue(episode.id); showToast('Removed from queue.', 'success'); } else { player.enqueue(episode); showToast('Added to queue.', 'success'); } }}
+                          accessible accessibilityRole="button"
+                          accessibilityLabel={isQueued ? 'Remove from queue' : 'Add to queue'}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+                            backgroundColor: isQueued ? colors.accent + '22' : colors.pill,
+                            borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
+                          <Ionicons name={isQueued ? 'remove-circle-outline' : 'add-circle-outline'} size={14} color={colors.accent} accessibilityElementsHidden />
+                          <Text style={{ color: colors.accent, fontWeight: '600', fontSize: 13 }}>
+                            {isQueued ? 'In Queue' : 'Queue'}
+                          </Text>
+                        </Pressable>
+                        <Pressable onPress={() => handleSave(episode)}
+                          accessible accessibilityRole="button"
+                          accessibilityLabel={isSaved ? 'Unsave episode' : 'Save episode'}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+                            backgroundColor: isSaved ? colors.accent + '22' : colors.pill,
+                            borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
+                          <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={14} color={colors.accent} accessibilityElementsHidden />
+                          <Text style={{ color: colors.accent, fontWeight: '600', fontSize: 13 }}>
+                            {isSaved ? 'Saved' : 'Save'}
+                          </Text>
+                        </Pressable>
+                        <Pressable onPress={() => { meta.removeDownload(episode.id); showToast('Download removed.', 'success'); }}
                           accessible accessibilityRole="button" accessibilityLabel="Remove download"
-                          style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
-                            backgroundColor: colors.pill, borderRadius: 8,
-                            paddingHorizontal: 14, paddingVertical: 8 }}>
-                          <Ionicons name="trash-outline" size={16} color="#FF3B30" />
-                          <Text style={{ color: '#FF3B30', fontWeight: '700', fontSize: 14 }}>Remove</Text>
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+                            backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
+                          <Ionicons name="trash-outline" size={14} color="#FF3B30" accessibilityElementsHidden />
+                          <Text style={{ color: '#FF3B30', fontWeight: '600', fontSize: 13 }}>Remove</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  );
+                })}
+              </>
+        )}
+
+        {/* ── Saved ────────────────────────────────────────────────────── */}
+        {filter === 'Saved' && (
+          savedEpisodes.length === 0
+            ? <EmptyState icon="bookmark-outline" title="No saved episodes"
+                subtitle="Bookmark episodes you want to come back to. Tap Save on any episode card or in the episode detail screen."
+                colors={colors} styles={styles} />
+            : <>
+                {/* Toolbar */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                  <Pressable
+                    onPress={showSavedSortSheet}
+                    accessible accessibilityRole="button"
+                    accessibilityLabel={`Sort: ${SAVED_SORT_LABELS[savedSort]}. Activate to change sort order.`}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4,
+                      backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                    <Ionicons name="funnel-outline" size={13} color={colors.accent} accessibilityElementsHidden />
+                    <Text style={{ fontSize: 13, color: colors.accent, fontWeight: '600' }}>{SAVED_SORT_LABELS[savedSort]}</Text>
+                    <Ionicons name="chevron-down" size={12} color={colors.accent} accessibilityElementsHidden />
+                  </Pressable>
+                  <View style={{ flex: 1 }} accessibilityElementsHidden />
+                  <Pressable
+                    onPress={() => {
+                      const toAdd = savedEpisodes.filter(ep => !player.queue.some(q => q.id === ep.id));
+                      toAdd.forEach(ep => player.enqueue(ep));
+                      showToast(toAdd.length > 0 ? `Added ${toAdd.length} episode${toAdd.length === 1 ? '' : 's'} to queue.` : 'All already in queue.', 'success');
+                    }}
+                    accessible accessibilityRole="button" accessibilityLabel="Queue all saved episodes"
+                    style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: colors.pill, borderRadius: 8 }}>
+                    <Text style={{ fontSize: 13, color: colors.accent, fontWeight: '600' }}>Queue All</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      const toDownload = savedEpisodes.filter(ep => !(ep.id in meta.downloaded) && !meta.downloading.has(ep.id));
+                      toDownload.forEach(ep => meta.startDownload(ep).catch(() => {}));
+                      showToast(toDownload.length > 0 ? `Downloading ${toDownload.length} episode${toDownload.length === 1 ? '' : 's'}.` : 'All already downloaded.', 'success');
+                    }}
+                    accessible accessibilityRole="button" accessibilityLabel="Download all saved episodes"
+                    style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: colors.pill, borderRadius: 8 }}>
+                    <Text style={{ fontSize: 13, color: colors.accent, fontWeight: '600' }}>Download All</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={async () => {
+                      for (const ep of savedEpisodes) await meta.unsaveEpisode(ep.id).catch(() => {});
+                      showToast('All saved episodes removed.', 'success');
+                    }}
+                    accessible accessibilityRole="button" accessibilityLabel="Unsave all saved episodes"
+                    style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: colors.pill, borderRadius: 8 }}>
+                    <Text style={{ fontSize: 13, color: '#FF3B30', fontWeight: '600' }}>Unsave All</Text>
+                  </Pressable>
+                </View>
+
+                {savedEpisodes.map(episode => {
+                  const isCurrent    = isCurrentEpisode(episode.id);
+                  const isQueued     = player.queue.some(q => q.id === episode.id);
+                  const isDownloaded = episode.id in meta.downloaded;
+                  const isDownloading = meta.downloading.has(episode.id);
+                  return (
+                    <View key={episode.id} style={styles.card}>
+                      <Pressable
+                        onPress={() => navigateToEpisode(episode)}
+                        accessible accessibilityRole="none"
+                        accessibilityLabel={[episodeLabel(episode), 'Saved'].join('. ')}
+                        accessibilityHint="Double tap to open episode details."
+                        accessibilityActions={[
+                          { name: 'play',       label: isCurrent && player.isPlaying ? 'Pause' : 'Play' },
+                          { name: 'queue',      label: isQueued ? 'Remove from queue' : 'Add to queue' },
+                          { name: 'download',   label: isDownloading ? 'Downloading…' : isDownloaded ? 'Delete download' : 'Download' },
+                          { name: 'share',      label: 'Share episode' },
+                          { name: 'markPlayed', label: 'Mark as played' },
+                          { name: 'unsave',     label: 'Unsave episode' },
+                        ]}
+                        onAccessibilityAction={({ nativeEvent }) => {
+                          switch (nativeEvent.actionName) {
+                            case 'play':       playEpisode(episode); break;
+                            case 'queue':      isQueued ? (player.removeFromQueue(episode.id), showToast('Removed from queue.', 'success')) : (player.enqueue(episode), showToast('Added to queue.', 'success')); break;
+                            case 'download':   handleDownload(episode); break;
+                            case 'share':      handleShare(episode); break;
+                            case 'markPlayed': handleMarkPlayed(episode); break;
+                            case 'unsave':     meta.unsaveEpisode(episode.id).then(() => showToast('Episode unsaved.', 'success')); break;
+                          }
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <Text style={[styles.cardTitle, { flex: 1, marginRight: 8 }]}>{episode.title}</Text>
+                          <Ionicons name="bookmark" size={16} color={colors.accent}
+                            accessibilityElementsHidden style={{ marginTop: 2 }} />
+                        </View>
+                        <Text style={[styles.cardMeta, { marginBottom: 10 }]}>
+                          {episode.showTitle}
+                          {episode.duration > 0 ? ` · ${formatDuration(episode.duration)}` : ''}
+                          {episode.publishedAt ? `  ·  ${formatPublishedDate(episode.publishedAt)}` : ''}
+                        </Text>
+                      </Pressable>
+
+                      {/* Row 1: Play · Queue · Unsave */}
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 2, marginBottom: 8 }}>
+                        <Pressable onPress={() => playEpisode(episode)}
+                          accessible accessibilityRole="button"
+                          accessibilityLabel={isCurrent && player.isPlaying ? 'Pause' : 'Play'}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+                            backgroundColor: colors.accent, borderRadius: 8,
+                            paddingHorizontal: 14, paddingVertical: 8, flex: 1 }}>
+                          <Ionicons name={isCurrent && player.isPlaying ? 'pause' : 'play'} size={14} color="#FFF" accessibilityElementsHidden />
+                          <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>
+                            {isCurrent && player.isPlaying ? 'Pause' : 'Play'}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => { if (isQueued) { player.removeFromQueue(episode.id); showToast('Removed from queue.', 'success'); } else { player.enqueue(episode); showToast('Added to queue.', 'success'); } }}
+                          accessible accessibilityRole="button"
+                          accessibilityLabel={isQueued ? 'Remove from queue' : 'Add to queue'}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+                            backgroundColor: isQueued ? colors.accent + '22' : colors.pill,
+                            borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
+                          <Ionicons name={isQueued ? 'remove-circle-outline' : 'add-circle-outline'} size={14} color={colors.accent} accessibilityElementsHidden />
+                          <Text style={{ color: colors.accent, fontWeight: '600', fontSize: 13 }}>
+                            {isQueued ? 'In Queue' : 'Queue'}
+                          </Text>
+                        </Pressable>
+                        <Pressable onPress={() => meta.unsaveEpisode(episode.id).then(() => showToast('Episode unsaved.', 'success'))}
+                          accessible accessibilityRole="button" accessibilityLabel="Unsave episode"
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+                            backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
+                          <Ionicons name="bookmark-outline" size={14} color="#FF3B30" accessibilityElementsHidden />
+                          <Text style={{ color: '#FF3B30', fontWeight: '600', fontSize: 13 }}>Unsave</Text>
+                        </Pressable>
+                      </View>
+
+                      {/* Row 2: Download · Share · Mark Played */}
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <Pressable onPress={() => handleDownload(episode)}
+                          accessible accessibilityRole="button"
+                          accessibilityLabel={isDownloading ? 'Downloading' : isDownloaded ? 'Remove download' : 'Download'}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+                            backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
+                          <Ionicons
+                            name={isDownloading ? 'cloud-download-outline' : isDownloaded ? 'trash-outline' : 'arrow-down-circle-outline'}
+                            size={14} color={isDownloaded ? '#FF3B30' : colors.accent} accessibilityElementsHidden />
+                          <Text style={{ color: isDownloaded ? '#FF3B30' : colors.accent, fontWeight: '600', fontSize: 13 }}>
+                            {isDownloading ? 'Downloading…' : isDownloaded ? 'Remove' : 'Download'}
+                          </Text>
+                        </Pressable>
+                        <Pressable onPress={() => handleShare(episode)}
+                          accessible accessibilityRole="button" accessibilityLabel="Share episode"
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+                            backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
+                          <Ionicons name="share-outline" size={14} color={colors.accent} accessibilityElementsHidden />
+                          <Text style={{ color: colors.accent, fontWeight: '600', fontSize: 13 }}>Share</Text>
+                        </Pressable>
+                        <Pressable onPress={() => handleMarkPlayed(episode)}
+                          accessible accessibilityRole="button" accessibilityLabel="Mark as played"
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+                            backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
+                          <Ionicons name="checkmark-circle-outline" size={14} color={colors.accent} accessibilityElementsHidden />
+                          <Text style={{ color: colors.accent, fontWeight: '600', fontSize: 13 }}>Mark Played</Text>
                         </Pressable>
                       </View>
                     </View>

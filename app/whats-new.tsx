@@ -10,9 +10,63 @@ type ChangeItem = {
   tag: 'New' | 'Improved' | 'Fixed';
 };
 
-const CURRENT_VERSION = '2026.0.1.2';
+const CURRENT_VERSION = '2026.0.1.3';
 
 const CHANGES: ChangeItem[] = [
+  {
+    icon: 'musical-note-outline',
+    tag: 'New',
+    title: 'Welcome Tone on Launch',
+    description: 'The app now plays a warm welcome tone every time it opens. First-time users hear it when the setup wizard appears; returning users hear it as the app loads. A small but friendly touch.',
+  },
+  {
+    icon: 'notifications-outline',
+    tag: 'Improved',
+    title: 'Refreshed Sound Scheme',
+    description: 'The Apple Crunch notification alert and the download-complete sound have both been updated to new, cleaner versions.',
+  },
+  {
+    icon: 'bookmark-outline',
+    tag: 'Improved',
+    title: 'Saved Episodes — Full Actions',
+    description: 'Saved episodes now have the same actions as the main list: Queue, Download, Share, and Mark as Played, all in two compact rows. Bulk actions let you Queue All, Download All, or Unsave All in one tap.',
+  },
+  {
+    icon: 'funnel-outline',
+    tag: 'New',
+    title: 'Sort Your Saved and Downloaded Episodes',
+    description: 'Both the Saved and Downloads views now have a sort button. Sort saved episodes by Newest Saved, Oldest Saved, Newest Published, A–Z, Shortest, or Longest. Downloads sort by date or title. Your choice is remembered across launches and synced to iCloud.',
+  },
+  {
+    icon: 'cloud-download-outline',
+    tag: 'Improved',
+    title: 'Downloaded Episodes — Full Actions',
+    description: 'Downloaded episodes now show Queue and Save buttons alongside the existing Play and Remove. The Remove All button sits in the same toolbar as the new sort control.',
+  },
+  {
+    icon: 'headset-outline',
+    tag: 'Improved',
+    title: 'VoiceOver Now Announces Saved Status',
+    description: 'When VoiceOver Detail Level is set to All, episode cards now announce "Saved" if the episode is bookmarked — so you know at a glance which ones you\'ve set aside, without opening them.',
+  },
+  {
+    icon: 'document-text-outline',
+    tag: 'Improved',
+    title: 'Episode About Section Revamped',
+    description: 'Show notes are now fully cleaned of HTML and markdown. App Store links open directly to the App Store. Email addresses open a new email. Web links open in the browser. All links are clearly labelled with icons and subtitles so VoiceOver users know exactly what each one does.',
+  },
+  {
+    icon: 'document-text-outline',
+    tag: 'Improved',
+    title: 'Transcript Opens in Its Own Screen',
+    description: 'Episode transcripts now open in a full modal sheet instead of expanding inline. Tap "See the Transcript" in the About section. The screen is clean and scrollable, with a Done button to return.',
+  },
+  {
+    icon: 'image-outline',
+    tag: 'Improved',
+    title: 'Podcast Artwork Is Now Described',
+    description: 'VoiceOver users will now hear a description of the podcast artwork on the episode detail page, generated on-device by iOS. No external service or network request — it works offline too.',
+  },
   {
     icon: 'person-circle-outline',
     tag: 'Improved',
@@ -139,7 +193,7 @@ export default function WhatsNew() {
             Version {CURRENT_VERSION}
           </Text>
           <Text style={{ fontSize: 16, color: colors.textSecondary, textAlign: 'center', lineHeight: 23 }}>
-            Search, sort, glass UI, smarter settings, and a unified Profile.
+            Welcome tone, refreshed sounds, full Saved and Downloads actions, sort filters, and a revamped episode About section.
           </Text>
         </View>
 
@@ -178,7 +232,7 @@ export default function WhatsNew() {
 
         {/* Previous version notes */}
         <View style={[styles.card, { backgroundColor: colors.pill, borderColor: colors.border, borderWidth: 1, marginBottom: 10 }]}
-          accessible accessibilityLabel="Also in version 2026.0.1.2: back buttons, forum filter pill, podcast speed pill, VoiceOver tab positions, sign-in fixes, settings routing fixes.">
+          accessible accessibilityLabel="Also in version 2026.0.1.2: search, sort and filter bars, Liquid Glass, forum filter pill, podcast speed pill, VoiceOver tab positions, sign-in fixes, settings routing fixes.">
           <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
             textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>
             Also in 2026.0.1.2

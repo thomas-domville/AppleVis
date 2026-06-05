@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AccessibilityInfo, Image, Linking, Platform,
+  AccessibilityInfo, Image, Linking, Modal, Platform,
   Pressable, ScrollView, Share, Text, View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -161,80 +161,141 @@ function parseShowNotes(rawHtml: string): { body: string; links: NoteLink[]; tra
 
 function ShowNotes({ rawHtml }: { rawHtml: string }) {
   const { colors, styles } = useTheme();
-  const [showTranscript, setShowTranscript] = useState(false);
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
   const { body, links, transcript } = useMemo(() => parseShowNotes(rawHtml), [rawHtml]);
 
   if (!body && !links.length && !transcript) return null;
 
   return (
-    <View style={[styles.card, { marginBottom: 20 }]}>
-      <Text style={[styles.cardTitle, { marginBottom: 8 }]} accessibilityRole="header">
-        About this episode
-      </Text>
-
-      {body.length > 0 && (
-        <Text style={{ fontSize: 15, lineHeight: 22, color: colors.textSecondary,
-          marginBottom: links.length > 0 ? 14 : 0 }}>
-          {body}
-        </Text>
-      )}
-
-      {links.length > 0 && (
-        <View style={{ gap: 10, marginTop: body.length > 0 ? 0 : 4 }}>
-          {links.map((link, i) => (
-            <Pressable
-              key={i}
-              onPress={() => Linking.openURL(link.url).catch(() => {})}
-              accessible
-              accessibilityRole="link"
-              accessibilityLabel={
-                link.kind === 'app'   ? `${link.label}, App Store` :
-                link.kind === 'email' ? `Email ${link.label}` :
-                link.label
-              }
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
-            >
-              <Ionicons
-                name={link.kind === 'app' ? 'logo-apple-appstore' :
-                      link.kind === 'email' ? 'mail-outline' : 'link-outline'}
-                size={16} color={colors.accent} accessibilityElementsHidden
-              />
-              <Text style={{ fontSize: 15, color: colors.accent,
-                textDecorationLine: 'underline', flex: 1 }}>
-                {link.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
-
+    <>
+      {/* ── Transcript modal ──────────────────────────────────────────── */}
       {transcript && (
-        <>
+        <Modal
+          visible={transcriptOpen}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setTranscriptOpen(false)}
+          accessibilityViewIsModal
+        >
+          <View style={{ flex: 1, backgroundColor: colors.background }}>
+            {/* Header */}
+            <View style={{
+              flexDirection: 'row', alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 56 : 20,
+              paddingBottom: 14,
+              borderBottomWidth: 1, borderBottomColor: colors.border,
+            }}>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text }}
+                accessibilityRole="header">
+                Transcript
+              </Text>
+              <Pressable
+                onPress={() => setTranscriptOpen(false)}
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel="Close transcript"
+                hitSlop={12}
+                style={{ backgroundColor: colors.pill, borderRadius: 14,
+                  paddingHorizontal: 14, paddingVertical: 6 }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>Done</Text>
+              </Pressable>
+            </View>
+
+            {/* Transcript text */}
+            <ScrollView
+              contentContainerStyle={{ padding: 20, paddingBottom: 48 }}
+              accessibilityLabel="Transcript content"
+            >
+              <Text style={{ fontSize: 15, lineHeight: 24, color: colors.text }}>
+                {transcript}
+              </Text>
+            </ScrollView>
+          </View>
+        </Modal>
+      )}
+
+      {/* ── Show notes card ───────────────────────────────────────────── */}
+      <View style={[styles.card, { marginBottom: 20 }]}>
+        <Text style={[styles.cardTitle, { marginBottom: 8 }]} accessibilityRole="header">
+          About this episode
+        </Text>
+
+        {body.length > 0 && (
+          <Text style={{ fontSize: 15, lineHeight: 22, color: colors.textSecondary,
+            marginBottom: links.length > 0 ? 14 : 0 }}>
+            {body}
+          </Text>
+        )}
+
+        {/* All links: App Store entries, email contacts, web links */}
+        {links.length > 0 && (
+          <View style={{ gap: 10, marginTop: body.length > 0 ? 0 : 4 }}>
+            {links.map((link, i) => (
+              <Pressable
+                key={i}
+                onPress={() => Linking.openURL(link.url).catch(() => {})}
+                accessible
+                accessibilityRole="link"
+                accessibilityLabel={
+                  link.kind === 'app'   ? `${link.label} — open in App Store` :
+                  link.kind === 'email' ? `Email ${link.label}` :
+                  link.label
+                }
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 12,
+                  backgroundColor: colors.inputBackground, borderRadius: 10,
+                  paddingHorizontal: 14, paddingVertical: 11 }}
+              >
+                <Ionicons
+                  name={
+                    link.kind === 'app'   ? 'logo-apple-appstore' :
+                    link.kind === 'email' ? 'mail-outline' : 'link-outline'
+                  }
+                  size={20} color={colors.accent} accessibilityElementsHidden
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>
+                    {link.label}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 1 }}>
+                    {link.kind === 'app'   ? 'App Store' :
+                     link.kind === 'email' ? 'Send email' : 'Open link'}
+                  </Text>
+                </View>
+                <Ionicons name="open-outline" size={16}
+                  color={colors.textSecondary} accessibilityElementsHidden />
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {transcript && (
           <Pressable
-            onPress={() => setShowTranscript(v => !v)}
+            onPress={() => setTranscriptOpen(true)}
             accessible
             accessibilityRole="button"
-            accessibilityLabel={showTranscript ? 'Hide transcript' : 'View transcript'}
-            accessibilityHint={showTranscript ? 'Collapses the episode transcript' : 'Expands the full episode transcript'}
+            accessibilityLabel="See the transcript"
+            accessibilityHint="Opens the full episode transcript in a new screen"
             style={{
               flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
               marginTop: 16, paddingTop: 14,
               borderTopWidth: 1, borderTopColor: colors.border,
             }}
           >
-            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>Transcript</Text>
-            <Ionicons name={showTranscript ? 'chevron-up' : 'chevron-down'}
-              size={18} color={colors.textSecondary} accessibilityElementsHidden />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Ionicons name="document-text-outline" size={20}
+                color={colors.accent} accessibilityElementsHidden />
+              <Text style={{ fontSize: 15, fontWeight: '600', color: colors.accent }}>
+                See the Transcript
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18}
+              color={colors.textSecondary} accessibilityElementsHidden />
           </Pressable>
-
-          {showTranscript && (
-            <Text style={{ fontSize: 14, lineHeight: 21, color: colors.textSecondary, marginTop: 12 }}>
-              {transcript}
-            </Text>
-          )}
-        </>
-      )}
-    </View>
+        )}
+      </View>
+    </>
   );
 }
 
@@ -492,9 +553,10 @@ export default function EpisodeDetail() {
   async function handleSaveToggle() {
     if (isSaved) {
       await persistence.unsaveItem(params.id);
+      await persistence.removeSavedEpisodeMeta(params.id);
       setIsSaved(false);
-      showToast('Removed from saved items');
-      AccessibilityInfo.announceForAccessibility('Episode removed from saved items');
+      showToast('Episode unsaved');
+      AccessibilityInfo.announceForAccessibility('Episode unsaved');
     } else {
       await persistence.saveItem({
         id: params.id,
@@ -502,6 +564,7 @@ export default function EpisodeDetail() {
         title: params.title,
         savedAt: new Date().toISOString(),
       });
+      await persistence.saveSavedEpisodeMeta(episode);
       setIsSaved(true);
       showToast('Episode saved');
       AccessibilityInfo.announceForAccessibility('Episode saved');
@@ -555,21 +618,26 @@ export default function EpisodeDetail() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
 
           {/* ── Artwork ──────────────────────────────────────────────────── */}
-          <View style={{ alignItems: 'center', marginBottom: 20, marginTop: 8 }}
-            accessible accessibilityLabel={`Podcast artwork for ${params.showTitle}`}>
+          {/* No accessibilityLabel set — iOS VoiceOver auto-describes the image
+              using on-device Vision. accessibilityElementsHidden removed so the
+              Image itself is the accessible element. */}
+          <View style={{ alignItems: 'center', marginBottom: 20, marginTop: 8 }}>
             {params.artworkUrl ? (
               <Image
                 source={{ uri: params.artworkUrl }}
                 style={{ width: 220, height: 220, borderRadius: 16 }}
                 resizeMode="cover"
-                accessibilityElementsHidden
+                accessible
+                accessibilityRole="image"
               />
             ) : (
               <Image
                 source={require('../../assets/images/podcasts-card.png')}
                 style={{ width: 220, height: 220, borderRadius: 16 }}
                 resizeMode="cover"
-                accessibilityElementsHidden
+                accessible
+                accessibilityRole="image"
+                accessibilityLabel="White image background with a logo and text in the center bottom area. On the left, there is an abstract symbol made of three angled lines forming a stylized letter A or V. The top and middle segments of the symbol are orange, and the bottom segment is blue. To the right of the symbol, in large blue letters, it says AppleVis. Below AppleVis, in smaller black letters, it says a Be My Eyes company. The word company is underlined with a slanted yellow highlight."
               />
             )}
           </View>
@@ -911,7 +979,7 @@ export default function EpisodeDetail() {
             paddingVertical: 16, marginBottom: 20,
           }]}>
             <Pressable onPress={handleSaveToggle} accessible accessibilityRole="button"
-              accessibilityLabel={isSaved ? 'Saved. Double-tap to unsave.' : 'Save episode'}
+              accessibilityLabel={isSaved ? 'Unsave episode' : 'Save episode'}
               style={{ alignItems: 'center', gap: 5, minWidth: 56 }}>
               <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'}
                 size={26} color={isSaved ? colors.accent : colors.text} />

@@ -2,7 +2,7 @@ import { Audio, InterruptionModeIOS } from 'expo-av';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type SoundKey = 'refreshStart' | 'refreshComplete' | 'mouseSqueak' | 'appleCrunch';
+type SoundKey = 'refreshStart' | 'refreshComplete' | 'mouseSqueak' | 'appleCrunch' | 'welcome';
 
 // ─── Asset map ────────────────────────────────────────────────────────────────
 
@@ -17,6 +17,7 @@ const ASSETS: Record<SoundKey, number> = {
   refreshComplete: require('../../assets/sounds/download-complete.wav'),
   mouseSqueak:     require('../../assets/sounds/Mouse Squeak.wav'),
   appleCrunch:     require('../../assets/sounds/Apple Crunch.wav'),
+  welcome:         require('../../assets/sounds/welcome.wav'),
 };
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -27,7 +28,7 @@ const cache: Partial<Record<SoundKey, Audio.Sound>> = {};
 // Keys that are played as standalone previews (not background music/podcasts).
 // These temporarily claim the Playback audio session so they use media volume,
 // not the ringer volume, which is often much lower.
-const PREVIEW_KEYS = new Set<SoundKey>(['mouseSqueak', 'appleCrunch']);
+const PREVIEW_KEYS = new Set<SoundKey>(['mouseSqueak', 'appleCrunch', 'welcome']);
 
 async function play(key: SoundKey): Promise<void> {
   try {
@@ -74,6 +75,7 @@ export const sounds = {
   refreshComplete: (): Promise<void> => play('refreshComplete'),
   mouseSqueak:     (): Promise<void> => play('mouseSqueak'),
   appleCrunch:     (): Promise<void> => play('appleCrunch'),
+  welcome:         (): Promise<void> => play('welcome'),
 
   // Call once on app start so first-play has no loading delay.
   // Loads audio into cache without playing it.

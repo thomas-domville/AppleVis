@@ -100,7 +100,10 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
       : onboarding.isComplete();
 
     check
-      .then((done) => { if (!done) setRedirectTo('/onboarding'); })
+      .then((done) => {
+        if (!done) setRedirectTo('/onboarding');
+        else sounds.welcome().catch(() => {});
+      })
       .catch(() => {})
       .finally(() => { SplashScreen.hideAsync().catch(() => {}); });
   }, []);

@@ -1,10 +1,14 @@
+import { useEffect } from 'react';
 import { Image, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { WizardLayout } from '../../src/components/WizardLayout';
+import { sounds } from '../../src/services/sounds';
 
 export default function WelcomeStep() {
   const { colors } = useTheme();
+
+  useEffect(() => { sounds.welcome().catch(() => {}); }, []);
 
   return (
     <WizardLayout
