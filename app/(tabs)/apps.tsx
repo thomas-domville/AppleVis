@@ -1,6 +1,7 @@
-import { useRef } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Share, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../../src/components/Screen';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
 import { LoadMoreButton } from '../../src/components/LoadMoreButton';
@@ -21,6 +22,17 @@ export default function Apps() {
   const { showToast }      = useToast();
   const appRefs            = useRef<Map<string, View>>(new Map());
   const { save }           = useFocusRestore();
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const visibleApps = useMemo(() => {
+    if (!searchQuery.trim()) return list.apps;
+    const q = searchQuery.toLowerCase();
+    return list.apps.filter(app =>
+      app.name.toLowerCase().includes(q) ||
+      app.developer.toLowerCase().includes(q) ||
+      app.category.toLowerCase().includes(q));
+  }, [list.apps, searchQuery]);
 
   useRefreshFeedback(list.refreshing, 'Apps', list.loading,
     () => appRefs.current.get(list.apps[0]?.id ?? '') ?? null);
@@ -46,6 +58,25 @@ export default function Apps() {
         <Text style={styles.lede}>
           Browse app directory listings, reviews, updates, saved apps, and followed apps.
         </Text>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center',
+          backgroundColor: colors.inputBackground, borderRadius: 10, borderWidth: 1,
+          borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 }}>
+          <Ionicons name="search" size={16} color={colors.textSecondary} style={{ marginRight: 6 }}
+            accessibilityElementsHidden />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search apps, developers, categories…"
+            placeholderTextColor={colors.textSecondary}
+            style={{ flex: 1, fontSize: 15, color: colors.text }}
+            accessible
+            accessibilityLabel="Search apps"
+            accessibilityHint="Type to filter apps by name, developer, or category"
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+        </View>
 
 {list.loading && (
           <View style={{ alignItems: 'center', paddingVertical: 32 }}>
@@ -76,7 +107,16 @@ export default function Apps() {
           </View>
         )}
 
-        {!list.loading && list.apps.map((app) => (
+        {!list.loading && list.apps.length > 0 && visibleApps.length === 0 && searchQuery.trim() && (
+          <View style={[styles.card, { alignItems: 'center', paddingVertical: 32 }]}>
+            <Text style={styles.cardTitle}>No results</Text>
+            <Text style={[styles.cardMeta, { textAlign: 'center', marginTop: 4 }]}>
+              No apps match "{searchQuery}". Try a different search.
+            </Text>
+          </View>
+        )}
+
+        {!list.loading && visibleApps.map((app) => (
           <AccessibleCard
             key={app.id}
             ref={(el) => {

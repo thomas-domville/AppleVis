@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo, ActivityIndicator, Animated,
   findNodeHandle, PanResponder, Pressable,
-  RefreshControl, ScrollView, Text, View,
+  RefreshControl, ScrollView, Text, TextInput, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -287,9 +287,10 @@ export default function Podcasts() {
   const { showToast }            = useToast();
   const { announcementLevel, podcastAutoDelete } = usePreferences();
 
-  const [filter, setFilter]     = useState<PodcastFilter>('Latest');
-  const [lastVisit, setLastVisit] = useState<Date | null>(null);
-  const [history, setHistory]     = useState<PlayHistoryEntry[]>([]);
+  const [filter, setFilter]         = useState<PodcastFilter>('Latest');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [lastVisit, setLastVisit]   = useState<Date | null>(null);
+  const [history, setHistory]       = useState<PlayHistoryEntry[]>([]);
 
   const firstEpisodeRef     = useRef<View | null>(null);
   const episodeItemRefs     = useRef<Record<string, View | null>>({});
@@ -371,6 +372,14 @@ export default function Podcasts() {
     list.episodes.forEach(ep => { map[ep.id] = ep; });
     return map;
   }, [meta.downloadedMeta, list.episodes]);
+
+  const filteredLatest = useMemo(() => {
+    if (!searchQuery.trim()) return list.episodes;
+    const q = searchQuery.toLowerCase();
+    return list.episodes.filter(ep =>
+      ep.title.toLowerCase().includes(q) ||
+      ep.showTitle.toLowerCase().includes(q));
+  }, [list.episodes, searchQuery]);
 
   const inProgressEpisodes = useMemo(() =>
     Object.values(allKnownEpisodes).filter(ep => {
@@ -533,6 +542,26 @@ export default function Podcasts() {
           </Pressable>
         )}
 
+        {/* ── Search bar ───────────────────────────────────────────────── */}
+        <View style={{ flexDirection: 'row', alignItems: 'center',
+          backgroundColor: colors.inputBackground, borderRadius: 10, borderWidth: 1,
+          borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 }}>
+          <Ionicons name="search" size={16} color={colors.textSecondary} style={{ marginRight: 6 }}
+            accessibilityElementsHidden />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search episodes…"
+            placeholderTextColor={colors.textSecondary}
+            style={{ flex: 1, fontSize: 15, color: colors.text }}
+            accessible
+            accessibilityLabel="Search episodes"
+            accessibilityHint="Type to filter episodes by title or show name"
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+        </View>
+
         {/* ── View filter picker ────────────────────────────────────────── */}
         <FilterPicker
           label="View"
@@ -561,7 +590,13 @@ export default function Podcasts() {
               </View>
             )}
 
-            {list.episodes.map((episode, index) => {
+            {filteredLatest.length === 0 && !list.loading && !list.error && searchQuery.trim() && (
+              <EmptyState icon="search-outline" title="No results"
+                subtitle={`No episodes match "${searchQuery}". Try a different search.`}
+                colors={colors} styles={styles} />
+            )}
+
+            {filteredLatest.map((episode, index) => {
               const isCurrent  = isCurrentEpisode(episode.id);
               const epProgress = isCurrent && player.duration > 0
                 ? player.position / player.duration : undefined;

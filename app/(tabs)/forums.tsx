@@ -1,6 +1,7 @@
-import { useRef } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Share, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../../src/components/Screen';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
 import { FilterPicker } from '../../src/components/FilterPicker';
@@ -26,6 +27,16 @@ export default function Forums() {
   const { showToast } = useToast();
   const topicRefs = useRef<Map<string, View>>(new Map());
   const { save }  = useFocusRestore();
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const visibleTopics = useMemo(() => {
+    if (!searchQuery.trim()) return forum.topics;
+    const q = searchQuery.toLowerCase();
+    return forum.topics.filter(t =>
+      t.title.toLowerCase().includes(q) ||
+      t.authorName.toLowerCase().includes(q));
+  }, [forum.topics, searchQuery]);
 
   useHandoff({
     activityType: 'com.applevis.app.viewForums',
@@ -95,6 +106,25 @@ export default function Forums() {
           />
         }
       >
+        <View style={{ flexDirection: 'row', alignItems: 'center',
+          backgroundColor: colors.inputBackground, borderRadius: 10, borderWidth: 1,
+          borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 }}>
+          <Ionicons name="search" size={16} color={colors.textSecondary} style={{ marginRight: 6 }}
+            accessibilityElementsHidden />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search topics…"
+            placeholderTextColor={colors.textSecondary}
+            style={{ flex: 1, fontSize: 15, color: colors.text }}
+            accessible
+            accessibilityLabel="Search topics"
+            accessibilityHint="Type to filter topics by title or author name"
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+        </View>
+
         <FilterPicker
           label="Filter Forums"
           value={forum.filter}
@@ -152,7 +182,16 @@ export default function Forums() {
           </View>
         )}
 
-        {!forum.loading && forum.topics.map((topic) => (
+        {!forum.loading && forum.topics.length > 0 && visibleTopics.length === 0 && searchQuery.trim() && (
+          <View style={[styles.card, { alignItems: 'center', paddingVertical: 32 }]}>
+            <Text style={styles.cardTitle}>No results</Text>
+            <Text style={[styles.cardMeta, { textAlign: 'center', marginTop: 4 }]}>
+              No topics match "{searchQuery}". Try a different search.
+            </Text>
+          </View>
+        )}
+
+        {!forum.loading && visibleTopics.map((topic) => (
           <AccessibleCard
             key={topic.id}
             ref={(el) => {
