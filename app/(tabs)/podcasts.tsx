@@ -457,7 +457,7 @@ export default function Podcasts() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <Screen title="Podcasts">
+    <Screen title="Podcasts" showBack={false}>
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={list.refreshing} onRefresh={list.refresh}
