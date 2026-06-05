@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo, ActivityIndicator, Animated,
   findNodeHandle, PanResponder, Pressable,
-  RefreshControl, ScrollView, Text, TextInput, View,
+  RefreshControl, ScrollView, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -20,7 +20,6 @@ import type { AnnouncementLevel } from '../../src/contexts/PreferencesContext';
 import { readAloud, donateSiriActivity } from '../../src/services/intelligenceService';
 import { trackMeaningfulAction } from '../../src/services/reviewPrompt';
 import { startPodcastLiveActivity, updateCarPlayEpisodes } from '../../src/native/nativeModules';
-import { GlassView } from '../../src/components/GlassView';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 import { useEpisodeMeta } from '../../src/hooks/useEpisodeMeta';
@@ -29,17 +28,9 @@ import type { PlayHistoryEntry } from '../../src/services/persistence';
 import { deleteAllDownloads } from '../../src/services/downloads';
 import type { PodcastEpisode } from '../../src/types/content';
 
-// ─── Filter / sort constants ──────────────────────────────────────────────────
+// ─── Filter constants ─────────────────────────────────────────────────────────
 const PODCAST_FILTERS = ['Latest', 'In Progress', 'Downloads', 'Queue', 'History'] as const;
 type PodcastFilter = typeof PODCAST_FILTERS[number];
-
-type SortOrder = 'newest' | 'oldest' | 'shortest' | 'longest';
-const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
-  { value: 'newest',   label: 'Newest first' },
-  { value: 'oldest',   label: 'Oldest first' },
-  { value: 'shortest', label: 'Shortest first' },
-  { value: 'longest',  label: 'Longest first' },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatTime(seconds: number): string {
@@ -297,21 +288,9 @@ export default function Podcasts() {
   const { showToast }            = useToast();
   const { announcementLevel, podcastAutoDelete } = usePreferences();
 
-  const [filter, setFilterRaw]      = useState<PodcastFilter>('Latest');
-  const [sortOrder, setSortOrder]   = useState<SortOrder>('newest');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showFilter, setShowFilter] = useState<string>('All Shows');
-  const [lastVisit, setLastVisit]   = useState<Date | null>(null);
-  const [history, setHistory]       = useState<PlayHistoryEntry[]>([]);
-  const [showSortSheet, setShowSortSheet]   = useState(false);
-  const [showShowPicker, setShowShowPicker] = useState(false);
-
-  // Close action-bar sheets whenever the view filter changes.
-  const setFilter = useCallback((f: PodcastFilter) => {
-    setFilterRaw(f);
-    setShowSortSheet(false);
-    setShowShowPicker(false);
-  }, []);
+  const [filter, setFilter]     = useState<PodcastFilter>('Latest');
+  const [lastVisit, setLastVisit] = useState<Date | null>(null);
+  const [history, setHistory]     = useState<PlayHistoryEntry[]>([]);
 
   const firstEpisodeRef     = useRef<View | null>(null);
   const episodeItemRefs     = useRef<Record<string, View | null>>({});
@@ -375,13 +354,6 @@ export default function Podcasts() {
   const isCurrentEpisode = useCallback((id: string) => player.episode?.id === id, [player.episode]);
   const playerProgress   = player.duration > 0 ? player.position / player.duration : 0;
 
-  // All shows present in the feed
-  const allShows = useMemo(() => {
-    const shows = new Set<string>();
-    list.episodes.forEach(ep => shows.add(ep.showTitle));
-    return ['All Shows', ...Array.from(shows).sort()];
-  }, [list.episodes]);
-
   // Push feed to CarPlay list template after every load/refresh.
   useEffect(() => {
     if (!list.episodes.length) return;
@@ -401,40 +373,18 @@ export default function Podcasts() {
     return map;
   }, [meta.downloadedMeta, list.episodes]);
 
-  // Helper: apply search + show filter + sort to a list
-  const applyFilters = useCallback((episodes: PodcastEpisode[]): PodcastEpisode[] => {
-    let result = episodes;
-    if (showFilter !== 'All Shows') {
-      result = result.filter(ep => ep.showTitle === showFilter);
-    }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(ep =>
-        ep.title.toLowerCase().includes(q) || ep.showTitle.toLowerCase().includes(q));
-    }
-    switch (sortOrder) {
-      case 'oldest':   return [...result].sort((a, b) =>
-        new Date(a.publishedAt ?? 0).getTime() - new Date(b.publishedAt ?? 0).getTime());
-      case 'shortest': return [...result].sort((a, b) => (a.duration || 0) - (b.duration || 0));
-      case 'longest':  return [...result].sort((a, b) => (b.duration || 0) - (a.duration || 0));
-      default:         return [...result].sort((a, b) =>
-        new Date(b.publishedAt ?? 0).getTime() - new Date(a.publishedAt ?? 0).getTime());
-    }
-  }, [showFilter, searchQuery, sortOrder]);
-
-  const inProgressEpisodes = useMemo(() => {
-    const raw = Object.values(allKnownEpisodes).filter(ep => {
+  const inProgressEpisodes = useMemo(() =>
+    Object.values(allKnownEpisodes).filter(ep => {
       const pos = meta.positions[ep.id] ?? 0;
       if (pos < 30) return false;
       if (ep.duration > 0 && pos >= ep.duration - 30) return false;
       return true;
-    }).sort((a, b) => (meta.positions[b.id] ?? 0) - (meta.positions[a.id] ?? 0));
-    return applyFilters(raw);
-  }, [allKnownEpisodes, meta.positions, applyFilters]);
+    }).sort((a, b) => (meta.positions[b.id] ?? 0) - (meta.positions[a.id] ?? 0)),
+  [allKnownEpisodes, meta.positions]);
 
   const downloadedEpisodes = useMemo(() =>
-    applyFilters(Object.values(allKnownEpisodes).filter(ep => ep.id in meta.downloaded)),
-  [allKnownEpisodes, meta.downloaded, applyFilters]);
+    Object.values(allKnownEpisodes).filter(ep => ep.id in meta.downloaded),
+  [allKnownEpisodes, meta.downloaded]);
 
   // Is an episode "new" (published since last visit)?
   const isNewEpisode = useCallback((ep: PodcastEpisode): boolean => {
@@ -504,21 +454,6 @@ export default function Podcasts() {
     );
   }
 
-  // Latest episodes after applying search/sort/show filter
-  const filteredLatest = useMemo(() => applyFilters(list.episodes), [list.episodes, applyFilters]);
-
-  // Episode count for the active filter — used in the action bar.
-  const currentCount = useMemo(() => {
-    switch (filter) {
-      case 'Latest':      return filteredLatest.length;
-      case 'In Progress': return inProgressEpisodes.length;
-      case 'Downloads':   return downloadedEpisodes.length;
-      case 'Queue':       return player.queue.length;
-      case 'History':     return history.length;
-      default:            return 0;
-    }
-  }, [filter, filteredLatest.length, inProgressEpisodes.length,
-      downloadedEpisodes.length, player.queue.length, history.length]);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -601,26 +536,6 @@ export default function Podcasts() {
           </Pressable>
         )}
 
-        {/* ── Search bar ───────────────────────────────────────────────── */}
-        <View style={{ flexDirection: 'row', alignItems: 'center',
-          backgroundColor: colors.inputBackground, borderRadius: 10, borderWidth: 1,
-          borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 }}>
-          <Ionicons name="search" size={16} color={colors.textSecondary} style={{ marginRight: 6 }}
-            accessibilityElementsHidden />
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search episodes…"
-            placeholderTextColor={colors.textSecondary}
-            style={{ flex: 1, fontSize: 15, color: colors.text }}
-            accessible
-            accessibilityLabel="Search episodes"
-            accessibilityHint="Type to filter episodes by title or show name"
-            returnKeyType="search"
-            clearButtonMode="while-editing"
-          />
-        </View>
-
         {/* ── View filter picker ────────────────────────────────────────── */}
         <FilterPicker
           label="View"
@@ -628,133 +543,6 @@ export default function Podcasts() {
           value={filter}
           onChange={setFilter}
         />
-
-        {/* ── Action bar: sort + show filter + episode count ───────────── */}
-        <View style={{ flexDirection: 'row', alignItems: 'center',
-          gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-
-          {/* Sort pill — visible for sortable views */}
-          {(filter === 'Latest' || filter === 'In Progress' || filter === 'Downloads') && (
-            <Pressable
-              onPress={() => { setShowShowPicker(false); setShowSortSheet(v => !v); }}
-              accessible accessibilityRole="button"
-              accessibilityLabel={`Sort: ${SORT_OPTIONS.find(s => s.value === sortOrder)?.label ?? sortOrder}. Double tap to change.`}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
-                backgroundColor: sortOrder !== 'newest' ? colors.accent + '22' : colors.pill,
-                borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
-                borderWidth: 1, borderColor: sortOrder !== 'newest' ? colors.accent : colors.border }}
-            >
-              <Ionicons name="swap-vertical-outline" size={14}
-                color={sortOrder !== 'newest' ? colors.accent : colors.textSecondary}
-                accessibilityElementsHidden />
-              <Text style={{ fontSize: 13, fontWeight: '500',
-                color: sortOrder !== 'newest' ? colors.accent : colors.text }}>
-                {SORT_OPTIONS.find(s => s.value === sortOrder)?.label ?? 'Sort'}
-              </Text>
-              {sortOrder !== 'newest' && (
-                <View style={{ width: 6, height: 6, borderRadius: 3,
-                  backgroundColor: colors.accent }} accessibilityElementsHidden />
-              )}
-            </Pressable>
-          )}
-
-          {/* Show filter pill — only when multiple shows, only for sortable views */}
-          {allShows.length > 2 &&
-           (filter === 'Latest' || filter === 'In Progress' || filter === 'Downloads') && (
-            showFilter !== 'All Shows' ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4,
-                backgroundColor: colors.accent + '22', borderRadius: 20,
-                paddingVertical: 6, paddingLeft: 12, paddingRight: 6,
-                borderWidth: 1, borderColor: colors.accent }}>
-                <Text style={{ fontSize: 13, fontWeight: '500', color: colors.accent }}
-                  numberOfLines={1}>
-                  {showFilter}
-                </Text>
-                <Pressable
-                  onPress={() => setShowFilter('All Shows')}
-                  accessible accessibilityRole="button"
-                  accessibilityLabel={`Clear show filter: ${showFilter}`}
-                  hitSlop={10}>
-                  <Ionicons name="close-circle" size={17} color={colors.accent} />
-                </Pressable>
-              </View>
-            ) : (
-              <Pressable
-                onPress={() => { setShowSortSheet(false); setShowShowPicker(v => !v); }}
-                accessible accessibilityRole="button"
-                accessibilityLabel="Filter by show. Double tap to pick a show."
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
-                  backgroundColor: colors.pill, borderRadius: 20,
-                  paddingHorizontal: 12, paddingVertical: 6,
-                  borderWidth: 1, borderColor: colors.border }}
-              >
-                <Ionicons name="mic-outline" size={14} color={colors.textSecondary}
-                  accessibilityElementsHidden />
-                <Text style={{ fontSize: 13, fontWeight: '500', color: colors.text }}>All Shows</Text>
-                <Ionicons name="chevron-down" size={12} color={colors.textSecondary}
-                  accessibilityElementsHidden />
-              </Pressable>
-            )
-          )}
-
-          {/* Episode count */}
-          <Text style={{ marginLeft: 'auto', fontSize: 13, color: colors.textSecondary }}
-            accessibilityElementsHidden>
-            {currentCount} episode{currentCount === 1 ? '' : 's'}
-          </Text>
-        </View>
-
-        {/* Sort sheet */}
-        {showSortSheet && (
-          <GlassView intensity={60} style={[styles.card, { marginBottom: 10, padding: 4 }]}
-            accessible accessibilityRole="menu" accessibilityLabel="Sort order">
-            {SORT_OPTIONS.map(opt => (
-              <Pressable
-                key={opt.value}
-                onPress={() => { setSortOrder(opt.value); setShowSortSheet(false); }}
-                accessible accessibilityRole="menuitem"
-                accessibilityLabel={opt.label}
-                accessibilityState={{ selected: sortOrder === opt.value }}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                  paddingHorizontal: 12, paddingVertical: 12 }}
-              >
-                <Text style={{ fontSize: 15, color: sortOrder === opt.value ? colors.accent : colors.text,
-                  fontWeight: sortOrder === opt.value ? '600' : '400' }}>
-                  {opt.label}
-                </Text>
-                {sortOrder === opt.value && (
-                  <Ionicons name="checkmark" size={18} color={colors.accent} accessibilityElementsHidden />
-                )}
-              </Pressable>
-            ))}
-          </GlassView>
-        )}
-
-        {/* Show picker sheet */}
-        {showShowPicker && allShows.length > 2 && (
-          <GlassView intensity={60} style={[styles.card, { marginBottom: 10, padding: 4 }]}
-            accessible accessibilityRole="menu" accessibilityLabel="Filter by show">
-            {allShows.map(show => (
-              <Pressable
-                key={show}
-                onPress={() => { setShowFilter(show); setShowShowPicker(false); }}
-                accessible accessibilityRole="menuitem"
-                accessibilityLabel={show}
-                accessibilityState={{ selected: showFilter === show }}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                  paddingHorizontal: 12, paddingVertical: 12 }}
-              >
-                <Text style={{ fontSize: 15, color: showFilter === show ? colors.accent : colors.text,
-                  fontWeight: showFilter === show ? '600' : '400' }}>
-                  {show}
-                </Text>
-                {showFilter === show && (
-                  <Ionicons name="checkmark" size={18} color={colors.accent} accessibilityElementsHidden />
-                )}
-              </Pressable>
-            ))}
-          </GlassView>
-        )}
 
         {/* ── Latest ───────────────────────────────────────────────────── */}
         {filter === 'Latest' && (
@@ -776,13 +564,7 @@ export default function Podcasts() {
               </View>
             )}
 
-            {filteredLatest.length === 0 && !list.loading && !list.error && searchQuery.trim() && (
-              <EmptyState icon="search-outline" title="No results"
-                subtitle={`No episodes match "${searchQuery}". Try a different search.`}
-                colors={colors} styles={styles} />
-            )}
-
-            {filteredLatest.map((episode, index) => {
+            {list.episodes.map((episode, index) => {
               const isCurrent  = isCurrentEpisode(episode.id);
               const epProgress = isCurrent && player.duration > 0
                 ? player.position / player.duration : undefined;
