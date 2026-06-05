@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import { Screen } from '../../src/components/Screen';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
 import { FilterPicker } from '../../src/components/FilterPicker';
-import { OfflineBanner } from '../../src/components/OfflineBanner';
 import { LoadMoreButton } from '../../src/components/LoadMoreButton';
 import { useForumState, FORUM_FILTERS } from '../../src/hooks/useForumState';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
@@ -103,9 +102,7 @@ export default function Forums() {
           onChange={forum.setFilter}
         />
 
-        <OfflineBanner fromCache={forum.fromCache} cachedAt={forum.cachedAt} />
-
-        {forum.filter === 'Since Last Visit' && (
+{forum.filter === 'Since Last Visit' && (
           <Text style={[styles.lede, { marginBottom: 12 }]}>Topics that changed since you last opened AppleVis.</Text>
         )}
         {forum.filter === 'Unread' && (

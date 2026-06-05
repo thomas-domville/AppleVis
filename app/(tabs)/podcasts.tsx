@@ -8,7 +8,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '../../src/components/Screen';
 import { FilterPicker } from '../../src/components/FilterPicker';
-import { OfflineBanner } from '../../src/components/OfflineBanner';
 import { LoadMoreButton } from '../../src/components/LoadMoreButton';
 import { usePlayer } from '../../src/contexts/PlayerContext';
 import { usePodcastList } from '../../src/hooks/usePodcastList';
@@ -466,9 +465,7 @@ export default function Podcasts() {
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
         accessibilityLabel="Podcasts"
       >
-        <OfflineBanner fromCache={list.fromCache} cachedAt={list.cachedAt} />
-
-        {/* ── Now Playing mini-card ─────────────────────────────────────── */}
+{/* ── Now Playing mini-card ─────────────────────────────────────── */}
         {player.episode && (
           <Pressable
             onPress={() => navigateToEpisode(player.episode!)}

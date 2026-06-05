@@ -3,7 +3,6 @@ import { ActivityIndicator, Clipboard, Pressable, RefreshControl, ScrollView, Sh
 import { useRouter } from 'expo-router';
 import { Screen } from '../../src/components/Screen';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
-import { OfflineBanner } from '../../src/components/OfflineBanner';
 import { LoadMoreButton } from '../../src/components/LoadMoreButton';
 import { useResourceList } from '../../src/hooks/useResourceList';
 import { useRefreshFeedback } from '../../src/hooks/useRefreshFeedback';
@@ -48,9 +47,7 @@ export default function Resources() {
           Guides, tutorials, how-to articles, accessibility resources, events, developer resources, and getting-started content.
         </Text>
 
-        <OfflineBanner fromCache={list.fromCache} cachedAt={list.cachedAt} />
-
-        {list.loading && (
+{list.loading && (
           <View style={{ alignItems: 'center', paddingVertical: 32 }}>
             <ActivityIndicator size="large" color={colors.appleVisBlue} />
             <Text style={[styles.lede, { marginTop: 12, textAlign: 'center' }]}>Loading resources…</Text>

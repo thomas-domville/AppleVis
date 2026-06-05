@@ -3,7 +3,6 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Share, Text, 
 import { useRouter } from 'expo-router';
 import { Screen } from '../../src/components/Screen';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
-import { OfflineBanner } from '../../src/components/OfflineBanner';
 import { LoadMoreButton } from '../../src/components/LoadMoreButton';
 import { useAppList } from '../../src/hooks/useAppList';
 import { useRefreshFeedback } from '../../src/hooks/useRefreshFeedback';
@@ -48,9 +47,7 @@ export default function Apps() {
           Browse app directory listings, reviews, updates, saved apps, and followed apps.
         </Text>
 
-        <OfflineBanner fromCache={list.fromCache} cachedAt={list.cachedAt} />
-
-        {list.loading && (
+{list.loading && (
           <View style={{ alignItems: 'center', paddingVertical: 32 }}>
             <ActivityIndicator size="large" color={colors.appleVisBlue} />
             <Text style={[styles.lede, { marginTop: 12, textAlign: 'center' }]}>Loading apps…</Text>
