@@ -121,6 +121,7 @@ function buildEpisodeLabel(
 // ─── Swipeable episode card ───────────────────────────────────────────────────
 function SwipeableEpisodeCard({
   episode, isCurrent, isPlaying, isNew, progress,
+  isQueued, isDownloaded, isDownloading,
   accessibilityLabel,
   onPress, onPlay, onQueue, onDownload, onRef,
   colors, styles,
@@ -130,6 +131,9 @@ function SwipeableEpisodeCard({
   isPlaying: boolean;
   isNew: boolean;
   progress?: number;
+  isQueued: boolean;
+  isDownloaded: boolean;
+  isDownloading: boolean;
   accessibilityLabel: string;
   onPress: () => void;
   onPlay: () => void;
@@ -176,12 +180,18 @@ function SwipeableEpisodeCard({
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: 20 }} accessibilityElementsHidden>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Ionicons name="list" size={20} color={colors.accent} />
-          <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>Queue</Text>
+          <Ionicons name={isQueued ? 'close-circle' : 'list'} size={20} color={colors.accent} />
+          <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>
+            {isQueued ? 'Remove' : 'Queue'}
+          </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>Download</Text>
-          <Ionicons name="arrow-down-circle-outline" size={20} color={colors.accent} />
+          <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>
+            {isDownloading ? 'Downloading…' : isDownloaded ? 'Delete' : 'Download'}
+          </Text>
+          <Ionicons
+            name={isDownloaded ? 'trash-outline' : 'arrow-down-circle-outline'}
+            size={20} color={colors.accent} />
         </View>
       </View>
 
@@ -191,11 +201,15 @@ function SwipeableEpisodeCard({
           accessible
           accessibilityRole="none"
           accessibilityLabel={accessibilityLabel}
-          accessibilityHint="Double tap to open episode details. Swipe right to queue. Swipe left to download."
+          accessibilityHint={[
+            'Double tap to open episode details.',
+            isQueued ? 'Swipe right to remove from queue.' : 'Swipe right to add to queue.',
+            isDownloading ? 'Download in progress.' : isDownloaded ? 'Swipe left to delete download.' : 'Swipe left to download.',
+          ].join(' ')}
           accessibilityActions={[
-            { name: 'play',     label: isPlaying && isCurrent ? 'Pause' : 'Play' },
-            { name: 'queue',    label: 'Add to queue' },
-            { name: 'download', label: 'Download' },
+            { name: 'play',     label: isCurrent && isPlaying ? 'Pause' : 'Play' },
+            { name: 'queue',    label: isQueued ? 'Remove from queue' : 'Add to queue' },
+            { name: 'download', label: isDownloading ? 'Downloading…' : isDownloaded ? 'Delete download' : 'Download' },
           ]}
           onAccessibilityAction={({ nativeEvent }) => {
             if (nativeEvent.actionName === 'play')     onPlay();
@@ -243,13 +257,22 @@ function SwipeableEpisodeCard({
             </Pressable>
             <Pressable
               onPress={onQueue}
-              accessible accessibilityRole="button" accessibilityLabel="Add to queue"
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={isQueued ? 'Remove from queue' : 'Add to queue'}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
-                backgroundColor: colors.pill, borderRadius: 8,
-                paddingHorizontal: 14, paddingVertical: 8 }}
+                backgroundColor: isQueued ? colors.accent + '22' : colors.pill,
+                borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 }}
             >
-              <Ionicons name="list" size={16} color={colors.accent} />
-              <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 14 }}>Queue</Text>
+              <Ionicons
+                name={isQueued ? 'checkmark-circle' : 'list'}
+                size={16}
+                color={colors.accent}
+                accessibilityElementsHidden
+              />
+              <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 14 }}>
+                {isQueued ? 'In Queue' : 'Queue'}
+              </Text>
             </Pressable>
           </View>
         </Pressable>
@@ -597,9 +620,10 @@ export default function Podcasts() {
             )}
 
             {filteredLatest.map((episode, index) => {
-              const isCurrent  = isCurrentEpisode(episode.id);
-              const epProgress = isCurrent && player.duration > 0
+              const isCurrent   = isCurrentEpisode(episode.id);
+              const epProgress  = isCurrent && player.duration > 0
                 ? player.position / player.duration : undefined;
+              const epIsQueued  = player.queue.some(q => q.id === episode.id);
               return (
                 <SwipeableEpisodeCard
                   key={episode.id}
@@ -608,10 +632,21 @@ export default function Podcasts() {
                   isPlaying={isCurrent && player.isPlaying}
                   isNew={isNewEpisode(episode)}
                   progress={epProgress}
+                  isQueued={epIsQueued}
+                  isDownloaded={episode.id in meta.downloaded}
+                  isDownloading={meta.downloading.has(episode.id)}
                   accessibilityLabel={episodeLabel(episode)}
                   onPress={() => navigateToEpisode(episode)}
                   onPlay={() => playEpisode(episode)}
-                  onQueue={() => { player.enqueue(episode); showToast('Added to queue.', 'success'); }}
+                  onQueue={() => {
+                    if (epIsQueued) {
+                      player.removeFromQueue(episode.id);
+                      showToast('Removed from queue.', 'success');
+                    } else {
+                      player.enqueue(episode);
+                      showToast('Added to queue.', 'success');
+                    }
+                  }}
                   onDownload={() => handleDownload(episode)}
                   onRef={el => {
                     episodeItemRefs.current[episode.id] = el;
@@ -649,10 +684,22 @@ export default function Podcasts() {
                     isPlaying={isCurrent && player.isPlaying}
                     isNew={false}
                     progress={prog}
+                    isQueued={player.queue.some(q => q.id === episode.id)}
+                    isDownloaded={episode.id in meta.downloaded}
+                    isDownloading={meta.downloading.has(episode.id)}
                     accessibilityLabel={episodeLabel(episode)}
                     onPress={() => navigateToEpisode(episode)}
                     onPlay={() => playEpisode(episode)}
-                    onQueue={() => { player.enqueue(episode); showToast('Added to queue.', 'success'); }}
+                    onQueue={() => {
+                      const queued = player.queue.some(q => q.id === episode.id);
+                      if (queued) {
+                        player.removeFromQueue(episode.id);
+                        showToast('Removed from queue.', 'success');
+                      } else {
+                        player.enqueue(episode);
+                        showToast('Added to queue.', 'success');
+                      }
+                    }}
                     onDownload={() => handleDownload(episode)}
                     colors={colors}
                     styles={styles}
