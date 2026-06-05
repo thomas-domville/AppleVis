@@ -58,7 +58,11 @@ function ThemedTabs() {
             style={style}
             accessible
             accessibilityRole="tab"
-            accessibilityLabel={getTabAccessibilityLabel(route.name)}
+            accessibilityLabel={
+              accessibilityState?.selected
+                ? `${getTabAccessibilityLabel(route.name)}, selected`
+                : getTabAccessibilityLabel(route.name)
+            }
             accessibilityState={accessibilityState}
           >
             {children}
