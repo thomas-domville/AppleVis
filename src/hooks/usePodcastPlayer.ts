@@ -1,5 +1,5 @@
 import { Audio, AVPlaybackStatus } from 'expo-av';
-import { AccessibilityInfo, Platform } from 'react-native';
+import { AccessibilityInfo, AppState, Platform } from 'react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PodcastEpisode, Chapter } from '../types/content';
 import { persistence } from '../services/persistence';
@@ -65,6 +65,7 @@ export function usePodcastPlayer() {
   const sleepRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const nowPlayingTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const queueLoadedRef = useRef(false);
+  const episodeRef    = useRef<PodcastEpisode | null>(null);
   const [state, setState] = useState<PlayerState>(DEFAULT);
   const {
     podcastAutoPlay, podcastSleepTimer, podcastSpeed, setPodcastSpeed,
@@ -121,6 +122,26 @@ export function usePodcastPlayer() {
   useEffect(() => {
     if (Platform.OS === 'ios') setTrimSilenceEnabled(podcastTrimSilence);
   }, [podcastTrimSilence]);
+
+  // Keep a stable ref to the current episode so AppState callback never goes stale.
+  useEffect(() => { episodeRef.current = state.episode; }, [state.episode]);
+
+  // Save playback position whenever the app moves to background or becomes inactive.
+  // Covers force-close and home-button dismissal that bypass the pause/stop paths.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'background' || nextState === 'inactive') {
+        const ep = episodeRef.current;
+        if (!ep || !soundRef.current) return;
+        soundRef.current.getStatusAsync().then((s) => {
+          if (s.isLoaded && episodeRef.current) {
+            persistence.savePodcastPosition(episodeRef.current.id, s.positionMillis / 1000);
+          }
+        }).catch(() => {});
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     Audio.setAudioModeAsync({
