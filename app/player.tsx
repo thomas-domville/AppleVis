@@ -201,9 +201,24 @@ export default function PlayerScreen() {
             player.setSpeed(nextSpeed);
             AccessibilityInfo.announceForAccessibility(`Speed ${nextSpeed}×`);
           }}
+          onAccessibilityAction={({ nativeEvent }) => {
+            const idx = SPEED_OPTIONS.indexOf(player.speed);
+            if (nativeEvent.actionName === 'increment' && idx < SPEED_OPTIONS.length - 1) {
+              const next = SPEED_OPTIONS[idx + 1];
+              player.setSpeed(next);
+              AccessibilityInfo.announceForAccessibility(`Speed ${next}×`);
+            }
+            if (nativeEvent.actionName === 'decrement' && idx > 0) {
+              const next = SPEED_OPTIONS[idx - 1];
+              player.setSpeed(next);
+              AccessibilityInfo.announceForAccessibility(`Speed ${next}×`);
+            }
+          }}
           accessible
-          accessibilityRole="button"
-          accessibilityLabel={`Speed ${player.speed}×. Double tap to change to ${nextSpeed}×.`}
+          accessibilityRole="adjustable"
+          accessibilityLabel="Speed"
+          accessibilityValue={{ text: `${player.speed}×` }}
+          accessibilityHint="Double tap to cycle forward. Swipe up to increase, swipe down to decrease."
           style={{ backgroundColor: colors.pill, borderRadius: 20,
             paddingHorizontal: 18, paddingVertical: 8 }}
         >

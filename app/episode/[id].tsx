@@ -723,9 +723,9 @@ export default function EpisodeDetail() {
                 onPress={cycleSpeedForward}
                 accessible
                 accessibilityRole="adjustable"
-                accessibilityLabel={`Playback speed: ${player.speed}×`}
+                accessibilityLabel="Playback speed"
                 accessibilityValue={{ text: `${player.speed}×` }}
-                accessibilityHint="Double tap to cycle speed. Swipe up to increase, swipe down to decrease."
+                accessibilityHint="Double tap to cycle forward. Swipe up to increase, swipe down to decrease."
                 onAccessibilityAction={(e) => {
                   if (e.nativeEvent.actionName === 'increment' && speedIdx < SPEED_OPTIONS.length - 1) {
                     const next = SPEED_OPTIONS[speedIdx + 1];
@@ -758,9 +758,9 @@ export default function EpisodeDetail() {
               <View
                 accessible
                 accessibilityRole="adjustable"
-                accessibilityLabel={`Volume: ${volumePct}`}
+                accessibilityLabel="Volume"
                 accessibilityValue={{ text: volumePct, min: 0, max: 100, now: Math.round(player.volume * 100) }}
-                accessibilityHint="Swipe up to increase volume, swipe down to decrease"
+                accessibilityHint="Swipe up to increase, swipe down to decrease"
                 onAccessibilityAction={(e) => {
                   if (e.nativeEvent.actionName === 'increment') {
                     const newIdx = Math.min(volumeSteps.length - 1, volumeIdx + 1);
@@ -810,7 +810,7 @@ export default function EpisodeDetail() {
               <View
                 accessible
                 accessibilityRole="adjustable"
-                accessibilityLabel={`Sleep timer: ${sleepDisplayLabel}`}
+                accessibilityLabel="Sleep timer"
                 accessibilityValue={{ text: sleepDisplayLabel }}
                 accessibilityHint="Swipe up to increase, swipe down to decrease or turn off. 'End of Episode' stops after the current episode finishes."
                 onAccessibilityAction={(e) => {
@@ -852,7 +852,7 @@ export default function EpisodeDetail() {
               accessible
               accessibilityRole="switch"
               accessibilityState={{ checked: podcastTrimSilence }}
-              accessibilityLabel={`Trim Silence. Skips silent gaps. ${podcastTrimSilence ? 'On' : 'Off'}.`}
+              accessibilityLabel="Trim Silence. Skips silent gaps."
               style={{ flexDirection: 'row', alignItems: 'center', gap: 12,
                 marginTop: 4, paddingVertical: 12,
                 borderTopWidth: 1, borderTopColor: colors.border }}
@@ -883,7 +883,7 @@ export default function EpisodeDetail() {
               accessible
               accessibilityRole="switch"
               accessibilityState={{ checked: podcastVoiceBoost }}
-              accessibilityLabel={`Voice Boost. Enhances speech clarity. ${podcastVoiceBoost ? 'On' : 'Off'}.`}
+              accessibilityLabel="Voice Boost. Enhances speech clarity."
               style={{ flexDirection: 'row', alignItems: 'center', gap: 12,
                 paddingVertical: 12,
                 borderTopWidth: 1, borderTopColor: colors.border }}
