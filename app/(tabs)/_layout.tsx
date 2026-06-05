@@ -24,6 +24,13 @@ const tabLabels: Record<string, string> = {
 
 const TAB_ORDER = ['index', 'forums', 'podcasts', 'apps', 'resources'];
 
+function getTabAccessibilityLabel(routeName: string) {
+  const position = TAB_ORDER.indexOf(routeName) + 1;
+  const label    = tabLabels[routeName] ?? routeName;
+
+  return `${label} tab, ${position} of ${TAB_ORDER.length}`;
+}
+
 function ThemedTabs() {
   const { colors, isDark, themeId } = useTheme();
   const reduceTransparency          = useReduceTransparency();
@@ -43,15 +50,15 @@ function ThemedTabs() {
         ),
         tabBarLabelStyle: { fontSize: 12 },
         headerShown: false,
-        tabBarAccessibilityLabel: `${tabLabels[route.name] ?? route.name}, ${TAB_ORDER.indexOf(route.name) + 1} of ${TAB_ORDER.length}`,
-        tabBarButton: ({ children, style, onPress, onLongPress, accessibilityLabel, accessibilityState }) => (
+        tabBarAccessibilityLabel: getTabAccessibilityLabel(route.name),
+        tabBarButton: ({ children, style, onPress, onLongPress, accessibilityState }) => (
           <Pressable
             onPress={onPress}
             onLongPress={onLongPress}
             style={style}
             accessible
             accessibilityRole="tab"
-            accessibilityLabel={accessibilityLabel}
+            accessibilityLabel={getTabAccessibilityLabel(route.name)}
             accessibilityState={accessibilityState}
           >
             {children}
