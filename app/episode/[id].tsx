@@ -343,6 +343,7 @@ export default function EpisodeDetail() {
   const { showToast } = useToast();
 
   const isCurrent     = player.episode?.id === params.id;
+  const isQueued      = player.queue.some(e => e.id === params.id);
   const durationSecs  = Number(params.duration ?? 0);
   const progress      = isCurrent && player.duration > 0 ? player.position / player.duration : 0;
   const durationKnown = isCurrent && player.duration > 0;
@@ -963,33 +964,59 @@ export default function EpisodeDetail() {
           {/* ── Play Next / Add to Queue ──────────────────────────────────── */}
           <View style={[styles.card, { marginBottom: 20 }]}>
             <Pressable
-              onPress={() => { player.playNext(episode); showToast('Added — plays after current episode');
-                AccessibilityInfo.announceForAccessibility('Added to play next'); }}
-              disabled={isCurrent}
+              onPress={() => {
+                player.playNext(episode);
+                showToast('Added — plays after current episode');
+                AccessibilityInfo.announceForAccessibility('Added to play next');
+              }}
+              disabled={isCurrent || isQueued}
               accessible accessibilityRole="button"
-              accessibilityLabel={isCurrent ? 'Episode is currently playing' : 'Play next — inserts immediately after the current episode'}
+              accessibilityLabel={
+                isCurrent ? 'Episode is currently playing' :
+                isQueued   ? 'Already in queue' :
+                'Play next — inserts immediately after the current episode'
+              }
               style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 }}
             >
               <Ionicons name="play-skip-forward-outline" size={22}
-                color={isCurrent ? colors.textSecondary : colors.accent} accessibilityElementsHidden />
+                color={isCurrent || isQueued ? colors.textSecondary : colors.accent} accessibilityElementsHidden />
               <Text style={{ fontSize: 15, fontWeight: '600',
-                color: isCurrent ? colors.textSecondary : colors.text }}>Play Next</Text>
+                color: isCurrent || isQueued ? colors.textSecondary : colors.text }}>Play Next</Text>
             </Pressable>
 
             <View style={{ height: 1, backgroundColor: colors.border }} />
 
             <Pressable
-              onPress={() => { player.enqueue(episode); showToast('Added to end of queue');
-                AccessibilityInfo.announceForAccessibility('Added to queue'); }}
+              onPress={() => {
+                if (isQueued) {
+                  player.removeFromQueue(params.id);
+                  showToast('Removed from queue');
+                  AccessibilityInfo.announceForAccessibility('Removed from queue');
+                } else {
+                  player.enqueue(episode);
+                  showToast('Added to end of queue');
+                  AccessibilityInfo.announceForAccessibility('Added to queue');
+                }
+              }}
               disabled={isCurrent}
               accessible accessibilityRole="button"
-              accessibilityLabel={isCurrent ? 'Episode is currently playing' : 'Add to queue'}
+              accessibilityLabel={
+                isCurrent ? 'Episode is currently playing' :
+                isQueued   ? 'Remove from queue' :
+                'Add to queue'
+              }
               style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 }}
             >
-              <Ionicons name="add-circle-outline" size={22}
-                color={isCurrent ? colors.textSecondary : colors.accent} accessibilityElementsHidden />
+              <Ionicons
+                name={isQueued ? 'checkmark-circle' : 'add-circle-outline'}
+                size={22}
+                color={isCurrent ? colors.textSecondary : isQueued ? colors.accent : colors.accent}
+                accessibilityElementsHidden
+              />
               <Text style={{ fontSize: 15, fontWeight: '600',
-                color: isCurrent ? colors.textSecondary : colors.text }}>Add to Queue</Text>
+                color: isCurrent ? colors.textSecondary : colors.text }}>
+                {isQueued ? 'Remove from Queue' : 'Add to Queue'}
+              </Text>
             </Pressable>
           </View>
 
