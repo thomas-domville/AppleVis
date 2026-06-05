@@ -64,6 +64,7 @@ export function usePodcastPlayer() {
   const soundRef = useRef<Audio.Sound | null>(null);
   const sleepRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const nowPlayingTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const queueLoadedRef = useRef(false);
   const [state, setState] = useState<PlayerState>(DEFAULT);
   const {
     podcastAutoPlay, podcastSleepTimer, podcastSpeed, setPodcastSpeed,
@@ -136,6 +137,22 @@ export function usePodcastPlayer() {
       if (Platform.OS === 'ios') clearNowPlayingInfo();
     };
   }, []);
+
+  // Restore queue from local storage on mount.
+  useEffect(() => {
+    persistence.getQueue()
+      .then(q => {
+        if (q.length > 0) patch({ queue: q });
+        queueLoadedRef.current = true;
+      })
+      .catch(() => { queueLoadedRef.current = true; });
+  }, [patch]);
+
+  // Persist queue whenever it changes (skip the initial empty state before load).
+  useEffect(() => {
+    if (!queueLoadedRef.current) return;
+    persistence.setQueue(state.queue).catch(() => {});
+  }, [state.queue]);
 
   // Keep skip interval state in sync with saved preferences.
   useEffect(() => {

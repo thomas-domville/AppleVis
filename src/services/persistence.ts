@@ -185,10 +185,10 @@ export const persistence = {
     return episodeId in downloads;
   },
 
-  // ── Podcast queue (device-local, session data) ────────────────────────────
+  // ── Podcast queue (device-local) ─────────────────────────────────────────
 
-  getQueue: () => localGet<string[]>(LK.QUEUE, []),
-  setQueue: (ids: string[]) => localSet(LK.QUEUE, ids),
+  getQueue: () => localGet<PodcastEpisode[]>(LK.QUEUE, []),
+  setQueue: (queue: PodcastEpisode[]) => localSet(LK.QUEUE, queue),
 
   // ── Play history (device-local, capped at 100 entries) ───────────────────
   // Stores the most recent 100 completed episodes, newest first.
