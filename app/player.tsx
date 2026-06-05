@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { AccessibilityInfo, Image, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -21,6 +21,11 @@ export default function PlayerScreen() {
   const player             = usePlayer();
   const [barWidth, setBarWidth] = useState(0);
 
+  const onMagicTap = useCallback(() => {
+    if (player.isPlaying) player.pause();
+    else player.play();
+  }, [player]);
+
   if (!player.episode) {
     router.back();
     return null;
@@ -39,7 +44,7 @@ export default function PlayerScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} onMagicTap={onMagicTap}>
 
       {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={{ flexDirection: 'row', alignItems: 'center',

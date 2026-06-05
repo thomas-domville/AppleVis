@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useCallback } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { RefreshBar } from './RefreshBar';
 import { useTheme } from '../contexts/ThemeContext';
+import { usePlayer } from '../contexts/PlayerContext';
 
 type Props = {
   title: string;
@@ -20,6 +21,16 @@ export function Screen({ title, children, showSettings = true, showSearch = fals
   const router             = useRouter();
   const { t }              = useTranslation();
   const { colors, styles } = useTheme();
+  const player             = usePlayer();
+
+  // VoiceOver magic tap (two-finger double-tap): play/pause from any screen.
+  // Returns without handling when no episode is loaded so iOS can pass the
+  // event to the next responder (e.g. a system media control).
+  const onMagicTap = useCallback(() => {
+    if (!player.episode) return;
+    if (player.isPlaying) player.pause();
+    else player.play();
+  }, [player]);
 
   const showActionRow = showSearch || showSettings;
 
@@ -28,6 +39,7 @@ export function Screen({ title, children, showSettings = true, showSearch = fals
       style={styles.screen}
       accessibilityLanguage="en"
       onAccessibilityEscape={() => { if (showBack && router.canGoBack()) router.back(); }}
+      onMagicTap={onMagicTap}
     >
       <View style={styles.content}>
 
