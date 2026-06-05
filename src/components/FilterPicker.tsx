@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Pressable, Text, View } from 'react-native';
+import { AccessibilityInfo, Modal, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -14,20 +14,41 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
   const [open, setOpen] = useState(false);
   const { colors } = useTheme();
 
+  const currentIdx = options.indexOf(value);
+
   function select(option: T) {
     onChange(option);
     setOpen(false);
   }
 
+  function cycleBy(delta: 1 | -1) {
+    const nextIdx = Math.max(0, Math.min(options.length - 1, currentIdx + delta));
+    const next = options[nextIdx];
+    if (next !== value) {
+      onChange(next);
+      AccessibilityInfo.announceForAccessibility(`${label}: ${next}`);
+    }
+  }
+
   return (
     <>
-      {/* Trigger button */}
+      {/*
+        accessibilityRole="adjustable" lets VoiceOver users swipe up/down to
+        cycle through options without opening the modal. Double-tap still opens
+        the sheet so sighted users (and VoiceOver users who want to jump) can
+        pick directly.
+      */}
       <Pressable
         onPress={() => setOpen(true)}
-        accessibilityRole="combobox"
-        accessibilityLabel={`${label}: ${value}`}
-        accessibilityHint="Double tap to change filter"
-        accessibilityState={{ expanded: open }}
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel={label}
+        accessibilityValue={{ text: value }}
+        accessibilityHint="Swipe up or down to change. Double tap to see all options."
+        onAccessibilityAction={({ nativeEvent }) => {
+          if (nativeEvent.actionName === 'increment') cycleBy(1);
+          if (nativeEvent.actionName === 'decrement') cycleBy(-1);
+        }}
         style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -51,7 +72,7 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
         />
       </Pressable>
 
-      {/* Options modal */}
+      {/* Options modal — for sighted users or VoiceOver users who want to jump */}
       <Modal
         visible={open}
         transparent
@@ -59,7 +80,6 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
         onRequestClose={() => setOpen(false)}
         accessibilityViewIsModal
       >
-        {/* Backdrop — tap to dismiss */}
         <Pressable
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }}
           onPress={() => setOpen(false)}
@@ -68,7 +88,6 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
           accessibilityLabel="Close filter picker"
         />
 
-        {/* Sheet */}
         <View
           style={{
             backgroundColor: colors.card,
@@ -79,7 +98,6 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
             paddingHorizontal: 0,
           }}
         >
-          {/* Handle */}
           <View
             style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 12 }}
             accessible={false}
@@ -102,7 +120,8 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
                 key={option}
                 onPress={() => select(option)}
                 accessibilityRole="button"
-                accessibilityLabel={isSelected ? `${option}, selected` : option}
+                accessibilityLabel={option}
+                accessibilityState={{ selected: isSelected }}
                 style={({ pressed }) => ({
                   flexDirection: 'row',
                   alignItems: 'center',
