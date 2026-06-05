@@ -790,34 +790,72 @@ export default function Podcasts() {
                 </View>
 
                 {player.queue.map((episode, index) => {
-                  const isCurrent = isCurrentEpisode(episode.id);
+                  const isCurrent  = isCurrentEpisode(episode.id);
+                  const isFirst    = index === 0;
+                  const isLast     = index === player.queue.length - 1;
+                  const queueTotal = player.queue.length;
                   return (
-                    <View key={episode.id} accessible accessibilityRole="none"
+                    <Pressable
+                      key={episode.id}
+                      onPress={() => navigateToEpisode(episode)}
+                      accessible
+                      accessibilityRole="none"
                       accessibilityLabel={[
-                        `Queue position ${index + 1}`,
-                        episode.title, episode.showTitle,
+                        `Queue position ${index + 1} of ${queueTotal}`,
+                        episode.title,
+                        episode.showTitle,
                         formatDuration(episode.duration),
                         isCurrent ? 'Currently loaded' : null,
                       ].filter(Boolean).join('. ')}
+                      accessibilityHint="Double tap to open episode details."
+                      accessibilityActions={[
+                        { name: 'play',     label: isCurrent && player.isPlaying ? 'Pause' : 'Play now' },
+                        ...(!isFirst  ? [{ name: 'moveUp',   label: 'Move up in queue' }]   : []),
+                        ...(!isLast   ? [{ name: 'moveDown', label: 'Move down in queue' }] : []),
+                        { name: 'remove',   label: 'Remove from queue' },
+                      ]}
+                      onAccessibilityAction={({ nativeEvent }) => {
+                        switch (nativeEvent.actionName) {
+                          case 'play':
+                            playEpisode(episode);
+                            navigateToEpisode(episode);
+                            break;
+                          case 'moveUp':
+                            player.moveQueueItemUp(episode.id);
+                            AccessibilityInfo.announceForAccessibility(
+                              `Moved to position ${index} of ${queueTotal}.`);
+                            break;
+                          case 'moveDown':
+                            player.moveQueueItemDown(episode.id);
+                            AccessibilityInfo.announceForAccessibility(
+                              `Moved to position ${index + 2} of ${queueTotal}.`);
+                            break;
+                          case 'remove':
+                            player.removeFromQueue(episode.id);
+                            showToast('Removed from queue.', 'success');
+                            break;
+                        }
+                      }}
                       style={[styles.card, isCurrent && { borderColor: colors.accent, borderWidth: 2 }]}
                     >
-                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+                      {/* Visual layout — sighted users; hidden from VoiceOver by the accessible parent */}
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}
+                        accessibilityElementsHidden>
                         <Text style={{ fontSize: 18, fontWeight: '700', color: colors.textSecondary,
                           minWidth: 28, paddingTop: 2 }}>{index + 1}</Text>
-                        <Pressable onPress={() => navigateToEpisode(episode)}
-                          accessible={false} style={{ flex: 1 }}>
+                        <View style={{ flex: 1 }}>
                           <Text style={styles.cardTitle}>{episode.title}</Text>
                           <Text style={styles.cardMeta}>
                             {episode.showTitle}
                             {episode.duration > 0 ? ` · ${formatDuration(episode.duration)}` : ''}
                           </Text>
-                        </Pressable>
+                        </View>
                       </View>
 
-                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}
+                        accessibilityElementsHidden>
                         <Pressable onPress={() => { playEpisode(episode); navigateToEpisode(episode); }}
-                          accessible accessibilityRole="button"
-                          accessibilityLabel={isCurrent && player.isPlaying ? 'Pause' : 'Play now'}
+                          accessible={false}
                           style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
                             backgroundColor: colors.accent, borderRadius: 8,
                             paddingHorizontal: 12, paddingVertical: 8, flex: 1 }}>
@@ -827,29 +865,28 @@ export default function Podcasts() {
                           </Text>
                         </Pressable>
                         <Pressable onPress={() => player.moveQueueItemUp(episode.id)}
-                          accessible accessibilityRole="button" accessibilityLabel="Move up in queue"
-                          disabled={index === 0}
+                          accessible={false}
+                          disabled={isFirst}
                           style={{ backgroundColor: colors.pill, borderRadius: 8,
-                            paddingHorizontal: 12, paddingVertical: 8, opacity: index === 0 ? 0.4 : 1 }}>
+                            paddingHorizontal: 12, paddingVertical: 8, opacity: isFirst ? 0.4 : 1 }}>
                           <Ionicons name="chevron-up" size={18} color={colors.text} />
                         </Pressable>
                         <Pressable onPress={() => player.moveQueueItemDown(episode.id)}
-                          accessible accessibilityRole="button" accessibilityLabel="Move down in queue"
-                          disabled={index === player.queue.length - 1}
+                          accessible={false}
+                          disabled={isLast}
                           style={{ backgroundColor: colors.pill, borderRadius: 8,
-                            paddingHorizontal: 12, paddingVertical: 8,
-                            opacity: index === player.queue.length - 1 ? 0.4 : 1 }}>
+                            paddingHorizontal: 12, paddingVertical: 8, opacity: isLast ? 0.4 : 1 }}>
                           <Ionicons name="chevron-down" size={18} color={colors.text} />
                         </Pressable>
                         <Pressable onPress={() => { player.removeFromQueue(episode.id);
                             showToast('Removed from queue.', 'success'); }}
-                          accessible accessibilityRole="button" accessibilityLabel="Remove from queue"
+                          accessible={false}
                           style={{ backgroundColor: colors.pill, borderRadius: 8,
                             paddingHorizontal: 12, paddingVertical: 8 }}>
                           <Ionicons name="close" size={18} color="#FF3B30" />
                         </Pressable>
                       </View>
-                    </View>
+                    </Pressable>
                   );
                 })}
               </>
