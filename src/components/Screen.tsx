@@ -82,10 +82,10 @@ export function Screen({ title, children, showSettings = true, showSearch = fals
 
             {showSettings && (
               <Pressable
-                onPress={() => router.push('/settings')}
+                onPress={() => router.push('/profile')}
                 accessibilityRole="button"
-                accessibilityLabel={t('screen.a11ySettings')}
-                accessibilityHint={t('screen.a11ySettingsHint')}
+                accessibilityLabel="Profile and Settings"
+                accessibilityHint="Opens your profile, account, and app settings."
                 hitSlop={8}
                 style={{
                   padding: 8,
@@ -95,7 +95,7 @@ export function Screen({ title, children, showSettings = true, showSearch = fals
                   borderColor: colors.border,
                 }}
               >
-                <Ionicons name="settings-outline" size={20} color={colors.accent} accessibilityElementsHidden />
+                <Ionicons name="person-circle-outline" size={20} color={colors.accent} accessibilityElementsHidden />
               </Pressable>
             )}
           </View>

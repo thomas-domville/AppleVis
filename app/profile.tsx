@@ -1,4 +1,6 @@
-import { Clipboard, Dimensions, Image, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Clipboard, Dimensions, findNodeHandle, Image, Linking,
+  Platform, Pressable, ScrollView, Switch, Text, TextInput, View, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
@@ -53,31 +55,37 @@ function InfoRow({ label, value, colors }: {
   );
 }
 
-function NavRow({ label, hint, icon, onPress, external = false, colors, styles }: {
+function NavRow({ label, hint, icon, onPress, external = false, destructive = false, colors, styles }: {
   label: string; hint?: string; icon: string; onPress: () => void;
-  external?: boolean;
+  external?: boolean; destructive?: boolean;
   colors: ReturnType<typeof useTheme>['colors'];
   styles: ReturnType<typeof useTheme>['styles'];
 }) {
+  const color = destructive ? '#B91C1C' : colors.accent;
   return (
     <Pressable
       onPress={onPress}
       accessible accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={hint}
-      style={({ pressed }) => [styles.cardSmall, {
-        flexDirection: 'row', alignItems: 'center', gap: 12,
-      }, pressed && { opacity: 0.85 }]}
+      style={({ pressed }) => [
+        styles.cardSmall,
+        { flexDirection: 'row', alignItems: 'center', gap: 12 },
+        destructive && { backgroundColor: '#FFF0F0', borderColor: '#FCA5A5', borderWidth: 1 },
+        pressed && { opacity: 0.85 },
+      ]}
     >
-      <Ionicons name={icon as any} size={20} color={colors.accent} accessibilityElementsHidden />
-      <Text style={[styles.body, { flex: 1, marginBottom: 0 }]}>{label}</Text>
+      <Ionicons name={icon as any} size={20} color={color} accessibilityElementsHidden />
+      <Text style={[styles.body, { flex: 1, marginBottom: 0, color: destructive ? '#B91C1C' : colors.text }]}>
+        {label}
+      </Text>
       <Ionicons name={external ? 'open-outline' : 'chevron-forward'} size={16}
         color={colors.textSecondary} accessibilityElementsHidden />
     </Pressable>
   );
 }
 
-// ── About section — shown for all users ───────────────────────────────────────
+// ── About section ─────────────────────────────────────────────────────────────
 
 function AboutSection({ colors, styles, showToast, router }: {
   colors: ReturnType<typeof useTheme>['colors'];
@@ -112,7 +120,6 @@ function AboutSection({ colors, styles, showToast, router }: {
 
   return (
     <>
-      {/* Brand card */}
       <View
         style={[styles.card, { alignItems: 'center', paddingVertical: 24 }]}
         accessible
@@ -135,7 +142,6 @@ function AboutSection({ colors, styles, showToast, router }: {
         </Text>
       </View>
 
-      {/* What's New */}
       <Pressable
         onPress={() => router.push('/whats-new' as any)}
         accessible accessibilityRole="button"
@@ -156,7 +162,6 @@ function AboutSection({ colors, styles, showToast, router }: {
         <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} accessibilityElementsHidden />
       </Pressable>
 
-      {/* App info */}
       <SectionHeader label="App Information" colors={colors} />
       <View style={styles.card}>
         <InfoRow label="Version" value={APP_VERSION}  colors={colors} />
@@ -170,7 +175,6 @@ function AboutSection({ colors, styles, showToast, router }: {
           colors={colors} />
       </View>
 
-      {/* Accessibility info */}
       <SectionHeader label="Active Accessibility Settings" colors={colors} />
       <View style={styles.card}>
         <InfoRow label="VoiceOver"           value={a11y.screenReaderEnabled ? 'On' : 'Off'} colors={colors} />
@@ -183,7 +187,6 @@ function AboutSection({ colors, styles, showToast, router }: {
           colors={colors} />
       </View>
 
-      {/* Copy support info */}
       <Pressable
         onPress={() => { Clipboard.setString(buildSupportInfo()); showToast('Support information copied.', 'success'); }}
         accessible accessibilityRole="button"
@@ -205,14 +208,13 @@ function AboutSection({ colors, styles, showToast, router }: {
         </View>
       </Pressable>
 
-      {/* Legal & Credits */}
       <SectionHeader label="Legal & Credits" colors={colors} />
-      <NavRow label="Privacy Policy"       icon="shield-checkmark-outline"
-        hint="Opens applevis.com/privacy in Safari." external
+      <NavRow label="Privacy Policy"       icon="shield-checkmark-outline" external
+        hint="Opens applevis.com/privacy in Safari."
         onPress={() => Linking.openURL(`${BASE}/privacy`).catch(() => showToast('Could not open link.', 'error'))}
         colors={colors} styles={styles} />
-      <NavRow label="Terms of Use"         icon="document-text-outline"
-        hint="Opens applevis.com/terms in Safari." external
+      <NavRow label="Terms of Use"         icon="document-text-outline" external
+        hint="Opens applevis.com/terms in Safari."
         onPress={() => Linking.openURL(`${BASE}/terms`).catch(() => showToast('Could not open link.', 'error'))}
         colors={colors} styles={styles} />
       <NavRow label="Open Source Licences" icon="code-slash-outline"
@@ -223,16 +225,15 @@ function AboutSection({ colors, styles, showToast, router }: {
         hint="The people and contributors behind AppleVis."
         onPress={() => router.push('/credits' as any)}
         colors={colors} styles={styles} />
-      <NavRow label="Report a Bug"         icon="bug-outline"
-        hint="Opens applevis.com/contact in Safari." external
+      <NavRow label="Report a Bug"         icon="bug-outline" external
+        hint="Opens applevis.com/contact in Safari."
         onPress={() => Linking.openURL(`${BASE}/contact`).catch(() => showToast('Could not open link.', 'error'))}
         colors={colors} styles={styles} />
-      <NavRow label="Send Feedback"        icon="chatbubble-ellipses-outline"
-        hint="Opens applevis.com/contact in Safari." external
+      <NavRow label="Send Feedback"        icon="chatbubble-ellipses-outline" external
+        hint="Opens applevis.com/contact in Safari."
         onPress={() => Linking.openURL(`${BASE}/contact`).catch(() => showToast('Could not open link.', 'error'))}
         colors={colors} styles={styles} />
 
-      {/* Footer */}
       <Text
         style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center',
           marginTop: 24, lineHeight: 20 }}
@@ -248,10 +249,34 @@ function AboutSection({ colors, styles, showToast, router }: {
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function Profile() {
-  const router        = useRouter();
+  const router             = useRouter();
   const { colors, styles } = useTheme();
-  const auth          = useAuth();
-  const { showToast } = useToast();
+  const auth               = useAuth();
+  const { showToast }      = useToast();
+
+  // Sign-in form state (used in signed-out view)
+  const [showForm,   setShowForm]   = useState(false);
+  const [email,      setEmail]      = useState('');
+  const [password,   setPassword]   = useState('');
+  const [signingIn,  setSigningIn]  = useState(false);
+  const emailRef       = useRef<TextInput>(null);
+  const signInBtnRef   = useRef<View>(null);
+
+  const restoreToSignInBtn = useCallback(() => {
+    setTimeout(() => {
+      const handle = signInBtnRef.current ? findNodeHandle(signInBtnRef.current) : null;
+      if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+    }, 200);
+  }, []);
+
+  useEffect(() => {
+    if (!showForm) return;
+    const t = setTimeout(() => {
+      const node = emailRef.current ? findNodeHandle(emailRef.current) : null;
+      if (node) AccessibilityInfo.setAccessibilityFocus(node);
+    }, 150);
+    return () => clearTimeout(t);
+  }, [showForm]);
 
   const savedTopics    = useSavedItems('forumTopic');
   const savedApps      = useSavedItems('appListing');
@@ -260,37 +285,109 @@ export default function Profile() {
   const appCount      = savedApps.items.length;
   const resourceCount = savedResources.items.length;
 
+  async function handleSignIn() {
+    if (!email.trim()) { showToast('Please enter your email address.', 'error'); return; }
+    if (!password)      { showToast('Please enter your password.', 'error'); return; }
+    setSigningIn(true);
+    const result = await auth.signIn(email, password);
+    setSigningIn(false);
+    if (result.ok) {
+      showToast(`Welcome back, ${auth.user?.name ?? 'you'}!`, 'success');
+      setEmail(''); setPassword(''); setShowForm(false);
+    } else {
+      showToast(result.error ?? 'Sign in failed.', 'error');
+    }
+  }
+
   async function handleSignOut() {
     await auth.signOut();
     showToast('Signed out.', 'success');
     router.replace('/(tabs)');
   }
 
-  // ── Signed-out view ────────────────────────────────────────────────────────
+  const inputStyle = {
+    borderWidth: 1.5, borderColor: colors.inputBorder, borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 12,
+    fontSize: 17, color: colors.text, backgroundColor: colors.inputBackground,
+  };
+
+  // ── Signed-out view ──────────────────────────────────────────────────────────
   if (!auth.isSignedIn || !auth.user) {
     return (
       <Screen title="Profile" showSettings={false}>
         <ScrollView showsVerticalScrollIndicator={false}>
-          {/* Not signed in card */}
-          <View style={[styles.card, { alignItems: 'center', paddingVertical: 28 }]}
-            accessible
-            accessibilityLabel="You are not signed in. Sign in to view your profile, saved items, and post history.">
-            <Ionicons name="person-circle-outline" size={56} color={colors.textSecondary} accessibilityElementsHidden />
-            <Text style={[styles.cardTitle, { marginTop: 12, textAlign: 'center' }]}>Not signed in</Text>
-            <Text style={[styles.cardMeta, { textAlign: 'center', marginTop: 4, marginBottom: 16 }]}>
-              Sign in to see your profile, saved items, and post history.
-            </Text>
-            <Pressable
-              onPress={() => router.push('/settings')}
-              accessible accessibilityRole="button" accessibilityLabel="Go to Settings to sign in"
-              style={{ backgroundColor: colors.accent, borderRadius: 12,
-                paddingHorizontal: 24, paddingVertical: 12 }}
-            >
-              <Text style={{ color: colors.accentText, fontWeight: '700', fontSize: 15 }}>Sign In</Text>
-            </Pressable>
-          </View>
 
-          {/* About section — always visible */}
+          {/* Not signed in / sign-in form */}
+          {!showForm ? (
+            <View style={[styles.card, { marginBottom: 4 }]}>
+              <Text style={styles.cardTitle}>Sign In</Text>
+              <Text style={[styles.cardMeta, { marginBottom: 14 }]}>
+                Sign in to post, follow topics, receive notifications, and sync across devices.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Pressable
+                  ref={signInBtnRef}
+                  onPress={() => setShowForm(true)}
+                  accessible accessibilityRole="button" accessibilityLabel="Sign in to AppleVis"
+                  style={{ alignSelf: 'flex-start', backgroundColor: colors.accent,
+                    borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 }}
+                >
+                  <Text style={{ color: colors.accentText, fontWeight: '700', fontSize: 15 }}>Sign In</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => router.push('/settings' as any)}
+                  accessible accessibilityRole="button" accessibilityLabel="Open Settings"
+                  style={{ backgroundColor: colors.pill, borderRadius: 10,
+                    paddingHorizontal: 16, paddingVertical: 10 }}
+                >
+                  <Text style={{ color: colors.pillText, fontWeight: '600', fontSize: 15 }}>Settings</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <View style={[styles.card, { gap: 16, marginBottom: 4 }]}>
+              <Text style={styles.cardTitle} accessibilityRole="header">Sign In</Text>
+              <View>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 6 }}
+                  importantForAccessibility="no-hide-descendants">Email</Text>
+                <TextInput ref={emailRef} value={email} onChangeText={setEmail}
+                  autoCapitalize="none" autoCorrect={false} keyboardType="email-address"
+                  textContentType="emailAddress" returnKeyType="next"
+                  accessible accessibilityLabel="Email address" style={inputStyle} />
+              </View>
+              <View>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 6 }}
+                  importantForAccessibility="no-hide-descendants">Password</Text>
+                <TextInput value={password} onChangeText={setPassword} secureTextEntry
+                  textContentType="password" returnKeyType="go" onSubmitEditing={handleSignIn}
+                  accessible accessibilityLabel="Password" style={inputStyle} />
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Pressable onPress={handleSignIn} disabled={signingIn}
+                  accessible accessibilityRole="button"
+                  accessibilityLabel={signingIn ? 'Signing in, please wait' : 'Sign in'}
+                  accessibilityState={{ disabled: signingIn }}
+                  style={{ flex: 1, alignItems: 'center',
+                    backgroundColor: signingIn ? colors.border : colors.accent,
+                    borderRadius: 10, padding: 13 }}>
+                  {signingIn
+                    ? <ActivityIndicator color={colors.accentText} />
+                    : <Text style={{ color: colors.accentText, fontWeight: '700', fontSize: 15 }}>Sign In</Text>}
+                </Pressable>
+                <Pressable
+                  onPress={() => { setShowForm(false); setEmail(''); setPassword(''); restoreToSignInBtn(); }}
+                  accessible accessibilityRole="button" accessibilityLabel="Cancel sign in"
+                  style={{ alignItems: 'center', backgroundColor: colors.pill,
+                    borderRadius: 10, padding: 13, paddingHorizontal: 18 }}>
+                  <Text style={{ color: colors.pillText, fontWeight: '600', fontSize: 15 }}>Cancel</Text>
+                </Pressable>
+              </View>
+              <Text style={[styles.cardMeta, { textAlign: 'center' }]}>
+                Use your applevis.com email and password.
+              </Text>
+            </View>
+          )}
+
           <SectionHeader label="About AppleVis" colors={colors} />
           <AboutSection colors={colors} styles={styles} showToast={showToast} router={router} />
 
@@ -302,7 +399,7 @@ export default function Profile() {
 
   const profileUrl = `${BASE}/users/${encodeURIComponent(auth.user.name)}`;
 
-  // ── Signed-in view ─────────────────────────────────────────────────────────
+  // ── Signed-in view ───────────────────────────────────────────────────────────
   return (
     <Screen title="Profile" showSettings={false}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -338,11 +435,32 @@ export default function Profile() {
           </Pressable>
         </View>
 
+        {/* Settings entry point */}
+        <Pressable
+          onPress={() => router.push('/settings' as any)}
+          accessible accessibilityRole="button"
+          accessibilityLabel="Settings"
+          accessibilityHint="Opens Appearance, Accessibility, Notifications, Podcasts, and all other app settings."
+          style={({ pressed }) => [styles.card, { flexDirection: 'row', alignItems: 'center',
+            gap: 12, marginBottom: 8 }, pressed && { opacity: 0.85 }]}
+        >
+          <View style={{ width: 40, height: 40, borderRadius: 10,
+            backgroundColor: colors.pill, alignItems: 'center', justifyContent: 'center' }}
+            accessibilityElementsHidden>
+            <Ionicons name="settings-outline" size={20} color={colors.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle}>Settings</Text>
+            <Text style={styles.cardMeta}>Appearance, Accessibility, Notifications, Podcasts, and more</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} accessibilityElementsHidden />
+        </Pressable>
+
         {/* Saved items */}
         <SectionHeader label="Saved Items" colors={colors} />
         {[
-          { label: 'Forum Topics', count: topicCount,    icon: 'chatbubbles-outline', route: '/(tabs)/forums' },
-          { label: 'Apps',         count: appCount,      icon: 'apps-outline',        route: '/(tabs)/apps'   },
+          { label: 'Forum Topics', count: topicCount,    icon: 'chatbubbles-outline', route: '/(tabs)/forums'    },
+          { label: 'Apps',         count: appCount,      icon: 'apps-outline',        route: '/(tabs)/apps'      },
           { label: 'Resources',    count: resourceCount, icon: 'library-outline',     route: '/(tabs)/resources' },
         ].map(({ label, count, icon, route }) => (
           <Pressable
@@ -363,18 +481,15 @@ export default function Profile() {
           </Pressable>
         ))}
 
-        {/* Account actions */}
+        {/* Account */}
         <SectionHeader label="Account" colors={colors} />
-
         <NavRow
           label="Account Settings on applevis.com"
           hint="Opens your account settings in Safari."
-          icon="settings-outline"
-          external
+          icon="settings-outline" external
           onPress={() => Linking.openURL(`${BASE}/user`).catch(() => showToast('Could not open link.', 'error'))}
           colors={colors} styles={styles}
         />
-
         <NavRow
           label="Delete Account"
           hint="Permanently deletes your AppleVis account and all associated data."
@@ -382,26 +497,16 @@ export default function Profile() {
           onPress={() => router.push('/delete-account' as any)}
           colors={colors} styles={styles}
         />
-
-        {/* Sign out — destructive, styled separately */}
-        <Pressable
+        <NavRow
+          label="Sign Out"
+          hint="Removes your account session from this device only."
+          icon="log-out-outline"
+          destructive
           onPress={handleSignOut}
-          accessible accessibilityRole="button"
-          accessibilityLabel="Sign out of AppleVis"
-          accessibilityHint="Removes your account session from this device."
-          style={({ pressed }) => [styles.cardSmall, {
-            flexDirection: 'row', alignItems: 'center', gap: 12,
-            backgroundColor: '#FFF0F0', borderColor: '#FCA5A5', borderWidth: 1,
-          }, pressed && { opacity: 0.85 }]}
-        >
-          <Ionicons name="log-out-outline" size={20} color="#B91C1C" accessibilityElementsHidden />
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.cardTitle, { color: '#B91C1C', marginBottom: 0 }]}>Sign Out</Text>
-            <Text style={styles.cardMeta}>Removes your session from this device only.</Text>
-          </View>
-        </Pressable>
+          colors={colors} styles={styles}
+        />
 
-        {/* About AppleVis */}
+        {/* About */}
         <SectionHeader label="About AppleVis" colors={colors} />
         <AboutSection colors={colors} styles={styles} showToast={showToast} router={router} />
 
