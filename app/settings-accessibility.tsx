@@ -82,7 +82,7 @@ export default function AccessibilitySettings() {
             <Pressable
               key={opt.id}
               onPress={() => setAnnouncementLevel(opt.id)}
-              accessible accessibilityRole="none"
+              accessible accessibilityRole="button"
               accessibilityState={{ selected: isSelected }}
               accessibilityLabel={`${opt.label} -- ${opt.badge}. ${opt.description}`}
               accessibilityHint={`VoiceOver will read: ${opt.preview}`}

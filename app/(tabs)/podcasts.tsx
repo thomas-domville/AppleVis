@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { EmptyState } from '../../src/components/EmptyState';
 import { Screen } from '../../src/components/Screen';
 import { FilterPicker } from '../../src/components/FilterPicker';
 import { LoadMoreButton } from '../../src/components/LoadMoreButton';
@@ -330,23 +331,6 @@ function SwipeableEpisodeCard({
   );
 }
 
-// ─── Empty state ──────────────────────────────────────────────────────────────
-function EmptyState({ icon, title, subtitle, colors, styles }: {
-  icon: string; title: string; subtitle: string;
-  colors: ReturnType<typeof useTheme>['colors'];
-  styles: ReturnType<typeof useTheme>['styles'];
-}) {
-  return (
-    <View style={[styles.card, { alignItems: 'center', paddingVertical: 36 }]}>
-      <Ionicons name={icon as any} size={40} color={colors.textSecondary}
-        accessibilityElementsHidden style={{ marginBottom: 12 }} />
-      <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text,
-        marginBottom: 6, textAlign: 'center' }}>{title}</Text>
-      <Text style={{ fontSize: 14, color: colors.textSecondary,
-        textAlign: 'center', lineHeight: 20 }}>{subtitle}</Text>
-    </View>
-  );
-}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function Podcasts() {
@@ -786,7 +770,7 @@ export default function Podcasts() {
             {filteredLatest.length === 0 && !list.loading && !list.error && searchQuery.trim() && (
               <EmptyState icon="search-outline" title="No results"
                 subtitle={`No episodes match "${searchQuery}". Try a different search.`}
-                colors={colors} styles={styles} />
+                />
             )}
 
             {filteredLatest.map((episode, index) => {
@@ -996,7 +980,7 @@ export default function Podcasts() {
           savedEpisodes.length === 0
             ? <EmptyState icon="bookmark-outline" title="No saved episodes"
                 subtitle="Bookmark episodes you want to come back to. Tap Save on any episode card or in the episode detail screen."
-                colors={colors} styles={styles} />
+                />
             : <>
                 {/* Toolbar */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -1159,7 +1143,7 @@ export default function Podcasts() {
           player.queue.length === 0
             ? <EmptyState icon="list-outline" title="Your queue is empty"
                 subtitle="Add episodes to your queue from the list or episode details."
-                colors={colors} styles={styles} />
+                />
             : <>
                 <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 12 }}>
                   <Pressable onPress={() => { player.clearQueue(); showToast('Queue cleared.', 'success'); }}
@@ -1278,7 +1262,7 @@ export default function Podcasts() {
           history.length === 0
             ? <EmptyState icon="time-outline" title="No play history"
                 subtitle="Episodes you finish will appear here."
-                colors={colors} styles={styles} />
+                />
             : <>
                 <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 12 }}>
                   <Pressable

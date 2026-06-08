@@ -5,48 +5,44 @@ import { AccessibilityInfo, findNodeHandle, Platform, Pressable, StyleSheet, Vie
 import { BlurView } from 'expo-blur';
 import { MiniPlayer } from '../../src/components/MiniPlayer';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { usePlayer } from '../../src/contexts/PlayerContext';
 import { useReduceTransparency } from '../../src/hooks/useReduceTransparency';
 
 const iconMap: Record<string, string> = {
-  index:     'home-outline',
-  forums:    'chatbubbles-outline',
-  podcasts:  'radio-outline',
-  apps:      'apps-outline',
-  resources: 'library-outline',
+  index:    'home-outline',
+  discover: 'compass-outline',
+  foryou:   'heart-outline',
 };
 
 const tabLabels: Record<string, string> = {
-  index:     'Home',
-  forums:    'Forums',
-  podcasts:  'Podcasts',
-  apps:      'Apps',
-  resources: 'Resources',
+  index:    'Home',
+  discover: 'Discover',
+  foryou:   'For You',
 };
 
-const TAB_ORDER = ['index', 'forums', 'podcasts', 'apps', 'resources'];
+const TAB_ORDER = ['index', 'discover', 'foryou'];
 
-function getTabAccessibilityLabel(routeName: string, selected = false) {
+function getTabAccessibilityLabel(routeName: string, selected = false, badge?: number) {
   const position = TAB_ORDER.indexOf(routeName) + 1;
   const label    = tabLabels[routeName] ?? routeName;
   const status   = selected ? ', selected' : '';
-
-  return `${label} tab, ${position} of ${TAB_ORDER.length}${status}`;
+  const badgeStr = badge ? `, ${badge} notification${badge === 1 ? '' : 's'}` : '';
+  return `${label} tab${badgeStr}, ${position} of ${TAB_ORDER.length}${status}`;
 }
 
 function AccessibleTabButton({
   routeName,
+  badge,
   children,
   style,
   onPress,
   onLongPress,
   accessibilityState,
 }: any) {
-  const btnRef            = useRef<View>(null);
+  const btnRef              = useRef<View>(null);
   const shouldFocusOnSelect = useRef(false);
-  const selected          = Boolean(accessibilityState?.selected);
+  const selected            = Boolean(accessibilityState?.selected);
 
-  // After navigation completes and this tab becomes selected, move VoiceOver
-  // focus here so it reads "Forums tab, 2 of 5, selected" naturally.
   useEffect(() => {
     if (!selected || !shouldFocusOnSelect.current) return;
     shouldFocusOnSelect.current = false;
@@ -67,7 +63,7 @@ function AccessibleTabButton({
       style={style}
       accessible
       accessibilityRole="tab"
-      accessibilityLabel={getTabAccessibilityLabel(routeName, selected)}
+      accessibilityLabel={getTabAccessibilityLabel(routeName, selected, badge)}
       accessibilityState={accessibilityState}
     >
       {children}
@@ -78,6 +74,8 @@ function AccessibleTabButton({
 function ThemedTabs() {
   const { colors, isDark, themeId } = useTheme();
   const reduceTransparency          = useReduceTransparency();
+  const player                      = usePlayer();
+  const queueBadge                  = player.queue.length > 0 ? player.queue.length : undefined;
 
   const isHighContrast = themeId === 'highContrastLight' || themeId === 'highContrastDark';
   const useGlass       = Platform.OS === 'ios' && !reduceTransparency && !isHighContrast;
@@ -94,18 +92,21 @@ function ThemedTabs() {
         ),
         tabBarLabelStyle: { fontSize: 12 },
         headerShown: false,
-        tabBarAccessibilityLabel: getTabAccessibilityLabel(route.name),
-        tabBarButton: ({ children, style, onPress, onLongPress, accessibilityState }) => (
-          <AccessibleTabButton
-            routeName={route.name}
-            style={style}
-            onPress={onPress}
-            onLongPress={onLongPress}
-            accessibilityState={accessibilityState}
-          >
-            {children}
-          </AccessibleTabButton>
-        ),
+        tabBarButton: ({ children, style, onPress, onLongPress, accessibilityState }) => {
+          const badge = route.name === 'foryou' ? queueBadge : undefined;
+          return (
+            <AccessibleTabButton
+              routeName={route.name}
+              badge={badge}
+              style={style}
+              onPress={onPress}
+              onLongPress={onLongPress}
+              accessibilityState={accessibilityState}
+            >
+              {children}
+            </AccessibleTabButton>
+          );
+        },
         tabBarStyle: {
           position: 'absolute' as const,
           backgroundColor: useGlass ? 'transparent' : colors.card,
@@ -125,11 +126,16 @@ function ThemedTabs() {
         tabBarInactiveTintColor: colors.textSecondary,
       })}
     >
-      <Tabs.Screen name="index"     options={{ title: 'Home' }} />
-      <Tabs.Screen name="forums"    options={{ title: 'Forums' }} />
-      <Tabs.Screen name="podcasts"  options={{ title: 'Podcasts' }} />
-      <Tabs.Screen name="apps"      options={{ title: 'Apps' }} />
-      <Tabs.Screen name="resources" options={{ title: 'Resources' }} />
+      {/* ── Visible tabs ─────────────────────────────────── */}
+      <Tabs.Screen name="index"    options={{ title: 'Home' }} />
+      <Tabs.Screen name="discover" options={{ title: 'Discover' }} />
+      <Tabs.Screen name="foryou"   options={{ title: 'For You', tabBarBadge: queueBadge }} />
+
+      {/* ── Legacy tabs — hidden from tab bar, still navigable ── */}
+      <Tabs.Screen name="forums"    options={{ href: null }} />
+      <Tabs.Screen name="podcasts"  options={{ href: null }} />
+      <Tabs.Screen name="apps"      options={{ href: null }} />
+      <Tabs.Screen name="resources" options={{ href: null }} />
     </Tabs>
   );
 }

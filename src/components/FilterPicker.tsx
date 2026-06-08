@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { AccessibilityInfo, Modal, Pressable, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, Modal, PanResponder, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -13,6 +13,25 @@ type Props<T extends string> = {
 export function FilterPicker<T extends string>({ label, value, options, onChange }: Props<T>) {
   const [open, setOpen] = useState(false);
   const { colors } = useTheme();
+
+  const sheetY = useRef(new Animated.Value(0)).current;
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, { dy, dx }) => dy > 8 && dy > Math.abs(dx),
+      onPanResponderMove: (_, { dy }) => { if (dy > 0) sheetY.setValue(dy); },
+      onPanResponderRelease: (_, { dy, vy }) => {
+        if (dy > 80 || vy > 1.5) {
+          Animated.timing(sheetY, { toValue: 600, duration: 200, useNativeDriver: true })
+            .start(() => { sheetY.setValue(0); setOpen(false); });
+        } else {
+          Animated.spring(sheetY, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(sheetY, { toValue: 0, useNativeDriver: true }).start();
+      },
+    })
+  ).current;
 
   const currentIdx = options.indexOf(value);
 
@@ -88,7 +107,8 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
           accessibilityLabel="Close filter picker"
         />
 
-        <View
+        <Animated.View
+          {...pan.panHandlers}
           style={{
             backgroundColor: colors.card,
             borderTopLeftRadius: 20,
@@ -96,6 +116,7 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
             paddingTop: 8,
             paddingBottom: 40,
             paddingHorizontal: 0,
+            transform: [{ translateY: sheetY }],
           }}
         >
           <View
@@ -146,7 +167,7 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
               </Pressable>
             );
           })}
-        </View>
+        </Animated.View>
       </Modal>
     </>
   );

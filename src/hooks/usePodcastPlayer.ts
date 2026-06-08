@@ -309,6 +309,7 @@ export function usePodcastPlayer() {
         {
           shouldPlay: autoPlay,
           rate: resolvedSpeed,
+          shouldCorrectPitch: true,
           volume: volumeRef.current,
           positionMillis: savedPosition * 1000,
           progressUpdateIntervalMillis: 500,

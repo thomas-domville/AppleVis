@@ -3,7 +3,8 @@
  *
  * iCloud-synced (via icloudStorage):
  *   saved item IDs, followed topic IDs, read topic IDs, podcast positions,
- *   settings, last visit timestamp
+ *   settings, last visit timestamp (used for "Since Last Visit" filter and
+ *   new-episode badge — NOT a scroll position; the feed always opens at top)
  *
  * Device-local only (via AsyncStorage):
  *   downloaded episode file paths (device-specific paths are meaningless on
@@ -12,7 +13,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { icloudStorage } from './icloudStorage';
-import type { SavedItem, ListResumeState, PodcastEpisode } from '../types/content';
+import type { SavedItem, PodcastEpisode } from '../types/content';
 import type { PlaybackSpeed } from '../hooks/usePodcastPlayer';
 
 export type PlayHistoryEntry = {
@@ -32,7 +33,6 @@ const CK = {
   POD_POSITIONS:  'applevis:podcastPositions',
   SETTINGS:       'applevis:settings',
   LAST_VISIT:     'applevis:lastVisit',
-  LIST_POSITIONS: 'applevis:listPositions',
 };
 
 // ── AsyncStorage keys (device-local) ──────────────────────────────────────────
@@ -123,16 +123,6 @@ export const persistence = {
 
   stampVisit(): Promise<void> {
     return icloudStorage.setString(CK.LAST_VISIT, new Date().toISOString());
-  },
-
-  // ── List resume positions (iCloud) ────────────────────────────────────────
-
-  getListPositions: () =>
-    icloudStorage.getJSON<Record<string, ListResumeState>>(CK.LIST_POSITIONS, {}),
-
-  async saveListPosition(state: ListResumeState): Promise<void> {
-    const positions = await persistence.getListPositions();
-    await icloudStorage.setJSON(CK.LIST_POSITIONS, { ...positions, [state.tab]: state });
   },
 
   // ── Settings (iCloud) ─────────────────────────────────────────────────────

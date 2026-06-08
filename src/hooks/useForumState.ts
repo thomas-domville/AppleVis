@@ -6,6 +6,7 @@ import { cachedApi } from '../services/cachedApi';
 import { apiHealth } from '../services/apiHealth';
 import { authEvents } from '../services/authEvents';
 import { persistence } from '../services/persistence';
+import { relativeTime } from '../utils/relativeTime';
 import { useToast } from '../contexts/ToastContext';
 import { usePreferences } from '../contexts/PreferencesContext';
 import type { ForumTopic } from '../types/content';
@@ -101,7 +102,7 @@ export function useForumState() {
         forumSaved.map((s) => ({
           id: s.id,
           title: s.title,
-          meta: `Saved · last activity ${new Date(s.lastActivityAt ?? s.savedAt).toLocaleDateString()}`,
+          meta: `Saved · last activity ${relativeTime(s.lastActivityAt ?? s.savedAt)}`,
           authorName: '',
           createdAt: s.savedAt,
           lastActivityAt: s.lastActivityAt ?? s.savedAt,

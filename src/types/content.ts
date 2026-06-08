@@ -1,4 +1,4 @@
-export type ContentKind = 'forumTopic' | 'podcastEpisode' | 'appListing' | 'resource';
+export type ContentKind = 'forumTopic' | 'podcastEpisode' | 'appListing' | 'resource' | 'blogPost';
 
 export type PaginatedResult<T> = { items: T[]; hasMore: boolean };
 
@@ -10,12 +10,48 @@ export type SavedItem = {
   lastActivityAt?: string;
 };
 
-export type ListResumeState = {
-  tab: 'Home' | 'Forums' | 'Podcasts' | 'Apps' | 'Resources';
-  filter?: string;
-  itemId: string;
-  itemTitle: string;
-  timestamp: string;
+
+// ─── Home feed ────────────────────────────────────────────────────────────────
+
+export type FeedPrefs = {
+  topics: boolean;
+  podcasts: boolean;
+  apps: boolean;
+  guides: boolean;
+  blogs: boolean;    // gate: pending Drupal blog content type name
+  appleOnly: boolean; // gate: pending taxonomy field name for Apple-related filter
+};
+
+export type FeedItem =
+  | { kind: 'topic';   data: ForumTopic;      activityAt: string }
+  | { kind: 'podcast'; data: PodcastEpisode;  activityAt: string }
+  | { kind: 'app';     data: AppListing;      activityAt: string }
+  | { kind: 'guide';   data: Resource;        activityAt: string }
+  | { kind: 'blog';    data: BlogPost;        activityAt: string };
+
+// ─── Blog posts (Phase 4 gate) ────────────────────────────────────────────────
+// Enabled once Drupal dev confirms the blog content type name.
+
+export type BlogPost = {
+  id: string;
+  title: string;
+  authorName: string;
+  publishedAt: string;
+  lastActivityAt?: string;
+  summary: string;
+  commentCount: number;
+  url: string;
+};
+
+// ─── Full-text search results ─────────────────────────────────────────────────
+
+export type SearchResult = {
+  id: string;
+  contentType: 'topic' | 'podcast' | 'app' | 'guide' | 'blog';
+  title: string;
+  summary?: string;
+  url: string;
+  updatedAt: string;
 };
 
 export type ForumTopic = {
@@ -44,6 +80,7 @@ export type PodcastEpisode = {
   audioUrl: string;
   duration: number;
   publishedAt: string;
+  lastActivityAt?: string;
   description: string;
   artworkUrl?: string;
   transcriptUrl?: string;

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Animated, Modal, PanResponder, Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -17,6 +17,25 @@ export function SettingsPickerRow<T extends string | number>({
   const { colors, styles } = useTheme();
   const [open, setOpen] = useState(false);
   const currentLabel = options.find(o => o.value === value)?.label ?? String(value);
+
+  const sheetY = useRef(new Animated.Value(0)).current;
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, { dy, dx }) => dy > 8 && dy > Math.abs(dx),
+      onPanResponderMove: (_, { dy }) => { if (dy > 0) sheetY.setValue(dy); },
+      onPanResponderRelease: (_, { dy, vy }) => {
+        if (dy > 80 || vy > 1.5) {
+          Animated.timing(sheetY, { toValue: 600, duration: 200, useNativeDriver: true })
+            .start(() => { sheetY.setValue(0); setOpen(false); });
+        } else {
+          Animated.spring(sheetY, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(sheetY, { toValue: 0, useNativeDriver: true }).start();
+      },
+    })
+  ).current;
 
   return (
     <>
@@ -53,17 +72,18 @@ export function SettingsPickerRow<T extends string | number>({
           accessibilityRole="button"
           accessibilityLabel="Dismiss picker"
         />
-        <View style={{
+        <Animated.View style={{
           backgroundColor: colors.card,
           borderTopLeftRadius: 22, borderTopRightRadius: 22,
           borderTopWidth: 1, borderTopColor: colors.border,
           maxHeight: '70%',
+          transform: [{ translateY: sheetY }],
         }}>
-          {/* Handle + header */}
-          <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 4 }}>
+          {/* Handle + header — drag here to dismiss */}
+          <View {...pan.panHandlers} style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 4 }}>
             <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border }} />
           </View>
-          <View style={{
+          <View {...pan.panHandlers} style={{
             flexDirection: 'row', alignItems: 'center',
             paddingHorizontal: 20, paddingBottom: 12,
             borderBottomWidth: 1, borderBottomColor: colors.border,
@@ -115,7 +135,7 @@ export function SettingsPickerRow<T extends string | number>({
             })}
             <View style={{ height: 40 }} />
           </ScrollView>
-        </View>
+        </Animated.View>
       </Modal>
     </>
   );

@@ -1,0 +1,226 @@
+{
+  "tabs": {
+    "home": "Hem",
+    "forums": "Forum",
+    "podcasts": "Poddar",
+    "apps": "Appar",
+    "resources": "Resurser"
+  },
+  "common": {
+    "loading": "Laddar…",
+    "retry": "Försök igen",
+    "cancel": "Avbryt",
+    "gotIt": "Förstått",
+    "save": "Spara",
+    "share": "Dela",
+    "search": "Sök",
+    "settings": "Inställningar",
+    "copyLink": "Kopiera länk",
+    "open": "Öppna",
+    "close": "Stäng",
+    "viewGuidelines": "Visa riktlinjer",
+    "translate": "Översätt",
+    "readAloud": "Läs upp",
+    "summarise": "Sammanfatta",
+    "simplify": "Förenkla"
+  },
+  "actions": {
+    "open": "Öppna",
+    "readAloud": "Läs upp",
+    "translate": "Översätt",
+    "summarise": "Sammanfatta",
+    "simplify": "Förenkla",
+    "share": "Dela",
+    "save": "Spara",
+    "copyLink": "Kopiera länk",
+    "openAppPage": "Öppna appsida",
+    "saveApp": "Spara app",
+    "viewReviews": "Visa recensioner",
+    "summariseReviews": "Sammanfatta recensioner",
+    "accessibilityConsensus": "Tillgänglighetsomdöme",
+    "saveTopic": "Spara ämne",
+    "unsaveTopic": "Ta bort från sparade",
+    "followTopic": "Följ ämne",
+    "unfollowTopic": "Sluta följa",
+    "signInToFollow": "Logga in för att följa",
+    "markAsRead": "Markera som läst",
+    "play": "Spela",
+    "pause": "Pausa",
+    "readDescriptionAloud": "Läs beskrivning upp",
+    "playNext": "Nästa",
+    "addToQueue": "Lägg till i kö",
+    "saveEpisode": "Spara avsnitt",
+    "download": "Ladda ned"
+  },
+  "home": {
+    "greeting": {
+      "morning": "God morgon",
+      "afternoon": "God dag",
+      "evening": "God kväll",
+      "night": "God natt"
+    },
+    "lastVisit": "Senaste besök",
+    "firstVisit": "ditt första besök — välkommen!"
+  },
+  "forums": {
+    "loading": "Laddar {{filter}}…",
+    "noTopics": "Inga ämnen",
+    "pullToRefresh": "Dra för att uppdatera forum",
+    "filters": {
+      "recent": "Senaste",
+      "new": "Nya",
+      "unread": "Olästa",
+      "following": "Följda",
+      "saved": "Sparade",
+      "sinceLastVisit": "Sedan senaste besök"
+    },
+    "filterDesc": {
+      "sinceLastVisit": "Ämnen som ändrats sedan du senast öppnade AppleVis.",
+      "unread": "Ämnen du ännu inte öppnat på den här enheten.",
+      "following": "Ämnen du följer. Sparas lokalt och synkroniseras via iCloud.",
+      "saved": "Ämnen sparade för senare. Synkroniseras via iCloud."
+    },
+    "error": "Det gick inte att ladda ämnen",
+    "noTopicsEmpty": {
+      "unread": "Allt är läst.",
+      "following": "Du följer inga ämnen ännu.",
+      "saved": "Du har inte sparat några ämnen ännu.",
+      "sinceLastVisit": "Ingen ny aktivitet sedan ditt senaste besök."
+    }
+  },
+  "podcasts": {
+    "episodes": "Avsnitt",
+    "loading": "Laddar avsnitt…",
+    "noEpisodes": "Inga avsnitt ännu",
+    "error": "Det gick inte att ladda avsnitt",
+    "pullToRefresh": "Dra för att uppdatera poddar",
+    "play": "Spela",
+    "pause": "Pausa",
+    "skipBack": "Spola tillbaka {{seconds}} s",
+    "skipForward": "Spola framåt {{seconds}} s",
+    "speed": "Hastighet",
+    "sleepTimer": "Sömnklocka",
+    "sleepTimerRemaining": "Sömnklocka — {{time}} kvar",
+    "cancelSleepTimer": "Avbryt sömnklocka",
+    "chapters": "Kapitel",
+    "jumpToChapter": "Gå till kapitel: {{title}}, börjar {{time}}",
+    "queue": "Kö",
+    "currentlyLoaded": "Laddad."
+  },
+  "apps": {
+    "loading": "Laddar appar…",
+    "noApps": "Inga appar ännu",
+    "error": "Det gick inte att ladda appar",
+    "pullToRefresh": "Dra för att uppdatera appar",
+    "reviews": "{{count}} recensioner",
+    "updated": "Uppdaterad {{date}}"
+  },
+  "resources": {
+    "loading": "Laddar resurser…",
+    "noResources": "Inga resurser ännu",
+    "error": "Det gick inte att ladda resurser",
+    "pullToRefresh": "Dra för att uppdatera resurser",
+    "updated": "Uppdaterad {{date}}"
+  },
+  "search": {
+    "placeholder": "Sök forum, appar, resurser…",
+    "accessibilityHint": "Skriv för att söka forumämnen, appar och resurser.",
+    "searching": "Söker…",
+    "noResults": "Inga resultat",
+    "noResultsHint": "Prova andra sökord eller kontrollera stavningen.",
+    "intro": "Sök bland forumämnen, appkatalogen och resurser. Resultat visas medan du skriver.",
+    "resultCount_one": "{{count}} resultat hittades",
+    "resultCount_other": "{{count}} resultat hittades",
+    "sectionForums": "Forumämnen ({{count}})",
+    "sectionApps": "Appar ({{count}})",
+    "sectionResources": "Resurser ({{count}})"
+  },
+  "settings": {
+    "checkingAccount": "Kontrollerar konto…",
+    "signedIn": "Inloggad på AppleVis",
+    "email": "E-post",
+    "emailPlaceholder": "E-postadress",
+    "password": "Lösenord",
+    "signingIn": "Loggar in, vänta",
+    "credentialsHint": "Använd din e-post och ditt lösenord från AppleVis webbplats.",
+    "groupedNote": "Inställningar är grupperade så att VoiceOver-användare inte behöver navigera genom en lång lista med reglage.",
+    "storageCache": "Lagring och cache",
+    "storageCacheDesc": "Hantera nedladdningar, cachad innehåll och lagringspolicy.",
+    "a11ySignIn": "Logga in på AppleVis",
+    "a11ySignOut": "Logga ut från AppleVis",
+    "a11ySignOutHint": "Tar bort ditt konto från den här enheten.",
+    "a11yOpenSection": "Öppnar den här inställningskategorin.",
+    "a11yStorageHint": "Öppnar inställningar för lagring och cache."
+  },
+  "storage": {
+    "storageUsed": "Använd lagring",
+    "downloadedEpisodes": "Nedladdade avsnitt",
+    "cachedContent": "Cachad innehåll",
+    "total": "Totalt",
+    "cacheRetention": "Cachelagring",
+    "cacheRetentionDesc": "Hur länge cachad innehåll ska sparas innan det raderas automatiskt.",
+    "clearStorage": "Rensa lagring",
+    "clearStorageDesc": "Nedladdningar sparas tills du raderar dem här. Cachad innehåll laddas om när varje avsnitt öppnas.",
+    "clearDownloads": "Radera nedladdningar",
+    "clearCache": "Rensa cache",
+    "clearAll": "Rensa allt",
+    "retention3months": "3 månader",
+    "retention6months": "6 månader",
+    "retention12months": "12 månader",
+    "retentionForever": "För alltid",
+    "confirmClearDownloads": "Det här raderar {{size}} nedladdade poddar från enheten.",
+    "confirmClearCache": "Det här raderar {{size}} cachad innehåll. Varje avsnitt laddas om nästa gång det öppnas.",
+    "confirmClearAll": "Det här raderar {{size}}, inklusive alla nedladdningar och cachad innehåll."
+  },
+  "offline": {
+    "withAge": "Visar cachad innehåll från {{age}}. Dra nedåt för att uppdatera när nätverk är tillgängligt.",
+    "noAge": "Visar cachad innehåll. Dra nedåt för att uppdatera när nätverk är tillgängligt."
+  },
+  "auth": {
+    "welcomeBack": "Välkommen tillbaka, {{name}}!",
+    "signedOut": "Utloggad.",
+    "sessionExpired": "Sessionen har gått ut. Logga in igen.",
+    "enterEmail": "Ange din e-postadress.",
+    "enterPassword": "Ange ditt lösenord."
+  },
+  "toast": {
+    "cacheCleared": "Cache rensad.",
+    "downloadsCleared": "Nedladdningar raderade.",
+    "allCleared": "All lagring rensad.",
+    "retentionUpdated": "Inställning för cachelagring uppdaterad.",
+    "topicSaved": "Ämne sparat.",
+    "topicUnsaved": "Borttaget från sparade.",
+    "addedToQueue": "Tillagd i kö.",
+    "playingNext": "Nästa: {{title}}",
+    "signInRequired": "Inloggning krävs. Öppna Inställningar för att logga in.",
+    "saveComing": "Spara-funktionen kommer snart.",
+    "downloadComing": "Nedladdningsfunktionen kommer snart.",
+    "summariseComing": "Sammanfattning blir tillgänglig när Apple Intelligence Foundation Models-stöd läggs till.",
+    "simplifyComing": "Förenkling blir tillgänglig när Apple Intelligence Foundation Models-stöd läggs till.",
+    "consensusComing": "Tillgänglighetsomdöme blir tillgängligt när Apple Intelligence Foundation Models-stöd läggs till."
+  },
+  "refresh": {
+    "refreshing": "Uppdaterar {{label}}",
+    "updated": "{{label}} uppdaterad",
+    "loaded": "{{label}} laddad"
+  },
+  "loadMore": {
+    "button": "Ladda mer",
+    "loading": "Laddar…"
+  },
+  "writingTools": {
+    "tip": "Apple Intelligence: välj skriven text för att kontrollera, skriva om eller översätta med Writing Tools.",
+    "a11yLabel": "Apple Intelligence-tips: välj skriven text för att kontrollera, skriva om, korta ner eller översätta med Writing Tools."
+  },
+  "translationBanner": {
+    "message": "Ditt meddelande verkar vara på ett annat språk än engelska. AppleVis kräver inlägg på engelska — tryck för att öppna Google Translate.",
+    "translate": "Öppna i Translate",
+    "postAsIs": "Publicera som det är"
+  },
+  "screen": {
+    "a11ySearch": "Sök i AppleVis",
+    "a11ySearchHint": "Öppnar sökning av forumämnen, appar och resurser.",
+    "a11ySettings": "Inställningar och profil",
+    "a11ySettingsHint": "Öppnar AppleVis inställningar, profil, hjälp och support."
+  }
+}

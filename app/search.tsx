@@ -7,6 +7,7 @@ import { useSearch } from '../src/hooks/useSearch';
 import { useLanguageDetection } from '../src/hooks/useLanguageDetection';
 import { TranslationBanner } from '../src/components/TranslationBanner';
 import { translateContent, readAloud } from '../src/services/intelligenceService';
+import { relativeTime } from '../src/utils/relativeTime';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { useAccessibilityPreferences } from '../src/hooks/useAccessibilityPreferences';
 
@@ -19,8 +20,14 @@ export default function SearchScreen() {
   const queryRef   = useRef('');
   // Separate state for language detection so the hook receives a stable
   // render-time value, not a ref (refs must not be read during render).
-  const [detectionQuery, setDetectionQuery] = useState('');
+  const [detectionQuery,  setDetectionQuery]  = useState('');
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const { isNonEnglish, isConfident } = useLanguageDetection(detectionQuery);
+
+  // Reset dismissed when the query becomes English again
+  useEffect(() => {
+    if (!isNonEnglish) setBannerDismissed(false);
+  }, [isNonEnglish]);
 
   // Auto-focus the input on mount.
   useEffect(() => {
@@ -76,10 +83,10 @@ export default function SearchScreen() {
       </View>
 
       {/* ── Non-English query detection ───────────────────────────────────── */}
-      {isNonEnglish && isConfident && (
+      {isNonEnglish && isConfident && !bannerDismissed && (
         <TranslationBanner
-          onTranslate={() => translateContent(queryRef.current, 'Search query')}
-          onDismiss={() => {}}
+          onTranslate={() => translateContent(queryRef.current)}
+          onDismiss={() => setBannerDismissed(true)}
         />
       )}
 
@@ -131,11 +138,10 @@ export default function SearchScreen() {
                 key={topic.id}
                 title={topic.title}
                 meta={topic.meta}
-                actions={['Open', ...(!screenReaderEnabled ? ['Read Aloud'] : []), 'Translate']}
+                actions={['Open', ...(!screenReaderEnabled ? ['Read Aloud'] : [])]}
                 onAction={(action) => {
                   if (action === 'Open') router.push({ pathname: '/topic/[id]' as any, params: { id: topic.id, title: topic.title } });
                   if (action === 'Read Aloud') readAloud(`${topic.title}. ${topic.meta}`);
-                  if (action === 'Translate')  translateContent(`${topic.title}\n${topic.meta}`, topic.title);
                 }}
               />
             ))}
@@ -159,11 +165,10 @@ export default function SearchScreen() {
                   app.developer   || null,
                   app.reviewCount > 0 ? `${app.reviewCount} reviews` : null,
                 ].filter(Boolean).join(' · ')}
-                actions={['Open App Page', ...(!screenReaderEnabled ? ['Read Aloud'] : []), 'Translate']}
+                actions={['Open App Page', ...(!screenReaderEnabled ? ['Read Aloud'] : [])]}
                 onAction={(action) => {
                   if (action === 'Open App Page') router.push({ pathname: '/app-detail/[id]' as any, params: { id: app.id, name: app.name } });
                   if (action === 'Read Aloud') readAloud(`${app.name}. ${app.summary}`);
-                  if (action === 'Translate')  translateContent(`${app.name}\n\n${app.summary}`, app.name);
                 }}
               />
             ))}
@@ -183,12 +188,11 @@ export default function SearchScreen() {
               <AccessibleCard
                 key={item.id}
                 title={item.title}
-                meta={`${item.kind} · Updated ${new Date(item.updatedAt).toLocaleDateString()}`}
-                actions={['Open', ...(!screenReaderEnabled ? ['Read Aloud'] : []), 'Translate']}
+                meta={`${item.kind} · Updated ${relativeTime(item.updatedAt)}`}
+                actions={['Open', ...(!screenReaderEnabled ? ['Read Aloud'] : [])]}
                 onAction={(action) => {
                   if (action === 'Open') router.push({ pathname: '/resource-detail/[id]' as any, params: { id: item.id, title: item.title, url: item.url } });
                   if (action === 'Read Aloud') readAloud(`${item.title}. ${item.summary}`);
-                  if (action === 'Translate')  translateContent(`${item.title}\n\n${item.summary}`, item.title);
                 }}
               />
             ))}

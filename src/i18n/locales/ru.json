@@ -1,0 +1,226 @@
+{
+  "tabs": {
+    "home": "Главная",
+    "forums": "Форумы",
+    "podcasts": "Подкасты",
+    "apps": "Приложения",
+    "resources": "Ресурсы"
+  },
+  "common": {
+    "loading": "Загрузка…",
+    "retry": "Повторить",
+    "cancel": "Отмена",
+    "gotIt": "Понятно",
+    "save": "Сохранить",
+    "share": "Поделиться",
+    "search": "Поиск",
+    "settings": "Настройки",
+    "copyLink": "Скопировать ссылку",
+    "open": "Открыть",
+    "close": "Закрыть",
+    "viewGuidelines": "Просмотр правил",
+    "translate": "Перевести",
+    "readAloud": "Прочитать вслух",
+    "summarise": "Резюмировать",
+    "simplify": "Упростить"
+  },
+  "actions": {
+    "open": "Открыть",
+    "readAloud": "Прочитать вслух",
+    "translate": "Перевести",
+    "summarise": "Резюмировать",
+    "simplify": "Упростить",
+    "share": "Поделиться",
+    "save": "Сохранить",
+    "copyLink": "Скопировать ссылку",
+    "openAppPage": "Открыть страницу приложения",
+    "saveApp": "Сохранить приложение",
+    "viewReviews": "Просмотр отзывов",
+    "summariseReviews": "Резюмировать отзывы",
+    "accessibilityConsensus": "Мнение о доступности",
+    "saveTopic": "Сохранить тему",
+    "unsaveTopic": "Убрать из сохранённых",
+    "followTopic": "Следить за темой",
+    "unfollowTopic": "Отписаться от темы",
+    "signInToFollow": "Войдите, чтобы следить",
+    "markAsRead": "Отметить как прочитанное",
+    "play": "Воспроизвести",
+    "pause": "Пауза",
+    "readDescriptionAloud": "Прочитать описание вслух",
+    "playNext": "Следующий",
+    "addToQueue": "Добавить в очередь",
+    "saveEpisode": "Сохранить выпуск",
+    "download": "Скачать"
+  },
+  "home": {
+    "greeting": {
+      "morning": "Доброе утро",
+      "afternoon": "Добрый день",
+      "evening": "Добрый вечер",
+      "night": "Доброй ночи"
+    },
+    "lastVisit": "Последний визит",
+    "firstVisit": "ваш первый визит — добро пожаловать!"
+  },
+  "forums": {
+    "loading": "Загрузка {{filter}}…",
+    "noTopics": "Нет тем",
+    "pullToRefresh": "Потяните для обновления форумов",
+    "filters": {
+      "recent": "Недавние",
+      "new": "Новые",
+      "unread": "Непрочитанные",
+      "following": "Отслеживаемые",
+      "saved": "Сохранённые",
+      "sinceLastVisit": "С последнего визита"
+    },
+    "filterDesc": {
+      "sinceLastVisit": "Темы, изменившиеся с вашего последнего открытия AppleVis.",
+      "unread": "Темы, которые вы ещё не открывали на этом устройстве.",
+      "following": "Темы, за которыми вы следите. Сохранены локально и синхронизированы через iCloud.",
+      "saved": "Темы, сохранённые на потом. Синхронизированы через iCloud."
+    },
+    "error": "Не удалось загрузить темы",
+    "noTopicsEmpty": {
+      "unread": "Всё прочитано.",
+      "following": "Вы пока не отслеживаете ни одной темы.",
+      "saved": "Вы ещё не сохранили ни одной темы.",
+      "sinceLastVisit": "Нет новой активности с вашего последнего визита."
+    }
+  },
+  "podcasts": {
+    "episodes": "Выпуски",
+    "loading": "Загрузка выпусков…",
+    "noEpisodes": "Выпусков пока нет",
+    "error": "Не удалось загрузить выпуски",
+    "pullToRefresh": "Потяните для обновления подкастов",
+    "play": "Воспроизвести",
+    "pause": "Пауза",
+    "skipBack": "Назад на {{seconds}} с",
+    "skipForward": "Вперёд на {{seconds}} с",
+    "speed": "Скорость",
+    "sleepTimer": "Таймер сна",
+    "sleepTimerRemaining": "Таймер сна — осталось {{time}}",
+    "cancelSleepTimer": "Отменить таймер сна",
+    "chapters": "Главы",
+    "jumpToChapter": "Перейти к главе: {{title}}, начинается в {{time}}",
+    "queue": "Очередь",
+    "currentlyLoaded": "Загружено."
+  },
+  "apps": {
+    "loading": "Загрузка приложений…",
+    "noApps": "Приложений пока нет",
+    "error": "Не удалось загрузить приложения",
+    "pullToRefresh": "Потяните для обновления приложений",
+    "reviews": "{{count}} отзывов",
+    "updated": "Обновлено {{date}}"
+  },
+  "resources": {
+    "loading": "Загрузка ресурсов…",
+    "noResources": "Ресурсов пока нет",
+    "error": "Не удалось загрузить ресурсы",
+    "pullToRefresh": "Потяните для обновления ресурсов",
+    "updated": "Обновлено {{date}}"
+  },
+  "search": {
+    "placeholder": "Поиск по форумам, приложениям, ресурсам…",
+    "accessibilityHint": "Введите текст для поиска по темам форума, приложениям и ресурсам.",
+    "searching": "Поиск…",
+    "noResults": "Нет результатов",
+    "noResultsHint": "Попробуйте другие ключевые слова или проверьте написание.",
+    "intro": "Поиск по темам форума, каталогу приложений и ресурсам. Результаты появляются при вводе.",
+    "resultCount_one": "Найден {{count}} результат",
+    "resultCount_other": "Найдено {{count}} результатов",
+    "sectionForums": "Темы форума ({{count}})",
+    "sectionApps": "Приложения ({{count}})",
+    "sectionResources": "Ресурсы ({{count}})"
+  },
+  "settings": {
+    "checkingAccount": "Проверка аккаунта…",
+    "signedIn": "Вы вошли в AppleVis",
+    "email": "Email",
+    "emailPlaceholder": "Адрес электронной почты",
+    "password": "Пароль",
+    "signingIn": "Выполняется вход, пожалуйста, подождите",
+    "credentialsHint": "Используйте email и пароль от сайта AppleVis.",
+    "groupedNote": "Настройки сгруппированы, чтобы пользователям VoiceOver не приходилось листать длинный список переключателей.",
+    "storageCache": "Хранилище и кэш",
+    "storageCacheDesc": "Управление загрузками, кэшированным контентом и политикой хранения.",
+    "a11ySignIn": "Войти в AppleVis",
+    "a11ySignOut": "Выйти из AppleVis",
+    "a11ySignOutHint": "Удаляет ваш аккаунт с этого устройства.",
+    "a11yOpenSection": "Открывает эту категорию настроек.",
+    "a11yStorageHint": "Открывает настройки хранилища и кэша."
+  },
+  "storage": {
+    "storageUsed": "Используемое хранилище",
+    "downloadedEpisodes": "Загруженные выпуски",
+    "cachedContent": "Кэшированный контент",
+    "total": "Всего",
+    "cacheRetention": "Хранение кэша",
+    "cacheRetentionDesc": "Как долго хранить кэшированный контент перед автоматическим удалением.",
+    "clearStorage": "Очистить хранилище",
+    "clearStorageDesc": "Загрузки хранятся до удаления здесь. Кэшированный контент загружается повторно при открытии каждого раздела.",
+    "clearDownloads": "Удалить загрузки",
+    "clearCache": "Очистить кэш",
+    "clearAll": "Очистить всё",
+    "retention3months": "3 месяца",
+    "retention6months": "6 месяцев",
+    "retention12months": "12 месяцев",
+    "retentionForever": "Навсегда",
+    "confirmClearDownloads": "Это удалит {{size}} загруженных подкастов с устройства.",
+    "confirmClearCache": "Это удалит {{size}} кэшированного контента. При следующем открытии каждого раздела он будет загружен повторно.",
+    "confirmClearAll": "Это удалит {{size}}, включая все загрузки и кэшированный контент."
+  },
+  "offline": {
+    "withAge": "Показывается сохранённый контент от {{age}}. Потяните вниз для обновления при наличии сети.",
+    "noAge": "Показывается сохранённый контент. Потяните вниз для обновления при наличии сети."
+  },
+  "auth": {
+    "welcomeBack": "С возвращением, {{name}}!",
+    "signedOut": "Вы вышли.",
+    "sessionExpired": "Сессия истекла. Пожалуйста, войдите снова.",
+    "enterEmail": "Введите адрес электронной почты.",
+    "enterPassword": "Введите пароль."
+  },
+  "toast": {
+    "cacheCleared": "Кэш очищен.",
+    "downloadsCleared": "Загрузки удалены.",
+    "allCleared": "Всё хранилище очищено.",
+    "retentionUpdated": "Настройка хранения кэша обновлена.",
+    "topicSaved": "Тема сохранена.",
+    "topicUnsaved": "Удалено из сохранённых.",
+    "addedToQueue": "Добавлено в очередь.",
+    "playingNext": "Следующий: {{title}}",
+    "signInRequired": "Требуется вход. Откройте Настройки для входа.",
+    "saveComing": "Сохранение скоро будет доступно.",
+    "downloadComing": "Загрузка скоро будет доступна.",
+    "summariseComing": "Резюмирование будет доступно при добавлении поддержки Apple Intelligence Foundation Models.",
+    "simplifyComing": "Упрощение текста будет доступно при добавлении поддержки Apple Intelligence Foundation Models.",
+    "consensusComing": "Мнение о доступности будет доступно при добавлении поддержки Apple Intelligence Foundation Models."
+  },
+  "refresh": {
+    "refreshing": "Обновление {{label}}",
+    "updated": "{{label}} обновлено",
+    "loaded": "{{label}} загружено"
+  },
+  "loadMore": {
+    "button": "Загрузить ещё",
+    "loading": "Загрузка…"
+  },
+  "writingTools": {
+    "tip": "Apple Intelligence: выберите введённый текст, чтобы проверить, переписать или перевести его с помощью Writing Tools.",
+    "a11yLabel": "Совет Apple Intelligence: выберите любой введённый текст, чтобы проверить, переписать, сократить или перевести его с помощью Writing Tools."
+  },
+  "translationBanner": {
+    "message": "Ваше сообщение написано не на английском. AppleVis требует публикации на английском языке — нажмите, чтобы открыть Google Переводчик.",
+    "translate": "Открыть в переводчике",
+    "postAsIs": "Оставить как есть"
+  },
+  "screen": {
+    "a11ySearch": "Поиск в AppleVis",
+    "a11ySearchHint": "Открывает поиск по темам форума, приложениям и ресурсам.",
+    "a11ySettings": "Настройки и профиль",
+    "a11ySettingsHint": "Открывает настройки AppleVis, профиль, справку и поддержку."
+  }
+}

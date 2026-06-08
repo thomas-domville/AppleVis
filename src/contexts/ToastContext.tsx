@@ -15,10 +15,17 @@ import {
   useState,
 } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type ToastType = 'success' | 'warning' | 'error';
+
+const HAPTIC: Record<ToastType, () => void> = {
+  success: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
+  warning: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning),
+  error:   () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error),
+};
 
 type ToastMessage = {
   id: number;
@@ -131,6 +138,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const counter = useRef(0);
 
   const showToast = useCallback((message: string, type: ToastType = 'success') => {
+    HAPTIC[type]();
     setToast({ id: ++counter.current, message, type });
   }, []);
 

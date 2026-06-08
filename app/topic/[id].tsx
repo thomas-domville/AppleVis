@@ -9,14 +9,10 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
 import { useHandoff } from '../../src/hooks/useHandoff';
-import { readAloud, translateContent } from '../../src/services/intelligenceService';
+import { readAloud } from '../../src/services/intelligenceService';
 import { api } from '../../src/services/api';
+import { relativeTime } from '../../src/utils/relativeTime';
 import type { ForumTopicDetail, ForumReply } from '../../src/types/content';
-
-function formatDate(iso: string): string {
-  if (!iso) return '';
-  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
-}
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -32,7 +28,7 @@ function ReplyCard({ reply, colors, styles }: {
     <View
       style={[styles.card, reply.isNew && { borderLeftWidth: 3, borderLeftColor: colors.accent }]}
       accessible
-      accessibilityLabel={`Reply by ${reply.authorName}, ${formatDate(reply.createdAt)}. ${plain}`}
+      accessibilityLabel={`Reply by ${reply.authorName}, ${relativeTime(reply.createdAt)}. ${plain}`}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.pill,
@@ -43,7 +39,7 @@ function ReplyCard({ reply, colors, styles }: {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>{reply.authorName}</Text>
-          <Text style={{ fontSize: 12, color: colors.textSecondary }}>{formatDate(reply.createdAt)}</Text>
+          <Text style={{ fontSize: 12, color: colors.textSecondary }}>{relativeTime(reply.createdAt)}</Text>
         </View>
         {reply.isNew && (
           <View style={{ backgroundColor: colors.accent, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
@@ -112,7 +108,7 @@ export default function TopicDetail() {
 
   return (
     <Screen title={displayTitle} showSettings={false} showSearch={false}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator>
 
         {loading && (
           <View style={{ alignItems: 'center', paddingVertical: 48 }}>
@@ -149,13 +145,13 @@ export default function TopicDetail() {
             {/* Topic meta */}
             <View style={[styles.card, { marginBottom: 8 }]}
               accessible
-              accessibilityLabel={`By ${topic.authorName || 'Community member'}. ${topic.replyCount} replies. ${formatDate(topic.createdAt)}.`}>
+              accessibilityLabel={`By ${topic.authorName || 'Community member'}. ${topic.replyCount} replies. ${relativeTime(topic.createdAt)}.`}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 <Ionicons name="chatbubbles-outline" size={16} color={colors.textSecondary} accessibilityElementsHidden />
                 <Text style={{ fontSize: 14, color: colors.textSecondary }}>
                   {topic.replyCount} {topic.replyCount === 1 ? 'reply' : 'replies'}
                   {topic.authorName ? `  ·  by ${topic.authorName}` : ''}
-                  {topic.createdAt ? `  ·  ${formatDate(topic.createdAt)}` : ''}
+                  {topic.createdAt ? `  ·  ${relativeTime(topic.createdAt)}` : ''}
                 </Text>
               </View>
 
@@ -189,15 +185,6 @@ export default function TopicDetail() {
                   </Pressable>
                 )}
 
-                <Pressable
-                  onPress={() => topic && translateContent(`${topic.title}\n\n${stripHtml(topic.body)}`, topic.title)}
-                  accessible accessibilityRole="button" accessibilityLabel="Translate topic"
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
-                    backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 }}
-                >
-                  <Ionicons name="language-outline" size={14} color={colors.pillText} />
-                  <Text style={{ color: colors.pillText, fontWeight: '600', fontSize: 13 }}>Translate</Text>
-                </Pressable>
               </View>
             </View>
 

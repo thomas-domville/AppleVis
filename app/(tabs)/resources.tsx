@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Clipboard, Pressable, RefreshControl, ScrollView, Share, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { EmptyState } from '../../src/components/EmptyState';
 import { Screen } from '../../src/components/Screen';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
 import { LoadMoreButton } from '../../src/components/LoadMoreButton';
@@ -10,7 +11,7 @@ import { useRefreshFeedback } from '../../src/hooks/useRefreshFeedback';
 import { useFocusRestore } from '../../src/hooks/useFocusRestore';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
-import { translateContent, readAloud, summariseText, simplifyText } from '../../src/services/intelligenceService';
+import { readAloud, summariseText, simplifyText } from '../../src/services/intelligenceService';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 
@@ -101,18 +102,19 @@ export default function Resources() {
         )}
 
         {!list.loading && !list.error && list.resources.length === 0 && (
-          <View style={[styles.card, { alignItems: 'center', paddingVertical: 32 }]}>
-            <Text style={styles.cardTitle}>No resources yet</Text>
-          </View>
+          <EmptyState
+            icon="book-outline"
+            title="No resources yet"
+            subtitle="Pull down to refresh."
+          />
         )}
 
         {!list.loading && list.resources.length > 0 && visibleResources.length === 0 && searchQuery.trim() && (
-          <View style={[styles.card, { alignItems: 'center', paddingVertical: 32 }]}>
-            <Text style={styles.cardTitle}>No results</Text>
-            <Text style={[styles.cardMeta, { textAlign: 'center', marginTop: 4 }]}>
-              No resources match "{searchQuery}". Try a different search.
-            </Text>
-          </View>
+          <EmptyState
+            icon="search-outline"
+            title="No results"
+            subtitle={`No resources match "${searchQuery}". Try a different search.`}
+          />
         )}
 
         {!list.loading && visibleResources.map((item) => (
@@ -124,15 +126,13 @@ export default function Resources() {
             }}
             title={item.title}
             meta={[item.kind, `Updated ${new Date(item.updatedAt).toLocaleDateString()}`].join(' · ')}
-            actions={['Open', 'Save', ...(!screenReaderEnabled ? ['Read Aloud'] : []), 'Translate', 'Summarise', 'Simplify', 'Share', 'Copy Link']}
+            actions={['Open', 'Save', ...(!screenReaderEnabled ? ['Read Aloud'] : []), 'Summarise', 'Simplify', 'Share', 'Copy Link']}
             onAction={(action) => {
               if (action === 'Open') {
                 save(resourceRefs.current.get(item.id) ?? null);
                 router.push({ pathname: '/resource-detail/[id]' as any, params: { id: item.id, title: item.title, url: item.url } });
               } else if (action === 'Read Aloud') {
                 readAloud([item.title, item.summary].filter(Boolean).join('. '));
-              } else if (action === 'Translate') {
-                translateContent([item.title, item.summary].filter(Boolean).join('\n\n'), item.title);
               } else if (action === 'Summarise') {
                 summariseText([item.title, item.summary].filter(Boolean).join('\n')).then((s) => {
                   if (s) showToast(s, 'success');

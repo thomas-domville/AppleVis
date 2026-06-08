@@ -1,5 +1,65 @@
 import { NativeModules } from 'react-native';
 
+// ─── Apple Intelligence (Foundation Models) ──────────────────────────────────
+
+/**
+ * Returns true when the device supports Apple Intelligence AND the user has
+ * enabled it in Settings → Apple Intelligence & Siri.
+ *
+ * Native side (Swift, requires iOS 18.1+):
+ *
+ *   import FoundationModels
+ *
+ *   @objc class AppleVisIntelligenceModule: NSObject {
+ *     @objc var isAvailable: Bool {
+ *       if #available(iOS 18.1, *) {
+ *         return LanguageModelSession.isAvailable
+ *       }
+ *       return false
+ *     }
+ *   }
+ *
+ * Returns false in all cases where AI cannot run:
+ *   - Native module not yet built (Expo Go / simulator)
+ *   - Device predates iPhone 15 Pro
+ *   - User has not enabled Apple Intelligence in Settings
+ *   - iOS version < 18.1
+ */
+export function isAppleIntelligenceAvailable(): boolean {
+  return NativeModules.AppleVisIntelligence?.isAvailable ?? false;
+}
+
+/**
+ * Sends a prompt to the on-device Foundation Models LLM and returns the
+ * response text. Returns null when Apple Intelligence is unavailable.
+ *
+ * Native side (Swift):
+ *
+ *   import FoundationModels
+ *
+ *   @objc func respond(_ prompt: String,
+ *                      resolve: @escaping RCTPromiseResolveBlock,
+ *                      reject: @escaping RCTPromiseRejectBlock) {
+ *     guard #available(iOS 18.1, *), LanguageModelSession.isAvailable else {
+ *       resolve(nil); return
+ *     }
+ *     Task {
+ *       do {
+ *         let session  = LanguageModelSession()
+ *         let response = try await session.respond(to: prompt)
+ *         resolve(response.content)
+ *       } catch {
+ *         reject("AI_ERROR", error.localizedDescription, error)
+ *       }
+ *     }
+ *   }
+ *
+ * All processing is on-device. No data leaves the device.
+ */
+export async function runFoundationModel(prompt: string): Promise<string | null> {
+  return NativeModules.AppleVisIntelligence?.respond(prompt) ?? null;
+}
+
 // ─── Live Activities ──────────────────────────────────────────────────────────
 
 export type PodcastLiveActivityState = {

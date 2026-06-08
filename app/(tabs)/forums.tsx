@@ -1,7 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Share, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import { EmptyState } from '../../src/components/EmptyState';
 import { Screen } from '../../src/components/Screen';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
 import { FilterPicker } from '../../src/components/FilterPicker';
@@ -13,7 +15,7 @@ import { useFocusRestore } from '../../src/hooks/useFocusRestore';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
-import { translateContent, donateSiriActivity, readAloud, summariseText, simplifyText } from '../../src/services/intelligenceService';
+import { donateSiriActivity, readAloud, summariseText, simplifyText } from '../../src/services/intelligenceService';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 
@@ -52,9 +54,6 @@ export default function Forums() {
       save(topicRefs.current.get(topicId) ?? null);
       donateSiriActivity({ type: 'openForums' });
       router.push({ pathname: '/topic/[id]' as any, params: { id: topicId, title: topicTitle } });
-    } else if (actionName === 'Translate') {
-      const topic = forum.topics.find((t) => t.id === topicId);
-      translateContent([topicTitle, topic?.meta ?? ''].filter(Boolean).join('\n'), topicTitle);
     } else if (actionName === 'Read Aloud') {
       const topic = forum.topics.find((t) => t.id === topicId);
       readAloud([topicTitle, topic?.meta ?? ''].filter(Boolean).join('. '));
@@ -71,8 +70,10 @@ export default function Forums() {
         else showToast('Plain-language simplification coming when Apple Intelligence Foundation Models support is added.', 'warning');
       });
     } else if (actionName === 'Mark as Read') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       forum.markRead(topicId);
     } else if (actionName === 'Follow Topic' || actionName === 'Unfollow Topic') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       const isFollowing = forum.topics.find((t) => t.id === topicId)?.isFollowing ?? false;
       forum.toggleFollow(topicId, isFollowing);
     } else if (actionName === 'Sign in to Follow') {
@@ -96,7 +97,7 @@ export default function Forums() {
   return (
     <Screen title="Forums" refreshing={forum.refreshing} showSearch showBack={false}>
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator
         refreshControl={
           <RefreshControl
             refreshing={forum.refreshing}
@@ -171,24 +172,24 @@ export default function Forums() {
         )}
 
         {!forum.loading && !forum.error && forum.topics.length === 0 && (
-          <View style={[styles.card, { alignItems: 'center', paddingVertical: 32 }]}>
-            <Text style={styles.cardTitle}>No topics</Text>
-            <Text style={[styles.cardMeta, { textAlign: 'center', marginTop: 4 }]}>
-              {forum.filter === 'Unread'           && 'You are all caught up.'}
-              {forum.filter === 'Following'        && 'You are not following any topics yet.'}
-              {forum.filter === 'Saved'            && 'You have not saved any topics yet.'}
-              {forum.filter === 'Since Last Visit' && 'No new activity since your last visit.'}
-            </Text>
-          </View>
+          <EmptyState
+            icon={forum.filter === 'Unread' ? 'checkmark-circle-outline' : forum.filter === 'Following' ? 'bookmark-outline' : forum.filter === 'Saved' ? 'heart-outline' : 'time-outline'}
+            title="No topics"
+            subtitle={
+              forum.filter === 'Unread'           ? 'You are all caught up.' :
+              forum.filter === 'Following'        ? 'You are not following any topics yet.' :
+              forum.filter === 'Saved'            ? 'You have not saved any topics yet.' :
+                                                    'No new activity since your last visit.'
+            }
+          />
         )}
 
         {!forum.loading && forum.topics.length > 0 && visibleTopics.length === 0 && searchQuery.trim() && (
-          <View style={[styles.card, { alignItems: 'center', paddingVertical: 32 }]}>
-            <Text style={styles.cardTitle}>No results</Text>
-            <Text style={[styles.cardMeta, { textAlign: 'center', marginTop: 4 }]}>
-              No topics match "{searchQuery}". Try a different search.
-            </Text>
-          </View>
+          <EmptyState
+            icon="search-outline"
+            title="No results"
+            subtitle={`No topics match "${searchQuery}". Try a different search.`}
+          />
         )}
 
         {!forum.loading && visibleTopics.map((topic) => (
@@ -214,7 +215,6 @@ export default function Forums() {
                 : 'Sign in to Follow',
               'Mark as Read',
               ...(!screenReaderEnabled ? ['Read Aloud'] : []),
-              'Translate',
               'Summarise',
               'Simplify',
               'Share',

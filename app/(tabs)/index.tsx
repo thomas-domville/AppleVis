@@ -1,161 +1,356 @@
-import { useEffect, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator, FlatList,
+  Modal, Pressable, RefreshControl, Text, View,
+} from 'react-native';
+import { useScrollToTop } from '@react-navigation/native';
+import { Tabs, useFocusEffect, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { EmptyState } from '../../src/components/EmptyState';
 import { Screen } from '../../src/components/Screen';
-import { AccessibleCard } from '../../src/components/AccessibleCard';
+import { FeedCard } from '../../src/components/FeedCard';
+import { useHomeFeed, DEFAULT_FEED_PREFS } from '../../src/hooks/useHomeFeed';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { persistence } from '../../src/services/persistence';
-import { useHandoff } from '../../src/hooks/useHandoff';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useHandoff } from '../../src/hooks/useHandoff';
+import { persistence } from '../../src/services/persistence';
+import type { FeedItem, FeedPrefs } from '../../src/types/content';
 
-function getGreetingKey(): 'home.greeting.morning' | 'home.greeting.afternoon' | 'home.greeting.evening' | 'home.greeting.night' {
-  const hour = new Date().getHours();
-  if (hour >= 5  && hour < 12) return 'home.greeting.morning';
-  if (hour >= 12 && hour < 17) return 'home.greeting.afternoon';
-  if (hour >= 17 && hour < 22) return 'home.greeting.evening';
-  return 'home.greeting.night';
+// ─── Greeting ─────────────────────────────────────────────────────────────────
+
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h >= 5  && h < 12) return 'Good morning';
+  if (h >= 12 && h < 17) return 'Good afternoon';
+  if (h >= 17 && h < 22) return 'Good evening';
+  return 'Good night';
 }
 
-export default function Home() {
-  const router     = useRouter();
+// ─── Filter picker ────────────────────────────────────────────────────────────
+
+type FilterRow = {
+  key: keyof FeedPrefs;
+  label: string;
+  subLabel: string;
+  gated?: boolean;  // true = show but disabled (Coming soon)
+};
+
+const FILTER_ROWS: FilterRow[] = [
+  { key: 'topics',    label: 'Latest Topics & Replies',       subLabel: 'Forum discussions and new replies' },
+  { key: 'podcasts',  label: 'Latest Podcasts & Comments',    subLabel: 'New episodes and episode discussion' },
+  { key: 'apps',      label: 'Latest App Entries & Reviews',  subLabel: 'New app listings and accessibility reviews' },
+  { key: 'guides',    label: 'Latest Guides & Comments',      subLabel: 'Guides, tutorials, and how-tos' },
+  { key: 'blogs',     label: 'Latest Blogs & Comments',       subLabel: 'Blog posts and discussion', gated: true },
+  { key: 'appleOnly', label: 'Apple-Related Topics Only',     subLabel: 'Filter topics to Apple products and services only', gated: true },
+];
+
+function FeedFilterModal({
+  visible,
+  prefs,
+  onUpdate,
+  onClose,
+}: {
+  visible: boolean;
+  prefs: FeedPrefs;
+  onUpdate: (key: keyof FeedPrefs, val: boolean) => void;
+  onClose: () => void;
+}) {
+  const { colors } = useTheme();
+  const insets     = useSafeAreaInsets();
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+      accessibilityViewIsModal
+    >
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        {/* Header */}
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+          paddingHorizontal: 20, paddingTop: insets.top + 16, paddingBottom: 16,
+          borderBottomWidth: 1, borderBottomColor: colors.border,
+        }}>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text }}>
+            Home Feed
+          </Text>
+          <Pressable
+            onPress={onClose}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Close feed settings"
+            style={{ padding: 8 }}
+          >
+            <Ionicons name="close" size={22} color={colors.text} />
+          </Pressable>
+        </View>
+
+        <Text style={{
+          fontSize: 13, color: colors.textSecondary,
+          paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10,
+          lineHeight: 18,
+        }}>
+          Choose what appears in your Home feed. Your preferences are saved automatically.
+        </Text>
+
+        {FILTER_ROWS.map((row) => {
+          const isOn    = prefs[row.key];
+          const isGated = row.gated;
+
+          return (
+            <Pressable
+              key={row.key}
+              onPress={() => {
+                if (isGated) return;
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onUpdate(row.key, !isOn);
+              }}
+              accessible
+              accessibilityRole="switch"
+              accessibilityLabel={isGated ? `${row.label}, coming soon` : row.label}
+              accessibilityHint={isGated ? undefined : row.subLabel}
+              accessibilityState={{ checked: isOn, disabled: !!isGated }}
+              style={({ pressed }) => ({
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                paddingHorizontal: 20, paddingVertical: 14,
+                borderBottomWidth: 1, borderBottomColor: colors.border,
+                opacity: pressed && !isGated ? 0.7 : 1,
+              })}
+            >
+              <View style={{ flex: 1, marginRight: 16 }}>
+                <Text style={{
+                  fontSize: 16, fontWeight: '500',
+                  color: isGated ? colors.textSecondary : colors.text,
+                }}>
+                  {row.label}
+                </Text>
+                <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>
+                  {isGated ? 'Coming soon' : row.subLabel}
+                </Text>
+              </View>
+              {isGated ? (
+                <View style={{
+                  paddingHorizontal: 8, paddingVertical: 3,
+                  backgroundColor: colors.pill, borderRadius: 6,
+                }}>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '600' }}>
+                    Soon
+                  </Text>
+                </View>
+              ) : (
+                <Ionicons
+                  name={isOn ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={24}
+                  color={isOn ? colors.accent : colors.border}
+                  accessibilityElementsHidden
+                />
+              )}
+            </Pressable>
+          );
+        })}
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
+
+export default function HomeScreen() {
+  const router  = useRouter();
   const { colors, styles } = useTheme();
-  const auth       = useAuth();
-  const { t }      = useTranslation();
-  const [lastVisit, setLastVisit] = useState<string | null>(null);
+  const auth    = useAuth();
+  const feed    = useHomeFeed();
+  const [filterVisible, setFilterVisible] = useState(false);
+  const flatListRef   = useRef<FlatList>(null);
+  useScrollToTop(flatListRef);
+  const unreadCount   = useMemo(
+    () => feed.items.filter(i => i.kind === 'topic' && i.data.isUnread).length,
+    [feed.items],
+  );
+
+  useFocusEffect(useCallback(() => {
+    const t = setTimeout(() => flatListRef.current?.flashScrollIndicators(), 350);
+    return () => clearTimeout(t);
+  }, []));
 
   useHandoff({
-    activityType: 'com.applevis.app.viewForums',
+    activityType: 'com.applevis.app.viewHome',
     title: 'AppleVis',
     webpageURL: 'https://www.applevis.com',
   });
 
   useEffect(() => {
-    persistence.getLastVisit().then(setLastVisit);
     persistence.stampVisit();
   }, []);
 
-  function formatLastVisit(iso: string | null): string {
-    if (!iso) return t('home.firstVisit');
-    const diffMs  = Date.now() - new Date(iso).getTime();
-    const diffMin = Math.floor(diffMs / 60_000);
-    if (diffMin < 1)  return 'just now';
-    if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? '' : 's'} ago`;
-    const diffH = Math.floor(diffMin / 60);
-    if (diffH < 24)   return `${diffH} hour${diffH === 1 ? '' : 's'} ago`;
-    const diffD = Math.floor(diffH / 24);
-    return              `${diffD} day${diffD === 1 ? '' : 's'} ago`;
+  function handleItemPress(item: FeedItem) {
+    switch (item.kind) {
+      case 'topic':
+        router.push({ pathname: '/topic/[id]' as any, params: { id: item.data.id, title: item.data.title } });
+        break;
+      case 'podcast':
+        router.push({ pathname: '/episode/[id]' as any, params: { id: item.data.id } });
+        break;
+      case 'app':
+        router.push({ pathname: '/app-detail/[id]' as any, params: { id: item.data.id, name: item.data.name } });
+        break;
+      case 'guide':
+        router.push({ pathname: '/resource-detail/[id]' as any, params: { id: item.data.id } });
+        break;
+    }
   }
 
-  const greeting     = t(getGreetingKey());
-  const name         = auth.user?.name ?? '';
-  const lastVisitStr = formatLastVisit(lastVisit);
+  // Greeting card at the top
+  const greeting = getGreeting();
+  const name     = auth.isSignedIn ? (auth.user?.name ?? '') : '';
 
-  return (
-    <Screen title="Home" showSearch showBack={false}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+  function renderHeader() {
+    const anyErrors = Object.keys(feed.errors).length > 0;
 
-        {auth.isSignedIn && name ? (
+    return (
+      <>
+        {/* Greeting */}
+        {name ? (
           <View
             style={[styles.card, { marginBottom: 4 }]}
             accessible
-            accessibilityLabel={`${greeting}, ${name}. ${t('home.lastVisit')}: ${lastVisitStr}.`}
+            accessibilityLabel={`${greeting}, ${name}.`}
           >
-            <Text
-              style={{ fontSize: 20, fontWeight: '300', color: colors.text, letterSpacing: 0.2 }}
-              importantForAccessibility="no-hide-descendants"
-            >
+            <Text style={{ fontSize: 20, fontWeight: '300', color: colors.text, letterSpacing: 0.2 }}
+              importantForAccessibility="no-hide-descendants">
               {greeting},
             </Text>
-            <Text
-              style={{ fontSize: 28, fontWeight: '700', color: colors.appleVisBlue, marginBottom: 8 }}
-              importantForAccessibility="no-hide-descendants"
-            >
+            <Text style={{ fontSize: 26, fontWeight: '700', color: colors.appleVisBlue }}
+              importantForAccessibility="no-hide-descendants">
               {name}
             </Text>
-            <Text
-              style={styles.cardMeta}
-              importantForAccessibility="no-hide-descendants"
-            >
-              {t('home.lastVisit')}: {lastVisitStr}
+          </View>
+        ) : null}
+
+        {/* Per-source error banners — only shown if something failed */}
+        {anyErrors && (
+          <View style={{
+            flexDirection: 'row', gap: 8, alignItems: 'flex-start',
+            backgroundColor: '#FFF8F0', borderRadius: 10, padding: 12, marginBottom: 10,
+          }}
+            accessible
+            accessibilityLabel={`Some content could not be loaded: ${Object.keys(feed.errors).join(', ')}.`}
+          >
+            <Ionicons name="warning-outline" size={16} color="#C05000" accessibilityElementsHidden style={{ marginTop: 1 }} />
+            <Text style={{ flex: 1, fontSize: 13, color: '#C05000', lineHeight: 18 }}>
+              Some sources could not be loaded. Pull down to retry.
             </Text>
           </View>
-        ) : (
-          <Text style={styles.lede}>{t('home.lastVisit')}: {lastVisitStr}</Text>
         )}
 
-        <AccessibleCard
-          title="Since Last Visit"
-          meta="Open Forums and choose Since Last Visit to see everything that changed."
-          actions={['Open Forums', 'Mark All Read']}
-          onAction={(a) => { if (a === 'Open Forums' || a === 'Open') router.push('/(tabs)/forums'); }}
-        />
+        {/* Section header */}
+        <Text
+          style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
+            textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10, marginTop: 4 }}
+          accessibilityRole="header"
+        >
+          Latest Activity
+        </Text>
+      </>
+    );
+  }
 
-        <AccessibleCard
-          title="Resume Where You Left Off"
-          meta="Your reading position and podcast position are saved and synced via iCloud."
-          actions={['Resume Podcast', 'Open Forums']}
-          onAction={(a) => {
-            if (a === 'Resume Podcast' || a === 'Open') router.push('/(tabs)/podcasts');
-            if (a === 'Open Forums') router.push('/(tabs)/forums');
-          }}
-        />
+  function renderFooter() {
+    if (feed.isLoadingMore) {
+      return (
+        <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+          <ActivityIndicator color={colors.appleVisBlue} accessibilityLabel="Loading more" />
+        </View>
+      );
+    }
+    if (!feed.hasMore && feed.items.length > 0) {
+      return (
+        <Text style={{ textAlign: 'center', color: colors.textSecondary, fontSize: 13, paddingVertical: 20 }}
+          accessible accessibilityLabel="You've reached the end of the feed.">
+          You're all caught up.
+        </Text>
+      );
+    }
+    return <View style={{ height: 20 }} />;
+  }
 
-        <AccessibleCard
-          title="Saved"
-          meta="Your saved topics, podcasts, apps, and resources — stored in iCloud across all your Apple devices."
-          actions={['Open Forums', 'Open Apps', 'Open Resources']}
-          onAction={(a) => {
-            if (a === 'Open Forums' || a === 'Open') router.push('/(tabs)/forums');
-            if (a === 'Open Apps') router.push('/(tabs)/apps');
-            if (a === 'Open Resources') router.push('/(tabs)/resources');
-          }}
-        />
+  return (
+    <>
+    <Tabs.Screen options={{ tabBarBadge: unreadCount > 0 ? unreadCount : undefined }} />
+    <Screen
+      title="Home"
+      showBack={false}
+      headerRight={
+        <Pressable
+          onPress={() => setFilterVisible(true)}
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel="Feed settings"
+          accessibilityHint="Choose what content types appear in your Home feed"
+          style={{ padding: 8 }}
+        >
+          <Ionicons name="options-outline" size={22} color={colors.accent} />
+        </Pressable>
+      }
+    >
+      {/* Loading state */}
+      {feed.loading && (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 }}>
+          <ActivityIndicator size="large" color={colors.appleVisBlue} accessibilityLabel="Loading feed" />
+          <Text style={[styles.lede, { marginTop: 14, textAlign: 'center' }]}>Loading your feed…</Text>
+        </View>
+      )}
 
-        <AccessibleCard
-          title="Continue Listening"
-          meta="Your podcast queue and playback position are saved and synced via iCloud."
-          actions={['Open Podcasts']}
-          onAction={(a) => { if (a === 'Open Podcasts' || a === 'Open') router.push('/(tabs)/podcasts'); }}
-        />
+      {/* Empty state — all sources off or all failed */}
+      {!feed.loading && feed.items.length === 0 && (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <EmptyState
+            icon="newspaper-outline"
+            title="Nothing to show"
+            subtitle="Turn on at least one content type using the feed settings button above."
+            action={{ label: 'Feed Settings', onPress: () => setFilterVisible(true) }}
+          />
+        </View>
+      )}
 
-        <AccessibleCard
-          title="New Forum Activity"
-          meta="Visit the Forums tab and choose Recent or Since Last Visit to see new topics."
-          actions={['Open Forums', 'Since Last Visit']}
-          onAction={(a) => { if (a === 'Open Forums' || a === 'Since Last Visit' || a === 'Open') router.push('/(tabs)/forums'); }}
+      {/* Feed */}
+      {!feed.loading && feed.items.length > 0 && (
+        <FlatList
+          data={feed.items}
+          keyExtractor={(item) => `${item.kind}-${item.data.id}`}
+          renderItem={({ item }) => (
+            <FeedCard item={item} onPress={() => handleItemPress(item)} />
+          )}
+          ListHeaderComponent={renderHeader}
+          ListFooterComponent={renderFooter}
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          onEndReached={() => feed.loadMore()}
+          onEndReachedThreshold={0.3}
+          refreshControl={
+            <RefreshControl
+              refreshing={feed.refreshing}
+              onRefresh={feed.refresh}
+              tintColor={colors.appleVisBlue}
+              accessibilityLabel="Pull to refresh feed"
+            />
+          }
+          ref={flatListRef}
+          showsVerticalScrollIndicator
         />
+      )}
 
-        <AccessibleCard
-          title="New Podcast Episodes"
-          meta="Open the Podcasts tab to see and play the latest episodes."
-          actions={['Open Podcasts']}
-          onAction={(a) => { if (a === 'Open Podcasts' || a === 'Open') router.push('/(tabs)/podcasts'); }}
-        />
-
-        <AccessibleCard
-          title="Recently Updated Apps"
-          meta="Browse the Apps tab to see recently updated app listings."
-          actions={['Open Apps']}
-          onAction={(a) => { if (a === 'Open Apps' || a === 'Open') router.push('/(tabs)/apps'); }}
-        />
-
-        <AccessibleCard
-          title="New Resources and Guides"
-          meta="Visit the Resources tab to see new guides, tutorials, and articles."
-          actions={['Open Resources']}
-          onAction={(a) => { if (a === 'Open Resources' || a === 'Open') router.push('/(tabs)/resources'); }}
-        />
-
-        <AccessibleCard
-          title="Notification Settings"
-          meta="Push notifications for forum replies and new episodes. Configure in Settings."
-          actions={['Open Settings']}
-          onAction={(a) => { if (a === 'Open Settings' || a === 'Open') router.push('/settings'); }}
-        />
-
-        <View style={{ height: 96 }} />
-      </ScrollView>
+      {/* Filter modal */}
+      <FeedFilterModal
+        visible={filterVisible}
+        prefs={feed.prefs}
+        onUpdate={feed.updatePref}
+        onClose={() => setFilterVisible(false)}
+      />
     </Screen>
+    </>
   );
 }

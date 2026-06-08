@@ -43,9 +43,9 @@ export default function AppearanceSettings() {
             <Pressable
               key={value}
               onPress={() => setCardDensity(value)}
-              accessible accessibilityRole="none"
+              accessible accessibilityRole="button"
               accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={`${label}. ${description}${isSelected ? '. Selected.' : ''}`}
+              accessibilityLabel={`${label}. ${description}`}
               style={[styles.cardSmall, {
                 borderWidth: isSelected ? 2 : 1,
                 borderColor: isSelected ? colors.accent : colors.border,
@@ -86,9 +86,9 @@ export default function AppearanceSettings() {
                   <Pressable
                     key={id}
                     onPress={() => setTheme(id)}
-                    accessible accessibilityRole="none"
+                    accessible accessibilityRole="button"
                     accessibilityState={{ selected: isSelected }}
-                    accessibilityLabel={`${theme.name}${isSelected ? ', selected' : ''}`}
+                    accessibilityLabel={theme.name}
                     accessibilityHint={`${theme.description} ${theme.example}`}
                     style={[styles.cardSmall, {
                       borderWidth: isSelected ? 2 : 1,

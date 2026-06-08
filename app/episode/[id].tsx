@@ -15,6 +15,7 @@ import { SPEED_OPTIONS, SLEEP_TIMER_OPTIONS, SLEEP_END_OF_EPISODE } from '../../
 import { downloadEpisode, deleteDownload, getLocalUri } from '../../src/services/downloads';
 import { persistence } from '../../src/services/persistence';
 import { showAirPlayPicker } from '../../src/native/nativeModules';
+import { relativeTime } from '../../src/utils/relativeTime';
 import type { PodcastEpisode } from '../../src/types/content';
 
 // ─── Skip-hold progression ────────────────────────────────────────────────────
@@ -38,6 +39,14 @@ function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function formatTimeSpoken(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  if (m === 0) return `${s} second${s === 1 ? '' : 's'}`;
+  if (s === 0) return `${m} minute${m === 1 ? '' : 's'}`;
+  return `${m} minute${m === 1 ? '' : 's'} and ${s} second${s === 1 ? '' : 's'}`;
 }
 
 function formatDuration(seconds: number): string {
@@ -97,8 +106,15 @@ function parseTranscript(raw: string): TranscriptCue[] {
 // ─── Show Notes ───────────────────────────────────────────────────────────────
 type NoteLink = { label: string; url: string; kind: 'app' | 'email' | 'web' };
 
-function parseShowNotes(rawHtml: string): { body: string; links: NoteLink[]; transcript: string | null } {
-  if (!rawHtml.trim()) return { body: '', links: [], transcript: null };
+function parseShowNotes(rawHtml: string): { body: string[]; links: NoteLink[]; transcript: string[] | null } {
+  if (!rawHtml.trim()) return { body: [], links: [], transcript: null };
+
+  // Split on the Transcript heading FIRST — so links in the transcript section
+  // (e.g. the VoicePen App Store URL in the disclaimer) never appear in the About card
+  const txHeadingMatch = rawHtml.match(/#{1,3}\s*Transcri?pt[^\n\r]*/i);
+  const splitIdx = txHeadingMatch?.index ?? -1;
+  const preHtml  = splitIdx >= 0 ? rawHtml.slice(0, splitIdx) : rawHtml;
+  const postHtml = splitIdx >= 0 ? rawHtml.slice(splitIdx + txHeadingMatch![0].length) : null;
 
   const links: NoteLink[] = [];
   const seen = new Set<string>();
@@ -116,45 +132,62 @@ function parseShowNotes(rawHtml: string): { body: string; links: NoteLink[]; tra
     }
   }
 
+  // Extract <a href> links only from the pre-transcript HTML
   const aRegex = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
   let m: RegExpExecArray | null;
-  while ((m = aRegex.exec(rawHtml)) !== null) addLink(m[2], m[1]);
+  while ((m = aRegex.exec(preHtml)) !== null) addLink(m[2], m[1]);
 
-  let text = rawHtml
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ').replace(/&#(\d+);/g, (_, c) => String.fromCharCode(Number(c)))
-    .replace(/&[a-z]{2,8};/g, ' ').replace(/\s+/g, ' ').trim();
+  // Convert HTML to plain text while preserving paragraph/line structure so that
+  // VoiceOver and braille displays get individual stops rather than one wall of text
+  function htmlToPlain(html: string): string {
+    return html
+      .replace(/<\/?(p|div|h[1-6]|li|blockquote)[^>]*>/gi, '\n\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .replace(/&nbsp;/g, ' ').replace(/&#(\d+);/g, (_, c) => String.fromCharCode(Number(c)))
+      .replace(/&[a-z]{2,8};/g, ' ')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
 
+  // Clean markdown formatting and split into individual navigable lines
+  function splitLines(text: string): string[] {
+    return text
+      .replace(/#{1,6}\s*/gm, '')
+      .replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1')
+      .replace(/^\s*[-*+]\s+/gm, '• ')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .split(/\n/)
+      .map(l => l.trim())
+      .filter(l => l.length > 0);
+  }
+
+  // Strip HTML from pre-transcript section, preserving paragraph structure
+  const preText = htmlToPlain(preHtml);
+
+  // Extract markdown links and email addresses from pre-transcript text only
   const mdRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g;
-  while ((m = mdRegex.exec(text)) !== null) addLink(m[1], m[2]);
+  while ((m = mdRegex.exec(preText)) !== null) addLink(m[1], m[2]);
 
   const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-  while ((m = emailRegex.exec(text)) !== null) {
+  while ((m = emailRegex.exec(preText)) !== null) {
     if (!seen.has(m[0])) {
       seen.add(m[0]);
       links.push({ label: m[0], url: `mailto:${m[0]}`, kind: 'email' });
     }
   }
 
-  let transcript: string | null = null;
-  const txMatch = text.match(/#{1,3}\s*Transcri?pt[^\n]*[\n\r]+([\s\S]*)/i);
-  if (txMatch) {
-    transcript = txMatch[1]
-      .replace(/#{1,6}\s*/gm, '')
-      .replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1')
-      .replace(/^\s*[-*+]\s+/gm, '• ')
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-      .replace(/\s+/g, ' ').trim();
-    text = text.slice(0, txMatch.index).trim();
+  // Process transcript — each line becomes its own braille/VoiceOver stop
+  let transcript: string[] | null = null;
+  if (postHtml) {
+    const txLines = splitLines(htmlToPlain(postHtml));
+    transcript = txLines.length > 0 ? txLines : null;
   }
 
-  const body = text
-    .replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1')
-    .replace(/#{1,6}\s*/g, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/^\s*[-*+]\s+/gm, '• ')
-    .replace(/\n{3,}/g, '\n\n').replace(/\s{2,}/g, ' ').trim();
+  // Build body as navigable lines
+  const body = splitLines(preText);
 
   return { body, links, transcript };
 }
@@ -164,7 +197,7 @@ function ShowNotes({ rawHtml }: { rawHtml: string }) {
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   const { body, links, transcript } = useMemo(() => parseShowNotes(rawHtml), [rawHtml]);
 
-  if (!body && !links.length && !transcript) return null;
+  if (!body.length && !links.length && !transcript) return null;
 
   return (
     <>
@@ -203,14 +236,17 @@ function ShowNotes({ rawHtml }: { rawHtml: string }) {
               </Pressable>
             </View>
 
-            {/* Transcript text */}
-            <ScrollView
-              contentContainerStyle={{ padding: 20, paddingBottom: 48 }}
-              accessibilityLabel="Transcript content"
-            >
-              <Text style={{ fontSize: 15, lineHeight: 24, color: colors.text }}>
-                {transcript}
-              </Text>
+            {/* Each line is its own VoiceOver / braille display stop */}
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 48 }}>
+              {transcript.map((line, i) => (
+                <Text
+                  key={i}
+                  accessible
+                  style={{ fontSize: 15, lineHeight: 24, color: colors.text, marginBottom: 10 }}
+                >
+                  {line}
+                </Text>
+              ))}
             </ScrollView>
           </View>
         </Modal>
@@ -222,16 +258,20 @@ function ShowNotes({ rawHtml }: { rawHtml: string }) {
           About this episode
         </Text>
 
-        {body.length > 0 && (
-          <Text style={{ fontSize: 15, lineHeight: 22, color: colors.textSecondary,
-            marginBottom: links.length > 0 ? 14 : 0 }}>
-            {body}
+        {/* Each paragraph/line is its own VoiceOver / braille display stop */}
+        {body.map((para, i) => (
+          <Text
+            key={i}
+            accessible
+            style={{ fontSize: 15, lineHeight: 22, color: colors.textSecondary, marginBottom: 6 }}
+          >
+            {para}
           </Text>
-        )}
+        ))}
 
         {/* All links: App Store entries, email contacts, web links */}
         {links.length > 0 && (
-          <View style={{ gap: 10, marginTop: body.length > 0 ? 0 : 4 }}>
+          <View style={{ gap: 10, marginTop: body.length > 0 ? 10 : 4 }}>
             {links.map((link, i) => (
               <Pressable
                 key={i}
@@ -409,9 +449,7 @@ export default function EpisodeDetail() {
   const progress      = isCurrent && player.duration > 0 ? player.position / player.duration : 0;
   const durationKnown = isCurrent && player.duration > 0;
 
-  const publishedLabel = params.publishedAt
-    ? new Date(params.publishedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
-    : null;
+  const publishedLabel = params.publishedAt ? relativeTime(params.publishedAt) : null;
 
   // ── Episode object ───────────────────────────────────────────────────────
   const episode = useMemo<PodcastEpisode>(() => ({
@@ -500,6 +538,7 @@ export default function EpisodeDetail() {
 
   // ── Play / load ──────────────────────────────────────────────────────────
   const handlePlayPause = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (!isCurrent) {
       player.loadEpisode(episode);
     } else if (player.isPlaying) {
@@ -525,6 +564,7 @@ export default function EpisodeDetail() {
 
   // ── Sleep ────────────────────────────────────────────────────────────────
   function applySleepIdx(idx: number) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSleepIdx(idx);
     const mins = SLEEP_MINS[idx];
     if (mins === 0) player.cancelSleepTimer();
@@ -604,6 +644,11 @@ export default function EpisodeDetail() {
   // ── Mark as played ───────────────────────────────────────────────────────
   async function handleMarkAsPlayed() {
     await persistence.clearPodcastPosition(params.id);
+    if (isCurrent) {
+      // stop() saves position before unloading as a safety measure, so clear again after
+      await player.stop();
+      await persistence.clearPodcastPosition(params.id);
+    }
     showToast('Marked as played');
     AccessibilityInfo.announceForAccessibility('Marked as played');
   }
@@ -615,7 +660,7 @@ export default function EpisodeDetail() {
     <Screen title="Episode" showSettings={false}>
       {/* onMagicTap lets VoiceOver two-finger double tap play/pause anywhere */}
       <View onMagicTap={handlePlayPause} style={{ flex: 1 }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator contentContainerStyle={{ paddingBottom: 40 }}>
 
           {/* ── Artwork ──────────────────────────────────────────────────── */}
           {/* No accessibilityLabel set — iOS VoiceOver auto-describes the image
@@ -629,6 +674,7 @@ export default function EpisodeDetail() {
                 resizeMode="cover"
                 accessible
                 accessibilityRole="image"
+                accessibilityLabel={`Podcast artwork. ${params.showTitle}`}
               />
             ) : (
               <Image
@@ -637,7 +683,7 @@ export default function EpisodeDetail() {
                 resizeMode="cover"
                 accessible
                 accessibilityRole="image"
-                accessibilityLabel="White image background with a logo and text in the center bottom area. On the left, there is an abstract symbol made of three angled lines forming a stylized letter A or V. The top and middle segments of the symbol are orange, and the bottom segment is blue. To the right of the symbol, in large blue letters, it says AppleVis. Below AppleVis, in smaller black letters, it says a Be My Eyes company. The word company is underlined with a slanted yellow highlight."
+                accessibilityLabel="Podcast artwork. White image background with a logo and text in the center bottom area. On the left, there is an abstract symbol made of three angled lines forming a stylized letter A or V. The top and middle segments of the symbol are orange, and the bottom segment is blue. To the right of the symbol, in large blue letters, it says AppleVis. Below AppleVis, in smaller black letters, it says a Be My Eyes company. The word company is underlined with a slanted yellow highlight."
               />
             )}
           </View>
@@ -682,7 +728,7 @@ export default function EpisodeDetail() {
                 <View
                   accessible
                   accessibilityRole="adjustable"
-                  accessibilityLabel={`Playback position. ${formatTime(player.position)} of ${formatTime(player.duration)}.`}
+                  accessibilityLabel={`Playback position. ${formatTimeSpoken(player.position)} of ${formatTimeSpoken(player.duration)}.`}
                   accessibilityValue={{ min: 0, max: Math.round(player.duration), now: Math.round(player.position) }}
                   accessibilityHint="Swipe up or down to move one minute at a time"
                   onAccessibilityAction={(e) => {
@@ -690,7 +736,7 @@ export default function EpisodeDetail() {
                       ? Math.min(player.duration, player.position + 60)
                       : Math.max(0, player.position - 60);
                     player.seekTo(newPos);
-                    AccessibilityInfo.announceForAccessibility(formatTime(newPos));
+                    AccessibilityInfo.announceForAccessibility(formatTimeSpoken(newPos));
                   }}
                   style={{ marginBottom: 6 }}
                 >

@@ -1,0 +1,226 @@
+{
+  "tabs": {
+    "home": "Beranda",
+    "forums": "Forum",
+    "podcasts": "Podcast",
+    "apps": "Aplikasi",
+    "resources": "Sumber Daya"
+  },
+  "common": {
+    "loading": "Memuat…",
+    "retry": "Coba Lagi",
+    "cancel": "Batal",
+    "gotIt": "Mengerti",
+    "save": "Simpan",
+    "share": "Bagikan",
+    "search": "Cari",
+    "settings": "Pengaturan",
+    "copyLink": "Salin Tautan",
+    "open": "Buka",
+    "close": "Tutup",
+    "viewGuidelines": "Lihat Panduan",
+    "translate": "Terjemahkan",
+    "readAloud": "Baca Keras",
+    "summarise": "Ringkas",
+    "simplify": "Sederhanakan"
+  },
+  "actions": {
+    "open": "Buka",
+    "readAloud": "Baca Keras",
+    "translate": "Terjemahkan",
+    "summarise": "Ringkas",
+    "simplify": "Sederhanakan",
+    "share": "Bagikan",
+    "save": "Simpan",
+    "copyLink": "Salin Tautan",
+    "openAppPage": "Buka Halaman Aplikasi",
+    "saveApp": "Simpan Aplikasi",
+    "viewReviews": "Lihat Ulasan",
+    "summariseReviews": "Ringkas Ulasan",
+    "accessibilityConsensus": "Konsensus Aksesibilitas",
+    "saveTopic": "Simpan Topik",
+    "unsaveTopic": "Hapus dari Tersimpan",
+    "followTopic": "Ikuti Topik",
+    "unfollowTopic": "Berhenti Mengikuti",
+    "signInToFollow": "Masuk untuk Mengikuti",
+    "markAsRead": "Tandai Sudah Dibaca",
+    "play": "Putar",
+    "pause": "Jeda",
+    "readDescriptionAloud": "Baca Deskripsi Keras",
+    "playNext": "Berikutnya",
+    "addToQueue": "Tambah ke Antrean",
+    "saveEpisode": "Simpan Episode",
+    "download": "Unduh"
+  },
+  "home": {
+    "greeting": {
+      "morning": "Selamat pagi",
+      "afternoon": "Selamat siang",
+      "evening": "Selamat sore",
+      "night": "Selamat malam"
+    },
+    "lastVisit": "Kunjungan Terakhir",
+    "firstVisit": "kunjungan pertama Anda — selamat datang!"
+  },
+  "forums": {
+    "loading": "Memuat {{filter}}…",
+    "noTopics": "Tidak Ada Topik",
+    "pullToRefresh": "Tarik untuk menyegarkan forum",
+    "filters": {
+      "recent": "Terbaru",
+      "new": "Baru",
+      "unread": "Belum Dibaca",
+      "following": "Diikuti",
+      "saved": "Tersimpan",
+      "sinceLastVisit": "Sejak Kunjungan Terakhir"
+    },
+    "filterDesc": {
+      "sinceLastVisit": "Topik yang berubah sejak Anda terakhir membuka AppleVis.",
+      "unread": "Topik yang belum Anda buka di perangkat ini.",
+      "following": "Topik yang Anda ikuti. Disimpan secara lokal dan disinkronkan melalui iCloud.",
+      "saved": "Topik yang disimpan untuk nanti. Disinkronkan melalui iCloud."
+    },
+    "error": "Gagal memuat topik",
+    "noTopicsEmpty": {
+      "unread": "Semua sudah dibaca.",
+      "following": "Anda belum mengikuti topik apa pun.",
+      "saved": "Anda belum menyimpan topik apa pun.",
+      "sinceLastVisit": "Tidak ada aktivitas baru sejak kunjungan terakhir Anda."
+    }
+  },
+  "podcasts": {
+    "episodes": "Episode",
+    "loading": "Memuat episode…",
+    "noEpisodes": "Belum ada episode",
+    "error": "Gagal memuat episode",
+    "pullToRefresh": "Tarik untuk menyegarkan podcast",
+    "play": "Putar",
+    "pause": "Jeda",
+    "skipBack": "Mundur {{seconds}} d",
+    "skipForward": "Maju {{seconds}} d",
+    "speed": "Kecepatan",
+    "sleepTimer": "Pengatur Waktu Tidur",
+    "sleepTimerRemaining": "Pengatur waktu tidur — {{time}} tersisa",
+    "cancelSleepTimer": "Batalkan pengatur waktu tidur",
+    "chapters": "Bab",
+    "jumpToChapter": "Lompat ke bab: {{title}}, mulai {{time}}",
+    "queue": "Antrean",
+    "currentlyLoaded": "Dimuat."
+  },
+  "apps": {
+    "loading": "Memuat aplikasi…",
+    "noApps": "Belum ada aplikasi",
+    "error": "Gagal memuat aplikasi",
+    "pullToRefresh": "Tarik untuk menyegarkan aplikasi",
+    "reviews": "{{count}} ulasan",
+    "updated": "Diperbarui {{date}}"
+  },
+  "resources": {
+    "loading": "Memuat sumber daya…",
+    "noResources": "Belum ada sumber daya",
+    "error": "Gagal memuat sumber daya",
+    "pullToRefresh": "Tarik untuk menyegarkan sumber daya",
+    "updated": "Diperbarui {{date}}"
+  },
+  "search": {
+    "placeholder": "Cari forum, aplikasi, sumber daya…",
+    "accessibilityHint": "Ketik untuk mencari topik forum, aplikasi, dan sumber daya.",
+    "searching": "Mencari…",
+    "noResults": "Tidak Ada Hasil",
+    "noResultsHint": "Coba kata kunci lain atau periksa ejaan.",
+    "intro": "Cari di topik forum, direktori aplikasi, dan sumber daya. Hasil muncul saat Anda mengetik.",
+    "resultCount_one": "{{count}} hasil ditemukan",
+    "resultCount_other": "{{count}} hasil ditemukan",
+    "sectionForums": "Topik Forum ({{count}})",
+    "sectionApps": "Aplikasi ({{count}})",
+    "sectionResources": "Sumber Daya ({{count}})"
+  },
+  "settings": {
+    "checkingAccount": "Memeriksa akun…",
+    "signedIn": "Masuk ke AppleVis",
+    "email": "Email",
+    "emailPlaceholder": "Alamat email",
+    "password": "Kata Sandi",
+    "signingIn": "Masuk, harap tunggu",
+    "credentialsHint": "Gunakan email dan kata sandi dari situs web AppleVis Anda.",
+    "groupedNote": "Pengaturan dikelompokkan agar pengguna VoiceOver tidak perlu menavigasi daftar sakelar yang panjang.",
+    "storageCache": "Penyimpanan dan Cache",
+    "storageCacheDesc": "Kelola unduhan, konten yang di-cache, dan kebijakan penyimpanan.",
+    "a11ySignIn": "Masuk ke AppleVis",
+    "a11ySignOut": "Keluar dari AppleVis",
+    "a11ySignOutHint": "Menghapus akun Anda dari perangkat ini.",
+    "a11yOpenSection": "Membuka kategori pengaturan ini.",
+    "a11yStorageHint": "Membuka pengaturan penyimpanan dan cache."
+  },
+  "storage": {
+    "storageUsed": "Penyimpanan Digunakan",
+    "downloadedEpisodes": "Episode yang Diunduh",
+    "cachedContent": "Konten yang Di-cache",
+    "total": "Total",
+    "cacheRetention": "Retensi Cache",
+    "cacheRetentionDesc": "Berapa lama menyimpan konten yang di-cache sebelum dihapus secara otomatis.",
+    "clearStorage": "Bersihkan Penyimpanan",
+    "clearStorageDesc": "Unduhan disimpan hingga Anda menghapusnya di sini. Konten cache dimuat ulang setiap kali bagian dibuka.",
+    "clearDownloads": "Hapus Unduhan",
+    "clearCache": "Bersihkan Cache",
+    "clearAll": "Bersihkan Semua",
+    "retention3months": "3 bulan",
+    "retention6months": "6 bulan",
+    "retention12months": "12 bulan",
+    "retentionForever": "Selamanya",
+    "confirmClearDownloads": "Ini akan menghapus {{size}} podcast yang diunduh dari perangkat.",
+    "confirmClearCache": "Ini akan menghapus {{size}} konten yang di-cache. Setiap bagian akan dimuat ulang saat dibuka berikutnya.",
+    "confirmClearAll": "Ini akan menghapus {{size}}, termasuk semua unduhan dan konten yang di-cache."
+  },
+  "offline": {
+    "withAge": "Menampilkan konten cache dari {{age}}. Tarik ke bawah untuk menyegarkan saat jaringan tersedia.",
+    "noAge": "Menampilkan konten yang di-cache. Tarik ke bawah untuk menyegarkan saat jaringan tersedia."
+  },
+  "auth": {
+    "welcomeBack": "Selamat datang kembali, {{name}}!",
+    "signedOut": "Keluar.",
+    "sessionExpired": "Sesi telah kedaluwarsa. Silakan masuk kembali.",
+    "enterEmail": "Masukkan alamat email Anda.",
+    "enterPassword": "Masukkan kata sandi Anda."
+  },
+  "toast": {
+    "cacheCleared": "Cache dibersihkan.",
+    "downloadsCleared": "Unduhan dihapus.",
+    "allCleared": "Semua penyimpanan dibersihkan.",
+    "retentionUpdated": "Pengaturan retensi cache diperbarui.",
+    "topicSaved": "Topik disimpan.",
+    "topicUnsaved": "Dihapus dari tersimpan.",
+    "addedToQueue": "Ditambahkan ke antrean.",
+    "playingNext": "Berikutnya: {{title}}",
+    "signInRequired": "Masuk diperlukan. Buka Pengaturan untuk masuk.",
+    "saveComing": "Fitur simpan akan segera hadir.",
+    "downloadComing": "Fitur unduh akan segera hadir.",
+    "summariseComing": "Ringkasan akan tersedia setelah dukungan Apple Intelligence Foundation Models ditambahkan.",
+    "simplifyComing": "Penyederhanaan akan tersedia setelah dukungan Apple Intelligence Foundation Models ditambahkan.",
+    "consensusComing": "Konsensus Aksesibilitas akan tersedia setelah dukungan Apple Intelligence Foundation Models ditambahkan."
+  },
+  "refresh": {
+    "refreshing": "Menyegarkan {{label}}",
+    "updated": "{{label}} diperbarui",
+    "loaded": "{{label}} dimuat"
+  },
+  "loadMore": {
+    "button": "Muat Lebih Banyak",
+    "loading": "Memuat…"
+  },
+  "writingTools": {
+    "tip": "Apple Intelligence: pilih teks yang diketik untuk memeriksa, menulis ulang, atau menerjemahkannya dengan Writing Tools.",
+    "a11yLabel": "Tip Apple Intelligence: pilih teks yang diketik untuk memeriksa, menulis ulang, mempersingkat, atau menerjemahkannya dengan Writing Tools."
+  },
+  "translationBanner": {
+    "message": "Pesan Anda tampaknya ditulis dalam bahasa selain bahasa Inggris. AppleVis mengharuskan postingan dalam bahasa Inggris — ketuk untuk membuka Google Translate.",
+    "translate": "Buka di Terjemahan",
+    "postAsIs": "Kirim Apa Adanya"
+  },
+  "screen": {
+    "a11ySearch": "Cari di AppleVis",
+    "a11ySearchHint": "Membuka pencarian topik forum, aplikasi, dan sumber daya.",
+    "a11ySettings": "Pengaturan dan Profil",
+    "a11ySettingsHint": "Membuka pengaturan AppleVis, profil, bantuan, dan dukungan."
+  }
+}

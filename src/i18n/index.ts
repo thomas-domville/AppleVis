@@ -1,7 +1,7 @@
 /**
  * Internationalisation setup
  *
- * Supports 13 languages. RTL is detected automatically for Arabic and Persian.
+ * Supports 23 languages. RTL is detected automatically for Arabic, Persian, and Hebrew.
  * Dynamic strings (dates, relative times) are handled by Intl built-ins —
  * they respect the device locale without any extra configuration here.
  *
@@ -29,10 +29,23 @@ import zh from './locales/zh.json';
 import ar from './locales/ar.json';
 import hi from './locales/hi.json';
 import fa from './locales/fa.json';
+import ru from './locales/ru.json';
+import tr from './locales/tr.json';
+import pl from './locales/pl.json';
+import sv from './locales/sv.json';
+import he from './locales/he.json';
+import id from './locales/id.json';
+import vi from './locales/vi.json';
+import uk from './locales/uk.json';
+import el from './locales/el.json';
+import th from './locales/th.json';
 
 // ─── Language detection ───────────────────────────────────────────────────────
 
-const SUPPORTED = new Set(['en','es','fr','de','pt','it','ja','ko','nl','zh','ar','hi','fa']);
+const SUPPORTED = new Set([
+  'en','es','fr','de','pt','it','ja','ko','nl','zh','ar','hi','fa',
+  'ru','tr','pl','sv','he','id','vi','uk','el','th',
+]);
 const RTL_LANGS  = new Set(['ar', 'fa', 'he', 'ur']);
 
 const deviceLocales = Localization.getLocales();
@@ -64,6 +77,16 @@ i18n.use(initReactI18next).init({
     ar: { translation: ar },
     hi: { translation: hi },
     fa: { translation: fa },
+    ru: { translation: ru },
+    tr: { translation: tr },
+    pl: { translation: pl },
+    sv: { translation: sv },
+    he: { translation: he },
+    id: { translation: id },
+    vi: { translation: vi },
+    uk: { translation: uk },
+    el: { translation: el },
+    th: { translation: th },
   },
   lng:          resolvedLang,
   fallbackLng:  'en',

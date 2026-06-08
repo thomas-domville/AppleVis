@@ -1,0 +1,226 @@
+{
+  "tabs": {
+    "home": "בית",
+    "forums": "פורומים",
+    "podcasts": "פודקאסטים",
+    "apps": "אפליקציות",
+    "resources": "משאבים"
+  },
+  "common": {
+    "loading": "טוען…",
+    "retry": "נסה שנית",
+    "cancel": "ביטול",
+    "gotIt": "הבנתי",
+    "save": "שמור",
+    "share": "שתף",
+    "search": "חיפוש",
+    "settings": "הגדרות",
+    "copyLink": "העתק קישור",
+    "open": "פתח",
+    "close": "סגור",
+    "viewGuidelines": "הצג הנחיות",
+    "translate": "תרגם",
+    "readAloud": "קרא בקול",
+    "summarise": "סכם",
+    "simplify": "פשט"
+  },
+  "actions": {
+    "open": "פתח",
+    "readAloud": "קרא בקול",
+    "translate": "תרגם",
+    "summarise": "סכם",
+    "simplify": "פשט",
+    "share": "שתף",
+    "save": "שמור",
+    "copyLink": "העתק קישור",
+    "openAppPage": "פתח דף אפליקציה",
+    "saveApp": "שמור אפליקציה",
+    "viewReviews": "הצג ביקורות",
+    "summariseReviews": "סכם ביקורות",
+    "accessibilityConsensus": "קונצנזוס נגישות",
+    "saveTopic": "שמור נושא",
+    "unsaveTopic": "הסר מהשמורים",
+    "followTopic": "עקוב אחר נושא",
+    "unfollowTopic": "הפסק לעקוב",
+    "signInToFollow": "היכנס כדי לעקוב",
+    "markAsRead": "סמן כנקרא",
+    "play": "הפעל",
+    "pause": "השהה",
+    "readDescriptionAloud": "קרא תיאור בקול",
+    "playNext": "הבא",
+    "addToQueue": "הוסף לתור",
+    "saveEpisode": "שמור פרק",
+    "download": "הורד"
+  },
+  "home": {
+    "greeting": {
+      "morning": "בוקר טוב",
+      "afternoon": "צהריים טובים",
+      "evening": "ערב טוב",
+      "night": "לילה טוב"
+    },
+    "lastVisit": "ביקור אחרון",
+    "firstVisit": "הביקור הראשון שלך — ברוך הבא!"
+  },
+  "forums": {
+    "loading": "טוען {{filter}}…",
+    "noTopics": "אין נושאים",
+    "pullToRefresh": "משוך לרענון הפורומים",
+    "filters": {
+      "recent": "אחרונים",
+      "new": "חדשים",
+      "unread": "לא נקראו",
+      "following": "נעקבים",
+      "saved": "שמורים",
+      "sinceLastVisit": "מאז הביקור האחרון"
+    },
+    "filterDesc": {
+      "sinceLastVisit": "נושאים שהשתנו מאז שפתחת את AppleVis לאחרונה.",
+      "unread": "נושאים שטרם פתחת במכשיר זה.",
+      "following": "נושאים שאתה עוקב אחריהם. נשמרים מקומית ומסונכרנים דרך iCloud.",
+      "saved": "נושאים שנשמרו לאחר כך. מסונכרנים דרך iCloud."
+    },
+    "error": "לא ניתן לטעון נושאים",
+    "noTopicsEmpty": {
+      "unread": "קראת הכל.",
+      "following": "אינך עוקב אחר נושאים עדיין.",
+      "saved": "לא שמרת נושאים עדיין.",
+      "sinceLastVisit": "אין פעילות חדשה מאז הביקור האחרון שלך."
+    }
+  },
+  "podcasts": {
+    "episodes": "פרקים",
+    "loading": "טוען פרקים…",
+    "noEpisodes": "אין פרקים עדיין",
+    "error": "לא ניתן לטעון פרקים",
+    "pullToRefresh": "משוך לרענון פודקאסטים",
+    "play": "הפעל",
+    "pause": "השהה",
+    "skipBack": "דלג אחורה {{seconds}} ש'",
+    "skipForward": "דלג קדימה {{seconds}} ש'",
+    "speed": "מהירות",
+    "sleepTimer": "טיימר שינה",
+    "sleepTimerRemaining": "טיימר שינה — נותרו {{time}}",
+    "cancelSleepTimer": "בטל טיימר שינה",
+    "chapters": "פרקים",
+    "jumpToChapter": "עבור לפרק: {{title}}, מתחיל ב-{{time}}",
+    "queue": "תור",
+    "currentlyLoaded": "נטען."
+  },
+  "apps": {
+    "loading": "טוען אפליקציות…",
+    "noApps": "אין אפליקציות עדיין",
+    "error": "לא ניתן לטעון אפליקציות",
+    "pullToRefresh": "משוך לרענון אפליקציות",
+    "reviews": "{{count}} ביקורות",
+    "updated": "עודכן {{date}}"
+  },
+  "resources": {
+    "loading": "טוען משאבים…",
+    "noResources": "אין משאבים עדיין",
+    "error": "לא ניתן לטעון משאבים",
+    "pullToRefresh": "משוך לרענון משאבים",
+    "updated": "עודכן {{date}}"
+  },
+  "search": {
+    "placeholder": "חפש פורומים, אפליקציות, משאבים…",
+    "accessibilityHint": "הקלד לחיפוש נושאים בפורום, אפליקציות ומשאבים.",
+    "searching": "מחפש…",
+    "noResults": "אין תוצאות",
+    "noResultsHint": "נסה מילות מפתח אחרות או בדוק את האיות.",
+    "intro": "חפש בנושאי פורום, קטלוג אפליקציות ומשאבים. התוצאות מופיעות בזמן הקלדה.",
+    "resultCount_one": "נמצאה תוצאה {{count}}",
+    "resultCount_other": "נמצאו {{count}} תוצאות",
+    "sectionForums": "נושאי פורום ({{count}})",
+    "sectionApps": "אפליקציות ({{count}})",
+    "sectionResources": "משאבים ({{count}})"
+  },
+  "settings": {
+    "checkingAccount": "בודק חשבון…",
+    "signedIn": "מחובר ל-AppleVis",
+    "email": "דואר אלקטרוני",
+    "emailPlaceholder": "כתובת דואר אלקטרוני",
+    "password": "סיסמה",
+    "signingIn": "מתחבר, אנא המתן",
+    "credentialsHint": "השתמש בדואר האלקטרוני והסיסמה מאתר AppleVis.",
+    "groupedNote": "ההגדרות מקובצות כדי שמשתמשי VoiceOver לא יצטרכו לנווט ברשימה ארוכה של מתגים.",
+    "storageCache": "אחסון ומטמון",
+    "storageCacheDesc": "נהל הורדות, תוכן במטמון ומדיניות אחסון.",
+    "a11ySignIn": "התחבר ל-AppleVis",
+    "a11ySignOut": "התנתק מ-AppleVis",
+    "a11ySignOutHint": "מסיר את חשבונך ממכשיר זה.",
+    "a11yOpenSection": "פותח קטגוריית הגדרות זו.",
+    "a11yStorageHint": "פותח הגדרות אחסון ומטמון."
+  },
+  "storage": {
+    "storageUsed": "אחסון בשימוש",
+    "downloadedEpisodes": "פרקים שהורדו",
+    "cachedContent": "תוכן במטמון",
+    "total": "סה\"כ",
+    "cacheRetention": "שמירת מטמון",
+    "cacheRetentionDesc": "כמה זמן לשמור תוכן במטמון לפני מחיקה אוטומטית.",
+    "clearStorage": "נקה אחסון",
+    "clearStorageDesc": "הורדות נשמרות עד שתמחק אותן כאן. תוכן המטמון נטען מחדש בכל פעם שפותחים קטע.",
+    "clearDownloads": "מחק הורדות",
+    "clearCache": "נקה מטמון",
+    "clearAll": "נקה הכל",
+    "retention3months": "3 חודשים",
+    "retention6months": "6 חודשים",
+    "retention12months": "12 חודשים",
+    "retentionForever": "לתמיד",
+    "confirmClearDownloads": "פעולה זו תמחק {{size}} פודקאסטים שהורדו מהמכשיר.",
+    "confirmClearCache": "פעולה זו תמחק {{size}} של תוכן במטמון. כל קטע יוטען מחדש בפעם הבאה שייפתח.",
+    "confirmClearAll": "פעולה זו תמחק {{size}}, כולל כל ההורדות ותוכן המטמון."
+  },
+  "offline": {
+    "withAge": "מציג תוכן שנשמר במטמון מ-{{age}}. משוך למטה לרענון כשיש רשת.",
+    "noAge": "מציג תוכן שנשמר במטמון. משוך למטה לרענון כשיש רשת."
+  },
+  "auth": {
+    "welcomeBack": "ברוך שובך, {{name}}!",
+    "signedOut": "התנתקת.",
+    "sessionExpired": "פג תוקף ההפעלה. אנא התחבר מחדש.",
+    "enterEmail": "הזן את כתובת הדואר האלקטרוני שלך.",
+    "enterPassword": "הזן את סיסמתך."
+  },
+  "toast": {
+    "cacheCleared": "המטמון נוקה.",
+    "downloadsCleared": "ההורדות נמחקו.",
+    "allCleared": "כל האחסון נוקה.",
+    "retentionUpdated": "הגדרת שמירת המטמון עודכנה.",
+    "topicSaved": "הנושא נשמר.",
+    "topicUnsaved": "הוסר מהשמורים.",
+    "addedToQueue": "נוסף לתור.",
+    "playingNext": "הבא: {{title}}",
+    "signInRequired": "נדרשת התחברות. פתח הגדרות להתחברות.",
+    "saveComing": "האפשרות לשמור תהיה זמינה בקרוב.",
+    "downloadComing": "ההורדה תהיה זמינה בקרוב.",
+    "summariseComing": "סיכום יהיה זמין כאשר יתווסף תמיכה ב-Apple Intelligence Foundation Models.",
+    "simplifyComing": "פישוט יהיה זמין כאשר יתווסף תמיכה ב-Apple Intelligence Foundation Models.",
+    "consensusComing": "קונצנזוס נגישות יהיה זמין כאשר יתווסף תמיכה ב-Apple Intelligence Foundation Models."
+  },
+  "refresh": {
+    "refreshing": "מרענן {{label}}",
+    "updated": "{{label}} עודכן",
+    "loaded": "{{label}} נטען"
+  },
+  "loadMore": {
+    "button": "טען עוד",
+    "loading": "טוען…"
+  },
+  "writingTools": {
+    "tip": "Apple Intelligence: בחר כל טקסט שהוקלד כדי לבדוק, לשכתב או לתרגם אותו עם Writing Tools.",
+    "a11yLabel": "טיפ Apple Intelligence: בחר כל טקסט שהוקלד כדי לבדוק, לשכתב, לקצר או לתרגם אותו עם Writing Tools."
+  },
+  "translationBanner": {
+    "message": "ההודעה שלך נראית כתובה בשפה שאינה אנגלית. AppleVis מחייב פרסום באנגלית — הקש כדי לפתוח את Google Translate.",
+    "translate": "פתח בתרגום",
+    "postAsIs": "פרסם כפי שהוא"
+  },
+  "screen": {
+    "a11ySearch": "חיפוש ב-AppleVis",
+    "a11ySearchHint": "פותח חיפוש של נושאי פורום, אפליקציות ומשאבים.",
+    "a11ySettings": "הגדרות ופרופיל",
+    "a11ySettingsHint": "פותח הגדרות AppleVis, פרופיל, עזרה ותמיכה."
+  }
+}

@@ -1,0 +1,226 @@
+{
+  "tabs": {
+    "home": "หน้าหลัก",
+    "forums": "ฟอรัม",
+    "podcasts": "พอดแคสต์",
+    "apps": "แอป",
+    "resources": "ทรัพยากร"
+  },
+  "common": {
+    "loading": "กำลังโหลด…",
+    "retry": "ลองอีกครั้ง",
+    "cancel": "ยกเลิก",
+    "gotIt": "เข้าใจแล้ว",
+    "save": "บันทึก",
+    "share": "แชร์",
+    "search": "ค้นหา",
+    "settings": "การตั้งค่า",
+    "copyLink": "คัดลอกลิงก์",
+    "open": "เปิด",
+    "close": "ปิด",
+    "viewGuidelines": "ดูแนวทาง",
+    "translate": "แปล",
+    "readAloud": "อ่านออกเสียง",
+    "summarise": "สรุป",
+    "simplify": "ทำให้เข้าใจง่าย"
+  },
+  "actions": {
+    "open": "เปิด",
+    "readAloud": "อ่านออกเสียง",
+    "translate": "แปล",
+    "summarise": "สรุป",
+    "simplify": "ทำให้เข้าใจง่าย",
+    "share": "แชร์",
+    "save": "บันทึก",
+    "copyLink": "คัดลอกลิงก์",
+    "openAppPage": "เปิดหน้าแอป",
+    "saveApp": "บันทึกแอป",
+    "viewReviews": "ดูรีวิว",
+    "summariseReviews": "สรุปรีวิว",
+    "accessibilityConsensus": "ความเห็นด้านการเข้าถึง",
+    "saveTopic": "บันทึกหัวข้อ",
+    "unsaveTopic": "ลบออกจากที่บันทึก",
+    "followTopic": "ติดตามหัวข้อ",
+    "unfollowTopic": "เลิกติดตาม",
+    "signInToFollow": "เข้าสู่ระบบเพื่อติดตาม",
+    "markAsRead": "ทำเครื่องหมายว่าอ่านแล้ว",
+    "play": "เล่น",
+    "pause": "หยุดชั่วคราว",
+    "readDescriptionAloud": "อ่านคำอธิบายออกเสียง",
+    "playNext": "ถัดไป",
+    "addToQueue": "เพิ่มในคิว",
+    "saveEpisode": "บันทึกตอน",
+    "download": "ดาวน์โหลด"
+  },
+  "home": {
+    "greeting": {
+      "morning": "สวัสดีตอนเช้า",
+      "afternoon": "สวัสดีตอนบ่าย",
+      "evening": "สวัสดีตอนเย็น",
+      "night": "ราตรีสวัสดิ์"
+    },
+    "lastVisit": "การเยี่ยมชมล่าสุด",
+    "firstVisit": "การเยี่ยมชมครั้งแรกของคุณ — ยินดีต้อนรับ!"
+  },
+  "forums": {
+    "loading": "กำลังโหลด {{filter}}…",
+    "noTopics": "ไม่มีหัวข้อ",
+    "pullToRefresh": "ดึงเพื่อรีเฟรชฟอรัม",
+    "filters": {
+      "recent": "ล่าสุด",
+      "new": "ใหม่",
+      "unread": "ยังไม่ได้อ่าน",
+      "following": "กำลังติดตาม",
+      "saved": "บันทึกแล้ว",
+      "sinceLastVisit": "ตั้งแต่เยี่ยมชมล่าสุด"
+    },
+    "filterDesc": {
+      "sinceLastVisit": "หัวข้อที่เปลี่ยนแปลงตั้งแต่คุณเปิด AppleVis ครั้งล่าสุด",
+      "unread": "หัวข้อที่คุณยังไม่ได้เปิดบนอุปกรณ์นี้",
+      "following": "หัวข้อที่คุณกำลังติดตาม บันทึกไว้ในเครื่องและซิงค์ผ่าน iCloud",
+      "saved": "หัวข้อที่บันทึกไว้สำหรับภายหลัง ซิงค์ผ่าน iCloud"
+    },
+    "error": "ไม่สามารถโหลดหัวข้อได้",
+    "noTopicsEmpty": {
+      "unread": "อ่านทุกอย่างแล้ว",
+      "following": "คุณยังไม่ได้ติดตามหัวข้อใด",
+      "saved": "คุณยังไม่ได้บันทึกหัวข้อใด",
+      "sinceLastVisit": "ไม่มีกิจกรรมใหม่ตั้งแต่การเยี่ยมชมครั้งล่าสุดของคุณ"
+    }
+  },
+  "podcasts": {
+    "episodes": "ตอน",
+    "loading": "กำลังโหลดตอน…",
+    "noEpisodes": "ยังไม่มีตอน",
+    "error": "ไม่สามารถโหลดตอนได้",
+    "pullToRefresh": "ดึงเพื่อรีเฟรชพอดแคสต์",
+    "play": "เล่น",
+    "pause": "หยุดชั่วคราว",
+    "skipBack": "ย้อนกลับ {{seconds}} วิ",
+    "skipForward": "ข้ามไปข้างหน้า {{seconds}} วิ",
+    "speed": "ความเร็ว",
+    "sleepTimer": "ตั้งเวลานอนหลับ",
+    "sleepTimerRemaining": "ตั้งเวลานอน — เหลืออีก {{time}}",
+    "cancelSleepTimer": "ยกเลิกตั้งเวลานอน",
+    "chapters": "บท",
+    "jumpToChapter": "ไปยังบท: {{title}} เริ่มที่ {{time}}",
+    "queue": "คิว",
+    "currentlyLoaded": "โหลดแล้ว"
+  },
+  "apps": {
+    "loading": "กำลังโหลดแอป…",
+    "noApps": "ยังไม่มีแอป",
+    "error": "ไม่สามารถโหลดแอปได้",
+    "pullToRefresh": "ดึงเพื่อรีเฟรชแอป",
+    "reviews": "{{count}} รีวิว",
+    "updated": "อัปเดต {{date}}"
+  },
+  "resources": {
+    "loading": "กำลังโหลดทรัพยากร…",
+    "noResources": "ยังไม่มีทรัพยากร",
+    "error": "ไม่สามารถโหลดทรัพยากรได้",
+    "pullToRefresh": "ดึงเพื่อรีเฟรชทรัพยากร",
+    "updated": "อัปเดต {{date}}"
+  },
+  "search": {
+    "placeholder": "ค้นหาฟอรัม แอป ทรัพยากร…",
+    "accessibilityHint": "พิมพ์เพื่อค้นหาหัวข้อฟอรัม แอป และทรัพยากร",
+    "searching": "กำลังค้นหา…",
+    "noResults": "ไม่พบผลลัพธ์",
+    "noResultsHint": "ลองใช้คำค้นหาอื่นหรือตรวจสอบการสะกดคำ",
+    "intro": "ค้นหาในหัวข้อฟอรัม ไดเรกทอรีแอป และทรัพยากร ผลลัพธ์จะแสดงขณะที่คุณพิมพ์",
+    "resultCount_one": "พบ {{count}} ผลลัพธ์",
+    "resultCount_other": "พบ {{count}} ผลลัพธ์",
+    "sectionForums": "หัวข้อฟอรัม ({{count}})",
+    "sectionApps": "แอป ({{count}})",
+    "sectionResources": "ทรัพยากร ({{count}})"
+  },
+  "settings": {
+    "checkingAccount": "กำลังตรวจสอบบัญชี…",
+    "signedIn": "เข้าสู่ระบบ AppleVis แล้ว",
+    "email": "อีเมล",
+    "emailPlaceholder": "ที่อยู่อีเมล",
+    "password": "รหัสผ่าน",
+    "signingIn": "กำลังเข้าสู่ระบบ โปรดรอ",
+    "credentialsHint": "ใช้อีเมลและรหัสผ่านจากเว็บไซต์ AppleVis ของคุณ",
+    "groupedNote": "การตั้งค่าถูกจัดกลุ่มเพื่อให้ผู้ใช้ VoiceOver ไม่ต้องนำทางผ่านรายการสวิตช์ยาว",
+    "storageCache": "พื้นที่เก็บข้อมูลและแคช",
+    "storageCacheDesc": "จัดการการดาวน์โหลด เนื้อหาที่แคชไว้ และนโยบายการจัดเก็บ",
+    "a11ySignIn": "เข้าสู่ระบบ AppleVis",
+    "a11ySignOut": "ออกจากระบบ AppleVis",
+    "a11ySignOutHint": "ลบบัญชีของคุณออกจากอุปกรณ์นี้",
+    "a11yOpenSection": "เปิดหมวดหมู่การตั้งค่านี้",
+    "a11yStorageHint": "เปิดการตั้งค่าพื้นที่เก็บข้อมูลและแคช"
+  },
+  "storage": {
+    "storageUsed": "พื้นที่ที่ใช้",
+    "downloadedEpisodes": "ตอนที่ดาวน์โหลด",
+    "cachedContent": "เนื้อหาที่แคชไว้",
+    "total": "รวม",
+    "cacheRetention": "การเก็บรักษาแคช",
+    "cacheRetentionDesc": "ระยะเวลาเก็บรักษาเนื้อหาที่แคชก่อนจะลบโดยอัตโนมัติ",
+    "clearStorage": "ล้างพื้นที่เก็บข้อมูล",
+    "clearStorageDesc": "การดาวน์โหลดจะถูกเก็บไว้จนกว่าคุณจะลบที่นี่ เนื้อหาแคชจะโหลดใหม่ทุกครั้งที่เปิดส่วนนั้น",
+    "clearDownloads": "ลบการดาวน์โหลด",
+    "clearCache": "ล้างแคช",
+    "clearAll": "ล้างทั้งหมด",
+    "retention3months": "3 เดือน",
+    "retention6months": "6 เดือน",
+    "retention12months": "12 เดือน",
+    "retentionForever": "ตลอดไป",
+    "confirmClearDownloads": "การดำเนินการนี้จะลบพอดแคสต์ที่ดาวน์โหลด {{size}} จากอุปกรณ์",
+    "confirmClearCache": "การดำเนินการนี้จะลบเนื้อหาแคช {{size}} แต่ละส่วนจะโหลดใหม่เมื่อเปิดครั้งถัดไป",
+    "confirmClearAll": "การดำเนินการนี้จะลบ {{size}} รวมถึงการดาวน์โหลดและเนื้อหาแคชทั้งหมด"
+  },
+  "offline": {
+    "withAge": "แสดงเนื้อหาที่แคชจาก {{age}} ดึงลงเพื่อรีเฟรชเมื่อมีเครือข่าย",
+    "noAge": "แสดงเนื้อหาที่แคชไว้ ดึงลงเพื่อรีเฟรชเมื่อมีเครือข่าย"
+  },
+  "auth": {
+    "welcomeBack": "ยินดีต้อนรับกลับมา {{name}}!",
+    "signedOut": "ออกจากระบบแล้ว",
+    "sessionExpired": "เซสชันหมดอายุแล้ว โปรดเข้าสู่ระบบอีกครั้ง",
+    "enterEmail": "กรอกที่อยู่อีเมลของคุณ",
+    "enterPassword": "กรอกรหัสผ่านของคุณ"
+  },
+  "toast": {
+    "cacheCleared": "ล้างแคชแล้ว",
+    "downloadsCleared": "ลบการดาวน์โหลดแล้ว",
+    "allCleared": "ล้างพื้นที่เก็บข้อมูลทั้งหมดแล้ว",
+    "retentionUpdated": "อัปเดตการตั้งค่าการเก็บรักษาแคชแล้ว",
+    "topicSaved": "บันทึกหัวข้อแล้ว",
+    "topicUnsaved": "ลบออกจากที่บันทึกแล้ว",
+    "addedToQueue": "เพิ่มในคิวแล้ว",
+    "playingNext": "ถัดไป: {{title}}",
+    "signInRequired": "ต้องเข้าสู่ระบบ เปิดการตั้งค่าเพื่อเข้าสู่ระบบ",
+    "saveComing": "ฟีเจอร์บันทึกจะมาเร็วๆ นี้",
+    "downloadComing": "ฟีเจอร์ดาวน์โหลดจะมาเร็วๆ นี้",
+    "summariseComing": "การสรุปจะพร้อมใช้งานเมื่อเพิ่มการรองรับ Apple Intelligence Foundation Models",
+    "simplifyComing": "การทำให้เข้าใจง่ายจะพร้อมใช้งานเมื่อเพิ่มการรองรับ Apple Intelligence Foundation Models",
+    "consensusComing": "ความเห็นด้านการเข้าถึงจะพร้อมใช้งานเมื่อเพิ่มการรองรับ Apple Intelligence Foundation Models"
+  },
+  "refresh": {
+    "refreshing": "กำลังรีเฟรช {{label}}",
+    "updated": "{{label}} อัปเดตแล้ว",
+    "loaded": "{{label}} โหลดแล้ว"
+  },
+  "loadMore": {
+    "button": "โหลดเพิ่มเติม",
+    "loading": "กำลังโหลด…"
+  },
+  "writingTools": {
+    "tip": "Apple Intelligence: เลือกข้อความที่พิมพ์เพื่อตรวจสอบ เขียนใหม่ หรือแปลด้วย Writing Tools",
+    "a11yLabel": "เคล็ดลับ Apple Intelligence: เลือกข้อความที่พิมพ์เพื่อตรวจสอบ เขียนใหม่ ย่อ หรือแปลด้วย Writing Tools"
+  },
+  "translationBanner": {
+    "message": "ข้อความของคุณดูเหมือนเขียนในภาษาอื่นที่ไม่ใช่ภาษาอังกฤษ AppleVis ต้องการโพสต์เป็นภาษาอังกฤษ — แตะเพื่อเปิด Google แปลภาษา",
+    "translate": "เปิดในตัวแปลภาษา",
+    "postAsIs": "โพสต์ตามที่เป็น"
+  },
+  "screen": {
+    "a11ySearch": "ค้นหาใน AppleVis",
+    "a11ySearchHint": "เปิดการค้นหาหัวข้อฟอรัม แอป และทรัพยากร",
+    "a11ySettings": "การตั้งค่าและโปรไฟล์",
+    "a11ySettingsHint": "เปิดการตั้งค่า AppleVis โปรไฟล์ ความช่วยเหลือ และการสนับสนุน"
+  }
+}

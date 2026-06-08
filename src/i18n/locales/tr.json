@@ -1,0 +1,226 @@
+{
+  "tabs": {
+    "home": "Ana Sayfa",
+    "forums": "Forumlar",
+    "podcasts": "Podcast'ler",
+    "apps": "Uygulamalar",
+    "resources": "Kaynaklar"
+  },
+  "common": {
+    "loading": "Yükleniyor…",
+    "retry": "Tekrar Dene",
+    "cancel": "İptal",
+    "gotIt": "Anladım",
+    "save": "Kaydet",
+    "share": "Paylaş",
+    "search": "Ara",
+    "settings": "Ayarlar",
+    "copyLink": "Bağlantıyı Kopyala",
+    "open": "Aç",
+    "close": "Kapat",
+    "viewGuidelines": "Yönergeleri Görüntüle",
+    "translate": "Çevir",
+    "readAloud": "Sesli Oku",
+    "summarise": "Özetle",
+    "simplify": "Sadeleştir"
+  },
+  "actions": {
+    "open": "Aç",
+    "readAloud": "Sesli Oku",
+    "translate": "Çevir",
+    "summarise": "Özetle",
+    "simplify": "Sadeleştir",
+    "share": "Paylaş",
+    "save": "Kaydet",
+    "copyLink": "Bağlantıyı Kopyala",
+    "openAppPage": "Uygulama Sayfasını Aç",
+    "saveApp": "Uygulamayı Kaydet",
+    "viewReviews": "İncelemeleri Gör",
+    "summariseReviews": "İncelemeleri Özetle",
+    "accessibilityConsensus": "Erişilebilirlik Görüşü",
+    "saveTopic": "Konuyu Kaydet",
+    "unsaveTopic": "Kaydedilenlerden Kaldır",
+    "followTopic": "Konuyu Takip Et",
+    "unfollowTopic": "Takibi Bırak",
+    "signInToFollow": "Takip İçin Giriş Yap",
+    "markAsRead": "Okundu Olarak İşaretle",
+    "play": "Oynat",
+    "pause": "Duraklat",
+    "readDescriptionAloud": "Açıklamayı Sesli Oku",
+    "playNext": "Sıradaki",
+    "addToQueue": "Sıraya Ekle",
+    "saveEpisode": "Bölümü Kaydet",
+    "download": "İndir"
+  },
+  "home": {
+    "greeting": {
+      "morning": "Günaydın",
+      "afternoon": "İyi günler",
+      "evening": "İyi akşamlar",
+      "night": "İyi geceler"
+    },
+    "lastVisit": "Son Ziyaret",
+    "firstVisit": "ilk ziyaretiniz — hoş geldiniz!"
+  },
+  "forums": {
+    "loading": "{{filter}} yükleniyor…",
+    "noTopics": "Konu Yok",
+    "pullToRefresh": "Forumları yenilemek için çekin",
+    "filters": {
+      "recent": "Son",
+      "new": "Yeni",
+      "unread": "Okunmamış",
+      "following": "Takip Edilen",
+      "saved": "Kaydedilen",
+      "sinceLastVisit": "Son Ziyaretten Bu Yana"
+    },
+    "filterDesc": {
+      "sinceLastVisit": "Son AppleVis açılışınızdan bu yana değişen konular.",
+      "unread": "Bu cihazda henüz açmadığınız konular.",
+      "following": "Takip ettiğiniz konular. Yerel olarak kaydedilir ve iCloud ile senkronize edilir.",
+      "saved": "Daha sonra okumak için kaydettiğiniz konular. iCloud ile senkronize edilir."
+    },
+    "error": "Konular yüklenemedi",
+    "noTopicsEmpty": {
+      "unread": "Her şeyi okudunuz.",
+      "following": "Henüz takip ettiğiniz bir konu yok.",
+      "saved": "Henüz konu kaydetmediniz.",
+      "sinceLastVisit": "Son ziyaretinizden bu yana yeni etkinlik yok."
+    }
+  },
+  "podcasts": {
+    "episodes": "Bölümler",
+    "loading": "Bölümler yükleniyor…",
+    "noEpisodes": "Henüz bölüm yok",
+    "error": "Bölümler yüklenemedi",
+    "pullToRefresh": "Podcast'leri yenilemek için çekin",
+    "play": "Oynat",
+    "pause": "Duraklat",
+    "skipBack": "{{seconds}} s geri al",
+    "skipForward": "{{seconds}} s ileri al",
+    "speed": "Hız",
+    "sleepTimer": "Uyku Zamanlayıcısı",
+    "sleepTimerRemaining": "Uyku zamanlayıcısı — {{time}} kaldı",
+    "cancelSleepTimer": "Uyku zamanlayıcısını iptal et",
+    "chapters": "Bölümler",
+    "jumpToChapter": "Bölüme git: {{title}}, başlangıç {{time}}",
+    "queue": "Sıra",
+    "currentlyLoaded": "Yüklendi."
+  },
+  "apps": {
+    "loading": "Uygulamalar yükleniyor…",
+    "noApps": "Henüz uygulama yok",
+    "error": "Uygulamalar yüklenemedi",
+    "pullToRefresh": "Uygulamaları yenilemek için çekin",
+    "reviews": "{{count}} inceleme",
+    "updated": "{{date}} tarihinde güncellendi"
+  },
+  "resources": {
+    "loading": "Kaynaklar yükleniyor…",
+    "noResources": "Henüz kaynak yok",
+    "error": "Kaynaklar yüklenemedi",
+    "pullToRefresh": "Kaynakları yenilemek için çekin",
+    "updated": "{{date}} tarihinde güncellendi"
+  },
+  "search": {
+    "placeholder": "Forum, uygulama, kaynak ara…",
+    "accessibilityHint": "Forum konularını, uygulamaları ve kaynakları aramak için yazın.",
+    "searching": "Aranıyor…",
+    "noResults": "Sonuç Yok",
+    "noResultsHint": "Farklı anahtar kelimeler deneyin veya yazımı kontrol edin.",
+    "intro": "Forum konularında, uygulama dizininde ve kaynaklarda arama yapın. Yazarken sonuçlar görünür.",
+    "resultCount_one": "{{count}} sonuç bulundu",
+    "resultCount_other": "{{count}} sonuç bulundu",
+    "sectionForums": "Forum Konuları ({{count}})",
+    "sectionApps": "Uygulamalar ({{count}})",
+    "sectionResources": "Kaynaklar ({{count}})"
+  },
+  "settings": {
+    "checkingAccount": "Hesap kontrol ediliyor…",
+    "signedIn": "AppleVis'e giriş yapıldı",
+    "email": "E-posta",
+    "emailPlaceholder": "E-posta adresi",
+    "password": "Şifre",
+    "signingIn": "Giriş yapılıyor, lütfen bekleyin",
+    "credentialsHint": "AppleVis web sitenizdeki e-posta ve şifrenizi kullanın.",
+    "groupedNote": "VoiceOver kullanıcılarının uzun bir geçiş listesinde gezinmesi gerekmemesi için ayarlar gruplandırılmıştır.",
+    "storageCache": "Depolama ve Önbellek",
+    "storageCacheDesc": "İndirmeleri, önbelleğe alınan içeriği ve saklama politikasını yönetin.",
+    "a11ySignIn": "AppleVis'e giriş yap",
+    "a11ySignOut": "AppleVis'ten çıkış yap",
+    "a11ySignOutHint": "Hesabınızı bu cihazdan kaldırır.",
+    "a11yOpenSection": "Bu ayar kategorisini açar.",
+    "a11yStorageHint": "Depolama ve önbellek ayarlarını açar."
+  },
+  "storage": {
+    "storageUsed": "Kullanılan Depolama",
+    "downloadedEpisodes": "İndirilen Bölümler",
+    "cachedContent": "Önbelleğe Alınan İçerik",
+    "total": "Toplam",
+    "cacheRetention": "Önbellek Saklama",
+    "cacheRetentionDesc": "Önbelleğe alınan içeriğin otomatik silinmeden önce ne kadar süre saklanacağı.",
+    "clearStorage": "Depolamayı Temizle",
+    "clearStorageDesc": "İndirmeler buradan silinene kadar saklanır. Önbelleğe alınan içerik her bölüm açıldığında yeniden indirilir.",
+    "clearDownloads": "İndirmeleri Sil",
+    "clearCache": "Önbelleği Temizle",
+    "clearAll": "Tümünü Temizle",
+    "retention3months": "3 ay",
+    "retention6months": "6 ay",
+    "retention12months": "12 ay",
+    "retentionForever": "Sonsuza Kadar",
+    "confirmClearDownloads": "Bu işlem, cihazdan {{size}} indirilen podcast'i siler.",
+    "confirmClearCache": "Bu işlem, {{size}} önbelleğe alınan içeriği siler. Her bölüm bir sonraki açılışında yeniden indirilir.",
+    "confirmClearAll": "Bu işlem, tüm indirmeler ve önbelleğe alınan içerik dahil {{size}} siler."
+  },
+  "offline": {
+    "withAge": "{{age}} tarihli önbelleğe alınan içerik gösteriliyor. Bağlantı olduğunda yenilemek için aşağı çekin.",
+    "noAge": "Önbelleğe alınan içerik gösteriliyor. Bağlantı olduğunda yenilemek için aşağı çekin."
+  },
+  "auth": {
+    "welcomeBack": "Tekrar hoş geldiniz, {{name}}!",
+    "signedOut": "Çıkış yapıldı.",
+    "sessionExpired": "Oturum süresi doldu. Lütfen tekrar giriş yapın.",
+    "enterEmail": "E-posta adresinizi girin.",
+    "enterPassword": "Şifrenizi girin."
+  },
+  "toast": {
+    "cacheCleared": "Önbellek temizlendi.",
+    "downloadsCleared": "İndirmeler silindi.",
+    "allCleared": "Tüm depolama temizlendi.",
+    "retentionUpdated": "Önbellek saklama ayarı güncellendi.",
+    "topicSaved": "Konu kaydedildi.",
+    "topicUnsaved": "Kaydedilenlerden kaldırıldı.",
+    "addedToQueue": "Sıraya eklendi.",
+    "playingNext": "Sıradaki: {{title}}",
+    "signInRequired": "Giriş gerekli. Giriş yapmak için Ayarlar'ı açın.",
+    "saveComing": "Kaydetme özelliği yakında kullanıma sunulacak.",
+    "downloadComing": "İndirme özelliği yakında kullanıma sunulacak.",
+    "summariseComing": "Özetleme, Apple Intelligence Foundation Models desteği eklendiğinde kullanılabilecek.",
+    "simplifyComing": "Sadeleştirme, Apple Intelligence Foundation Models desteği eklendiğinde kullanılabilecek.",
+    "consensusComing": "Erişilebilirlik Görüşü, Apple Intelligence Foundation Models desteği eklendiğinde kullanılabilecek."
+  },
+  "refresh": {
+    "refreshing": "{{label}} yenileniyor",
+    "updated": "{{label}} güncellendi",
+    "loaded": "{{label}} yüklendi"
+  },
+  "loadMore": {
+    "button": "Daha Fazla Yükle",
+    "loading": "Yükleniyor…"
+  },
+  "writingTools": {
+    "tip": "Apple Intelligence: Yazma Araçları ile yazılan metni denetlemek, yeniden yazmak veya çevirmek için herhangi bir girdi metnini seçin.",
+    "a11yLabel": "Apple Intelligence ipucu: Yazma Araçları ile denetlemek, yeniden yazmak, kısaltmak veya çevirmek için herhangi bir girdi metnini seçin."
+  },
+  "translationBanner": {
+    "message": "Mesajınız İngilizce dışında bir dilde yazılmış gibi görünüyor. AppleVis, İngilizce yayınlamayı gerektirir — Google Translate'i açmak için dokunun.",
+    "translate": "Çeviride Aç",
+    "postAsIs": "Olduğu Gibi Gönder"
+  },
+  "screen": {
+    "a11ySearch": "AppleVis'te Ara",
+    "a11ySearchHint": "Forum konularında, uygulamalarda ve kaynaklarda aramayı açar.",
+    "a11ySettings": "Ayarlar ve Profil",
+    "a11ySettingsHint": "AppleVis ayarlarını, profili, yardımı ve desteği açar."
+  }
+}

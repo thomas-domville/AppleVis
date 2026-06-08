@@ -30,6 +30,12 @@ const cache: Partial<Record<SoundKey, Audio.Sound>> = {};
 // not the ringer volume, which is often much lower.
 const PREVIEW_KEYS = new Set<SoundKey>(['mouseSqueak', 'appleCrunch', 'welcome']);
 
+// Per-key volume overrides (0.0–1.0). Omitted keys default to 1.0.
+const VOLUMES: Partial<Record<SoundKey, number>> = {
+  welcome:         0.4,
+  refreshComplete: 0.4,
+};
+
 async function play(key: SoundKey): Promise<void> {
   try {
     const isPreview = PREVIEW_KEYS.has(key);
@@ -43,11 +49,12 @@ async function play(key: SoundKey): Promise<void> {
       });
     }
 
+    const volume = VOLUMES[key] ?? 1.0;
     if (!cache[key]) {
-      const { sound } = await Audio.Sound.createAsync(ASSETS[key], { volume: 1.0 });
+      const { sound } = await Audio.Sound.createAsync(ASSETS[key], { volume });
       cache[key] = sound;
     }
-    await cache[key]!.setVolumeAsync(1.0);
+    await cache[key]!.setVolumeAsync(volume);
     await cache[key]!.setPositionAsync(0);
     await cache[key]!.playAsync();
 

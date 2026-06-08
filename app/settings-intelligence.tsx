@@ -143,13 +143,12 @@ export default function IntelligenceSettings() {
           title="Translate"
           badge="Live"
           badgeVariant="live"
-          description="Opens the iOS Share sheet with content pre-filled. Supports any language iOS supports — no extra setup needed. Available via the VoiceOver actions rotor on forum topics, app listings, and resources."
+          description="When you type a reply or comment in a language other than English, a banner appears offering to open Google Translate with your text pre-filled. AppleVis requires all posts to be in English — this helps non-English speakers contribute."
         >
           <TryButton
             label="Try Translate"
             onPress={() => translateContent(
               'Welcome to AppleVis — the premier community for blind, DeafBlind, and low vision Apple users.',
-              'AppleVis',
             )}
           />
         </FeatureCard>
@@ -160,7 +159,7 @@ export default function IntelligenceSettings() {
           accessible
           accessibilityRole="switch"
           accessibilityState={{ checked: nonEnglishDetectionEnabled }}
-          accessibilityLabel={`Non-English Text Detection, ${nonEnglishDetectionEnabled ? 'on' : 'off'}. When you type or paste non-English text in the search bar or compose screen, a banner appears offering to translate it before you search or post.`}
+          accessibilityLabel="Non-English Text Detection. When you type or paste non-English text in the search bar or compose screen, a banner appears offering to translate it before you search or post."
           style={({ pressed }) => [
             styles.card,
             { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14,

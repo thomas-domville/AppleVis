@@ -1,8 +1,8 @@
 /**
  * AppleVis Theme System
  *
- * 13 themes across three groups:
- *   Standard    — System, Light, Dark, Midnight, Warm, Sepia
+ * 14 themes across three groups:
+ *   Standard    — System, System (Inverted), Light, Dark, Midnight, Warm, Sepia
  *   AppleVis    — Classic, Mouse Light, Mouse Dark, Orchard, Golden Gate, Nebula
  *   Accessibility — High Contrast Light, High Contrast Dark
  *
@@ -12,6 +12,7 @@
 
 export type ThemeId =
   | 'system'
+  | 'oppositeToSystem'
   | 'light'
   | 'dark'
   | 'midnight'
@@ -294,6 +295,15 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
     description: 'Follows your iOS Light or Dark Mode setting automatically — the app always matches the rest of your device.',
     example: 'If your iPhone is in Dark Mode, AppleVis will be dark. Switch iOS to Light Mode and AppleVis switches too.',
     colors: light, // placeholder — resolved dynamically in ThemeContext
+  },
+  oppositeToSystem: {
+    id: 'oppositeToSystem',
+    name: 'System (Inverted)',
+    group: 'standard',
+    isDark: false, // resolved at runtime
+    description: 'Always the opposite of your iOS appearance — dark app when your phone is light, light app when your phone is dark. Useful if you rely on contrast to locate the keyboard on screen.',
+    example: 'If your iPhone is in Light Mode, AppleVis will be dark — making the light system keyboard stand out against the dark app background.',
+    colors: dark, // placeholder — resolved dynamically in ThemeContext
   },
   light: {
     id: 'light',

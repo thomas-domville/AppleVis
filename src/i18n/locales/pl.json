@@ -1,0 +1,226 @@
+{
+  "tabs": {
+    "home": "Strona główna",
+    "forums": "Fora",
+    "podcasts": "Podcasty",
+    "apps": "Aplikacje",
+    "resources": "Zasoby"
+  },
+  "common": {
+    "loading": "Ładowanie…",
+    "retry": "Spróbuj ponownie",
+    "cancel": "Anuluj",
+    "gotIt": "Rozumiem",
+    "save": "Zapisz",
+    "share": "Udostępnij",
+    "search": "Szukaj",
+    "settings": "Ustawienia",
+    "copyLink": "Kopiuj link",
+    "open": "Otwórz",
+    "close": "Zamknij",
+    "viewGuidelines": "Zobacz wskazówki",
+    "translate": "Przetłumacz",
+    "readAloud": "Czytaj na głos",
+    "summarise": "Podsumuj",
+    "simplify": "Uprość"
+  },
+  "actions": {
+    "open": "Otwórz",
+    "readAloud": "Czytaj na głos",
+    "translate": "Przetłumacz",
+    "summarise": "Podsumuj",
+    "simplify": "Uprość",
+    "share": "Udostępnij",
+    "save": "Zapisz",
+    "copyLink": "Kopiuj link",
+    "openAppPage": "Otwórz stronę aplikacji",
+    "saveApp": "Zapisz aplikację",
+    "viewReviews": "Zobacz recenzje",
+    "summariseReviews": "Podsumuj recenzje",
+    "accessibilityConsensus": "Opinia o dostępności",
+    "saveTopic": "Zapisz temat",
+    "unsaveTopic": "Usuń z zapisanych",
+    "followTopic": "Obserwuj temat",
+    "unfollowTopic": "Przestań obserwować",
+    "signInToFollow": "Zaloguj się, aby obserwować",
+    "markAsRead": "Oznacz jako przeczytane",
+    "play": "Odtwórz",
+    "pause": "Pauza",
+    "readDescriptionAloud": "Czytaj opis na głos",
+    "playNext": "Następny",
+    "addToQueue": "Dodaj do kolejki",
+    "saveEpisode": "Zapisz odcinek",
+    "download": "Pobierz"
+  },
+  "home": {
+    "greeting": {
+      "morning": "Dzień dobry",
+      "afternoon": "Dzień dobry",
+      "evening": "Dobry wieczór",
+      "night": "Dobranoc"
+    },
+    "lastVisit": "Ostatnia wizyta",
+    "firstVisit": "twoja pierwsza wizyta — witamy!"
+  },
+  "forums": {
+    "loading": "Ładowanie {{filter}}…",
+    "noTopics": "Brak tematów",
+    "pullToRefresh": "Pociągnij, aby odświeżyć fora",
+    "filters": {
+      "recent": "Ostatnie",
+      "new": "Nowe",
+      "unread": "Nieprzeczytane",
+      "following": "Obserwowane",
+      "saved": "Zapisane",
+      "sinceLastVisit": "Od ostatniej wizyty"
+    },
+    "filterDesc": {
+      "sinceLastVisit": "Tematy zmienione od ostatniego otwarcia AppleVis.",
+      "unread": "Tematy, których jeszcze nie otworzyłeś na tym urządzeniu.",
+      "following": "Tematy, które obserwujesz. Zapisane lokalnie i synchronizowane przez iCloud.",
+      "saved": "Tematy zapisane na później. Synchronizowane przez iCloud."
+    },
+    "error": "Nie udało się załadować tematów",
+    "noTopicsEmpty": {
+      "unread": "Wszystko przeczytane.",
+      "following": "Nie obserwujesz jeszcze żadnych tematów.",
+      "saved": "Nie zapisałeś jeszcze żadnych tematów.",
+      "sinceLastVisit": "Brak nowej aktywności od Twojej ostatniej wizyty."
+    }
+  },
+  "podcasts": {
+    "episodes": "Odcinki",
+    "loading": "Ładowanie odcinków…",
+    "noEpisodes": "Brak odcinków",
+    "error": "Nie udało się załadować odcinków",
+    "pullToRefresh": "Pociągnij, aby odświeżyć podcasty",
+    "play": "Odtwórz",
+    "pause": "Pauza",
+    "skipBack": "Cofnij o {{seconds}} s",
+    "skipForward": "Przewiń o {{seconds}} s",
+    "speed": "Prędkość",
+    "sleepTimer": "Timer uśpienia",
+    "sleepTimerRemaining": "Timer uśpienia — pozostało {{time}}",
+    "cancelSleepTimer": "Anuluj timer uśpienia",
+    "chapters": "Rozdziały",
+    "jumpToChapter": "Przejdź do rozdziału: {{title}}, start o {{time}}",
+    "queue": "Kolejka",
+    "currentlyLoaded": "Załadowano."
+  },
+  "apps": {
+    "loading": "Ładowanie aplikacji…",
+    "noApps": "Brak aplikacji",
+    "error": "Nie udało się załadować aplikacji",
+    "pullToRefresh": "Pociągnij, aby odświeżyć aplikacje",
+    "reviews": "{{count}} recenzji",
+    "updated": "Zaktualizowano {{date}}"
+  },
+  "resources": {
+    "loading": "Ładowanie zasobów…",
+    "noResources": "Brak zasobów",
+    "error": "Nie udało się załadować zasobów",
+    "pullToRefresh": "Pociągnij, aby odświeżyć zasoby",
+    "updated": "Zaktualizowano {{date}}"
+  },
+  "search": {
+    "placeholder": "Szukaj forów, aplikacji, zasobów…",
+    "accessibilityHint": "Wpisz, aby szukać tematów na forum, aplikacji i zasobów.",
+    "searching": "Szukanie…",
+    "noResults": "Brak wyników",
+    "noResultsHint": "Spróbuj innych słów kluczowych lub sprawdź pisownię.",
+    "intro": "Szukaj w tematach forum, katalogu aplikacji i zasobach. Wyniki pojawiają się podczas pisania.",
+    "resultCount_one": "Znaleziono {{count}} wynik",
+    "resultCount_other": "Znaleziono {{count}} wyników",
+    "sectionForums": "Tematy forum ({{count}})",
+    "sectionApps": "Aplikacje ({{count}})",
+    "sectionResources": "Zasoby ({{count}})"
+  },
+  "settings": {
+    "checkingAccount": "Sprawdzanie konta…",
+    "signedIn": "Zalogowano do AppleVis",
+    "email": "E-mail",
+    "emailPlaceholder": "Adres e-mail",
+    "password": "Hasło",
+    "signingIn": "Logowanie, proszę czekać",
+    "credentialsHint": "Użyj adresu e-mail i hasła ze strony AppleVis.",
+    "groupedNote": "Ustawienia są pogrupowane, aby użytkownicy VoiceOver nie musieli przewijać długiej listy przełączników.",
+    "storageCache": "Pamięć i pamięć podręczna",
+    "storageCacheDesc": "Zarządzaj pobranymi plikami, treścią w pamięci podręcznej i polityką przechowywania.",
+    "a11ySignIn": "Zaloguj się do AppleVis",
+    "a11ySignOut": "Wyloguj się z AppleVis",
+    "a11ySignOutHint": "Usuwa Twoje konto z tego urządzenia.",
+    "a11yOpenSection": "Otwiera tę kategorię ustawień.",
+    "a11yStorageHint": "Otwiera ustawienia pamięci i pamięci podręcznej."
+  },
+  "storage": {
+    "storageUsed": "Używana pamięć",
+    "downloadedEpisodes": "Pobrane odcinki",
+    "cachedContent": "Zawartość pamięci podręcznej",
+    "total": "Łącznie",
+    "cacheRetention": "Przechowywanie pamięci podręcznej",
+    "cacheRetentionDesc": "Jak długo przechowywać zawartość pamięci podręcznej przed automatycznym usunięciem.",
+    "clearStorage": "Wyczyść pamięć",
+    "clearStorageDesc": "Pobrane pliki są przechowywane do momentu usunięcia tutaj. Zawartość pamięci podręcznej jest ponownie pobierana przy każdym otwarciu sekcji.",
+    "clearDownloads": "Usuń pobrane pliki",
+    "clearCache": "Wyczyść pamięć podręczną",
+    "clearAll": "Wyczyść wszystko",
+    "retention3months": "3 miesiące",
+    "retention6months": "6 miesięcy",
+    "retention12months": "12 miesięcy",
+    "retentionForever": "Na zawsze",
+    "confirmClearDownloads": "Spowoduje to usunięcie {{size}} pobranych podcastów z urządzenia.",
+    "confirmClearCache": "Spowoduje to usunięcie {{size}} zawartości z pamięci podręcznej. Każda sekcja zostanie ponownie pobrana przy następnym otwarciu.",
+    "confirmClearAll": "Spowoduje to usunięcie {{size}}, w tym wszystkich pobranych plików i zawartości pamięci podręcznej."
+  },
+  "offline": {
+    "withAge": "Wyświetlana jest zawartość z pamięci podręcznej z {{age}}. Pociągnij w dół, aby odświeżyć, gdy będzie dostępna sieć.",
+    "noAge": "Wyświetlana jest zawartość z pamięci podręcznej. Pociągnij w dół, aby odświeżyć, gdy będzie dostępna sieć."
+  },
+  "auth": {
+    "welcomeBack": "Witamy z powrotem, {{name}}!",
+    "signedOut": "Wylogowano.",
+    "sessionExpired": "Sesja wygasła. Zaloguj się ponownie.",
+    "enterEmail": "Wprowadź swój adres e-mail.",
+    "enterPassword": "Wprowadź swoje hasło."
+  },
+  "toast": {
+    "cacheCleared": "Pamięć podręczna wyczyszczona.",
+    "downloadsCleared": "Pobrane pliki usunięte.",
+    "allCleared": "Cała pamięć wyczyszczona.",
+    "retentionUpdated": "Ustawienie przechowywania pamięci podręcznej zaktualizowane.",
+    "topicSaved": "Temat zapisany.",
+    "topicUnsaved": "Usunięto z zapisanych.",
+    "addedToQueue": "Dodano do kolejki.",
+    "playingNext": "Następny: {{title}}",
+    "signInRequired": "Wymagane logowanie. Otwórz Ustawienia, aby się zalogować.",
+    "saveComing": "Zapisywanie będzie dostępne wkrótce.",
+    "downloadComing": "Pobieranie będzie dostępne wkrótce.",
+    "summariseComing": "Podsumowanie będzie dostępne po dodaniu obsługi Apple Intelligence Foundation Models.",
+    "simplifyComing": "Upraszczanie będzie dostępne po dodaniu obsługi Apple Intelligence Foundation Models.",
+    "consensusComing": "Opinia o dostępności będzie dostępna po dodaniu obsługi Apple Intelligence Foundation Models."
+  },
+  "refresh": {
+    "refreshing": "Odświeżanie {{label}}",
+    "updated": "{{label}} zaktualizowano",
+    "loaded": "{{label}} załadowano"
+  },
+  "loadMore": {
+    "button": "Załaduj więcej",
+    "loading": "Ładowanie…"
+  },
+  "writingTools": {
+    "tip": "Apple Intelligence: wybierz dowolny wpisany tekst, aby sprawdzić, przepisać lub przetłumaczyć go za pomocą Writing Tools.",
+    "a11yLabel": "Wskazówka Apple Intelligence: wybierz dowolny wpisany tekst, aby sprawdzić, przepisać, skrócić lub przetłumaczyć go za pomocą Writing Tools."
+  },
+  "translationBanner": {
+    "message": "Twoja wiadomość wydaje się być napisana w języku innym niż angielski. AppleVis wymaga publikowania po angielsku — dotknij, aby otworzyć Google Translate.",
+    "translate": "Otwórz w tłumaczu",
+    "postAsIs": "Opublikuj tak jak jest"
+  },
+  "screen": {
+    "a11ySearch": "Szukaj w AppleVis",
+    "a11ySearchHint": "Otwiera wyszukiwanie tematów forum, aplikacji i zasobów.",
+    "a11ySettings": "Ustawienia i profil",
+    "a11ySettingsHint": "Otwiera ustawienia AppleVis, profil, pomoc i wsparcie."
+  }
+}

@@ -8,7 +8,31 @@
  * NEEDS BUILDING: push tokens, flag/save/follow, account sync, account deletion
  */
 
-import type { ForumTopic, ForumReply, ForumTopicDetail, AppListing, AppDetail, AppReview, Resource, ResourceDetail, PodcastEpisode, PaginatedResult } from '../types/content';
+import { relativeTime } from '../utils/relativeTime';
+import type { ForumTopic, ForumReply, ForumTopicDetail, AppListing, AppDetail, AppReview, Resource, ResourceDetail, PodcastEpisode, PaginatedResult, BlogPost, SearchResult } from '../types/content';
+
+// ─── Phase 4 gate constants ───────────────────────────────────────────────────
+// Replace each null / placeholder with the confirmed value from the Drupal
+// developer, then flip the corresponding gated flag in the UI.
+//
+// Gate 1 — Blog content type:
+//   Set to the JSON:API resource type name, e.g. 'blog', 'blog_post', 'article'.
+//   Affects: api.blogs.list(), Home feed Blogs toggle, Discover Blogs section.
+const BLOG_CONTENT_TYPE: string | null = null;
+//
+// Gate 2 — Forum Apple-related filter:
+//   Set FORUM_APPLE_FILTER_PATH to the taxonomy reference field path on forum
+//   nodes, e.g. 'field_category.name' or 'field_forum.name'.
+//   Set FORUM_APPLE_FILTER_VALUE to the taxonomy term label, e.g. 'Apple'.
+//   Affects: Home feed "Apple-Related Only" toggle.
+const FORUM_APPLE_FILTER_PATH: string | null = null;
+const FORUM_APPLE_FILTER_VALUE = 'Apple';
+//
+// Gate 3 — Full-text Search API:
+//   Set to the REST path prefix, e.g. '/search_api/index/content?fulltext=' or
+//   '/views/site_search/page_1?fulltext='.
+//   Affects: Discover tab search (upgrades from title-CONTAINS to full-text).
+const SEARCH_API_PATH: string | null = null;
 
 const BASE             = 'https://www.applevis.com';
 const JSONAPI          = `${BASE}/jsonapi`;
@@ -99,7 +123,7 @@ function mapForum(node: JsonApiNode, included: JsonApiNode[] = []): ForumTopic {
   return {
     id: node.id,
     title: a.title ?? '',
-    meta: `${a.comment_forum?.comment_count ?? 0} replies · ${new Date(a.changed).toLocaleDateString()}`,
+    meta: `${a.comment_forum?.comment_count ?? 0} replies · ${relativeTime(a.changed)}`,
     authorName,
     createdAt: a.created ?? '',
     lastActivityAt: a.changed ?? '',
@@ -176,6 +200,7 @@ function mapPodcast(node: JsonApiNode, included: JsonApiNode[] = []): PodcastEpi
     audioUrl: rawUri ? fileUri(rawUri) : '',
     duration,
     publishedAt: a.created ?? '',
+    lastActivityAt: (a.changed as string | undefined) ?? undefined,
     description: a.body?.value ?? '',
     artworkUrl,
     transcriptUrl: transcriptUrl || undefined,
@@ -197,6 +222,33 @@ function mapApp(node: JsonApiNode): AppListing {
     lastUpdatedAt: a.changed ?? '',
     appStoreUrl: a.field_link2?.uri ?? a.field_link3?.uri ?? '',
     summary: a.body?.summary ?? a.body?.value ?? '',
+  };
+}
+
+// ─── Blog posts (Phase 4 gate) ───────────────────────────────────────────────
+// NOTE TO DRUPAL DEVELOPER: confirm comment field name on blog nodes
+// (likely comment_node_blog or comment — check with field_info_field()).
+
+function mapBlog(node: JsonApiNode, included: JsonApiNode[] = []): BlogPost {
+  const a = node.attributes;
+  const uidId = (node.relationships?.uid?.data as { id?: string } | undefined)?.id;
+  const userNode = uidId ? included.find((n) => n.id === uidId) : undefined;
+  const authorName = String(
+    userNode?.attributes?.display_name ?? userNode?.attributes?.name ?? '',
+  );
+  return {
+    id: node.id,
+    title: a.title ?? '',
+    authorName,
+    publishedAt: a.created ?? '',
+    lastActivityAt: (a.changed as string | undefined) ?? undefined,
+    summary: a.body?.summary ?? a.body?.value ?? '',
+    commentCount:
+      a.comment_node_blog?.comment_count ??
+      a.comment?.comment_count ??
+      a.field_comment?.comment_count ??
+      0,
+    url: `${BASE}${a.path?.alias ?? `/node/${a.drupal_internal__nid}`}`,
   };
 }
 
@@ -246,7 +298,7 @@ function mapResource(node: JsonApiNode): Resource {
 export const api = {
 
   forums: {
-    async list(filter: string, page = 0, sinceDate?: string) {
+    async list(filter: string, page = 0, sinceDate?: string, appleOnly?: boolean) {
       const sort = filter === 'New' ? '-created' : '-changed';
       let path = `/node/forum?sort=${sort}&${pageParams(page)}&include=uid`;
       if (sinceDate) {
@@ -255,6 +307,13 @@ export const api = {
           `&filter[since][condition][path]=changed` +
           `&filter[since][condition][operator]=%3E` +
           `&filter[since][condition][value]=${encoded}`;
+      }
+      // Gate 2 — Apple-related filter. Active only once FORUM_APPLE_FILTER_PATH is set.
+      if (appleOnly && FORUM_APPLE_FILTER_PATH) {
+        path +=
+          `&filter[apple][condition][path]=${encodeURIComponent(FORUM_APPLE_FILTER_PATH)}` +
+          `&filter[apple][condition][operator]=%3D` +
+          `&filter[apple][condition][value]=${encodeURIComponent(FORUM_APPLE_FILTER_VALUE)}`;
       }
       const res = await jsonApi<JsonApiCollection>(path);
       if (!res.ok) return res;
@@ -361,12 +420,12 @@ export const api = {
   },
 
   podcasts: {
-    async episodes(page = 0) {
+    async episodes(page = 0, sort: '-created' | '-changed' = '-created') {
       // include=field_podcast fetches the audio file (for audioUrl)
       // include=field_chapters fetches chapter paragraph entities (mapped in mapPodcast)
       // NOTE TO DRUPAL DEVELOPER: add field_image to include once artwork field name is confirmed
       const res = await jsonApi<JsonApiCollection>(
-        `/node/podcast?sort=-created&include=field_podcast,field_chapters&${pageParams(page)}`,
+        `/node/podcast?sort=${sort}&include=field_podcast,field_chapters&${pageParams(page)}`,
       );
       if (!res.ok) return res;
       return {
@@ -475,6 +534,23 @@ export const api = {
     },
   },
 
+  // ─── Blogs (Phase 4 gate) ────────────────────────────────────────────────────
+  // Active once BLOG_CONTENT_TYPE is set to the confirmed Drupal resource type.
+
+  blogs: {
+    async list(page = 0) {
+      if (!BLOG_CONTENT_TYPE) return { ok: false as const, error: 'BLOG_NOT_CONFIGURED' };
+      const res = await jsonApi<JsonApiCollection>(
+        `/node/${BLOG_CONTENT_TYPE}?sort=-changed&${pageParams(page)}&include=uid`,
+      );
+      if (!res.ok) return res;
+      return {
+        ok: true as const,
+        data: { items: res.data.data.map((n) => mapBlog(n, res.data.included ?? [])), hasMore: hasNextPage(res.data) } satisfies PaginatedResult<BlogPost>,
+      };
+    },
+  },
+
   // ─── Search ──────────────────────────────────────────────────────────────────
 
   search: {
@@ -503,6 +579,25 @@ export const api = {
       );
       if (!res.ok) return res;
       return { ok: true as const, data: { items: res.data.data.map(mapResource), hasMore: false } satisfies PaginatedResult<Resource> };
+    },
+
+    // Gate 3 — Full-text search across all content types via Drupal Search API.
+    // Returns 'SEARCH_NOT_CONFIGURED' when SEARCH_API_PATH is null, so callers
+    // can fall back to per-type title-CONTAINS search in the meantime.
+    async fullText(query: string): Promise<{ ok: true; data: SearchResult[] } | { ok: false; error: string }> {
+      if (!SEARCH_API_PATH) return { ok: false, error: 'SEARCH_NOT_CONFIGURED' };
+      const q   = encodeURIComponent(query.trim());
+      const res = await drupalRest<any[]>(`${SEARCH_API_PATH}${q}`);
+      if (!res.ok) return res;
+      const results: SearchResult[] = (Array.isArray(res.data) ? res.data : []).map((item: any) => ({
+        id:          String(item.id ?? item.nid ?? item.uuid ?? ''),
+        contentType: (item.type ?? item.content_type ?? 'topic') as SearchResult['contentType'],
+        title:       String(item.title ?? item.name ?? ''),
+        summary:     (item.body ?? item.summary ?? item.field_summary ?? undefined) as string | undefined,
+        url:         String(item.url ?? item.path ?? ''),
+        updatedAt:   String(item.changed ?? item.updated ?? ''),
+      }));
+      return { ok: true, data: results };
     },
   },
 

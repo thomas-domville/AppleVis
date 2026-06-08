@@ -1,0 +1,226 @@
+{
+  "tabs": {
+    "home": "Trang chủ",
+    "forums": "Diễn đàn",
+    "podcasts": "Podcast",
+    "apps": "Ứng dụng",
+    "resources": "Tài nguyên"
+  },
+  "common": {
+    "loading": "Đang tải…",
+    "retry": "Thử lại",
+    "cancel": "Hủy",
+    "gotIt": "Đã hiểu",
+    "save": "Lưu",
+    "share": "Chia sẻ",
+    "search": "Tìm kiếm",
+    "settings": "Cài đặt",
+    "copyLink": "Sao chép liên kết",
+    "open": "Mở",
+    "close": "Đóng",
+    "viewGuidelines": "Xem hướng dẫn",
+    "translate": "Dịch",
+    "readAloud": "Đọc to",
+    "summarise": "Tóm tắt",
+    "simplify": "Đơn giản hóa"
+  },
+  "actions": {
+    "open": "Mở",
+    "readAloud": "Đọc to",
+    "translate": "Dịch",
+    "summarise": "Tóm tắt",
+    "simplify": "Đơn giản hóa",
+    "share": "Chia sẻ",
+    "save": "Lưu",
+    "copyLink": "Sao chép liên kết",
+    "openAppPage": "Mở trang ứng dụng",
+    "saveApp": "Lưu ứng dụng",
+    "viewReviews": "Xem đánh giá",
+    "summariseReviews": "Tóm tắt đánh giá",
+    "accessibilityConsensus": "Đánh giá khả năng tiếp cận",
+    "saveTopic": "Lưu chủ đề",
+    "unsaveTopic": "Xóa khỏi mục đã lưu",
+    "followTopic": "Theo dõi chủ đề",
+    "unfollowTopic": "Bỏ theo dõi",
+    "signInToFollow": "Đăng nhập để theo dõi",
+    "markAsRead": "Đánh dấu đã đọc",
+    "play": "Phát",
+    "pause": "Tạm dừng",
+    "readDescriptionAloud": "Đọc mô tả to",
+    "playNext": "Tiếp theo",
+    "addToQueue": "Thêm vào hàng đợi",
+    "saveEpisode": "Lưu tập",
+    "download": "Tải xuống"
+  },
+  "home": {
+    "greeting": {
+      "morning": "Chào buổi sáng",
+      "afternoon": "Chào buổi chiều",
+      "evening": "Chào buổi tối",
+      "night": "Chúc ngủ ngon"
+    },
+    "lastVisit": "Lần truy cập cuối",
+    "firstVisit": "lần đầu tiên của bạn — chào mừng!"
+  },
+  "forums": {
+    "loading": "Đang tải {{filter}}…",
+    "noTopics": "Không có chủ đề",
+    "pullToRefresh": "Kéo để làm mới diễn đàn",
+    "filters": {
+      "recent": "Gần đây",
+      "new": "Mới",
+      "unread": "Chưa đọc",
+      "following": "Đang theo dõi",
+      "saved": "Đã lưu",
+      "sinceLastVisit": "Kể từ lần truy cập cuối"
+    },
+    "filterDesc": {
+      "sinceLastVisit": "Các chủ đề đã thay đổi kể từ lần cuối bạn mở AppleVis.",
+      "unread": "Các chủ đề bạn chưa mở trên thiết bị này.",
+      "following": "Các chủ đề bạn đang theo dõi. Được lưu cục bộ và đồng bộ qua iCloud.",
+      "saved": "Các chủ đề đã lưu để đọc sau. Được đồng bộ qua iCloud."
+    },
+    "error": "Không thể tải chủ đề",
+    "noTopicsEmpty": {
+      "unread": "Đã đọc hết.",
+      "following": "Bạn chưa theo dõi chủ đề nào.",
+      "saved": "Bạn chưa lưu chủ đề nào.",
+      "sinceLastVisit": "Không có hoạt động mới kể từ lần truy cập cuối của bạn."
+    }
+  },
+  "podcasts": {
+    "episodes": "Tập",
+    "loading": "Đang tải tập…",
+    "noEpisodes": "Chưa có tập nào",
+    "error": "Không thể tải tập",
+    "pullToRefresh": "Kéo để làm mới podcast",
+    "play": "Phát",
+    "pause": "Tạm dừng",
+    "skipBack": "Tua lại {{seconds}} g",
+    "skipForward": "Tua tới {{seconds}} g",
+    "speed": "Tốc độ",
+    "sleepTimer": "Hẹn giờ ngủ",
+    "sleepTimerRemaining": "Hẹn giờ ngủ — còn {{time}}",
+    "cancelSleepTimer": "Hủy hẹn giờ ngủ",
+    "chapters": "Chương",
+    "jumpToChapter": "Chuyển đến chương: {{title}}, bắt đầu lúc {{time}}",
+    "queue": "Hàng đợi",
+    "currentlyLoaded": "Đã tải."
+  },
+  "apps": {
+    "loading": "Đang tải ứng dụng…",
+    "noApps": "Chưa có ứng dụng nào",
+    "error": "Không thể tải ứng dụng",
+    "pullToRefresh": "Kéo để làm mới ứng dụng",
+    "reviews": "{{count}} đánh giá",
+    "updated": "Cập nhật {{date}}"
+  },
+  "resources": {
+    "loading": "Đang tải tài nguyên…",
+    "noResources": "Chưa có tài nguyên nào",
+    "error": "Không thể tải tài nguyên",
+    "pullToRefresh": "Kéo để làm mới tài nguyên",
+    "updated": "Cập nhật {{date}}"
+  },
+  "search": {
+    "placeholder": "Tìm diễn đàn, ứng dụng, tài nguyên…",
+    "accessibilityHint": "Nhập để tìm kiếm chủ đề diễn đàn, ứng dụng và tài nguyên.",
+    "searching": "Đang tìm kiếm…",
+    "noResults": "Không có kết quả",
+    "noResultsHint": "Thử từ khóa khác hoặc kiểm tra chính tả.",
+    "intro": "Tìm kiếm trong các chủ đề diễn đàn, danh mục ứng dụng và tài nguyên. Kết quả xuất hiện khi bạn gõ.",
+    "resultCount_one": "Tìm thấy {{count}} kết quả",
+    "resultCount_other": "Tìm thấy {{count}} kết quả",
+    "sectionForums": "Chủ đề diễn đàn ({{count}})",
+    "sectionApps": "Ứng dụng ({{count}})",
+    "sectionResources": "Tài nguyên ({{count}})"
+  },
+  "settings": {
+    "checkingAccount": "Đang kiểm tra tài khoản…",
+    "signedIn": "Đã đăng nhập vào AppleVis",
+    "email": "Email",
+    "emailPlaceholder": "Địa chỉ email",
+    "password": "Mật khẩu",
+    "signingIn": "Đang đăng nhập, vui lòng chờ",
+    "credentialsHint": "Sử dụng email và mật khẩu từ trang web AppleVis của bạn.",
+    "groupedNote": "Cài đặt được nhóm lại để người dùng VoiceOver không cần điều hướng qua danh sách chuyển đổi dài.",
+    "storageCache": "Bộ nhớ và bộ nhớ đệm",
+    "storageCacheDesc": "Quản lý tải xuống, nội dung được lưu vào bộ nhớ đệm và chính sách lưu trữ.",
+    "a11ySignIn": "Đăng nhập vào AppleVis",
+    "a11ySignOut": "Đăng xuất khỏi AppleVis",
+    "a11ySignOutHint": "Xóa tài khoản của bạn khỏi thiết bị này.",
+    "a11yOpenSection": "Mở danh mục cài đặt này.",
+    "a11yStorageHint": "Mở cài đặt bộ nhớ và bộ nhớ đệm."
+  },
+  "storage": {
+    "storageUsed": "Bộ nhớ đã dùng",
+    "downloadedEpisodes": "Tập đã tải xuống",
+    "cachedContent": "Nội dung trong bộ nhớ đệm",
+    "total": "Tổng cộng",
+    "cacheRetention": "Lưu giữ bộ nhớ đệm",
+    "cacheRetentionDesc": "Thời gian lưu giữ nội dung trong bộ nhớ đệm trước khi tự động xóa.",
+    "clearStorage": "Xóa bộ nhớ",
+    "clearStorageDesc": "Tải xuống được lưu cho đến khi bạn xóa tại đây. Nội dung trong bộ nhớ đệm sẽ được tải lại mỗi khi mở phần.",
+    "clearDownloads": "Xóa tải xuống",
+    "clearCache": "Xóa bộ nhớ đệm",
+    "clearAll": "Xóa tất cả",
+    "retention3months": "3 tháng",
+    "retention6months": "6 tháng",
+    "retention12months": "12 tháng",
+    "retentionForever": "Mãi mãi",
+    "confirmClearDownloads": "Điều này sẽ xóa {{size}} podcast đã tải xuống khỏi thiết bị.",
+    "confirmClearCache": "Điều này sẽ xóa {{size}} nội dung trong bộ nhớ đệm. Mỗi phần sẽ được tải lại khi mở tiếp theo.",
+    "confirmClearAll": "Điều này sẽ xóa {{size}}, bao gồm tất cả tải xuống và nội dung trong bộ nhớ đệm."
+  },
+  "offline": {
+    "withAge": "Đang hiển thị nội dung được lưu từ {{age}}. Kéo xuống để làm mới khi có mạng.",
+    "noAge": "Đang hiển thị nội dung được lưu trong bộ nhớ đệm. Kéo xuống để làm mới khi có mạng."
+  },
+  "auth": {
+    "welcomeBack": "Chào mừng trở lại, {{name}}!",
+    "signedOut": "Đã đăng xuất.",
+    "sessionExpired": "Phiên đã hết hạn. Vui lòng đăng nhập lại.",
+    "enterEmail": "Nhập địa chỉ email của bạn.",
+    "enterPassword": "Nhập mật khẩu của bạn."
+  },
+  "toast": {
+    "cacheCleared": "Đã xóa bộ nhớ đệm.",
+    "downloadsCleared": "Đã xóa tải xuống.",
+    "allCleared": "Đã xóa toàn bộ bộ nhớ.",
+    "retentionUpdated": "Đã cập nhật cài đặt lưu giữ bộ nhớ đệm.",
+    "topicSaved": "Đã lưu chủ đề.",
+    "topicUnsaved": "Đã xóa khỏi mục đã lưu.",
+    "addedToQueue": "Đã thêm vào hàng đợi.",
+    "playingNext": "Tiếp theo: {{title}}",
+    "signInRequired": "Cần đăng nhập. Mở Cài đặt để đăng nhập.",
+    "saveComing": "Tính năng lưu sẽ sớm ra mắt.",
+    "downloadComing": "Tính năng tải xuống sẽ sớm ra mắt.",
+    "summariseComing": "Tóm tắt sẽ khả dụng khi thêm hỗ trợ Apple Intelligence Foundation Models.",
+    "simplifyComing": "Đơn giản hóa sẽ khả dụng khi thêm hỗ trợ Apple Intelligence Foundation Models.",
+    "consensusComing": "Đánh giá khả năng tiếp cận sẽ khả dụng khi thêm hỗ trợ Apple Intelligence Foundation Models."
+  },
+  "refresh": {
+    "refreshing": "Đang làm mới {{label}}",
+    "updated": "{{label}} đã cập nhật",
+    "loaded": "{{label}} đã tải"
+  },
+  "loadMore": {
+    "button": "Tải thêm",
+    "loading": "Đang tải…"
+  },
+  "writingTools": {
+    "tip": "Apple Intelligence: chọn bất kỳ văn bản đã nhập nào để kiểm tra, viết lại hoặc dịch bằng Writing Tools.",
+    "a11yLabel": "Mẹo Apple Intelligence: chọn bất kỳ văn bản đã nhập nào để kiểm tra, viết lại, rút gọn hoặc dịch bằng Writing Tools."
+  },
+  "translationBanner": {
+    "message": "Tin nhắn của bạn có vẻ được viết bằng ngôn ngữ khác tiếng Anh. AppleVis yêu cầu đăng bài bằng tiếng Anh — nhấn để mở Google Dịch.",
+    "translate": "Mở trong Dịch",
+    "postAsIs": "Đăng như hiện tại"
+  },
+  "screen": {
+    "a11ySearch": "Tìm kiếm trong AppleVis",
+    "a11ySearchHint": "Mở tìm kiếm chủ đề diễn đàn, ứng dụng và tài nguyên.",
+    "a11ySettings": "Cài đặt và hồ sơ",
+    "a11ySettingsHint": "Mở cài đặt AppleVis, hồ sơ, trợ giúp và hỗ trợ."
+  }
+}

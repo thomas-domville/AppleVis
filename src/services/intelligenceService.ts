@@ -2,7 +2,7 @@
  * Apple Intelligence / on-device AI integration
  *
  * JS layer (works today):
- *   translateContent   — opens iOS Share sheet; user picks Translate app
+ *   translateContent   — opens Google Translate app (if installed) or web fallback
  *   detectNonEnglish   — Unicode-range heuristic, no API needed
  *   readAloud          — expo-speech text-to-speech, stops any current speech first
  *   stopReading        — stops active speech
@@ -18,8 +18,9 @@
  * Each stub logs a reminder in __DEV__ so it is easy to find later.
  */
 
-import { Share } from 'react-native';
+import { Linking } from 'react-native';
 import * as Speech from 'expo-speech';
+import { isAppleIntelligenceAvailable as nativeIsAvailable, runFoundationModel } from '../native/nativeModules';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,17 +41,30 @@ export type SpotlightItem = {
   url: string;
 };
 
-// ─── JS-only: translate via system Share sheet ────────────────────────────────
+// ─── JS-only: translate via Google Translate ─────────────────────────────────
 
 /**
- * Opens the iOS Share sheet with the supplied text. The system Translate
- * option appears automatically — no native code needed.
+ * Opens Google Translate with the supplied text pre-filled, auto-detecting
+ * the source language and targeting English.
+ *
+ * Priority:
+ *   1. Google Translate app (googletranslate://) if installed
+ *   2. Google Translate web in the default browser
+ *
+ * Text is capped at 1 500 characters before encoding to keep URLs in range.
+ * Used by TranslationBanner when a user types non-English in a compose field
+ * — the goal is to help them produce an English post per site guidelines.
  */
-export async function translateContent(text: string, title?: string): Promise<void> {
+export async function translateContent(text: string): Promise<void> {
+  const capped  = text.trim().slice(0, 1500);
+  const encoded = encodeURIComponent(capped);
+  const appUrl  = `googletranslate://translate?text=${encoded}&sl=auto&tl=en`;
+  const webUrl  = `https://translate.google.com/?sl=auto&tl=en&text=${encoded}`;
   try {
-    await Share.share({ message: text, ...(title ? { title } : {}) });
+    const canUseApp = await Linking.canOpenURL(appUrl).catch(() => false);
+    await Linking.openURL(canUseApp ? appUrl : webUrl);
   } catch {
-    // User cancelled or share not available — silent.
+    // Silent — if the URL cannot be opened (e.g. simulator) do nothing.
   }
 }
 
@@ -97,6 +111,17 @@ export async function isReading(): Promise<boolean> {
   try { return await Speech.isSpeakingAsync(); } catch { return false; }
 }
 
+// ─── Apple Intelligence availability ─────────────────────────────────────────
+
+/**
+ * Returns true when the device supports Apple Intelligence and the user has
+ * enabled it in Settings → Apple Intelligence & Siri. Delegates to the native
+ * AppleVisIntelligence module — false in Expo Go / simulator / unsupported devices.
+ */
+export function isAppleIntelligenceAvailable(): boolean {
+  return nativeIsAvailable();
+}
+
 // ─── Native stubs ─────────────────────────────────────────────────────────────
 // These are no-ops until a native Expo module implements the bridge.
 // The Swift AppIntent types to implement are documented below each stub.
@@ -122,73 +147,63 @@ export function donateSiriActivity(intent: SiriIntent): void {
 }
 
 /**
- * Summarises text using Apple's on-device Foundation Models (iOS 18.2+).
- * Falls back to null when the native module is absent.
- *
- * Native side to implement (Swift, requires iOS 18.2+):
- *   import FoundationModels
- *   let session = LanguageModelSession()
- *   let summary = try await session.respond(
- *     to: "Summarise the following in 2–3 sentences:\n\n\(text)"
- *   )
+ * Summarises text using Apple's on-device Foundation Models (iOS 18.1+).
+ * Returns null when Apple Intelligence is not available on the device.
  */
-export async function summariseText(_text: string): Promise<string | null> {
-  if (__DEV__) console.log('[AppleIntelligence] summariseText — native module not yet built.');
-  return null;
+export async function summariseText(text: string): Promise<string | null> {
+  if (!isAppleIntelligenceAvailable()) return null;
+  return runFoundationModel(
+    `Summarise the following in 2–3 sentences:\n\n${text}`,
+  );
 }
 
 /**
  * Rewrites text at a simpler reading level using Foundation Models.
- * Useful for users who need plain-language versions of technical content.
- *
- * Native prompt (Swift):
- *   "Rewrite the following in plain, simple English that anyone can understand.
- *    Keep it under 100 words. Do not add new information:\n\n\(text)"
+ * Returns null when Apple Intelligence is not available on the device.
  */
-export async function simplifyText(_text: string): Promise<string | null> {
-  if (__DEV__) console.log('[AppleIntelligence] simplifyText — native module not yet built.');
-  return null;
+export async function simplifyText(text: string): Promise<string | null> {
+  if (!isAppleIntelligenceAvailable()) return null;
+  return runFoundationModel(
+    `Rewrite the following in plain, simple English that anyone can understand. ` +
+    `Keep it under 100 words. Do not add new information:\n\n${text}`,
+  );
 }
 
 /**
  * Generates a personalised "What's new" digest summarising recent activity.
- * Called on app open after a long absence; result shown on the Home screen.
- *
- * Native prompt (Swift):
- *   "Here is a list of new AppleVis activity since the user's last visit.
- *    Write a friendly 2–3 sentence digest for a blind VoiceOver user:\n\n\(activity)"
+ * Returns null when Apple Intelligence is not available on the device.
  */
-export async function generateDigest(_activitySummary: string): Promise<string | null> {
-  if (__DEV__) console.log('[AppleIntelligence] generateDigest — native module not yet built.');
-  return null;
+export async function generateDigest(activitySummary: string): Promise<string | null> {
+  if (!isAppleIntelligenceAvailable()) return null;
+  return runFoundationModel(
+    `Here is a list of new AppleVis activity since the user's last visit. ` +
+    `Write a friendly 2–3 sentence digest for a blind VoiceOver user:\n\n${activitySummary}`,
+  );
 }
 
 /**
  * Aggregates multiple app reviews into an accessibility consensus statement.
- * E.g. "Most reviewers say this app works well with VoiceOver. Some note issues
- *       with the in-app purchase screen."
- *
- * Native prompt (Swift):
- *   "Summarise the following AppleVis accessibility reviews in 1–2 sentences,
- *    focusing on VoiceOver and accessibility:\n\n\(reviews)"
+ * Returns null when Apple Intelligence is not available on the device.
  */
-export async function accessibilityConsensus(_reviews: string[]): Promise<string | null> {
-  if (__DEV__) console.log('[AppleIntelligence] accessibilityConsensus — native module not yet built.');
-  return null;
+export async function accessibilityConsensus(reviews: string[]): Promise<string | null> {
+  if (!isAppleIntelligenceAvailable()) return null;
+  return runFoundationModel(
+    `Summarise the following AppleVis accessibility reviews in 1–2 sentences, ` +
+    `focusing on VoiceOver and accessibility:\n\n${reviews.join('\n\n')}`,
+  );
 }
 
 /**
- * Cleans up a raw auto-generated podcast transcript:
- * fixes punctuation, removes filler words, corrects common mis-transcriptions.
- *
- * Native prompt (Swift):
- *   "Clean up this auto-generated podcast transcript. Fix punctuation, remove
- *    filler words (um, uh, like), and correct obvious mis-transcriptions.
- *    Do not change the meaning:\n\n\(transcript)"
+ * Cleans up a raw auto-generated podcast transcript.
+ * Returns null when Apple Intelligence is not available on the device.
  */
-export async function cleanTranscript(_rawTranscript: string): Promise<string | null> {
-  if (__DEV__) console.log('[AppleIntelligence] cleanTranscript — native module not yet built.');
-  return null;
+export async function cleanTranscript(rawTranscript: string): Promise<string | null> {
+  if (!isAppleIntelligenceAvailable()) return null;
+  return runFoundationModel(
+    `Clean up this auto-generated podcast transcript. Fix punctuation, remove ` +
+    `filler words (um, uh, like), and correct obvious mis-transcriptions. ` +
+    `Do not change the meaning:\n\n${rawTranscript}`,
+  );
 }
 
 /**
@@ -228,10 +243,22 @@ export async function cleanTranscript(_rawTranscript: string): Promise<string | 
  *   // Parse result.content as JSON → [GuidelineWarning]
  */
 export async function checkAgainstGuidelinesAI(
-  _text: string,
+  text: string,
 ): Promise<import('./guidelinesChecker').GuidelineWarning[]> {
-  if (__DEV__) console.log('[AppleIntelligence] checkAgainstGuidelinesAI — native module not yet built.');
-  return [];
+  if (!isAppleIntelligenceAvailable()) return [];
+  const result = await runFoundationModel(
+    `You are a content moderation assistant for AppleVis, an accessibility community ` +
+    `for blind and low vision Apple users. Review the following draft post and identify ` +
+    `any CLEAR violations of the AppleVis posting guidelines. Be conservative — only flag ` +
+    `obvious violations. Respond ONLY with a JSON array where each item has: id, rule, message, severity. ` +
+    `If no violations, return []\n\nDraft post:\n${text}`,
+  );
+  if (!result) return [];
+  try {
+    return JSON.parse(result) as import('./guidelinesChecker').GuidelineWarning[];
+  } catch {
+    return [];
+  }
 }
 
 /**

@@ -80,12 +80,13 @@ export default function NotificationSettings() {
         {CATEGORIES.map(({ key, label, description }) => {
           const enabled = notificationPrefs[key];
           return (
-            <View
+            <Pressable
               key={key}
+              onPress={() => toggleCategory(key)}
               style={[styles.cardSmall, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}
               accessible
-              accessibilityLabel={`${label}. ${description}. ${enabled ? 'On' : 'Off'}.`}
               accessibilityRole="switch"
+              accessibilityLabel={`${label}. ${description}`}
               accessibilityState={{ checked: enabled }}
             >
               <View style={{ flex: 1 }}>
@@ -101,7 +102,7 @@ export default function NotificationSettings() {
                 thumbColor="#FFFFFF"
                 accessibilityElementsHidden
               />
-            </View>
+            </Pressable>
           );
         })}
 
@@ -116,9 +117,9 @@ export default function NotificationSettings() {
             <Pressable
               key={id}
               onPress={() => { setNotificationSound(id); previewSound(id); }}
-              accessible accessibilityRole="none"
+              accessible accessibilityRole="button"
               accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={`${label}${isSelected ? ', selected' : ''}`}
+              accessibilityLabel={label}
               accessibilityHint={`${description}${id !== 'none' ? ' Double tap to preview.' : ''}`}
               style={[styles.cardSmall, {
                 flexDirection: 'row', alignItems: 'center', gap: 12,

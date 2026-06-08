@@ -1,4 +1,4 @@
-import { ScrollView, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Screen } from '../src/components/Screen';
 import { SettingsPickerRow } from '../src/components/SettingsPickerRow';
 import { SettingsSegmentedRow } from '../src/components/SettingsSegmentedRow';
@@ -25,11 +25,12 @@ function ToggleRow({ label, description, value, onValueChange, colors, styles }:
   styles: ReturnType<typeof useTheme>['styles'];
 }) {
   return (
-    <View
+    <Pressable
+      onPress={() => onValueChange(!value)}
       style={[styles.cardSmall, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}
       accessible
-      accessibilityLabel={`${label}. ${description}. ${value ? 'On' : 'Off'}.`}
       accessibilityRole="switch"
+      accessibilityLabel={`${label}. ${description}`}
       accessibilityState={{ checked: value }}
     >
       <View style={{ flex: 1 }}>
@@ -45,7 +46,7 @@ function ToggleRow({ label, description, value, onValueChange, colors, styles }:
         thumbColor="#FFFFFF"
         accessibilityElementsHidden
       />
-    </View>
+    </Pressable>
   );
 }
 

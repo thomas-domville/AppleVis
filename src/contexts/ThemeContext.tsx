@@ -38,11 +38,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (themeId === 'system') {
       return systemScheme === 'dark' ? THEMES.dark.colors : THEMES.light.colors;
     }
+    if (themeId === 'oppositeToSystem') {
+      return systemScheme === 'dark' ? THEMES.light.colors : THEMES.dark.colors;
+    }
     return THEMES[themeId].colors;
   }, [themeId, systemScheme]);
 
   const isDark = useMemo(() => {
     if (themeId === 'system') return systemScheme === 'dark';
+    if (themeId === 'oppositeToSystem') return systemScheme !== 'dark';
     return THEMES[themeId].isDark;
   }, [themeId, systemScheme]);
 

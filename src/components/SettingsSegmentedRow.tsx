@@ -28,9 +28,6 @@ export function SettingsSegmentedRow<T extends string | number>({
           borderColor: colors.border,
           overflow: 'hidden',
         }}
-        accessible
-        accessibilityRole="none"
-        accessibilityLabel={`${label}: ${options.find(o => o.value === value)?.label ?? String(value)}`}
       >
         {options.map((opt, i) => {
           const isSelected = opt.value === value;
@@ -39,9 +36,9 @@ export function SettingsSegmentedRow<T extends string | number>({
               key={String(opt.value)}
               onPress={() => onSelect(opt.value)}
               accessible
-              accessibilityRole="none"
+              accessibilityRole="button"
               accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={`${opt.label}${isSelected ? ', selected' : ''}`}
+              accessibilityLabel={opt.label}
               style={{
                 flex: 1,
                 paddingVertical: 9,

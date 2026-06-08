@@ -8,14 +8,10 @@ import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPre
 import { useToast } from '../../src/contexts/ToastContext';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
 import { useHandoff } from '../../src/hooks/useHandoff';
-import { readAloud, translateContent, summariseText } from '../../src/services/intelligenceService';
+import { readAloud, summariseText } from '../../src/services/intelligenceService';
 import { api } from '../../src/services/api';
+import { relativeTime } from '../../src/utils/relativeTime';
 import type { ResourceDetail } from '../../src/types/content';
-
-function formatDate(iso: string): string {
-  if (!iso) return '';
-  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
-}
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -94,7 +90,7 @@ export default function ResourceDetailScreen() {
 
   return (
     <Screen title={displayTitle} showSettings={false} showSearch={false}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator>
 
         {loading && (
           <View style={{ alignItems: 'center', paddingVertical: 48 }}>
@@ -125,7 +121,7 @@ export default function ResourceDetailScreen() {
                 resource.title,
                 resource.kind,
                 resource.authorName ? `by ${resource.authorName}` : null,
-                `Updated ${formatDate(resource.updatedAt)}`,
+                `Updated ${relativeTime(resource.updatedAt)}`,
               ].filter(Boolean).join('. ')}>
 
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
@@ -145,7 +141,7 @@ export default function ResourceDetailScreen() {
                 <View style={{ backgroundColor: colors.pill, borderRadius: 8,
                   paddingHorizontal: 10, paddingVertical: 4 }}>
                   <Text style={{ color: colors.pillText, fontSize: 13 }}>
-                    Updated {formatDate(resource.updatedAt)}
+                    Updated {relativeTime(resource.updatedAt)}
                   </Text>
                 </View>
               </View>
@@ -184,16 +180,6 @@ export default function ResourceDetailScreen() {
                     <Text style={{ color: colors.pillText, fontWeight: '600', fontSize: 13 }}>Read Aloud</Text>
                   </Pressable>
                 )}
-
-                <Pressable
-                  onPress={() => translateContent(`${resource.title}\n\n${stripHtml(resource.body)}`, resource.title)}
-                  accessible accessibilityRole="button" accessibilityLabel="Translate"
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
-                    backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 }}
-                >
-                  <Ionicons name="language-outline" size={14} color={colors.pillText} />
-                  <Text style={{ color: colors.pillText, fontWeight: '600', fontSize: 13 }}>Translate</Text>
-                </Pressable>
 
                 <Pressable
                   onPress={() => summariseText(`${resource.title}\n\n${stripHtml(resource.body)}`).then((s) => {

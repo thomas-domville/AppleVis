@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { AccessibilityActionEvent, ActionSheetIOS, Platform, Pressable, Text, View } from 'react-native';
+import { AccessibilityActionEvent, ActionSheetIOS, Image, Platform, Pressable, Text, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { usePreferences } from '../contexts/PreferencesContext';
 
@@ -11,10 +11,12 @@ type Props = {
   hint?: string;
   actions?: string[];
   onAction?: (actionName: string) => void;
+  /** Optional app icon shown as a 44pt rounded thumbnail beside the title. */
+  iconUrl?: string;
 };
 
 export const AccessibleCard = forwardRef<View, Props>(
-  function AccessibleCard({ title, meta, authorLabel, hint = 'Double tap to open.', actions = [], onAction }, ref) {
+  function AccessibleCard({ title, meta, authorLabel, hint = 'Double tap to open.', actions = [], onAction, iconUrl }, ref) {
     const { styles }            = useTheme();
     const { announcementLevel } = usePreferences();
 
@@ -56,13 +58,24 @@ export const AccessibleCard = forwardRef<View, Props>(
         accessibilityHint={resolvedHint}
         accessibilityActions={actions.map((name) => ({ name, label: name }))}
         onAccessibilityAction={handleAccessibilityAction}
-        onPress={() => onAction?.('Open')}
+        onPress={() => onAction?.(actions[0] ?? 'Open')}
         onLongPress={handleLongPress}
         delayLongPress={500}
         style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}
       >
-        <Text style={styles.cardTitle}>{title}</Text>
-        {meta ? <Text style={styles.cardMeta}>{meta}</Text> : null}
+        <View style={iconUrl ? { flexDirection: 'row', alignItems: 'flex-start', gap: 12 } : undefined}>
+          {iconUrl && (
+            <Image
+              source={{ uri: iconUrl }}
+              style={{ width: 44, height: 44, borderRadius: 10 }}
+              accessibilityElementsHidden
+            />
+          )}
+          <View style={iconUrl ? { flex: 1 } : undefined}>
+            <Text style={styles.cardTitle}>{title}</Text>
+            {meta ? <Text style={styles.cardMeta}>{meta}</Text> : null}
+          </View>
+        </View>
       </Pressable>
     );
   },
