@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AccessibilityInfo, Image, Linking, Modal, Platform,
-  Pressable, ScrollView, Share, Text, View,
+  AccessibilityInfo, ActionSheetIOS, Clipboard, findNodeHandle,
+  Image, Linking, Modal, Platform,
+  Pressable, ScrollView, Share, StyleSheet, Text, View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -11,10 +13,12 @@ import { usePlayer } from '../../src/contexts/PlayerContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
 import { useToast } from '../../src/contexts/ToastContext';
+import { useAuth } from '../../src/contexts/AuthContext';
 import { SPEED_OPTIONS, SLEEP_TIMER_OPTIONS, SLEEP_END_OF_EPISODE } from '../../src/hooks/usePodcastPlayer';
 import { downloadEpisode, deleteDownload, getLocalUri } from '../../src/services/downloads';
 import { persistence } from '../../src/services/persistence';
 import { showAirPlayPicker } from '../../src/native/nativeModules';
+import { isAppleIntelligenceAvailable, readAloud, summariseText } from '../../src/services/intelligenceService';
 import { relativeTime } from '../../src/utils/relativeTime';
 import type { PodcastEpisode } from '../../src/types/content';
 
@@ -71,11 +75,21 @@ function sleepLabel(mins: number): string {
   return `${mins} min`;
 }
 
+function stripHtmlPlain(html: string): string {
+  return html
+    .replace(/<\/?(p|div|h[1-6]|li|blockquote)[^>]*>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ').replace(/&#(\d+);/g, (_, c) => String.fromCharCode(Number(c)))
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // ─── VTT / SRT transcript parser ─────────────────────────────────────────────
 type TranscriptCue = { startSeconds: number; text: string };
 
 function parseTimestamp(ts: string): number {
-  // Handles both HH:MM:SS.mmm and MM:SS.mmm (VTT) and HH:MM:SS,mmm (SRT)
   const cleaned = ts.trim().replace(',', '.');
   const parts = cleaned.split(':').map(Number);
   if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
@@ -85,18 +99,16 @@ function parseTimestamp(ts: string): number {
 
 function parseTranscript(raw: string): TranscriptCue[] {
   const cues: TranscriptCue[] = [];
-  // Split on blank lines to get blocks
   const blocks = raw.split(/\n{2,}/);
   for (const block of blocks) {
     const lines = block.trim().split('\n');
-    // Find the timing line: "HH:MM:SS.mmm --> HH:MM:SS.mmm"
     const timingIdx = lines.findIndex(l => l.includes('-->'));
     if (timingIdx === -1) continue;
     const [startStr] = lines[timingIdx].split('-->');
     const text = lines
       .slice(timingIdx + 1)
       .join(' ')
-      .replace(/<[^>]+>/g, '')  // strip inline VTT tags like <c>
+      .replace(/<[^>]+>/g, '')
       .trim();
     if (text) cues.push({ startSeconds: parseTimestamp(startStr), text });
   }
@@ -109,8 +121,6 @@ type NoteLink = { label: string; url: string; kind: 'app' | 'email' | 'web' };
 function parseShowNotes(rawHtml: string): { body: string[]; links: NoteLink[]; transcript: string[] | null } {
   if (!rawHtml.trim()) return { body: [], links: [], transcript: null };
 
-  // Split on the Transcript heading FIRST — so links in the transcript section
-  // (e.g. the VoicePen App Store URL in the disclaimer) never appear in the About card
   const txHeadingMatch = rawHtml.match(/#{1,3}\s*Transcri?pt[^\n\r]*/i);
   const splitIdx = txHeadingMatch?.index ?? -1;
   const preHtml  = splitIdx >= 0 ? rawHtml.slice(0, splitIdx) : rawHtml;
@@ -132,13 +142,10 @@ function parseShowNotes(rawHtml: string): { body: string[]; links: NoteLink[]; t
     }
   }
 
-  // Extract <a href> links only from the pre-transcript HTML
   const aRegex = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
   let m: RegExpExecArray | null;
   while ((m = aRegex.exec(preHtml)) !== null) addLink(m[2], m[1]);
 
-  // Convert HTML to plain text while preserving paragraph/line structure so that
-  // VoiceOver and braille displays get individual stops rather than one wall of text
   function htmlToPlain(html: string): string {
     return html
       .replace(/<\/?(p|div|h[1-6]|li|blockquote)[^>]*>/gi, '\n\n')
@@ -152,7 +159,6 @@ function parseShowNotes(rawHtml: string): { body: string[]; links: NoteLink[]; t
       .trim();
   }
 
-  // Clean markdown formatting and split into individual navigable lines
   function splitLines(text: string): string[] {
     return text
       .replace(/#{1,6}\s*/gm, '')
@@ -164,10 +170,8 @@ function parseShowNotes(rawHtml: string): { body: string[]; links: NoteLink[]; t
       .filter(l => l.length > 0);
   }
 
-  // Strip HTML from pre-transcript section, preserving paragraph structure
   const preText = htmlToPlain(preHtml);
 
-  // Extract markdown links and email addresses from pre-transcript text only
   const mdRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g;
   while ((m = mdRegex.exec(preText)) !== null) addLink(m[1], m[2]);
 
@@ -179,16 +183,13 @@ function parseShowNotes(rawHtml: string): { body: string[]; links: NoteLink[]; t
     }
   }
 
-  // Process transcript — each line becomes its own braille/VoiceOver stop
   let transcript: string[] | null = null;
   if (postHtml) {
     const txLines = splitLines(htmlToPlain(postHtml));
     transcript = txLines.length > 0 ? txLines : null;
   }
 
-  // Build body as navigable lines
   const body = splitLines(preText);
-
   return { body, links, transcript };
 }
 
@@ -201,7 +202,6 @@ function ShowNotes({ rawHtml }: { rawHtml: string }) {
 
   return (
     <>
-      {/* ── Transcript modal ──────────────────────────────────────────── */}
       {transcript && (
         <Modal
           visible={transcriptOpen}
@@ -211,7 +211,6 @@ function ShowNotes({ rawHtml }: { rawHtml: string }) {
           accessibilityViewIsModal
         >
           <View style={{ flex: 1, backgroundColor: colors.background }}>
-            {/* Header */}
             <View style={{
               flexDirection: 'row', alignItems: 'center',
               justifyContent: 'space-between',
@@ -235,8 +234,6 @@ function ShowNotes({ rawHtml }: { rawHtml: string }) {
                 <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>Done</Text>
               </Pressable>
             </View>
-
-            {/* Each line is its own VoiceOver / braille display stop */}
             <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 48 }}>
               {transcript.map((line, i) => (
                 <Text
@@ -252,13 +249,11 @@ function ShowNotes({ rawHtml }: { rawHtml: string }) {
         </Modal>
       )}
 
-      {/* ── Show notes card ───────────────────────────────────────────── */}
       <View style={[styles.card, { marginBottom: 20 }]}>
         <Text style={[styles.cardTitle, { marginBottom: 8 }]} accessibilityRole="header">
           About this episode
         </Text>
 
-        {/* Each paragraph/line is its own VoiceOver / braille display stop */}
         {body.map((para, i) => (
           <Text
             key={i}
@@ -269,7 +264,6 @@ function ShowNotes({ rawHtml }: { rawHtml: string }) {
           </Text>
         ))}
 
-        {/* All links: App Store entries, email contacts, web links */}
         {links.length > 0 && (
           <View style={{ gap: 10, marginTop: body.length > 0 ? 10 : 4 }}>
             {links.map((link, i) => (
@@ -339,14 +333,8 @@ function ShowNotes({ rawHtml }: { rawHtml: string }) {
   );
 }
 
-// ─── Dedicated VTT transcript (fetched from transcriptUrl) ───────────────────
-function VttTranscript({
-  url,
-  currentPosition,
-}: {
-  url: string;
-  currentPosition: number;
-}) {
+// ─── Dedicated VTT transcript ─────────────────────────────────────────────────
+function VttTranscript({ url, currentPosition }: { url: string; currentPosition: number }) {
   const { colors, styles } = useTheme();
   const [cues, setCues] = useState<TranscriptCue[]>([]);
   const [loading, setLoading] = useState(false);
@@ -364,7 +352,6 @@ function VttTranscript({
       .finally(() => setLoading(false));
   }, [open, url, cues.length]);
 
-  // Auto-scroll to the active cue while playing
   useEffect(() => {
     if (!open || cues.length === 0) return;
     const activeIdx = cues.reduce((best, cue, i) =>
@@ -428,26 +415,114 @@ function VttTranscript({
   );
 }
 
+// ─── Bottom toolbar button ────────────────────────────────────────────────────
+function ToolbarButton({
+  icon, activeIcon, label, onPress, active, accent, disabled,
+}: {
+  icon: string; activeIcon?: string; label: string; onPress: () => void;
+  active?: boolean; accent?: boolean; disabled?: boolean;
+}) {
+  const { colors } = useTheme();
+  const resolvedIcon = (active && activeIcon) ? activeIcon : icon;
+  const color = disabled
+    ? colors.textSecondary
+    : accent ? colors.accent
+    : active ? colors.accent
+    : colors.textSecondary;
+  return (
+    <Pressable
+      onPress={disabled ? undefined : onPress}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={label.replace(/\n/g, ' ')}
+      accessibilityState={{ selected: active, disabled }}
+      style={({ pressed }) => ({
+        flex: 1, alignItems: 'center', justifyContent: 'center',
+        gap: 4, opacity: disabled ? 0.35 : pressed ? 0.55 : 1, paddingVertical: 10,
+      })}
+    >
+      <Ionicons name={resolvedIcon as any} size={23} color={color} accessibilityElementsHidden />
+      <Text
+        style={{ fontSize: 10, fontWeight: '600', color, textAlign: 'center', lineHeight: 13 }}
+        accessibilityElementsHidden
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+// ─── SectionDivider ───────────────────────────────────────────────────────────
+function SectionDivider({ label }: { label: string }) {
+  const { colors } = useTheme();
+  return (
+    <View accessible accessibilityRole="header" accessibilityLabel={label}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} accessibilityElementsHidden />
+      <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary,
+        letterSpacing: 1.2, textTransform: 'uppercase' }} accessibilityElementsHidden>
+        {label}
+      </Text>
+      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} accessibilityElementsHidden />
+    </View>
+  );
+}
+
+// ─── ComingSoonShell ──────────────────────────────────────────────────────────
+function ComingSoonShell({ icon, message }: { icon: string; message: string }) {
+  const { colors } = useTheme();
+  return (
+    <View accessible accessibilityRole="text"
+      accessibilityLabel={`${message} Coming soon.`}
+      style={{
+        backgroundColor: colors.inputBackground,
+        borderRadius: 14, padding: 20, marginBottom: 20,
+        alignItems: 'center', opacity: 0.7,
+      }}>
+      <Ionicons name={icon as any} size={36} color={colors.textSecondary}
+        style={{ marginBottom: 10 }} accessibilityElementsHidden />
+      <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20 }}
+        accessibilityElementsHidden>
+        {message}
+      </Text>
+      <View style={{
+        marginTop: 12, paddingHorizontal: 10, paddingVertical: 4,
+        backgroundColor: colors.accent, borderRadius: 8,
+      }} accessibilityElementsHidden>
+        <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFF', letterSpacing: 1 }}>
+          COMING SOON
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
+const TOOLBAR_H = 58;
+
 export default function EpisodeDetail() {
   const params = useLocalSearchParams<{
     id: string; title: string; showTitle: string;
     description?: string; artworkUrl?: string;
     publishedAt?: string; duration?: string; audioUrl: string;
-    transcriptUrl?: string;
+    transcriptUrl?: string; url?: string;
   }>();
 
   const router  = useRouter();
   const player  = usePlayer();
+  const auth    = useAuth();
   const { colors, styles } = useTheme();
   const { podcastTrimSilence, setPodcastTrimSilence, podcastVoiceBoost, setPodcastVoiceBoost } = usePreferences();
   const { showToast } = useToast();
+  const aiAvailable = isAppleIntelligenceAvailable();
+  const insets = useSafeAreaInsets();
 
   const isCurrent     = player.episode?.id === params.id;
   const isQueued      = player.queue.some(e => e.id === params.id);
   const durationSecs  = Number(params.duration ?? 0);
   const progress      = isCurrent && player.duration > 0 ? player.position / player.duration : 0;
   const durationKnown = isCurrent && player.duration > 0;
+  const episodeUrl    = params.url || undefined;
 
   const publishedLabel = params.publishedAt ? relativeTime(params.publishedAt) : null;
 
@@ -462,14 +537,24 @@ export default function EpisodeDetail() {
     duration: durationSecs,
     audioUrl: params.audioUrl,
     transcriptUrl: params.transcriptUrl || undefined,
+    url: episodeUrl,
   }), [params.id, params.title, params.showTitle, params.description,
-      params.artworkUrl, params.publishedAt, durationSecs, params.audioUrl, params.transcriptUrl]);
+      params.artworkUrl, params.publishedAt, durationSecs, params.audioUrl,
+      params.transcriptUrl, episodeUrl]);
+
+  // ── Refs ─────────────────────────────────────────────────────────────────
+  const scrollRef   = useRef<ScrollView>(null);
+  const discussionY = useRef<number>(0);
 
   // ── Save state ───────────────────────────────────────────────────────────
   const [isSaved, setIsSaved] = useState(false);
 
   // ── Download state ───────────────────────────────────────────────────────
   const [downloadState, setDownloadState] = useState<DownloadState>('idle');
+
+  // ── AI state ─────────────────────────────────────────────────────────────
+  const [aiWorking, setAiWorking] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
 
   useEffect(() => {
     persistence.getSavedItems()
@@ -480,13 +565,13 @@ export default function EpisodeDetail() {
       .catch(() => {});
   }, [params.id]);
 
-  // ── Sleep timer picker state ─────────────────────────────────────────────
+  // ── Sleep timer ──────────────────────────────────────────────────────────
   const [sleepIdx, setSleepIdx] = useState(() => {
-    if (player.sleepAtEndOfEpisode) return 1; // End of Episode index
+    if (player.sleepAtEndOfEpisode) return 1;
     if (!player.sleepTimerRemaining) return 0;
     const remainMins = Math.ceil(player.sleepTimerRemaining / 60);
     const i = SLEEP_TIMER_OPTIONS.findIndex(m => m >= remainMins);
-    return i >= 0 ? i + 2 : SLEEP_TIMER_OPTIONS.length + 1; // +2 for Off and End of Episode
+    return i >= 0 ? i + 2 : SLEEP_TIMER_OPTIONS.length + 1;
   });
 
   const sleepDisplayLabel = player.sleepAtEndOfEpisode
@@ -552,7 +637,7 @@ export default function EpisodeDetail() {
     : player.isLoading ? 'Loading, please wait'
     : player.isPlaying ? 'Pause' : 'Resume';
 
-  // ── Speed — tap cycles forward, VoiceOver adjustable swipes ─────────────
+  // ── Speed ────────────────────────────────────────────────────────────────
   const speedIdx = SPEED_OPTIONS.indexOf(player.speed);
 
   function cycleSpeedForward() {
@@ -582,7 +667,7 @@ export default function EpisodeDetail() {
     player.setVolume(volumeSteps[clamped]);
   }
 
-  // ── Chapter accessibility actions (rotor-style) ──────────────────────────
+  // ── Chapter accessibility actions ────────────────────────────────────────
   const chapters = (isCurrent ? player.episode?.chapters : undefined) ?? [];
   const chapterActions = chapters.map(c => ({
     name: `chapter_${c.startTime}`,
@@ -637,15 +722,59 @@ export default function EpisodeDetail() {
 
   // ── Share ────────────────────────────────────────────────────────────────
   function handleShare() {
-    const message = `${params.title} — ${params.showTitle} on AppleVis`;
-    Share.share({ title: params.title, message }).catch(() => {});
+    const url = episodeUrl ?? 'https://www.applevis.com/podcasts';
+    Share.share({ title: params.title, message: `${params.title} — ${params.showTitle}\n${url}` }).catch(() => {});
+  }
+
+  // ── Copy link ────────────────────────────────────────────────────────────
+  function handleCopyLink() {
+    const url = episodeUrl ?? 'https://www.applevis.com/podcasts';
+    Clipboard.setString(url);
+    showToast('Link copied to clipboard');
+    AccessibilityInfo.announceForAccessibility('Link copied to clipboard');
+  }
+
+  // ── Open in browser ──────────────────────────────────────────────────────
+  function handleOpenInBrowser() {
+    const url = episodeUrl ?? 'https://www.applevis.com/podcasts';
+    Linking.openURL(url).catch(() => showToast('Could not open Safari.', 'error'));
+  }
+
+  // ── Queue toggle (toolbar) ───────────────────────────────────────────────
+  function handleQueueToggle() {
+    if (isCurrent) return;
+    if (isQueued) {
+      player.removeFromQueue(params.id);
+      showToast('Removed from queue');
+      AccessibilityInfo.announceForAccessibility('Removed from queue');
+    } else {
+      player.enqueue(episode);
+      showToast('Added to end of queue');
+      AccessibilityInfo.announceForAccessibility('Added to queue');
+    }
+  }
+
+  // ── Add new comment (toolbar) ────────────────────────────────────────────
+  function handleAddComment() {
+    if (!auth.isSignedIn) {
+      showToast('Sign in to add a new comment.', 'warning');
+      return;
+    }
+    router.push({
+      pathname: '/episode/comments/[id]' as any,
+      params: {
+        id: params.id,
+        title: params.title,
+        showTitle: params.showTitle,
+        url: params.url ?? '',
+      },
+    });
   }
 
   // ── Mark as played ───────────────────────────────────────────────────────
   async function handleMarkAsPlayed() {
     await persistence.clearPodcastPosition(params.id);
     if (isCurrent) {
-      // stop() saves position before unloading as a safety measure, so clear again after
       await player.stop();
       await persistence.clearPodcastPosition(params.id);
     }
@@ -653,19 +782,52 @@ export default function EpisodeDetail() {
     AccessibilityInfo.announceForAccessibility('Marked as played');
   }
 
-  // ── Transcript URL (separate from show notes inline transcript) ──────────
+  // ── AI: Summarise show notes ─────────────────────────────────────────────
+  async function handleAiSummarise() {
+    if (!params.description || aiWorking) return;
+    if (aiSummary) {
+      setAiSummary(null);
+      return;
+    }
+    setAiWorking(true);
+    try {
+      const plain = stripHtmlPlain(params.description ?? '');
+      const result = await summariseText(plain);
+      if (result) {
+        setAiSummary(result);
+      } else {
+        showToast('Could not summarise — try again', 'error');
+      }
+    } catch {
+      showToast('Could not summarise — try again', 'error');
+    } finally {
+      setAiWorking(false);
+    }
+  }
+
+  // ── Transcript URL ───────────────────────────────────────────────────────
   const transcriptUrl = params.transcriptUrl ?? player.episode?.transcriptUrl ?? undefined;
+
+  // ── Download pill label helpers ──────────────────────────────────────────
+  const downloadLabel =
+    downloadState === 'done'        ? 'Downloaded' :
+    downloadState === 'downloading' ? 'Saving…'    : 'Download';
+  const downloadIcon =
+    downloadState === 'done'        ? 'checkmark-circle' :
+    downloadState === 'downloading' ? 'cloud-download-outline' :
+    'arrow-down-circle-outline';
+
+  // ── unused import suppressors ────────────────────────────────────────────
+  void ActionSheetIOS;
+  void findNodeHandle;
 
   return (
     <Screen title="Episode" showSettings={false}>
       {/* onMagicTap lets VoiceOver two-finger double tap play/pause anywhere */}
       <View onMagicTap={handlePlayPause} style={{ flex: 1 }}>
-        <ScrollView showsVerticalScrollIndicator contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView ref={scrollRef} showsVerticalScrollIndicator style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: TOOLBAR_H + 16 }}>
 
           {/* ── Artwork ──────────────────────────────────────────────────── */}
-          {/* No accessibilityLabel set — iOS VoiceOver auto-describes the image
-              using on-device Vision. accessibilityElementsHidden removed so the
-              Image itself is the accessible element. */}
           <View style={{ alignItems: 'center', marginBottom: 20, marginTop: 8 }}>
             {params.artworkUrl ? (
               <Image
@@ -688,25 +850,37 @@ export default function EpisodeDetail() {
             )}
           </View>
 
-          {/* ── Metadata ─────────────────────────────────────────────────── */}
-          <Text accessibilityRole="header"
-            style={{ fontSize: 20, fontWeight: '800', color: colors.text,
-              textAlign: 'center', marginBottom: 6, lineHeight: 26 }}>
-            {params.title}
-          </Text>
-          <Text style={{ fontSize: 15, color: colors.textSecondary, textAlign: 'center', marginBottom: 2 }}>
-            {params.showTitle}
-          </Text>
-          {(publishedLabel || durationSecs > 0) && (
-            <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginBottom: 24 }}>
-              {[publishedLabel, durationSecs > 0 ? formatDuration(durationSecs) : null].filter(Boolean).join(' · ')}
+          {/* ── Metadata band — single compound label for braille displays ─ */}
+          <View
+            accessible
+            accessibilityLabel={[
+              params.title,
+              params.showTitle,
+              publishedLabel,
+              durationSecs > 0 ? formatDuration(durationSecs) : null,
+            ].filter(Boolean).join('. ') + '.'}
+            style={{ marginBottom: 24 }}
+          >
+            <Text accessibilityElementsHidden
+              style={{ fontSize: 20, fontWeight: '800', color: colors.text,
+                textAlign: 'center', lineHeight: 26 }}>
+              {params.title}
             </Text>
-          )}
+            <Text accessibilityElementsHidden
+              style={{ fontSize: 15, color: colors.textSecondary, textAlign: 'center', marginTop: 4 }}>
+              {params.showTitle}
+            </Text>
+            {(publishedLabel || durationSecs > 0) && (
+              <Text accessibilityElementsHidden
+                style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginTop: 4 }}>
+                {[publishedLabel, durationSecs > 0 ? formatDuration(durationSecs) : null].filter(Boolean).join(' · ')}
+              </Text>
+            )}
+          </View>
 
           {/* ── Player card ──────────────────────────────────────────────── */}
           <View style={[styles.card, { marginBottom: 20 }]}>
 
-            {/* Error state */}
             {isCurrent && player.error && (
               <View style={{ backgroundColor: '#E5393522', borderRadius: 8, padding: 12, marginBottom: 14 }}>
                 <Text style={{ color: '#E53935', fontSize: 14, marginBottom: 8 }}>
@@ -746,7 +920,6 @@ export default function EpisodeDetail() {
                   </View>
                 </View>
 
-                {/* Position / remaining time */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
                   <Text style={{ fontSize: 13, color: colors.textSecondary }}>
                     {formatTime(player.position)}
@@ -760,7 +933,6 @@ export default function EpisodeDetail() {
                   </Text>
                 </View>
 
-                {/* Buffering */}
                 {player.isBuffering && (
                   <Text style={{ fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginBottom: 6 }}
                     accessibilityLiveRegion="polite">
@@ -768,7 +940,6 @@ export default function EpisodeDetail() {
                   </Text>
                 )}
 
-                {/* Current chapter — live region so VoiceOver announces chapter changes */}
                 {player.currentChapter && (
                   <Text
                     style={{ fontSize: 13, color: colors.accent, textAlign: 'center',
@@ -831,7 +1002,7 @@ export default function EpisodeDetail() {
               )}
             </View>
 
-            {/* ── Speed row — tap cycles, VoiceOver adjustable swipes ─────── */}
+            {/* Speed row */}
             {isCurrent && (
               <Pressable
                 onPress={cycleSpeedForward}
@@ -867,7 +1038,7 @@ export default function EpisodeDetail() {
               </Pressable>
             )}
 
-            {/* ── Volume row — adjustable ──────────────────────────────────── */}
+            {/* Volume row */}
             {isCurrent && (
               <View
                 accessible
@@ -892,23 +1063,14 @@ export default function EpisodeDetail() {
               >
                 <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>Volume</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <Pressable
-                    onPress={() => setVolumeIdx(volumeIdx - 1)}
-                    accessible={false}
-                    hitSlop={8}
-                  >
+                  <Pressable onPress={() => setVolumeIdx(volumeIdx - 1)} accessible={false} hitSlop={8}>
                     <Ionicons name="volume-low-outline" size={20} color={colors.textSecondary} />
                   </Pressable>
-                  {/* Visual bar */}
                   <View style={{ width: 80, height: 4, backgroundColor: colors.border, borderRadius: 2 }}>
                     <View style={{ height: 4, backgroundColor: colors.accent, borderRadius: 2,
                       width: `${Math.round(player.volume * 100)}%` }} />
                   </View>
-                  <Pressable
-                    onPress={() => setVolumeIdx(volumeIdx + 1)}
-                    accessible={false}
-                    hitSlop={8}
-                  >
+                  <Pressable onPress={() => setVolumeIdx(volumeIdx + 1)} accessible={false} hitSlop={8}>
                     <Ionicons name="volume-high-outline" size={20} color={colors.textSecondary} />
                   </Pressable>
                   <Text style={{ fontSize: 13, color: colors.accent, fontWeight: '700', minWidth: 36,
@@ -919,7 +1081,7 @@ export default function EpisodeDetail() {
               </View>
             )}
 
-            {/* ── Sleep timer — adjustable ─────────────────────────────────── */}
+            {/* Sleep timer */}
             {isCurrent && (
               <View
                 accessible
@@ -956,7 +1118,7 @@ export default function EpisodeDetail() {
               </View>
             )}
 
-            {/* ── Trim silence ─────────────────────────────────────────────── */}
+            {/* Trim silence */}
             <Pressable
               onPress={() => {
                 const next = !podcastTrimSilence;
@@ -987,7 +1149,7 @@ export default function EpisodeDetail() {
               </View>
             </Pressable>
 
-            {/* ── Voice Boost ──────────────────────────────────────────────── */}
+            {/* Voice Boost */}
             <Pressable
               onPress={() => {
                 const next = !podcastVoiceBoost;
@@ -1017,62 +1179,6 @@ export default function EpisodeDetail() {
                   alignSelf: podcastVoiceBoost ? 'flex-end' : 'flex-start' }} />
               </View>
             </Pressable>
-          </View>
-
-          {/* ── Action bar: Save · Download · Share · AirPlay ─────────────── */}
-          <View style={[styles.card, {
-            flexDirection: 'row', justifyContent: 'space-around',
-            paddingVertical: 16, marginBottom: 20,
-          }]}>
-            <Pressable onPress={handleSaveToggle} accessible accessibilityRole="button"
-              accessibilityLabel={isSaved ? 'Unsave episode' : 'Save episode'}
-              style={{ alignItems: 'center', gap: 5, minWidth: 56 }}>
-              <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'}
-                size={26} color={isSaved ? colors.accent : colors.text} />
-              <Text style={{ fontSize: 11, color: isSaved ? colors.accent : colors.text, fontWeight: '600' }}>
-                {isSaved ? 'Saved' : 'Save'}
-              </Text>
-            </Pressable>
-
-            <Pressable onPress={handleDownloadToggle} disabled={downloadState === 'downloading'}
-              accessible accessibilityRole="button"
-              accessibilityLabel={
-                downloadState === 'done'        ? 'Downloaded. Double-tap to remove.' :
-                downloadState === 'downloading' ? 'Downloading, please wait' :
-                'Download for offline listening'
-              }
-              style={{ alignItems: 'center', gap: 5, minWidth: 56 }}>
-              <Ionicons
-                name={downloadState === 'done' ? 'checkmark-circle' :
-                      downloadState === 'downloading' ? 'cloud-download-outline' :
-                      'arrow-down-circle-outline'}
-                size={26}
-                color={downloadState === 'done' ? colors.accent :
-                       downloadState === 'downloading' ? colors.textSecondary : colors.text}
-              />
-              <Text style={{ fontSize: 11, fontWeight: '600',
-                color: downloadState === 'done' ? colors.accent :
-                       downloadState === 'downloading' ? colors.textSecondary : colors.text }}>
-                {downloadState === 'done' ? 'Downloaded' :
-                 downloadState === 'downloading' ? 'Saving…' : 'Download'}
-              </Text>
-            </Pressable>
-
-            <Pressable onPress={handleShare} accessible accessibilityRole="button"
-              accessibilityLabel="Share episode"
-              style={{ alignItems: 'center', gap: 5, minWidth: 56 }}>
-              <Ionicons name="share-outline" size={26} color={colors.text} />
-              <Text style={{ fontSize: 11, color: colors.text, fontWeight: '600' }}>Share</Text>
-            </Pressable>
-
-            {Platform.OS === 'ios' && (
-              <Pressable onPress={() => showAirPlayPicker()} accessible accessibilityRole="button"
-                accessibilityLabel="AirPlay or Bluetooth audio output"
-                style={{ alignItems: 'center', gap: 5, minWidth: 56 }}>
-                <Ionicons name="radio-outline" size={26} color={colors.text} />
-                <Text style={{ fontSize: 11, color: colors.text, fontWeight: '600' }}>AirPlay</Text>
-              </Pressable>
-            )}
           </View>
 
           {/* ── Play Next / Add to Queue ──────────────────────────────────── */}
@@ -1124,7 +1230,7 @@ export default function EpisodeDetail() {
               <Ionicons
                 name={isQueued ? 'checkmark-circle' : 'add-circle-outline'}
                 size={22}
-                color={isCurrent ? colors.textSecondary : isQueued ? colors.accent : colors.accent}
+                color={isCurrent ? colors.textSecondary : colors.accent}
                 accessibilityElementsHidden
               />
               <Text style={{ fontSize: 15, fontWeight: '600',
@@ -1163,7 +1269,7 @@ export default function EpisodeDetail() {
             <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text, flex: 1 }}>Mark as Played</Text>
           </Pressable>
 
-          {/* ── Chapters — with VoiceOver rotor-style custom actions ─────── */}
+          {/* ── Chapters ─────────────────────────────────────────────────── */}
           {isCurrent && chapters.length > 0 && (
             <View
               style={[styles.card, { marginBottom: 20 }]}
@@ -1211,7 +1317,7 @@ export default function EpisodeDetail() {
             </View>
           )}
 
-          {/* ── Live transcript (from dedicated VTT/SRT file) ─────────────── */}
+          {/* ── Live transcript ───────────────────────────────────────────── */}
           {transcriptUrl && isCurrent && (
             <VttTranscript url={transcriptUrl} currentPosition={player.position} />
           )}
@@ -1219,22 +1325,181 @@ export default function EpisodeDetail() {
           {/* ── Show notes ───────────────────────────────────────────────── */}
           {!!params.description && <ShowNotes rawHtml={params.description} />}
 
-          {/* ── View on AppleVis ─────────────────────────────────────────── */}
-          <Pressable
-            onPress={() => Linking.openURL('https://www.applevis.com/podcasts').catch(() => {})}
-            accessible accessibilityRole="link"
-            accessibilityLabel={`View ${params.showTitle} on AppleVis — opens website in browser`}
-            style={[styles.cardSmall, { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }]}
+          {/* ── Quick nav ────────────────────────────────────────────────── */}
+          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
+            <Pressable
+              onPress={() => scrollRef.current?.scrollTo({ y: discussionY.current, animated: true })}
+              accessible accessibilityRole="button"
+              accessibilityLabel="Jump to Community Discussion"
+              accessibilityHint="Scrolls down to the discussion section"
+              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                gap: 8, paddingVertical: 11, borderRadius: 12,
+                backgroundColor: colors.inputBackground, borderWidth: 1, borderColor: colors.border }}
+            >
+              <Ionicons name="chatbubbles-outline" size={16} color={colors.accent} accessibilityElementsHidden />
+              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.accent }}>Jump to Discussion</Text>
+            </Pressable>
+          </View>
+
+          {/* ── Apple Intelligence ────────────────────────────────────────── */}
+          <View style={[styles.card, { marginBottom: 20, opacity: aiAvailable ? 1 : 0.55 }]}>
+            <SectionDivider label="Apple Intelligence" />
+            <Pressable
+              onPress={handleAiSummarise}
+              disabled={!aiAvailable || !params.description || aiWorking}
+              accessible accessibilityRole="button"
+              accessibilityLabel={aiSummary ? 'Summarise Show Notes. Tap to hide summary.' : 'Summarise Show Notes'}
+              accessibilityHint={
+                !aiAvailable ? 'Requires iPhone 16 or later with Apple Intelligence enabled in Settings' :
+                !params.description ? 'No show notes available to summarise' :
+                aiWorking ? 'Summarising, please wait' : undefined
+              }
+              style={({ pressed }) => ({
+                flexDirection: 'row', alignItems: 'center', gap: 14,
+                paddingVertical: 12,
+                opacity: pressed ? 0.65 : 1,
+              })}
+            >
+              <View style={{
+                width: 44, height: 44, borderRadius: 22,
+                backgroundColor: aiAvailable ? `${colors.accent}18` : colors.inputBackground,
+                alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Ionicons name={aiWorking ? 'hourglass-outline' : 'sparkles'}
+                  size={22} color={aiAvailable ? colors.accent : colors.textSecondary}
+                  accessibilityElementsHidden />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>
+                  {aiWorking ? 'Summarising…' : 'Summarise Show Notes'}
+                </Text>
+                {!aiAvailable && (
+                  <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                    Requires iPhone 16 with Apple Intelligence enabled
+                  </Text>
+                )}
+              </View>
+              <Ionicons name={aiSummary ? 'chevron-up' : 'chevron-down'}
+                size={18} color={colors.textSecondary} accessibilityElementsHidden />
+            </Pressable>
+
+            {aiSummary && (
+              <View style={{ marginTop: 4, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.border }}>
+                <Text accessible style={{ fontSize: 15, lineHeight: 22, color: colors.textSecondary }}>
+                  {aiSummary}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* ── Community Discussion ──────────────────────────────────────── */}
+          <View
+            onLayout={(e) => { discussionY.current = e.nativeEvent.layout.y; }}
           >
-            <Ionicons name="globe-outline" size={22} color={colors.accent} accessibilityElementsHidden />
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>View on AppleVis</Text>
-              <Text style={{ fontSize: 13, color: colors.textSecondary }}>Open show page in browser</Text>
-            </View>
-            <Ionicons name="open-outline" size={18} color={colors.textSecondary} accessibilityElementsHidden />
+            <SectionDivider label="Community Discussion" />
+            <Pressable
+              onPress={() => router.push({
+                pathname: '/episode/comments/[id]' as any,
+                params: {
+                  id: params.id,
+                  title: params.title,
+                  showTitle: params.showTitle,
+                  url: params.url ?? '',
+                },
+              })}
+              accessible accessibilityRole="button"
+              accessibilityLabel="Community Discussion. View and join the conversation about this episode. Double tap to open."
+              style={({ pressed }) => [styles.card, {
+                marginBottom: 20, flexDirection: 'row', alignItems: 'center', gap: 14,
+                opacity: pressed ? 0.75 : 1,
+              }]}
+            >
+              <View style={{
+                width: 48, height: 48, borderRadius: 24,
+                backgroundColor: `${colors.accent}18`,
+                alignItems: 'center', justifyContent: 'center',
+              }} accessibilityElementsHidden>
+                <Ionicons name="chatbubbles-outline" size={24} color={colors.accent} accessibilityElementsHidden />
+              </View>
+              <View style={{ flex: 1 }} accessibilityElementsHidden>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 2 }}>
+                  Community Discussion
+                </Text>
+                <Text style={{ fontSize: 13, color: colors.textSecondary }}>
+                  View and join the conversation
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} accessibilityElementsHidden />
+            </Pressable>
+          </View>
+
+          {/* ── Related Episodes ──────────────────────────────────────────── */}
+          <SectionDivider label="Related Episodes" />
+          <ComingSoonShell
+            icon="grid-outline"
+            message="Episodes from the same series or covering similar topics will appear here."
+          />
+
+          {/* ── Back to Top ───────────────────────────────────────────────── */}
+          <Pressable
+            onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
+            accessible accessibilityRole="button"
+            accessibilityLabel="Back to Top"
+            accessibilityHint="Scrolls back to the beginning of this page"
+            style={{ alignItems: 'center', paddingVertical: 16 }}
+          >
+            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.accent }}>Back to Top</Text>
           </Pressable>
 
         </ScrollView>
+
+        {/* ── Fixed bottom toolbar ──────────────────────────────────────── */}
+        <View
+          style={{
+            flexDirection: 'row',
+            height: TOOLBAR_H,
+            paddingHorizontal: 4,
+            backgroundColor: colors.card,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: colors.border,
+            alignItems: 'center',
+          }}
+          accessibilityRole="toolbar"
+          accessibilityLabel="Episode actions"
+        >
+          <ToolbarButton
+            icon="list-outline"
+            activeIcon="checkmark-circle"
+            label={isQueued ? 'Remove\nfrom Queue' : 'Queue this\nEpisode'}
+            active={isQueued}
+            disabled={isCurrent}
+            onPress={handleQueueToggle}
+          />
+          <ToolbarButton
+            icon="bookmark-outline"
+            activeIcon="bookmark"
+            label={isSaved ? 'Saved' : 'Save this\nEpisode'}
+            active={isSaved}
+            onPress={handleSaveToggle}
+          />
+          <ToolbarButton
+            icon="share-outline"
+            label={'Share this\nEpisode'}
+            onPress={handleShare}
+          />
+          <ToolbarButton
+            icon="safari-outline"
+            label={'Open in\nSafari'}
+            disabled={!episodeUrl}
+            onPress={handleOpenInBrowser}
+          />
+          <ToolbarButton
+            icon="pencil-outline"
+            label={'Add New\nComment'}
+            onPress={handleAddComment}
+            accent
+          />
+        </View>
       </View>
     </Screen>
   );

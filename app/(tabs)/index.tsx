@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, FlatList,
+  AccessibilityInfo, ActivityIndicator, FlatList,
   Modal, Pressable, RefreshControl, Text, View,
 } from 'react-native';
 import { useScrollToTop } from '@react-navigation/native';
@@ -76,13 +76,13 @@ function FeedFilterModal({
           borderBottomWidth: 1, borderBottomColor: colors.border,
         }}>
           <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text }}>
-            Home Feed
+            Customize Home
           </Text>
           <Pressable
             onPress={onClose}
             accessible
             accessibilityRole="button"
-            accessibilityLabel="Close feed settings"
+            accessibilityLabel="Close Customize Home"
             style={{ padding: 8 }}
           >
             <Ionicons name="close" size={22} color={colors.text} />
@@ -94,7 +94,7 @@ function FeedFilterModal({
           paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10,
           lineHeight: 18,
         }}>
-          Choose what appears in your Home feed. Your preferences are saved automatically.
+          Choose what appears on your Home screen. Your preferences are saved automatically.
         </Text>
 
         {FILTER_ROWS.map((row) => {
@@ -187,6 +187,19 @@ export default function HomeScreen() {
     persistence.stampVisit();
   }, []);
 
+  // Announce to VoiceOver once when the initial load completes.
+  // Uses a ref so it fires exactly once per mount (not on refresh or load-more).
+  const hasAnnouncedRef = useRef(false);
+  useEffect(() => {
+    if (!hasAnnouncedRef.current && !feed.loading && feed.items.length > 0) {
+      hasAnnouncedRef.current = true;
+      const count = feed.items.length;
+      AccessibilityInfo.announceForAccessibility(
+        `Home loaded. ${count} item${count === 1 ? '' : 's'}.`,
+      );
+    }
+  }, [feed.loading, feed.items.length]);
+
   function handleItemPress(item: FeedItem) {
     switch (item.kind) {
       case 'topic':
@@ -270,7 +283,7 @@ export default function HomeScreen() {
     if (!feed.hasMore && feed.items.length > 0) {
       return (
         <Text style={{ textAlign: 'center', color: colors.textSecondary, fontSize: 13, paddingVertical: 20 }}
-          accessible accessibilityLabel="You've reached the end of the feed.">
+          accessible accessibilityLabel="You've reached the end.">
           You're all caught up.
         </Text>
       );
@@ -284,13 +297,13 @@ export default function HomeScreen() {
     <Screen
       title="Home"
       showBack={false}
-      headerRight={
+      headerLeft={
         <Pressable
           onPress={() => setFilterVisible(true)}
           accessible
           accessibilityRole="button"
-          accessibilityLabel="Feed settings"
-          accessibilityHint="Choose what content types appear in your Home feed"
+          accessibilityLabel="Customize Home"
+          accessibilityHint="Choose what content types appear on your Home screen"
           style={{ padding: 8 }}
         >
           <Ionicons name="options-outline" size={22} color={colors.accent} />
@@ -300,8 +313,8 @@ export default function HomeScreen() {
       {/* Loading state */}
       {feed.loading && (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 }}>
-          <ActivityIndicator size="large" color={colors.appleVisBlue} accessibilityLabel="Loading feed" />
-          <Text style={[styles.lede, { marginTop: 14, textAlign: 'center' }]}>Loading your feed…</Text>
+          <ActivityIndicator size="large" color={colors.appleVisBlue} accessibilityLabel="Loading Home" />
+          <Text style={[styles.lede, { marginTop: 14, textAlign: 'center' }]}>Loading…</Text>
         </View>
       )}
 
@@ -311,8 +324,8 @@ export default function HomeScreen() {
           <EmptyState
             icon="newspaper-outline"
             title="Nothing to show"
-            subtitle="Turn on at least one content type using the feed settings button above."
-            action={{ label: 'Feed Settings', onPress: () => setFilterVisible(true) }}
+            subtitle="Turn on at least one content type using the Customize Home button above."
+            action={{ label: 'Customize Home', onPress: () => setFilterVisible(true) }}
           />
         </View>
       )}
@@ -335,7 +348,7 @@ export default function HomeScreen() {
               refreshing={feed.refreshing}
               onRefresh={feed.refresh}
               tintColor={colors.appleVisBlue}
-              accessibilityLabel="Pull to refresh feed"
+              accessibilityLabel="Pull to refresh"
             />
           }
           ref={flatListRef}

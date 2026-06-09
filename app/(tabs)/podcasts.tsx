@@ -534,6 +534,7 @@ export default function Podcasts() {
         duration: String(episode.duration),
         audioUrl: episode.audioUrl,
         transcriptUrl: episode.transcriptUrl ?? '',
+        url: episode.url ?? '',
       },
     });
   }
@@ -826,7 +827,7 @@ export default function Podcasts() {
         {filter === 'In Progress' && (
           inProgressEpisodes.length === 0
             ? <EmptyState icon="time-outline" title="No episodes in progress"
-                subtitle="Episodes you've started will appear here." colors={colors} styles={styles} />
+                subtitle="Episodes you've started will appear here." />
             : inProgressEpisodes.map(episode => {
                 const isCurrent = isCurrentEpisode(episode.id);
                 const pos       = isCurrent ? player.position : (meta.positions[episode.id] ?? 0);
@@ -870,7 +871,7 @@ export default function Podcasts() {
         {filter === 'Downloads' && (
           downloadedEpisodes.length === 0
             ? <EmptyState icon="cloud-download-outline" title="No downloaded episodes"
-                subtitle="Download episodes to listen offline." colors={colors} styles={styles} />
+                subtitle="Download episodes to listen offline." />
             : <>
                 {/* Toolbar */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>

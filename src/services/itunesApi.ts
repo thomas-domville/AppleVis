@@ -9,6 +9,12 @@
 
 export type ItunesMetadata = {
   appStoreId:        string;
+  appName:           string;          // trackName — app display name
+  developerName:     string;          // artistName — developer or publisher
+  category:          string;          // primaryGenreName — e.g. "Productivity"
+  bundleId:          string;          // e.g. "com.agilebits.onepassword-ios-ifap"
+  appStoreUrl:       string;          // canonical trackViewUrl from iTunes
+  artworkUrl:        string;          // artworkUrl100 — 100×100 icon URL
   price:             string;          // "Free", "$2.99", etc.
   version:           string;          // "3.2.1"
   versionDate:       string;          // ISO date of current version release
@@ -60,6 +66,12 @@ export async function fetchItunesMetadata(appStoreUrl: string): Promise<ItunesMe
 
     return {
       appStoreId:          id,
+      appName:             (r.trackName as string | undefined) ?? '',
+      developerName:       (r.artistName as string | undefined) ?? '',
+      category:            (r.primaryGenreName as string | undefined) ?? '',
+      bundleId:            (r.bundleId as string | undefined) ?? '',
+      appStoreUrl:         (r.trackViewUrl as string | undefined) ?? appStoreUrl,
+      artworkUrl:          (r.artworkUrl100 as string | undefined) ?? (r.artworkUrl60 as string | undefined) ?? '',
       price:               (r.formattedPrice as string | undefined) ?? (r.price === 0 ? 'Free' : String(r.price ?? '')),
       version:             (r.version as string | undefined) ?? '',
       versionDate:         (r.currentVersionReleaseDate as string | undefined) ?? '',

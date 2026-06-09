@@ -65,6 +65,7 @@ export type ForumTopic = {
   isUnread: boolean;
   isFollowing: boolean;
   isSaved: boolean;
+  url?: string;
 };
 
 export type Chapter = {
@@ -85,6 +86,7 @@ export type PodcastEpisode = {
   artworkUrl?: string;
   transcriptUrl?: string;
   chapters?: Chapter[];
+  url?: string;
 };
 
 export type AppListing = {
@@ -98,6 +100,7 @@ export type AppListing = {
   appStoreUrl: string;
   iconUrl?: string;
   summary: string;
+  url?: string;  // AppleVis app page URL
 };
 
 export type Resource = {
@@ -122,6 +125,8 @@ export type ForumTopicDetail = ForumTopic & {
   body: string;
   replies: ForumReply[];
   url: string;
+  category?: string;   // pending: confirm taxonomy field name with Drupal dev
+  viewCount?: number;  // pending: confirm view count field name with Drupal dev
 };
 
 export type AppReview = {
@@ -138,6 +143,7 @@ export type AppDetail = AppListing & {
   body: string;
   reviews: AppReview[];
   accessibilityRating?: number;
+  reportedIssueCount?: number;  // pending: confirm field name with Drupal dev
 };
 
 export type ResourceDetail = Resource & {

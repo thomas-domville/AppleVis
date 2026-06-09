@@ -115,6 +115,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     if (user) {
+      // Best-effort: clear push token before signing out so server stops targeting this device.
+      api.account.removePushToken(user.csrfToken).catch(() => {});
       await api.account.signOut(user.logoutToken).catch(() => {});
     }
     await clearSession();

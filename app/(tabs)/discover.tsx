@@ -511,6 +511,31 @@ export default function DiscoverScreen() {
               </>
             )}
 
+            {/* ── Forums ────────────────────────────────────────────────── */}
+            <SectionHeader label="Forums" />
+            <Pressable
+              onPress={() => router.push('/(tabs)/forums' as any)}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="AppleVis Forums. Browse and join discussions. Double tap to open."
+              style={({ pressed }) => [
+                styles.card,
+                { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 8, opacity: pressed ? 0.75 : 1 },
+              ]}
+            >
+              <Ionicons name="chatbubbles-outline" size={32} color={colors.accent} accessibilityElementsHidden />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 3 }}>
+                  AppleVis Forums
+                </Text>
+                <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 18 }}>
+                  Community discussions about accessibility and Apple products
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.textSecondary}
+                accessibilityElementsHidden />
+            </Pressable>
+
             {/* ── Podcasts ───────────────────────────────────────────────── */}
             <SectionHeader label="Podcasts" />
             <Pressable
@@ -618,6 +643,74 @@ export default function DiscoverScreen() {
                 </Text>
               </View>
             </View>
+
+            {/* ── Contribute to AppleVis ───────────────────────────────────── */}
+            <SectionHeader label="Contribute to AppleVis" />
+            <Pressable
+              onPress={() => Linking.openURL('https://www.applevis.com/podcasts/upload').catch(() => {})}
+              accessible
+              accessibilityRole="link"
+              accessibilityLabel="Submit a Podcast. Know an accessible podcast? Nominate it for the AppleVis directory. Opens submission form in your browser."
+              style={({ pressed }) => [
+                styles.card,
+                { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 8, opacity: pressed ? 0.75 : 1 },
+              ]}
+            >
+              <Ionicons name="mic-outline" size={28} color={colors.accent} accessibilityElementsHidden />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 3 }}>
+                  Submit a Podcast
+                </Text>
+                <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 18 }}>
+                  Know an accessible podcast? Nominate it for the AppleVis directory
+                </Text>
+              </View>
+              <Ionicons name="open-outline" size={16} color={colors.textSecondary} accessibilityElementsHidden />
+            </Pressable>
+
+            <Pressable
+              onPress={() => Linking.openURL('https://www.applevis.com/form/blog-submission').catch(() => {})}
+              accessible
+              accessibilityRole="link"
+              accessibilityLabel="Submit a Blog Post. Share your expertise or experience with the AppleVis community. Opens submission form in your browser."
+              style={({ pressed }) => [
+                styles.card,
+                { flexDirection: 'row', alignItems: 'center', gap: 14, opacity: pressed ? 0.75 : 1 },
+              ]}
+            >
+              <Ionicons name="create-outline" size={28} color={colors.accent} accessibilityElementsHidden />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 3 }}>
+                  Submit a Blog Post
+                </Text>
+                <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 18 }}>
+                  Share your expertise or experience with the AppleVis community
+                </Text>
+              </View>
+              <Ionicons name="open-outline" size={16} color={colors.textSecondary} accessibilityElementsHidden />
+            </Pressable>
+
+            <Pressable
+              onPress={() => router.push('/submit-app')}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Submit an App. Found an accessible iOS app? Add it to the AppleVis directory with your accessibility notes."
+              style={({ pressed }) => [
+                styles.card,
+                { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 0, opacity: pressed ? 0.75 : 1 },
+              ]}
+            >
+              <Ionicons name="phone-portrait-outline" size={28} color={colors.accent} accessibilityElementsHidden />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 3 }}>
+                  Submit an App
+                </Text>
+                <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 18 }}>
+                  Found an accessible iOS app? Add it to the AppleVis directory
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} accessibilityElementsHidden />
+            </Pressable>
           </>
         )}
       </ScrollView>

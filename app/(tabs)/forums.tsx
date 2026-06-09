@@ -95,7 +95,31 @@ export default function Forums() {
   }
 
   return (
-    <Screen title="Forums" refreshing={forum.refreshing} showSearch showBack={false}>
+    <Screen
+      title="Forums"
+      refreshing={forum.refreshing}
+      showSearch
+      showBack={false}
+      headerRight={
+        <Pressable
+          onPress={() => {
+            if (!auth.isSignedIn) { showToast('Sign in to start a new topic.', 'warning'); return; }
+            router.push({ pathname: '/compose' as any, params: { mode: 'newTopic' } });
+          }}
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel="New Topic"
+          accessibilityHint={auth.isSignedIn ? 'Start a new forum topic' : 'Sign in to start a new forum topic'}
+          style={{
+            padding: 8, borderRadius: 10,
+            backgroundColor: colors.inputBackground,
+            borderWidth: 1, borderColor: colors.border,
+          }}
+        >
+          <Ionicons name="create-outline" size={20} color={colors.accent} accessibilityElementsHidden />
+        </Pressable>
+      }
+    >
       <ScrollView
         showsVerticalScrollIndicator
         refreshControl={

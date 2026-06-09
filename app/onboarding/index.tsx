@@ -50,7 +50,7 @@ export default function WelcomeStep() {
         { icon: '🗣️', text: 'Built for VoiceOver from the ground up — every element labelled, every action accessible to blind, DeafBlind, and low vision users.' },
         { icon: '🤝', text: 'An active, engaged community where members empower each other with their collective understanding of Apple accessibility.' },
         { icon: '🎙️', text: 'Forum discussions, app reviews, podcast episodes, and guides — the knowledge of the AppleVis community in one place.' },
-        { icon: '🎨', text: '13 themes including high contrast, Mouse, and OLED Midnight — choose yours in the next few steps.' },
+        { icon: '🎨', text: '14 themes including high contrast, Mouse, and OLED Midnight — choose yours in the next few steps.' },
       ].map(({ icon, text }) => (
         <View
           key={text}

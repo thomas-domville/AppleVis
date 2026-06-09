@@ -84,7 +84,7 @@ export function WriteReviewModal({ visible, appId, appName, onClose, onSubmitted
       return;
     }
     if (body.trim().length < 20) {
-      showToast('Please write at least 20 characters in your review.', 'warning');
+      showToast('Please write at least 20 characters in your comment.', 'warning');
       return;
     }
 
@@ -104,7 +104,7 @@ export function WriteReviewModal({ visible, appId, appName, onClose, onSubmitted
 
     setSubmitting(false);
     reset();
-    showToast('Review submitted! It will appear after moderation.', 'success');
+    showToast('Comment submitted! It will appear after moderation.', 'success');
     onSubmitted();
   }
 
@@ -127,7 +127,7 @@ export function WriteReviewModal({ visible, appId, appName, onClose, onSubmitted
         }}>
           <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text, flex: 1 }}
             accessibilityRole="header">
-            Write a Review
+            Add New Comment
           </Text>
           <Pressable
             onPress={handleClose}
@@ -218,7 +218,7 @@ export function WriteReviewModal({ visible, appId, appName, onClose, onSubmitted
           <View style={{ gap: 8 }}>
             <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
               textTransform: 'uppercase', letterSpacing: 0.8 }}>
-              Your Review *
+              Your Comment *
             </Text>
             <TextInput
               value={body}
@@ -232,7 +232,7 @@ export function WriteReviewModal({ visible, appId, appName, onClose, onSubmitted
                 fontSize: 15, color: colors.text,
                 minHeight: 140, paddingTop: 12,
               }]}
-              accessible accessibilityLabel="Review text"
+              accessible accessibilityLabel="Comment text"
               accessibilityHint="Describe your accessibility experience with this app"
               returnKeyType="default"
             />
@@ -246,7 +246,7 @@ export function WriteReviewModal({ visible, appId, appName, onClose, onSubmitted
             onPress={handleSubmit}
             disabled={submitting}
             accessible accessibilityRole="button"
-            accessibilityLabel={submitting ? 'Submitting review' : 'Submit review'}
+            accessibilityLabel={submitting ? 'Submitting comment' : 'Submit comment'}
             accessibilityState={{ disabled: submitting }}
             style={({ pressed }) => ({
               backgroundColor: submitting ? colors.textSecondary : colors.accent,
@@ -256,7 +256,7 @@ export function WriteReviewModal({ visible, appId, appName, onClose, onSubmitted
           >
             {submitting
               ? <ActivityIndicator color="#FFF" />
-              : <Text style={{ fontSize: 16, fontWeight: '700', color: '#FFF' }}>Submit Review</Text>
+              : <Text style={{ fontSize: 16, fontWeight: '700', color: '#FFF' }}>Submit Comment</Text>
             }
           </Pressable>
 

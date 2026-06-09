@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Share Extension Info.plist for AppleVisShareExtension target.
+
+  Xcode: File → New → Target → Share Extension, then replace the generated
+  Info.plist with this file (or merge these keys into the generated one).
+
+  Key notes:
+    • NSExtensionPrincipalClass must match the Swift class name exactly.
+    • NSExtensionActivationRule limits the share sheet appearance to web URLs
+      only — the extension will NOT appear for photos, files, plain text, etc.
+    • The App Groups entitlement (com.apple.security.application-groups) is set
+      in the target's Signing & Capabilities tab, NOT in Info.plist.
+    • The "applevis" URL scheme must be registered in the MAIN app target's
+      Info.plist so iOS can route applevis:// back to AppleVis when the
+      extension calls extensionContext?.open(_:).
+-->
+<plist version="1.0">
+<dict>
+  <key>CFBundleDisplayName</key>
+  <string>Submit to AppleVis</string>
+
+  <key>CFBundleExecutable</key>
+  <string>$(EXECUTABLE_NAME)</string>
+
+  <key>CFBundleIdentifier</key>
+  <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+
+  <key>CFBundleName</key>
+  <string>$(PRODUCT_NAME)</string>
+
+  <key>CFBundlePackageType</key>
+  <string>XPC!</string>
+
+  <key>CFBundleShortVersionString</key>
+  <string>1.0</string>
+
+  <key>CFBundleVersion</key>
+  <string>1</string>
+
+  <key>NSExtension</key>
+  <dict>
+    <key>NSExtensionAttributes</key>
+    <dict>
+      <!--
+        Only activate for web URLs. The extension will appear in the share sheet
+        when the user shares a URL from Safari, App Store, or any app that
+        provides a public.url type item.
+      -->
+      <key>NSExtensionActivationRule</key>
+      <dict>
+        <key>NSExtensionActivationSupportsWebURLWithMaxCount</key>
+        <integer>1</integer>
+      </dict>
+    </dict>
+
+    <key>NSExtensionPointIdentifier</key>
+    <string>com.apple.share-services</string>
+
+    <key>NSExtensionPrincipalClass</key>
+    <string>$(PRODUCT_MODULE_NAME).AppleVisShareExtensionViewController</string>
+  </dict>
+</dict>
+</plist>

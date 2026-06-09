@@ -4,8 +4,8 @@
  * Content (forums, podcasts, apps, resources) is served via Drupal JSON:API.
  * Authentication uses Drupal's REST Simple Auth module.
  *
- * WORKING NOW  : all content GET endpoints, POST /user/login?_format=json
- * NEEDS BUILDING: push tokens, flag/save/follow, account sync, account deletion
+ * WORKING NOW  : all content GET endpoints, login, account deletion, push token
+ * STILL NEEDED : follow/unfollow server-side flag (subscribe_node), search API path
  */
 
 import { relativeTime } from '../utils/relativeTime';
@@ -16,16 +16,21 @@ import type { ForumTopic, ForumReply, ForumTopicDetail, AppListing, AppDetail, A
 // developer, then flip the corresponding gated flag in the UI.
 //
 // Gate 1 — Blog content type:
-//   Set to the JSON:API resource type name, e.g. 'blog', 'blog_post', 'article'.
-//   Affects: api.blogs.list(), Home feed Blogs toggle, Discover Blogs section.
-const BLOG_CONTENT_TYPE: string | null = null;
+//   Confirmed by live API inspection: Drupal content type is 'blog2'.
+const BLOG_CONTENT_TYPE: string | null = 'blog2';
 //
 // Gate 2 — Forum Apple-related filter:
-//   Set FORUM_APPLE_FILTER_PATH to the taxonomy reference field path on forum
-//   nodes, e.g. 'field_category.name' or 'field_forum.name'.
-//   Set FORUM_APPLE_FILTER_VALUE to the taxonomy term label, e.g. 'Apple'.
-//   Affects: Home feed "Apple-Related Only" toggle.
-const FORUM_APPLE_FILTER_PATH: string | null = null;
+//   Field path confirmed by live API: 'taxonomy_forums.name'.
+//   Value TBD — no single term is named 'Apple'. The forum has: iOS and iPadOS,
+//   macOS and Mac Apps, Apple Beta Releases, Apple Hardware and Compatible
+//   Accessories, Other Apple Chat, tvOS and Apple TV Apps, watchOS and Apple
+//   Watch Apps, Braille on Apple Products, Low Vision Accessibility on Apple
+//   Products, iOS and iPadOS Gaming, App Development and Programming,
+//   Accessibility Advocacy, Assistive Technology, Site News, Android, Windows,
+//   Smart Home Tech and Gadgets.
+//   TODO: ask developer what term value(s) define "Apple-related" for this filter,
+//   or switch to a NOT IN exclusion for Android / Windows.
+const FORUM_APPLE_FILTER_PATH: string | null = 'taxonomy_forums.name';
 const FORUM_APPLE_FILTER_VALUE = 'Apple';
 //
 // Gate 3 — Full-text Search API:
@@ -43,6 +48,7 @@ const COMMON_HEADERS   = {
   'Accept-Language': 'en-US,en;q=0.9',
   'Origin':          BASE,
   'Referer':         `${BASE}/`,
+  'X-App-Auth':      '2ff01dc7bf35469d93c6',
 };
 
 function fileUri(drupalUri: string): string {
@@ -131,6 +137,7 @@ function mapForum(node: JsonApiNode, included: JsonApiNode[] = []): ForumTopic {
     isUnread: false,
     isFollowing: false,
     isSaved: false,
+    url: a.path?.alias ? `${BASE}${a.path.alias}` : undefined,
   };
 }
 
@@ -153,33 +160,19 @@ function mapPodcast(node: JsonApiNode, included: JsonApiNode[] = []): PodcastEpi
   const fileNode = fileId ? included.find((n) => n.id === fileId) : undefined;
   const rawUri   = fileNode?.attributes?.uri?.value as string | undefined;
 
-  // Duration — try common Drupal field names; falls back to 0 until confirmed
-  const rawDuration =
-    a.field_duration ??
-    a.field_podcast_duration ??
-    a.field_episode_duration ??
-    fileNode?.attributes?.field_duration ??
-    0;
-  const duration = typeof rawDuration === 'number' ? rawDuration
-    : typeof rawDuration === 'string' ? (parseFloat(rawDuration) || 0)
-    : 0;
+  // Duration — confirmed by live API inspection: Drupal does NOT store episode
+  // duration on the node or the file entity. Duration must be resolved client-side
+  // from the audio file (AVFoundation / expo-av asset duration).
+  const duration = 0;
 
-  // Artwork — try common field names; omitted until confirmed
-  const imageId = (
-    (node.relationships?.field_image?.data as { id?: string } | undefined)?.id ??
-    (node.relationships?.field_artwork?.data as { id?: string } | undefined)?.id ??
-    (node.relationships?.field_thumbnail?.data as { id?: string } | undefined)?.id
-  );
-  const imageNode  = imageId ? included.find((n) => n.id === imageId) : undefined;
-  const rawImgUri  = imageNode?.attributes?.uri?.value as string | undefined;
-  const artworkUrl = rawImgUri ? fileUri(rawImgUri) : undefined;
+  // Artwork — confirmed by live API: no per-episode artwork field exists on
+  // node--podcast. The app uses a static show artwork asset.
+  const artworkUrl: string | undefined = undefined;
 
-  // Transcript URL — try common field names
+  // Transcript URL — field not found on live nodes; may not be in use.
   const transcriptUrl = (a.field_transcript_url ?? a.field_vtt_url) as string | undefined;
 
-  // Chapters — mapped when field_chapters relationship is included in the query.
-  // NOTE TO DRUPAL DEVELOPER: add &include=field_chapters to the episodes query
-  // and add field_chapters paragraphs with title + field_start_time attributes.
+  // Chapters — no field_chapters relationship exists on live nodes.
   const chapterRefs = (node.relationships?.field_chapters?.data as { id: string }[] | undefined) ?? [];
   const chapters = chapterRefs.length > 0
     ? chapterRefs
@@ -205,6 +198,7 @@ function mapPodcast(node: JsonApiNode, included: JsonApiNode[] = []): PodcastEpi
     artworkUrl,
     transcriptUrl: transcriptUrl || undefined,
     chapters,
+    url: a.path?.alias ? `${BASE}${a.path.alias}` : undefined,
   };
 }
 
@@ -222,6 +216,7 @@ function mapApp(node: JsonApiNode): AppListing {
     lastUpdatedAt: a.changed ?? '',
     appStoreUrl: a.field_link2?.uri ?? a.field_link3?.uri ?? '',
     summary: a.body?.summary ?? a.body?.value ?? '',
+    url: a.path?.alias ? `${BASE}${a.path.alias}` : undefined,
   };
 }
 
@@ -243,23 +238,24 @@ function mapBlog(node: JsonApiNode, included: JsonApiNode[] = []): BlogPost {
     publishedAt: a.created ?? '',
     lastActivityAt: (a.changed as string | undefined) ?? undefined,
     summary: a.body?.summary ?? a.body?.value ?? '',
-    commentCount:
-      a.comment_node_blog?.comment_count ??
-      a.comment?.comment_count ??
-      a.field_comment?.comment_count ??
-      0,
+    commentCount: a.comment_node_blog2?.comment_count ?? 0,
     url: `${BASE}${a.path?.alias ?? `/node/${a.drupal_internal__nid}`}`,
   };
 }
 
 // ─── Forum replies / comments ────────────────────────────────────────────────
 
-function mapComment(node: JsonApiNode): ForumReply {
+function mapComment(node: JsonApiNode, included: JsonApiNode[] = []): ForumReply {
   const a = node.attributes;
+  const uidId = (node.relationships?.uid?.data as { id?: string } | undefined)?.id;
+  const userNode = uidId ? included.find((n) => n.id === uidId) : undefined;
+  const authorName = String(
+    userNode?.attributes?.display_name ?? userNode?.attributes?.name ?? a.name ?? '',
+  );
   return {
     id: node.id,
-    authorName: (a.name as string | undefined) ?? 'Community Member',
-    authorId: (node.relationships?.uid?.data as { id: string } | undefined)?.id ?? '',
+    authorName,
+    authorId: uidId ?? '',
     body: (a.comment_body?.processed ?? a.comment_body?.value ?? '') as string,
     createdAt: (a.created ?? '') as string,
   };
@@ -267,11 +263,16 @@ function mapComment(node: JsonApiNode): ForumReply {
 
 // ─── App reviews ─────────────────────────────────────────────────────────────
 
-function mapAppReview(node: JsonApiNode): AppReview {
+function mapAppReview(node: JsonApiNode, included: JsonApiNode[] = []): AppReview {
   const a = node.attributes;
+  const uidId = (node.relationships?.uid?.data as { id?: string } | undefined)?.id;
+  const userNode = uidId ? included.find((n) => n.id === uidId) : undefined;
+  const authorName = String(
+    userNode?.attributes?.display_name ?? userNode?.attributes?.name ?? a.name ?? '',
+  );
   return {
     id: node.id,
-    authorName: (a.name as string | undefined) ?? 'Community Member',
+    authorName,
     body: (a.comment_body?.processed ?? a.comment_body?.value ?? '') as string,
     createdAt: (a.created ?? '') as string,
     appVersion: (a.field_app_version ?? undefined) as string | undefined,
@@ -291,6 +292,16 @@ function mapResource(node: JsonApiNode): Resource {
     updatedAt: a.changed ?? '',
     url: `${BASE}${a.path?.alias ?? `/node/${a.drupal_internal__nid}`}`,
   };
+}
+
+// ─── Auth helpers ────────────────────────────────────────────────────────────
+
+async function resolveMyUuid(csrfToken: string): Promise<string | null> {
+  const res = await jsonApi<{ meta?: { links?: { me?: { meta?: { id?: string } } } } }>('', {
+    headers: { 'X-CSRF-Token': csrfToken },
+  });
+  if (!res.ok) return null;
+  return res.data?.meta?.links?.me?.meta?.id ?? null;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -366,18 +377,59 @@ export const api = {
       { ok: true; data: ForumTopicDetail } | { ok: false; error: string }
     > {
       const [topicRes, commentsRes] = await Promise.all([
-        jsonApi<{ data: JsonApiNode }>(`/node/forum/${id}`),
-        jsonApi<JsonApiCollection>(`/comment/comment?filter[entity_id.id]=${id}&sort=created&page[limit]=100`),
+        jsonApi<{ data: JsonApiNode; included?: JsonApiNode[] }>(`/node/forum/${id}?include=uid,taxonomy_forums`),
+        jsonApi<JsonApiCollection>(`/comment/comment_forum?filter[entity_id.id]=${id}&sort=created&page[limit]=100&include=uid`),
       ]);
 
       if (!topicRes.ok) return topicRes;
 
-      const topic = mapForum(topicRes.data.data);
+      const topic = mapForum(topicRes.data.data, topicRes.data.included ?? []);
       const body = String(topicRes.data.data.attributes.body?.value ?? topicRes.data.data.attributes.body?.processed ?? '');
       const url = `${BASE}${topicRes.data.data.attributes.path?.alias ?? `/node/${topicRes.data.data.attributes.drupal_internal__nid}`}`;
-      const replies: ForumReply[] = commentsRes.ok ? commentsRes.data.data.map(mapComment) : [];
+      const replies: ForumReply[] = commentsRes.ok ? commentsRes.data.data.map((n) => mapComment(n, commentsRes.data.included ?? [])) : [];
 
-      return { ok: true, data: { ...topic, body, replies, url } };
+      // NOTE TO DRUPAL DEVELOPER:
+      //   category — confirm taxonomy field: field_forum.name, field_category.name, or taxonomy_forums.name
+      //   viewCount — confirm view count field: field_view_count, totalcount, or similar
+      const n = topicRes.data.data;
+      // Category: confirmed by live API — relationship is 'taxonomy_forums',
+      // resolved via include. The included term name is in its own attributes.name.
+      const taxId = (n.relationships?.taxonomy_forums?.data as { id?: string } | undefined)?.id;
+      const taxTerm = taxId ? (topicRes.data.included ?? []).find((inc) => inc.id === taxId) : undefined;
+      const category = (taxTerm?.attributes?.name ?? undefined) as string | undefined;
+      const viewCount = (
+        n.attributes.field_view_count ??
+        n.attributes.totalcount ??
+        undefined
+      ) as number | undefined;
+
+      return { ok: true, data: { ...topic, body, replies, url, category, viewCount } };
+    },
+
+    /**
+     * Create a new forum topic.
+     *
+     * NOTE TO DRUPAL DEVELOPER:
+     *   Confirm: node type name ('node--forum'?), body field name, any required taxonomy.
+     *   Standard Drupal JSON:API node POST:
+     *     type: 'node--forum' (may differ — confirm with dev)
+     *     attributes.title: topic subject line
+     *     attributes.body: { value, format: 'basic_html' }
+     */
+    async submitNewTopic(title: string, body: string, csrfToken: string) {
+      return jsonApi<{ data: JsonApiNode }>('/node/forum', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({
+          data: {
+            type: 'node--forum',
+            attributes: {
+              title,
+              body: { value: body, format: 'basic_html' },
+            },
+          },
+        }),
+      });
     },
 
     /**
@@ -412,20 +464,54 @@ export const api = {
     markRead: (id: string, token: string) =>
       drupalRest<void>(`/node/${id}/flag/read`, { method: 'POST', headers: { 'X-CSRF-Token': token } }),
 
-    follow: (id: string, token: string) =>
-      drupalRest<void>(`/node/${id}/flag/follow_content`, { method: 'POST', headers: { 'X-CSRF-Token': token } }),
+    // follow — creates a flagging--subscribe_node entity via JSON:API.
+    // The flag machine name on this site is 'subscribe_node' (confirmed by live API).
+    async follow(nodeUuid: string, token: string) {
+      return jsonApi<{ data: JsonApiNode }>('/flagging/subscribe_node', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': token },
+        body: JSON.stringify({
+          data: {
+            type: 'flagging--subscribe_node',
+            relationships: {
+              flagged_entity: { data: { type: 'node--forum', id: nodeUuid } },
+            },
+          },
+        }),
+      });
+    },
 
-    unfollow: (id: string, token: string) =>
-      drupalRest<void>(`/node/${id}/flag/follow_content`, { method: 'DELETE', headers: { 'X-CSRF-Token': token } }),
+    // unfollow — resolves the flagging UUID first, then deletes it.
+    async unfollow(nodeUuid: string, token: string) {
+      const listRes = await jsonApi<JsonApiCollection>(
+        `/flagging/subscribe_node?filter[flagged_entity.id]=${nodeUuid}`,
+      );
+      if (!listRes.ok) return listRes;
+      const flagging = listRes.data.data[0];
+      if (!flagging) return { ok: true as const, data: undefined };
+      const ctrl  = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+      try {
+        const res = await fetch(`${JSONAPI}/flagging/subscribe_node/${flagging.id}`, {
+          method: 'DELETE',
+          headers: { ...COMMON_HEADERS, 'Content-Type': 'application/vnd.api+json', 'X-CSRF-Token': token },
+          signal: ctrl.signal,
+        });
+        if (!res.ok) return { ok: false as const, error: `HTTP ${res.status}` };
+        return { ok: true as const, data: undefined };
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return { ok: false as const, error: 'Request timed out.' };
+        return { ok: false as const, error: err instanceof Error ? err.message : 'Network error' };
+      } finally {
+        clearTimeout(timer);
+      }
+    },
   },
 
   podcasts: {
     async episodes(page = 0, sort: '-created' | '-changed' = '-created') {
-      // include=field_podcast fetches the audio file (for audioUrl)
-      // include=field_chapters fetches chapter paragraph entities (mapped in mapPodcast)
-      // NOTE TO DRUPAL DEVELOPER: add field_image to include once artwork field name is confirmed
       const res = await jsonApi<JsonApiCollection>(
-        `/node/podcast?sort=${sort}&include=field_podcast,field_chapters&${pageParams(page)}`,
+        `/node/podcast?sort=${sort}&include=field_podcast&${pageParams(page)}`,
       );
       if (!res.ok) return res;
       return {
@@ -443,6 +529,18 @@ export const api = {
       );
       if (!res.ok) return res;
       return { ok: true as const, data: mapPodcast(res.data.data, res.data.included ?? []) };
+    },
+
+    // Episode comments — confirmed bundle name: comment_node_podcast
+    async comments(episodeId: string) {
+      const res = await jsonApi<JsonApiCollection>(
+        `/comment/comment_node_podcast?filter[entity_id.id]=${episodeId}&sort=created&page[limit]=100&include=uid`,
+      );
+      if (!res.ok) return res;
+      return {
+        ok: true as const,
+        data: res.data.data.map((n) => mapComment(n, res.data.included ?? [])),
+      };
     },
 
     transcript: (id: string) =>
@@ -476,16 +574,24 @@ export const api = {
     > {
       const [appRes, reviewsRes] = await Promise.all([
         jsonApi<{ data: JsonApiNode }>(`/node/ios_app_directory/${id}`),
-        jsonApi<JsonApiCollection>(`/comment/comment?filter[entity_id.id]=${id}&sort=-created&page[limit]=50`),
+        jsonApi<JsonApiCollection>(`/comment/comment_node_ios_app_directory?filter[entity_id.id]=${id}&sort=-created&page[limit]=50&include=uid`),
       ]);
 
       if (!appRes.ok) return appRes;
 
       const app = mapApp(appRes.data.data);
       const body = String(appRes.data.data.attributes.body?.value ?? appRes.data.data.attributes.body?.processed ?? '');
-      const reviews: AppReview[] = reviewsRes.ok ? reviewsRes.data.data.map(mapAppReview) : [];
+      const reviews: AppReview[] = reviewsRes.ok ? reviewsRes.data.data.map((n) => mapAppReview(n, reviewsRes.data.included ?? [])) : [];
 
-      return { ok: true, data: { ...app, body, reviews } };
+      // NOTE TO DRUPAL DEVELOPER:
+      //   reportedIssueCount — confirm field: field_reported_issues, field_issue_count, or similar
+      const reportedIssueCount = (
+        appRes.data.data.attributes.field_reported_issues ??
+        appRes.data.data.attributes.field_issue_count ??
+        undefined
+      ) as number | undefined;
+
+      return { ok: true, data: { ...app, body, reviews, reportedIssueCount } };
     },
 
     async updates(page = 0) {
@@ -605,7 +711,7 @@ export const api = {
 
   account: {
     async getSessionToken(): Promise<string> {
-      const res = await fetch(`${BASE}/session/token`);
+      const res = await fetch(`${BASE}/session/token`, { headers: COMMON_HEADERS });
       return res.ok ? res.text() : '';
     },
 
@@ -622,26 +728,30 @@ export const api = {
       });
     },
 
-    registerPushToken: (token: string, csrfToken: string) =>
-      drupalRest<void>(`/api/v1/account/push-token`, {
-        method: 'POST', headers: { 'X-CSRF-Token': csrfToken }, body: JSON.stringify({ token }),
-      }),
+    async registerPushToken(pushToken: string, csrfToken: string) {
+      const uuid = await resolveMyUuid(csrfToken);
+      if (!uuid) return { ok: false as const, error: 'Could not resolve account ID.' };
+      return jsonApi<void>(`/user/user/${uuid}`, {
+        method: 'PATCH',
+        headers: { 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ data: { type: 'user--user', id: uuid, attributes: { field_push_token: pushToken } } }),
+      });
+    },
 
-    removePushToken: (token: string, csrfToken: string) =>
-      drupalRest<void>(`/api/v1/account/push-token`, {
-        method: 'DELETE', headers: { 'X-CSRF-Token': csrfToken }, body: JSON.stringify({ token }),
-      }),
+    async removePushToken(csrfToken: string) {
+      const uuid = await resolveMyUuid(csrfToken);
+      if (!uuid) return { ok: false as const, error: 'Could not resolve account ID.' };
+      return jsonApi<void>(`/user/user/${uuid}`, {
+        method: 'PATCH',
+        headers: { 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ data: { type: 'user--user', id: uuid, attributes: { field_push_token: '' } } }),
+      });
+    },
 
     async deleteAccount(csrfToken: string): Promise<JsonApiResult<undefined>> {
-      // Step 1 — resolve the authenticated user's UUID from the JSON:API root.
-      const meRes = await jsonApi<{ meta?: { links?: { me?: { meta?: { id?: string } } } } }>('', {
-        headers: { 'X-CSRF-Token': csrfToken },
-      });
-      if (!meRes.ok) return meRes;
-      const uuid = meRes.data?.meta?.links?.me?.meta?.id;
+      const uuid = await resolveMyUuid(csrfToken);
       if (!uuid) return { ok: false, error: 'Could not resolve account ID from server.' };
 
-      // Step 2 — DELETE /jsonapi/user/user/{uuid}. Drupal returns 204 No Content on success.
       const ctrl  = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
       try {

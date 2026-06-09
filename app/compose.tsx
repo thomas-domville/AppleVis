@@ -14,53 +14,83 @@ import { useLanguageDetection } from '../src/hooks/useLanguageDetection';
 import { translateContent } from '../src/services/intelligenceService';
 import { api } from '../src/services/api';
 
-const MIN_REPLY_LENGTH = 10;
-const MAX_REPLY_LENGTH = 10_000;
+const MIN_BODY_LENGTH = 10;
+const MIN_SUBJECT_LENGTH = 3;
+const MAX_BODY_LENGTH = 10_000;
 
 export default function Compose() {
-  const { topicId, topicTitle } = useLocalSearchParams<{ topicId: string; topicTitle: string }>();
+  const { topicId, topicTitle, mode } = useLocalSearchParams<{
+    topicId: string; topicTitle: string; mode?: string;
+  }>();
+  const isNewTopic = mode === 'newTopic';
   const router        = useRouter();
   const { colors }    = useTheme();
   const auth          = useAuth();
   const { showToast } = useToast();
 
-  const [body,       setBody]       = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const inputRef = useRef<TextInput>(null);
+  const [subject,         setSubject]         = useState('');
+  const [body,            setBody]            = useState('');
+  const [submitting,      setSubmitting]      = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const subjectRef = useRef<TextInput>(null);
+  const bodyRef    = useRef<TextInput>(null);
 
   const { topWarning, dismiss } = useGuidelinesCheck(body);
   const { isNonEnglish, isConfident } = useLanguageDetection(body);
 
-  // Focus text input on mount
   useEffect(() => {
+    if (!isNonEnglish) setBannerDismissed(false);
+  }, [isNonEnglish]);
+
+  // Focus subject (new topic) or body (reply) on mount
+  useEffect(() => {
+    const ref = isNewTopic ? subjectRef : bodyRef;
     const t = setTimeout(() => {
-      const node = inputRef.current ? findNodeHandle(inputRef.current) : null;
+      const node = ref.current ? findNodeHandle(ref.current) : null;
       if (node) AccessibilityInfo.setAccessibilityFocus(node);
     }, 400);
     return () => clearTimeout(t);
-  }, []);
+  }, [isNewTopic]);
 
-  const canSubmit = body.trim().length >= MIN_REPLY_LENGTH && !submitting;
-  const remaining = MAX_REPLY_LENGTH - body.length;
+  const canSubmit = isNewTopic
+    ? subject.trim().length >= MIN_SUBJECT_LENGTH && body.trim().length >= MIN_BODY_LENGTH && !submitting
+    : body.trim().length >= MIN_BODY_LENGTH && !submitting;
+  const remaining = MAX_BODY_LENGTH - body.length;
 
   const handleSubmit = useCallback(async () => {
     if (!canSubmit || !auth.user) return;
     const token = await api.account.getSessionToken();
     setSubmitting(true);
-    const res = await api.forums.submitReply(topicId, body.trim(), token);
-    setSubmitting(false);
-    if (res.ok) {
-      showToast('Reply posted successfully.', 'success');
-      router.back();
+    if (isNewTopic) {
+      const res = await api.forums.submitNewTopic(subject.trim(), body.trim(), token);
+      setSubmitting(false);
+      if (res.ok) {
+        showToast('Topic posted! It will appear after moderation.', 'success');
+        router.back();
+      } else {
+        showToast(
+          res.error.includes('403') || res.error.includes('401')
+            ? 'Your session expired. Please sign in again.'
+            : `Could not post topic: ${res.error}`,
+          'error',
+        );
+      }
     } else {
-      showToast(
-        res.error.includes('403') || res.error.includes('401')
-          ? 'Your session expired. Please sign in again.'
-          : `Could not post reply: ${res.error}`,
-        'error',
-      );
+      const res = await api.forums.submitReply(topicId, body.trim(), token);
+      setSubmitting(false);
+      if (res.ok) {
+        showToast('Comment posted successfully.', 'success');
+        router.back();
+      } else {
+        showToast(
+          res.error.includes('403') || res.error.includes('401')
+            ? 'Your session expired. Please sign in again.'
+            : `Could not post comment: ${res.error}`,
+          'error',
+        );
+      }
     }
-  }, [canSubmit, auth.user, topicId, body, router, showToast]);
+  }, [canSubmit, auth.user, topicId, subject, body, isNewTopic, router, showToast]);
 
   const inputStyle = {
     borderWidth: 1.5,
@@ -72,12 +102,11 @@ export default function Compose() {
     lineHeight: 24,
     color: colors.text,
     backgroundColor: colors.inputBackground,
-    minHeight: 160,
     textAlignVertical: 'top' as const,
   };
 
   return (
-    <Screen title="Reply" showSettings={false} showSearch={false}>
+    <Screen title={isNewTopic ? 'New Topic' : 'Add New Comment'} showSettings={false} showSearch={false}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -87,21 +116,71 @@ export default function Compose() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Topic context */}
-          <View style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14,
-            borderWidth: 1, borderColor: colors.border, marginBottom: 16 }}
-            accessible accessibilityLabel={`Replying to: ${topicTitle}`}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
-              textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}
-              accessibilityElementsHidden>Replying to</Text>
-            <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{topicTitle}</Text>
-          </View>
+          {/* Context card */}
+          {isNewTopic ? (
+            <View
+              style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14,
+                borderWidth: 1, borderColor: colors.border, marginBottom: 16 }}
+              accessible
+              accessibilityLabel="Post a new topic to AppleVis Forums"
+            >
+              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+                textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}
+                accessibilityElementsHidden>
+                Posting to
+              </Text>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>
+                AppleVis Forums
+              </Text>
+            </View>
+          ) : (
+            <View
+              style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14,
+                borderWidth: 1, borderColor: colors.border, marginBottom: 16 }}
+              accessible
+              accessibilityLabel={`Adding new comment to: ${topicTitle}`}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+                textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}
+                accessibilityElementsHidden>
+                Adding comment to
+              </Text>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>
+                {topicTitle}
+              </Text>
+            </View>
+          )}
+
+          {/* Subject field — new topic only */}
+          {isNewTopic && (
+            <View style={{ marginBottom: 12 }}>
+              <TextInput
+                ref={subjectRef}
+                value={subject}
+                onChangeText={setSubject}
+                placeholder="Topic subject…"
+                placeholderTextColor={colors.textSecondary}
+                maxLength={200}
+                accessible
+                accessibilityLabel="Topic subject"
+                accessibilityHint={`Minimum ${MIN_SUBJECT_LENGTH} characters`}
+                style={[inputStyle, { minHeight: 0, height: 52, lineHeight: 24 }]}
+                returnKeyType="next"
+                onSubmitEditing={() => bodyRef.current?.focus()}
+              />
+              {subject.length > 0 && subject.trim().length < MIN_SUBJECT_LENGTH && (
+                <Text style={{ fontSize: 13, color: '#D97706', marginTop: 6 }}>
+                  Subject must be at least {MIN_SUBJECT_LENGTH} characters.
+                </Text>
+              )}
+            </View>
+          )}
 
           {/* Non-English detection */}
-          {isNonEnglish && isConfident && (
+          {isNonEnglish && isConfident && !bannerDismissed && (
             <TranslationBanner
-              onTranslate={() => translateContent(body, 'Reply')}
-              onDismiss={() => {}}
+              onTranslate={() => translateContent(body)}
+              onDismiss={() => setBannerDismissed(true)}
             />
           )}
 
@@ -113,34 +192,37 @@ export default function Compose() {
           {/* Writing Tools tip */}
           <WritingToolsTip />
 
-          {/* Text input */}
+          {/* Body input */}
           <View style={{ marginBottom: 8 }}>
             <TextInput
-              ref={inputRef}
+              ref={bodyRef}
               value={body}
               onChangeText={setBody}
-              placeholder="Write your reply here..."
+              placeholder={isNewTopic ? 'Write your topic here…' : 'Write your comment here…'}
               placeholderTextColor={colors.textSecondary}
               multiline
-              maxLength={MAX_REPLY_LENGTH}
+              maxLength={MAX_BODY_LENGTH}
               accessible
-              accessibilityLabel="Reply text"
-              accessibilityHint={`Minimum ${MIN_REPLY_LENGTH} characters. ${remaining} characters remaining.`}
-              style={inputStyle}
+              accessibilityLabel={isNewTopic ? 'Topic body' : 'Comment text'}
+              accessibilityHint={`Minimum ${MIN_BODY_LENGTH} characters. ${remaining} characters remaining.`}
+              style={[inputStyle, { minHeight: 160 }]}
             />
           </View>
 
           {/* Character count */}
-          <Text style={{ fontSize: 12, color: remaining < 200 ? '#D97706' : colors.textSecondary,
-            textAlign: 'right', marginBottom: 16 }}
-            accessible accessibilityLabel={`${remaining} characters remaining`}>
+          <Text
+            style={{ fontSize: 12, color: remaining < 200 ? '#D97706' : colors.textSecondary,
+              textAlign: 'right', marginBottom: 16 }}
+            accessible
+            accessibilityLabel={`${remaining} characters remaining`}
+          >
             {remaining} characters remaining
           </Text>
 
           {/* Too short message */}
-          {body.length > 0 && body.trim().length < MIN_REPLY_LENGTH && (
+          {body.length > 0 && body.trim().length < MIN_BODY_LENGTH && (
             <Text style={{ fontSize: 13, color: '#D97706', marginBottom: 12 }}>
-              Reply must be at least {MIN_REPLY_LENGTH} characters.
+              {isNewTopic ? 'Topic body' : 'Comment'} must be at least {MIN_BODY_LENGTH} characters.
             </Text>
           )}
 
@@ -151,7 +233,11 @@ export default function Compose() {
               disabled={!canSubmit}
               accessible
               accessibilityRole="button"
-              accessibilityLabel={submitting ? 'Posting reply, please wait' : 'Post reply'}
+              accessibilityLabel={
+                submitting
+                  ? (isNewTopic ? 'Posting topic, please wait' : 'Posting comment, please wait')
+                  : (isNewTopic ? 'Post topic' : 'Post comment')
+              }
               accessibilityState={{ disabled: !canSubmit }}
               style={{
                 backgroundColor: canSubmit ? colors.accent : colors.border,
@@ -160,13 +246,17 @@ export default function Compose() {
             >
               {submitting
                 ? <ActivityIndicator color={colors.accentText} />
-                : <Text style={{ color: colors.accentText, fontWeight: '700', fontSize: 16 }}>Post Reply</Text>
+                : <Text style={{ color: colors.accentText, fontWeight: '700', fontSize: 16 }}>
+                    {isNewTopic ? 'Post Topic' : 'Post Comment'}
+                  </Text>
               }
             </Pressable>
 
             <Pressable
               onPress={() => router.back()}
-              accessible accessibilityRole="button" accessibilityLabel="Cancel and go back"
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Cancel and go back"
               style={{ borderRadius: 14, paddingVertical: 14, alignItems: 'center',
                 backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}
             >
@@ -179,9 +269,10 @@ export default function Compose() {
             <View style={{ marginTop: 16, padding: 12, backgroundColor: colors.pill,
               borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
               <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                DEV NOTE: submitReply posts to /jsonapi/comment/comment.
-                Confirm comment type name and relationship fields with Drupal developer.
-                Topic ID: {topicId}
+                {isNewTopic
+                  ? 'DEV NOTE: submitNewTopic posts to /jsonapi/node/forum.\nConfirm node type name and body field with Drupal developer.'
+                  : `DEV NOTE: submitReply posts to /jsonapi/comment/comment.\nConfirm comment type and relationship fields with Drupal developer.\nTopic ID: ${topicId}`
+                }
               </Text>
             </View>
           )}

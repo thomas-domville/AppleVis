@@ -240,6 +240,37 @@ export function handleIncomingShare(_item: SharedItem): void {
   if (__DEV__) console.log('[NativeModules] handleIncomingShare — native module not yet built.', _item);
 }
 
+/**
+ * Reads and clears the pending App Store URL written by the iOS Share Extension.
+ *
+ * When the user shares an App Store link from Safari/App Store app, the Share
+ * Extension writes the URL to App Group UserDefaults (suite: group.com.applevis.app,
+ * key: pendingAppShareURL) before opening the applevis://submit-app?url= deep link.
+ * This function is a belt-and-suspenders fallback: called on app foreground to
+ * catch any URL that slipped through before the Linking listener was ready.
+ *
+ * Returns null if no pending URL is waiting.
+ *
+ * Native side (AppleVisAppShare.swift — ios-native/AppShare/):
+ *
+ *   @objc func consumePendingURL(
+ *     _ resolve: @escaping RCTPromiseResolveBlock,
+ *       reject:  @escaping RCTPromiseRejectBlock
+ *   ) {
+ *     let defaults = UserDefaults(suiteName: "group.com.applevis.app")
+ *     let url = defaults?.string(forKey: "pendingAppShareURL")
+ *     defaults?.removeObject(forKey: "pendingAppShareURL")
+ *     resolve(url)
+ *   }
+ *
+ * Entitlement needed (main app target):
+ *   com.apple.security.application-groups = ["group.com.applevis.app"]
+ */
+export async function consumePendingShareURL(): Promise<string | null> {
+  if (__DEV__) console.log('[NativeModules] consumePendingShareURL — native module not yet built.');
+  return null;
+}
+
 // ─── Vision Framework — Image Description ────────────────────────────────────
 
 /**

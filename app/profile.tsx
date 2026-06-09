@@ -388,6 +388,29 @@ export default function Profile() {
             </View>
           )}
 
+          <SectionHeader label="Contribute to AppleVis" colors={colors} />
+          <NavRow
+            label="Submit a Podcast"
+            hint="Opens the podcast submission form in Safari. Nominate an accessible podcast for the AppleVis directory."
+            icon="mic-outline" external
+            onPress={() => Linking.openURL('https://www.applevis.com/podcasts/upload').catch(() => showToast('Could not open link.', 'error'))}
+            colors={colors} styles={styles}
+          />
+          <NavRow
+            label="Submit a Blog Post"
+            hint="Opens the blog submission form in Safari. Share your expertise with the AppleVis community."
+            icon="create-outline" external
+            onPress={() => Linking.openURL('https://www.applevis.com/form/blog-submission').catch(() => showToast('Could not open link.', 'error'))}
+            colors={colors} styles={styles}
+          />
+          <NavRow
+            label="Submit an App"
+            hint="Found an accessible iOS app? Add it to the AppleVis directory with your accessibility notes."
+            icon="phone-portrait-outline"
+            onPress={() => router.push('/submit-app')}
+            colors={colors} styles={styles}
+          />
+
           <SectionHeader label="About AppleVis" colors={colors} />
           <AboutSection colors={colors} styles={styles} showToast={showToast} router={router} />
 
@@ -480,6 +503,30 @@ export default function Profile() {
             </View>
           </Pressable>
         ))}
+
+        {/* Contribute */}
+        <SectionHeader label="Contribute to AppleVis" colors={colors} />
+        <NavRow
+          label="Submit a Podcast"
+          hint="Opens the podcast submission form in Safari. Nominate an accessible podcast for the AppleVis directory."
+          icon="mic-outline" external
+          onPress={() => Linking.openURL('https://www.applevis.com/podcasts/upload').catch(() => showToast('Could not open link.', 'error'))}
+          colors={colors} styles={styles}
+        />
+        <NavRow
+          label="Submit a Blog Post"
+          hint="Opens the blog submission form in Safari. Share your expertise with the AppleVis community."
+          icon="create-outline" external
+          onPress={() => Linking.openURL('https://www.applevis.com/form/blog-submission').catch(() => showToast('Could not open link.', 'error'))}
+          colors={colors} styles={styles}
+        />
+        <NavRow
+          label="Submit an App"
+          hint="Found an accessible iOS app? Add it to the AppleVis directory with your accessibility notes."
+          icon="phone-portrait-outline"
+          onPress={() => router.push('/submit-app')}
+          colors={colors} styles={styles}
+        />
 
         {/* Account */}
         <SectionHeader label="Account" colors={colors} />

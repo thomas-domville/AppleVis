@@ -48,13 +48,37 @@ function getHostAndPath(url: string): { host: string; path: string } | null {
  * Returns true if the URL was handled, false if it was ignored.
  */
 export function handleIncomingUrl(url: string): boolean {
-  // Allow custom scheme links: applevis://...
-  const isCustomScheme = url.startsWith('applevis://');
+  // ── Custom scheme (applevis://[action]?[params]) ────────────────────────────
+  if (url.startsWith('applevis://')) {
+    const withoutScheme = url.replace(/^applevis:\/\//, '');
+    const qMark = withoutScheme.indexOf('?');
+    const action = (qMark === -1 ? withoutScheme : withoutScheme.slice(0, qMark)).toLowerCase();
+    const params = qMark !== -1 ? new URLSearchParams(withoutScheme.slice(qMark + 1)) : new URLSearchParams();
 
+    if (action === 'submit-app') {
+      const appUrl = params.get('url') ?? '';
+      if (appUrl) {
+        router.push({ pathname: '/submit-app', params: { url: appUrl } });
+      } else {
+        router.push('/submit-app');
+      }
+      return true;
+    }
+
+    if (action === 'share') {
+      // Generic share — route to forums; refine per content type in future.
+      router.push('/(tabs)/forums');
+      return true;
+    }
+
+    return false;
+  }
+
+  // ── Universal links (applevis.com) ──────────────────────────────────────────
   const parsed = getHostAndPath(url);
-  if (parsed && !APPLEVIS_HOSTS.has(parsed.host) && !isCustomScheme) return false;
+  if (!parsed || !APPLEVIS_HOSTS.has(parsed.host)) return false;
 
-  const path = parsed?.path ?? url.replace('applevis:/', '');
+  const path = parsed.path;
 
   if (/^\/(forum|node\/\d+|community)/.test(path)) {
     router.push('/(tabs)/forums');
@@ -73,13 +97,6 @@ export function handleIncomingUrl(url: string): boolean {
 
   if (/^\/(resource|guide|tutorial|article|help)/.test(path)) {
     router.push('/(tabs)/resources');
-    return true;
-  }
-
-  if (path === '/share' || path.startsWith('/share?')) {
-    // Content shared from the Share Extension lands here.
-    // Future: parse the URL param and pre-fill a compose screen.
-    router.push('/(tabs)/forums');
     return true;
   }
 

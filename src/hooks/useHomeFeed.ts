@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
+import { cachedApi } from '../services/cachedApi';
 import type { BlogPost, FeedItem, FeedPrefs } from '../types/content';
 
 const PREFS_KEY = '@applevis_home_feed_prefs';
@@ -50,7 +51,7 @@ async function fetchPage(prefs: FeedPrefs, page: number): Promise<{
   }
 
   if (prefs.podcasts) {
-    calls.push(api.podcasts.episodes(page, '-changed').then((res) => {
+    calls.push(cachedApi.podcasts.episodes(page).then((res) => {
       if (res.ok) {
         res.data.items.forEach((p) =>
           items.push({ kind: 'podcast', data: p, activityAt: p.lastActivityAt ?? p.publishedAt }),

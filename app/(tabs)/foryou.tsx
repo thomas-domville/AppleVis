@@ -67,6 +67,8 @@ function QueueSection() {
         publishedAt: episode.publishedAt ?? '',
         duration: String(episode.duration),
         audioUrl: episode.audioUrl,
+        transcriptUrl: episode.transcriptUrl ?? '',
+        url: episode.url ?? '',
       },
     });
   }

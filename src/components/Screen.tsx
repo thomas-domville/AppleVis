@@ -15,9 +15,13 @@ type Props = {
   showSearch?: boolean;
   showBack?: boolean;
   refreshing?: boolean;
+  /** Control anchored to the LEFT of the action row (e.g. Feed Settings on Home). */
+  headerLeft?: ReactNode;
+  /** Control anchored to the RIGHT cluster, beside the Settings button. */
+  headerRight?: ReactNode;
 };
 
-export function Screen({ title, children, showSettings = true, showSearch = false, showBack = true, refreshing }: Props) {
+export function Screen({ title, children, showSettings = true, showSearch = false, showBack = true, refreshing, headerLeft, headerRight }: Props) {
   const router             = useRouter();
   const { t }              = useTranslation();
   const { colors, styles } = useTheme();
@@ -32,7 +36,7 @@ export function Screen({ title, children, showSettings = true, showSearch = fals
     else player.play();
   }, [player]);
 
-  const showActionRow = showSearch || showSettings;
+  const showActionRow = showSearch || showSettings || !!headerLeft || !!headerRight;
 
   return (
     <SafeAreaView
@@ -60,56 +64,70 @@ export function Screen({ title, children, showSettings = true, showSearch = fals
         {/* Screen title */}
         <Text accessibilityRole="header" style={styles.title}>{title}</Text>
 
-        {/* Search bar + Settings button — each a single focusable Pressable */}
+        {/* Action row — left cluster anchored left, right cluster anchored right.
+            VoiceOver touch exploration: Feed Settings (or custom left action) in
+            top-left; Profile/Settings in top-right, matching iOS conventions. */}
         {showActionRow && (
           <View
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 4 }}
+            style={{
+              flexDirection: 'row', alignItems: 'center',
+              justifyContent: 'space-between',
+              marginTop: 8, marginBottom: 4,
+            }}
             accessible={false}
           >
-            {showSearch && (
-              <Pressable
-                onPress={() => router.push('/search')}
-                accessibilityRole="search"
-                accessibilityLabel={t('screen.a11ySearch')}
-                accessibilityHint={t('screen.a11ySearchHint')}
-                style={{
-                  flex: 1,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 8,
-                  backgroundColor: colors.inputBackground,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  paddingHorizontal: 10,
-                  paddingVertical: 9,
-                }}
-              >
-                <Ionicons name="search-outline" size={16} color={colors.textSecondary} accessibilityElementsHidden />
-                <Text style={{ fontSize: 15, color: colors.textSecondary }}>
-                  {t('screen.a11ySearch')}
-                </Text>
-              </Pressable>
-            )}
+            {/* Left anchor — custom action (e.g. Feed Settings on Home tab) */}
+            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+              {headerLeft}
+            </View>
 
-            {showSettings && (
-              <Pressable
-                onPress={() => router.push('/profile')}
-                accessibilityRole="button"
-                accessibilityLabel="Profile and Settings"
-                accessibilityHint="Opens your profile, account, and app settings."
-                hitSlop={8}
-                style={{
-                  padding: 8,
-                  borderRadius: 10,
-                  backgroundColor: colors.inputBackground,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}
-              >
-                <Ionicons name="person-circle-outline" size={20} color={colors.accent} accessibilityElementsHidden />
-              </Pressable>
-            )}
+            {/* Right cluster — search bar (flex:1), any headerRight, then Profile */}
+            <View style={{ flex: 1, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'flex-end' }}>
+              {showSearch && (
+                <Pressable
+                  onPress={() => router.push('/search')}
+                  accessibilityRole="search"
+                  accessibilityLabel={t('screen.a11ySearch')}
+                  accessibilityHint={t('screen.a11ySearchHint')}
+                  style={{
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    backgroundColor: colors.inputBackground,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    paddingHorizontal: 10,
+                    paddingVertical: 9,
+                  }}
+                >
+                  <Ionicons name="search-outline" size={16} color={colors.textSecondary} accessibilityElementsHidden />
+                  <Text style={{ fontSize: 15, color: colors.textSecondary }}>
+                    {t('screen.a11ySearch')}
+                  </Text>
+                </Pressable>
+              )}
+              {headerRight}
+              {showSettings && (
+                <Pressable
+                  onPress={() => router.push('/profile')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Profile and Settings"
+                  accessibilityHint="Opens your profile, account, and app settings."
+                  hitSlop={8}
+                  style={{
+                    padding: 8,
+                    borderRadius: 10,
+                    backgroundColor: colors.inputBackground,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  <Ionicons name="person-circle-outline" size={20} color={colors.accent} accessibilityElementsHidden />
+                </Pressable>
+              )}
+            </View>
           </View>
         )}
 
