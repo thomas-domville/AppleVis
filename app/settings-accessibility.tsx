@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Screen } from '../src/components/Screen';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { usePreferences } from '../src/contexts/PreferencesContext';
@@ -17,28 +17,35 @@ const LEVELS: LevelOption[] = [
     id: 'simple',
     label: 'Simple',
     badge: 'Minimal',
-    description: 'VoiceOver reads only the title. Fast to scan -- details are one swipe away.',
-    preview: '"iOS 18 VoiceOver Tips."',
+    description: 'Title and content type only. Fast to scan -- author, date, and comment count are a swipe away.',
+    preview: '"iOS 18 VoiceOver Tips. Forum."',
   },
   {
     id: 'normal',
     label: 'Normal',
     badge: 'Balanced',
-    description: 'Title plus the most useful context -- unread state and reply count.',
-    preview: '"iOS 18 VoiceOver Tips. Unread. 14 replies."',
+    description: 'Title plus author and comment count -- the most useful details without the full date history.',
+    preview: '"iOS 18 VoiceOver Tips. Forum. By JaneD. 14 comments."',
   },
   {
     id: 'all',
     label: 'All',
     badge: 'Recommended',
-    description: 'Everything at once -- title, status, counts, follow and save state, author, date.',
-    preview: '"iOS 18 VoiceOver Tips. Unread. 14 replies. Following. Saved. Posted by JaneD, 2 days ago."',
+    description: 'Everything at once -- title, author, comment count, posted date, and last comment time.',
+    preview: '"iOS 18 VoiceOver Tips. Forum. By JaneD. 14 comments. Posted 2 days ago. Last comment 3 hours ago."',
   },
 ];
 
 export default function AccessibilitySettings() {
   const { colors, styles }  = useTheme();
-  const { announcementLevel, setAnnouncementLevel } = usePreferences();
+  const {
+    announcementLevel,
+    setAnnouncementLevel,
+    helpfulTipsEnabled,
+    setHelpfulTipsEnabled,
+    welcomeSummaryEnabled,
+    setWelcomeSummaryEnabled,
+  } = usePreferences();
 
   return (
     <Screen title="Accessibility" showSettings={false}>
@@ -49,6 +56,70 @@ export default function AccessibilitySettings() {
           (Dynamic Type, Reduce Motion, Bold Text, Increase Contrast) are
           respected automatically from iOS Settings.
         </Text>
+
+        <Pressable
+          onPress={() => setHelpfulTipsEnabled(!helpfulTipsEnabled)}
+          accessible
+          accessibilityRole="switch"
+          accessibilityState={{ checked: helpfulTipsEnabled }}
+          accessibilityLabel="AppleVis Tips. Shows short contextual tips and reminders throughout AppleVis."
+          style={({ pressed }) => [styles.cardSmall, {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            marginBottom: 16,
+            opacity: pressed ? 0.85 : 1,
+          }]}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 3 }}>
+              AppleVis Tips
+            </Text>
+            <Text style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 20 }}>
+              Shows short contextual tips and friendly reminders where they can save time.
+            </Text>
+          </View>
+          <Switch
+            value={helpfulTipsEnabled}
+            onValueChange={setHelpfulTipsEnabled}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            trackColor={{ false: colors.border, true: colors.appleVisBlue }}
+            thumbColor="#FFFFFF"
+          />
+        </Pressable>
+
+        <Pressable
+          onPress={() => setWelcomeSummaryEnabled(!welcomeSummaryEnabled)}
+          accessible
+          accessibilityRole="switch"
+          accessibilityState={{ checked: welcomeSummaryEnabled }}
+          accessibilityLabel="Welcome summary. Shows a short since your last visit summary on Home."
+          style={({ pressed }) => [styles.cardSmall, {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            marginBottom: 16,
+            opacity: pressed ? 0.85 : 1,
+          }]}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 3 }}>
+              Welcome Summary
+            </Text>
+            <Text style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 20 }}>
+              Shows a brief Home update with new AppleVis activity since your last visit.
+            </Text>
+          </View>
+          <Switch
+            value={welcomeSummaryEnabled}
+            onValueChange={setWelcomeSummaryEnabled}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            trackColor={{ false: colors.border, true: colors.appleVisBlue }}
+            thumbColor="#FFFFFF"
+          />
+        </Pressable>
 
         {/* iOS settings note */}
         <View style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14,
@@ -73,7 +144,7 @@ export default function AccessibilitySettings() {
 
         {/* Announcement level */}
         <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
-          textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 }}
+          textTransform: 'uppercase', letterSpacing: 0, marginBottom: 12 }}
           accessibilityRole="header">VoiceOver Detail Level</Text>
 
         {LEVELS.map((opt) => {
@@ -108,7 +179,7 @@ export default function AccessibilitySettings() {
               <View style={{ backgroundColor: colors.background, borderRadius: 8, padding: 10,
                 borderWidth: 1, borderColor: colors.border }}>
                 <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary,
-                  textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
+                  textTransform: 'uppercase', letterSpacing: 0, marginBottom: 4 }}>
                   VoiceOver reads:
                 </Text>
                 <Text style={{ fontSize: 14, color: colors.text, lineHeight: 20, fontStyle: 'italic' }}>

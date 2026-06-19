@@ -18,22 +18,22 @@ const OPTIONS: Option[] = [
     id: 'simple',
     label: 'Simple',
     badge: 'Minimal',
-    description: 'Shows only the title of each item. Fast to navigate — details are a swipe away.',
-    preview: '"iOS 18 VoiceOver Tips"',
+    description: 'Title and content type only. Fast to scan — author, date, and comment count are a swipe away.',
+    preview: '"iOS 18 VoiceOver Tips. Forum."',
   },
   {
     id: 'normal',
     label: 'Normal',
     badge: 'Balanced',
-    description: 'Title plus the most useful status — unread state and reply count. A good middle ground.',
-    preview: '"iOS 18 VoiceOver Tips. Unread. 14 replies."',
+    description: 'Title plus author and comment count — the most useful details without the full date history.',
+    preview: '"iOS 18 VoiceOver Tips. Forum. By JaneD. 14 comments."',
   },
   {
     id: 'all',
     label: 'All',
     badge: 'Recommended',
-    description: 'Everything at a glance — title, unread state, reply count, follow and save status, and author. The richest experience.',
-    preview: '"iOS 18 VoiceOver Tips. Unread. 14 replies. Following. Saved. Posted by JaneD, 2 days ago."',
+    description: 'Everything at once — title, author, comment count, posted date, and last comment time.',
+    preview: '"iOS 18 VoiceOver Tips. Forum. By JaneD. 14 comments. Posted 2 days ago. Last comment 3 hours ago."',
   },
 ];
 
@@ -46,18 +46,10 @@ export default function AnnouncementStep() {
       step={4}
       totalSteps={5}
       title="Item detail level"
-      description="Choose how much detail AppleVis shows when you navigate forum topics, apps, and podcast episodes. If you use VoiceOver — Apple's built-in screen reader for blind and low-vision users — this also controls what it announces aloud. You can change this any time in Settings → Accessibility."
+      description="Choose how much detail AppleVis shows when you navigate forum topics, apps, and podcast episodes. This affects every item card — useful whether you read the screen yourself or use VoiceOver, Apple's built-in screen reader. You can change this any time in Settings → Accessibility."
       onNext={() => router.push('/onboarding/notifications')}
     >
-      {/* System settings note */}
-      <View style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14,
-        borderWidth: 1, borderColor: colors.border, marginBottom: 22 }}>
-        <Text style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 20 }}>
-          iOS accessibility settings like larger text, bold text, and reduced motion are
-          respected automatically — no setup needed here.
-        </Text>
-      </View>
-
+      <View accessibilityRole="radiogroup" accessibilityLabel="Item detail level">
       {OPTIONS.map((opt) => {
         const isSelected = announcementLevel === opt.id;
         return (
@@ -65,8 +57,8 @@ export default function AnnouncementStep() {
             key={opt.id}
             onPress={() => setAnnouncementLevel(opt.id)}
             accessible
-            accessibilityRole="none"
-            accessibilityState={{ selected: isSelected }}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: isSelected }}
             accessibilityLabel={`${opt.label} — ${opt.badge}. ${opt.description}`}
             accessibilityHint={`Example: ${opt.preview}`}
             style={{
@@ -111,6 +103,7 @@ export default function AnnouncementStep() {
           </Pressable>
         );
       })}
+      </View>
     </WizardLayout>
   );
 }

@@ -1,0 +1,86 @@
+import type { AppCategory, AppPlatform } from '../types/content';
+
+export const APP_PLATFORMS: AppPlatform[] = [
+  { id: 'ios', name: 'iOS and iPadOS' },
+  { id: 'mac', name: 'Mac' },
+  { id: 'watchos', name: 'Apple Watch' },
+  { id: 'tvos', name: 'Apple TV' },
+  { id: 'visionos', name: 'Vision Pro' },
+];
+
+export const FALLBACK_APP_CATEGORIES: Record<string, AppCategory[]> = {
+  ios: [
+    { name: 'Books', slug: 'books' },
+    { name: 'Business', slug: 'business' },
+    { name: 'Developer Tools', slug: 'developer-tools' },
+    { name: 'Education', slug: 'education' },
+    { name: 'Entertainment', slug: 'entertainment' },
+    { name: 'Finance', slug: 'finance' },
+    { name: 'Food and Drink', slug: 'food-and-drink' },
+    { name: 'Games', slug: 'games' },
+    { name: 'Graphics and Design', slug: 'graphics-and-design' },
+    { name: 'Health and Fitness', slug: 'health-and-fitness' },
+    { name: 'Lifestyle', slug: 'lifestyle' },
+    { name: 'Medical', slug: 'medical' },
+    { name: 'Music', slug: 'music' },
+    { name: 'Navigation', slug: 'navigation' },
+    { name: 'News', slug: 'news' },
+    { name: 'Photo and Video', slug: 'photo-and-video' },
+    { name: 'Productivity', slug: 'productivity' },
+    { name: 'Reference', slug: 'reference' },
+    { name: 'Safari Extensions', slug: 'safari-extensions' },
+    { name: 'Shopping', slug: 'shopping' },
+    { name: 'Social Networking', slug: 'social-networking' },
+    { name: 'Sports and Activities', slug: 'sports-and-activities' },
+    { name: 'Travel', slug: 'travel' },
+    { name: 'Utilities', slug: 'utilities' },
+    { name: 'Weather', slug: 'weather' },
+  ],
+  mac: [
+    { name: 'Business', slug: 'business' },
+    { name: 'Developer Tools', slug: 'developer-tools' },
+    { name: 'Education', slug: 'education' },
+    { name: 'Entertainment', slug: 'entertainment' },
+    { name: 'Finance', slug: 'finance' },
+    { name: 'Games', slug: 'games' },
+    { name: 'Graphics and Design', slug: 'graphics-and-design' },
+    { name: 'Health and Fitness', slug: 'health-and-fitness' },
+    { name: 'Lifestyle', slug: 'lifestyle' },
+    { name: 'Music', slug: 'music' },
+    { name: 'News', slug: 'news' },
+    { name: 'Photo and Video', slug: 'photo-and-video' },
+    { name: 'Productivity', slug: 'productivity' },
+    { name: 'Reference', slug: 'reference' },
+    { name: 'Social Networking', slug: 'social-networking' },
+    { name: 'Sports and Activities', slug: 'sports-and-activities' },
+    { name: 'Travel', slug: 'travel' },
+    { name: 'Utilities', slug: 'utilities' },
+    { name: 'Weather', slug: 'weather' },
+  ],
+  watchos: [
+    { name: 'Health and Fitness', slug: 'health-and-fitness' },
+    { name: 'Lifestyle', slug: 'lifestyle' },
+    { name: 'Productivity', slug: 'productivity' },
+    { name: 'Utilities', slug: 'utilities' },
+  ],
+  tvos: [
+    { name: 'Entertainment', slug: 'entertainment' },
+    { name: 'Games', slug: 'games' },
+    { name: 'Music', slug: 'music' },
+    { name: 'Sports and Activities', slug: 'sports-and-activities' },
+    { name: 'Utilities', slug: 'utilities' },
+  ],
+  visionos: [
+    { name: 'Entertainment', slug: 'entertainment' },
+    { name: 'Games', slug: 'games' },
+    { name: 'Productivity', slug: 'productivity' },
+    { name: 'Utilities', slug: 'utilities' },
+  ],
+};
+
+export const IOS_PUBLIC_CATEGORY_PATHS: Record<string, string> = Object.fromEntries(
+  FALLBACK_APP_CATEGORIES.ios.map((category) => [
+    category.slug,
+    `/ios-ipados-app-directory/${category.slug}`,
+  ]),
+);

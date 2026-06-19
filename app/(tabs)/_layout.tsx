@@ -1,7 +1,8 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef } from 'react';
-import { AccessibilityInfo, findNodeHandle, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useNavigationState } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { MiniPlayer } from '../../src/components/MiniPlayer';
 import { useTheme } from '../../src/contexts/ThemeContext';
@@ -39,24 +40,27 @@ function AccessibleTabButton({
   onLongPress,
   accessibilityState,
 }: any) {
-  const btnRef              = useRef<View>(null);
-  const shouldFocusOnSelect = useRef(false);
-  const selected            = Boolean(accessibilityState?.selected);
+  const shouldAnnounce = useRef(false);
+  const focusedIndex   = useNavigationState((state) => state.index);
+  const selected       = TAB_ORDER.indexOf(routeName) === focusedIndex;
 
   useEffect(() => {
-    if (!selected || !shouldFocusOnSelect.current) return;
-    shouldFocusOnSelect.current = false;
+    if (!selected || !shouldAnnounce.current) return;
+    shouldAnnounce.current = false;
+    const label    = tabLabels[routeName] ?? routeName;
+    const position = TAB_ORDER.indexOf(routeName) + 1;
+    // Short delay lets the screen transition settle before speaking
     setTimeout(() => {
-      const handle = findNodeHandle(btnRef.current);
-      if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
-    }, 350);
-  }, [selected]);
+      AccessibilityInfo.announceForAccessibility(
+        `${label}, tab ${position} of ${TAB_ORDER.length}, selected`,
+      );
+    }, 300);
+  }, [selected, routeName]);
 
   return (
     <Pressable
-      ref={btnRef}
       onPress={(event) => {
-        if (!selected) shouldFocusOnSelect.current = true;
+        if (!selected) shouldAnnounce.current = true;
         onPress?.(event);
       }}
       onLongPress={onLongPress}
@@ -64,7 +68,7 @@ function AccessibleTabButton({
       accessible
       accessibilityRole="tab"
       accessibilityLabel={getTabAccessibilityLabel(routeName, selected, badge)}
-      accessibilityState={accessibilityState}
+      accessibilityState={{ ...accessibilityState, selected }}
     >
       {children}
     </Pressable>

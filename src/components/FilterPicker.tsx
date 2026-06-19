@@ -99,6 +99,7 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
         onRequestClose={() => setOpen(false)}
         accessibilityViewIsModal
       >
+        <View style={{ flex: 1 }} onAccessibilityEscape={() => setOpen(false)}>
         <Pressable
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }}
           onPress={() => setOpen(false)}
@@ -168,6 +169,7 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
             );
           })}
         </Animated.View>
+        </View>
       </Modal>
     </>
   );

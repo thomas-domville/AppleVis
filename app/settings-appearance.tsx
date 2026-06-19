@@ -31,7 +31,7 @@ export default function AppearanceSettings() {
 
         {/* Card density */}
         <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
-          textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}
+          textTransform: 'uppercase', letterSpacing: 0, marginBottom: 8 }}
           accessibilityRole="header">Card Density</Text>
 
         {([
@@ -76,7 +76,7 @@ export default function AppearanceSettings() {
           return (
             <View key={groupId} style={{ marginTop: 20 }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
-                textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}
+                textTransform: 'uppercase', letterSpacing: 0, marginBottom: 10 }}
                 accessibilityRole="header">{groupLabel}</Text>
 
               {groupThemes.map((id) => {

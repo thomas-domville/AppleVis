@@ -3,6 +3,7 @@ import { AccessibilityInfo, AppState, Platform } from 'react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PodcastEpisode, Chapter } from '../types/content';
 import { persistence } from '../services/persistence';
+import { parseChapters } from '../services/id3Parser';
 import { getLocalUri } from '../services/downloads';
 import { usePreferences } from '../contexts/PreferencesContext';
 import {
@@ -319,18 +320,58 @@ export function usePodcastPlayer() {
 
       soundRef.current = sound;
 
+      // Re-apply pitch correction explicitly: shouldCorrectPitch in createAsync's
+      // initialStatus is not reliable on iOS — the rate takes effect but pitch
+      // correction does not, producing chipmunk audio at non-1× speeds.
+      if (resolvedSpeed !== 1.0) {
+        await sound.setRateAsync(resolvedSpeed, true).catch(() => {});
+      }
+
       const actualDuration = status.isLoaded && status.durationMillis
         ? status.durationMillis / 1000
         : episode.duration;
 
+      // Cache the real duration so episode list cards can display it on subsequent visits.
+      if (actualDuration > 0 && episode.duration <= 0) {
+        persistence.saveEpisodeDuration(episode.id, actualDuration);
+      }
+
+      // Load or parse chapter markers.
+      // Check persistence first; parse from the MP3 header in the background if not cached.
+      const cachedChapters = await persistence.getEpisodeChapters(episode.id);
+      const episodeWithChapters: PodcastEpisode = {
+        ...episode,
+        duration: actualDuration,
+        chapters: cachedChapters ?? episode.chapters ?? [],
+      };
+
       if (status.isLoaded) {
         patch({
-          isLoading: false,
-          isPlaying: autoPlay,
-          duration: actualDuration,
-          position: savedPosition,
-          currentChapter: resolveChapter(episode, savedPosition),
-          speed: resolvedSpeed,
+          isLoading:      false,
+          isPlaying:      autoPlay,
+          duration:       actualDuration,
+          position:       savedPosition,
+          episode:        episodeWithChapters,
+          currentChapter: resolveChapter(episodeWithChapters, savedPosition),
+          speed:          resolvedSpeed,
+        });
+      }
+
+      // Parse chapters from the MP3 ID3 header if not yet cached.
+      if (cachedChapters === null) {
+        parseChapters(episode.audioUrl).then((parsed) => {
+          persistence.saveEpisodeChapters(episode.id, parsed);
+          if (parsed.length > 0) {
+            setState((prev) => {
+              if (prev.episode?.id !== episode.id) return prev;
+              const updated = { ...prev.episode, chapters: parsed };
+              return {
+                ...prev,
+                episode:        updated,
+                currentChapter: resolveChapter(updated, prev.position),
+              };
+            });
+          }
         });
       }
 

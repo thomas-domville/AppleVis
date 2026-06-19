@@ -1,31 +1,38 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  AccessibilityInfo, ActionSheetIOS, ActivityIndicator, Clipboard,
+  AccessibilityInfo, ActionSheetIOS, ActivityIndicator, Animated, Clipboard,
   findNodeHandle, Image, Linking, Platform, Pressable,
   ScrollView, Share, StyleSheet, Text, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Screen } from '../../src/components/Screen';
 import { WriteReviewModal } from '../../src/components/WriteReviewModal';
+import { AuthorProfileModal } from '../../src/components/AuthorProfileModal';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
+import { useAlert } from '../../src/contexts/AccessibleAlertContext';
+import { ALERTS } from '../../src/data/alertMessages';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import {
   readAloud, accessibilityConsensus, summariseText, isAppleIntelligenceAvailable,
 } from '../../src/services/intelligenceService';
 import { api } from '../../src/services/api';
-import { fetchItunesMetadata } from '../../src/services/itunesApi';
+import { cachedApi } from '../../src/services/cachedApi';
+import { persistence } from '../../src/services/persistence';
+import { contentCache } from '../../src/services/contentCache';
+import { fetchItunesMetadata, fetchDeveloperApps } from '../../src/services/itunesApi';
 import { relativeTime } from '../../src/utils/relativeTime';
+import { displayCommentSubject, subjectLabel } from '../../src/utils/commentSubject';
 import type { AppDetail, AppReview } from '../../src/types/content';
-import type { ItunesMetadata } from '../../src/services/itunesApi';
+import type { ItunesMetadata, DeveloperApp } from '../../src/services/itunesApi';
 
-// ─── HTML stripper — preserves link text and block structure ──────────────────
+// ─── HTML stripper ────────────────────────────────────────────────────────────
 
 function stripHtml(html: string): string {
   return html
@@ -45,37 +52,37 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-function formatLanguages(codes: string[]): string {
-  if (codes.length === 0) return '';
-  const names = codes.slice(0, 5).map((c) => {
-    try { return new Intl.DisplayNames(['en'], { type: 'language' }).of(c) ?? c; }
+// Converts ISO language codes to full English names (e.g. "EN" → "English").
+function languageNames(codes: string[]): string[] {
+  if (codes.length === 0) return [];
+  let dn: Intl.DisplayNames | null = null;
+  try { dn = new Intl.DisplayNames(['en'], { type: 'language' }); } catch { /* */ }
+  return codes.map((c) => {
+    try { return dn?.of(c) ?? c; }
     catch { return c; }
   });
-  const extra = codes.length - names.length;
-  return extra > 0 ? `${names.join(', ')} and ${extra} more` : names.join(', ');
 }
 
-// ─── Bottom toolbar button ────────────────────────────────────────────────────
+// ─── Toolbar button ──────────────────────────────────────────────────────────
 
 function ToolbarButton({
-  icon, activeIcon, label, onPress, active, accent, disabled,
+  icon, activeIcon, label, a11yLabel, onPress, active, accent, disabled,
 }: {
-  icon: string; activeIcon?: string; label: string; onPress: () => void;
+  icon: string; activeIcon?: string; label: string; a11yLabel?: string; onPress: () => void;
   active?: boolean; accent?: boolean; disabled?: boolean;
 }) {
   const { colors } = useTheme();
   const resolvedIcon = (active && activeIcon) ? activeIcon : icon;
-  const color = disabled
-    ? colors.textSecondary
-    : accent ? colors.accent
-    : active ? colors.accent
+  const color = disabled ? colors.textSecondary
+    : accent  ? colors.accent
+    : active  ? colors.accent
     : colors.textSecondary;
   return (
     <Pressable
       onPress={disabled ? undefined : onPress}
       accessible
       accessibilityRole="button"
-      accessibilityLabel={label.replace(/\n/g, ' ')}
+      accessibilityLabel={a11yLabel ?? label.replace(/\n/g, ' ')}
       accessibilityState={{ selected: active, disabled }}
       style={({ pressed }) => ({
         flex: 1, alignItems: 'center', justifyContent: 'center',
@@ -83,28 +90,24 @@ function ToolbarButton({
       })}
     >
       <Ionicons name={resolvedIcon as any} size={23} color={color} accessibilityElementsHidden />
-      <Text
-        style={{ fontSize: 10, fontWeight: '600', color, textAlign: 'center', lineHeight: 13 }}
-        accessibilityElementsHidden
-      >
+      <Text style={{ fontSize: 12, fontWeight: '600', color, textAlign: 'center', lineHeight: 15 }}
+        accessibilityElementsHidden>
         {label}
       </Text>
     </Pressable>
   );
 }
 
-// ─── Section divider ──────────────────────────────────────────────────────────
+// ─── Section divider ─────────────────────────────────────────────────────────
 
 function SectionDivider({ label }: { label: string }) {
   const { colors } = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 16 }}>
       <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} accessibilityElementsHidden />
-      <Text
-        style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
-          textTransform: 'uppercase', letterSpacing: 0.7 }}
-        accessibilityRole="header"
-      >
+      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
+        textTransform: 'uppercase', letterSpacing: 0.7 }}
+        accessibilityRole="header">
         {label}
       </Text>
       <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} accessibilityElementsHidden />
@@ -112,29 +115,113 @@ function SectionDivider({ label }: { label: string }) {
   );
 }
 
-// ─── Coming-soon shell ────────────────────────────────────────────────────────
+// ─── Accessibility rating config ─────────────────────────────────────────────
 
-function ComingSoonShell({ icon, message }: { icon: string; message: string }) {
-  const { colors } = useTheme();
+type RatingKey = 'excellent' | 'good' | 'fair' | 'poor';
+
+const RATING_CONFIG: Record<RatingKey, {
+  value: number;
+  color: string;
+  descriptions: { voiceOver: string; buttonLabeling: string; usability: string };
+}> = {
+  excellent: {
+    value: 1.0, color: '#22c55e',
+    descriptions: {
+      voiceOver:      'Works flawlessly with VoiceOver. No workarounds needed.',
+      buttonLabeling: 'All interactive elements are clearly and accurately labeled.',
+      usability:      'Smooth, intuitive experience for screen reader users.',
+    },
+  },
+  good: {
+    value: 0.75, color: '#84cc16',
+    descriptions: {
+      voiceOver:      'Works well with VoiceOver. Minor issues or inconsistencies.',
+      buttonLabeling: 'Most elements are labeled. Occasional unlabeled buttons.',
+      usability:      'Generally usable with minor friction points.',
+    },
+  },
+  fair: {
+    value: 0.50, color: '#f59e0b',
+    descriptions: {
+      voiceOver:      'Partially accessible. Some features may require workarounds.',
+      buttonLabeling: 'Many interactive elements have poor or missing labels.',
+      usability:      'Usable but requires significant effort or workarounds.',
+    },
+  },
+  poor: {
+    value: 0.25, color: '#ef4444',
+    descriptions: {
+      voiceOver:      'Significant accessibility barriers. Most features are difficult or impossible to use with VoiceOver.',
+      buttonLabeling: 'Most interactive elements are unlabeled or incorrectly labeled.',
+      usability:      'Very difficult or unusable for screen reader users.',
+    },
+  },
+};
+
+function getRatingKey(text: string): RatingKey | null {
+  const t = (text || '').trim().toLowerCase();
+  if (t === 'excellent') return 'excellent';
+  if (t === 'good')      return 'good';
+  if (t === 'fair')      return 'fair';
+  if (t === 'poor')      return 'poor';
+  return null;
+}
+
+function ratingDescription(
+  text: string,
+  category: 'voiceOver' | 'buttonLabeling' | 'usability',
+): string {
+  const key = getRatingKey(text);
+  return key ? RATING_CONFIG[key].descriptions[category] : '';
+}
+
+// ─── Accessibility rating gauge ───────────────────────────────────────────────
+
+function RatingGauge({
+  label, ratingWord, ratingKey, descriptionKey, colors,
+}: {
+  label: string;
+  ratingWord: string;
+  ratingKey: RatingKey;
+  descriptionKey: 'voiceOver' | 'buttonLabeling' | 'usability';
+  colors: ReturnType<typeof useTheme>['colors'];
+}) {
+  const config = RATING_CONFIG[ratingKey];
+  const fillAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fillAnim, {
+      toValue: config.value,
+      duration: 700,
+      delay: 300,
+      useNativeDriver: false,
+    }).start();
+  }, []);
+
   return (
-    <View
-      style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-        backgroundColor: colors.pill, borderRadius: 12, padding: 14,
-        borderWidth: 1, borderColor: colors.border, opacity: 0.7, marginBottom: 12 }}
-      accessible
-      accessibilityLabel={`${message} — coming soon.`}
-    >
-      <Ionicons name={icon as any} size={20} color={colors.textSecondary}
-        accessibilityElementsHidden style={{ marginTop: 1 }} />
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 20 }}>{message}</Text>
-        <View style={{ flexDirection: 'row', marginTop: 6 }}>
-          <View style={{ paddingHorizontal: 8, paddingVertical: 2,
-            backgroundColor: colors.card, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
-            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>COMING SOON</Text>
-          </View>
+    <View style={{ marginBottom: 14 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between',
+        alignItems: 'center', marginBottom: 6 }}>
+        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+          textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          {label}
+        </Text>
+        <View style={{ backgroundColor: config.color + '22', borderRadius: 6,
+          paddingHorizontal: 8, paddingVertical: 2 }}>
+          <Text style={{ fontSize: 12, fontWeight: '800', color: config.color }}>
+            {ratingWord}
+          </Text>
         </View>
       </View>
+      <View style={{ height: 8, backgroundColor: colors.pill, borderRadius: 4, marginBottom: 6 }}>
+        <Animated.View style={{
+          height: 8, backgroundColor: config.color, borderRadius: 4,
+          width: fillAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+        }} />
+      </View>
+      <Text style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 17 }}>
+        {config.descriptions[descriptionKey]}
+      </Text>
     </View>
   );
 }
@@ -147,21 +234,89 @@ function StarRow({ rating, size = 14, color = '#F5A623' }: {
   return (
     <View style={{ flexDirection: 'row', gap: 2 }} accessibilityElementsHidden>
       {[1, 2, 3, 4, 5].map((s) => (
-        <Ionicons
-          key={s}
+        <Ionicons key={s}
           name={s <= Math.round(rating) ? 'star' : 'star-outline'}
-          size={size}
-          color={color}
-        />
+          size={size} color={color} />
       ))}
     </View>
   );
 }
 
-// ─── Review card ─────────────────────────────────────────────────────────────
+// ─── Collapsible text card ────────────────────────────────────────────────────
+// Each paragraph is its own accessible Text node — braille users can navigate
+// paragraph by paragraph without panning through one giant blob.
 
-function ReviewCard({
-  review, index, total, colors, styles, screenReaderEnabled, showToast,
+function AccessibilityField({
+  heading, text, colors, styles, collapseAt = 350,
+}: {
+  heading: string;
+  text: string;
+  colors: ReturnType<typeof useTheme>['colors'];
+  styles: ReturnType<typeof useTheme>['styles'];
+  collapseAt?: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const plain = stripHtml(text);
+  const paragraphs = plain.split('\n\n').map(p => p.replace(/\n/g, ' ').trim()).filter(Boolean);
+
+  // Show paragraphs up to ~collapseAt total characters when collapsed.
+  const collapsedParagraphs = (() => {
+    let len = 0;
+    const result: string[] = [];
+    for (const p of paragraphs) {
+      if (len > 0 && len + p.length > collapseAt) break;
+      result.push(p);
+      len += p.length + 2;
+    }
+    return result.length > 0 ? result : paragraphs.slice(0, 1);
+  })();
+  const hasHiddenContent = collapsedParagraphs.length < paragraphs.length;
+  const visibleParagraphs = hasHiddenContent && !expanded ? collapsedParagraphs : paragraphs;
+  const hiddenCount = paragraphs.length - collapsedParagraphs.length;
+
+  return (
+    <>
+      <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 8 }}
+        accessibilityRole="header">
+        {heading}
+      </Text>
+      <View style={[styles.card, { marginBottom: hasHiddenContent ? 4 : 10 }]}>
+        {visibleParagraphs.map((para, i) => (
+          <Text
+            key={i}
+            accessible
+            style={{
+              fontSize: 15, lineHeight: 23, color: colors.text,
+              marginBottom: i < visibleParagraphs.length - 1 ? 10 : 0,
+            }}
+          >
+            {para}
+          </Text>
+        ))}
+      </View>
+      {hasHiddenContent && (
+        <Pressable
+          onPress={() => setExpanded(v => !v)}
+          accessible accessibilityRole="button"
+          accessibilityLabel={
+            expanded
+              ? `Show less of ${heading}`
+              : `Show full ${heading}. ${hiddenCount} more section${hiddenCount === 1 ? '' : 's'}.`
+          }
+          style={{ marginBottom: 10 }}>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.accent }}>
+            {expanded ? 'Show less' : `Show full ${heading} (${hiddenCount} more)`}
+          </Text>
+        </Pressable>
+      )}
+    </>
+  );
+}
+
+// ─── Accessibility comment card ───────────────────────────────────────────────
+
+function CommentCard({
+  review, index, total, colors, styles, screenReaderEnabled, showToast, onReplyTo, isNew,
 }: {
   review: AppReview;
   index: number;
@@ -170,278 +325,117 @@ function ReviewCard({
   styles: ReturnType<typeof useTheme>['styles'];
   screenReaderEnabled: boolean;
   showToast: (msg: string, type?: 'success' | 'warning' | 'error') => void;
+  onReplyTo: () => void;
+  isNew?: boolean;
 }) {
   const plain = stripHtml(review.body);
+  const commentSubject = displayCommentSubject(review.subject);
 
-  const reviewActions = [
+  const actions = [
+    { label: 'Reply to this Comment', action: onReplyTo },
     ...(!screenReaderEnabled
-      ? [{ label: 'Read Aloud', action: () => readAloud(`Review by ${review.authorName}. ${plain}`) }]
+      ? [{ label: 'Read Aloud', action: () => readAloud(`Comment by ${review.authorName}. ${subjectLabel(review.subject)}${plain}`) }]
       : []),
-    { label: 'Copy Review Text', action: () => { Clipboard.setString(plain); showToast('Review text copied.', 'success'); } },
-    { label: 'Share Review', action: () => Share.share({ message: `${review.authorName} on AppleVis: ${plain}` }).catch(() => {}) },
+    { label: 'Copy Comment Text', action: () => { Clipboard.setString(plain); showToast('Comment text copied.', 'success'); } },
+    { label: 'Share Comment', action: () => Share.share({
+      message: [
+        `${review.authorName} on AppleVis`,
+        commentSubject ? `Subject: ${commentSubject}` : null,
+        plain,
+      ].filter(Boolean).join('\n\n'),
+    }).catch(() => {}) },
     { label: 'Mark as Helpful', action: () => showToast('Helpful votes — coming once the Drupal Flags API is confirmed.', 'warning') },
-    { label: 'Report Review',   action: () => showToast('Reporting — coming once the Drupal Flags API is confirmed.', 'warning') },
+    { label: 'Report Comment',  action: () => showToast('Reporting — coming once the Drupal Flags API is confirmed.', 'warning') },
   ];
 
   function handleLongPress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
-        {
-          title: `Review by ${review.authorName}`,
-          options: ['Cancel', ...reviewActions.map(a => a.label)],
-          cancelButtonIndex: 0,
-        },
-        (i) => { if (i > 0) reviewActions[i - 1].action(); },
+        { title: `Comment by ${review.authorName}`, options: ['Cancel', ...actions.map(a => a.label)], cancelButtonIndex: 0 },
+        (i) => { if (i > 0) actions[i - 1].action(); },
       );
     }
   }
 
-  const ratingLabel = review.rating ? `${review.rating} out of 5 stars. ` : '';
-  const versionLabel = review.appVersion ? `Version ${review.appVersion}. ` : '';
+  const ratingLabel  = review.rating    ? `${review.rating} out of 5 stars. ` : '';
+  const versionLabel = review.appVersion ? `Tested in version ${review.appVersion}. ` : '';
 
   return (
-    <Pressable
-      onLongPress={handleLongPress}
-      delayLongPress={400}
-      accessible
-      accessibilityLabel={
-        `Review ${index + 1} of ${total} by ${review.authorName}. ` +
-        ratingLabel + versionLabel +
-        `${relativeTime(review.createdAt)}. ${plain}. Hold for options.`
-      }
-      accessibilityActions={reviewActions.map(a => ({ name: a.label, label: a.label }))}
-      onAccessibilityAction={({ nativeEvent }) => {
-        reviewActions.find(a => a.label === nativeEvent.actionName)?.action();
-      }}
-      style={[styles.card, { marginBottom: 10 }]}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}
-        accessibilityElementsHidden>
-        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.pill,
-          alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.pillText }}>
-            {review.authorName.charAt(0).toUpperCase()}
-          </Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>
-            {review.authorName}
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-            {review.rating ? <StarRow rating={review.rating} size={12} /> : null}
-            <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-              {review.appVersion ? `v${review.appVersion}  ·  ` : ''}{relativeTime(review.createdAt)}
-            </Text>
-          </View>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          {review.platform ? (
-            <View style={{ backgroundColor: colors.pill, borderRadius: 6,
-              paddingHorizontal: 6, paddingVertical: 2 }}>
-              <Text style={{ color: colors.pillText, fontSize: 11, fontWeight: '600' }}>
-                {review.platform}
-              </Text>
-            </View>
-          ) : null}
-          <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '500' }}>
-            {index + 1}/{total}
-          </Text>
-        </View>
-      </View>
-      <Text style={{ fontSize: 15, lineHeight: 23, color: colors.text }} accessibilityElementsHidden>
-        {plain}
-      </Text>
-    </Pressable>
-  );
-}
-
-// ─── iTunes metadata section ──────────────────────────────────────────────────
-
-function ItunesSection({
-  meta, colors, styles,
-}: {
-  meta: ItunesMetadata;
-  colors: ReturnType<typeof useTheme>['colors'];
-  styles: ReturnType<typeof useTheme>['styles'];
-}) {
-  const [showAllNotes, setShowAllNotes]   = useState(false);
-  const [showFullDesc, setShowFullDesc]   = useState(false);
-
-  const notes = meta.releaseNotes.trim();
-  const notesTruncated  = notes.length > 280 && !showAllNotes;
-  const notesDisplay    = notesTruncated ? notes.slice(0, 280).trimEnd() + '…' : notes;
-
-  const desc = meta.appStoreDescription.trim();
-  const descTruncated   = desc.length > 400 && !showFullDesc;
-  const descDisplay     = descTruncated ? desc.slice(0, 400).trimEnd() + '…' : desc;
-
-  const facts: { label: string; value: string }[] = [
-    { label: 'Price',    value: meta.price },
-    { label: 'Version',  value: meta.version },
-    ...(meta.fileSizeMb       ? [{ label: 'Size',    value: meta.fileSizeMb }]              : []),
-    ...(meta.minimumOsVersion ? [{ label: 'Requires', value: `iOS ${meta.minimumOsVersion}+` }] : []),
-    ...(meta.ageRating        ? [{ label: 'Rated',   value: meta.ageRating }]               : []),
-    ...(meta.versionDate      ? [{ label: 'Released', value: relativeTime(meta.versionDate) }] : []),
-  ].filter((f) => f.value);
-
-  const langs = formatLanguages(meta.languages);
-
-  return (
-    <>
-      <SectionDivider label="App Store Information" />
-
-      {/* Quick facts */}
-      <View style={[styles.card, { marginBottom: 10 }]}
+    <View style={[styles.card, { marginBottom: 10, padding: 0 }, isNew && { borderLeftWidth: 3, borderLeftColor: colors.accent }]}>
+      <Pressable
+        onLongPress={handleLongPress}
+        delayLongPress={400}
         accessible
-        accessibilityLabel={facts.map((f) => `${f.label}: ${f.value}`).join('. ')}>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 14, columnGap: 0 }}>
-          {facts.map((fact, i) => (
-            <View key={i} style={{ width: '33.33%', paddingRight: 8 }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary,
-                textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 3 }}>
-                {fact.label}
+        accessibilityRole="header"
+        accessibilityLabel={
+          (isNew ? 'New comment. ' : '') +
+          `Comment ${index + 1} of ${total} by ${review.authorName}. ` +
+          (commentSubject ? `Subject: ${commentSubject}. ` : '') +
+          ratingLabel + versionLabel +
+          `${relativeTime(review.createdAt)}. Hold for options.`
+        }
+        accessibilityActions={actions.map(a => ({ name: a.label, label: a.label }))}
+        onAccessibilityAction={({ nativeEvent }) => {
+          actions.find(a => a.label === nativeEvent.actionName)?.action();
+        }}
+        style={({ pressed }) => ({
+          padding: 14,
+          paddingBottom: 8,
+          opacity: pressed ? 0.75 : 1,
+        })}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants">
+          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.accent,
+            alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.accentText }}>
+              {review.authorName.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>
+              {review.authorName}
+            </Text>
+            {!!commentSubject && (
+              <Text style={{ fontSize: 13, color: colors.text, marginTop: 2 }} numberOfLines={2}>
+                {commentSubject}
               </Text>
-              <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>
-                {fact.value}
+            )}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+              {review.rating ? <StarRow rating={review.rating} size={12} /> : null}
+              <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                {review.appVersion ? `v${review.appVersion}  ·  ` : ''}{relativeTime(review.createdAt)}
               </Text>
             </View>
-          ))}
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {isNew && (
+              <View style={{ backgroundColor: colors.accent, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                <Text style={{ color: colors.accentText, fontSize: 12, fontWeight: '700' }}>NEW</Text>
+              </View>
+            )}
+            {review.platform ? (
+              <View style={{ backgroundColor: colors.pill, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                <Text style={{ color: colors.pillText, fontSize: 11, fontWeight: '600' }}>{review.platform}</Text>
+              </View>
+            ) : null}
+            <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '500' }}>{index + 1}/{total}</Text>
+          </View>
         </View>
-      </View>
-
-      {/* App Store rating */}
-      {meta.appStoreRating != null && meta.appStoreRatingCount > 0 ? (
-        <View style={[styles.card, { marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 12 }]}
+      </Pressable>
+      <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
+        <Text
           accessible
-          accessibilityLabel={`App Store rating: ${meta.appStoreRating.toFixed(1)} out of 5 from ${meta.appStoreRatingCount.toLocaleString()} ratings. This is the general App Store rating, separate from the AppleVis accessibility rating.`}>
-          <View style={{ alignItems: 'center', minWidth: 56 }}>
-            <Text style={{ fontSize: 36, fontWeight: '800', color: colors.text, lineHeight: 40 }}>
-              {meta.appStoreRating.toFixed(1)}
-            </Text>
-            <StarRow rating={meta.appStoreRating} size={13} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>App Store Rating</Text>
-            <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2, lineHeight: 17 }}>
-              {meta.appStoreRatingCount.toLocaleString()} ratings · General quality,
-              separate from AppleVis accessibility score
-            </Text>
-          </View>
-        </View>
-      ) : null}
-
-      {/* Languages */}
-      {langs ? (
-        <View style={[styles.card, { marginBottom: 10 }]}
-          accessible accessibilityLabel={`Supported languages: ${langs}`}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
-            textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>
-            Languages
-          </Text>
-          <Text style={{ fontSize: 14, color: colors.text, lineHeight: 20 }}>{langs}</Text>
-        </View>
-      ) : null}
-
-      {/* Developer website */}
-      {meta.developerWebsite ? (
-        <Pressable
-          onPress={() => Linking.openURL(meta.developerWebsite!).catch(() => {})}
-          accessible accessibilityRole="link"
-          accessibilityLabel="Developer website"
-          accessibilityHint="Opens the developer's website in Safari"
-          style={({ pressed }) => [styles.card, {
-            flexDirection: 'row', alignItems: 'center', gap: 10,
-            marginBottom: 10, opacity: pressed ? 0.75 : 1,
-          }]}>
-          <Ionicons name="globe-outline" size={20} color={colors.accent} accessibilityElementsHidden />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.accent }}>Developer Website</Text>
-            <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 1 }} numberOfLines={1}>
-              {meta.developerWebsite.replace(/^https?:\/\//, '')}
-            </Text>
-          </View>
-          <Ionicons name="open-outline" size={16} color={colors.textSecondary} accessibilityElementsHidden />
-        </Pressable>
-      ) : null}
-
-      {/* What's new */}
-      {notes ? (
-        <>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text,
-            marginTop: 4, marginBottom: 8 }} accessibilityRole="header">
-            What's New in v{meta.version}
-          </Text>
-          <View style={[styles.card, { marginBottom: 10 }]}
-            accessible accessibilityLabel={`What's new in version ${meta.version}: ${notes}`}>
-            <Text style={{ fontSize: 15, lineHeight: 23, color: colors.text }}>{notesDisplay}</Text>
-            {notes.length > 280 ? (
-              <Pressable
-                onPress={() => setShowAllNotes((v) => !v)}
-                accessible accessibilityRole="button"
-                accessibilityLabel={showAllNotes ? 'Show less release notes' : 'Read more release notes'}
-                style={{ marginTop: 10 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.accent }}>
-                  {showAllNotes ? 'Show less' : 'Read more'}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-        </>
-      ) : null}
-
-      {/* App Store description — often different from AppleVis body */}
-      {desc ? (
-        <>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text,
-            marginTop: 4, marginBottom: 8 }} accessibilityRole="header">
-            App Store Description
-          </Text>
-          <View style={[styles.card, { marginBottom: 10 }]}
-            accessible accessibilityLabel={`App Store description: ${desc}`}>
-            <Text style={{ fontSize: 15, lineHeight: 23, color: colors.text }}>{descDisplay}</Text>
-            {desc.length > 400 ? (
-              <Pressable
-                onPress={() => setShowFullDesc((v) => !v)}
-                accessible accessibilityRole="button"
-                accessibilityLabel={showFullDesc ? 'Show less of App Store description' : 'Read full App Store description'}
-                style={{ marginTop: 10 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.accent }}>
-                  {showFullDesc ? 'Show less' : 'Read more'}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-        </>
-      ) : null}
-
-      {/* Screenshots */}
-      {meta.screenshotUrls.length > 0 ? (
-        <>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text,
-            marginTop: 4, marginBottom: 8 }} accessibilityRole="header">
-            Screenshots
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 10, paddingBottom: 4 }}
-            accessibilityLabel={`${meta.screenshotUrls.length} app screenshots`}
-            style={{ marginBottom: 10 }}
-          >
-            {meta.screenshotUrls.map((url, i) => (
-              <Image
-                key={url}
-                source={{ uri: url }}
-                style={{ width: 160, height: 284, borderRadius: 12 }}
-                accessible
-                accessibilityLabel={`Screenshot ${i + 1} of ${meta.screenshotUrls.length}`}
-              />
-            ))}
-          </ScrollView>
-        </>
-      ) : null}
-    </>
+          accessibilityRole="text"
+          accessibilityLabel={plain}
+          style={{ fontSize: 15, lineHeight: 23, color: colors.text }}
+        >
+          {plain}
+        </Text>
+      </View>
+    </View>
   );
 }
 
@@ -453,24 +447,48 @@ export default function AppDetailScreen() {
   const { id, name: paramName } = useLocalSearchParams<{ id: string; name?: string }>();
   const router                   = useRouter();
   const { colors, styles }       = useTheme();
-  const { screenReaderEnabled }  = useAccessibilityPreferences();
+  const { screenReaderEnabled, reduceMotion, reduceTransparency } = useAccessibilityPreferences();
   const auth                     = useAuth();
   const { showToast }            = useToast();
+  const { showAlert }            = useAlert();
   const saved                    = useSavedItems('appListing');
   const aiAvailable              = isAppleIntelligenceAvailable();
   const insets                   = useSafeAreaInsets();
 
-  const [app,          setApp]          = useState<AppDetail | null>(null);
-  const [loading,      setLoading]      = useState(true);
-  const [error,        setError]        = useState<string | null>(null);
-  const [showReview,   setShowReview]   = useState(false);
-  const [itunes,       setItunes]       = useState<ItunesMetadata | null>(null);
-  const [itunesLoading,setItunesLoading]= useState(false);
-  const [aiWorking,    setAiWorking]    = useState<'consensus' | 'summarise' | null>(null);
+  const [app,           setApp]           = useState<AppDetail | null>(null);
+  const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState<string | null>(null);
+  const [fromCache,     setFromCache]     = useState(false);
+  const [showReview,    setShowReview]    = useState(false);
+  const [replyingTo,    setReplyingTo]    = useState<AppReview | null>(null);
+  const [authorProfile, setAuthorProfile] = useState(false);
+  const [itunes,        setItunes]        = useState<ItunesMetadata | 'not-found' | null>(null);
+  const [itunesLoading, setItunesLoading] = useState(false);
+  const [developerApps, setDeveloperApps] = useState<DeveloperApp[]>([]);
+  const [aiWorking,     setAiWorking]     = useState<'accessibility' | 'community' | null>(null);
+  const [loadingMoreReviews, setLoadingMoreReviews] = useState(false);
 
-  const scrollRef  = useRef<ScrollView>(null);
-  const heroRef    = useRef<View>(null);
-  const reviewsY   = useRef<number>(0);
+  // Collapsible App Store description & What's New
+  const [notesExpanded, setNotesExpanded] = useState(false);
+
+  const itunesMeta     = itunes !== null && itunes !== 'not-found' ? itunes : null;
+  const itunesNotFound = itunes === 'not-found';
+
+  const [lastSeenAt,    setLastSeenAt]    = useState<string | null>(null);
+
+  const scrollRef            = useRef<ScrollView>(null);
+  const commentsY            = useRef<number>(0);
+  const heroRef              = useRef<Text>(null);
+  const commentsRef          = useRef<View>(null);
+  const hasInitialFocus      = useRef(false);
+  const prevShowReview       = useRef(false);
+  const commentOffsets       = useRef<Record<string, number>>({});
+  const firstNewReviewRef    = useRef<View | null>(null);
+  const firstNewAfterLoadRef = useRef<View | null>(null);
+  const preLoadCount         = useRef(0);
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const heroAnim     = useRef(new Animated.Value(0)).current;
+  const contentAnim  = useRef(new Animated.Value(0)).current;
 
   useHandoff(app ? {
     activityType: 'com.applevis.app.viewApp',
@@ -478,22 +496,53 @@ export default function AppDetailScreen() {
     webpageURL: app.url ?? 'https://www.applevis.com/accessibility-apps',
   } : null);
 
+  // VoiceOver: focus to hero card on first load.
+  useEffect(() => {
+    if (!app || hasInitialFocus.current) return;
+    hasInitialFocus.current = true;
+    setTimeout(() => {
+      const handle = findNodeHandle(heroRef.current);
+      if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+    }, 200);
+  }, [app]);
+
+  // VoiceOver: return focus to Community Discussion heading after WriteReviewModal closes.
+  useEffect(() => {
+    if (prevShowReview.current && !showReview) {
+      setTimeout(() => {
+        const handle = findNodeHandle(commentsRef.current);
+        if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+      }, 400);
+    }
+    prevShowReview.current = showReview;
+  }, [showReview]);
+
   function loadApp() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    api.apps.detail(id).then((res) => {
+    Promise.all([
+      cachedApi.apps.detail(id),
+      persistence.getItemVisit(id),
+    ]).then(([res, visit]) => {
+      setLastSeenAt(visit?.seenAt ?? null);
       setLoading(false);
       if (res.ok) {
         setApp(res.data);
-        setTimeout(() => {
-          const node = heroRef.current ? findNodeHandle(heroRef.current) : null;
-          if (node) AccessibilityInfo.setAccessibilityFocus(node);
-        }, 350);
+        setFromCache(res.fromCache);
+        persistence.stampItemVisit(id, res.data.reviewCount);
         if (res.data.appStoreUrl) {
           setItunesLoading(true);
           fetchItunesMetadata(res.data.appStoreUrl)
-            .then((meta) => { setItunes(meta); setItunesLoading(false); })
+            .then((meta) => {
+              setItunes(meta);
+              setItunesLoading(false);
+              if (meta && meta !== 'not-found' && meta.artistId) {
+                fetchDeveloperApps(meta.artistId, meta.appStoreId)
+                  .then(setDeveloperApps)
+                  .catch(() => {});
+              }
+            })
             .catch(() => { setItunesLoading(false); });
         }
       } else {
@@ -506,6 +555,27 @@ export default function AppDetailScreen() {
   }
 
   useEffect(() => { loadApp(); }, [id]);
+
+  // Fade in hero then content when data arrives; skip animation for Reduce Motion / VoiceOver.
+  useEffect(() => {
+    if (!app) return;
+    if (reduceMotion || screenReaderEnabled) {
+      heroAnim.setValue(1);
+      contentAnim.setValue(1);
+      return;
+    }
+    Animated.parallel([
+      Animated.timing(heroAnim,    { toValue: 1, duration: 380, useNativeDriver: true }),
+      Animated.timing(contentAnim, { toValue: 1, duration: 450, delay: 180, useNativeDriver: true }),
+    ]).start();
+  }, [app]);
+
+  function handleScroll(e: { nativeEvent: { contentOffset: { y: number }; contentSize: { height: number }; layoutMeasurement: { height: number } } }) {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const total = contentSize.height - layoutMeasurement.height;
+    if (total <= 0) return;
+    progressAnim.setValue(Math.min(1, Math.max(0, contentOffset.y / total)));
+  }
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -522,9 +592,34 @@ export default function AppDetailScreen() {
     }
   }
 
+  async function handleLoadMoreComments() {
+    if (!app || !id || loadingMoreReviews) return;
+    preLoadCount.current = app.reviews.length;
+    setLoadingMoreReviews(true);
+    const res = await api.apps.moreReviews(id, app.reviews.length);
+    setLoadingMoreReviews(false);
+    if (res.ok && res.data.length > 0) {
+      setApp(a => a ? { ...a, reviews: [...a.reviews, ...res.data] } : a);
+      showToast(`${res.data.length} more comment${res.data.length === 1 ? '' : 's'} loaded.`, 'success');
+      setTimeout(() => {
+        const handle = findNodeHandle(firstNewAfterLoadRef.current);
+        if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+      }, 400);
+    } else if (!res.ok) {
+      showToast(`Could not load more comments: ${res.error}`, 'error');
+    }
+  }
+
   function handleOpenAppStore() {
-    if (!app?.appStoreUrl) return;
-    Linking.openURL(app.appStoreUrl).catch(() => showToast('Could not open the App Store.', 'error'));
+    const url = itunesMeta?.appStoreUrl || app?.appStoreUrl;
+    if (!url) return;
+    Linking.openURL(url).catch(() => showToast('Could not open the App Store.', 'error'));
+  }
+
+  function handleOpenDeveloperPage() {
+    if (!itunesMeta?.artistId) return;
+    const url = `https://apps.apple.com/developer/id${itunesMeta.artistId}`;
+    Linking.openURL(url).catch(() => showToast('Could not open the App Store.', 'error'));
   }
 
   function handleShare() {
@@ -535,13 +630,6 @@ export default function AppDetailScreen() {
     }).catch(() => {});
   }
 
-  function handleCopyLink() {
-    if (!app) return;
-    const link = app.url ?? app.appStoreUrl ?? 'https://www.applevis.com/accessibility-apps';
-    Clipboard.setString(link);
-    showToast('Link copied.', 'success');
-  }
-
   function handleOpenInBrowser() {
     if (!app) return;
     const link = app.url ?? 'https://www.applevis.com/accessibility-apps';
@@ -550,86 +638,141 @@ export default function AppDetailScreen() {
 
   function handleWriteReview() {
     if (!auth.isSignedIn) {
-      showToast('Sign in to add a new comment.', 'warning');
+      showAlert({ ...ALERTS.auth.signInRequired('write a review'), onConfirm: () => router.push('/settings-account' as any) });
       return;
     }
     setShowReview(true);
   }
 
-  function handleReadAloud() {
-    if (!app) return;
-    readAloud(`${app.name}. ${app.developer ? `By ${app.developer}.` : ''} ${stripHtml(app.summary || app.body)}`);
-  }
-
-  function handleReadReviewsAloud() {
-    if (!app || app.reviews.length === 0) return;
-    const parts = app.reviews.map((r, i) => {
-      const rating = r.rating ? `${r.rating} stars.` : '';
-      return `Review ${i + 1} by ${r.authorName}. ${rating} ${stripHtml(r.body)}`;
-    });
-    readAloud(parts.join(' '));
-  }
-
-  async function handleAccessibilityConsensus() {
-    if (!app) return;
-    if (!aiAvailable) {
-      showToast('Enable Apple Intelligence in Settings → Apple Intelligence & Siri to use this.', 'warning');
+  async function handleSummariseAccessibility() {
+    if (!app || !aiAvailable) return;
+    const parts = [
+      app.accessibilityComments,
+      app.voiceOverPerformance,
+      app.buttonLabelling,
+      app.usabilityNotes,
+      app.otherComments,
+    ].filter((v): v is string => !!v).map(stripHtml);
+    if (parts.length === 0) {
+      showToast('No accessibility notes to summarise.', 'warning');
       return;
     }
-    if (app.reviews.length === 0) {
-      showToast('No reviews yet to analyse.', 'warning');
-      return;
-    }
-    setAiWorking('consensus');
-    const result = await accessibilityConsensus(app.reviews.map((r) => stripHtml(r.body)));
-    setAiWorking(null);
-    if (result) showToast(result, 'success');
-    else showToast('Accessibility Consensus requires Apple Intelligence Foundation Models (iOS 18.1+).', 'warning');
-  }
-
-  async function handleSummariseReviews() {
-    if (!app) return;
-    if (!aiAvailable) {
-      showToast('Enable Apple Intelligence in Settings → Apple Intelligence & Siri to use this.', 'warning');
-      return;
-    }
-    if (app.reviews.length === 0) {
-      showToast('No reviews yet to summarise.', 'warning');
-      return;
-    }
-    setAiWorking('summarise');
-    const combined = app.reviews.map((r, i) => `Review ${i + 1}: ${stripHtml(r.body)}`).join('\n');
-    const result = await summariseText(`Accessibility reviews for ${app.name}:\n${combined}`);
+    setAiWorking('accessibility');
+    const result = await summariseText(
+      `Accessibility notes for ${app.name}:\n${parts.join('\n\n')}`,
+    );
     setAiWorking(null);
     if (result) showToast(result, 'success');
     else showToast('Summarisation requires Apple Intelligence Foundation Models (iOS 18.1+).', 'warning');
   }
 
-  function handleJumpToReviews() {
-    scrollRef.current?.scrollTo({ y: reviewsY.current, animated: true });
+  async function handleSummariseCommunity() {
+    if (!app || !aiAvailable) return;
+    if (app.reviews.length === 0) {
+      showToast('No community comments to summarise.', 'warning');
+      return;
+    }
+    setAiWorking('community');
+    const combined = app.reviews.map((r, i) => `Comment ${i + 1}: ${stripHtml(r.body)}`).join('\n');
+    const result = await summariseText(`Community comments for ${app.name}:\n${combined}`);
+    setAiWorking(null);
+    if (result) showToast(result, 'success');
+    else showToast('Summarisation requires Apple Intelligence Foundation Models (iOS 18.1+).', 'warning');
+  }
+
+  function handleJumpToComments() {
+    scrollRef.current?.scrollTo({ y: commentsY.current, animated: true });
+  }
+
+  function handleJumpToNewComment(firstNewId: string) {
+    const offset = commentOffsets.current[firstNewId] ?? 0;
+    const y = Math.max(0, commentsY.current + offset - 20);
+    scrollRef.current?.scrollTo({ y, animated: true });
+    setTimeout(() => {
+      const handle = findNodeHandle(firstNewReviewRef.current);
+      if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+    }, 400);
   }
 
   function handleBackToTop() {
     scrollRef.current?.scrollTo({ y: 0, animated: true });
   }
 
-  const displayTitle = app?.name ?? paramName ?? 'App';
-  const hasReviews   = (app?.reviews.length ?? 0) > 0;
+  // ── Derived display values ───────────────────────────────────────────────────
+
+  const firstNewReview   = lastSeenAt && app
+    ? app.reviews.find(r => r.createdAt > lastSeenAt) ?? null
+    : null;
+  const newReviewCount   = lastSeenAt && app
+    ? app.reviews.filter(r => r.createdAt > lastSeenAt).length
+    : 0;
+
+  const displayName      = itunesMeta?.appName      || app?.name      || paramName || 'App';
+  const displayDeveloper = itunesMeta?.developerName || app?.developer || '';
+  const displayCategory  = itunesMeta?.category      || app?.category  || '';
+  const displayIcon      = itunesMeta?.artworkUrl    || app?.iconUrl   || '';
+  const displayPrice     = itunesMeta?.price          || '';
+  const displayVersion   = itunesMeta?.version       || '';
+
+  // "Title updated" notice: iTunes has a different name than what AppleVis recorded
+  const titleUpdated = !!app?.name && !!itunesMeta?.appName &&
+    app.name.trim().toLowerCase() !== itunesMeta.appName.trim().toLowerCase();
+
+  // Version staleness: current App Store version differs from the version AppleVis tested
+  const versionMismatch = !!app?.reviewedVersion && !!itunesMeta?.version &&
+    app.reviewedVersion !== itunesMeta.version;
+
+  const hasComments    = (app?.reviews.length ?? 0) > 0;
+  const hasAccessNotes = !!(
+    app?.accessibilityComments || app?.voiceOverPerformance ||
+    app?.buttonLabelling       || app?.usabilityNotes       || app?.otherComments
+  );
+
+  // Collapsible App Store description
+  const desc = itunesMeta?.appStoreDescription?.trim() ?? '';
+
+  // Collapsible What's New
+  const notes = itunesMeta?.releaseNotes?.trim() ?? '';
+  const NOTES_COLLAPSE = 280;
+  const notesDisplay = notes.length > NOTES_COLLAPSE && !notesExpanded
+    ? notes.slice(0, NOTES_COLLAPSE).trimEnd() + '…' : notes;
+
+
+  const langs = languageNames(itunesMeta?.languages ?? []);
 
   return (
-    <Screen title={displayTitle} showSettings={false} showSearch={false}>
+    <Screen title={displayName} showSettings={false} showSearch={false} titleAccessible={false}>
       <View style={{ flex: 1 }}>
+      {/* Reading progress bar — purely visual, hidden from VoiceOver/braille */}
+      {app && (
+        <View style={{ height: 5, backgroundColor: colors.border }}
+          accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Animated.View style={{
+            height: 5, backgroundColor: colors.accent,
+            width: progressAnim.interpolate({
+              inputRange: [0, 1], outputRange: ['0%', '100%'], extrapolate: 'clamp',
+            }),
+          }} />
+        </View>
+      )}
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: 16, paddingBottom: TOOLBAR_H + 16 }}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
 
         {/* ── Loading ─────────────────────────────────────────────────── */}
         {loading && (
-          <View style={{ alignItems: 'center', paddingVertical: 48 }}>
-            <ActivityIndicator size="large" color={colors.accent} accessibilityLabel="Loading app" />
+          <View
+            accessible
+            accessibilityLiveRegion="polite"
+            accessibilityLabel="Loading app, please wait"
+            style={{ alignItems: 'center', paddingVertical: 48 }}
+          >
+            <ActivityIndicator size="large" color={colors.accent} />
             <Text style={[styles.cardMeta, { marginTop: 12, textAlign: 'center' }]}>Loading app…</Text>
           </View>
         )}
@@ -649,318 +792,810 @@ export default function AppDetailScreen() {
         {/* ── App content ─────────────────────────────────────────────── */}
         {app && (
           <>
-            {/* ── Hero header ─────────────────────────────────────────── */}
-            <View
-              ref={heroRef}
-              style={[styles.card, { marginBottom: 10 }]}
-              accessible
-              accessibilityLabel={[
-                app.name,
-                app.developer ? `by ${app.developer}` : null,
-                app.category  ? app.category : null,
-                app.platform  ? app.platform : null,
-                itunes?.price ? itunes.price : null,
-                app.accessibilityRating != null
-                  ? `AppleVis accessibility rating ${app.accessibilityRating} out of 5`
-                  : null,
-                `${app.reviewCount} community ${app.reviewCount === 1 ? 'review' : 'reviews'}`,
-                `Last updated ${relativeTime(app.lastUpdatedAt)}`,
-              ].filter(Boolean).join('. ')}
-            >
-              {/* Icon + name */}
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14, marginBottom: 14 }}
-                accessibilityElementsHidden>
-                {app.iconUrl ? (
+            {/* ── Offline banner ──────────────────────────────────────── */}
+            {fromCache && (
+              <View
+                accessible
+                accessibilityLabel="Viewing offline content. Some information may be out of date."
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 8,
+                  backgroundColor: colors.pill, borderRadius: 10,
+                  paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10,
+                }}>
+                <Ionicons name="cloud-offline-outline" size={16} color={colors.textSecondary}
+                  accessibilityElementsHidden />
+                <Text style={{ flex: 1, fontSize: 13, color: colors.textSecondary }}>
+                  Viewing offline content · some details may be out of date
+                </Text>
+                <Pressable onPress={loadApp} accessible accessibilityRole="button"
+                  accessibilityLabel="Refresh"
+                  style={{ paddingHorizontal: 8, paddingVertical: 4 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.accent }}>Refresh</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {/* ── 1. Hero header ──────────────────────────────────────── */}
+            <Animated.View style={{
+              opacity: heroAnim,
+              transform: [{ translateY: heroAnim.interpolate({
+                inputRange: [0, 1], outputRange: [12, 0],
+              }) }],
+            }}>
+            <View style={[styles.card, { marginBottom: 10, overflow: 'hidden', padding: 0 }]}>
+              {/* Blurred tinted backdrop — purely visual, unique to each app's icon */}
+              {displayIcon && !reduceTransparency && (
+                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 160 }}
+                  accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
                   <Image
-                    source={{ uri: app.iconUrl }}
-                    style={{ width: 72, height: 72, borderRadius: 16 }}
-                    accessibilityElementsHidden
+                    source={{ uri: displayIcon }}
+                    style={{ width: '100%', height: '100%', opacity: 0.28 }}
+                    blurRadius={60}
+                    accessibilityIgnoresInvertColors
                   />
+                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: colors.card, opacity: 0.62 }} />
+                </View>
+              )}
+              <View style={{ padding: 16 }}>
+              {/* Icon row — visual only, entirely hidden from VoiceOver */}
+              <View
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                {displayIcon ? (
+                  <Image source={{ uri: displayIcon }}
+                    style={{ width: 72, height: 72, borderRadius: 16 }}
+                    accessibilityIgnoresInvertColors />
                 ) : (
                   <View style={{ width: 72, height: 72, borderRadius: 16,
                     backgroundColor: colors.pill, alignItems: 'center', justifyContent: 'center' }}>
                     <Ionicons name="apps-outline" size={32} color={colors.textSecondary} />
                   </View>
                 )}
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 21, fontWeight: '800', color: colors.text, lineHeight: 26 }}>
-                    {app.name}
-                  </Text>
-                  {app.developer ? (
-                    <Text style={{ fontSize: 14, color: colors.textSecondary, marginTop: 3 }}>
-                      {app.developer}
-                    </Text>
-                  ) : null}
-                  {itunes?.price ? (
-                    <View style={{ alignSelf: 'flex-start', backgroundColor: colors.accent,
-                      borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginTop: 8 }}>
-                      <Text style={{ color: colors.accentText, fontSize: 13, fontWeight: '700' }}>
-                        {itunes.price}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
               </View>
 
-              {/* AppleVis accessibility rating */}
-              {app.accessibilityRating != null ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8,
-                  marginBottom: 12, paddingBottom: 12,
-                  borderBottomWidth: 1, borderBottomColor: colors.border }}
-                  accessibilityElementsHidden>
-                  <StarRow rating={app.accessibilityRating} size={18} />
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>
-                    {app.accessibilityRating}/5
+              {/* Swipe 1: title — direct child of card, Screen already renders header role so omit it here */}
+              <Text
+                ref={heroRef}
+                accessible
+                accessibilityRole="header"
+                accessibilityLabel={displayName}
+                style={{
+                  fontSize: 21, fontWeight: '800', color: colors.text, lineHeight: 26,
+                  marginLeft: 86,
+                  marginTop: -72,
+                  minHeight: 72,
+                  marginBottom: 8,
+                  textAlignVertical: 'top',
+                }}>
+                {displayName}
+              </Text>
+
+              {/* Swipe 2 (only shown when App Store title differs): original AppleVis name */}
+              {titleUpdated && (
+                <View
+                  accessible
+                  accessibilityLabel={`App Store title has been updated by the developer since this entry was originally submitted to AppleVis as "${app.name}"`}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+                  <Ionicons name="pencil-outline" size={12} color={colors.textSecondary}
+                    accessibilityElementsHidden />
+                  <Text style={{ fontSize: 12, color: colors.textSecondary, fontStyle: 'italic', flex: 1 }}>
+                    Title updated on App Store · Original AppleVis title: "{app.name}"
                   </Text>
+                </View>
+              )}
+
+              {/* Swipe 3: Submitter profile button — tappable like topic detail */}
+              <Pressable
+                onPress={app.submitterUid ? () => setAuthorProfile(true) : undefined}
+                accessible
+                accessibilityRole={app.submitterUid ? 'button' : 'text'}
+                accessibilityLabel={app.submittedBy ? `Submitted by ${app.submittedBy}` : 'Submitted by AppleVis member'}
+                accessibilityHint={[
+                  app.createdAt          ? `Posted ${relativeTime(app.createdAt)}`          : null,
+                  app.lastUpdatedAt      ? `Last comment ${relativeTime(app.lastUpdatedAt)}` : null,
+                  app.submitterUid       ? 'Double tap to view profile'                      : null,
+                ].filter(Boolean).join('. ')}
+                style={({ pressed }) => ({
+                  flexDirection: 'row', alignItems: 'center', gap: 10,
+                  marginBottom: 8, opacity: pressed ? 0.65 : 1,
+                })}>
+                <View
+                  style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.accent,
+                    alignItems: 'center', justifyContent: 'center' }}
+                  accessibilityElementsHidden>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>
+                    {(app.submittedBy || '?').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}
+                    accessibilityElementsHidden>
+                    {app.submittedBy || 'AppleVis member'}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary }}
+                    accessibilityElementsHidden>
+                    {app.createdAt ? `Posted ${relativeTime(app.createdAt)}` : ''}
+                    {app.createdAt ? ' · ' : ''}
+                    {`Last comment ${relativeTime(app.lastUpdatedAt)}`}
+                  </Text>
+                </View>
+                {app.submitterUid && (
+                  <Ionicons name="chevron-forward" size={16} color={colors.textSecondary}
+                    accessibilityElementsHidden />
+                )}
+              </Pressable>
+
+              {/* Swipe 4: Category */}
+              {displayCategory ? (
+                <Text
+                  accessible
+                  style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 6 }}>
+                  Category: {displayCategory}
+                </Text>
+              ) : null}
+
+              {/* Swipe 5: Developer */}
+              {displayDeveloper ? (
+                <Pressable
+                  onPress={itunesMeta?.artistId ? handleOpenDeveloperPage : undefined}
+                  accessible
+                  accessibilityRole={itunesMeta?.artistId ? 'link' : 'text'}
+                  accessibilityLabel={
+                    itunesMeta?.artistId
+                      ? `Developer: ${displayDeveloper}. Opens developer page in the App Store`
+                      : `Developer: ${displayDeveloper}`
+                  }
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                  <Text style={{ fontSize: 13,
+                    color: itunesMeta?.artistId ? colors.accent : colors.textSecondary,
+                    fontWeight: itunesMeta?.artistId ? '600' : '400' }}>
+                    Developer: {displayDeveloper}
+                  </Text>
+                  {itunesMeta?.artistId && (
+                    <Ionicons name="open-outline" size={13} color={colors.accent}
+                      accessibilityElementsHidden />
+                  )}
+                </Pressable>
+              ) : null}
+
+              {/* iTunes loading indicator */}
+              {itunesLoading && !itunesMeta && !itunesNotFound ? (
+                <ActivityIndicator size="small" color={colors.textSecondary}
+                  style={{ alignSelf: 'flex-start', marginBottom: 6 }}
+                  accessibilityLabel="Loading App Store details" />
+              ) : null}
+
+              {/* Swipe 6: Comment count */}
+              {app.reviewCount > 0 && (
+                <Text
+                  accessible
+                  style={{ fontSize: 12, color: colors.textSecondary }}>
+                  {app.reviewCount} {app.reviewCount === 1 ? 'comment' : 'comments'}
+                </Text>
+              )}
+              </View>{/* end padding wrapper */}
+            </View>{/* end hero card */}
+            </Animated.View>{/* end hero animation */}
+
+            {/* ── Remaining content fades in after hero ────────────────── */}
+            <Animated.View style={{
+              opacity: contentAnim,
+              transform: [{ translateY: contentAnim.interpolate({
+                inputRange: [0, 1], outputRange: [12, 0],
+              }) }],
+            }}>
+
+            {/* ── 2. App no longer on the App Store ───────────────────── */}
+            {itunesNotFound && (
+              <View style={[styles.card, {
+                marginBottom: 10, flexDirection: 'row', alignItems: 'flex-start', gap: 12,
+                borderWidth: 1, borderColor: '#9CA3AF', backgroundColor: colors.pill,
+              }]}
+                accessible
+                accessibilityLabel="This app is no longer available on the App Store. The accessibility record below reflects the community's experience when it was available.">
+                <Ionicons name="storefront-outline" size={20} color={colors.textSecondary}
+                  accessibilityElementsHidden style={{ marginTop: 2 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
+                    No longer on the App Store
+                  </Text>
+                  <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 18 }}>
+                    This app is no longer available to download. The accessibility record below reflects the community's experience when it was available.
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* ── Quick nav: jump to comments ──────────────────────────── */}
+            {app.reviewCount > 0 && (
+              <View style={{ marginBottom: 12 }}>
+                <Pressable onPress={handleJumpToComments}
+                  accessible accessibilityRole="button"
+                  accessibilityLabel={`Jump to ${app.reviewCount} ${app.reviewCount === 1 ? 'comment' : 'comments'}`}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+                    backgroundColor: colors.pill, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
+                    alignSelf: 'flex-start' }}>
+                  <Ionicons name="arrow-down-outline" size={16} color={colors.pillText} accessibilityElementsHidden />
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: colors.pillText }}>Jump to Comments</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {/* ── App Store content ────────────────────────────────────── */}
+            {itunesLoading && !itunes ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8,
+                  paddingVertical: 12, paddingHorizontal: 4, marginBottom: 4 }}>
+                  <ActivityIndicator size="small" color={colors.textSecondary} accessibilityElementsHidden />
                   <Text style={{ fontSize: 13, color: colors.textSecondary }}>
-                    AppleVis accessibility
+                    Loading App Store information…
                   </Text>
                 </View>
               ) : null}
 
-              {/* Meta pills */}
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}
-                accessibilityElementsHidden>
-                {app.category ? (
-                  <View style={{ backgroundColor: colors.pill, borderRadius: 8,
-                    paddingHorizontal: 10, paddingVertical: 4 }}>
-                    <Text style={{ color: colors.pillText, fontSize: 13, fontWeight: '600' }}>
-                      {app.category}
+              {itunesMeta && (
+                <>
+                  {/* ── App Store Description ───────────────────────── */}
+                  {desc ? (
+                    <>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text,
+                        marginBottom: 8 }} accessibilityRole="header">
+                        About this App
+                      </Text>
+                      <View style={[styles.card, { marginBottom: 10 }]}>
+                        <Text
+                          accessible
+                          style={{ fontSize: 15, lineHeight: 23, color: colors.text }}>
+                          {desc}
+                        </Text>
+                      </View>
+                    </>
+                  ) : null}
+
+                  {/* ── Current Version card (merges iOS review version) ── */}
+                  <View
+                    style={[styles.card, { marginBottom: 10 }]}
+                    accessible
+                    accessibilityLabel={[
+                      `Current version: ${itunesMeta.version}.`,
+                      itunesMeta.versionDate
+                        ? `Released ${relativeTime(itunesMeta.versionDate)}.`
+                        : null,
+                      versionMismatch
+                        ? `AppleVis entry reviewed on version ${app.reviewedVersion}.`
+                        : null,
+                      app.testedOnIOS
+                        ? `Reviewed on iOS ${app.testedOnIOS}.`
+                        : null,
+                    ].filter((v): v is string => !!v).join(' ')}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+                      textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>
+                      Current Version
                     </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginBottom: (versionMismatch || app.testedOnIOS) ? 10 : 0 }}>
+                      <Text style={{ fontSize: 28, fontWeight: '800', color: colors.text }}>
+                        {itunesMeta.version}
+                      </Text>
+                      {itunesMeta.versionDate ? (
+                        <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 5 }}>
+                          Released {relativeTime(itunesMeta.versionDate)}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {(versionMismatch || app.testedOnIOS) ? (
+                      <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}
+                        accessibilityElementsHidden>
+                        {versionMismatch ? (
+                          <View>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary,
+                              textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>
+                              Reviewed on
+                            </Text>
+                            <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>
+                              v{app.reviewedVersion}
+                            </Text>
+                          </View>
+                        ) : null}
+                        {app.testedOnIOS ? (
+                          <View>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary,
+                              textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>
+                              Reviewed on iOS
+                            </Text>
+                            <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>
+                              {app.testedOnIOS}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    ) : null}
                   </View>
-                ) : null}
-                {app.platform ? (
-                  <View style={{ backgroundColor: colors.pill, borderRadius: 8,
-                    paddingHorizontal: 10, paddingVertical: 4 }}>
-                    <Text style={{ color: colors.pillText, fontSize: 13, fontWeight: '600' }}>
-                      {app.platform}
-                    </Text>
-                  </View>
-                ) : null}
-                <View style={{ backgroundColor: colors.pill, borderRadius: 8,
-                  paddingHorizontal: 10, paddingVertical: 4 }}>
-                  <Text style={{ color: colors.pillText, fontSize: 13, fontWeight: '600' }}>
-                    {app.reviewCount} {app.reviewCount === 1 ? 'review' : 'reviews'}
-                  </Text>
-                </View>
-                <View style={{ backgroundColor: colors.pill, borderRadius: 8,
-                  paddingHorizontal: 10, paddingVertical: 4 }}>
-                  <Text style={{ color: colors.pillText, fontSize: 13, fontWeight: '600' }}>
-                    Updated {relativeTime(app.lastUpdatedAt)}
-                  </Text>
-                </View>
-              </View>
-            </View>
 
-            {/* ── About this App (AppleVis body) ──────────────────────── */}
-            {app.body && stripHtml(app.body) ? (
-              <>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text,
-                  marginBottom: 8 }} accessibilityRole="header">
-                  About this App
-                </Text>
-                <View style={[styles.card, { marginBottom: 10 }]}
-                  accessible accessibilityLabel={`About this app: ${stripHtml(app.body)}`}>
-                  <Text style={{ fontSize: 15, lineHeight: 25, color: colors.text }}
-                    accessibilityElementsHidden>
-                    {stripHtml(app.body)}
-                  </Text>
-                </View>
-              </>
-            ) : app.summary ? (
-              <>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text,
-                  marginBottom: 8 }} accessibilityRole="header">
-                  About this App
-                </Text>
-                <View style={[styles.card, { marginBottom: 10 }]}
-                  accessible accessibilityLabel={`About this app: ${stripHtml(app.summary)}`}>
-                  <Text style={{ fontSize: 15, lineHeight: 25, color: colors.text }}
-                    accessibilityElementsHidden>
-                    {stripHtml(app.summary)}
-                  </Text>
-                </View>
-              </>
-            ) : null}
+                  {/* ── What's New — no standalone heading to avoid duplication ── */}
+                  {notes ? (
+                    <View style={[styles.card, { marginBottom: 10 }]}
+                      accessible accessibilityLabel={`What's new in version ${itunesMeta.version}: ${notes}`}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+                        textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}
+                        accessibilityElementsHidden>
+                        What's New · v{itunesMeta.version}
+                      </Text>
+                      <Text style={{ fontSize: 15, lineHeight: 23, color: colors.text }}
+                        accessibilityElementsHidden>
+                        {notesDisplay}
+                      </Text>
+                      {notes.length > NOTES_COLLAPSE && (
+                        <Pressable onPress={() => setNotesExpanded(v => !v)}
+                          accessible accessibilityRole="button"
+                          accessibilityLabel={notesExpanded ? 'Show less release notes' : 'Read more release notes'}
+                          style={{ marginTop: 10 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.accent }}>
+                            {notesExpanded ? 'Show less' : 'Read more'}
+                          </Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  ) : null}
 
-            {/* Quick nav row */}
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-              {!screenReaderEnabled && (
-                <Pressable
-                  onPress={handleReadAloud}
-                  accessible accessibilityRole="button"
-                  accessibilityLabel="Read description aloud"
-                  accessibilityHint="Reads the app name and description"
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
-                    backgroundColor: colors.pill, borderRadius: 10,
-                    paddingHorizontal: 14, paddingVertical: 10 }}
-                >
-                  <Ionicons name="volume-medium-outline" size={16} color={colors.pillText} accessibilityElementsHidden />
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: colors.pillText }}>Read Aloud</Text>
-                </Pressable>
-              )}
-              {app.reviewCount > 0 && (
-                <Pressable
-                  onPress={handleJumpToReviews}
-                  accessible accessibilityRole="button"
-                  accessibilityLabel={`Jump to ${app.reviewCount} community ${app.reviewCount === 1 ? 'review' : 'reviews'}`}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
-                    backgroundColor: colors.pill, borderRadius: 10,
-                    paddingHorizontal: 14, paddingVertical: 10 }}
-                >
-                  <Ionicons name="arrow-down-outline" size={16} color={colors.pillText} accessibilityElementsHidden />
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: colors.pillText }}>
-                    Jump to Reviews
-                  </Text>
-                </Pressable>
-              )}
-            </View>
-
-            {/* ── iTunes metadata ──────────────────────────────────────── */}
-            {itunesLoading && !itunes ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8,
-                paddingVertical: 12, paddingHorizontal: 4, marginBottom: 4 }}>
-                <ActivityIndicator size="small" color={colors.textSecondary} accessibilityElementsHidden />
-                <Text style={{ fontSize: 13, color: colors.textSecondary }}>
-                  Loading App Store information…
-                </Text>
-              </View>
-            ) : null}
-            {itunes ? (
-              <ItunesSection meta={itunes} colors={colors} styles={styles} />
-            ) : null}
-
-            {/* ── Apple Intelligence ───────────────────────────────────── */}
-            {(hasReviews || (app.body && stripHtml(app.body))) && (
-              <View style={[styles.card, { marginBottom: 10, opacity: aiAvailable ? 1 : 0.55 }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}
-                  accessibilityElementsHidden>
-                  <Ionicons name="sparkles-outline" size={16} color={colors.accent} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
-                    textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                    Apple Intelligence
-                  </Text>
-                  {!aiAvailable && (
-                    <View style={{ backgroundColor: colors.pill, borderRadius: 6,
-                      paddingHorizontal: 8, paddingVertical: 2 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
-                        NOT ENABLED
+                  {/* ── Price ───────────────────────────────────────── */}
+                  {itunesMeta.price ? (
+                    <View style={[styles.card, { marginBottom: 10 }]}
+                      accessible
+                      accessibilityLabel={`Price: ${itunesMeta.price}`}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+                        textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>
+                        Price
+                      </Text>
+                      <Text style={{ fontSize: 22, fontWeight: '800', color: colors.text }}>
+                        {itunesMeta.price}
                       </Text>
                     </View>
-                  )}
-                </View>
+                  ) : null}
 
-                <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
-                  {hasReviews && (
-                    <Pressable
-                      onPress={handleAccessibilityConsensus}
-                      disabled={aiWorking === 'consensus'}
+                  {/* ── App Store rating ────────────────────────────── */}
+                  {itunesMeta.appStoreRating != null && itunesMeta.appStoreRatingCount > 0 ? (
+                    <View style={[styles.card, { marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 12 }]}
                       accessible
-                      accessibilityRole="button"
-                      accessibilityLabel={
-                        aiAvailable
-                          ? (aiWorking === 'consensus' ? 'Analysing reviews, please wait' : 'Accessibility Consensus')
-                          : 'Accessibility Consensus — enable Apple Intelligence in Settings to use this'
-                      }
-                      accessibilityHint={aiAvailable ? 'Summarises what all reviewers say about VoiceOver and accessibility' : 'Go to Settings → Apple Intelligence & Siri'}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 8,
-                        backgroundColor: aiAvailable ? colors.accent : colors.pill,
-                        borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, flex: 1 }}
-                    >
-                      {aiWorking === 'consensus'
-                        ? <ActivityIndicator size="small" color={aiAvailable ? colors.accentText : colors.pillText} accessibilityElementsHidden />
-                        : <Ionicons name="eye-outline" size={16} color={aiAvailable ? colors.accentText : colors.pillText} accessibilityElementsHidden />
-                      }
-                      <Text style={{ fontSize: 13, fontWeight: '700',
-                        color: aiAvailable ? colors.accentText : colors.pillText, flex: 1 }}>
-                        {aiWorking === 'consensus' ? 'Analysing…' : 'Accessibility\nConsensus'}
-                      </Text>
-                    </Pressable>
-                  )}
+                      accessibilityLabel={`App Store rating: ${itunesMeta.appStoreRating.toFixed(1)} out of 5 from ${itunesMeta.appStoreRatingCount.toLocaleString()} ratings. This is the general App Store rating, separate from the AppleVis accessibility rating.`}>
+                      <View style={{ alignItems: 'center', minWidth: 56 }}>
+                        <Text style={{ fontSize: 36, fontWeight: '800', color: colors.text, lineHeight: 40 }}>
+                          {itunesMeta.appStoreRating.toFixed(1)}
+                        </Text>
+                        <StarRow rating={itunesMeta.appStoreRating} size={13} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>App Store Rating</Text>
+                        <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2, lineHeight: 17 }}>
+                          {itunesMeta.appStoreRatingCount.toLocaleString()} ratings · General quality, separate from AppleVis accessibility score
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
 
-                  {hasReviews && (
-                    <Pressable
-                      onPress={handleSummariseReviews}
-                      disabled={aiWorking === 'summarise'}
+                  {/* ── Available on (devices) ──────────────────────── */}
+                  {itunesMeta.supportedDevices.length > 0 ? (
+                    <View style={[styles.card, { marginBottom: 10 }]}
                       accessible
-                      accessibilityRole="button"
-                      accessibilityLabel={
-                        aiAvailable
-                          ? (aiWorking === 'summarise' ? 'Summarising reviews, please wait' : 'Summarise reviews')
-                          : 'Summarise Reviews — enable Apple Intelligence in Settings to use this'
-                      }
-                      accessibilityHint={aiAvailable ? 'Creates a brief AI summary of all community reviews' : 'Go to Settings → Apple Intelligence & Siri'}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 8,
-                        backgroundColor: aiAvailable ? colors.pill : colors.pill,
-                        borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, flex: 1,
-                        borderWidth: aiAvailable ? 1 : 0, borderColor: colors.border }}
-                    >
-                      {aiWorking === 'summarise'
-                        ? <ActivityIndicator size="small" color={colors.pillText} accessibilityElementsHidden />
-                        : <Ionicons name="sparkles" size={16} color={colors.pillText} accessibilityElementsHidden />
-                      }
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.pillText, flex: 1 }}>
-                        {aiWorking === 'summarise' ? 'Summarising…' : 'Summarise\nReviews'}
+                      accessibilityLabel={`Available on: ${itunesMeta.supportedDevices.join(', ')}`}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+                        textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>
+                        Available On
                       </Text>
-                    </Pressable>
-                  )}
-                </View>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}
+                        accessibilityElementsHidden>
+                        {itunesMeta.supportedDevices.map((d) => (
+                          <View key={d} style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+                            backgroundColor: colors.pill, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 }}>
+                            <Ionicons
+                              name={
+                                d === 'iPad'        ? 'tablet-portrait-outline' :
+                                d === 'Mac'         ? 'laptop-outline' :
+                                d === 'Apple Watch' ? 'watch-outline' :
+                                d === 'Apple TV'    ? 'tv-outline' :
+                                'phone-portrait-outline'
+                              }
+                              size={18} color={colors.pillText} />
+                            <Text style={{ fontSize: 13, fontWeight: '600', color: colors.pillText }}>{d}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  ) : null}
 
-                {!aiAvailable && (
-                  <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 10, lineHeight: 17 }}
-                    accessibilityElementsHidden>
-                    Enable Apple Intelligence in Settings → Apple Intelligence & Siri
+                  {/* ── Screenshots (visual only, hidden from VoiceOver) */}
+                  {itunesMeta.screenshotUrls.length > 0 ? (
+                    <>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text,
+                        marginTop: 4, marginBottom: 8 }}
+                        accessibilityElementsHidden>
+                        Screenshots
+                      </Text>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ gap: 10, paddingBottom: 4 }}
+                        style={{ marginBottom: 10 }}
+                        accessibilityElementsHidden
+                        importantForAccessibility="no-hide-descendants"
+                      >
+                        {itunesMeta.screenshotUrls.map((url) => (
+                          <Image key={url} source={{ uri: url }}
+                            style={{ width: 160, height: 284, borderRadius: 12 }}
+                            accessibilityElementsHidden />
+                        ))}
+                      </ScrollView>
+                    </>
+                  ) : null}
+                </>
+              )}
+
+            {/* ── Accessibility notes ──────────────────────────────────── */}
+
+              {/* Accessibility Comments */}
+              {app.accessibilityComments ? (
+                <AccessibilityField
+                  heading="Accessibility Notes"
+                  text={app.accessibilityComments}
+                  colors={colors}
+                  styles={styles}
+                />
+              ) : null}
+
+              {/* Accessibility Ratings — animated gauges for known ratings,
+                  text fallback for free-form values.
+                  Single accessible node: VoiceOver/braille reads all three ratings
+                  plus their contextual descriptions in one focused element. */}
+              {(app.voiceOverPerformance || app.buttonLabelling || app.usabilityNotes) ? (
+                <>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 8 }}
+                    accessibilityRole="header">
+                    Accessibility Ratings
                   </Text>
-                )}
-              </View>
-            )}
+                  <View
+                    style={[styles.card, { marginBottom: 10 }]}
+                    accessible
+                    accessibilityLabel={[
+                      app.voiceOverPerformance
+                        ? `VoiceOver Performance: ${app.voiceOverPerformance}.${ratingDescription(app.voiceOverPerformance, 'voiceOver') ? ' ' + ratingDescription(app.voiceOverPerformance, 'voiceOver') : ''}`
+                        : null,
+                      app.buttonLabelling
+                        ? `Button Labeling: ${app.buttonLabelling}.${ratingDescription(app.buttonLabelling, 'buttonLabeling') ? ' ' + ratingDescription(app.buttonLabelling, 'buttonLabeling') : ''}`
+                        : null,
+                      app.usabilityNotes
+                        ? `Usability: ${app.usabilityNotes}.${ratingDescription(app.usabilityNotes, 'usability') ? ' ' + ratingDescription(app.usabilityNotes, 'usability') : ''}`
+                        : null,
+                    ].filter(Boolean).join(' ')}
+                  >
+                    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                      {app.voiceOverPerformance ? (
+                        getRatingKey(app.voiceOverPerformance)
+                          ? <RatingGauge
+                              label="VoiceOver Performance"
+                              ratingWord={app.voiceOverPerformance}
+                              ratingKey={getRatingKey(app.voiceOverPerformance)!}
+                              descriptionKey="voiceOver"
+                              colors={colors}
+                            />
+                          : <View style={{ marginBottom: 14 }}>
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+                                textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+                                VoiceOver Performance
+                              </Text>
+                              <Text style={{ fontSize: 15, lineHeight: 23, color: colors.text }}>
+                                {stripHtml(app.voiceOverPerformance)}
+                              </Text>
+                            </View>
+                      ) : null}
+                      {app.buttonLabelling ? (
+                        getRatingKey(app.buttonLabelling)
+                          ? <RatingGauge
+                              label="Button Labeling"
+                              ratingWord={app.buttonLabelling}
+                              ratingKey={getRatingKey(app.buttonLabelling)!}
+                              descriptionKey="buttonLabeling"
+                              colors={colors}
+                            />
+                          : <View style={{ marginBottom: 14 }}>
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+                                textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+                                Button Labeling
+                              </Text>
+                              <Text style={{ fontSize: 15, lineHeight: 23, color: colors.text }}>
+                                {stripHtml(app.buttonLabelling)}
+                              </Text>
+                            </View>
+                      ) : null}
+                      {app.usabilityNotes ? (
+                        getRatingKey(app.usabilityNotes)
+                          ? <RatingGauge
+                              label="Usability"
+                              ratingWord={app.usabilityNotes}
+                              ratingKey={getRatingKey(app.usabilityNotes)!}
+                              descriptionKey="usability"
+                              colors={colors}
+                            />
+                          : <View style={{ marginBottom: 14 }}>
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+                                textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+                                Usability
+                              </Text>
+                              <Text style={{ fontSize: 15, lineHeight: 23, color: colors.text }}>
+                                {stripHtml(app.usabilityNotes)}
+                              </Text>
+                            </View>
+                      ) : null}
+                    </View>
+                  </View>
+                </>
+              ) : null}
 
-            {/* ── Reported Accessibility Issues — coming soon ───────────── */}
-            <SectionDivider
-              label={app.reportedIssueCount != null
-                ? `${app.reportedIssueCount} Reported Issues`
-                : 'Reported Issues'}
-            />
-            <ComingSoonShell
-              icon="bug-outline"
-              message={
-                app.reportedIssueCount != null
-                  ? `${app.reportedIssueCount} reported accessibility issues — full issue tracker coming once the Drupal field name is confirmed`
-                  : 'Track reported VoiceOver and accessibility bugs — coming once the Drupal field name is confirmed with the developer'
-              }
-            />
+              {/* Other Comments */}
+              {app.otherComments ? (
+                <AccessibilityField
+                  heading="Other Comments"
+                  text={app.otherComments}
+                  colors={colors}
+                  styles={styles}
+                />
+              ) : null}
 
-            {/* ── Community Reviews ─────────────────────────────────────── */}
-            <View onLayout={(e) => { reviewsY.current = e.nativeEvent.layout.y; }}>
-              <SectionDivider
-                label={`${app.reviewCount} Community ${app.reviewCount === 1 ? 'Comment' : 'Comments'}`}
-              />
-
-              {/* Read reviews aloud */}
-              {!screenReaderEnabled && hasReviews && (
+              {/* Apple Intelligence — Summarise Accessibility Notes (only if available) */}
+              {aiAvailable && hasAccessNotes && (
                 <Pressable
-                  onPress={handleReadReviewsAloud}
+                  onPress={handleSummariseAccessibility}
+                  disabled={aiWorking === 'accessibility'}
                   accessible accessibilityRole="button"
-                  accessibilityLabel={`Read all ${app.reviews.length} reviews aloud`}
-                  accessibilityHint="Reads each review in sequence"
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8,
+                  accessibilityLabel={
+                    aiWorking === 'accessibility'
+                      ? 'Summarising accessibility notes, please wait'
+                      : 'Summarise Accessibility Notes with Apple Intelligence'
+                  }
+                  accessibilityHint="Generates a brief AI summary of the accessibility notes above"
+                  style={({ pressed }) => ({
+                    flexDirection: 'row', alignItems: 'center', gap: 8,
                     backgroundColor: colors.pill, borderRadius: 10,
-                    paddingHorizontal: 14, paddingVertical: 10, alignSelf: 'flex-start', marginBottom: 14 }}
-                >
-                  <Ionicons name="volume-medium-outline" size={16} color={colors.pillText} accessibilityElementsHidden />
+                    paddingHorizontal: 14, paddingVertical: 12,
+                    alignSelf: 'flex-start', marginBottom: 4,
+                    opacity: pressed || aiWorking === 'accessibility' ? 0.6 : 1,
+                  })}>
+                  {aiWorking === 'accessibility'
+                    ? <ActivityIndicator size="small" color={colors.pillText} accessibilityElementsHidden />
+                    : <Ionicons name="sparkles-outline" size={16} color={colors.pillText} accessibilityElementsHidden />
+                  }
                   <Text style={{ fontSize: 14, fontWeight: '600', color: colors.pillText }}>
-                    Read All Reviews
+                    {aiWorking === 'accessibility' ? 'Summarising…' : 'Summarise Accessibility Notes'}
                   </Text>
                 </Pressable>
               )}
 
-              {/* No reviews state */}
-              {!hasReviews && (
+            {/* ── Information ──────────────────────────────────────────── */}
+            {itunesMeta && (itunesMeta.minimumOsVersion || itunesMeta.ageRating || itunesMeta.fileSizeMb) ? (
+              <>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text,
+                  marginTop: 12, marginBottom: 8 }}
+                  accessibilityRole="header">
+                  Information
+                </Text>
+                <View style={[styles.card, { marginBottom: 10 }]}
+                  accessible
+                  accessibilityLabel={[
+                    itunesMeta.minimumOsVersion ? `Requires iOS ${itunesMeta.minimumOsVersion} or later` : null,
+                    itunesMeta.ageRating        ? `Rated ${itunesMeta.ageRating}`                        : null,
+                    itunesMeta.fileSizeMb       ? `File size: ${itunesMeta.fileSizeMb}`                  : null,
+                  ].filter((v): v is string => !!v).join('. ')}>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 14, columnGap: 0 }}>
+                    {itunesMeta.minimumOsVersion ? (
+                      <View style={{ width: '33.33%', paddingRight: 8 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary,
+                          textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 3 }}>Requires</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>
+                          iOS {itunesMeta.minimumOsVersion}+
+                        </Text>
+                      </View>
+                    ) : null}
+                    {itunesMeta.ageRating ? (
+                      <View style={{ width: '33.33%', paddingRight: 8 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary,
+                          textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 3 }}>Rated</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>
+                          {itunesMeta.ageRating}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {itunesMeta.fileSizeMb ? (
+                      <View style={{ width: '33.33%', paddingRight: 8 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary,
+                          textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 3 }}>Size</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>
+                          {itunesMeta.fileSizeMb}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              </>
+            ) : null}
+
+            {/* ── Languages ────────────────────────────────────────────── */}
+            {itunesMeta && langs.length > 0 ? (
+              <View style={[styles.card, { marginBottom: 10 }]}
+                accessible
+                accessibilityLabel={`Supported languages: ${langs.join(', ')}`}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+                  textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>
+                  Languages
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}
+                  accessibilityElementsHidden>
+                  {langs.map((lang) => (
+                    <View key={lang} style={{ backgroundColor: colors.pill, borderRadius: 8,
+                      paddingHorizontal: 10, paddingVertical: 4 }}>
+                      <Text style={{ fontSize: 13, color: colors.pillText, fontWeight: '500' }}>{lang}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+
+            {/* ── View in App Store ─────────────────────────────────────── */}
+            {itunesMeta ? (
+              <Pressable
+                onPress={handleOpenAppStore}
+                accessible accessibilityRole="link"
+                accessibilityLabel={`Open ${displayName} in the App Store`}
+                accessibilityHint="Opens in the App Store app"
+                style={({ pressed }) => [styles.card, {
+                  flexDirection: 'row', alignItems: 'center', gap: 10,
+                  marginBottom: 10, opacity: pressed ? 0.75 : 1,
+                }]}>
+                <Ionicons name="logo-apple" size={20} color={colors.accent} accessibilityElementsHidden />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.accent }}>View in App Store</Text>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 1 }} numberOfLines={1}>
+                    {itunesMeta.appStoreUrl.replace(/^https?:\/\//, '')}
+                  </Text>
+                </View>
+                <Ionicons name="open-outline" size={16} color={colors.textSecondary} accessibilityElementsHidden />
+              </Pressable>
+            ) : null}
+
+            {/* ── Developer website ─────────────────────────────────────── */}
+            {itunesMeta?.developerWebsite ? (
+              <Pressable
+                onPress={() => Linking.openURL(itunesMeta!.developerWebsite!).catch(() => {})}
+                accessible accessibilityRole="link"
+                accessibilityLabel={`${displayDeveloper} developer website`}
+                accessibilityHint="Opens the developer's website in Safari"
+                style={({ pressed }) => [styles.card, {
+                  flexDirection: 'row', alignItems: 'center', gap: 10,
+                  marginBottom: 10, opacity: pressed ? 0.75 : 1,
+                }]}>
+                <Ionicons name="globe-outline" size={20} color={colors.accent} accessibilityElementsHidden />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.accent }}>Developer Website</Text>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 1 }} numberOfLines={1}>
+                    {itunesMeta.developerWebsite.replace(/^https?:\/\//, '')}
+                  </Text>
+                </View>
+                <Ionicons name="open-outline" size={16} color={colors.textSecondary} accessibilityElementsHidden />
+              </Pressable>
+            ) : null}
+
+            {/* ── More from this developer ─────────────────────────────── */}
+            {developerApps.length > 0 && (() => {
+              const devName = itunesMeta?.developerName || app.developer || 'this developer';
+              return (
+                <>
+                  <SectionDivider label={`More from ${devName}`} />
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ gap: 14, paddingBottom: 4, paddingHorizontal: 2 }}
+                    style={{ marginBottom: 12 }}
+                    accessibilityLabel={`${developerApps.length} more apps by ${devName}`}
+                  >
+                    {developerApps.map((devApp) => (
+                      <Pressable
+                        key={devApp.id}
+                        onPress={() => Linking.openURL(devApp.appStoreUrl).catch(() => {})}
+                        accessible accessibilityRole="link"
+                        accessibilityLabel={[
+                          devApp.name, devApp.category, devApp.price, 'Opens in App Store',
+                        ].filter(Boolean).join('. ')}
+                        style={({ pressed }) => ({ width: 100, alignItems: 'center', opacity: pressed ? 0.7 : 1 })}>
+                        {devApp.iconUrl ? (
+                          <Image source={{ uri: devApp.iconUrl }}
+                            style={{ width: 64, height: 64, borderRadius: 14 }}
+                            accessibilityElementsHidden
+                            accessibilityIgnoresInvertColors />
+                        ) : (
+                          <View style={{ width: 64, height: 64, borderRadius: 14,
+                            backgroundColor: colors.pill, alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="apps-outline" size={28} color={colors.textSecondary} />
+                          </View>
+                        )}
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text,
+                          textAlign: 'center', marginTop: 7, lineHeight: 16 }}
+                          numberOfLines={2} accessibilityElementsHidden>
+                          {devApp.name}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: colors.accent,
+                          textAlign: 'center', marginTop: 3, fontWeight: '500' }}
+                          numberOfLines={1} accessibilityElementsHidden>
+                          {devApp.price}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </>
+              );
+            })()}
+
+            {/* ── 10. Community Discussion ──────────────────────────────── */}
+            <View
+              ref={commentsRef}
+              onLayout={(e) => { commentsY.current = e.nativeEvent.layout.y; }}
+            >
+              <SectionDivider
+                label={
+                  `Community Discussion - ${app.reviewCount} ${app.reviewCount === 1 ? 'comment' : 'comments'}` +
+                  (newReviewCount > 0 ? ` - ${newReviewCount} new` : '')
+                }
+              />
+
+              {/* Jump to first new comment */}
+              {firstNewReview && (
+                <Pressable
+                  onPress={() => handleJumpToNewComment(firstNewReview.id)}
+                  accessible
+                  accessibilityRole="button"
+                  accessibilityLabel={`Jump to first new comment. ${newReviewCount} new since your last visit.`}
+                  style={[styles.card, {
+                    flexDirection: 'row', alignItems: 'center', gap: 10,
+                    marginBottom: 12, paddingVertical: 12,
+                  }]}
+                >
+                  <Ionicons name="flag-outline" size={18} color={colors.accent} accessibilityElementsHidden />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: colors.accent }}>
+                      Jump to First New Comment
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                      {newReviewCount} new since your last visit
+                    </Text>
+                  </View>
+                  <Ionicons name="arrow-down-outline" size={16} color={colors.accent} accessibilityElementsHidden />
+                </Pressable>
+              )}
+
+              {/* Read all aloud — sighted users only */}
+              {!screenReaderEnabled && hasComments && (
+                <Pressable
+                  onPress={() => {
+                    const parts = app.reviews.map((r, i) => {
+                      const rating = r.rating ? `${r.rating} stars.` : '';
+                      return `Comment ${i + 1} by ${r.authorName}. ${rating} ${stripHtml(r.body)}`;
+                    });
+                    readAloud(parts.join(' '));
+                  }}
+                  accessible accessibilityRole="button"
+                  accessibilityLabel={`Read all ${app.reviews.length} comments aloud`}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8,
+                    backgroundColor: colors.pill, borderRadius: 10,
+                    paddingHorizontal: 14, paddingVertical: 10, alignSelf: 'flex-start', marginBottom: 14 }}>
+                  <Ionicons name="volume-medium-outline" size={16} color={colors.pillText} accessibilityElementsHidden />
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: colors.pillText }}>Read All Comments</Text>
+                </Pressable>
+              )}
+
+              {/* No comments state */}
+              {!hasComments && (
                 <View style={[styles.card, { alignItems: 'center', paddingVertical: 28, marginBottom: 12 }]}>
                   <Ionicons name="chatbubble-outline" size={32} color={colors.textSecondary}
                     accessibilityElementsHidden style={{ marginBottom: 10 }} />
                   <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 6 }}>
-                    No reviews yet
+                    No comments yet
                   </Text>
                   <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center' }}>
                     Be the first to share your accessibility experience.
@@ -968,49 +1603,108 @@ export default function AppDetailScreen() {
                 </View>
               )}
 
-              {/* Review cards */}
-              {app.reviews.map((review, i) => (
-                <ReviewCard
-                  key={review.id}
-                  review={review}
-                  index={i}
-                  total={app.reviews.length}
-                  colors={colors}
-                  styles={styles}
-                  screenReaderEnabled={screenReaderEnabled}
-                  showToast={showToast}
-                />
-              ))}
+              {/* Comment cards */}
+              {app.reviews.map((review, i) => {
+                const isNewReview      = lastSeenAt != null && review.createdAt > lastSeenAt;
+                const isFirstNew       = isNewReview && review.id === firstNewReview?.id;
+                const isFirstAfterLoad = preLoadCount.current > 0 && i === preLoadCount.current;
+                return (
+                  <View
+                    key={review.id}
+                    ref={
+                      isFirstNew       ? (v) => { firstNewReviewRef.current    = v; } :
+                      isFirstAfterLoad ? (v) => { firstNewAfterLoadRef.current = v; } :
+                      undefined
+                    }
+                    onLayout={(e) => { commentOffsets.current[review.id] = e.nativeEvent.layout.y; }}
+                  >
+                    <CommentCard
+                      review={review}
+                      index={i}
+                      total={app.reviews.length}
+                      colors={colors}
+                      styles={styles}
+                      screenReaderEnabled={screenReaderEnabled}
+                      showToast={showToast}
+                      isNew={isNewReview}
+                      onReplyTo={() => {
+                        if (!auth.isSignedIn) { showAlert({ ...ALERTS.auth.signInRequired('reply to reviews'), onConfirm: () => router.push('/settings-account' as any) }); return; }
+                        setReplyingTo(review);
+                        setTimeout(() => setShowReview(true), 350);
+                      }}
+                    />
+                  </View>
+                );
+              })}
 
-              {/* Load more — coming soon when reviewCount > loaded */}
-              {hasReviews && app.reviews.length < app.reviewCount && (
-                <ComingSoonShell
-                  icon="ellipsis-horizontal-outline"
-                  message={`Load more reviews — ${app.reviewCount - app.reviews.length} more pending pagination support`}
-                />
+              {/* Load more */}
+              {hasComments && app.reviews.length < app.reviewCount && (
+                <Pressable
+                  onPress={handleLoadMoreComments}
+                  disabled={loadingMoreReviews}
+                  accessible accessibilityRole="button"
+                  accessibilityLabel={
+                    loadingMoreReviews
+                      ? 'Loading more comments'
+                      : `Load ${app.reviewCount - app.reviews.length} more comment${app.reviewCount - app.reviews.length === 1 ? '' : 's'}`
+                  }
+                  accessibilityState={{ disabled: loadingMoreReviews }}
+                  style={[styles.card, {
+                    alignItems: 'center', paddingVertical: 14, marginBottom: 8,
+                    flexDirection: 'row', justifyContent: 'center', gap: 8,
+                  }]}>
+                  {loadingMoreReviews
+                    ? <ActivityIndicator size="small" color={colors.accent} />
+                    : <>
+                        <Ionicons name="ellipsis-horizontal-outline" size={18} color={colors.accent}
+                          accessibilityElementsHidden />
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: colors.accent }}>
+                          Load {app.reviewCount - app.reviews.length} More Comment{app.reviewCount - app.reviews.length === 1 ? '' : 's'}
+                        </Text>
+                      </>
+                  }
+                </Pressable>
+              )}
+
+              {/* Apple Intelligence - Summarise Community Discussion (only if available) */}
+              {aiAvailable && hasComments && (
+                <Pressable
+                  onPress={handleSummariseCommunity}
+                  disabled={aiWorking === 'community'}
+                  accessible accessibilityRole="button"
+                  accessibilityLabel={
+                    aiWorking === 'community'
+                      ? 'Summarising community comments, please wait'
+                      : 'Summarise Community Discussion with Apple Intelligence'
+                  }
+                  accessibilityHint="Generates a brief AI summary of what the community says about accessibility"
+                  style={({ pressed }) => ({
+                    flexDirection: 'row', alignItems: 'center', gap: 8,
+                    backgroundColor: colors.pill, borderRadius: 10,
+                    paddingHorizontal: 14, paddingVertical: 12,
+                    alignSelf: 'flex-start', marginTop: 4, marginBottom: 4,
+                    opacity: pressed || aiWorking === 'community' ? 0.6 : 1,
+                  })}>
+                  {aiWorking === 'community'
+                    ? <ActivityIndicator size="small" color={colors.pillText} accessibilityElementsHidden />
+                    : <Ionicons name="sparkles-outline" size={16} color={colors.pillText} accessibilityElementsHidden />
+                  }
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: colors.pillText }}>
+                    {aiWorking === 'community' ? 'Summarising...' : 'Summarise Community Discussion'}
+                  </Text>
+                </Pressable>
               )}
             </View>
 
-            {/* ── Related Apps — coming soon ───────────────────────────── */}
-            <SectionDivider label="Related Apps" />
-            <ComingSoonShell
-              icon="apps-outline"
-              message={
-                app.developer
-                  ? `More apps by ${app.developer} and in the ${app.category || 'same'} category — coming once the Drupal category API is confirmed`
-                  : 'Related apps in the same category — coming once the Drupal category API is confirmed'
-              }
-            />
+            </Animated.View>{/* end contentAnim */}
 
-            {/* Back to top */}
-            <Pressable
-              onPress={handleBackToTop}
+            {/* ── 11. Back to top ──────────────────────────────────────── */}
+            <Pressable onPress={handleBackToTop}
               accessible accessibilityRole="button"
               accessibilityLabel="Back to top"
               accessibilityHint="Scrolls back to the app header"
               style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                gap: 6, paddingVertical: 16 }}
-            >
+                gap: 6, paddingVertical: 16 }}>
               <Ionicons name="arrow-up-outline" size={16} color={colors.textSecondary} accessibilityElementsHidden />
               <Text style={{ fontSize: 14, color: colors.textSecondary, fontWeight: '500' }}>Back to Top</Text>
             </Pressable>
@@ -1019,7 +1713,7 @@ export default function AppDetailScreen() {
         )}
       </ScrollView>
 
-      {/* ── Fixed bottom toolbar ──────────────────────────────────────────── */}
+      {/* ── Fixed bottom toolbar ─────────────────────────────────────────── */}
       {app && (
         <View
           style={{
@@ -1036,47 +1730,77 @@ export default function AppDetailScreen() {
         >
           <ToolbarButton
             icon="logo-apple"
-            label={'Get in\nApp Store'}
+            label={displayPrice
+              ? `Get — ${displayPrice}`
+              : itunesNotFound ? 'Unavailable' : 'Get in\nApp Store'}
+            a11yLabel={
+              itunesNotFound
+                ? 'Unavailable on App Store'
+                : displayPrice && displayPrice !== 'Free'
+                  ? `Get app for ${displayPrice} from App Store`
+                  : 'Get app from App Store'
+            }
             onPress={handleOpenAppStore}
-            disabled={!app.appStoreUrl}
+            disabled={itunesNotFound || !app.appStoreUrl}
           />
           <ToolbarButton
             icon="bookmark-outline"
             activeIcon="bookmark"
             label={isSaved ? 'Saved' : 'Save this\nApp Entry'}
+            a11yLabel={isSaved ? 'Saved' : 'Save this App Entry'}
             active={isSaved}
             onPress={handleSave}
           />
           <ToolbarButton
             icon="share-outline"
-            label={'Share this\nApp Entry'}
+            label="Share this\nApp Entry"
+            a11yLabel="Share this App Entry"
             onPress={handleShare}
           />
           <ToolbarButton
             icon="safari-outline"
-            label={'Open in\nSafari'}
+            label="Open in\nSafari"
+            a11yLabel="Open in Safari"
             onPress={handleOpenInBrowser}
           />
           <ToolbarButton
             icon="pencil-outline"
-            label={'Add New\nComment'}
+            label="Add New\nComment"
+            a11yLabel="Add new comment"
             onPress={handleWriteReview}
             accent
           />
         </View>
       )}
 
-      {/* Write Review Modal — outside scroll, rendered modally */}
+      {/* Write Review Modal */}
       {app && (
         <WriteReviewModal
           visible={showReview}
           appId={id ?? ''}
           appName={app.name}
-          onClose={() => setShowReview(false)}
+          replyToAuthor={replyingTo?.authorName}
+          replyToText={replyingTo ? stripHtml(replyingTo.body) : undefined}
+          onClose={() => { setShowReview(false); setReplyingTo(null); }}
           onSubmitted={() => {
             setShowReview(false);
-            showToast('Review submitted! It will appear after moderation.', 'success');
+            setReplyingTo(null);
+            showToast('Comment submitted! It will appear after moderation.', 'success');
+            if (id) contentCache.clear(`apps:detail:${id}`);
+            loadApp();
           }}
+        />
+      )}
+
+      {/* Author Profile Modal */}
+      {app && (
+        <AuthorProfileModal
+          visible={authorProfile}
+          onClose={() => setAuthorProfile(false)}
+          authorId={app.submitterUid ?? ''}
+          authorName={app.submittedBy ?? ''}
+          isSignedIn={auth.isSignedIn}
+          showToast={showToast}
         />
       )}
       </View>

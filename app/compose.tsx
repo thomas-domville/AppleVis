@@ -9,6 +9,8 @@ import { TranslationBanner } from '../src/components/TranslationBanner';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useToast } from '../src/contexts/ToastContext';
+import { useAlert } from '../src/contexts/AccessibleAlertContext';
+import { ALERTS } from '../src/data/alertMessages';
 import { useGuidelinesCheck } from '../src/hooks/useGuidelinesCheck';
 import { useLanguageDetection } from '../src/hooks/useLanguageDetection';
 import { translateContent } from '../src/services/intelligenceService';
@@ -19,17 +21,37 @@ const MIN_SUBJECT_LENGTH = 3;
 const MAX_BODY_LENGTH = 10_000;
 
 export default function Compose() {
-  const { topicId, topicTitle, mode } = useLocalSearchParams<{
-    topicId: string; topicTitle: string; mode?: string;
-  }>();
-  const isNewTopic = mode === 'newTopic';
+  const { topicId, topicTitle, episodeId, episodeTitle, mode, replyToAuthor, replyToQuote } =
+    useLocalSearchParams<{
+      topicId: string; topicTitle: string;
+      episodeId?: string; episodeTitle?: string;
+      mode?: string;
+      replyToAuthor?: string; replyToQuote?: string;
+    }>();
+  const isNewTopic        = mode === 'newTopic';
+  const isEpisodeComment  = !isNewTopic && !!episodeId;
+  const isResourceComment = mode === 'resourceComment';
+  const isBlogComment     = mode === 'blogComment';
+  const isReplyToComment  = !isNewTopic && !isEpisodeComment && !isResourceComment && !isBlogComment && !!replyToAuthor;
   const router        = useRouter();
   const { colors }    = useTheme();
   const auth          = useAuth();
   const { showToast } = useToast();
+  const { showAlert } = useAlert();
 
-  const [subject,         setSubject]         = useState('');
-  const [body,            setBody]            = useState('');
+  const [subject, setSubject] = useState(() => {
+    if (replyToAuthor && topicTitle) {
+      const t = topicTitle.length > 40 ? topicTitle.slice(0, 40) + '…' : topicTitle;
+      return `@${replyToAuthor} re: ${t}`;
+    }
+    return '';
+  });
+  const [body, setBody] = useState(() => {
+    if (replyToAuthor && replyToQuote) {
+      return `Replying to ${replyToAuthor}:\n"${replyToQuote.trim()}"\n\n`;
+    }
+    return '';
+  });
   const [submitting,      setSubmitting]      = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const subjectRef = useRef<TextInput>(null);
@@ -68,29 +90,39 @@ export default function Compose() {
         showToast('Topic posted! It will appear after moderation.', 'success');
         router.back();
       } else {
-        showToast(
-          res.error.includes('403') || res.error.includes('401')
-            ? 'Your session expired. Please sign in again.'
-            : `Could not post topic: ${res.error}`,
-          'error',
-        );
+        (res.error.includes('403') || res.error.includes('401'))
+          ? showAlert(ALERTS.auth.sessionExpired())
+          : showAlert(ALERTS.compose.postFailed(res.error));
       }
-    } else {
-      const res = await api.forums.submitReply(topicId, body.trim(), token);
+    } else if (isEpisodeComment) {
+      const res = await api.podcasts.submitComment(episodeId!, body.trim(), token);
       setSubmitting(false);
-      if (res.ok) {
-        showToast('Comment posted successfully.', 'success');
-        router.back();
-      } else {
-        showToast(
-          res.error.includes('403') || res.error.includes('401')
-            ? 'Your session expired. Please sign in again.'
-            : `Could not post comment: ${res.error}`,
-          'error',
-        );
-      }
+      if (res.ok) { showToast('Comment posted successfully.', 'success'); router.back(); }
+      else if (res.error.includes('403') || res.error.includes('401')) { showAlert(ALERTS.auth.sessionExpired()); }
+      else { showAlert(ALERTS.compose.commentFailed(res.error)); }
+    } else if (isResourceComment) {
+      const res = await api.resources.submitComment(topicId, body.trim(), token);
+      setSubmitting(false);
+      if (res.ok) { showToast('Comment posted successfully.', 'success'); router.back(); }
+      else if (res.error.includes('403') || res.error.includes('401')) { showAlert(ALERTS.auth.sessionExpired()); }
+      else { showAlert(ALERTS.compose.commentFailed(res.error)); }
+    } else if (isBlogComment) {
+      const res = await api.blogs.submitComment(topicId, body.trim(), token);
+      setSubmitting(false);
+      if (res.ok) { showToast('Comment posted successfully.', 'success'); router.back(); }
+      else if (res.error.includes('403') || res.error.includes('401')) { showAlert(ALERTS.auth.sessionExpired()); }
+      else { showAlert(ALERTS.compose.commentFailed(res.error)); }
+    } else {
+      const res = await api.forums.submitReply(
+        topicId, body.trim(), token,
+        isReplyToComment ? (subject.trim() || 'Reply') : undefined,
+      );
+      setSubmitting(false);
+      if (res.ok) { showToast('Comment posted successfully.', 'success'); router.back(); }
+      else if (res.error.includes('403') || res.error.includes('401')) { showAlert(ALERTS.auth.sessionExpired()); }
+      else { showAlert(ALERTS.compose.commentFailed(res.error)); }
     }
-  }, [canSubmit, auth.user, topicId, subject, body, isNewTopic, router, showToast]);
+  }, [canSubmit, auth.user, topicId, episodeId, subject, body, isNewTopic, isEpisodeComment, isResourceComment, isBlogComment, isReplyToComment, router, showToast]);
 
   const inputStyle = {
     borderWidth: 1.5,
@@ -106,7 +138,17 @@ export default function Compose() {
   };
 
   return (
-    <Screen title={isNewTopic ? 'New Topic' : 'Add New Comment'} showSettings={false} showSearch={false}>
+    <Screen
+        title={
+          isNewTopic        ? 'New Topic'         :
+          isReplyToComment  ? 'Reply to Comment'  :
+          isResourceComment ? 'Add Guide Comment' :
+          isBlogComment     ? 'Add Blog Comment'  :
+          'Add New Comment'
+        }
+        showSettings={false}
+        showSearch={false}
+      >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -133,6 +175,75 @@ export default function Compose() {
                 AppleVis Forums
               </Text>
             </View>
+          ) : isReplyToComment ? (
+            <View
+              style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14,
+                borderWidth: 1, borderColor: colors.border, marginBottom: 16 }}
+              accessible
+              accessibilityLabel={`Replying to ${replyToAuthor}${replyToQuote ? `: ${replyToQuote}` : ''}`}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+                textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}
+                accessibilityElementsHidden>
+                Replying to
+              </Text>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: replyToQuote ? 6 : 0 }}>
+                {replyToAuthor}
+              </Text>
+              {!!replyToQuote && (
+                <Text
+                  style={{ fontSize: 13, color: colors.textSecondary, fontStyle: 'italic', lineHeight: 18 }}
+                  numberOfLines={2}
+                  accessibilityElementsHidden
+                >
+                  {`"${replyToQuote}"`}
+                </Text>
+              )}
+            </View>
+          ) : isEpisodeComment ? (
+            <View
+              style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14,
+                borderWidth: 1, borderColor: colors.border, marginBottom: 16 }}
+              accessible
+              accessibilityLabel={`Adding new comment to episode: ${episodeTitle}`}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+                textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}
+                accessibilityElementsHidden>
+                Adding comment to
+              </Text>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>
+                {episodeTitle}
+              </Text>
+            </View>
+          ) : isResourceComment ? (
+            <View
+              style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14,
+                borderWidth: 1, borderColor: colors.border, marginBottom: 16 }}
+              accessible
+              accessibilityLabel={`Adding comment to guide: ${topicTitle}`}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+                textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}
+                accessibilityElementsHidden>
+                Commenting on guide
+              </Text>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{topicTitle}</Text>
+            </View>
+          ) : isBlogComment ? (
+            <View
+              style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14,
+                borderWidth: 1, borderColor: colors.border, marginBottom: 16 }}
+              accessible
+              accessibilityLabel={`Adding comment to blog post: ${topicTitle}`}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+                textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}
+                accessibilityElementsHidden>
+                Commenting on blog post
+              </Text>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{topicTitle}</Text>
+            </View>
           ) : (
             <View
               style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14,
@@ -151,24 +262,24 @@ export default function Compose() {
             </View>
           )}
 
-          {/* Subject field — new topic only */}
-          {isNewTopic && (
+          {/* Subject field — new topic and direct replies */}
+          {(isNewTopic || isReplyToComment) && (
             <View style={{ marginBottom: 12 }}>
               <TextInput
                 ref={subjectRef}
                 value={subject}
                 onChangeText={setSubject}
-                placeholder="Topic subject…"
+                placeholder={isNewTopic ? 'Topic subject…' : 'Subject…'}
                 placeholderTextColor={colors.textSecondary}
                 maxLength={200}
                 accessible
-                accessibilityLabel="Topic subject"
-                accessibilityHint={`Minimum ${MIN_SUBJECT_LENGTH} characters`}
+                accessibilityLabel={isNewTopic ? 'Topic subject' : 'Subject'}
+                accessibilityHint={isNewTopic ? `Minimum ${MIN_SUBJECT_LENGTH} characters` : 'You can edit the pre-filled subject'}
                 style={[inputStyle, { minHeight: 0, height: 52, lineHeight: 24 }]}
                 returnKeyType="next"
                 onSubmitEditing={() => bodyRef.current?.focus()}
               />
-              {subject.length > 0 && subject.trim().length < MIN_SUBJECT_LENGTH && (
+              {isNewTopic && subject.length > 0 && subject.trim().length < MIN_SUBJECT_LENGTH && (
                 <Text style={{ fontSize: 13, color: '#D97706', marginTop: 6 }}>
                   Subject must be at least {MIN_SUBJECT_LENGTH} characters.
                 </Text>
@@ -270,8 +381,8 @@ export default function Compose() {
               borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
               <Text style={{ fontSize: 12, color: colors.textSecondary }}>
                 {isNewTopic
-                  ? 'DEV NOTE: submitNewTopic posts to /jsonapi/node/forum.\nConfirm node type name and body field with Drupal developer.'
-                  : `DEV NOTE: submitReply posts to /jsonapi/comment/comment.\nConfirm comment type and relationship fields with Drupal developer.\nTopic ID: ${topicId}`
+                  ? `DEV NOTE: submitNewTopic → POST /jsonapi/node/forum (type: node--forum). Topic ID: ${topicId ?? 'N/A'}`
+                  : `DEV NOTE: submitReply → POST /jsonapi/comment/comment_forum (type: comment--comment_forum). Topic ID: ${topicId}`
                 }
               </Text>
             </View>

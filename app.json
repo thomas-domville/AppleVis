@@ -2,7 +2,7 @@
   "expo": {
     "name": "AppleVis",
     "slug": "applevis",
-    "version": "2026.0.1.1",
+    "version": "2026.0.2",
     "orientation": "default",
     "icon": "./assets/icons/app-icon.png",
     "scheme": "applevis",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.applevis.app",
-      "buildNumber": "1",
+      "buildNumber": "6",
       "minimumOsVersion": "16.0",
       "usesNonExemptEncryption": false,
       "associatedDomains": [
@@ -46,7 +46,15 @@
     "plugins": [
       "expo-router",
       "expo-av",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/Mouse Squeak.wav",
+            "./assets/sounds/Apple Crunch.wav"
+          ]
+        }
+      ],
       "./plugins/withPrivacyManifest",
       [
         "expo-build-properties",
@@ -78,6 +86,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "YOUR-EAS-PROJECT-UUID"
+      }
     }
   }
 }

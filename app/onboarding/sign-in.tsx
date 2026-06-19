@@ -1,20 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, findNodeHandle, Linking, Pressable, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, findNodeHandle, Linking, Pressable, Text, TextInput, useColorScheme, View } from 'react-native';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
+import { useAlert } from '../../src/contexts/AccessibleAlertContext';
+import { ALERTS } from '../../src/data/alertMessages';
 import { WizardLayout } from '../../src/components/WizardLayout';
 
 const REGISTER_URL = 'https://www.applevis.com/user/register';
 
 export default function SignInStep() {
   const { colors }       = useTheme();
+  const colorScheme      = useColorScheme();
   const auth             = useAuth();
   const { showToast }    = useToast();
+  const { showAlert }    = useAlert();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [busy,     setBusy]     = useState(false);
+  const [signInError, setSignInError] = useState<string | null>(null);
   const usernameRef = useRef<TextInput>(null);
 
   // If already signed in (session restored), auto-advance.
@@ -34,19 +40,37 @@ export default function SignInStep() {
   }, []);
 
   const handleSignIn = useCallback(async () => {
-    if (!username.trim()) { showToast('Please enter your username or email address.', 'error'); return; }
-    if (!password)        { showToast('Please enter your password.', 'error'); return; }
+    if (!username.trim()) {
+      const msg = 'Please enter your AppleVis username or email address.';
+      setSignInError(msg);
+      showToast(msg, 'error');
+      AccessibilityInfo.announceForAccessibility(msg);
+      return;
+    }
+    if (!password) {
+      const msg = 'Please enter your AppleVis password.';
+      setSignInError(msg);
+      showToast(msg, 'error');
+      AccessibilityInfo.announceForAccessibility(msg);
+      return;
+    }
+    setSignInError(null);
     setBusy(true);
     try {
       const result = await auth.signIn(username.trim(), password);
       if (result.ok) {
-        showToast(`Welcome, ${auth.user?.name ?? 'back'}!`, 'success');
+        const msg = `Signed in successfully as ${result.user.name}.`;
+        showToast(msg, 'success');
+        AccessibilityInfo.announceForAccessibility(msg);
         router.push('/onboarding/theme');
       } else {
-        showToast(result.error ?? 'Sign in failed. Please try again.', 'error');
+        setSignInError(result.error);
+        showAlert(ALERTS.auth.signInFailed(result.error));
       }
-    } catch {
-      showToast('Something went wrong. Please check your connection and try again.', 'error');
+    } catch (err) {
+      const msg = 'Something went wrong in the app. Please try again.';
+      setSignInError(msg);
+      showAlert(ALERTS.auth.signInFailed(msg));
     } finally {
       setBusy(false);
     }
@@ -79,10 +103,12 @@ export default function SignInStep() {
           'Receive push notifications for new episodes, new app entries, and mentions',
           'Sync your saved items across devices via iCloud',
         ].map((item) => (
-          <Text key={item} accessible accessibilityLabel={item}
-            style={{ fontSize: 15, color: colors.textSecondary, marginBottom: 5, lineHeight: 22 }}>
-            {'• '}{item}
-          </Text>
+          <View key={item} style={{ flexDirection: 'row', gap: 10, marginBottom: 7, alignItems: 'flex-start' }}
+            accessible accessibilityLabel={item}>
+            <Ionicons name="checkmark" size={16} color={colors.accent}
+              style={{ marginTop: 3 }} accessibilityElementsHidden />
+            <Text style={{ flex: 1, fontSize: 15, color: colors.textSecondary, lineHeight: 22 }}>{item}</Text>
+          </View>
         ))}
 
         {/* Sign up link */}
@@ -112,15 +138,17 @@ export default function SignInStep() {
         <TextInput
           ref={usernameRef}
           value={username}
-          onChangeText={setUsername}
+          onChangeText={(t) => { setSignInError(null); setUsername(t); }}
+          placeholder="Enter your username or email address"
+          placeholderTextColor={colors.textSecondary}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="default"
           textContentType="username"
           returnKeyType="next"
           accessible
-          accessibilityLabel="Username or email"
-          accessibilityHint="Enter your AppleVis username or email address"
+          accessibilityLabel="Username or email address"
+          accessibilityHint="Enter your AppleVis username or email address. Both are accepted."
           style={inputStyle}
         />
       </View>
@@ -132,8 +160,10 @@ export default function SignInStep() {
         </Text>
         <TextInput
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(t) => { setSignInError(null); setPassword(t); }}
           secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
           textContentType="password"
           returnKeyType="go"
           onSubmitEditing={handleSignIn}
@@ -143,9 +173,39 @@ export default function SignInStep() {
         />
       </View>
 
+      {/* Inline error — stays visible even when keyboard is up */}
+      {signInError && (
+        <View
+          style={{
+            backgroundColor: colorScheme === 'dark' ? 'rgba(185,28,28,0.15)' : '#FEE2E2',
+            borderRadius: 10, padding: 14,
+            borderWidth: 1,
+            borderColor: colorScheme === 'dark' ? 'rgba(185,28,28,0.40)' : '#FCA5A5',
+            marginBottom: 14,
+            flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+          }}
+          accessible
+          accessibilityRole="alert"
+          accessibilityLabel={signInError}
+        >
+          <Ionicons name="warning" size={18}
+            color={colorScheme === 'dark' ? '#FCA5A5' : '#B91C1C'}
+            accessibilityElementsHidden />
+          <Text style={{ flex: 1, fontSize: 15,
+            color: colorScheme === 'dark' ? '#FCA5A5' : '#B91C1C', lineHeight: 21 }}
+            accessibilityElementsHidden>
+            {signInError}
+          </Text>
+        </View>
+      )}
+
       {busy && (
         <View style={{ alignItems: 'center', marginBottom: 16 }} accessible accessibilityLabel="Signing in, please wait">
           <ActivityIndicator color={colors.accent} />
+          <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 6 }}
+            accessibilityElementsHidden>
+            Contacting server…
+          </Text>
         </View>
       )}
 

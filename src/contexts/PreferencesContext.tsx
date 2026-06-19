@@ -22,23 +22,25 @@ export type NotificationPrefs = {
   announcements:  boolean;
 };
 
-export type NotificationSound = 'mouseSqueak' | 'appleCrunch' | 'none';
+export type NotificationSound = 'mouseSqueak' | 'appleCrunch' | 'goldenRetrieverBark' | 'none';
 
 const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
-  forumReplies:   true,
-  mentions:       true,
-  newTopics:      true,
-  followedTopics: true,
-  newEpisodes:    true,
-  appUpdates:     true,
-  newResources:   true,
-  announcements:  true,
+  forumReplies:   false,
+  mentions:       false,
+  newTopics:      false,
+  followedTopics: false,
+  newEpisodes:    false,
+  appUpdates:     false,
+  newResources:   false,
+  announcements:  false,
 };
 
 const KEYS = {
   announcementLevel:          '@applevis_announcement_level',
   defaultForumFilter:         '@applevis_default_forum_filter',
   cardDensity:                '@applevis_card_density',
+  helpfulTipsEnabled:         '@applevis_helpful_tips_enabled',
+  welcomeSummaryEnabled:      '@applevis_welcome_summary_enabled',
   notificationPrefs:          '@applevis_notification_prefs',
   notificationSound:          '@applevis_notification_sound',
   nonEnglishDetectionEnabled: '@applevis_non_english_detection',
@@ -64,6 +66,12 @@ type PreferencesContextValue = {
 
   cardDensity:    CardDensity;
   setCardDensity: (v: CardDensity) => void;
+
+  helpfulTipsEnabled:    boolean;
+  setHelpfulTipsEnabled: (v: boolean) => void;
+
+  welcomeSummaryEnabled:    boolean;
+  setWelcomeSummaryEnabled: (v: boolean) => void;
 
   notificationPrefs:    NotificationPrefs;
   setNotificationPrefs: (v: NotificationPrefs) => void;
@@ -119,6 +127,8 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const [announcementLevel,   setAnnouncementLevelState]   = useState<AnnouncementLevel>('all');
   const [defaultForumFilter,  setDefaultForumFilterState]  = useState<DefaultForumFilter>('Recent');
   const [cardDensity,         setCardDensityState]         = useState<CardDensity>('comfortable');
+  const [helpfulTipsEnabled,  setHelpfulTipsEnabledState]  = useState<boolean>(true);
+  const [welcomeSummaryEnabled, setWelcomeSummaryEnabledState] = useState<boolean>(true);
   const [notificationPrefs,           setNotificationPrefsState]           = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
   const [notificationSound,           setNotificationSoundState]           = useState<NotificationSound>('mouseSqueak');
   const [nonEnglishDetectionEnabled,  setNonEnglishDetectionEnabledState]  = useState<boolean>(true);
@@ -156,11 +166,13 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       persistence.getSetting<PodcastAutoDelete>(KEYS.podcastAutoDelete, 'off'),
       persistence.getSetting<boolean>(KEYS.podcastTrimSilence, false),
       persistence.getSetting<PodcastResumeRewind>(KEYS.podcastResumeRewind, 15),
+      persistence.getSetting<boolean>(KEYS.helpfulTipsEnabled, true),
+      persistence.getSetting<boolean>(KEYS.welcomeSummaryEnabled, true),
     ]);
 
     Promise.all([uiLoads, podcastLoads])
       .then(([[level, filter, density, prefs, sound, nonEnglish],
-              [speed, skipB, skipF, autoPlay, sleep, vBoost, eq, autoDl, autoDel, trimSilence, resumeRewind]]) => {
+              [speed, skipB, skipF, autoPlay, sleep, vBoost, eq, autoDl, autoDel, trimSilence, resumeRewind, helpfulTips, welcomeSummary]]) => {
         if (level)      setAnnouncementLevelState(level as AnnouncementLevel);
         if (filter)     setDefaultForumFilterState(filter as DefaultForumFilter);
         if (density)    setCardDensityState(density as CardDensity);
@@ -179,6 +191,8 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
         setPodcastAutoDeleteState(autoDel);
         setPodcastTrimSilenceState(trimSilence);
         setPodcastResumeRewindState(resumeRewind);
+        setHelpfulTipsEnabledState(helpfulTips);
+        setWelcomeSummaryEnabledState(welcomeSummary);
       })
       .finally(() => setIsLoading(false));
   }, []);
@@ -196,6 +210,16 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const setCardDensity = useCallback((v: CardDensity) => {
     setCardDensityState(v);
     AsyncStorage.setItem(KEYS.cardDensity, v).catch(() => {});
+  }, []);
+
+  const setHelpfulTipsEnabled = useCallback((v: boolean) => {
+    setHelpfulTipsEnabledState(v);
+    persistence.setSetting(KEYS.helpfulTipsEnabled, v).catch(() => {});
+  }, []);
+
+  const setWelcomeSummaryEnabled = useCallback((v: boolean) => {
+    setWelcomeSummaryEnabledState(v);
+    persistence.setSetting(KEYS.welcomeSummaryEnabled, v).catch(() => {});
   }, []);
 
   const setNotificationPrefs = useCallback((v: NotificationPrefs) => {
@@ -262,6 +286,8 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     announcementLevel,  setAnnouncementLevel,
     defaultForumFilter, setDefaultForumFilter,
     cardDensity,        setCardDensity,
+    helpfulTipsEnabled, setHelpfulTipsEnabled,
+    welcomeSummaryEnabled, setWelcomeSummaryEnabled,
     notificationPrefs,  setNotificationPrefs,
     notificationSound,  setNotificationSound,
     nonEnglishDetectionEnabled, setNonEnglishDetectionEnabled,
@@ -279,11 +305,11 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     isLoading,
   }), [
     announcementLevel, defaultForumFilter, cardDensity,
-    notificationPrefs, notificationSound, nonEnglishDetectionEnabled,
+    helpfulTipsEnabled, welcomeSummaryEnabled, notificationPrefs, notificationSound, nonEnglishDetectionEnabled,
     podcastSpeed, podcastSkipBack, podcastSkipForward, podcastAutoPlay,
     podcastSleepTimer, podcastVoiceBoost, podcastEQ, podcastAutoDownload, podcastAutoDelete, podcastTrimSilence,
     isLoading,
-    setAnnouncementLevel, setDefaultForumFilter, setCardDensity,
+    setAnnouncementLevel, setDefaultForumFilter, setCardDensity, setHelpfulTipsEnabled, setWelcomeSummaryEnabled,
     setNotificationPrefs, setNotificationSound, setNonEnglishDetectionEnabled,
     setPodcastSpeed, setPodcastSkipBack, setPodcastSkipForward, setPodcastAutoPlay,
     setPodcastSleepTimer, setPodcastVoiceBoost, setPodcastEQ, setPodcastAutoDownload, setPodcastAutoDelete,

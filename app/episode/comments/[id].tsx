@@ -1,25 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  AccessibilityInfo, ActionSheetIOS, Clipboard,
-  Linking, Platform, Pressable, ScrollView, Share, Text, View,
+  AccessibilityInfo, ActivityIndicator, ActionSheetIOS, Clipboard,
+  findNodeHandle, Linking, Platform, Pressable, ScrollView, Share, Text, View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Screen } from '../../../src/components/Screen';
 import { useTheme } from '../../../src/contexts/ThemeContext';
 import { useToast } from '../../../src/contexts/ToastContext';
+import { useAlert } from '../../../src/contexts/AccessibleAlertContext';
+import { ALERTS } from '../../../src/data/alertMessages';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { isAppleIntelligenceAvailable, summariseText } from '../../../src/services/intelligenceService';
+import { api } from '../../../src/services/api';
+import { persistence } from '../../../src/services/persistence';
 import { relativeTime } from '../../../src/utils/relativeTime';
+import { displayCommentSubject, subjectLabel } from '../../../src/utils/commentSubject';
+import type { ForumReply } from '../../../src/types/content';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-type EpisodeComment = {
-  id: string;
-  authorName: string;
-  body: string;
-  createdAt: string;
-  isNew?: boolean;
-};
+type EpisodeComment = ForumReply;
 
 // ─── SectionDivider ───────────────────────────────────────────────────────────
 function SectionDivider({ label }: { label: string }) {
@@ -37,136 +37,98 @@ function SectionDivider({ label }: { label: string }) {
   );
 }
 
-// ─── ComingSoonShell ──────────────────────────────────────────────────────────
-function ComingSoonShell({ icon, message, url }: { icon: string; message: string; url?: string }) {
-  const { colors } = useTheme();
-  return (
-    <View style={{
-      borderRadius: 14, padding: 20, marginBottom: 20,
-      backgroundColor: colors.inputBackground,
-      borderWidth: 1.5, borderColor: `${colors.accent}44`,
-      alignItems: 'center',
-    }}>
-      <Ionicons name={icon as any} size={36} color={colors.accent}
-        style={{ marginBottom: 10 }} accessibilityElementsHidden />
-
-      <Text accessible style={{ fontSize: 14, color: colors.textSecondary,
-        textAlign: 'center', lineHeight: 20, marginBottom: 12 }}>
-        {message}
-      </Text>
-
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <View style={{
-          paddingHorizontal: 10, paddingVertical: 4,
-          backgroundColor: colors.accent, borderRadius: 8,
-        }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFF', letterSpacing: 1 }}
-            accessibilityElementsHidden>
-            COMING SOON
-          </Text>
-        </View>
-
-        {url && (
-          <Pressable
-            onPress={() => Linking.openURL(url).catch(() => {})}
-            accessible
-            accessibilityRole="link"
-            accessibilityLabel="View on AppleVis website"
-            accessibilityHint="Opens this episode's page in the browser to read comments now"
-            style={{ paddingHorizontal: 12, paddingVertical: 4,
-              backgroundColor: colors.inputBackground,
-              borderWidth: 1, borderColor: colors.border, borderRadius: 8 }}
-          >
-            <Text style={{ fontSize: 11, fontWeight: '600', color: colors.accent }}>
-              View on Web
-            </Text>
-          </Pressable>
-        )}
-      </View>
-    </View>
-  );
-}
-
 // ─── CommentCard ─────────────────────────────────────────────────────────────
 function CommentCard({
-  comment, index, total,
+  comment, index, total, episodeTitle, onReply,
 }: {
   comment: EpisodeComment;
   index: number;
   total: number;
+  episodeTitle: string;
+  onReply: () => void;
 }) {
   const { colors, styles } = useTheme();
   const { showToast } = useToast();
   const timeStr = relativeTime(comment.createdAt);
+  const commentSubject = displayCommentSubject(comment.subject, episodeTitle);
 
-  const compoundLabel = [
+  const headerLabel = [
     `Comment ${index + 1} of ${total}.`,
+    subjectLabel(comment.subject, episodeTitle),
     comment.authorName + '.',
     timeStr + '.',
     comment.isNew ? 'New.' : '',
-    comment.body.slice(0, 280) + (comment.body.length > 280 ? '…' : '') + '.',
     'Hold for options.',
   ].filter(Boolean).join(' ');
 
   function showActions() {
-    const options = ['Copy Comment Text', 'Share Comment', 'Report Comment', 'Cancel'];
-    const destructiveIdx = 2;
-    const cancelIdx = 3;
-
     if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       ActionSheetIOS.showActionSheetWithOptions(
-        { options, cancelButtonIndex: cancelIdx, destructiveButtonIndex: destructiveIdx },
+        { title: `Comment by ${comment.authorName}`, options: ['Cancel', 'Reply to this Comment', 'Copy Comment Text', 'Share Comment', 'Report Comment'], cancelButtonIndex: 0, destructiveButtonIndex: 4 },
         (idx) => {
-          if (idx === 0) {
-            Clipboard.setString(comment.body);
-            showToast('Comment text copied.');
-            AccessibilityInfo.announceForAccessibility('Comment text copied');
+          if (idx === 1) onReply();
+          if (idx === 2) { Clipboard.setString(comment.body); showToast('Comment text copied.'); AccessibilityInfo.announceForAccessibility('Comment text copied'); }
+          if (idx === 3) {
+            Share.share({
+              message: [
+                commentSubject ? `Subject: ${commentSubject}` : null,
+                comment.body,
+              ].filter(Boolean).join('\n\n'),
+            }).catch(() => {});
           }
-          if (idx === 1) {
-            Share.share({ message: comment.body }).catch(() => {});
-          }
-          if (idx === 2) {
-            showToast('Report sent — thank you.');
-            AccessibilityInfo.announceForAccessibility('Report sent');
-          }
+          if (idx === 4) { showToast('Report sent — thank you.'); AccessibilityInfo.announceForAccessibility('Report sent'); }
         },
       );
     }
   }
 
   return (
+    <View style={[styles.card, { marginBottom: 12, padding: 0 }]}>
     <Pressable
       onLongPress={showActions}
+      delayLongPress={400}
       accessible
-      accessibilityLabel={compoundLabel}
+      accessibilityRole="header"
+      accessibilityLabel={headerLabel}
       accessibilityActions={[
+        { name: 'reply',  label: 'Reply to this Comment' },
         { name: 'copy',   label: 'Copy Comment Text' },
         { name: 'share',  label: 'Share Comment' },
         { name: 'report', label: 'Report Comment' },
       ]}
       onAccessibilityAction={({ nativeEvent }) => {
+        if (nativeEvent.actionName === 'reply') onReply();
         if (nativeEvent.actionName === 'copy') {
           Clipboard.setString(comment.body);
           showToast('Comment text copied.');
           AccessibilityInfo.announceForAccessibility('Comment text copied');
         }
         if (nativeEvent.actionName === 'share') {
-          Share.share({ message: comment.body }).catch(() => {});
+          Share.share({
+            message: [
+              commentSubject ? `Subject: ${commentSubject}` : null,
+              comment.body,
+            ].filter(Boolean).join('\n\n'),
+          }).catch(() => {});
         }
         if (nativeEvent.actionName === 'report') {
           showToast('Report sent — thank you.');
           AccessibilityInfo.announceForAccessibility('Report sent');
         }
       }}
-      style={({ pressed }) => [styles.card, {
-        marginBottom: 12, opacity: pressed ? 0.85 : 1,
-      }]}
+      style={({ pressed }) => ({
+        padding: 14,
+        paddingBottom: 8,
+        opacity: pressed ? 0.85 : 1,
+      })}
     >
       {/* Header: author + date + new badge */}
       <View style={{ flexDirection: 'row', alignItems: 'center',
-        justifyContent: 'space-between', marginBottom: 10 }}
-        accessibilityElementsHidden>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        justifyContent: 'space-between' }}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants">
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
           <View style={{
             width: 32, height: 32, borderRadius: 16,
             backgroundColor: `${colors.accent}22`,
@@ -176,9 +138,16 @@ function CommentCard({
               {comment.authorName.slice(0, 1).toUpperCase()}
             </Text>
           </View>
-          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>
-            {comment.authorName}
-          </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>
+              {comment.authorName}
+            </Text>
+            {!!commentSubject && (
+              <Text style={{ fontSize: 13, color: colors.text, marginTop: 2 }} numberOfLines={2}>
+                {commentSubject}
+              </Text>
+            )}
+          </View>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           {comment.isNew && (
@@ -190,13 +159,20 @@ function CommentCard({
           <Text style={{ fontSize: 12, color: colors.textSecondary }}>{timeStr}</Text>
         </View>
       </View>
+    </Pressable>
 
       {/* Body */}
-      <Text style={{ fontSize: 15, lineHeight: 22, color: colors.textSecondary }}
-        accessibilityElementsHidden>
-        {comment.body}
-      </Text>
-    </Pressable>
+      <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
+        <Text
+          accessible
+          accessibilityRole="text"
+          accessibilityLabel={comment.body}
+          style={{ fontSize: 15, lineHeight: 22, color: colors.textSecondary }}
+        >
+          {comment.body}
+        </Text>
+      </View>
+    </View>
   );
 }
 
@@ -210,17 +186,57 @@ export default function EpisodeComments() {
   const auth   = useAuth();
   const { colors, styles } = useTheme();
   const { showToast } = useToast();
+  const { showAlert } = useAlert();
   const aiAvailable = isAppleIntelligenceAvailable();
 
   // ── State ────────────────────────────────────────────────────────────────
-  const [comments]   = useState<EpisodeComment[]>([]);
-  // NOTE: Comments API endpoint is not yet confirmed with Drupal developer.
-  // When ready, fetch from something like:
-  //   /api/v1/podcasts/episodes/${params.id}/comments  (custom endpoint)
-  //   or /comment?filter[entity_id]=${params.id}&filter[entity_type]=node (JSON:API)
+  const [comments,   setComments]   = useState<EpisodeComment[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [aiWorking,  setAiWorking]  = useState(false);
+  const [aiSummary,  setAiSummary]  = useState<string | null>(null);
 
-  const [aiWorking, setAiWorking] = useState(false);
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const scrollRef          = useRef<ScrollView>(null);
+  const headingRef         = useRef<View>(null);
+  const hasInitialFocusRef = useRef(false);
+  const commentsY          = useRef<number>(0);
+  const firstNewCommentRef = useRef<View | null>(null);
+  const commentOffsets     = useRef<Record<string, number>>({});
+
+  // VoiceOver: focus the episode heading immediately on open (content is available from params).
+  useEffect(() => {
+    if (hasInitialFocusRef.current) return;
+    hasInitialFocusRef.current = true;
+    setTimeout(() => {
+      const handle = findNodeHandle(headingRef.current);
+      if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+    }, 200);
+  }, []);
+
+  useEffect(() => {
+    if (!params.id) return;
+    setLoading(true);
+    setFetchError(null);
+    Promise.all([
+      api.podcasts.comments(params.id),
+      persistence.getItemVisit(params.id),
+    ]).then(([res, visit]) => {
+      setLoading(false);
+      if (res.ok) {
+        const seenAt = visit?.seenAt ?? null;
+        const marked = seenAt
+          ? res.data.map(c => ({ ...c, isNew: c.createdAt > seenAt }))
+          : res.data;
+        setComments(marked);
+        persistence.stampItemVisit(params.id, res.data.length);
+      } else {
+        setFetchError(res.error);
+      }
+    }).catch((err: unknown) => {
+      setLoading(false);
+      setFetchError(err instanceof Error ? err.message : 'Unexpected error');
+    });
+  }, [params.id]);
 
   const episodeUrl = params.url || undefined;
 
@@ -247,25 +263,40 @@ export default function EpisodeComments() {
     }
   }
 
+  const firstNewComment  = comments.find(c => c.isNew) ?? null;
+  const newCommentCount  = comments.filter(c => c.isNew).length;
+
+  function handleJumpToNewComment(firstNewId: string) {
+    const offset = commentOffsets.current[firstNewId] ?? 0;
+    const y = Math.max(0, commentsY.current + offset - 20);
+    scrollRef.current?.scrollTo({ y, animated: true });
+    setTimeout(() => {
+      const handle = findNodeHandle(firstNewCommentRef.current);
+      if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+    }, 400);
+  }
+
   // ── Post comment ─────────────────────────────────────────────────────────
   function handlePostComment() {
     if (!auth.isSignedIn) {
-      showToast('Sign in to post a comment');
-      AccessibilityInfo.announceForAccessibility('Sign in to post a comment');
+      showAlert({ ...ALERTS.auth.signInRequired('post a comment'), onConfirm: () => router.push('/settings-account' as any) });
       return;
     }
-    // Navigate to compose when backend supports episode comments
-    showToast('Episode comments are coming soon');
-    AccessibilityInfo.announceForAccessibility('Episode comments are coming soon');
+    router.push({
+      pathname: '/compose' as any,
+      params: { episodeId: params.id, episodeTitle: params.title },
+    });
   }
 
   return (
-    <Screen title="Discussion" showSettings={false}>
-      <ScrollView showsVerticalScrollIndicator contentContainerStyle={{ paddingBottom: 40 }}>
+    <Screen title="Discussion" showSettings={false} titleAccessible={false}>
+      <ScrollView ref={scrollRef} showsVerticalScrollIndicator contentContainerStyle={{ paddingBottom: 40 }}>
 
         {/* ── Episode header ───────────────────────────────────────────── */}
         <View
+          ref={headingRef}
           accessible
+          accessibilityRole="header"
           accessibilityLabel={`Community discussion for: ${params.title}. ${params.showTitle}.`}
           style={[styles.card, { marginBottom: 20, flexDirection: 'row', alignItems: 'center', gap: 12 }]}
         >
@@ -376,21 +407,102 @@ export default function EpisodeComments() {
         </View>
 
         {/* ── Comments section ─────────────────────────────────────────── */}
-        <SectionDivider label={comments.length > 0 ? `${comments.length} Comments` : 'Comments'} />
+        <View onLayout={(e) => { commentsY.current = e.nativeEvent.layout.y; }}>
+          <SectionDivider label={
+            loading ? 'Community Discussion' :
+            fetchError ? 'Community Discussion' :
+            comments.length > 0
+              ? `Community Discussion - ${comments.length} comment${comments.length === 1 ? '' : 's'}` +
+                (newCommentCount > 0 ? ` - ${newCommentCount} new` : '')
+              : 'Community Discussion'
+          } />
+          {firstNewComment && (
+            <Pressable
+              onPress={() => handleJumpToNewComment(firstNewComment.id)}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={`Jump to first new comment. ${newCommentCount} new since your last visit.`}
+              style={[styles.card, {
+                flexDirection: 'row', alignItems: 'center', gap: 10,
+                marginBottom: 12, paddingVertical: 12,
+              }]}
+            >
+              <Ionicons name="flag-outline" size={18} color={colors.accent} accessibilityElementsHidden />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.accent }}>
+                  Jump to First New Comment
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                  {newCommentCount} new since your last visit
+                </Text>
+              </View>
+              <Ionicons name="arrow-down-outline" size={16} color={colors.accent} accessibilityElementsHidden />
+            </Pressable>
+          )}
+        </View>
 
-        {comments.length > 0 ? (
-          comments.map((comment, i) => (
-            <CommentCard key={comment.id} comment={comment} index={i} total={comments.length} />
-          ))
+        {loading ? (
+          <View
+            accessible
+            accessibilityLiveRegion="polite"
+            accessibilityLabel="Loading comments, please wait"
+            style={{ alignItems: 'center', paddingVertical: 32 }}
+          >
+            <ActivityIndicator size="large" color={colors.accent} />
+            <Text style={{ fontSize: 14, color: colors.textSecondary, marginTop: 10 }}>
+              Loading comments…
+            </Text>
+          </View>
+        ) : fetchError ? (
+          <View style={[styles.card, { borderColor: '#FCA5A5', borderWidth: 1, alignItems: 'center', paddingVertical: 20 }]}>
+            <Ionicons name="alert-circle-outline" size={28} color="#B91C1C" accessibilityElementsHidden />
+            <Text style={{ fontSize: 14, color: '#B91C1C', fontWeight: '600', marginTop: 8 }}>
+              Could not load comments
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4, textAlign: 'center' }}>
+              {fetchError}
+            </Text>
+          </View>
+        ) : comments.length > 0 ? (
+          comments.map((comment, i) => {
+            const isFirstNew = comment.isNew && comment.id === firstNewComment?.id;
+            return (
+              <View
+                key={comment.id}
+                ref={isFirstNew ? (v) => { firstNewCommentRef.current = v; } : undefined}
+                onLayout={(e) => { commentOffsets.current[comment.id] = e.nativeEvent.layout.y; }}
+              >
+                <CommentCard
+                  comment={comment}
+                  index={i}
+                  total={comments.length}
+                  episodeTitle={params.title}
+                  onReply={() => {
+                    if (!auth.isSignedIn) { showAlert({ ...ALERTS.auth.signInRequired('reply to comments'), onConfirm: () => router.push('/settings-account' as any) }); return; }
+                    const plain = comment.body.slice(0, 150).trimEnd() + (comment.body.length > 150 ? '…' : '');
+                    router.push({
+                      pathname: '/compose' as any,
+                      params: { episodeId: params.id, episodeTitle: params.title, replyToAuthor: comment.authorName, replyToQuote: plain },
+                    });
+                  }}
+                />
+              </View>
+            );
+          })
         ) : (
-          <ComingSoonShell
-            icon="chatbubbles-outline"
-            message={
-              'Community comments for podcast episodes are on their way. ' +
-              'You can read and join the existing discussion on the AppleVis website now.'
-            }
-            url={episodeUrl}
-          />
+          <View style={[styles.card, { alignItems: 'center', paddingVertical: 24 }]}
+            accessible accessibilityLabel="No comments yet. Be the first to share your thoughts.">
+            <Ionicons name="chatbubbles-outline" size={32} color={colors.textSecondary}
+              style={{ marginBottom: 8 }} accessibilityElementsHidden />
+            <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 6 }}
+              accessibilityElementsHidden>
+              No comments yet
+            </Text>
+            <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center' }}
+              accessibilityElementsHidden>
+              Be the first to share your thoughts about this episode.
+            </Text>
+          </View>
         )}
 
         {/* ── View on AppleVis ─────────────────────────────────────────── */}
@@ -401,7 +513,7 @@ export default function EpisodeComments() {
             accessibilityLabel={`View ${params.title} on AppleVis — opens in browser`}
             style={[styles.cardSmall, { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }]}
           >
-            <Ionicons name="globe-outline" size={22} color={colors.accent} accessibilityElementsHidden />
+            <Ionicons name={"safari-outline" as any} size={22} color={colors.accent} accessibilityElementsHidden />
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>View on AppleVis</Text>
               <Text style={{ fontSize: 13, color: colors.textSecondary }}>Read and post comments on the website</Text>

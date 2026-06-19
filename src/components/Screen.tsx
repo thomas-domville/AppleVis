@@ -14,6 +14,7 @@ type Props = {
   showSettings?: boolean;
   showSearch?: boolean;
   showBack?: boolean;
+  titleAccessible?: boolean;
   refreshing?: boolean;
   /** Control anchored to the LEFT of the action row (e.g. Feed Settings on Home). */
   headerLeft?: ReactNode;
@@ -21,7 +22,17 @@ type Props = {
   headerRight?: ReactNode;
 };
 
-export function Screen({ title, children, showSettings = true, showSearch = false, showBack = true, refreshing, headerLeft, headerRight }: Props) {
+export function Screen({
+  title,
+  children,
+  showSettings = true,
+  showSearch = false,
+  showBack = true,
+  titleAccessible = true,
+  refreshing,
+  headerLeft,
+  headerRight,
+}: Props) {
   const router             = useRouter();
   const { t }              = useTranslation();
   const { colors, styles } = useTheme();
@@ -62,7 +73,15 @@ export function Screen({ title, children, showSettings = true, showSearch = fals
         )}
 
         {/* Screen title */}
-        <Text accessibilityRole="header" style={styles.title}>{title}</Text>
+        <Text
+          accessible={titleAccessible}
+          accessibilityRole={titleAccessible ? 'header' : undefined}
+          accessibilityElementsHidden={!titleAccessible}
+          importantForAccessibility={titleAccessible ? 'auto' : 'no-hide-descendants'}
+          style={styles.title}
+        >
+          {title}
+        </Text>
 
         {/* Action row — left cluster anchored left, right cluster anchored right.
             VoiceOver touch exploration: Feed Settings (or custom left action) in

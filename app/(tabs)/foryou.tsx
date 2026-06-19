@@ -1,6 +1,7 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Pressable, RefreshControl, ScrollView, Share, Text, View,
+  AccessibilityInfo, ActivityIndicator, findNodeHandle, Pressable,
+  RefreshControl, ScrollView, Share, Text, View,
 } from 'react-native';
 import { useScrollToTop } from '@react-navigation/native';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -12,9 +13,11 @@ import { FilterPicker } from '../../src/components/FilterPicker';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
 import { usePlayer } from '../../src/contexts/PlayerContext';
 import { useEpisodeMeta } from '../../src/hooks/useEpisodeMeta';
+import { useEpisodeDurations } from '../../src/hooks/useEpisodeDurations';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
+import { useTip, TIP_KEYS, TIPS } from '../../src/contexts/ContextualTipContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { deleteAllDownloads } from '../../src/services/downloads';
 import type { PodcastEpisode, SavedItem } from '../../src/types/content';
@@ -26,6 +29,15 @@ function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   return h > 0 ? `${h}h ${m}m` : `${m} min`;
+}
+
+function formatTime(seconds: number): string {
+  if (seconds <= 0) return '0:00';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function kindLabel(kind: SavedItem['kind']): string {
@@ -44,16 +56,91 @@ function kindLabel(kind: SavedItem['kind']): string {
 const FOR_YOU_TABS = ['Queue', 'Downloads', 'Saved'] as const;
 type ForYouTab = typeof FOR_YOU_TABS[number];
 
-type SavedFilter = 'All' | 'Topics' | 'Podcasts' | 'Apps' | 'Guides';
-const SAVED_FILTERS: SavedFilter[] = ['All', 'Topics', 'Podcasts', 'Apps', 'Guides'];
+type SavedFilter = 'All' | 'Topics' | 'Podcasts' | 'Apps' | 'Guides' | 'Blogs';
+const SAVED_FILTERS: SavedFilter[] = ['All', 'Topics', 'Podcasts', 'Apps', 'Guides', 'Blogs'];
+
+const KIND_ACCENT_SAVED: Record<SavedItem['kind'], string> = {
+  forumTopic:      '#6366f1',
+  podcastEpisode:  '#f97316',
+  appListing:      '#3b82f6',
+  resource:        '#10b981',
+  blogPost:        '#8b5cf6',
+};
+
+const SECTION_ACCENT: Record<ForYouTab, string> = {
+  Queue:     '#f97316',
+  Downloads: '#10b981',
+  Saved:     '#6366f1',
+};
+
+// ─── SavedItemCard ────────────────────────────────────────────────────────────
+
+function SavedItemCard({
+  item,
+  accentColor,
+  kindLabel: kLabel,
+  kindDisplay,
+  onOpen,
+  onUnsave,
+}: {
+  item: SavedItem;
+  accentColor: string;
+  kindLabel: string;
+  kindDisplay: string;
+  onOpen: () => void;
+  onUnsave: () => void;
+}) {
+  const { colors, styles } = useTheme();
+  return (
+    <Pressable
+      onPress={onOpen}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={`${item.title}. ${kindDisplay}. Saved ${relativeTime(item.savedAt)}.`}
+      accessibilityHint="Double tap to open. Hold for options."
+      accessibilityActions={[
+        { name: 'open',   label: `Open ${kLabel}` },
+        { name: 'unsave', label: 'Unsave' },
+      ]}
+      onAccessibilityAction={({ nativeEvent }) => {
+        if (nativeEvent.actionName === 'open')   onOpen();
+        if (nativeEvent.actionName === 'unsave') onUnsave();
+      }}
+      style={({ pressed }) => [
+        styles.card,
+        { marginBottom: 10, borderLeftWidth: 3, borderLeftColor: accentColor, opacity: pressed ? 0.75 : 1 },
+      ]}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+        <Text
+          style={{ flex: 1, fontSize: 16, fontWeight: '600', color: colors.text, lineHeight: 22 }}
+          numberOfLines={2}
+        >
+          {item.title}
+        </Text>
+        <Ionicons name="bookmark" size={15} color={accentColor} accessibilityElementsHidden style={{ marginTop: 2 }} />
+      </View>
+      <Text style={{ fontSize: 11, fontWeight: '700', color: accentColor,
+        textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
+        {kindDisplay}
+      </Text>
+      <Text style={{ fontSize: 13, color: colors.textSecondary }}>
+        Saved {relativeTime(item.savedAt)}
+      </Text>
+    </Pressable>
+  );
+}
 
 // ─── Queue section ────────────────────────────────────────────────────────────
 
 function QueueSection() {
-  const router          = useRouter();
+  const router             = useRouter();
   const { colors, styles } = useTheme();
-  const player          = usePlayer();
-  const queue           = player.queue;
+  const player             = usePlayer();
+  const cachedDurations    = useEpisodeDurations();
+  const enrich             = (ep: PodcastEpisode): PodcastEpisode =>
+    cachedDurations[ep.id] ? { ...ep, duration: cachedDurations[ep.id] } : ep;
+  const queue              = player.queue.map(enrich);
 
   function navigateToEpisode(episode: PodcastEpisode) {
     router.push({
@@ -87,12 +174,16 @@ function QueueSection() {
             onPress={() => navigateToEpisode(player.episode!)}
             accessible accessibilityRole="button"
             accessibilityLabel={`Now playing: ${player.episode.title}. ${player.episode.showTitle}. Double tap to open.`}
-            style={[styles.cardSmall, { borderWidth: 2, borderColor: colors.accent, marginBottom: 20 }]}
+            style={[styles.cardSmall, {
+              borderWidth: 2, borderColor: colors.accent,
+              borderLeftWidth: 4, borderLeftColor: '#f97316',
+              marginBottom: 20,
+            }]}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <Ionicons
                 name={player.isPlaying ? 'musical-notes' : 'pause'}
-                size={20} color={colors.accent} accessibilityElementsHidden
+                size={20} color='#f97316' accessibilityElementsHidden
               />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }} numberOfLines={2}>
@@ -106,6 +197,20 @@ function QueueSection() {
                 </Text>
               </View>
             </View>
+            {player.duration > 0 && (
+              <View accessibilityElementsHidden>
+                <View style={{ height: 5, backgroundColor: colors.border, borderRadius: 2.5, marginTop: 10, overflow: 'hidden' }}>
+                  <View style={{
+                    height: 5, borderRadius: 2.5, backgroundColor: '#f97316',
+                    width: `${Math.min(100, (player.position / player.duration) * 100)}%`,
+                  }} />
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary }}>{formatTime(player.position)}</Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary }}>{formatTime(player.duration)}</Text>
+                </View>
+              </View>
+            )}
           </Pressable>
         </>
       )}
@@ -122,7 +227,20 @@ function QueueSection() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
               textTransform: 'uppercase', letterSpacing: 0.8 }}
-              accessibilityRole="header">
+              accessibilityRole="header"
+              accessibilityActions={[{ name: 'summary', label: 'Queue summary' }]}
+              onAccessibilityAction={() => {
+                const totalSecs = queue.reduce((s, ep) => s + (ep.duration > 0 ? ep.duration : 0), 0);
+                const h = Math.floor(totalSecs / 3600);
+                const m = Math.floor((totalSecs % 3600) / 60);
+                const durLabel = h > 0
+                  ? `${h} hour${h !== 1 ? 's' : ''} ${m} minute${m !== 1 ? 's' : ''}`
+                  : `${m} minute${m !== 1 ? 's' : ''}`;
+                AccessibilityInfo.announceForAccessibility(
+                  `${queue.length} episode${queue.length !== 1 ? 's' : ''} in queue${totalSecs > 0 ? `, about ${durLabel}` : ''}.`
+                );
+              }}
+            >
               Up Next ({queue.length})
             </Text>
             <Pressable
@@ -164,12 +282,12 @@ function QueueSection() {
                     case 'remove':     player.removeFromQueue(episode.id); break;
                   }
                 }}
-                style={[styles.cardSmall, { marginBottom: 8 }]}
+                style={[styles.cardSmall, { marginBottom: 8, borderLeftWidth: 3, borderLeftColor: '#f97316' }]}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View style={{ width: 28, height: 28, borderRadius: 14,
-                    backgroundColor: colors.pill, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.pillText }}>{index + 1}</Text>
+                    backgroundColor: '#f97316', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>{index + 1}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }} numberOfLines={2}>
@@ -206,15 +324,18 @@ function QueueSection() {
 // ─── Downloads section ────────────────────────────────────────────────────────
 
 function DownloadsSection() {
-  const router          = useRouter();
+  const router             = useRouter();
   const { colors, styles } = useTheme();
-  const player          = usePlayer();
-  const meta            = useEpisodeMeta();
-  const { showToast }   = useToast();
+  const player             = usePlayer();
+  const meta               = useEpisodeMeta();
+  const { showToast }      = useToast();
+  const cachedDurations    = useEpisodeDurations();
+  const enrich             = (ep: PodcastEpisode): PodcastEpisode =>
+    cachedDurations[ep.id] ? { ...ep, duration: cachedDurations[ep.id] } : ep;
 
-  const downloadedEpisodes = Object.values(meta.downloadedMeta).sort(
-    (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-  );
+  const downloadedEpisodes = Object.values(meta.downloadedMeta)
+    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+    .map(enrich);
 
   function navigateToEpisode(episode: PodcastEpisode) {
     router.push({
@@ -244,9 +365,39 @@ function DownloadsSection() {
 
   return (
     <>
-      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+        <Text
+          style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.textSecondary,
+            textTransform: 'uppercase', letterSpacing: 0.8 }}
+          accessibilityRole="header"
+          accessibilityActions={[{ name: 'summary', label: 'Downloads summary' }]}
+          onAccessibilityAction={() => {
+            const total = downloadedEpisodes.reduce((s, ep) => s + (ep.duration > 0 ? ep.duration : 0), 0);
+            const h = Math.floor(total / 3600);
+            const m = Math.floor((total % 3600) / 60);
+            const durLabel = h > 0
+              ? `${h} hour${h !== 1 ? 's' : ''} ${m} minute${m !== 1 ? 's' : ''}`
+              : `${m} minute${m !== 1 ? 's' : ''}`;
+            AccessibilityInfo.announceForAccessibility(
+              `${downloadedEpisodes.length} downloaded episode${downloadedEpisodes.length !== 1 ? 's' : ''}${total > 0 ? `, ${durLabel} total` : ''}.`
+            );
+          }}
+        >
+          Downloaded Episodes
+        </Text>
+        <View style={{ paddingHorizontal: 8, paddingVertical: 3, backgroundColor: '#10b98122',
+          borderRadius: 10, marginRight: 8 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: '#10b981' }} accessibilityElementsHidden>
+            {downloadedEpisodes.length}
+          </Text>
+        </View>
         <Pressable
-          onPress={async () => { await deleteAllDownloads(); meta.reload(); showToast('All downloads removed.', 'success'); }}
+          onPress={async () => {
+            await deleteAllDownloads();
+            meta.reload();
+            showToast('All downloads removed.', 'success');
+            AccessibilityInfo.announceForAccessibility('All downloads removed.');
+          }}
           accessible accessibilityRole="button" accessibilityLabel="Remove all downloads"
           style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.pill, borderRadius: 8 }}
         >
@@ -344,14 +495,18 @@ function DownloadsSection() {
 // ─── Saved section ────────────────────────────────────────────────────────────
 
 function SavedSection() {
-  const router          = useRouter();
+  const router             = useRouter();
   const { colors, styles } = useTheme();
-  const player          = usePlayer();
-  const meta            = useEpisodeMeta();
-  const saved           = useSavedItems();
-  const { showToast }   = useToast();
+  const player             = usePlayer();
+  const meta               = useEpisodeMeta();
+  const saved              = useSavedItems();
+  const { showToast }      = useToast();
+  const cachedDurations    = useEpisodeDurations();
+  const enrich             = (ep: PodcastEpisode): PodcastEpisode =>
+    cachedDurations[ep.id] ? { ...ep, duration: cachedDurations[ep.id] } : ep;
 
   const [kindFilter, setKindFilter] = useState<SavedFilter>('All');
+  const sectionCountRef = useRef<Text | null>(null);
 
   // Reload meta when section comes into focus (covers unsave from other screens)
   useFocusEffect(useCallback(() => { meta.reload(); }, []));
@@ -362,6 +517,7 @@ function SavedSection() {
     if (kindFilter === 'Podcasts') return item.kind === 'podcastEpisode';
     if (kindFilter === 'Apps')     return item.kind === 'appListing';
     if (kindFilter === 'Guides')   return item.kind === 'resource';
+    if (kindFilter === 'Blogs')    return item.kind === 'blogPost';
     return true;
   });
 
@@ -375,6 +531,50 @@ function SavedSection() {
 
   return (
     <>
+      {/* Section heading */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+        <Text
+          style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.textSecondary,
+            textTransform: 'uppercase', letterSpacing: 0.8 }}
+          accessibilityRole="header"
+          accessibilityActions={[{ name: 'summary', label: 'Saved summary' }]}
+          onAccessibilityAction={() => {
+            const kindMap: Partial<Record<SavedFilter, SavedItem['kind']>> = {
+              Topics: 'forumTopic', Podcasts: 'podcastEpisode',
+              Apps: 'appListing', Guides: 'resource', Blogs: 'blogPost',
+            };
+            const parts = (Object.entries(kindMap) as [string, SavedItem['kind']][])
+              .map(([lbl, kind]) => {
+                const n = saved.items.filter(i => i.kind === kind).length;
+                return n > 0 ? `${n} ${lbl.toLowerCase()}` : null;
+              })
+              .filter(Boolean);
+            AccessibilityInfo.announceForAccessibility(
+              saved.items.length === 0
+                ? 'No saved items.'
+                : `${saved.items.length} saved item${saved.items.length !== 1 ? 's' : ''}: ${parts.join(', ')}.`
+            );
+          }}
+        >
+          Saved Items
+        </Text>
+        <Text
+          ref={sectionCountRef}
+          style={{ fontSize: 12, color: colors.textSecondary }}
+          accessibilityLiveRegion="polite"
+          accessible
+          accessibilityLabel={
+            kindFilter === 'All'
+              ? `${filteredItems.length} saved item${filteredItems.length !== 1 ? 's' : ''}`
+              : `${filteredItems.length} saved ${kindFilter.toLowerCase()}`
+          }
+        >
+          {kindFilter === 'All'
+            ? `${filteredItems.length} item${filteredItems.length !== 1 ? 's' : ''}`
+            : `${filteredItems.length} ${kindFilter.toLowerCase()}`}
+        </Text>
+      </View>
+
       {/* Kind filter chips */}
       <ScrollView
         horizontal showsHorizontalScrollIndicator={false}
@@ -398,26 +598,12 @@ function SavedSection() {
                 backgroundColor: isSelected ? colors.accent : colors.inputBackground,
               }}
             >
-              <Text style={{ fontSize: 14, fontWeight: '600', color: isSelected ? '#FFF' : colors.text }}>
+              <Text style={{ fontSize: 14, fontWeight: isSelected ? '700' : '600', color: isSelected ? '#FFF' : colors.text }}>
                 {f}
               </Text>
             </Pressable>
           );
         })}
-
-        {/* Blogs — disabled chip */}
-        <View
-          style={{
-            paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-            borderWidth: 1, borderColor: colors.border,
-            backgroundColor: colors.inputBackground, opacity: 0.45,
-          }}
-          accessible
-          accessibilityLabel="Blogs, coming soon, unavailable"
-          accessibilityState={{ disabled: true }}
-        >
-          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textSecondary }}>Blogs</Text>
-        </View>
       </ScrollView>
 
       {/* Bulk unsave */}
@@ -427,6 +613,10 @@ function SavedSection() {
             onPress={async () => {
               for (const item of filteredItems) await saved.unsave(item.id).catch(() => {});
               showToast('Removed saved items.', 'success');
+              setTimeout(() => {
+                const handle = findNodeHandle(sectionCountRef.current);
+                if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+              }, 300);
             }}
             accessible accessibilityRole="button"
             accessibilityLabel={`Unsave all ${kindFilter === 'All' ? '' : kindFilter.toLowerCase() + ' '}items`}
@@ -450,16 +640,29 @@ function SavedSection() {
       {filteredItems.map((item) => {
         // ── Podcast episode — rich card with full metadata ──────────────
         if (item.kind === 'podcastEpisode') {
-          const episode = meta.savedMeta[item.id];
+          const episode = meta.savedMeta[item.id] ? enrich(meta.savedMeta[item.id]!) : undefined;
           const isQueued = player.queue.some((q) => q.id === item.id);
           const isDownloaded = item.id in meta.downloaded;
           const isDownloading = meta.downloading.has(item.id);
 
           if (episode) {
             return (
-              <View key={item.id} style={[styles.card, { marginBottom: 10 }]}>
+              <View key={item.id} style={[styles.card, { marginBottom: 10, borderLeftWidth: 3, borderLeftColor: '#f97316' }]}>
                 <Pressable
-                  onPress={() => router.push({ pathname: '/episode/[id]' as any, params: { id: item.id } })}
+                  onPress={() => router.push({
+                    pathname: '/episode/[id]' as any,
+                    params: {
+                      id: episode.id,
+                      title: episode.title,
+                      showTitle: episode.showTitle,
+                      description: episode.description ?? '',
+                      artworkUrl: episode.artworkUrl ?? '',
+                      publishedAt: episode.publishedAt ?? '',
+                      duration: String(episode.duration),
+                      audioUrl: episode.audioUrl ?? '',
+                      url: episode.url ?? '',
+                    },
+                  })}
                   accessible accessibilityRole="none"
                   accessibilityLabel={[
                     episode.title, episode.showTitle,
@@ -553,17 +756,16 @@ function SavedSection() {
             );
           }
 
-          // Episode metadata not available — fallback simple card
+          // Episode metadata not available — fallback card
           return (
-            <AccessibleCard
+            <SavedItemCard
               key={item.id}
-              title={item.title}
-              meta={`Podcast · Saved ${relativeTime(item.savedAt)}`}
-              actions={['Open Episode', 'Unsave']}
-              onAction={(action) => {
-                if (action === 'Open Episode') router.push({ pathname: '/episode/[id]' as any, params: { id: item.id } });
-                else if (action === 'Unsave') { saved.unsave(item.id); showToast('Episode unsaved.', 'success'); }
-              }}
+              item={item}
+              accentColor="#f97316"
+              kindLabel="Episode"
+              kindDisplay="Podcast"
+              onOpen={() => router.push({ pathname: '/episode/[id]' as any, params: { id: item.id } })}
+              onUnsave={() => { saved.unsave(item.id); showToast('Episode unsaved.', 'success'); }}
             />
           );
         }
@@ -571,15 +773,14 @@ function SavedSection() {
         // ── Topic ───────────────────────────────────────────────────────
         if (item.kind === 'forumTopic') {
           return (
-            <AccessibleCard
+            <SavedItemCard
               key={item.id}
-              title={item.title}
-              meta={`Topic · Saved ${relativeTime(item.savedAt)}`}
-              actions={['Open Topic', 'Unsave']}
-              onAction={(action) => {
-                if (action === 'Open Topic') router.push({ pathname: '/topic/[id]' as any, params: { id: item.id, title: item.title } });
-                else if (action === 'Unsave') { saved.unsave(item.id); showToast('Topic unsaved.', 'success'); }
-              }}
+              item={item}
+              accentColor="#6366f1"
+              kindLabel="Topic"
+              kindDisplay="Forum Topic"
+              onOpen={() => router.push({ pathname: '/topic/[id]' as any, params: { id: item.id, title: item.title } })}
+              onUnsave={() => { saved.unsave(item.id); showToast('Topic unsaved.', 'success'); }}
             />
           );
         }
@@ -587,15 +788,14 @@ function SavedSection() {
         // ── App ─────────────────────────────────────────────────────────
         if (item.kind === 'appListing') {
           return (
-            <AccessibleCard
+            <SavedItemCard
               key={item.id}
-              title={item.title}
-              meta={`App · Saved ${relativeTime(item.savedAt)}`}
-              actions={['Open App Page', 'Unsave']}
-              onAction={(action) => {
-                if (action === 'Open App Page') router.push({ pathname: '/app-detail/[id]' as any, params: { id: item.id, name: item.title } });
-                else if (action === 'Unsave') { saved.unsave(item.id); showToast('App unsaved.', 'success'); }
-              }}
+              item={item}
+              accentColor="#3b82f6"
+              kindLabel="App"
+              kindDisplay="App Listing"
+              onOpen={() => router.push({ pathname: '/app-detail/[id]' as any, params: { id: item.id, name: item.title } })}
+              onUnsave={() => { saved.unsave(item.id); showToast('App unsaved.', 'success'); }}
             />
           );
         }
@@ -603,15 +803,29 @@ function SavedSection() {
         // ── Guide ────────────────────────────────────────────────────────
         if (item.kind === 'resource') {
           return (
-            <AccessibleCard
+            <SavedItemCard
               key={item.id}
-              title={item.title}
-              meta={`Guide · Saved ${relativeTime(item.savedAt)}`}
-              actions={['Open Guide', 'Unsave']}
-              onAction={(action) => {
-                if (action === 'Open Guide') router.push({ pathname: '/resource-detail/[id]' as any, params: { id: item.id } });
-                else if (action === 'Unsave') { saved.unsave(item.id); showToast('Guide unsaved.', 'success'); }
-              }}
+              item={item}
+              accentColor="#10b981"
+              kindLabel="Guide"
+              kindDisplay="Guide"
+              onOpen={() => router.push({ pathname: '/resource-detail/[id]' as any, params: { id: item.id } })}
+              onUnsave={() => { saved.unsave(item.id); showToast('Guide unsaved.', 'success'); }}
+            />
+          );
+        }
+
+        // ── Blog post ─────────────────────────────────────────────────────
+        if (item.kind === 'blogPost') {
+          return (
+            <SavedItemCard
+              key={item.id}
+              item={item}
+              accentColor="#8b5cf6"
+              kindLabel="Blog Post"
+              kindDisplay="Blog Post"
+              onOpen={() => router.push({ pathname: '/blog-detail/[id]' as any, params: { id: item.id, title: item.title } })}
+              onUnsave={() => { saved.unsave(item.id); showToast('Blog post unsaved.', 'success'); }}
             />
           );
         }
@@ -629,12 +843,19 @@ export default function ForYouScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
+  const { showTip } = useTip();
   useScrollToTop(scrollRef);
 
   useFocusEffect(useCallback(() => {
+    showTip(TIP_KEYS.tabForYou, TIPS.tabForYou);
     const t = setTimeout(() => scrollRef.current?.flashScrollIndicators(), 350);
     return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []));
+
+  useEffect(() => {
+    AccessibilityInfo.announceForAccessibility(tab);
+  }, [tab]);
 
   function handleRefresh() {
     setRefreshing(true);
@@ -652,6 +873,7 @@ export default function ForYouScreen() {
     <Screen title="For You" showBack={false}>
       <ScrollView
         ref={scrollRef}
+        accessibilityLabel="For You"
         contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
         showsVerticalScrollIndicator
         refreshControl={
@@ -670,7 +892,13 @@ export default function ForYouScreen() {
           onChange={(v) => setTab(v as ForYouTab)}
         />
 
-        <View key={refreshKey} style={{ marginTop: 16 }}>
+        {/* Section accent strip */}
+        <View
+          style={{ height: 3, borderRadius: 2, backgroundColor: SECTION_ACCENT[tab], marginTop: -4, marginBottom: 12 }}
+          accessibilityElementsHidden
+        />
+
+        <View key={refreshKey} style={{ marginTop: 0 }}>
           {tab === 'Queue'     && <QueueSection />}
           {tab === 'Downloads' && <DownloadsSection />}
           {tab === 'Saved'     && <SavedSection />}

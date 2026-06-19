@@ -13,7 +13,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { icloudStorage } from './icloudStorage';
-import type { SavedItem, PodcastEpisode } from '../types/content';
+import type { SavedItem, PodcastEpisode, Chapter } from '../types/content';
 import type { PlaybackSpeed } from '../hooks/usePodcastPlayer';
 
 export type PlayHistoryEntry = {
@@ -45,6 +45,10 @@ const LK = {
   LAST_EPISODE:  'applevis:lastEpisode',
   VOLUME:        'applevis:volume',
   SAVED_META:    'applevis:savedEpisodeMeta',
+  TOPIC_SEEN:        'applevis:topicSeen',
+  EPISODE_DURATIONS: 'applevis:episodeDurations',
+  EPISODE_CHAPTERS:  'applevis:episodeChapters',
+  ITEM_VISITS:       'applevis:itemVisits',
 };
 
 async function localGet<T>(key: string, fallback: T): Promise<T> {
@@ -234,6 +238,65 @@ export const persistence = {
 
   async clearPlayHistory(): Promise<void> {
     await localSet(LK.PLAY_HISTORY, []);
+  },
+
+  // ── Episode durations (device-local) ─────────────────────────────────────
+  // Stores real durations extracted from expo-av, keyed by episode ID.
+  // Used to display duration in episode list cards before the episode is played.
+
+  getEpisodeDurations: () => localGet<Record<string, number>>(LK.EPISODE_DURATIONS, {}),
+
+  async saveEpisodeDuration(episodeId: string, seconds: number): Promise<void> {
+    const map = await localGet<Record<string, number>>(LK.EPISODE_DURATIONS, {});
+    await localSet(LK.EPISODE_DURATIONS, { ...map, [episodeId]: seconds });
+  },
+
+  // ── Episode chapters (device-local) ──────────────────────────────────────
+  // Stores chapters parsed from MP3 ID3 CHAP frames, keyed by episode ID.
+  // null means "not yet parsed"; [] means "parsed but no chapters found".
+
+  async getEpisodeChapters(episodeId: string): Promise<Chapter[] | null> {
+    const map = await localGet<Record<string, Chapter[]>>(LK.EPISODE_CHAPTERS, {});
+    return episodeId in map ? map[episodeId] : null;
+  },
+
+  async saveEpisodeChapters(episodeId: string, chapters: Chapter[]): Promise<void> {
+    const map = await localGet<Record<string, Chapter[]>>(LK.EPISODE_CHAPTERS, {});
+    await localSet(LK.EPISODE_CHAPTERS, { ...map, [episodeId]: chapters });
+  },
+
+  // ── Per-topic last-seen timestamp (device-local) ─────────────────────────
+  // Stores the ISO timestamp when the user last opened each forum topic.
+  // Used to mark replies added since the last visit as "new".
+
+  async getTopicLastSeen(topicId: string): Promise<string | null> {
+    const map = await localGet<Record<string, string>>(LK.TOPIC_SEEN, {});
+    return map[topicId] ?? null;
+  },
+
+  async stampTopicSeen(topicId: string): Promise<void> {
+    const map = await localGet<Record<string, string>>(LK.TOPIC_SEEN, {});
+    await localSet(LK.TOPIC_SEEN, { ...map, [topicId]: new Date().toISOString() });
+  },
+
+  // ── Per-item visit tracking (all content types) ───────────────────────────
+  // Stores last-visited timestamp + comment count for topics, apps, blogs,
+  // resources and episode comment pages. Used to:
+  //   • Mark comments added since last visit as "new" on detail pages
+  //   • Show "X new" comment counts on home tab feed cards
+
+  async getItemVisit(id: string): Promise<{ seenAt: string; commentCount: number } | null> {
+    const map = await localGet<Record<string, { seenAt: string; commentCount: number }>>(LK.ITEM_VISITS, {});
+    return map[id] ?? null;
+  },
+
+  async stampItemVisit(id: string, commentCount: number): Promise<void> {
+    const map = await localGet<Record<string, { seenAt: string; commentCount: number }>>(LK.ITEM_VISITS, {});
+    await localSet(LK.ITEM_VISITS, { ...map, [id]: { seenAt: new Date().toISOString(), commentCount } });
+  },
+
+  async getAllItemVisits(): Promise<Record<string, { seenAt: string; commentCount: number }>> {
+    return localGet<Record<string, { seenAt: string; commentCount: number }>>(LK.ITEM_VISITS, {});
   },
 
   // ── Per-show playback speed (device-local) ────────────────────────────────

@@ -5,11 +5,14 @@ import { Screen } from '../src/components/Screen';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useToast } from '../src/contexts/ToastContext';
+import { useAlert } from '../src/contexts/AccessibleAlertContext';
+import { ALERTS } from '../src/data/alertMessages';
 
 export default function DeleteAccount() {
   const { colors, styles } = useTheme();
   const auth               = useAuth();
   const { showToast }      = useToast();
+  const { showAlert }      = useAlert();
   const [confirmed, setConfirmed] = useState(false);
   const [loading,   setLoading]   = useState(false);
 
@@ -22,7 +25,7 @@ export default function DeleteAccount() {
       showToast('Your account has been deleted.', 'success');
       router.replace('/(tabs)');
     } else {
-      showToast(result.error ?? 'Could not delete account. Please try again.', 'error');
+      showAlert(ALERTS.account.deleteFailed(result.error));
     }
   }
 

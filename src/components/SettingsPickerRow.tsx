@@ -1,5 +1,15 @@
-import { useRef, useState } from 'react';
-import { Animated, Modal, PanResponder, Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import {
+  AccessibilityInfo,
+  Animated,
+  findNodeHandle,
+  Modal,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -17,6 +27,7 @@ export function SettingsPickerRow<T extends string | number>({
   const { colors, styles } = useTheme();
   const [open, setOpen] = useState(false);
   const currentLabel = options.find(o => o.value === value)?.label ?? String(value);
+  const titleRef = useRef<Text>(null);
 
   const sheetY = useRef(new Animated.Value(0)).current;
   const pan = useRef(
@@ -37,6 +48,15 @@ export function SettingsPickerRow<T extends string | number>({
     })
   ).current;
 
+  useEffect(() => {
+    if (!open) return;
+    const timer = setTimeout(() => {
+      const handle = findNodeHandle(titleRef.current);
+      if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [open]);
+
   return (
     <>
       <Pressable
@@ -52,8 +72,13 @@ export function SettingsPickerRow<T extends string | number>({
             {description}
           </Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Text style={{ fontSize: 15, color: colors.accent, fontWeight: '600' }}>{currentLabel}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: '42%' }}>
+          <Text
+            style={{ fontSize: 15, color: colors.accent, fontWeight: '600', flexShrink: 1, textAlign: 'right' }}
+            numberOfLines={2}
+          >
+            {currentLabel}
+          </Text>
           <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} accessibilityElementsHidden />
         </View>
       </Pressable>
@@ -65,6 +90,7 @@ export function SettingsPickerRow<T extends string | number>({
         onRequestClose={() => setOpen(false)}
         accessibilityViewIsModal
       >
+        <View style={{ flex: 1 }} onAccessibilityEscape={() => setOpen(false)}>
         <Pressable
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }}
           onPress={() => setOpen(false)}
@@ -88,7 +114,7 @@ export function SettingsPickerRow<T extends string | number>({
             paddingHorizontal: 20, paddingBottom: 12,
             borderBottomWidth: 1, borderBottomColor: colors.border,
           }}>
-            <Text style={{ flex: 1, fontSize: 17, fontWeight: '700', color: colors.text }}
+            <Text ref={titleRef} style={{ flex: 1, fontSize: 17, fontWeight: '700', color: colors.text }}
               accessibilityRole="header">{label}</Text>
             <Pressable
               onPress={() => setOpen(false)}
@@ -136,6 +162,7 @@ export function SettingsPickerRow<T extends string | number>({
             <View style={{ height: 40 }} />
           </ScrollView>
         </Animated.View>
+        </View>
       </Modal>
     </>
   );

@@ -10,7 +10,7 @@ function SectionHeader({ label, colors }: { label: string; colors: ReturnType<ty
   return (
     <Text
       style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
-        textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 20, marginBottom: 8 }}
+        textTransform: 'uppercase', letterSpacing: 0, marginTop: 20, marginBottom: 8 }}
       accessibilityRole="header"
     >
       {label}

@@ -1,10 +1,11 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AccessibilityInfo, Image, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlayer } from '../src/contexts/PlayerContext';
 import { useTheme } from '../src/contexts/ThemeContext';
+import { useTip, TIP_KEYS, TIPS } from '../src/contexts/ContextualTipContext';
 import { SPEED_OPTIONS } from '../src/hooks/usePodcastPlayer';
 
 function formatTime(seconds: number): string {
@@ -19,7 +20,15 @@ export default function PlayerScreen() {
   const router             = useRouter();
   const { colors }         = useTheme();
   const player             = usePlayer();
+  const { showTip }        = useTip();
   const [barWidth, setBarWidth] = useState(0);
+
+  // Show magic-tap tip the first time the player is opened.
+  useEffect(() => {
+    const t = setTimeout(() => showTip(TIP_KEYS.playerMagicTap, TIPS.playerMagicTap), 1500);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onMagicTap = useCallback(() => {
     if (player.isPlaying) player.pause();
@@ -44,7 +53,11 @@ export default function PlayerScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} onMagicTap={onMagicTap}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      onMagicTap={onMagicTap}
+      onAccessibilityEscape={() => router.back()}
+    >
 
       {/* ── Header ──────────────────────────────────────────────────── */}
       <View style={{ flexDirection: 'row', alignItems: 'center',

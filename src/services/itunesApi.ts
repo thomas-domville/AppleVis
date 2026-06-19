@@ -9,6 +9,7 @@
 
 export type ItunesMetadata = {
   appStoreId:        string;
+  artistId:          string;          // numeric developer/publisher ID — used to fetch other apps by this dev
   appName:           string;          // trackName — app display name
   developerName:     string;          // artistName — developer or publisher
   category:          string;          // primaryGenreName — e.g. "Productivity"
@@ -29,6 +30,16 @@ export type ItunesMetadata = {
   ipadScreenshotUrls: string[];
   developerWebsite:  string | null;   // sellerUrl — may be absent
   appStoreDescription: string;        // Full App Store description (different from AppleVis body)
+  supportedDevices:  string[];        // normalised: "iPhone", "iPad", "Mac", "Apple Watch", "Apple TV"
+};
+
+export type DeveloperApp = {
+  id:          string;
+  name:        string;
+  iconUrl:     string;
+  category:    string;
+  price:       string;
+  appStoreUrl: string;
 };
 
 function extractAppStoreId(url: string): string | null {
@@ -44,7 +55,23 @@ function formatBytes(bytesStr: string): string {
   return `${(b / 1_048_576).toFixed(1)} MB`;
 }
 
-export async function fetchItunesMetadata(appStoreUrl: string): Promise<ItunesMetadata | null> {
+function normaliseSupportedDevices(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const items = raw as string[];
+  const out: string[] = [];
+  if (items.some(d => /iPhone|iPod/.test(d)))  out.push('iPhone');
+  if (items.some(d => /iPad/.test(d)))          out.push('iPad');
+  if (items.some(d => /Watch/.test(d)))         out.push('Apple Watch');
+  if (items.some(d => /Mac|AppleM/.test(d)))    out.push('Mac');
+  if (items.some(d => /AppleTV/.test(d)))       out.push('Apple TV');
+  return out;
+}
+
+// Returns ItunesMetadata on success, 'not-found' when the app is no longer on the
+// App Store (iTunes returned resultCount:0), or null for transient network errors.
+export async function fetchItunesMetadata(
+  appStoreUrl: string,
+): Promise<ItunesMetadata | 'not-found' | null> {
   const id = extractAppStoreId(appStoreUrl);
   if (!id) return null;
 
@@ -60,12 +87,14 @@ export async function fetchItunesMetadata(appStoreUrl: string): Promise<ItunesMe
       results: Record<string, unknown>[];
     };
 
-    if (!json.resultCount || !json.results[0]) return null;
+    // resultCount === 0 means the app is definitively absent from the App Store.
+    if (!json.resultCount || !json.results[0]) return 'not-found';
 
     const r = json.results[0] as Record<string, unknown>;
 
     return {
       appStoreId:          id,
+      artistId:            String(r.artistId ?? ''),
       appName:             (r.trackName as string | undefined) ?? '',
       developerName:       (r.artistName as string | undefined) ?? '',
       category:            (r.primaryGenreName as string | undefined) ?? '',
@@ -86,8 +115,45 @@ export async function fetchItunesMetadata(appStoreUrl: string): Promise<ItunesMe
       ipadScreenshotUrls:  Array.isArray(r.ipadScreenshotUrls) ? (r.ipadScreenshotUrls as string[]) : [],
       developerWebsite:    (r.sellerUrl as string | undefined) ?? null,
       appStoreDescription: (r.description as string | undefined) ?? '',
+      supportedDevices:    normaliseSupportedDevices(r.supportedDevices),
     };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Fetch other apps published by the same developer.
+ * Uses the artistId (developer numeric ID) from a prior iTunes lookup.
+ * Returns up to 10 apps, excluding the current one, sorted as iTunes returns them.
+ */
+export async function fetchDeveloperApps(
+  artistId: string,
+  excludeAppId: string,
+): Promise<DeveloperApp[]> {
+  if (!artistId) return [];
+  try {
+    const res = await fetch(
+      `https://itunes.apple.com/lookup?id=${artistId}&entity=software&limit=12`,
+      { headers: { Accept: 'application/json' } },
+    );
+    if (!res.ok) return [];
+
+    const json = await res.json() as { resultCount: number; results: Record<string, unknown>[] };
+
+    return json.results
+      .filter((r) => r.kind === 'software' && String(r.trackId) !== excludeAppId)
+      .slice(0, 10)
+      .map((r) => ({
+        id:          String(r.trackId ?? ''),
+        name:        (r.trackName as string | undefined) ?? '',
+        iconUrl:     (r.artworkUrl100 as string | undefined) ?? (r.artworkUrl60 as string | undefined) ?? '',
+        category:    (r.primaryGenreName as string | undefined) ?? '',
+        price:       (r.formattedPrice as string | undefined) ?? (r.price === 0 ? 'Free' : String(r.price ?? '')),
+        appStoreUrl: (r.trackViewUrl as string | undefined) ?? '',
+      }))
+      .filter((a) => a.name && a.appStoreUrl);
+  } catch {
+    return [];
   }
 }

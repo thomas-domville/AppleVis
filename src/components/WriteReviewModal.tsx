@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator, KeyboardAvoidingView, Modal, Platform,
   Pressable, ScrollView, Text, TextInput, View,
@@ -6,6 +6,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useToast } from '../contexts/ToastContext';
+import { useTip, TIP_KEYS, TIPS } from '../contexts/ContextualTipContext';
+import { api } from '../services/api';
 
 const PLATFORMS = ['iOS', 'macOS', 'watchOS', 'Apple TV', 'Vision Pro'] as const;
 
@@ -13,6 +15,8 @@ type Props = {
   visible: boolean;
   appId: string;
   appName: string;
+  replyToAuthor?: string;
+  replyToText?: string;
   onClose: () => void;
   onSubmitted: () => void;
 };
@@ -55,15 +59,35 @@ function StarPicker({
   );
 }
 
-export function WriteReviewModal({ visible, appId, appName, onClose, onSubmitted }: Props) {
+export function WriteReviewModal({ visible, appId, appName, replyToAuthor, replyToText, onClose, onSubmitted }: Props) {
   const { colors, styles } = useTheme();
   const { showToast }      = useToast();
+  const { showTip }        = useTip();
 
   const [rating,      setRating]      = useState(0);
   const [platform,    setPlatform]    = useState<string>('iOS');
   const [version,     setVersion]     = useState('');
   const [body,        setBody]        = useState('');
   const [submitting,  setSubmitting]  = useState(false);
+
+  const isReply = !!replyToAuthor;
+
+  // Pre-fill body with reply prefix when modal opens for a reply
+  useEffect(() => {
+    if (visible && replyToAuthor) {
+      setBody(`[Replying to ${replyToAuthor}]\n\n`);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, replyToAuthor]);
+
+  // Show star-rating tip the first time the review form opens (not for replies).
+  useEffect(() => {
+    if (visible && !replyToAuthor) {
+      const t = setTimeout(() => showTip(TIP_KEYS.reviewStarRating, TIPS.reviewStarRating), 800);
+      return () => clearTimeout(t);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   function reset() {
     setRating(0);
@@ -79,7 +103,7 @@ export function WriteReviewModal({ visible, appId, appName, onClose, onSubmitted
   }
 
   async function handleSubmit() {
-    if (rating === 0) {
+    if (!isReply && rating === 0) {
       showToast('Please choose an accessibility rating before submitting.', 'warning');
       return;
     }
@@ -89,23 +113,35 @@ export function WriteReviewModal({ visible, appId, appName, onClose, onSubmitted
     }
 
     setSubmitting(true);
-
-    // TODO: wire to api.apps.submitReview once the Drupal comment endpoint
-    // for ios_app_directory is confirmed (see Drupal Brief v2).
-    // The payload will be:
-    //   { appId, rating, platform, appVersion: version, body }
-    // using the same JSON:API comment POST pattern as forum replies.
-    if (__DEV__) {
-      console.log('[WriteReview] Would submit:', { appId, rating, platform, version, body });
+    const token = await api.account.getSessionToken();
+    if (!token) {
+      setSubmitting(false);
+      showToast('Your session has expired. Please sign in again.', 'error');
+      return;
     }
 
-    // Simulate network delay in the shell
-    await new Promise((r) => setTimeout(r, 800));
+    const ratingLabel = ['', 'Very poor', 'Poor', 'Average', 'Good', 'Excellent'][rating];
+    const fullBody = isReply && rating === 0
+      ? body.trim()
+      : `Accessibility rating: ${rating}/5 (${ratingLabel})\n\n${body.trim()}`;
 
+    const res = await api.apps.submitReview(appId, fullBody, token, {
+      platform: platform,
+      appVersion: version || undefined,
+    });
     setSubmitting(false);
-    reset();
-    showToast('Comment submitted! It will appear after moderation.', 'success');
-    onSubmitted();
+    if (res.ok) {
+      reset();
+      showToast('Comment submitted! It will appear after moderation.', 'success');
+      onSubmitted();
+    } else {
+      showToast(
+        res.error.includes('403') || res.error.includes('401')
+          ? 'Session expired. Please sign in again.'
+          : `Could not submit: ${res.error}`,
+        'error',
+      );
+    }
   }
 
   return (
@@ -119,6 +155,7 @@ export function WriteReviewModal({ visible, appId, appName, onClose, onSubmitted
       <KeyboardAvoidingView
         style={{ flex: 1, backgroundColor: colors.background }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        onAccessibilityEscape={handleClose}
       >
         {/* Header */}
         <View style={{
@@ -127,7 +164,7 @@ export function WriteReviewModal({ visible, appId, appName, onClose, onSubmitted
         }}>
           <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text, flex: 1 }}
             accessibilityRole="header">
-            Add New Comment
+            {isReply ? `Reply to ${replyToAuthor}` : 'Add New Comment'}
           </Text>
           <Pressable
             onPress={handleClose}

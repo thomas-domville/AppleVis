@@ -2,19 +2,31 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PREFIX = 'applevis:cache:';
 
-// How long before cached data is considered stale (shown with a banner)
+// How long before cached data is considered stale (re-fetch on next open)
 // and how long before it is considered expired (not served at all).
+// More-specific prefixes must appear BEFORE their generic parent so the first-match
+// loop in getTTL picks them up correctly.
 const STALE_MS: Record<string, number> = {
-  'forums:':    30 * 60 * 1000,         // 30 min
-  'podcasts:':   6 * 60 * 60 * 1000,    // 6 hr
-  'apps:':       6 * 60 * 60 * 1000,    // 6 hr
-  'resources:':  6 * 60 * 60 * 1000,    // 6 hr
+  'forums:detail:':    5 * 60 * 1000,        //  5 min — forum replies change frequently
+  'apps:detail:':     15 * 60 * 1000,        // 15 min — reviews moderate; fields stable
+  'blogs:detail:':    10 * 60 * 1000,        // 10 min — blog comments
+  'resources:detail:':10 * 60 * 1000,        // 10 min — guide comments
+  'forums:':          30 * 60 * 1000,        // 30 min
+  'podcasts:':         6 * 60 * 60 * 1000,   //  6 hr
+  'apps:':             6 * 60 * 60 * 1000,   //  6 hr
+  'resources:':        6 * 60 * 60 * 1000,   //  6 hr
+  'blogs:':            6 * 60 * 60 * 1000,   //  6 hr
 };
 const EXPIRE_MS: Record<string, number> = {
-  'forums:':    7  * 24 * 60 * 60 * 1000,  // 7 days
-  'podcasts:':  30 * 24 * 60 * 60 * 1000,  // 30 days
-  'apps:':      30 * 24 * 60 * 60 * 1000,
-  'resources:': 30 * 24 * 60 * 60 * 1000,
+  'forums:detail:':    2 * 24 * 60 * 60 * 1000,  //  2 days
+  'apps:detail:':      7 * 24 * 60 * 60 * 1000,  //  7 days
+  'blogs:detail:':     7 * 24 * 60 * 60 * 1000,  //  7 days
+  'resources:detail:': 7 * 24 * 60 * 60 * 1000,  //  7 days
+  'forums:':           7 * 24 * 60 * 60 * 1000,  //  7 days
+  'podcasts:':        30 * 24 * 60 * 60 * 1000,  // 30 days
+  'apps:':            30 * 24 * 60 * 60 * 1000,
+  'resources:':       30 * 24 * 60 * 60 * 1000,
+  'blogs:':           30 * 24 * 60 * 60 * 1000,
 };
 
 function getTTL(key: string): { staleMs: number; expireMs: number } {

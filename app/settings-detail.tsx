@@ -47,6 +47,11 @@ function SettingCard({ item }: { item: SettingItem }) {
 
   // Map well-known setting IDs to dedicated interactive screens
   const INTERACTIVE_ROUTES: Record<string, string> = {
+    signIn:                 '/settings-account',
+    displayName:            '/settings-account',
+    emailAddress:           '/settings-account',
+    changePassword:         '/settings-account',
+    deleteAccount:          '/settings-account',
     theme:                  '/settings-appearance',
     cardDensity:            '/settings-appearance',
     announcementLevel:      '/settings-accessibility',
@@ -86,7 +91,6 @@ function SettingCard({ item }: { item: SettingItem }) {
     helpIntelligence:       '/help',
     helpFAQ:                '/help',
     helpGuidelines:         '/help',
-    deleteAccount:          '/profile',
     // Intelligence & Siri — all items open the dedicated intelligence screen
     readAloud:              '/settings-intelligence',
     translate:              '/settings-intelligence',
@@ -136,7 +140,7 @@ function SettingCard({ item }: { item: SettingItem }) {
         {badge && (
           <View style={{ backgroundColor: statusBadgeColor(item.status, colors.accent),
             borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-            <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>{badge}</Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>{badge}</Text>
           </View>
         )}
         <Ionicons
@@ -154,8 +158,8 @@ function SettingCard({ item }: { item: SettingItem }) {
       {/* Example box */}
       <View style={{ backgroundColor: colors.background, borderRadius: 8,
         padding: 10, borderLeftWidth: 3, borderLeftColor: colors.accent }}>
-        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary,
-          textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
+        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+          textTransform: 'uppercase', letterSpacing: 0, marginBottom: 4 }}>
           Example
         </Text>
         <Text style={{ fontSize: 14, lineHeight: 20, color: colors.text, fontStyle: 'italic' }}>

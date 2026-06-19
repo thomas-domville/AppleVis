@@ -15,6 +15,7 @@ import { usePodcastList } from '../../src/hooks/usePodcastList';
 import { useRefreshFeedback } from '../../src/hooks/useRefreshFeedback';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
+import { useTip, TIP_KEYS, TIPS } from '../../src/contexts/ContextualTipContext';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
 import type { AnnouncementLevel } from '../../src/contexts/PreferencesContext';
 import { readAloud, donateSiriActivity } from '../../src/services/intelligenceService';
@@ -23,6 +24,7 @@ import { startPodcastLiveActivity, updateCarPlayEpisodes } from '../../src/nativ
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 import { useEpisodeMeta } from '../../src/hooks/useEpisodeMeta';
+import { useEpisodeDurations } from '../../src/hooks/useEpisodeDurations';
 import { persistence } from '../../src/services/persistence';
 import type { PlayHistoryEntry } from '../../src/services/persistence';
 import { deleteAllDownloads } from '../../src/services/downloads';
@@ -340,10 +342,33 @@ export default function Podcasts() {
   const player                   = usePlayer();
   const list                     = usePodcastList();
   const meta                     = useEpisodeMeta();
+  const cachedDurations          = useEpisodeDurations();
+
+  // Enrich episodes with real durations extracted from expo-av on prior plays.
+  const episodes = useMemo(
+    () => list.episodes.map((ep: PodcastEpisode) =>
+      cachedDurations[ep.id] ? { ...ep, duration: cachedDurations[ep.id] } : ep,
+    ),
+    [list.episodes, cachedDurations],
+  );
   const { showToast }            = useToast();
+  const { showTip }              = useTip();
   const { announcementLevel, podcastAutoDelete } = usePreferences();
 
   const [filter, setFilter]           = useState<PodcastFilter>('Latest');
+
+  // Show relevant tip the first time the user switches to Saved or Downloads.
+  useEffect(() => {
+    if (filter === 'Saved') {
+      const t = setTimeout(() => showTip(TIP_KEYS.savedSwipeActions, TIPS.savedSwipeActions), 1000);
+      return () => clearTimeout(t);
+    }
+    if (filter === 'Downloads') {
+      const t = setTimeout(() => showTip(TIP_KEYS.downloadsOffline, TIPS.downloadsOffline), 1000);
+      return () => clearTimeout(t);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
   const [searchQuery, setSearchQuery] = useState('');
   const [lastVisit, setLastVisit]     = useState<Date | null>(null);
   const [history, setHistory]         = useState<PlayHistoryEntry[]>([]);
@@ -425,30 +450,30 @@ export default function Podcasts() {
 
   // Push feed to CarPlay list template after every load/refresh.
   useEffect(() => {
-    if (!list.episodes.length) return;
-    updateCarPlayEpisodes(list.episodes.slice(0, 100).map(ep => ({
+    if (!episodes.length) return;
+    updateCarPlayEpisodes(episodes.slice(0, 100).map(ep => ({
       id:           ep.id,
       title:        ep.title,
       showTitle:    ep.showTitle,
       duration:     ep.duration,
       isDownloaded: !!meta.downloadedMeta[ep.id],
     })));
-  }, [list.episodes, meta.downloadedMeta]);
+  }, [episodes, meta.downloadedMeta]);
 
   // Merged known episodes map (downloaded metadata + live feed)
   const allKnownEpisodes = useMemo<Record<string, PodcastEpisode>>(() => {
     const map: Record<string, PodcastEpisode> = { ...meta.downloadedMeta };
-    list.episodes.forEach(ep => { map[ep.id] = ep; });
+    episodes.forEach(ep => { map[ep.id] = ep; });
     return map;
-  }, [meta.downloadedMeta, list.episodes]);
+  }, [meta.downloadedMeta, episodes]);
 
   const filteredLatest = useMemo(() => {
-    if (!searchQuery.trim()) return list.episodes;
+    if (!searchQuery.trim()) return episodes;
     const q = searchQuery.toLowerCase();
-    return list.episodes.filter(ep =>
+    return episodes.filter(ep =>
       ep.title.toLowerCase().includes(q) ||
       ep.showTitle.toLowerCase().includes(q));
-  }, [list.episodes, searchQuery]);
+  }, [episodes, searchQuery]);
 
   const inProgressEpisodes = useMemo(() =>
     Object.values(allKnownEpisodes).filter(ep => {
@@ -483,7 +508,7 @@ export default function Podcasts() {
     Object.values(meta.savedMeta).forEach(ep => {
       if (meta.savedIds.has(ep.id)) { items.push(ep); seen.add(ep.id); }
     });
-    list.episodes.forEach(ep => {
+    episodes.forEach(ep => {
       if (meta.savedIds.has(ep.id) && !seen.has(ep.id)) items.push(ep);
     });
     const savedAtMap = new Map(meta.savedItems.map(s => [s.id, s.savedAt]));
@@ -511,7 +536,7 @@ export default function Podcasts() {
         }
       }
     });
-  }, [meta.savedIds, meta.savedMeta, meta.savedItems, list.episodes, savedSort]);
+  }, [meta.savedIds, meta.savedMeta, meta.savedItems, episodes, savedSort]);
 
   // Is an episode "new" (published since last visit)?
   const isNewEpisode = useCallback((ep: PodcastEpisode): boolean => {

@@ -23,6 +23,7 @@ export function SettingsSegmentedRow<T extends string | number>({
       <View
         style={{
           flexDirection: 'row',
+          flexWrap: 'wrap',
           borderRadius: 10,
           borderWidth: 1,
           borderColor: colors.border,
@@ -40,18 +41,23 @@ export function SettingsSegmentedRow<T extends string | number>({
               accessibilityState={{ selected: isSelected }}
               accessibilityLabel={opt.label}
               style={{
-                flex: 1,
+                flexGrow: 1,
+                flexBasis: `${100 / Math.min(options.length, 3)}%`,
                 paddingVertical: 9,
+                paddingHorizontal: 8,
                 alignItems: 'center',
                 backgroundColor: isSelected ? colors.accent : colors.pill,
                 borderRightWidth: i < options.length - 1 ? 1 : 0,
                 borderRightColor: colors.border,
+                borderBottomWidth: options.length > 3 && i < options.length - 1 ? 1 : 0,
+                borderBottomColor: colors.border,
               }}
             >
               <Text style={{
                 fontSize: 14,
                 fontWeight: '600',
                 color: isSelected ? colors.accentText : colors.pillText,
+                textAlign: 'center',
               }}>
                 {opt.label}
               </Text>

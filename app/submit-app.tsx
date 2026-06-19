@@ -107,7 +107,12 @@ export default function SubmitAppScreen() {
       const data = await fetchItunesMetadata(target);
       if (!data) {
         setLookupState('error');
-        showToast('App not found. Check the URL and try again.', 'error');
+        showToast('Network error. Check your connection and try again.', 'error');
+        return;
+      }
+      if (data === 'not-found') {
+        setLookupState('error');
+        showToast('App not found in the App Store. Check the URL and try again.', 'error');
         return;
       }
       setMeta(data);

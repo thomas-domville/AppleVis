@@ -8,8 +8,9 @@ import { useTheme } from '../src/contexts/ThemeContext';
 import { useToast } from '../src/contexts/ToastContext';
 import { useAccessibilityPreferences } from '../src/hooks/useAccessibilityPreferences';
 import { useDynamicType } from '../src/hooks/useDynamicType';
+import { APPLEVIS_SOCIAL_LINKS } from '../src/data/socialLinks';
 
-const APP_VERSION   = Constants.expoConfig?.version   ?? '2026.0.1.1';
+const APP_VERSION   = Constants.expoConfig?.version   ?? '2026.0.2';
 const BUILD_NUMBER  = Constants.expoConfig?.ios?.buildNumber ?? '2';
 const IOS_VERSION   = Platform.OS === 'ios' ? String(Platform.Version) : 'N/A';
 const DEVICE_NAME   = Device.deviceName ?? 'Unknown device';
@@ -89,13 +90,14 @@ export default function About() {
         <View style={[styles.card, { alignItems: 'center', paddingVertical: 28 }]}
           accessible
           accessibilityLabel={`AppleVis — a Be My Eyes company. Version ${APP_VERSION}, Build ${BUILD_NUMBER}. The premier community for blind, DeafBlind, and low vision Apple users.`}>
-          <View style={{ backgroundColor: '#ffffff', borderRadius: 12,
+          <View style={{ backgroundColor: colors.card, borderRadius: 12,
             paddingHorizontal: 16, paddingVertical: 12, marginBottom: 16 }}
             accessibilityElementsHidden>
             <Image
               source={require('../assets/images/applevis-logo.png')}
               style={{ width: 200, height: 57 }}
               resizeMode="contain"
+              accessibilityIgnoresInvertColors
             />
           </View>
           <Text style={{ fontSize: 15, color: colors.textSecondary, marginBottom: 2 }}>
@@ -176,6 +178,29 @@ export default function About() {
             </Text>
           </View>
         </Pressable>
+
+        {/* Connect */}
+        <SectionHeader label="Connect With Us" colors={colors} />
+        {APPLEVIS_SOCIAL_LINKS.map((link) => (
+          <Pressable
+            key={link.id}
+            onPress={() => Linking.openURL(link.url).catch(() => showToast('Could not open link.', 'error'))}
+            accessible
+            accessibilityRole="link"
+            accessibilityLabel={link.description}
+            accessibilityHint="Opens in Safari."
+            style={({ pressed }) => [styles.cardSmall, {
+              flexDirection: 'row', alignItems: 'center', gap: 12,
+            }, pressed && { opacity: 0.85 }]}
+          >
+            <Ionicons name={link.icon as any} size={20} color={colors.accent} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.body, { marginBottom: 0 }]}>{link.label}</Text>
+              <Text style={[styles.cardMeta, { marginTop: 1 }]}>{link.url.replace('https://', '')}</Text>
+            </View>
+            <Ionicons name="open-outline" size={16} color={colors.textSecondary} />
+          </Pressable>
+        ))}
 
         {/* Links */}
         <SectionHeader label="Legal & Credits" colors={colors} />

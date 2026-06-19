@@ -4,12 +4,13 @@
  * Content (forums, podcasts, apps, resources) is served via Drupal JSON:API.
  * Authentication uses Drupal's REST Simple Auth module.
  *
- * WORKING NOW  : all content GET endpoints, login, account deletion, push token
- * STILL NEEDED : follow/unfollow server-side flag (subscribe_node), search API path
+ * WORKING NOW  : all content GET/POST endpoints, login, follow/unfollow, push token
+ * STILL NEEDED : full-text search API path, app categories, apple-only filter value
  */
 
 import { relativeTime } from '../utils/relativeTime';
-import type { ForumTopic, ForumReply, ForumTopicDetail, AppListing, AppDetail, AppReview, Resource, ResourceDetail, PodcastEpisode, PaginatedResult, BlogPost, SearchResult } from '../types/content';
+import { IOS_PUBLIC_CATEGORY_PATHS } from '../data/appDirectory';
+import type { ForumTopic, ForumReply, ForumTopicDetail, AppListing, AppDetail, AppReview, Resource, ResourceDetail, PodcastEpisode, PaginatedResult, BlogPost, BlogPostDetail, SearchResult, AppCategoryProbe, AppCategory, AppPlatform } from '../types/content';
 
 // ─── Phase 4 gate constants ───────────────────────────────────────────────────
 // Replace each null / placeholder with the confirmed value from the Drupal
@@ -20,24 +21,16 @@ import type { ForumTopic, ForumReply, ForumTopicDetail, AppListing, AppDetail, A
 const BLOG_CONTENT_TYPE: string | null = 'blog2';
 //
 // Gate 2 — Forum Apple-related filter:
-//   Field path confirmed by live API: 'taxonomy_forums.name'.
-//   Value TBD — no single term is named 'Apple'. The forum has: iOS and iPadOS,
-//   macOS and Mac Apps, Apple Beta Releases, Apple Hardware and Compatible
-//   Accessories, Other Apple Chat, tvOS and Apple TV Apps, watchOS and Apple
-//   Watch Apps, Braille on Apple Products, Low Vision Accessibility on Apple
-//   Products, iOS and iPadOS Gaming, App Development and Programming,
-//   Accessibility Advocacy, Assistive Technology, Site News, Android, Windows,
-//   Smart Home Tech and Gadgets.
-//   TODO: ask developer what term value(s) define "Apple-related" for this filter,
-//   or switch to a NOT IN exclusion for Android / Windows.
-const FORUM_APPLE_FILTER_PATH: string | null = 'taxonomy_forums.name';
-const FORUM_APPLE_FILTER_VALUE = 'Apple';
+//   Non-Apple forum TIDs confirmed by developer:
+//     265 = Windows, 266 = Android, 267 = Smart Home Tech and Gadgets, 269 = Assistive Technology
+//   All other 13 forums are Apple-related. Filter uses NOT IN on drupal_internal__tid.
+const FORUM_NON_APPLE_TIDS = [265, 266, 267, 269];
 //
 // Gate 3 — Full-text Search API:
 //   Set to the REST path prefix, e.g. '/search_api/index/content?fulltext=' or
 //   '/views/site_search/page_1?fulltext='.
 //   Affects: Discover tab search (upgrades from title-CONTAINS to full-text).
-const SEARCH_API_PATH: string | null = null;
+const SEARCH_API_PATH: string | null = '/api/v1/search';
 
 const BASE             = 'https://www.applevis.com';
 const JSONAPI          = `${BASE}/jsonapi`;
@@ -55,6 +48,16 @@ function fileUri(drupalUri: string): string {
   return drupalUri.replace('public://', `${BASE}/sites/default/files/`);
 }
 
+function profileFieldText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const nested = record.value ?? record.processed ?? record.uri ?? record.title;
+    return typeof nested === 'string' ? nested : '';
+  }
+  return '';
+}
+
 // ─── Generic fetch helpers ────────────────────────────────────────────────────
 
 type JsonApiResult<T> = { ok: true; data: T } | { ok: false; error: string; status?: number };
@@ -68,7 +71,19 @@ async function jsonApi<T>(path: string, options?: RequestInit): Promise<JsonApiR
       ...options,
       signal: ctrl.signal,
     });
-    if (!res.ok) return { ok: false, error: `HTTP ${res.status}`, status: res.status };
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      let detail = text.trim();
+      try {
+        const json = detail ? JSON.parse(detail) : null;
+        detail = String(json?.message ?? json?.error ?? json?.errors?.[0]?.detail ?? detail);
+      } catch { /* keep plain response text */ }
+      return {
+        ok: false,
+        error: detail ? `HTTP ${res.status}: ${detail}` : `HTTP ${res.status}`,
+        status: res.status,
+      };
+    }
     const json = await res.json() as T;
     return { ok: true, data: json };
   } catch (err) {
@@ -90,9 +105,41 @@ async function drupalRest<T>(path: string, options?: RequestInit): Promise<JsonA
       ...options,
       signal: ctrl.signal,
     });
-    if (!res.ok) return { ok: false, error: `HTTP ${res.status}`, status: res.status };
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      let detail = text.trim();
+      try {
+        const json = detail ? JSON.parse(detail) : null;
+        detail = String(json?.message ?? json?.error ?? json?.errors?.[0]?.detail ?? detail);
+      } catch { /* keep plain response text */ }
+      return {
+        ok: false,
+        error: detail ? `HTTP ${res.status}: ${detail}` : `HTTP ${res.status}`,
+        status: res.status,
+      };
+    }
     const json = await res.json() as T;
     return { ok: true, data: json };
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      return { ok: false, error: 'Request timed out.' };
+    }
+    return { ok: false, error: err instanceof Error ? err.message : 'Network error' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function publicHtml(path: string): Promise<JsonApiResult<string>> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      headers: { ...COMMON_HEADERS, Accept: 'text/html' },
+      signal: ctrl.signal,
+    });
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}`, status: res.status };
+    return { ok: true, data: await res.text() };
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
       return { ok: false, error: 'Request timed out.' };
@@ -126,20 +173,71 @@ function mapForum(node: JsonApiNode, included: JsonApiNode[] = []): ForumTopic {
   const authorName = String(
     userNode?.attributes?.display_name ?? userNode?.attributes?.name ?? '',
   );
+  const taxId = (node.relationships?.taxonomy_forums?.data as { id?: string } | undefined)?.id;
+  const taxTerm = taxId ? included.find((n) => n.id === taxId) : undefined;
+  const category = (taxTerm?.attributes?.name ?? undefined) as string | undefined;
+  // last_comment_timestamp is a Unix timestamp (seconds) of the most recent comment —
+  // more precise than the node's changed field which also updates on body edits.
+  const lastCommentTs = a.comment_forum?.last_comment_timestamp as number | undefined;
+  const lastActivityAt = (lastCommentTs && lastCommentTs > 0)
+    ? new Date(lastCommentTs * 1000).toISOString()
+    : (a.changed ?? '');
   return {
     id: node.id,
     title: a.title ?? '',
     meta: `${a.comment_forum?.comment_count ?? 0} replies · ${relativeTime(a.changed)}`,
     authorName,
+    authorId: uidId ?? '',
     createdAt: a.created ?? '',
-    lastActivityAt: a.changed ?? '',
+    lastActivityAt,
     replyCount: a.comment_forum?.comment_count ?? 0,
     isUnread: false,
     isFollowing: false,
     isSaved: false,
+    category,
     url: a.path?.alias ? `${BASE}${a.path.alias}` : undefined,
   };
 }
+
+// Converts a forum URL slug to a display category name.
+// e.g. "apple-beta-releases" → "Apple Beta Releases"
+function categoryFromForumUrl(url: string): string | undefined {
+  try {
+    const parts = new URL(url).pathname.split('/').filter(Boolean);
+    // pathname: /forum/{category-slug}/{topic-slug}
+    if (parts.length >= 2 && parts[0] === 'forum') {
+      return parts[1].split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    }
+  } catch (_) { /* ignore malformed URLs */ }
+  return undefined;
+}
+
+// Maps a flat item from GET /api/v1/forums/recent to ForumTopic.
+// This endpoint returns correct last_comment_timestamp order (matching the website)
+// but does not include author or numeric category ID.
+function mapForumFromRecent(item: Record<string, string>): ForumTopic {
+  const lastTs = Number(item.last_comment_timestamp ?? 0);
+  const lastActivityAt = lastTs > 0
+    ? new Date(lastTs * 1000).toISOString()
+    : new Date(Number(item.changed) * 1000).toISOString();
+  const replyCount = Number(item.comment_count ?? 0);
+  return {
+    id: item.uuid,
+    title: item.title ?? '',
+    meta: `${replyCount} repl${replyCount === 1 ? 'y' : 'ies'} · ${relativeTime(lastActivityAt)}`,
+    authorName: '',
+    createdAt: new Date(Number(item.created) * 1000).toISOString(),
+    lastActivityAt,
+    replyCount,
+    isUnread: false,
+    isFollowing: false,
+    isSaved: false,
+    category: categoryFromForumUrl(item.url ?? ''),
+    url: item.url,
+  };
+}
+
+const RECENT_PAGE_SIZE = 20;
 
 // ─── Podcasts ─────────────────────────────────────────────────────────────────
 
@@ -154,6 +252,13 @@ function mapForum(node: JsonApiNode, included: JsonApiNode[] = []): ForumTopic {
 
 function mapPodcast(node: JsonApiNode, included: JsonApiNode[] = []): PodcastEpisode {
   const a = node.attributes;
+
+  // Author (uid relationship — same pattern as mapComment)
+  const uidId    = (node.relationships?.uid?.data as { id?: string } | undefined)?.id;
+  const userNode = uidId ? included.find((n) => n.id === uidId) : undefined;
+  const authorName = String(
+    userNode?.attributes?.display_name ?? userNode?.attributes?.name ?? '',
+  ) || undefined;
 
   // Audio file
   const fileId   = node.relationships?.field_podcast?.data?.id as string | undefined;
@@ -199,19 +304,202 @@ function mapPodcast(node: JsonApiNode, included: JsonApiNode[] = []): PodcastEpi
     transcriptUrl: transcriptUrl || undefined,
     chapters,
     url: a.path?.alias ? `${BASE}${a.path.alias}` : undefined,
+    authorName,
   };
 }
 
 // ─── Apps ─────────────────────────────────────────────────────────────────────
 
-function mapApp(node: JsonApiNode): AppListing {
+const APP_CATEGORY_RELATIONSHIP_CANDIDATES = [
+  'field_category',
+  'field_app_category',
+  'field_app_categories',
+  'field_directory_category',
+  'field_ios_app_category',
+  'field_app_store_category',
+  'taxonomy_app_category',
+  'taxonomy_categories',
+];
+
+function relatedTermName(node: JsonApiNode, included: JsonApiNode[], relationshipNames: string[]): string {
+  for (const fieldName of relationshipNames) {
+    const relData = node.relationships?.[fieldName]?.data;
+    const refs = Array.isArray(relData) ? relData : relData ? [relData] : [];
+    for (const ref of refs) {
+      const term = included.find((n) => n.id === ref.id);
+      const name = term?.attributes?.name;
+      if (typeof name === 'string' && name.trim()) return name.trim();
+    }
+  }
+  return '';
+}
+
+function normaliseAppCategoryName(category: string): string {
+  const aliases: Record<string, string> = {
+    'Food & Drink': 'Food and Drink',
+    'Graphics & Design': 'Graphics and Design',
+    'Health & Fitness': 'Health and Fitness',
+    'Photo & Video': 'Photo and Video',
+    Sports: 'Sports and Activities',
+  };
+  return aliases[category] ?? category;
+}
+
+function decodeHtml(text: string): string {
+  return text
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#(\d+);/g, (_m, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_m, code) => String.fromCharCode(parseInt(code, 16)));
+}
+
+type DirectoryApiListing = Partial<{
+  id: string | number;
+  nid: string | number;
+  uuid: string;
+  name: string;
+  title: string;
+  developer: string;
+  platform: string;
+  category: string;
+  summary: string;
+  body: string;
+  url: string;
+  path: string;
+  appStoreUrl: string;
+  app_store_url: string;
+  lastUpdatedAt: string;
+  last_updated_at: string;
+  changed: string;
+  updated: string;
+  reviewCount: number;
+  review_count: number;
+  commentCount: number;
+  comment_count: number;
+  iconUrl: string;
+  icon_url: string;
+}>;
+
+function mapDirectoryApiListing(item: DirectoryApiListing, platform: string, category: string): AppListing {
+  const url = String(item.url ?? item.path ?? '');
+  const changed = String(item.lastUpdatedAt ?? item.last_updated_at ?? item.changed ?? item.updated ?? new Date().toISOString());
+  return {
+    id: String(item.id ?? item.uuid ?? item.nid ?? url),
+    name: String(item.name ?? item.title ?? ''),
+    developer: String(item.developer ?? ''),
+    platform: String(item.platform ?? platform),
+    category: String(item.category ?? category),
+    reviewCount: Number(item.reviewCount ?? item.review_count ?? item.commentCount ?? item.comment_count ?? 0),
+    lastUpdatedAt: changed,
+    appStoreUrl: String(item.appStoreUrl ?? item.app_store_url ?? ''),
+    iconUrl: item.iconUrl ?? item.icon_url,
+    summary: String(item.summary ?? item.body ?? ''),
+    url: url || undefined,
+  };
+}
+
+function textFromHtml(html: string): string {
+  return decodeHtml(
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim(),
+  );
+}
+
+function parsePublicAppDirectory(html: string, category: string): AppListing[] {
+  const headingPattern = /<h3[^>]*>\s*<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>\s*<\/h3>/gi;
+  const matches = [...html.matchAll(headingPattern)];
+  return matches.map((match, index) => {
+    const rawHref = match[1] ?? '';
+    const url = rawHref.startsWith('http') ? rawHref : `${BASE}${rawHref}`;
+    const title = textFromHtml(match[2] ?? '');
+    const start = (match.index ?? 0) + match[0].length;
+    const end = index + 1 < matches.length ? (matches[index + 1].index ?? html.length) : html.search(/<h2[^>]*>\s*Site Information/i);
+    const chunk = html.slice(start, end > start ? end : html.length);
+    const text = textFromHtml(chunk);
+    const postDate = text.match(/Post Date:\s*((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4})/)?.[1]?.trim();
+    const parsedDate = postDate ? new Date(postDate) : null;
+    const summary = text
+      .replace(/Post Date:\s*[^.]+?\d{4}/, '')
+      .replace(/Pagination\s+Page\s+\d+[\s\S]*$/i, '')
+      .trim();
+
+    return {
+      id: `public:${url}`,
+      name: title,
+      developer: '',
+      platform: 'iOS',
+      category,
+      reviewCount: 0,
+      lastUpdatedAt: parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate.toISOString() : new Date().toISOString(),
+      appStoreUrl: '',
+      summary,
+      url,
+    };
+  }).filter((app) => app.name && app.url);
+}
+
+function inferSearchContentType(path: string): SearchResult['contentType'] {
+  if (path.startsWith('/forum/')) return 'topic';
+  if (path.startsWith('/podcasts/') || path === '/podcasts') return 'podcast';
+  if (path.includes('app-directory') || path.includes('apps/')) return 'app';
+  if (path.startsWith('/guides/') || path === '/guides') return 'guide';
+  if (path.startsWith('/blog/')) return 'blog';
+  if (path.startsWith('/bugs/')) return 'bug';
+  if (path.startsWith('/reviews/')) return 'review';
+  if (path.startsWith('/new-to-')) return 'page';
+  return 'unknown';
+}
+
+function parsePublicSearch(html: string): SearchResult[] {
+  const headingPattern = /<h3[^>]*>\s*<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>\s*<\/h3>/gi;
+  const matches = [...html.matchAll(headingPattern)];
+  const seen = new Set<string>();
+
+  return matches.map((match, index) => {
+    const rawHref = match[1] ?? '';
+    const path = rawHref.startsWith(BASE) ? rawHref.slice(BASE.length) : rawHref;
+    const url = rawHref.startsWith('http') ? rawHref : `${BASE}${rawHref}`;
+    const title = textFromHtml(match[2] ?? '');
+    const start = (match.index ?? 0) + match[0].length;
+    const end = index + 1 < matches.length ? (matches[index + 1].index ?? html.length) : html.length;
+    const chunk = html.slice(start, end);
+    const summary = textFromHtml(chunk)
+      .replace(/^Submitted by\s+.+?\s+on\s+/i, '')
+      .slice(0, 260)
+      .trim();
+
+    return {
+      id: `public:${url}`,
+      contentType: inferSearchContentType(path),
+      title,
+      summary,
+      url,
+      updatedAt: '',
+      source: 'public' as const,
+    };
+  }).filter((result) => {
+    if (!result.title || !result.url || seen.has(result.url)) return false;
+    seen.add(result.url);
+    return true;
+  });
+}
+
+function mapApp(node: JsonApiNode, included: JsonApiNode[] = []): AppListing {
   const a = node.attributes;
   return {
     id: node.id,
     name: a.title ?? '',
     developer: '',
     platform: 'iOS',
-    category: '',
+    category: relatedTermName(node, included, APP_CATEGORY_RELATIONSHIP_CANDIDATES),
     reviewCount: a.comment_node_ios_app_directory?.comment_count ?? 0,
     lastUpdatedAt: a.changed ?? '',
     appStoreUrl: a.field_link2?.uri ?? a.field_link3?.uri ?? '',
@@ -220,9 +508,8 @@ function mapApp(node: JsonApiNode): AppListing {
   };
 }
 
-// ─── Blog posts (Phase 4 gate) ───────────────────────────────────────────────
-// NOTE TO DRUPAL DEVELOPER: confirm comment field name on blog nodes
-// (likely comment_node_blog or comment — check with field_info_field()).
+// ─── Blog posts ───────────────────────────────────────────────────────────────
+// Comment bundle confirmed: comment_node_blog2 (observed via comment_count attribute key).
 
 function mapBlog(node: JsonApiNode, included: JsonApiNode[] = []): BlogPost {
   const a = node.attributes;
@@ -235,6 +522,7 @@ function mapBlog(node: JsonApiNode, included: JsonApiNode[] = []): BlogPost {
     id: node.id,
     title: a.title ?? '',
     authorName,
+    authorId: uidId ?? undefined,
     publishedAt: a.created ?? '',
     lastActivityAt: (a.changed as string | undefined) ?? undefined,
     summary: a.body?.summary ?? a.body?.value ?? '',
@@ -254,6 +542,7 @@ function mapComment(node: JsonApiNode, included: JsonApiNode[] = []): ForumReply
   );
   return {
     id: node.id,
+    subject: (a.subject as string | undefined) || undefined,
     authorName,
     authorId: uidId ?? '',
     body: (a.comment_body?.processed ?? a.comment_body?.value ?? '') as string,
@@ -272,6 +561,7 @@ function mapAppReview(node: JsonApiNode, included: JsonApiNode[] = []): AppRevie
   );
   return {
     id: node.id,
+    subject: (a.subject as string | undefined) || undefined,
     authorName,
     body: (a.comment_body?.processed ?? a.comment_body?.value ?? '') as string,
     createdAt: (a.created ?? '') as string,
@@ -289,7 +579,9 @@ function mapResource(node: JsonApiNode): Resource {
     title: a.title ?? '',
     kind: 'guide',
     summary: a.body?.summary ?? a.body?.value ?? '',
+    createdAt: (a.created as string | undefined) ?? undefined,
     updatedAt: a.changed ?? '',
+    commentCount: a.comment_node_guides?.comment_count ?? 0,
     url: `${BASE}${a.path?.alias ?? `/node/${a.drupal_internal__nid}`}`,
   };
 }
@@ -310,8 +602,30 @@ export const api = {
 
   forums: {
     async list(filter: string, page = 0, sinceDate?: string, appleOnly?: boolean) {
-      const sort = filter === 'New' ? '-created' : '-changed';
-      let path = `/node/forum?sort=${sort}&${pageParams(page)}&include=uid`;
+      // "New" sorts by creation date — JSON:API only.
+      // All other filters use the dedicated /api/v1/forums/recent endpoint which sorts
+      // by last_comment_timestamp DESC, matching the website's sort order exactly.
+      if (filter !== 'New') {
+        let qs = `page=${page}`;
+        if (appleOnly) {
+          FORUM_NON_APPLE_TIDS.forEach((tid) => { qs += `&apple_only[]=${tid}`; });
+        }
+        const res = await fetch(`${BASE}/api/v1/forums/recent?${qs}`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (!res.ok) return { ok: false as const, error: `Forums: ${res.status}` };
+        const items: Record<string, string>[] = await res.json();
+        return {
+          ok: true as const,
+          data: {
+            items: items.map(mapForumFromRecent),
+            hasMore: items.length === RECENT_PAGE_SIZE,
+          } satisfies PaginatedResult<ForumTopic>,
+        };
+      }
+
+      // "New" filter — creation-date sort via JSON:API.
+      let path = `/node/forum?sort=-created&${pageParams(page, 20)}&include=uid,taxonomy_forums`;
       if (sinceDate) {
         const encoded = encodeURIComponent(sinceDate);
         path +=
@@ -319,12 +633,12 @@ export const api = {
           `&filter[since][condition][operator]=%3E` +
           `&filter[since][condition][value]=${encoded}`;
       }
-      // Gate 2 — Apple-related filter. Active only once FORUM_APPLE_FILTER_PATH is set.
-      if (appleOnly && FORUM_APPLE_FILTER_PATH) {
-        path +=
-          `&filter[apple][condition][path]=${encodeURIComponent(FORUM_APPLE_FILTER_PATH)}` +
-          `&filter[apple][condition][operator]=%3D` +
-          `&filter[apple][condition][value]=${encodeURIComponent(FORUM_APPLE_FILTER_VALUE)}`;
+      if (appleOnly) {
+        path += `&filter[notApple][condition][path]=taxonomy_forums.drupal_internal__tid` +
+          `&filter[notApple][condition][operator]=NOT%20IN`;
+        FORUM_NON_APPLE_TIDS.forEach((tid, i) => {
+          path += `&filter[notApple][condition][value][${i}]=${tid}`;
+        });
       }
       const res = await jsonApi<JsonApiCollection>(path);
       if (!res.ok) return res;
@@ -349,7 +663,7 @@ export const api = {
         `&filter[ids][condition][operator]=IN` +
         `&${valueParams}` +
         `&page[limit]=${capped.length}` +
-        `&include=uid`;
+        `&include=uid,taxonomy_forums`;
       const res = await jsonApi<JsonApiCollection>(path);
       if (!res.ok) return res;
       return {
@@ -359,20 +673,13 @@ export const api = {
     },
 
     async topic(id: string) {
-      const res = await jsonApi<JsonApiCollection & { data: JsonApiNode }>(`/node/forum/${id}?include=uid`);
+      const res = await jsonApi<JsonApiCollection & { data: JsonApiNode }>(`/node/forum/${id}?include=uid,taxonomy_forums`);
       if (!res.ok) return res;
       return { ok: true as const, data: mapForum(res.data.data, res.data.included ?? []) };
     },
 
-    /**
-     * Fetch a single topic with its full body text and all replies.
-     *
-     * NOTE TO DRUPAL DEVELOPER:
-     *   Confirm the comment entity type name and filter path.
-     *   Common: /jsonapi/comment/comment?filter[entity_id.id]=[uuid]
-     *   May need: &sort=created&page[limit]=100&include=uid
-     *   The topic body comes from node.attributes.body.value (or .processed).
-     */
+    // Fetch a single topic with its full body text and all replies.
+    // Comment bundle confirmed working: comment_forum (GET /comment/comment_forum).
     async topicDetail(id: string): Promise<
       { ok: true; data: ForumTopicDetail } | { ok: false; error: string }
     > {
@@ -406,16 +713,17 @@ export const api = {
       return { ok: true, data: { ...topic, body, replies, url, category, viewCount } };
     },
 
-    /**
-     * Create a new forum topic.
-     *
-     * NOTE TO DRUPAL DEVELOPER:
-     *   Confirm: node type name ('node--forum'?), body field name, any required taxonomy.
-     *   Standard Drupal JSON:API node POST:
-     *     type: 'node--forum' (may differ — confirm with dev)
-     *     attributes.title: topic subject line
-     *     attributes.body: { value, format: 'basic_html' }
-     */
+    // Fetch the next page of replies for a topic (used by "Load more" in the UI).
+    async moreReplies(topicId: string, offset: number) {
+      const res = await jsonApi<JsonApiCollection>(
+        `/comment/comment_forum?filter[entity_id.id]=${topicId}&sort=created&page[limit]=100&page[offset]=${offset}&include=uid`,
+      );
+      if (!res.ok) return res;
+      return { ok: true as const, data: res.data.data.map((n) => mapComment(n, res.data.included ?? [])) };
+    },
+
+    // Create a new forum topic.
+    // Type 'node--forum' follows standard Drupal JSON:API content type naming.
     async submitNewTopic(title: string, body: string, csrfToken: string) {
       return jsonApi<{ data: JsonApiNode }>('/node/forum', {
         method: 'POST',
@@ -432,29 +740,22 @@ export const api = {
       });
     },
 
-    /**
-     * Submit a reply to a forum topic.
-     *
-     * NOTE TO DRUPAL DEVELOPER:
-     *   Confirm: comment content type name, field names, entity relationship type.
-     *   Standard Drupal JSON:API comment POST:
-     *     type: 'comment--comment' (may differ per content type)
-     *     relationships.entity_id: { type: 'node--forum', id: topicId }
-     */
-    async submitReply(topicId: string, body: string, csrfToken: string) {
-      return jsonApi<{ data: JsonApiNode }>('/comment/comment', {
+    // Submit a reply to a forum topic.
+    // Bundle confirmed: comment_forum (same bundle used by the GET /comment/comment_forum endpoint).
+    async submitReply(topicId: string, body: string, csrfToken: string, subject?: string) {
+      return jsonApi<{ data: JsonApiNode }>('/comment/comment_forum', {
         method: 'POST',
         headers: { 'X-CSRF-Token': csrfToken },
         body: JSON.stringify({
           data: {
-            type: 'comment--comment',
+            type: 'comment--comment_forum',
             attributes: {
-              subject: 'Reply',
+              subject: subject || 'Reply',
               comment_body: { value: body, format: 'basic_html' },
             },
             relationships: {
               entity_id: { data: { type: 'node--forum', id: topicId } },
-              comment_type: { data: { type: 'comment_type--comment_type', id: 'comment' } },
+              comment_type: { data: { type: 'comment_type--comment_type', id: 'comment_forum' } },
             },
           },
         }),
@@ -511,7 +812,7 @@ export const api = {
   podcasts: {
     async episodes(page = 0, sort: '-created' | '-changed' = '-created') {
       const res = await jsonApi<JsonApiCollection>(
-        `/node/podcast?sort=${sort}&include=field_podcast&${pageParams(page)}`,
+        `/node/podcast?sort=${sort}&include=field_podcast,uid&${pageParams(page)}`,
       );
       if (!res.ok) return res;
       return {
@@ -525,7 +826,7 @@ export const api = {
 
     async episode(id: string) {
       const res = await jsonApi<{ data: JsonApiNode; included?: JsonApiNode[] }>(
-        `/node/podcast/${id}?include=field_podcast`,
+        `/node/podcast/${id}?include=field_podcast,uid`,
       );
       if (!res.ok) return res;
       return { ok: true as const, data: mapPodcast(res.data.data, res.data.included ?? []) };
@@ -543,11 +844,120 @@ export const api = {
       };
     },
 
+    async submitComment(episodeId: string, body: string, csrfToken: string) {
+      return jsonApi<{ data: JsonApiNode }>('/comment/comment_node_podcast', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({
+          data: {
+            type: 'comment--comment_node_podcast',
+            attributes: {
+              subject: 'Comment',
+              comment_body: { value: body, format: 'basic_html' },
+            },
+            relationships: {
+              entity_id: { data: { type: 'node--podcast', id: episodeId } },
+              comment_type: { data: { type: 'comment_type--comment_type', id: 'comment_node_podcast' } },
+            },
+          },
+        }),
+      });
+    },
+
+    // Love a comment — flag machine name 'love_it' unconfirmed.
+    // TODO: Confirm with Drupal dev: flag machine name + whether comment entity
+    //       type is comment--comment_node_podcast.
+    async loveComment(commentUuid: string, token: string) {
+      return jsonApi<{ data: JsonApiNode }>('/flagging/love_it', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': token },
+        body: JSON.stringify({
+          data: {
+            type: 'flagging--love_it',
+            relationships: {
+              flagged_entity: { data: { type: 'comment--comment_node_podcast', id: commentUuid } },
+            },
+          },
+        }),
+      });
+    },
+
+    async unloveComment(commentUuid: string, token: string) {
+      const listRes = await jsonApi<JsonApiCollection>(
+        `/flagging/love_it?filter[flagged_entity.id]=${commentUuid}`,
+      );
+      if (!listRes.ok) return listRes;
+      const flagging = listRes.data.data[0];
+      if (!flagging) return { ok: true as const, data: undefined };
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+      try {
+        const res = await fetch(`${JSONAPI}/flagging/love_it/${flagging.id}`, {
+          method: 'DELETE',
+          headers: { ...COMMON_HEADERS, 'Content-Type': 'application/vnd.api+json', 'X-CSRF-Token': token },
+          signal: ctrl.signal,
+        });
+        if (!res.ok) return { ok: false as const, error: `HTTP ${res.status}` };
+        return { ok: true as const, data: undefined };
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return { ok: false as const, error: 'Request timed out.' };
+        return { ok: false as const, error: err instanceof Error ? err.message : 'Network error' };
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+
     transcript: (id: string) =>
       drupalRest<{ text: string; vttUrl?: string }>(`/api/v1/podcasts/episodes/${id}/transcript`),
   },
 
   apps: {
+    async platforms(): Promise<{ ok: true; data: AppPlatform[] } | { ok: false; error: string; status?: number }> {
+      const res = await drupalRest<AppPlatform[]>('/api/v1/apps/platforms');
+      if (!res.ok) return res;
+      return { ok: true, data: Array.isArray(res.data) ? res.data : [] };
+    },
+
+    async categories(platform: string): Promise<{ ok: true; data: AppCategory[] } | { ok: false; error: string; status?: number }> {
+      const res = await drupalRest<AppCategory[]>(`/api/v1/apps/${encodeURIComponent(platform)}/categories`);
+      if (!res.ok) return res;
+      return {
+        ok: true,
+        data: (Array.isArray(res.data) ? res.data : [])
+          .map((category) => ({
+            name: String(category.name ?? ''),
+            slug: String(category.slug ?? ''),
+            count: typeof category.count === 'number' ? category.count : undefined,
+          }))
+          .filter((category) => category.name && category.slug),
+      };
+    },
+
+    async category(platform: string, category: AppCategory, page = 0, limit = 20): Promise<
+      | { ok: true; data: PaginatedResult<AppListing> & { probe: AppCategoryProbe } }
+      | { ok: false; error: string; attemptedFields: string[]; status?: number }
+    > {
+      const path = `/api/v1/apps/${encodeURIComponent(platform)}/categories/${encodeURIComponent(category.slug)}?page=${page}&limit=${limit}`;
+      const res = await drupalRest<{ items?: DirectoryApiListing[]; hasMore?: boolean } | DirectoryApiListing[]>(path);
+      if (!res.ok) {
+        return { ok: false, error: res.error, status: res.status, attemptedFields: ['custom app directory API'] };
+      }
+      const rawItems = Array.isArray(res.data) ? res.data : (res.data.items ?? []);
+      return {
+        ok: true,
+        data: {
+          items: rawItems.map((item) => mapDirectoryApiListing(item, platform, category.name)),
+          hasMore: Array.isArray(res.data) ? rawItems.length >= limit : !!res.data.hasMore,
+          probe: {
+            category: category.name,
+            fieldName: 'AppleVis app directory API',
+            attemptedFields: ['custom app directory API'],
+            source: 'api',
+          },
+        },
+      };
+    },
+
     async list(page = 0) {
       const res = await jsonApi<JsonApiCollection>(
         `/node/ios_app_directory?sort=-changed&${pageParams(page)}`,
@@ -555,7 +965,106 @@ export const api = {
       if (!res.ok) return res;
       return {
         ok: true as const,
-        data: { items: res.data.data.map(mapApp), hasMore: hasNextPage(res.data) } satisfies PaginatedResult<AppListing>,
+        data: { items: res.data.data.map((n) => mapApp(n)), hasMore: hasNextPage(res.data) } satisfies PaginatedResult<AppListing>,
+      };
+    },
+
+    async categoryExperiment(category: AppCategory, platform = 'ios', page = 0): Promise<
+      | { ok: true; data: PaginatedResult<AppListing> & { probe: AppCategoryProbe } }
+      | { ok: false; error: string; attemptedFields: string[] }
+    > {
+      if (platform !== 'ios') {
+        return {
+          ok: false,
+          error: 'JSON:API category probing is currently only available for the iOS app directory.',
+          attemptedFields: ['jsonapi category probe'],
+        };
+      }
+      const normalised = normaliseAppCategoryName(category.name);
+      const encoded = encodeURIComponent(normalised);
+      const attemptedFields: string[] = [];
+      let lastError = '';
+
+      for (const fieldName of APP_CATEGORY_RELATIONSHIP_CANDIDATES) {
+        attemptedFields.push(fieldName);
+        const res = await jsonApi<JsonApiCollection>(
+          `/node/ios_app_directory?include=${fieldName}&filter[${fieldName}.name]=${encoded}&sort=title&${pageParams(page)}`,
+        );
+
+        if (!res.ok) {
+          lastError = res.error;
+          continue;
+        }
+
+        const items = res.data.data.map((n) => {
+          const app = mapApp(n, res.data.included ?? []);
+          return { ...app, category: app.category || normalised };
+        });
+
+        if (items.length === 0 && page === 0) continue;
+
+        return {
+          ok: true,
+          data: {
+            items,
+            hasMore: hasNextPage(res.data),
+            probe: {
+              category: normalised,
+              fieldName,
+              attemptedFields,
+              source: 'jsonapi',
+            },
+          },
+        };
+      }
+
+      return {
+        ok: false,
+        error: lastError || 'No standard Drupal category relationship matched this app directory.',
+        attemptedFields,
+      };
+    },
+
+    async publicCategory(category: AppCategory, platform = 'ios', page = 0): Promise<
+      | { ok: true; data: PaginatedResult<AppListing> & { probe: AppCategoryProbe } }
+      | { ok: false; error: string; attemptedFields: string[] }
+    > {
+      const normalised = normaliseAppCategoryName(category.name);
+      if (platform !== 'ios') {
+        return {
+          ok: false,
+          error: `${normalised} is waiting for the AppleVis app directory API for this platform.`,
+          attemptedFields: ['public category page'],
+        };
+      }
+      const basePath = IOS_PUBLIC_CATEGORY_PATHS[category.slug];
+      if (!basePath) {
+        return {
+          ok: false,
+          error: `No public AppleVis category page is mapped for ${normalised}.`,
+          attemptedFields: ['public category page'],
+        };
+      }
+
+      const path = page > 0 ? `${basePath}?page=${page}` : basePath;
+      const res = await publicHtml(path);
+      if (!res.ok) {
+        return { ok: false, error: res.error, attemptedFields: ['public category page'] };
+      }
+
+      const items = parsePublicAppDirectory(res.data, normalised);
+      return {
+        ok: true,
+        data: {
+          items,
+          hasMore: /Next page|rel=["']next["']|pagination.+Last page/is.test(res.data),
+          probe: {
+            category: normalised,
+            fieldName: 'public category page',
+            attemptedFields: ['public category page'],
+            source: 'public',
+          },
+        },
       };
     },
 
@@ -565,33 +1074,61 @@ export const api = {
       return { ok: true as const, data: mapApp(res.data.data) };
     },
 
-    /**
-     * Fetch a single app listing with its full body and all reviews.
-     * NOTE TO DRUPAL DEVELOPER: confirm comment entity type for app reviews.
-     */
+    // Fetch a single app listing with its full body and all reviews.
+    // Review bundle confirmed: comment_node_ios_app_directory (same key used by comment_count attribute).
     async detail(id: string): Promise<
       { ok: true; data: AppDetail } | { ok: false; error: string }
     > {
       const [appRes, reviewsRes] = await Promise.all([
-        jsonApi<{ data: JsonApiNode }>(`/node/ios_app_directory/${id}`),
+        jsonApi<{ data: JsonApiNode; included?: JsonApiNode[] }>(`/node/ios_app_directory/${id}?include=uid`),
         jsonApi<JsonApiCollection>(`/comment/comment_node_ios_app_directory?filter[entity_id.id]=${id}&sort=-created&page[limit]=50&include=uid`),
       ]);
 
       if (!appRes.ok) return appRes;
 
       const app = mapApp(appRes.data.data);
-      const body = String(appRes.data.data.attributes.body?.value ?? appRes.data.data.attributes.body?.processed ?? '');
+      const a    = appRes.data.data.attributes;
+
+      // Submitter — uid relationship → display_name (same pattern as mapBlog)
+      const uidId      = (appRes.data.data.relationships?.uid?.data as { id?: string } | undefined)?.id;
+      const userNode   = uidId ? appRes.data.included?.find((n) => n.id === uidId) : undefined;
+      const submittedBy = String(userNode?.attributes?.display_name ?? userNode?.attributes?.name ?? '');
+      const createdAt   = String(a.created ?? '');
+
+      const body    = String(a.body?.value ?? a.body?.processed ?? '');
       const reviews: AppReview[] = reviewsRes.ok ? reviewsRes.data.data.map((n) => mapAppReview(n, reviewsRes.data.included ?? [])) : [];
 
-      // NOTE TO DRUPAL DEVELOPER:
-      //   reportedIssueCount — confirm field: field_reported_issues, field_issue_count, or similar
-      const reportedIssueCount = (
-        appRes.data.data.attributes.field_reported_issues ??
-        appRes.data.data.attributes.field_issue_count ??
-        undefined
-      ) as number | undefined;
+      // Confirmed field names from live JSON:API probe (2026-06-16):
+      const reviewedVersion  = a.field_version        ? String(a.field_version)        : undefined;
+      const testedOnIOS      = a.field_ios_version     ? String(a.field_ios_version)    : undefined;
 
-      return { ok: true, data: { ...app, body, reviews, reportedIssueCount } };
+      // Rich-text fields — prefer .value, fall back to .processed
+      const accessibilityComments = (a.field_comments?.value        ?? a.field_comments?.processed        ?? undefined) as string | undefined;
+      const otherComments         = (a.field_other_comments?.value  ?? a.field_other_comments?.processed  ?? undefined) as string | undefined;
+
+      // Plain-string fields
+      const voiceOverPerformance = a.field_voiceover ? String(a.field_voiceover) : undefined;
+      const buttonLabelling      = a.field_labelling ? String(a.field_labelling) : undefined;
+      const usabilityNotes       = a.field_usability ? String(a.field_usability) : undefined;
+
+      return {
+        ok: true,
+        data: {
+          ...app,
+          submittedBy:  submittedBy  || undefined,
+          submitterUid: uidId        || undefined,
+          createdAt:    createdAt    || undefined,
+          body,
+          reviews,
+          reviewedVersion,
+          testedOnIOS,
+          accessibilityComments,
+          voiceOverPerformance,
+          buttonLabelling,
+          usabilityNotes,
+          otherComments,
+        },
+      };
     },
 
     async updates(page = 0) {
@@ -601,8 +1138,41 @@ export const api = {
       if (!res.ok) return res;
       return {
         ok: true as const,
-        data: { items: res.data.data.map(mapApp), hasMore: hasNextPage(res.data) } satisfies PaginatedResult<AppListing>,
+        data: { items: res.data.data.map((n) => mapApp(n)), hasMore: hasNextPage(res.data) } satisfies PaginatedResult<AppListing>,
       };
+    },
+
+    // Fetch the next page of reviews for an app (used by "Load more" in the UI).
+    async moreReviews(appId: string, offset: number) {
+      const res = await jsonApi<JsonApiCollection>(
+        `/comment/comment_node_ios_app_directory?filter[entity_id.id]=${appId}&sort=-created&page[limit]=50&page[offset]=${offset}&include=uid`,
+      );
+      if (!res.ok) return res;
+      return { ok: true as const, data: res.data.data.map((n) => mapAppReview(n, res.data.included ?? [])) };
+    },
+
+    // Submit an app review. Bundle confirmed: comment_node_ios_app_directory.
+    // field_app_version and field_platform are written to the same fields mapAppReview reads.
+    async submitReview(appId: string, body: string, csrfToken: string, opts?: { platform?: string; appVersion?: string }) {
+      return jsonApi<{ data: JsonApiNode }>('/comment/comment_node_ios_app_directory', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({
+          data: {
+            type: 'comment--comment_node_ios_app_directory',
+            attributes: {
+              subject: 'Review',
+              comment_body: { value: body, format: 'basic_html' },
+              ...(opts?.appVersion ? { field_app_version: opts.appVersion } : {}),
+              ...(opts?.platform   ? { field_platform:   opts.platform }   : {}),
+            },
+            relationships: {
+              entity_id: { data: { type: 'node--ios_app_directory', id: appId } },
+              comment_type: { data: { type: 'comment_type--comment_type', id: 'comment_node_ios_app_directory' } },
+            },
+          },
+        }),
+      });
     },
   },
 
@@ -625,23 +1195,61 @@ export const api = {
     },
 
     /**
-     * Fetch a resource with its full body text.
-     * NOTE TO DRUPAL DEVELOPER: confirm body field name for guides content type.
+     * Fetch a resource with its full body text and author info via uid relationship.
      */
     async detail(id: string): Promise<
       { ok: true; data: ResourceDetail } | { ok: false; error: string }
     > {
-      const res = await jsonApi<{ data: JsonApiNode }>(`/node/guides/${id}`);
+      const res = await jsonApi<{ data: JsonApiNode; included?: JsonApiNode[] }>(`/node/guides/${id}?include=uid`);
       if (!res.ok) return res;
-      const resource = mapResource(res.data.data);
-      const body = String(res.data.data.attributes.body?.value ?? res.data.data.attributes.body?.processed ?? '');
-      const authorName = String(res.data.data.attributes.field_author ?? '');
-      return { ok: true, data: { ...resource, body, authorName: authorName || undefined } };
+      const node     = res.data.data;
+      const included = res.data.included ?? [];
+      const resource = mapResource(node);
+      const body     = String(node.attributes.body?.value ?? node.attributes.body?.processed ?? '');
+      const uidId    = (node.relationships?.uid?.data as { id?: string } | undefined)?.id;
+      const userNode = uidId ? included.find((n) => n.id === uidId) : undefined;
+      const authorName = String(
+        userNode?.attributes?.display_name ?? userNode?.attributes?.name ?? node.attributes.field_author ?? '',
+      );
+      return { ok: true, data: { ...resource, body, authorName: authorName || undefined, authorId: uidId ?? undefined } };
+    },
+
+    // Fetch comments on a guide/resource.
+    // Bundle inferred from Drupal naming convention: comment_node_{content_type}.
+    async comments(resourceId: string) {
+      const res = await jsonApi<JsonApiCollection>(
+        `/comment/comment_node_guides?filter[entity_id.id]=${resourceId}&sort=created&page[limit]=100&include=uid`,
+      );
+      if (!res.ok) return res;
+      return {
+        ok: true as const,
+        data: res.data.data.map((n) => mapComment(n, res.data.included ?? [])),
+      };
+    },
+
+    async submitComment(resourceId: string, body: string, csrfToken: string) {
+      return jsonApi<{ data: JsonApiNode }>('/comment/comment_node_guides', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({
+          data: {
+            type: 'comment--comment_node_guides',
+            attributes: {
+              subject: 'Comment',
+              comment_body: { value: body, format: 'basic_html' },
+            },
+            relationships: {
+              entity_id: { data: { type: 'node--guides', id: resourceId } },
+              comment_type: { data: { type: 'comment_type--comment_type', id: 'comment_node_guides' } },
+            },
+          },
+        }),
+      });
     },
   },
 
-  // ─── Blogs (Phase 4 gate) ────────────────────────────────────────────────────
-  // Active once BLOG_CONTENT_TYPE is set to the confirmed Drupal resource type.
+  // ─── Blogs ────────────────────────────────────────────────────────────────────
+  // Blog content type confirmed: 'blog2'.
 
   blogs: {
     async list(page = 0) {
@@ -654,6 +1262,56 @@ export const api = {
         ok: true as const,
         data: { items: res.data.data.map((n) => mapBlog(n, res.data.included ?? [])), hasMore: hasNextPage(res.data) } satisfies PaginatedResult<BlogPost>,
       };
+    },
+
+    async detail(id: string): Promise<
+      { ok: true; data: BlogPostDetail } | { ok: false; error: string }
+    > {
+      if (!BLOG_CONTENT_TYPE) return { ok: false, error: 'BLOG_NOT_CONFIGURED' };
+      const res = await jsonApi<{ data: JsonApiNode; included?: JsonApiNode[] }>(
+        `/node/${BLOG_CONTENT_TYPE}/${id}?include=uid`,
+      );
+      if (!res.ok) return res;
+      const node     = res.data.data;
+      const included = res.data.included ?? [];
+      const blog     = mapBlog(node, included);
+      const body     = String(node.attributes.body?.value ?? node.attributes.body?.processed ?? '');
+      return { ok: true, data: { ...blog, body } };
+    },
+
+    // Fetch comments on a blog post.
+    // Bundle confirmed: comment_node_blog2 (observed via comment_count attribute key on blog nodes).
+    async comments(blogId: string) {
+      if (!BLOG_CONTENT_TYPE) return { ok: false as const, error: 'BLOG_NOT_CONFIGURED' };
+      const res = await jsonApi<JsonApiCollection>(
+        `/comment/comment_node_${BLOG_CONTENT_TYPE}?filter[entity_id.id]=${blogId}&sort=created&page[limit]=100&include=uid`,
+      );
+      if (!res.ok) return res;
+      return {
+        ok: true as const,
+        data: res.data.data.map((n) => mapComment(n, res.data.included ?? [])),
+      };
+    },
+
+    async submitComment(blogId: string, body: string, csrfToken: string) {
+      if (!BLOG_CONTENT_TYPE) return { ok: false as const, error: 'BLOG_NOT_CONFIGURED' };
+      return jsonApi<{ data: JsonApiNode }>(`/comment/comment_node_${BLOG_CONTENT_TYPE}`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({
+          data: {
+            type: `comment--comment_node_${BLOG_CONTENT_TYPE}`,
+            attributes: {
+              subject: 'Comment',
+              comment_body: { value: body, format: 'basic_html' },
+            },
+            relationships: {
+              entity_id: { data: { type: `node--${BLOG_CONTENT_TYPE}`, id: blogId } },
+              comment_type: { data: { type: 'comment_type--comment_type', id: `comment_node_${BLOG_CONTENT_TYPE}` } },
+            },
+          },
+        }),
+      });
     },
   },
 
@@ -675,7 +1333,7 @@ export const api = {
         `/node/ios_app_directory?filter[title][operator]=CONTAINS&filter[title][value]=${q}&sort=-changed&page[limit]=10`,
       );
       if (!res.ok) return res;
-      return { ok: true as const, data: { items: res.data.data.map(mapApp), hasMore: false } satisfies PaginatedResult<AppListing> };
+      return { ok: true as const, data: { items: res.data.data.map((n) => mapApp(n)), hasMore: false } satisfies PaginatedResult<AppListing> };
     },
 
     async resources(query: string) {
@@ -687,21 +1345,33 @@ export const api = {
       return { ok: true as const, data: { items: res.data.data.map(mapResource), hasMore: false } satisfies PaginatedResult<Resource> };
     },
 
+    async publicSite(query: string): Promise<{ ok: true; data: SearchResult[] } | { ok: false; error: string }> {
+      const q = encodeURIComponent(query.trim());
+      const res = await publicHtml(`/search?key=${q}`);
+      if (!res.ok) return res;
+      return { ok: true, data: parsePublicSearch(res.data).slice(0, 20) };
+    },
+
     // Gate 3 — Full-text search across all content types via Drupal Search API.
     // Returns 'SEARCH_NOT_CONFIGURED' when SEARCH_API_PATH is null, so callers
     // can fall back to per-type title-CONTAINS search in the meantime.
     async fullText(query: string): Promise<{ ok: true; data: SearchResult[] } | { ok: false; error: string }> {
       if (!SEARCH_API_PATH) return { ok: false, error: 'SEARCH_NOT_CONFIGURED' };
       const q   = encodeURIComponent(query.trim());
-      const res = await drupalRest<any[]>(`${SEARCH_API_PATH}${q}`);
+      const separator = SEARCH_API_PATH.includes('?') ? '&' : '?';
+      const res = await drupalRest<any[] | { items?: any[]; results?: any[] }>(
+        `${SEARCH_API_PATH}${separator}key=${q}&q=${q}&page=0&limit=20`,
+      );
       if (!res.ok) return res;
-      const results: SearchResult[] = (Array.isArray(res.data) ? res.data : []).map((item: any) => ({
+      const rawItems = Array.isArray(res.data) ? res.data : (res.data.items ?? res.data.results ?? []);
+      const results: SearchResult[] = rawItems.map((item: any) => ({
         id:          String(item.id ?? item.nid ?? item.uuid ?? ''),
-        contentType: (item.type ?? item.content_type ?? 'topic') as SearchResult['contentType'],
+        contentType: (item.type ?? item.contentType ?? item.content_type ?? 'unknown') as SearchResult['contentType'],
         title:       String(item.title ?? item.name ?? ''),
         summary:     (item.body ?? item.summary ?? item.field_summary ?? undefined) as string | undefined,
         url:         String(item.url ?? item.path ?? ''),
         updatedAt:   String(item.changed ?? item.updated ?? ''),
+        source:      'api',
       }));
       return { ok: true, data: results };
     },
@@ -715,11 +1385,65 @@ export const api = {
       return res.ok ? res.text() : '';
     },
 
-    async signIn(email: string, password: string) {
-      return drupalRest<{ current_user: { uid: string; name: string }; csrf_token: string; logout_token: string }>(
-        `/user/login?_format=json`,
-        { method: 'POST', body: JSON.stringify({ name: email, pass: password }) },
-      );
+    async signIn(email: string, password: string): Promise<
+      | { ok: true; data: { current_user: { uid: string; name: string }; csrf_token: string; logout_token: string } }
+      | { ok: false; error: string; status?: number }
+    > {
+      const reqHeaders = {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-App-Auth': COMMON_HEADERS['X-App-Auth'],
+      };
+      const url = `${BASE}/user/login?_format=json`;
+      const ctrl  = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+      try {
+        const body = JSON.stringify({ name: email, pass: password });
+        const parseLoginResponse = async (res: Response) => {
+          const text = await res.text().catch(() => '');
+          if (!res.ok) {
+            let detail = text.trim();
+            try {
+              const json = detail ? JSON.parse(detail) : null;
+              detail = String(json?.message ?? json?.error ?? json?.errors?.[0]?.detail ?? detail);
+            } catch { /* keep plain text */ }
+            return {
+              ok: false as const,
+              error: detail ? `HTTP ${res.status}: ${detail}` : `HTTP ${res.status}`,
+              status: res.status,
+            };
+          }
+          const json = JSON.parse(text) as { current_user: { uid: string; name: string }; csrf_token: string; logout_token: string };
+          return { ok: true as const, data: json };
+        };
+
+        const first = await fetch(url, {
+          method: 'POST',
+          headers: reqHeaders,
+          body,
+          signal: ctrl.signal,
+        });
+        const firstResult = await parseLoginResponse(first);
+        if (firstResult.ok || firstResult.status !== 403) return firstResult;
+
+        const retry = await fetch(url, {
+          method: 'POST',
+          headers: { ...reqHeaders, 'Cache-Control': 'no-cache' },
+          body,
+          credentials: 'omit',
+          signal: ctrl.signal,
+        });
+        return parseLoginResponse(retry);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const isTimeout = err instanceof Error && err.name === 'AbortError';
+        return {
+          ok: false,
+          error: isTimeout ? 'Request timed out.' : msg,
+        };
+      } finally {
+        clearTimeout(timer);
+      }
     },
 
     async signOut(logoutToken: string) {
@@ -728,13 +1452,25 @@ export const api = {
       });
     },
 
-    async registerPushToken(pushToken: string, csrfToken: string) {
+    async registerPushToken(pushToken: string, csrfToken: string, soundFile?: string) {
+      const uuid = await resolveMyUuid(csrfToken);
+      if (!uuid) return { ok: false as const, error: 'Could not resolve account ID.' };
+      const attributes: Record<string, string> = { field_push_token: pushToken };
+      if (soundFile) attributes.field_push_sound = soundFile;
+      return jsonApi<void>(`/user/user/${uuid}`, {
+        method: 'PATCH',
+        headers: { 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ data: { type: 'user--user', id: uuid, attributes } }),
+      });
+    },
+
+    async updatePushSound(soundFile: string, csrfToken: string) {
       const uuid = await resolveMyUuid(csrfToken);
       if (!uuid) return { ok: false as const, error: 'Could not resolve account ID.' };
       return jsonApi<void>(`/user/user/${uuid}`, {
         method: 'PATCH',
         headers: { 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify({ data: { type: 'user--user', id: uuid, attributes: { field_push_token: pushToken } } }),
+        body: JSON.stringify({ data: { type: 'user--user', id: uuid, attributes: { field_push_sound: soundFile } } }),
       });
     },
 
@@ -744,7 +1480,7 @@ export const api = {
       return jsonApi<void>(`/user/user/${uuid}`, {
         method: 'PATCH',
         headers: { 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify({ data: { type: 'user--user', id: uuid, attributes: { field_push_token: '' } } }),
+        body: JSON.stringify({ data: { type: 'user--user', id: uuid, attributes: { field_push_token: '', field_push_sound: '' } } }),
       });
     },
 
@@ -774,5 +1510,60 @@ export const api = {
       drupalRest<{ syncedAt: string }>(`/api/v1/account/sync`, {
         method: 'POST', headers: { 'X-CSRF-Token': csrfToken }, body: JSON.stringify(payload),
       }),
+  },
+
+  // ─── User profiles & contact ─────────────────────────────────────────────────
+
+  users: {
+    /**
+     * Fetch a public user profile by JSON:API UUID.
+     * Returns display name, username, member-since date, and numeric uid
+     * (needed for the contact form recipient field).
+     */
+    async profile(uuid: string) {
+      type UserNode = { data: JsonApiNode };
+      const res = await jsonApi<UserNode>(`/user/user/${uuid}`);
+      if (!res.ok) return res;
+      const a = res.data.data.attributes;
+      return {
+        ok: true as const,
+        data: {
+          uuid,
+          displayName:  String(a.display_name ?? a.name ?? ''),
+          username:     String(a.name ?? ''),
+          memberSince:  String(a.created ?? ''),
+          numericUid:   Number(a.drupal_internal__uid ?? 0),
+          profileUrl:   a.path?.alias ? `${BASE}${a.path.alias}` : undefined,
+          location:     profileFieldText(a.field_location),
+          bio:          profileFieldText(a.field_bio ?? a.field_about ?? a.field_profile_bio ?? a.field_description),
+          website:      profileFieldText(a.field_website ?? a.field_url ?? a.field_homepage),
+        },
+      };
+    },
+
+    /**
+     * Send a private contact message to another member via Drupal's Contact module.
+     * Uses the standard REST endpoint — neither party's email address is revealed.
+     * Requires the user to be authenticated (session cookie present).
+     *
+     * NOTE TO DRUPAL DEVELOPER:
+     *   Confirm the personal contact form machine name is 'personal'.
+     *   If the REST endpoint /contact_message is not enabled, enable it at
+     *   Admin → Config → Services → REST → contact_message (POST, json, cookie).
+     */
+    async sendContact(numericUid: number, subject: string, message: string) {
+      const token = await api.account.getSessionToken();
+      if (!token) return { ok: false as const, error: 'Could not get session token.' };
+      return drupalRest<void>('/contact_message?_format=json', {
+        method:  'POST',
+        headers: { 'X-CSRF-Token': token },
+        body: JSON.stringify({
+          contact_form: [{ target_id: 'personal' }],
+          subject:      [{ value: subject  }],
+          message:      [{ value: message  }],
+          recipient:    [{ target_id: numericUid }],
+        }),
+      });
+    },
   },
 };

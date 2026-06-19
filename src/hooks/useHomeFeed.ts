@@ -11,7 +11,7 @@ export const DEFAULT_FEED_PREFS: FeedPrefs = {
   podcasts:  true,
   apps:      true,
   guides:    true,
-  blogs:     false,    // gate — pending Drupal blog content type name
+  blogs:     true,     // always mirrors guides
   appleOnly: false,    // gate — pending taxonomy field name
 };
 
@@ -161,7 +161,9 @@ export function useHomeFeed() {
   const refresh = useCallback(() => loadFromStart(prefs, true), [prefs, loadFromStart]);
 
   const updatePref = useCallback(async (key: keyof FeedPrefs, value: boolean) => {
-    const next = { ...prefs, [key]: value };
+    const next: FeedPrefs = { ...prefs, [key]: value };
+    // Blogs always mirrors guides — same toggle controls both
+    if (key === 'guides') next.blogs = value;
     setPrefs(next);
     await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(next));
     // loadFromStart fires via the useEffect above when prefs state updates

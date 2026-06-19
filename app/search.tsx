@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, ScrollView, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Linking, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '../src/components/Screen';
 import { AccessibleCard } from '../src/components/AccessibleCard';
@@ -43,6 +43,7 @@ export default function SearchScreen() {
       : `${totalCount} result${totalCount === 1 ? '' : 's'} found: ` +
         [
           results.forums.length    > 0 ? `${results.forums.length} forum topic${results.forums.length    === 1 ? '' : 's'}`    : '',
+          results.site.length      > 0 ? `${results.site.length} site result${results.site.length      === 1 ? '' : 's'}`       : '',
           results.apps.length      > 0 ? `${results.apps.length} app${results.apps.length      === 1 ? '' : 's'}`              : '',
           results.resources.length > 0 ? `${results.resources.length} resource${results.resources.length === 1 ? '' : 's'}`    : '',
         ].filter(Boolean).join(', ');
@@ -94,7 +95,12 @@ export default function SearchScreen() {
 
         {/* ── Loading ───────────────────────────────────────────────────────── */}
         {loading && (
-          <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+          <View
+            accessible
+            accessibilityLiveRegion="polite"
+            accessibilityLabel="Searching, please wait"
+            style={{ alignItems: 'center', paddingVertical: 32 }}
+          >
             <ActivityIndicator size="large" color={colors.appleVisBlue} />
             <Text style={[styles.lede, { marginTop: 10, textAlign: 'center' }]}>Searching…</Text>
           </View>
@@ -120,11 +126,37 @@ export default function SearchScreen() {
         {/* ── Prompt when no query yet ──────────────────────────────────────── */}
         {!hasQuery && !loading && (
           <Text style={styles.lede}>
-            Search across forum topics, app directory listings, and resources. Results appear as you type.
+            Search AppleVis. Public site results are used until the search API is available.
           </Text>
         )}
 
         {/* ── Forum results ─────────────────────────────────────────────────── */}
+        {!loading && results.site.length > 0 && (
+          <>
+            <Text
+              style={[styles.cardTitle, { marginBottom: 8, marginTop: 4 }]}
+              accessibilityRole="header"
+            >
+              Site Results ({results.site.length})
+            </Text>
+            {results.site.map((item) => (
+              <AccessibleCard
+                key={item.id}
+                title={item.title}
+                meta={[
+                  item.contentType !== 'unknown' ? item.contentType : null,
+                  item.source === 'public' ? 'AppleVis public search' : 'AppleVis search API',
+                ].filter(Boolean).join(' · ')}
+                actions={['Open Result', ...(!screenReaderEnabled ? ['Read Aloud'] : [])]}
+                onAction={(action) => {
+                  if (action === 'Open Result') Linking.openURL(item.url).catch(() => {});
+                  if (action === 'Read Aloud') readAloud(`${item.title}. ${item.summary ?? ''}`);
+                }}
+              />
+            ))}
+          </>
+        )}
+
         {!loading && results.forums.length > 0 && (
           <>
             <Text

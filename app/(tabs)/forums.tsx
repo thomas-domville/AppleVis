@@ -15,6 +15,8 @@ import { useFocusRestore } from '../../src/hooks/useFocusRestore';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
+import { useAlert } from '../../src/contexts/AccessibleAlertContext';
+import { ALERTS } from '../../src/data/alertMessages';
 import { donateSiriActivity, readAloud, summariseText, simplifyText } from '../../src/services/intelligenceService';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
@@ -27,6 +29,7 @@ export default function Forums() {
   const forum = useForumState();
   const saved = useSavedItems('forumTopic');
   const { showToast } = useToast();
+  const { showAlert } = useAlert();
   const topicRefs = useRef<Map<string, View>>(new Map());
   const { save }  = useFocusRestore();
 
@@ -77,7 +80,7 @@ export default function Forums() {
       const isFollowing = forum.topics.find((t) => t.id === topicId)?.isFollowing ?? false;
       forum.toggleFollow(topicId, isFollowing);
     } else if (actionName === 'Sign in to Follow') {
-      showToast('Sign in required. Visit Settings to sign in.', 'warning');
+      showAlert({ ...ALERTS.auth.signInRequired('follow topics'), onConfirm: () => router.push('/settings-account' as any) });
     } else if (actionName === 'Save Topic' || actionName === 'Unsave Topic') {
       if (saved.isSaved(topicId)) {
         saved.unsave(topicId);
@@ -103,7 +106,7 @@ export default function Forums() {
       headerRight={
         <Pressable
           onPress={() => {
-            if (!auth.isSignedIn) { showToast('Sign in to start a new topic.', 'warning'); return; }
+            if (!auth.isSignedIn) { showAlert({ ...ALERTS.auth.signInRequired('start a new topic'), onConfirm: () => router.push('/settings-account' as any) }); return; }
             router.push({ pathname: '/compose' as any, params: { mode: 'newTopic' } });
           }}
           accessible
@@ -171,7 +174,12 @@ export default function Forums() {
         )}
 
         {forum.loading && (
-          <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+          <View
+            accessible
+            accessibilityLiveRegion="polite"
+            accessibilityLabel={`Loading ${forum.filter.toLowerCase()}, please wait`}
+            style={{ alignItems: 'center', paddingVertical: 32 }}
+          >
             <ActivityIndicator size="large" color={colors.appleVisBlue} />
             <Text style={[styles.lede, { marginTop: 12, textAlign: 'center' }]}>
               Loading {forum.filter.toLowerCase()}…

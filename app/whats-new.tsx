@@ -10,164 +10,98 @@ type ChangeItem = {
   tag: 'New' | 'Improved' | 'Fixed';
 };
 
-const CURRENT_VERSION = '2026.0.1.3';
+const CURRENT_VERSION = '2026.0.2';
 
 const CHANGES: ChangeItem[] = [
   {
-    icon: 'musical-note-outline',
+    icon: 'paw-outline',
     tag: 'New',
-    title: 'Welcome Tone on Launch',
-    description: 'The app now plays a warm welcome tone every time it opens. First-time users hear it when the setup wizard appears; returning users hear it as the app loads. A small but friendly touch.',
+    title: 'Golden Retriever Bark Alert Sound',
+    description: 'A third notification sound option joins Mouse Squeak and Apple Crunch — a warm, friendly golden retriever bark. Choose it in Settings → Notifications or during setup.',
+  },
+  {
+    icon: 'volume-medium-outline',
+    tag: 'Improved',
+    title: 'All Sounds Now at the Same Volume',
+    description: 'Mouse Squeak, Apple Crunch, Golden Retriever Bark, and the welcome tone are now all balanced to the same loudness level. No more sounds that are much louder or quieter than others.',
+  },
+  {
+    icon: 'home-outline',
+    tag: 'Improved',
+    title: 'Smarter Welcome Summary',
+    description: 'The welcome card on the Home tab now tells you how many new comments have appeared in threads you have visited since your last session. Tap it to jump straight to the last item you were reading — VoiceOver focus lands on it automatically.',
+  },
+  {
+    icon: 'headset-outline',
+    tag: 'Improved',
+    title: 'Three Distinct VoiceOver Detail Levels',
+    description: 'Simple, Normal, and All now produce genuinely different labels. Simple gives title and content type only. Normal adds author and comment count. All adds posted date and last-comment time. The setup wizard and Accessibility Settings both show updated examples.',
+  },
+  {
+    icon: 'heart-outline',
+    tag: 'New',
+    title: 'Follow Forum Topics',
+    description: 'Tap the Follow button on any forum topic to subscribe to it. You will receive notifications when new replies are posted. Manage your followed topics from your profile.',
+  },
+  {
+    icon: 'newspaper-outline',
+    tag: 'New',
+    title: 'Read Blog Posts and Guides in the App',
+    description: 'Blog posts and guides now open fully inside the app — no need to switch to Safari. Comments are included, and you can post a comment directly from the page.',
+  },
+  {
+    icon: 'star-outline',
+    tag: 'New',
+    title: 'Write App Reviews In-App',
+    description: 'You can now write a review of any app in the directory directly from the app detail page. Your rating, accessibility rating, and review text are submitted straight to AppleVis.',
+  },
+  {
+    icon: 'arrow-down-outline',
+    tag: 'New',
+    title: 'Load More and Jump to First Unread',
+    description: 'Long forum threads now have a Load More button to page through replies. A Jump to First Unread button takes you straight to the reply you have not seen yet — one tap instead of scrolling through dozens of replies.',
+  },
+  {
+    icon: 'time-outline',
+    tag: 'New',
+    title: 'Episode Duration on Feed Cards',
+    description: 'Podcast episode cards in the feed now show the episode duration after the first time you play or tap that episode. Durations are cached locally so they appear instantly on future visits.',
+  },
+  {
+    icon: 'apps-outline',
+    tag: 'Improved',
+    title: 'App Directory Fully Revamped',
+    description: 'App detail pages now show VoiceOver support, labelling, usability, and other ratings directly from AppleVis. Reviews and comments load live. The detail layout is cleaner and more structured for VoiceOver navigation.',
+  },
+  {
+    icon: 'chatbubbles-outline',
+    tag: 'Improved',
+    title: 'Richer Forum Thread Presentation',
+    description: 'Topic detail pages now have category headers, animated entry, colour-coded author avatars, NEW badges on unread replies, and correct formatting for code blocks and quoted text. Braille display users get cleaner paragraph breaks.',
+  },
+  {
+    icon: 'document-text-outline',
+    tag: 'Improved',
+    title: 'Redesigned Detail Pages',
+    description: 'Blog, guide, episode, and resource detail pages have all been redesigned with consistent layout, better typography, and improved VoiceOver navigation — matching the look and feel of the forum topic view.',
   },
   {
     icon: 'notifications-outline',
     tag: 'Improved',
-    title: 'Refreshed Sound Scheme',
-    description: 'The Apple Crunch notification alert and the download-complete sound have both been updated to new, cleaner versions.',
+    title: 'Cleaner Notifications Setup',
+    description: 'Notification categories now default to off during setup. The sound picker and Disable All button only appear once you turn at least one category on — so the first screen you see is not confusing with a "nothing selected" note while a sound appears selected.',
   },
   {
-    icon: 'bookmark-outline',
-    tag: 'Improved',
-    title: 'Saved Episodes — Full Actions',
-    description: 'Saved episodes now have the same actions as the main list: Queue, Download, Share, and Mark as Played, all in two compact rows. Bulk actions let you Queue All, Download All, or Unsave All in one tap.',
-  },
-  {
-    icon: 'funnel-outline',
-    tag: 'New',
-    title: 'Sort Your Saved and Downloaded Episodes',
-    description: 'Both the Saved and Downloads views now have a sort button. Sort saved episodes by Newest Saved, Oldest Saved, Newest Published, A–Z, Shortest, or Longest. Downloads sort by date or title. Your choice is remembered across launches and synced to iCloud.',
-  },
-  {
-    icon: 'cloud-download-outline',
-    tag: 'Improved',
-    title: 'Downloaded Episodes — Full Actions',
-    description: 'Downloaded episodes now show Queue and Save buttons alongside the existing Play and Remove. The Remove All button sits in the same toolbar as the new sort control.',
-  },
-  {
-    icon: 'headset-outline',
-    tag: 'Improved',
-    title: 'VoiceOver Now Announces Saved Status',
-    description: 'When VoiceOver Detail Level is set to All, episode cards now announce "Saved" if the episode is bookmarked — so you know at a glance which ones you\'ve set aside, without opening them.',
-  },
-  {
-    icon: 'document-text-outline',
-    tag: 'Improved',
-    title: 'Episode About Section Revamped',
-    description: 'Show notes are now fully cleaned of HTML and markdown. App Store links open directly to the App Store. Email addresses open a new email. Web links open in the browser. All links are clearly labelled with icons and subtitles so VoiceOver users know exactly what each one does.',
-  },
-  {
-    icon: 'document-text-outline',
-    tag: 'Improved',
-    title: 'Transcript Opens in Its Own Screen',
-    description: 'Episode transcripts now open in a full modal sheet instead of expanding inline. Tap "See the Transcript" in the About section. The screen is clean and scrollable, with a Done button to return.',
-  },
-  {
-    icon: 'image-outline',
-    tag: 'Improved',
-    title: 'Podcast Artwork Is Now Described',
-    description: 'VoiceOver users will now hear a description of the podcast artwork on the episode detail page, generated on-device by iOS. No external service or network request — it works offline too.',
-  },
-  {
-    icon: 'person-circle-outline',
-    tag: 'Improved',
-    title: 'Profile Now Includes About',
-    description: 'Everything that was in the separate About screen — version number, device info, What\'s New, copy support info, privacy policy, credits — now lives inside your Profile. Settings is now purely a settings screen. Sign Out has moved to Profile too.',
-  },
-  {
-    icon: 'options-outline',
-    tag: 'Improved',
-    title: 'Podcast Settings Are Much Less Swipeable',
-    description: 'Playback Speed and Sleep Timer now open a list — tap once to pick your value. Skip Back, Skip Forward, EQ, Auto-Download, and Auto-Delete use compact segmented buttons. A new Resume Rewind setting has also been added to the Queue section.',
-  },
-  {
-    icon: 'chatbubbles-outline',
-    tag: 'New',
-    title: 'Forums Has Its Own Settings Page',
-    description: 'A new Forums section in Settings lets you choose which view the Forums tab opens on by default — Recent, Since Last Visit, or Unread. No more switching the filter every time you open the app.',
-  },
-  {
-    icon: 'search-outline',
-    tag: 'New',
-    title: 'Search on Forums, Apps, and Resources',
-    description: 'All three tabs now have a search bar at the top. Type to filter by title, author, developer, category, or resource type. Results update as you type.',
-  },
-  {
-    icon: 'funnel-outline',
-    tag: 'New',
-    title: 'Sort and Filter Bar on Every Tab',
-    description: 'Forums, Apps, Resources, and Podcasts all now have the same action bar: a sort button showing the current order, a filter button (by category, type, or show), and a count of visible results. Opening one closes the other automatically.',
-  },
-  {
-    icon: 'water-outline',
-    tag: 'New',
-    title: 'Liquid Glass on iOS',
-    description: 'Sort sheets, filter sheets, the mini player, and the tab bar now use the iOS frosted-glass blur effect. It turns off automatically if you have Reduce Transparency enabled in iOS Accessibility Settings, or if you use a High Contrast theme.',
-  },
-  {
-    icon: 'chevron-back-outline',
-    tag: 'New',
-    title: 'Back Button on Every Screen',
-    description: 'Every settings page, topic view, and detail screen now shows a Back button at the top left so you can always find your way back without hunting for it.',
-  },
-  {
-    icon: 'funnel-outline',
-    tag: 'Improved',
-    title: 'Forum Filter is One Tap, Not Six Swipes',
-    description: 'The row of six filter buttons (Recent, New, Unread, etc.) has been replaced with a single button showing your current choice. Tap it to open a list and pick a different one. Much less swiping with VoiceOver.',
+    icon: 'accessibility-outline',
+    tag: 'Fixed',
+    title: 'VoiceOver Focus After Feed Loads',
+    description: 'VoiceOver cursor now lands on the welcome card when the Home feed finishes loading, and returns to your last position after pull-to-refresh or navigating back from a detail page.',
   },
   {
     icon: 'speedometer-outline',
-    tag: 'Improved',
-    title: 'Podcast Speed is One Tap Too',
-    description: 'The nine playback speed buttons have been replaced the same way — one button shows the current speed, tap to change it.',
-  },
-  {
-    icon: 'headset-outline',
-    tag: 'Improved',
-    title: 'VoiceOver Tabs Now Say Their Position',
-    description: 'VoiceOver now reads each tab as "Home, 1 of 5" or "Forums, 2 of 5" — the same way any Apple app announces tabs. Previously it just said the tab name with no position.',
-  },
-  {
-    icon: 'search-outline',
     tag: 'Fixed',
-    title: 'Search and Settings Buttons No Longer Repeat',
-    description: 'VoiceOver was announcing the Search and Settings buttons twice — once as a group and once as a link. They now each announce once, cleanly, as a button.',
-  },
-  {
-    icon: 'person-outline',
-    tag: 'Improved',
-    title: 'Forum Topics Now Say Who Posted Them',
-    description: 'When VoiceOver Detail Level is set to "All" in Accessibility Settings, VoiceOver now reads the name of the person who posted a topic — for example "VoiceOver Tips. By JohnDoe. 5 replies."',
-  },
-  {
-    icon: 'settings-outline',
-    tag: 'Fixed',
-    title: 'Settings Pages Now Open the Real Controls',
-    description: 'Tapping Appearance, Accessibility, Notifications, or Podcasts in Settings now goes straight to the page where you can actually make changes. Before, it opened a description page instead.',
-  },
-  {
-    icon: 'toggle-outline',
-    tag: 'Fixed',
-    title: 'Your Settings Now Actually Take Effect',
-    description: 'Six settings that were being saved but had no effect are now wired up: your default forum filter, card size (Comfortable or Compact), notification toggles, silence notifications option, podcast auto-play, and default sleep timer.',
-  },
-  {
-    icon: 'log-in-outline',
-    tag: 'Improved',
-    title: 'Sign In Accepts Username or Email',
-    description: 'The sign-in screen now accepts either your AppleVis username or your email address, not just email. There is also a direct link to create a free account, and a "Skip for now" button so you can explore the app first.',
-  },
-  {
-    icon: 'person-add-outline',
-    tag: 'Fixed',
-    title: 'Sign In Now Works',
-    description: 'A server issue that was preventing sign-in has been fixed. You can now log in with your AppleVis account.',
-  },
-  {
-    icon: 'phone-portrait-outline',
-    tag: 'Fixed',
-    title: 'App Opens Correctly in Expo Go',
-    description: 'The app now opens without a blank white screen. A startup sound that was playing by accident has also been silenced.',
+    title: 'Pitch Correction When Changing Speed',
+    description: 'Switching playback speed between episodes no longer causes audio to sound like a chipmunk. Pitch correction is now applied correctly whenever the speed is changed.',
   },
 ];
 
@@ -193,7 +127,7 @@ export default function WhatsNew() {
             Version {CURRENT_VERSION}
           </Text>
           <Text style={{ fontSize: 16, color: colors.textSecondary, textAlign: 'center', lineHeight: 23 }}>
-            Welcome tone, refreshed sounds, full Saved and Downloads actions, sort filters, and a revamped episode About section.
+            New sounds, smarter home welcome, follow topics, in-app blogs and reviews, richer detail pages, and VoiceOver focus fixes.
           </Text>
         </View>
 
@@ -231,6 +165,32 @@ export default function WhatsNew() {
         })}
 
         {/* Previous version notes */}
+        <View style={[styles.card, { backgroundColor: colors.pill, borderColor: colors.border, borderWidth: 1, marginBottom: 10 }]}
+          accessible accessibilityLabel="Also in versions 2026.0.1.3 through 2026.0.1.5: welcome tone on launch, refreshed sounds, saved and downloaded episodes with full actions, sort filters for saved and downloads, VoiceOver saved status on episode cards, revamped episode About section, transcript screen, podcast artwork described, topic and episode detail screens, bottom toolbars on all detail pages.">
+          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
+            textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>
+            Also in 2026.0.1.3 – 2026.0.1.5
+          </Text>
+          {[
+            'Welcome tone plays on every app launch',
+            'Refreshed notification and system sounds',
+            'Saved and downloaded episodes with full Queue, Share, Mark as Played actions',
+            'Sort your saved and downloaded episodes by date, title, or duration',
+            'VoiceOver announces "Saved" on bookmarked episode cards (Detail Level: All)',
+            'Episode About section revamped — clean text, live links with icons',
+            'Episode transcripts open in a dedicated full-screen modal',
+            'Podcast artwork described by on-device iOS intelligence',
+            'Full forum topic and episode detail screens',
+            'Bottom toolbars on all detail pages for quick actions',
+          ].map((item) => (
+            <View key={item} style={{ flexDirection: 'row', gap: 8, marginBottom: 6 }}
+              accessible accessibilityLabel={item}>
+              <Text style={{ color: colors.accent, fontSize: 15 }} accessibilityElementsHidden>•</Text>
+              <Text style={{ flex: 1, fontSize: 14, color: colors.textSecondary, lineHeight: 20 }}>{item}</Text>
+            </View>
+          ))}
+        </View>
+
         <View style={[styles.card, { backgroundColor: colors.pill, borderColor: colors.border, borderWidth: 1, marginBottom: 10 }]}
           accessible accessibilityLabel="Also in version 2026.0.1.2: search, sort and filter bars, Liquid Glass, forum filter pill, podcast speed pill, VoiceOver tab positions, sign-in fixes, settings routing fixes.">
           <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,

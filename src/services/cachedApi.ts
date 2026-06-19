@@ -18,7 +18,14 @@ import { api } from './api';
 import { apiHealth, type ApiGroup } from './apiHealth';
 import { contentCache } from './contentCache';
 import { authEvents } from './authEvents';
-import type { ForumTopic, PodcastEpisode, AppListing, Resource, PaginatedResult } from '../types/content';
+import type {
+  ForumTopic, ForumTopicDetail,
+  PodcastEpisode,
+  AppListing, AppDetail,
+  Resource, ResourceDetail,
+  BlogPost, BlogPostDetail,
+  PaginatedResult,
+} from '../types/content';
 
 // Returns true only when the connection is clearly fast enough to justify
 // firing multiple parallel background requests.
@@ -106,6 +113,10 @@ export const cachedApi = {
     topic(id: string): Promise<CachedResult<ForumTopic>> {
       return fetchWithCache('forums', `forums:topic:${id}`, () => api.forums.topic(id));
     },
+
+    topicDetail(id: string): Promise<CachedResult<ForumTopicDetail>> {
+      return fetchWithCache('forums', `forums:detail:${id}`, () => api.forums.topicDetail(id));
+    },
   },
 
   podcasts: {
@@ -114,7 +125,7 @@ export const cachedApi = {
     },
 
     episode(id: string): Promise<CachedResult<PodcastEpisode>> {
-      return fetchWithCache('podcasts', `podcasts:episode:${id}`, () => api.podcasts.episode(id));
+      return fetchWithCache('podcasts', `podcasts:detail:${id}`, () => api.podcasts.episode(id));
     },
   },
 
@@ -126,11 +137,29 @@ export const cachedApi = {
     updates(page = 0): Promise<CachedResult<PaginatedResult<AppListing>>> {
       return fetchWithCache('apps', `apps:updates:${page}`, () => api.apps.updates(page));
     },
+
+    detail(id: string): Promise<CachedResult<AppDetail>> {
+      return fetchWithCache('apps', `apps:detail:${id}`, () => api.apps.detail(id));
+    },
   },
 
   resources: {
     list(page = 0): Promise<CachedResult<PaginatedResult<Resource>>> {
       return fetchWithCache('resources', `resources:list:${page}`, () => api.resources.list(page));
+    },
+
+    detail(id: string): Promise<CachedResult<ResourceDetail>> {
+      return fetchWithCache('resources', `resources:detail:${id}`, () => api.resources.detail(id));
+    },
+  },
+
+  blogs: {
+    list(page = 0): Promise<CachedResult<PaginatedResult<BlogPost>>> {
+      return fetchWithCache('blogs', `blogs:list:${page}`, () => api.blogs.list(page));
+    },
+
+    detail(id: string): Promise<CachedResult<BlogPostDetail>> {
+      return fetchWithCache('blogs', `blogs:detail:${id}`, () => api.blogs.detail(id));
     },
   },
 
@@ -146,6 +175,7 @@ export const cachedApi = {
       cachedApi.podcasts.episodes(0),
       cachedApi.apps.list(0),
       cachedApi.resources.list(0),
+      cachedApi.blogs.list(0),
     ]);
   },
 };

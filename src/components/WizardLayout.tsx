@@ -1,7 +1,8 @@
 import { ReactNode, useEffect, useRef } from 'react';
-import { AccessibilityInfo, findNodeHandle, Pressable, ScrollView, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, findNodeHandle, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAccessibilityPreferences } from '../hooks/useAccessibilityPreferences';
 import { onboarding } from '../services/onboarding';
 import { router } from 'expo-router';
 
@@ -25,7 +26,20 @@ export function WizardLayout({
   onNext, nextLabel = 'Next', nextDisabled = false, hideSkip = false, hideStepIndicator = false,
 }: Props) {
   const { colors } = useTheme();
+  const { reduceMotion } = useAccessibilityPreferences();
   const headingRef = useRef<Text>(null);
+
+  // Per-dot animated widths (pill ↔ circle morph on step change)
+  const dotWidths = useRef<Animated.Value[]>(
+    Array.from({ length: totalSteps }, (_, i) => new Animated.Value(i + 1 === step ? 24 : 8))
+  ).current;
+
+  // Top progress stripe
+  const stripeAnim = useRef(new Animated.Value((step / totalSteps) * 100)).current;
+
+  // Step entrance (fade + slide-up)
+  const entranceOpacity     = useRef(new Animated.Value(0)).current;
+  const entranceTranslateY  = useRef(new Animated.Value(10)).current;
 
   // Move VoiceOver focus to the step heading whenever the step changes.
   useEffect(() => {
@@ -36,6 +50,41 @@ export function WizardLayout({
     return () => clearTimeout(timer);
   }, [step]);
 
+  // Animate dots on step change.
+  useEffect(() => {
+    if (reduceMotion) {
+      dotWidths.forEach((anim, i) => anim.setValue(i + 1 === step ? 24 : 8));
+      return;
+    }
+    dotWidths.forEach((anim, i) => {
+      Animated.spring(anim, { toValue: i + 1 === step ? 24 : 8, useNativeDriver: false }).start();
+    });
+  }, [step, reduceMotion, dotWidths]);
+
+  // Animate progress stripe on step change.
+  useEffect(() => {
+    Animated.timing(stripeAnim, {
+      toValue: (step / totalSteps) * 100,
+      duration: 350,
+      useNativeDriver: false,
+    }).start();
+  }, [step, totalSteps, stripeAnim]);
+
+  // Entrance animation on each step.
+  useEffect(() => {
+    if (reduceMotion) {
+      entranceOpacity.setValue(1);
+      entranceTranslateY.setValue(0);
+      return;
+    }
+    entranceOpacity.setValue(0);
+    entranceTranslateY.setValue(10);
+    Animated.parallel([
+      Animated.timing(entranceOpacity,    { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.timing(entranceTranslateY, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]).start();
+  }, [step, reduceMotion, entranceOpacity, entranceTranslateY]);
+
   async function handleSkip() {
     await onboarding.markComplete();
     router.replace('/(tabs)');
@@ -43,12 +92,21 @@ export function WizardLayout({
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* ── Top progress stripe ─────────────────────────────────────────── */}
+      <View style={{ height: 4, backgroundColor: colors.border }}>
+        <Animated.View style={{
+          height: 4,
+          backgroundColor: colors.accent,
+          width: stripeAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }),
+        }} />
+      </View>
+
       <ScrollView
         contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, paddingTop: 16, paddingBottom: 48 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Progress dots ──────────────────────────────────────────────── */}
+        {/* ── Animated progress dots ──────────────────────────────────────── */}
         {!hideStepIndicator && (
           <View
             style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 32 }}
@@ -56,10 +114,10 @@ export function WizardLayout({
             accessibilityLabel={`Step ${step} of ${totalSteps}`}
           >
             {Array.from({ length: totalSteps }).map((_, i) => (
-              <View
+              <Animated.View
                 key={i}
                 style={{
-                  width: i + 1 === step ? 24 : 8,
+                  width: dotWidths[i],
                   height: 8,
                   borderRadius: 4,
                   backgroundColor: i + 1 === step ? colors.accent : colors.border,
@@ -69,26 +127,34 @@ export function WizardLayout({
           </View>
         )}
 
-        {/* ── Step heading ────────────────────────────────────────────────── */}
-        <Text
-          ref={headingRef}
-          accessibilityRole="header"
-          accessible
-          accessibilityLabel={hideStepIndicator ? title : `${title}. Step ${step} of ${totalSteps}.`}
-          style={{ fontSize: 30, fontWeight: '800', color: colors.text, marginBottom: 10, lineHeight: 36 }}
+        {/* ── Animated entrance: heading + description + content ──────────── */}
+        <Animated.View
+          style={{
+            flex: 1,
+            opacity: entranceOpacity,
+            transform: [{ translateY: entranceTranslateY }],
+          }}
         >
-          {title}
-        </Text>
-        <Text style={{ fontSize: 17, lineHeight: 25, color: colors.textSecondary, marginBottom: 28 }}>
-          {description}
-        </Text>
+          <Text
+            ref={headingRef}
+            accessibilityRole="header"
+            accessible
+            accessibilityLabel={hideStepIndicator ? title : `${title}. Step ${step} of ${totalSteps}.`}
+            style={{ fontSize: 30, fontWeight: '800', color: colors.text, marginBottom: 10, lineHeight: 36 }}
+          >
+            {title}
+          </Text>
+          <Text style={{ fontSize: 17, lineHeight: 25, color: colors.textSecondary, marginBottom: 28 }}>
+            {description}
+          </Text>
 
-        {/* ── Step content ────────────────────────────────────────────────── */}
-        <View style={{ flex: 1 }}>
-          {children}
-        </View>
+          {/* ── Step content ──────────────────────────────────────────────── */}
+          <View style={{ flex: 1 }}>
+            {children}
+          </View>
+        </Animated.View>
 
-        {/* ── Actions ─────────────────────────────────────────────────────── */}
+        {/* ── Actions (outside entrance anim — always visible) ────────────── */}
         <View style={{ marginTop: 32, gap: 12 }}>
           <Pressable
             onPress={onNext}
@@ -114,11 +180,11 @@ export function WizardLayout({
               onPress={handleSkip}
               accessible
               accessibilityRole="button"
-              accessibilityLabel="Skip setup and go straight to the app"
-              accessibilityHint="You can change all these settings later in the Settings tab."
+              accessibilityLabel="I'll set this up later"
+              accessibilityHint="Exits the setup wizard. Everything can be changed any time in the Settings tab."
               style={{ alignItems: 'center', paddingVertical: 12 }}
             >
-              <Text style={{ color: colors.textSecondary, fontSize: 15 }}>Skip setup</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 15 }}>{"I'll set this up later"}</Text>
             </Pressable>
           )}
         </View>

@@ -7,7 +7,7 @@
  *   body    — standard paragraph
  *   bullets — unordered list of short items
  *   steps   — numbered tutorial steps
- *   tip     — highlighted helpful tip (green tint)
+ *   tip     — highlighted AppleVis Tip (green tint)
  *   note    — informational aside (blue tint)
  *   warning — caution notice (amber tint)
  */

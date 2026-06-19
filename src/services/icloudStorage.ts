@@ -82,6 +82,15 @@ export const icloudStorage = {
     return remove(key);
   },
 
+  async getAllKeys(): Promise<string[]> {
+    try {
+      const keys = isAvailable ? await Native!.getAllKeys() : await AsyncStorage.getAllKeys();
+      return Array.from(keys);
+    } catch {
+      return [];
+    }
+  },
+
   // ── Set helpers (stored as JSON arrays, deduplicated) ─────────────────────
 
   async getSet(key: string): Promise<Set<string>> {
