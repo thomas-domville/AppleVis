@@ -97,6 +97,7 @@ function SettingCard({ item }: { item: SettingItem }) {
     helpApps:               '/help',
     helpPodcasts:           '/help',
     helpResources:          '/help',
+    helpBugTracker:         '/help',
     helpIntelligence:       '/help',
     helpFAQ:                '/help',
     helpGuidelines:         '/help',
@@ -121,10 +122,20 @@ function SettingCard({ item }: { item: SettingItem }) {
     clearLocalData:         '/settings-privacy',
   };
 
-  const interactiveRoute = INTERACTIVE_ROUTES[item.id];
-  const isNavigable = item.type === 'nav' || item.type === 'link' || !!interactiveRoute;
+  // Map help items that have dedicated articles to push straight to the article
+  const HELP_ARTICLE_ROUTES: Record<string, string> = {
+    helpSubmitBug:      'community-submit-bug',
+    helpSubmitBlog:     'community-submit-blog',
+    helpSubmitPodcast:  'community-submit-podcast',
+    helpSubmitApp:      'community-submit-app',
+  };
+
+  const interactiveRoute  = INTERACTIVE_ROUTES[item.id];
+  const helpArticleId     = HELP_ARTICLE_ROUTES[item.id];
+  const isNavigable = item.type === 'nav' || item.type === 'link' || !!interactiveRoute || !!helpArticleId;
 
   function handlePress() {
+    if (helpArticleId) { router.push({ pathname: '/help-article', params: { articleId: helpArticleId } } as any); return; }
     if (interactiveRoute) { router.push(interactiveRoute as any); return; }
     if (item.route) router.push(item.route as any);
   }
