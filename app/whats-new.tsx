@@ -10,98 +10,50 @@ type ChangeItem = {
   tag: 'New' | 'Improved' | 'Fixed';
 };
 
-const CURRENT_VERSION = '2026.0.2';
+const CURRENT_VERSION = '2026.0.5';
 
 const CHANGES: ChangeItem[] = [
   {
-    icon: 'paw-outline',
+    icon: 'bug-outline',
     tag: 'New',
-    title: 'Golden Retriever Bark Alert Sound',
-    description: 'A third notification sound option joins Mouse Squeak and Apple Crunch — a warm, friendly golden retriever bark. Choose it in Settings → Notifications or during setup.',
+    title: 'Submit a Bug Report In-App',
+    description: 'Report accessibility bugs without leaving AppleVis. The four-step wizard guides you through platform and OS version, bug title and Apple Feedback number, a detailed description, and recognition preference. Open Discover → Contribute → Submit a Bug Report.',
   },
   {
-    icon: 'volume-medium-outline',
-    tag: 'Improved',
-    title: 'All Sounds Now at the Same Volume',
-    description: 'Mouse Squeak, Apple Crunch, Golden Retriever Bark, and the welcome tone are now all balanced to the same loudness level. No more sounds that are much louder or quieter than others.',
-  },
-  {
-    icon: 'home-outline',
-    tag: 'Improved',
-    title: 'Smarter Welcome Summary',
-    description: 'The welcome card on the Home tab now tells you how many new comments have appeared in threads you have visited since your last session. Tap it to jump straight to the last item you were reading — VoiceOver focus lands on it automatically.',
-  },
-  {
-    icon: 'headset-outline',
-    tag: 'Improved',
-    title: 'Three Distinct VoiceOver Detail Levels',
-    description: 'Simple, Normal, and All now produce genuinely different labels. Simple gives title and content type only. Normal adds author and comment count. All adds posted date and last-comment time. The setup wizard and Accessibility Settings both show updated examples.',
-  },
-  {
-    icon: 'heart-outline',
+    icon: 'create-outline',
     tag: 'New',
-    title: 'Follow Forum Topics',
-    description: 'Tap the Follow button on any forum topic to subscribe to it. You will receive notifications when new replies are posted. Manage your followed topics from your profile.',
+    title: 'Submit a Blog Post In-App',
+    description: 'Write, import a text or Markdown file, or paste from the clipboard to submit a blog post to the AppleVis Editorial Team. A three-step wizard handles title, category, content, and review — no need to open a browser.',
   },
   {
-    icon: 'newspaper-outline',
+    icon: 'mic-outline',
     tag: 'New',
-    title: 'Read Blog Posts and Guides in the App',
-    description: 'Blog posts and guides now open fully inside the app — no need to switch to Safari. Comments are included, and you can post a comment directly from the page.',
+    title: 'Submit a Podcast In-App',
+    description: 'Upload a podcast episode directly from the app. Pick an MP3, AAC, M4A, WAV, or AIFF file from Files or iCloud Drive, add a description, and submit. The three-step wizard keeps the process simple.',
   },
   {
-    icon: 'star-outline',
+    icon: 'phone-portrait-outline',
     tag: 'New',
-    title: 'Write App Reviews In-App',
-    description: 'You can now write a review of any app in the directory directly from the app detail page. Your rating, accessibility rating, and review text are submitted straight to AppleVis.',
+    title: 'Submit an App Entry In-App',
+    description: 'Add a new app to the AppleVis App Directory without visiting the website. The five-step wizard searches iTunes, confirms app details, and walks you through VoiceOver performance, labelling, and usability ratings. Entries are published immediately when submitted by a signed-in member.',
   },
   {
-    icon: 'arrow-down-outline',
-    tag: 'New',
-    title: 'Load More and Jump to First Unread',
-    description: 'Long forum threads now have a Load More button to page through replies. A Jump to First Unread button takes you straight to the reply you have not seen yet — one tap instead of scrolling through dozens of replies.',
-  },
-  {
-    icon: 'time-outline',
-    tag: 'New',
-    title: 'Episode Duration on Feed Cards',
-    description: 'Podcast episode cards in the feed now show the episode duration after the first time you play or tap that episode. Durations are cached locally so they appear instantly on future visits.',
-  },
-  {
-    icon: 'apps-outline',
+    icon: 'share-outline',
     tag: 'Improved',
-    title: 'App Directory Fully Revamped',
-    description: 'App detail pages now show VoiceOver support, labelling, usability, and other ratings directly from AppleVis. Reviews and comments load live. The detail layout is cleaner and more structured for VoiceOver navigation.',
+    title: 'Share Extension Handles More Content Types',
+    description: 'The AppleVis Share Extension now recognises three types of shared content: App Store URLs open the app submission wizard, podcast URLs (from Podcasts, Overcast, Spotify, Pocket Casts, and others) open the podcast wizard, and plain text or text files open the blog post wizard with your content pre-loaded.',
   },
   {
-    icon: 'chatbubbles-outline',
+    icon: 'help-circle-outline',
     tag: 'Improved',
-    title: 'Richer Forum Thread Presentation',
-    description: 'Topic detail pages now have category headers, animated entry, colour-coded author avatars, NEW badges on unread replies, and correct formatting for code blocks and quoted text. Braille display users get cleaner paragraph breaks.',
+    title: 'Help Centre: Step-by-Step Wizard Guides',
+    description: 'Settings → Help now includes dedicated step-by-step guides for all four submission wizards — Submit a Bug Report, Submit a Blog Post, Submit a Podcast, and Submit an App Entry. Tap any guide to jump straight to the article. The Bug Tracker and Be My Eyes articles have also been updated.',
   },
   {
-    icon: 'document-text-outline',
+    icon: 'musical-notes-outline',
     tag: 'Improved',
-    title: 'Redesigned Detail Pages',
-    description: 'Blog, guide, episode, and resource detail pages have all been redesigned with consistent layout, better typography, and improved VoiceOver navigation — matching the look and feel of the forum topic view.',
-  },
-  {
-    icon: 'notifications-outline',
-    tag: 'Improved',
-    title: 'Cleaner Notifications Setup',
-    description: 'Notification categories now default to off during setup. The sound picker and Disable All button only appear once you turn at least one category on — so the first screen you see is not confusing with a "nothing selected" note while a sound appears selected.',
-  },
-  {
-    icon: 'accessibility-outline',
-    tag: 'Fixed',
-    title: 'VoiceOver Focus After Feed Loads',
-    description: 'VoiceOver cursor now lands on the welcome card when the Home feed finishes loading, and returns to your last position after pull-to-refresh or navigating back from a detail page.',
-  },
-  {
-    icon: 'speedometer-outline',
-    tag: 'Fixed',
-    title: 'Pitch Correction When Changing Speed',
-    description: 'Switching playback speed between episodes no longer causes audio to sound like a chipmunk. Pitch correction is now applied correctly whenever the speed is changed.',
+    title: 'Refreshed UI Sounds',
+    description: 'The refresh and screen-close sounds have been updated to cleaner versions. Eight older duplicate sound files have been removed, leaving a single consistent set of audio assets.',
   },
 ];
 
@@ -127,7 +79,7 @@ export default function WhatsNew() {
             Version {CURRENT_VERSION}
           </Text>
           <Text style={{ fontSize: 16, color: colors.textSecondary, textAlign: 'center', lineHeight: 23 }}>
-            New sounds, smarter home welcome, follow topics, in-app blogs and reviews, richer detail pages, and VoiceOver focus fixes.
+            Four in-app submission wizards (bug reports, blog posts, podcasts, app entries), extended Share Extension, wizard guides in Help Centre, and refreshed UI sounds.
           </Text>
         </View>
 
@@ -165,6 +117,36 @@ export default function WhatsNew() {
         })}
 
         {/* Previous version notes */}
+        <View style={[styles.card, { backgroundColor: colors.pill, borderColor: colors.border, borderWidth: 1, marginBottom: 10 }]}
+          accessible accessibilityLabel="Also in version 2026.0.2: Golden Retriever Bark alert sound, balanced alert volumes, smarter welcome summary, three VoiceOver detail levels, follow forum topics, in-app blog posts and guides, write app reviews in-app, load more and jump to first unread, episode duration on feed cards, app directory revamp, richer forum threads, redesigned detail pages, VoiceOver focus after feed loads, pitch correction fix.">
+          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
+            textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>
+            Also in 2026.0.2
+          </Text>
+          {[
+            'Golden Retriever Bark added as a third alert sound option',
+            'All alert sounds balanced to the same loudness level',
+            'Welcome card shows new comment counts and jumps to last-read position',
+            'Three genuinely different VoiceOver Detail Levels: Simple, Normal, and All',
+            'Follow forum topics and receive reply notifications',
+            'Blog posts and guides open fully inside the app with comments',
+            'Write app reviews in-app with rating and accessibility assessment',
+            'Load More button and Jump to First Unread in long forum threads',
+            'Episode duration shown on feed cards after first play',
+            'App detail pages show VoiceOver, labelling, and usability ratings',
+            'Forum threads: category headers, colour-coded avatars, NEW badges, code blocks',
+            'Blog, guide, episode, and resource detail pages redesigned',
+            'VoiceOver focus lands correctly after feed load and pull-to-refresh',
+            'Pitch correction applied correctly when switching playback speed',
+          ].map((item) => (
+            <View key={item} style={{ flexDirection: 'row', gap: 8, marginBottom: 6 }}
+              accessible accessibilityLabel={item}>
+              <Text style={{ color: colors.accent, fontSize: 15 }} accessibilityElementsHidden>•</Text>
+              <Text style={{ flex: 1, fontSize: 14, color: colors.textSecondary, lineHeight: 20 }}>{item}</Text>
+            </View>
+          ))}
+        </View>
+
         <View style={[styles.card, { backgroundColor: colors.pill, borderColor: colors.border, borderWidth: 1, marginBottom: 10 }]}
           accessible accessibilityLabel="Also in versions 2026.0.1.3 through 2026.0.1.5: welcome tone on launch, refreshed sounds, saved and downloaded episodes with full actions, sort filters for saved and downloads, VoiceOver saved status on episode cards, revamped episode About section, transcript screen, podcast artwork described, topic and episode detail screens, bottom toolbars on all detail pages.">
           <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
