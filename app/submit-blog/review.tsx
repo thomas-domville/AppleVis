@@ -192,7 +192,7 @@ export function ThankYouScreen({
   type,
   onDone,
 }: {
-  type: 'blog' | 'podcast' | 'bug' | 'app';
+  type: 'blog' | 'podcast' | 'bug' | 'app' | 'contact';
   onDone: () => void;
 }) {
   const { colors }                            = useTheme();
@@ -239,6 +239,12 @@ export function ThankYouScreen({
       heading: 'Thank you for your submission!',
       body:    'The AppleVis Editorial Team will review your app entry and determine whether it will be published. We will reach out to you with our decision. Please allow 2–3 days for the approval process.',
       done:    'Back to Discover',
+    },
+    contact: {
+      icon:    'mail-outline' as const,
+      heading: 'Message sent!',
+      body:    'The AppleVis team has received your message. We typically reply to urgent issues as soon as possible and routine enquiries within one business day.',
+      done:    'Back to Profile',
     },
   }[type];
 

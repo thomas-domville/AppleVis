@@ -191,28 +191,6 @@ function AboutSection({ colors, styles, showToast, router }: {
     ].join('\n');
   }
 
-  function openSupportEmail() {
-    const subject = 'AppleVis App Bug, Feedback, Suggestion, or Recommendation';
-    const body = [
-      'Hello AppleVis Support,',
-      '',
-      'I am contacting you about the AppleVis app.',
-      '',
-      'Type of message: Bug / Feedback / Suggestion / Recommendation',
-      '',
-      'What happened or what would you like to suggest?',
-      '',
-      '',
-      'Steps to reproduce, if this is a bug:',
-      '1.',
-      '2.',
-      '3.',
-      '',
-      buildSupportInfo(),
-    ].join('\n');
-    const url = `mailto:support@applevis.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    Linking.openURL(url).catch(() => showToast('Could not open Mail.', 'error'));
-  }
 
   return (
     <>
@@ -334,9 +312,9 @@ function AboutSection({ colors, styles, showToast, router }: {
         hint="The people and contributors behind AppleVis."
         onPress={() => router.push('/credits' as any)}
         colors={colors} styles={styles} />
-      <NavRow label="Contact App Support"  icon="chatbubble-ellipses-outline" external
-        hint="Opens your default Mail app with support at applevis.com, a subject line, and app support details already filled in."
-        onPress={openSupportEmail}
+      <NavRow label="Contact App Support"  icon="chatbubble-ellipses-outline"
+        hint="Opens the in-app contact wizard to send a bug report, feedback, suggestion, or recommendation to the AppleVis team."
+        onPress={() => router.push('/contact' as any)}
         colors={colors} styles={styles} />
 
       <Text

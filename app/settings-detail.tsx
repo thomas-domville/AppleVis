@@ -101,7 +101,7 @@ function SettingCard({ item }: { item: SettingItem }) {
     helpIntelligence:       '/help',
     helpFAQ:                '/help',
     helpGuidelines:         '/help',
-    contactAppSupport:      '/profile',
+    contactAppSupport:      '/contact',
     // Intelligence & Siri — all items open the dedicated intelligence screen
     readAloud:              '/settings-intelligence',
     translate:              '/settings-intelligence',

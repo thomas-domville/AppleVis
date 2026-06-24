@@ -211,3 +211,62 @@ export async function submitPodcastForm(payload: PodcastPayload): Promise<Drupal
     return { ok: false, error: e instanceof Error ? e.message : 'Network error. Please try again.' };
   }
 }
+
+// ── Contact / feedback form ───────────────────────────────────────────────────
+// Form at /contact (Drupal Webform)
+// Fields: i_understand_that_applevis_does_not_accept_sponsored_posts_conte (checkbox),
+//         name, email, subject, message, url (honeypot — blank),
+//         captcha_sid, captcha_token, captcha_response, captcha_cacheable (extracted)
+// No form_token on this webform — captcha tokens serve as CSRF protection.
+
+export type ContactPayload = {
+  name:    string;
+  email:   string;
+  subject: string;
+  message: string;
+};
+
+export async function submitContactForm(payload: ContactPayload): Promise<DrupalFormResult> {
+  const path = '/contact';
+  try {
+    const pageRes = await fetch(`${BASE}${path}`, {
+      headers: { ...FORM_HEADERS, Accept: 'text/html,application/xhtml+xml' },
+    });
+    if (!pageRes.ok) return { ok: false, error: 'Could not load the contact form. Check your connection and try again.' };
+    const html = await pageRes.text();
+
+    const formBuildId     = html.match(/name="form_build_id"\s+value="([^"]+)"/)?.[1]     ?? '';
+    const captchaSid      = html.match(/name="captcha_sid"\s+value="([^"]+)"/)?.[1]       ?? '';
+    const captchaToken    = html.match(/name="captcha_token"\s+value="([^"]+)"/)?.[1]     ?? '';
+    const captchaResponse = html.match(/name="captcha_response"\s+value="([^"]+)"/)?.[1]  ?? 'Turnstile no captcha';
+
+    if (!formBuildId) return { ok: false, error: 'Could not load the contact form. Check your connection and try again.' };
+
+    const body = encodeFields({
+      i_understand_that_applevis_does_not_accept_sponsored_posts_conte: '1',
+      name:              payload.name,
+      email:             payload.email,
+      subject:           payload.subject,
+      message:           payload.message,
+      captcha_sid:       captchaSid,
+      captcha_token:     captchaToken,
+      captcha_response:  captchaResponse,
+      captcha_cacheable: '1',
+      form_build_id:     formBuildId,
+      form_id:           'webform_submission_contact_node_25142_add_form',
+      url:               '',   // honeypot — must be blank
+      op:                'Send message',
+    });
+
+    const res = await fetch(`${BASE}${path}`, {
+      method:  'POST',
+      headers: { ...FORM_HEADERS, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    return wasRedirected(res, path)
+      ? { ok: true }
+      : { ok: false, error: 'The message was not sent. Please check your details and try again.' };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error. Please try again.' };
+  }
+}

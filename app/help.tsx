@@ -1,19 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, findNodeHandle, Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../src/components/Screen';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { useFocusRestore } from '../src/hooks/useFocusRestore';
 import { HELP_SECTIONS } from '../src/data/helpContent';
-import { useToast } from '../src/contexts/ToastContext';
-
-const SUPPORT_EMAIL = 'support@applevis.com';
 
 export default function HelpScreen() {
   const router = useRouter();
   const { colors, styles } = useTheme();
-  const { showToast } = useToast();
   const { save } = useFocusRestore();
   const sectionRefs = useRef<Map<string, View>>(new Map());
   const headingRef = useRef<Text | null>(null);
@@ -44,22 +40,6 @@ export default function HelpScreen() {
     return () => timers.forEach(clearTimeout);
   }, []);
 
-  function openSupportEmail() {
-    const subject = 'AppleVis App Help or Support';
-    const body = [
-      'Hello AppleVis Support,',
-      '',
-      'I need help with the AppleVis app.',
-      '',
-      'What I was trying to do:',
-      '',
-      '',
-      'What happened:',
-      '',
-    ].join('\n');
-    Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`)
-      .catch(() => showToast('Could not open Mail.', 'error'));
-  }
 
   return (
     <Screen title="Help & Support" showSettings={false}>
@@ -227,19 +207,19 @@ export default function HelpScreen() {
           Contact
         </Text>
         <Pressable
-          onPress={openSupportEmail}
+          onPress={() => router.push('/contact' as any)}
           accessible
           accessibilityRole="button"
-          accessibilityLabel="Contact App Support. Opens Mail addressed to support at applevis.com."
+          accessibilityLabel="Contact App Support. Opens the in-app contact wizard."
           accessibilityHint="Use this for app bugs, suggestions, recommendations, and feedback."
           style={({ pressed }) => [styles.card, { flexDirection: 'row', alignItems: 'center', gap: 12, borderLeftWidth: 4, borderLeftColor: colors.accent }, pressed && { opacity: 0.85 }]}
         >
-          <Ionicons name="mail-outline" size={24} color={colors.accent} accessibilityElementsHidden />
+          <Ionicons name="chatbubble-ellipses-outline" size={24} color={colors.accent} accessibilityElementsHidden />
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>Contact App Support</Text>
-            <Text style={[styles.cardMeta, { marginTop: 2 }]}>Email support@applevis.com for bugs, suggestions, recommendations, or feedback.</Text>
+            <Text style={[styles.cardMeta, { marginTop: 2 }]}>Send a bug report, feedback, suggestion, or recommendation to the AppleVis team — directly in the app.</Text>
           </View>
-          <Ionicons name="open-outline" size={16} color={colors.textSecondary} accessibilityElementsHidden />
+          <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} accessibilityElementsHidden />
         </Pressable>
 
         <View style={{ height: 96 }} />
