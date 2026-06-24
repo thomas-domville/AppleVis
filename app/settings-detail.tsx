@@ -75,6 +75,15 @@ function SettingCard({ item }: { item: SettingItem }) {
     podcastEQ:              '/settings-podcast',
     podcastAutoDownload:    '/settings-podcast',
     podcastAutoDelete:      '/settings-podcast',
+    icloudSync:             '/settings-saved-sync',
+    savedItemsSync:         '/settings-saved-sync',
+    readingPosition:        '/settings-saved-sync',
+    podcastPositionSync:    '/settings-saved-sync',
+    queueSync:              '/settings-saved-sync',
+    settingsSync:           '/settings-saved-sync',
+    savedTopics:            '/settings-saved-sync',
+    savedApps:              '/settings-saved-sync',
+    savedResources:         '/settings-saved-sync',
     // About items now live in Profile
     version:                '/profile',
     whatsNew:               '/whats-new',
@@ -91,6 +100,7 @@ function SettingCard({ item }: { item: SettingItem }) {
     helpIntelligence:       '/help',
     helpFAQ:                '/help',
     helpGuidelines:         '/help',
+    contactAppSupport:      '/profile',
     // Intelligence & Siri — all items open the dedicated intelligence screen
     readAloud:              '/settings-intelligence',
     translate:              '/settings-intelligence',
@@ -103,6 +113,12 @@ function SettingCard({ item }: { item: SettingItem }) {
     liveActivities:         '/settings-intelligence',
     widgets:                '/settings-intelligence',
     spotlight:              '/settings-intelligence',
+    dataCollected:          '/settings-privacy',
+    icloudStorage:          '/settings-privacy',
+    keychainStorage:        '/settings-privacy',
+    onDeviceAI:             '/settings-privacy',
+    privacyPolicy:          '/settings-privacy',
+    clearLocalData:         '/settings-privacy',
   };
 
   const interactiveRoute = INTERACTIVE_ROUTES[item.id];

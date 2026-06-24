@@ -3,7 +3,7 @@ import { cachedApi } from '../services/cachedApi';
 import { apiHealth } from '../services/apiHealth';
 import type { PodcastEpisode } from '../types/content';
 
-export function usePodcastList() {
+export function usePodcastList(tagTid?: number) {
   const [episodes, setEpisodes]           = useState<PodcastEpisode[]>([]);
   const [loading, setLoading]             = useState(true);
   const [refreshing, setRefreshing]       = useState(false);
@@ -24,7 +24,7 @@ export function usePodcastList() {
       setHasMore(false);
     }
 
-    const result = await cachedApi.podcasts.episodes(0);
+    const result = await cachedApi.podcasts.episodes(0, tagTid);
 
     if (result.ok) {
       setEpisodes(result.data.items);
@@ -40,20 +40,20 @@ export function usePodcastList() {
 
     if (background) setRefreshing(false);
     else setLoading(false);
-  }, []);
+  }, [tagTid]);
 
   const loadMore = useCallback(async () => {
     if (!hasMore || isLoadingMore) return;
     setIsLoadingMore(true);
     const nextPage = page + 1;
-    const result = await cachedApi.podcasts.episodes(nextPage);
+    const result = await cachedApi.podcasts.episodes(nextPage, tagTid);
     if (result.ok) {
       setEpisodes((prev) => [...prev, ...result.data.items]);
       setHasMore(result.data.hasMore);
       setPage(nextPage);
     }
     setIsLoadingMore(false);
-  }, [hasMore, isLoadingMore, page]);
+  }, [hasMore, isLoadingMore, page, tagTid]);
 
   // Pull-to-refresh: keep existing episodes visible while fetching fresh content.
   const refresh = useCallback(async () => {

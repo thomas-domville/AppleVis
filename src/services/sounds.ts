@@ -1,42 +1,86 @@
 import { Audio, InterruptionModeIOS } from 'expo-av';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+type SoundKey =
+  | 'tabChange'
+  | 'articleOpen'
+  | 'screenClose'
+  | 'pickerTick'
+  | 'downloadComplete'
+  | 'podcastPlay'
+  | 'podcastPause'
+  | 'refresh'
+  | 'success'
+  | 'error'
+  | 'reply'
+  | 'tipPopup'
+  | 'bookmarkSaved'
+  | 'searchComplete'
+  | 'syncComplete'
+  | 'offline'
+  | 'loadingStart'
+  | 'mouseSqueak'
+  | 'appleCrunch'
+  | 'goldenRetrieverBark'
+  | 'welcome';
 
-type SoundKey = 'refreshStart' | 'refreshComplete' | 'mouseSqueak' | 'appleCrunch' | 'goldenRetrieverBark' | 'welcome';
-
-// ─── Asset map ────────────────────────────────────────────────────────────────
-
-// open-section for "begin" (subtle ping), download-complete for "done".
-// When the Sounds & Haptics setting is implemented, gate playback on
-// persistence.getSetting('appSounds', true) here.
-// React Native asset bundling requires require() — ES import is not supported
-// for audio files resolved at runtime by the Metro bundler.
+// React Native asset bundling requires static require() calls for audio files.
 /* eslint-disable @typescript-eslint/no-require-imports */
 const ASSETS: Record<SoundKey, number> = {
-  refreshStart:         require('../../assets/sounds/open-section.wav'),
-  refreshComplete:      require('../../assets/sounds/download-complete.wav'),
-  mouseSqueak:          require('../../assets/sounds/Mouse Squeak.wav'),
-  appleCrunch:          require('../../assets/sounds/Apple Crunch.wav'),
-  goldenRetrieverBark:  require('../../assets/sounds/Golden Retriever Bark.wav'),
-  welcome:              require('../../assets/sounds/welcome.wav'),
+  tabChange:           require('../../assets/sounds/tab_change.wav'),
+  articleOpen:         require('../../assets/sounds/article_open.wav'),
+  screenClose:         require('../../assets/sounds/screen_close.wav'),
+  pickerTick:          require('../../assets/sounds/picker_tick.wav'),
+  downloadComplete:    require('../../assets/sounds/download_complete.wav'),
+  podcastPlay:         require('../../assets/sounds/podcast_play.wav'),
+  podcastPause:        require('../../assets/sounds/podcast_pause.wav'),
+  refresh:             require('../../assets/sounds/refresh.wav'),
+  success:             require('../../assets/sounds/success.wav'),
+  error:               require('../../assets/sounds/error.wav'),
+  reply:               require('../../assets/sounds/reply.wav'),
+  tipPopup:            require('../../assets/sounds/tip_popup.wav'),
+  bookmarkSaved:       require('../../assets/sounds/bookmark_saved.wav'),
+  searchComplete:      require('../../assets/sounds/search_complete.wav'),
+  syncComplete:        require('../../assets/sounds/sync_complete.wav'),
+  offline:             require('../../assets/sounds/offline.wav'),
+  loadingStart:        require('../../assets/sounds/loading_start.wav'),
+  mouseSqueak:         require('../../assets/sounds/Mouse Squeak.wav'),
+  appleCrunch:         require('../../assets/sounds/Apple Crunch.wav'),
+  goldenRetrieverBark: require('../../assets/sounds/Golden Retriever Bark.wav'),
+  welcome:             require('../../assets/sounds/welcome.wav'),
 };
 /* eslint-enable @typescript-eslint/no-require-imports */
 
-// ─── Module-level cache ───────────────────────────────────────────────────────
-
 const cache: Partial<Record<SoundKey, Audio.Sound>> = {};
 
-// Keys that are played as standalone previews (not background music/podcasts).
-// These temporarily claim the Playback audio session so they use media volume,
-// not the ringer volume, which is often much lower.
-const PREVIEW_KEYS = new Set<SoundKey>(['mouseSqueak', 'appleCrunch', 'goldenRetrieverBark', 'welcome']);
+// Preview sounds temporarily claim the playback session so users hear them at
+// media volume. Short UI event sounds stay ambient and non-disruptive.
+const PREVIEW_KEYS = new Set<SoundKey>([
+  'mouseSqueak',
+  'appleCrunch',
+  'goldenRetrieverBark',
+  'welcome',
+]);
 
-// Per-key volume overrides (0.0–1.0). Omitted keys default to 1.0.
-// All user-facing sounds RMS-normalised to ~−26.6 dBFS (Apple Crunch reference at 1.0).
-// Mouse Squeak: −2.15 dB trim; Bark: −19.2 dB trim; Welcome: −16.5 dB trim.
+const EVENT_VOLUME = 0.7;
 const VOLUMES: Partial<Record<SoundKey, number>> = {
+  tabChange:           EVENT_VOLUME,
+  articleOpen:         EVENT_VOLUME,
+  screenClose:         EVENT_VOLUME,
+  pickerTick:          EVENT_VOLUME,
+  downloadComplete:    EVENT_VOLUME,
+  podcastPlay:         EVENT_VOLUME,
+  podcastPause:        EVENT_VOLUME,
+  refresh:             EVENT_VOLUME,
+  success:             EVENT_VOLUME,
+  error:               EVENT_VOLUME,
+  reply:               EVENT_VOLUME,
+  tipPopup:            EVENT_VOLUME,
+  bookmarkSaved:       EVENT_VOLUME,
+  searchComplete:      EVENT_VOLUME,
+  syncComplete:        EVENT_VOLUME,
+  offline:             EVENT_VOLUME,
+  loadingStart:        EVENT_VOLUME,
   welcome:             0.15,
-  refreshComplete:     0.4,
   mouseSqueak:         0.78,
   goldenRetrieverBark: 0.11,
 };
@@ -64,8 +108,6 @@ async function play(key: SoundKey): Promise<void> {
     await cache[key]!.playAsync();
 
     if (isPreview) {
-      // Restore ambient mode after the clip finishes so the podcast player
-      // isn't affected. 3 s covers the longest preview clip with headroom.
       setTimeout(async () => {
         try {
           await Audio.setAudioModeAsync({
@@ -74,29 +116,50 @@ async function play(key: SoundKey): Promise<void> {
             shouldDuckAndroid: true,
             staysActiveInBackground: false,
           });
-        } catch (_e) { /* non-critical */ }
+        } catch (_e) {
+          // Non-critical: future playback calls reset the audio mode if needed.
+        }
       }, 3000);
     }
-  } catch (_e) { /* non-critical */ }
+  } catch (_e) {
+    // UI sounds should never block the action that triggered them.
+  }
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
-
 export const sounds = {
-  refreshStart:    (): Promise<void> => play('refreshStart'),
-  refreshComplete: (): Promise<void> => play('refreshComplete'),
+  tabChange:        (): Promise<void> => play('tabChange'),
+  articleOpen:      (): Promise<void> => play('articleOpen'),
+  screenClose:      (): Promise<void> => play('screenClose'),
+  pickerTick:       (): Promise<void> => play('pickerTick'),
+  downloadComplete: (): Promise<void> => play('downloadComplete'),
+  podcastPlay:      (): Promise<void> => play('podcastPlay'),
+  podcastPause:     (): Promise<void> => play('podcastPause'),
+  refresh:          (): Promise<void> => play('refresh'),
+  success:          (): Promise<void> => play('success'),
+  error:            (): Promise<void> => play('error'),
+  reply:            (): Promise<void> => play('reply'),
+  tipPopup:         (): Promise<void> => play('tipPopup'),
+  bookmarkSaved:    (): Promise<void> => play('bookmarkSaved'),
+  searchComplete:   (): Promise<void> => play('searchComplete'),
+  syncComplete:     (): Promise<void> => play('syncComplete'),
+  offline:          (): Promise<void> => play('offline'),
+  loadingStart:     (): Promise<void> => play('loadingStart'),
+
+  // Backward-compatible names used by existing refresh hooks.
+  refreshStart:     (): Promise<void> => play('refresh'),
+  refreshComplete:  (): Promise<void> => play('success'),
+
   mouseSqueak:         (): Promise<void> => play('mouseSqueak'),
   appleCrunch:         (): Promise<void> => play('appleCrunch'),
   goldenRetrieverBark: (): Promise<void> => play('goldenRetrieverBark'),
   welcome:             (): Promise<void> => play('welcome'),
 
-  // Call once on app start so first-play has no loading delay.
-  // Loads audio into cache without playing it.
   async preload(): Promise<void> {
     await Promise.allSettled(
       (Object.keys(ASSETS) as SoundKey[]).map(async (key) => {
         if (!cache[key]) {
-          const { sound } = await Audio.Sound.createAsync(ASSETS[key], { shouldPlay: false });
+          const volume = VOLUMES[key] ?? 1.0;
+          const { sound } = await Audio.Sound.createAsync(ASSETS[key], { shouldPlay: false, volume });
           cache[key] = sound;
         }
       }),

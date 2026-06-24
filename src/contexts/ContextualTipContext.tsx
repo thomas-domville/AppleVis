@@ -20,6 +20,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from './ThemeContext';
+import { sounds } from '../services/sounds';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,6 +71,7 @@ function TipModal({
   const introLabel = `AppleVis Tip. ${title}. ${message}`;
 
   function handleShow() {
+    sounds.tipPopup().catch(() => {});
     Animated.parallel([
       Animated.spring(scaleAnim, {
         toValue: 1, useNativeDriver: true,

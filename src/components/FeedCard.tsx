@@ -1,4 +1,4 @@
-import { memo, useState, type Ref } from 'react';
+import { memo, useMemo, useState, type Ref } from 'react';
 import { AccessibilityInfo, ActionSheetIOS, Clipboard, Linking, Platform, Pressable, Share, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -11,12 +11,14 @@ import { useToast } from '../contexts/ToastContext';
 import { useAccessibilityPreferences } from '../hooks/useAccessibilityPreferences';
 import { useSavedItems } from '../hooks/useSavedItems';
 import { useDownloadedEpisodes } from '../hooks/useDownloadedEpisodes';
+import { useFollowedItem } from '../hooks/useFollowedItem';
 import { persistence } from '../services/persistence';
 import { api } from '../services/api';
 import { readAloud } from '../services/intelligenceService';
+import { sounds } from '../services/sounds';
 import { relativeTime } from '../utils/relativeTime';
 import { WriteReviewModal } from './WriteReviewModal';
-import type { FeedItem } from '../types/content';
+import type { FeedItem, FollowedItem } from '../types/content';
 
 // ─── Label / icon maps ────────────────────────────────────────────────────────
 
@@ -33,7 +35,15 @@ const SAVE_LABELS: Record<FeedItem['kind'], string> = {
   podcast: 'Episode',
   app:     'App entry',
   guide:   'Guide',
-  blog:    'Post',
+  blog:    'Blog',
+};
+
+const FOLLOW_LABELS: Record<FeedItem['kind'], string> = {
+  topic:   'Topic',
+  podcast: 'Episode',
+  app:     'App',
+  guide:   'Guide',
+  blog:    'Blog',
 };
 
 // ─── Content helpers ──────────────────────────────────────────────────────────
@@ -141,6 +151,36 @@ function getA11yType(item: FeedItem): string {
   return KIND_LABELS[item.kind];
 }
 
+function getFollowNodeType(item: FeedItem): string {
+  switch (item.kind) {
+    case 'topic':   return 'node--forum';
+    case 'podcast': return 'node--podcast';
+    case 'app':     return 'node--ios_app_directory';
+    case 'guide':   return 'node--guides';
+    case 'blog':    return 'node--blog2';
+  }
+}
+
+function getFollowKind(item: FeedItem): FollowedItem['kind'] {
+  switch (item.kind) {
+    case 'topic':   return 'forumTopic';
+    case 'podcast': return 'podcastEpisode';
+    case 'app':     return 'appListing';
+    case 'guide':   return 'resource';
+    case 'blog':    return 'blogPost';
+  }
+}
+
+function getFollowUrl(item: FeedItem): string | undefined {
+  switch (item.kind) {
+    case 'topic':   return item.data.url;
+    case 'podcast': return item.data.url;
+    case 'app':     return item.data.url;
+    case 'guide':   return item.data.url;
+    case 'blog':    return item.data.url;
+  }
+}
+
 // ─── Action builder ───────────────────────────────────────────────────────────
 
 type Action = {
@@ -155,7 +195,9 @@ function buildActions(
     isSignedIn: boolean;
     voiceOverOn: boolean;
     isQueued: boolean;
+    isCurrentPodcastPlaying: boolean;
     isSaved: boolean;
+    isFollowing: boolean;
     showToast: (msg: string, type?: 'success' | 'warning' | 'error') => void;
     onPlay: () => void;
     onQueue: () => void;
@@ -164,11 +206,11 @@ function buildActions(
     onWriteReview: () => void;
     onSave: () => void;
     onAddEpisodeComment: () => void;
-    onFollowTopic: () => void;
+    onToggleFollow: () => void;
     onOpenTopicInBrowser: () => void;
   },
 ): Action[] {
-  const { isSignedIn, voiceOverOn, isQueued, isSaved, showToast, onPlay, onQueue, onPlayNext, onReply, onWriteReview, onSave, onAddEpisodeComment, onFollowTopic, onOpenTopicInBrowser } = opts;
+  const { isSignedIn, voiceOverOn, isQueued, isCurrentPodcastPlaying, isSaved, isFollowing, showToast, onPlay, onQueue, onPlayNext, onReply, onWriteReview, onSave, onAddEpisodeComment, onToggleFollow, onOpenTopicInBrowser } = opts;
   const title = getTitle(item);
   const stub  = () => showToast('Coming soon.', 'warning');
   const commentStub = () => {
@@ -194,7 +236,7 @@ function buildActions(
     label: item.kind === 'topic'   ? 'Share this Topic'
          : item.kind === 'app'     ? 'Share this App Entry'
          : item.kind === 'podcast' ? 'Share this Episode'
-         : item.kind === 'blog'    ? 'Share this Post'
+         : item.kind === 'blog'    ? 'Share this Blog'
          : `Share this ${KIND_LABELS[item.kind]}`,
     name: 'share',
     onPress: () => Share.share({ title, message: getShareMessage(item) }),
@@ -205,7 +247,7 @@ function buildActions(
       const actions: Action[] = [];
       actions.push({ label: 'Add New Comment',                                             name: 'reply',    onPress: onReply });
       actions.push({ label: isSaved ? 'Remove from Saved' : 'Save this Topic',            name: 'save',     onPress: onSave });
-      actions.push({ label: 'Follow this Topic',                                           name: 'follow',   onPress: onFollowTopic });
+      actions.push({ label: isFollowing ? 'Unfollow this Topic' : 'Follow this Topic',    name: 'follow',   onPress: onToggleFollow });
       if (readAloudAction) actions.push(readAloudAction);
       actions.push({ label: 'Open in Safari',  name: 'browser', onPress: onOpenTopicInBrowser });
       actions.push(shareAction);
@@ -214,7 +256,7 @@ function buildActions(
 
     case 'podcast': {
       const actions: Action[] = [];
-      actions.push({ label: 'Play this Episode', name: 'play', onPress: onPlay });
+      actions.push({ label: isCurrentPodcastPlaying ? 'Stop this Episode' : 'Play this Episode', name: 'play', onPress: onPlay });
       actions.push({
         label: isQueued ? 'Remove from Queue' : 'Queue this Episode',
         name: 'queue',
@@ -223,6 +265,7 @@ function buildActions(
       actions.push({ label: 'Play Next',                                                    name: 'playNext', onPress: onPlayNext });
       actions.push({ label: 'Add New Comment',                                              name: 'comment',  onPress: onAddEpisodeComment });
       actions.push({ label: isSaved ? 'Remove from Saved' : 'Save this Episode',           name: 'save',     onPress: onSave });
+      actions.push({ label: isFollowing ? 'Unfollow this Episode' : 'Follow this Episode', name: 'follow',   onPress: onToggleFollow });
       if (readAloudAction) actions.push(readAloudAction);
       actions.push(shareAction);
       return actions;
@@ -232,6 +275,7 @@ function buildActions(
       const actions: Action[] = [];
       actions.push({ label: 'Add New Comment',                                              name: 'review',   onPress: onWriteReview });
       actions.push({ label: isSaved ? 'Remove from Saved' : 'Save this App Entry',         name: 'save',     onPress: onSave });
+      actions.push({ label: isFollowing ? 'Unfollow this App' : 'Follow this App',         name: 'follow',   onPress: onToggleFollow });
       if (readAloudAction) actions.push(readAloudAction);
       if (item.data.appStoreUrl) {
         actions.push({
@@ -248,6 +292,7 @@ function buildActions(
       const actions: Action[] = [];
       actions.push({ label: 'Add New Comment',                                              name: 'comment',  onPress: commentStub });
       actions.push({ label: isSaved ? 'Remove from Saved' : 'Save this Guide',             name: 'save',     onPress: onSave });
+      actions.push({ label: isFollowing ? 'Unfollow this Guide' : 'Follow this Guide',     name: 'follow',   onPress: onToggleFollow });
       if (readAloudAction) actions.push(readAloudAction);
       actions.push(shareAction);
       return actions;
@@ -256,7 +301,8 @@ function buildActions(
     case 'blog': {
       const actions: Action[] = [];
       actions.push({ label: 'Add New Comment',                                              name: 'comment',  onPress: commentStub });
-      actions.push({ label: isSaved ? 'Remove from Saved' : 'Save this Post',              name: 'save',     onPress: onSave });
+      actions.push({ label: isSaved ? 'Remove from Saved' : 'Save this Blog',              name: 'save',     onPress: onSave });
+      actions.push({ label: isFollowing ? 'Unfollow this Blog' : 'Follow this Blog',       name: 'follow',   onPress: onToggleFollow });
       if (readAloudAction) actions.push(readAloudAction);
       actions.push(shareAction);
       return actions;
@@ -273,9 +319,10 @@ type Props = {
   newCount?: number;
   accentColor?: string;
   onFocus?: () => void;
+  onMarkRead?: () => void;
 };
 
-export const FeedCard = memo(function FeedCard({ item, onPress, cardRef, newCount = 0, accentColor, onFocus }: Props) {
+export const FeedCard = memo(function FeedCard({ item, onPress, cardRef, newCount = 0, accentColor, onFocus, onMarkRead }: Props) {
   const router               = useRouter();
   const { colors, styles }   = useTheme();
   const { announcementLevel } = usePreferences();
@@ -294,11 +341,35 @@ export const FeedCard = memo(function FeedCard({ item, onPress, cardRef, newCoun
     Date.now() - new Date(item.activityAt).getTime() < 7 * 24 * 60 * 60 * 1000;
 
   const isQueued     = item.kind === 'podcast' && player.queue.some(q => q.id === item.data.id);
+  const isCurrentPodcast = item.kind === 'podcast' && player.episode?.id === item.data.id;
+  const isCurrentPodcastPlaying = isCurrentPodcast && player.isPlaying;
   const isSavedItem  = saved.isSaved(item.data.id);
   const isDownloaded = item.kind === 'podcast' && isEpisodeDownloaded(item.data.id);
+  const followItem = useMemo<FollowedItem>(() => ({
+    id: item.data.id,
+    kind: getFollowKind(item),
+    nodeType: getFollowNodeType(item),
+    title,
+    followedAt: new Date().toISOString(),
+    lastActivityAt: item.activityAt,
+    url: getFollowUrl(item),
+  }), [item, title]);
+  const followed = useFollowedItem(followItem);
+  const isFollowingItem = followed.isFollowing || (item.kind === 'topic' && item.data.isFollowing);
 
   function handlePlay() {
     if (item.kind !== 'podcast') return;
+    if (isCurrentPodcastPlaying) {
+      player.stop();
+      AccessibilityInfo.announceForAccessibility('Playback stopped.');
+      return;
+    }
+    if (isCurrentPodcast && !player.isPlaying) {
+      player.play();
+      AccessibilityInfo.announceForAccessibility(`Resuming: ${item.data.title}`);
+      return;
+    }
+    sounds.podcastPlay().catch(() => {});
     player.loadEpisode(item.data);
     AccessibilityInfo.announceForAccessibility(`Now playing: ${item.data.title}`);
   }
@@ -344,6 +415,7 @@ export const FeedCard = memo(function FeedCard({ item, onPress, cardRef, newCoun
                  :                          'blogPost'      as const;
       saved.save({ id, kind, title, savedAt: new Date().toISOString() });
       if (item.kind === 'podcast') persistence.saveSavedEpisodeMeta(item.data).catch(() => {});
+      sounds.bookmarkSaved().catch(() => {});
       showToast(`${SAVE_LABELS[item.kind]} saved.`, 'success');
     }
   }
@@ -360,17 +432,20 @@ export const FeedCard = memo(function FeedCard({ item, onPress, cardRef, newCoun
     });
   }
 
-  async function handleFollowTopic() {
+  async function handleToggleFollow() {
     if (!auth.isSignedIn) {
-      showToast('Sign in to follow topics.', 'warning');
+      showToast(`Sign in to follow this ${FOLLOW_LABELS[item.kind].toLowerCase()}.`, 'warning');
       return;
     }
-    if (item.kind !== 'topic') return;
-    const token = await api.account.getSessionToken();
-    if (!token) { showToast('Session expired. Please sign in again.', 'error'); return; }
-    const res = await api.forums.follow(item.data.id, token);
-    if (res.ok) showToast('Now following this topic. You will receive notifications for new replies.', 'success');
-    else showToast(`Could not follow: ${res.error}`, 'error');
+    if (isFollowingItem) {
+      await followed.unfollow();
+      showToast(`Unfollowed ${FOLLOW_LABELS[item.kind].toLowerCase()}.`, 'success');
+      return;
+    }
+
+    const result = await followed.follow();
+    if (result === 'followed') showToast(`Following ${FOLLOW_LABELS[item.kind].toLowerCase()}.`, 'success');
+    else showToast('Following saved. Server sync is waiting for AppleVis support.', 'warning');
   }
 
   function handleOpenTopicInBrowser() {
@@ -380,28 +455,36 @@ export const FeedCard = memo(function FeedCard({ item, onPress, cardRef, newCoun
     else showToast('URL not available yet.', 'warning');
   }
 
-  const actions = buildActions(item, {
-    isSignedIn: auth.isSignedIn,
-    voiceOverOn: a11y.screenReaderEnabled,
-    isQueued,
-    isSaved: isSavedItem,
-    showToast,
-    onPlay: handlePlay,
-    onQueue: handleQueue,
-    onPlayNext: handlePlayNext,
-    onReply: handleReply,
-    onWriteReview: () => {
-      if (!auth.isSignedIn) { showToast('Sign in to write a review.', 'warning'); return; }
-      setReviewVisible(true);
-    },
-    onSave: handleSaveItem,
-    onAddEpisodeComment: handleAddEpisodeComment,
-    onFollowTopic: handleFollowTopic,
-    onOpenTopicInBrowser: handleOpenTopicInBrowser,
-  });
+  const actions = [
+    ...(newCount > 0 && onMarkRead
+      ? [{ label: 'Mark as Read', name: 'markRead', onPress: onMarkRead }]
+      : []),
+    ...buildActions(item, {
+      isSignedIn: auth.isSignedIn,
+      voiceOverOn: a11y.screenReaderEnabled,
+      isQueued,
+      isCurrentPodcastPlaying,
+      isSaved: isSavedItem,
+      isFollowing: isFollowingItem,
+      showToast,
+      onPlay: handlePlay,
+      onQueue: handleQueue,
+      onPlayNext: handlePlayNext,
+      onReply: handleReply,
+      onWriteReview: () => {
+        if (!auth.isSignedIn) { showToast('Sign in to write a review.', 'warning'); return; }
+        setReviewVisible(true);
+      },
+      onSave: handleSaveItem,
+      onAddEpisodeComment: handleAddEpisodeComment,
+      onToggleFollow: handleToggleFollow,
+      onOpenTopicInBrowser: handleOpenTopicInBrowser,
+    }),
+  ];
 
   const stateLabels: string[] = [];
   if (isSavedItem)   stateLabels.push('Saved');
+  if (isFollowingItem) stateLabels.push('Following');
   if (isQueued)      stateLabels.push('In queue');
   if (isDownloaded)  stateLabels.push('Downloaded');
   const states = stateLabels.length > 0 ? `. ${stateLabels.join('. ')}` : '';
@@ -433,6 +516,11 @@ export const FeedCard = memo(function FeedCard({ item, onPress, cardRef, newCoun
     }
   }
 
+  function handleOpen() {
+    sounds.articleOpen().catch(() => {});
+    onPress();
+  }
+
   return (
     <>
     {item.kind === 'app' && (
@@ -446,7 +534,7 @@ export const FeedCard = memo(function FeedCard({ item, onPress, cardRef, newCoun
     )}
     <Pressable
       ref={cardRef}
-      onPress={onPress}
+      onPress={handleOpen}
       onFocus={onFocus}
       onLongPress={handleLongPress}
       delayLongPress={400}

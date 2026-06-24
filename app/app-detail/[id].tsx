@@ -11,11 +11,13 @@ import * as Haptics from 'expo-haptics';
 import { Screen } from '../../src/components/Screen';
 import { WriteReviewModal } from '../../src/components/WriteReviewModal';
 import { AuthorProfileModal } from '../../src/components/AuthorProfileModal';
+import { EditContentModal } from '../../src/components/EditContentModal';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { useAlert } from '../../src/contexts/AccessibleAlertContext';
+import { usePreferences } from '../../src/contexts/PreferencesContext';
 import { ALERTS } from '../../src/data/alertMessages';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
 import { useHandoff } from '../../src/hooks/useHandoff';
@@ -317,6 +319,7 @@ function AccessibilityField({
 
 function CommentCard({
   review, index, total, colors, styles, screenReaderEnabled, showToast, onReplyTo, isNew,
+  currentUserUuid, onEdit, onDelete,
 }: {
   review: AppReview;
   index: number;
@@ -327,9 +330,13 @@ function CommentCard({
   showToast: (msg: string, type?: 'success' | 'warning' | 'error') => void;
   onReplyTo: () => void;
   isNew?: boolean;
+  currentUserUuid?: string;
+  onEdit: (review: AppReview) => void;
+  onDelete: (review: AppReview) => void;
 }) {
-  const plain = stripHtml(review.body);
+  const plain          = stripHtml(review.body);
   const commentSubject = displayCommentSubject(review.subject);
+  const isOwnReview    = !!currentUserUuid && currentUserUuid === review.authorId;
 
   const actions = [
     { label: 'Reply to this Comment', action: onReplyTo },
@@ -346,6 +353,10 @@ function CommentCard({
     }).catch(() => {}) },
     { label: 'Mark as Helpful', action: () => showToast('Helpful votes — coming once the Drupal Flags API is confirmed.', 'warning') },
     { label: 'Report Comment',  action: () => showToast('Reporting — coming once the Drupal Flags API is confirmed.', 'warning') },
+    ...(isOwnReview ? [
+      { label: 'Edit Review',   action: () => onEdit(review) },
+      { label: 'Delete Review', action: () => onDelete(review) },
+    ] : []),
   ];
 
   function handleLongPress() {
@@ -447,12 +458,13 @@ export default function AppDetailScreen() {
   const { id, name: paramName } = useLocalSearchParams<{ id: string; name?: string }>();
   const router                   = useRouter();
   const { colors, styles }       = useTheme();
+  const { aiSummariesEnabled }   = usePreferences();
   const { screenReaderEnabled, reduceMotion, reduceTransparency } = useAccessibilityPreferences();
   const auth                     = useAuth();
   const { showToast }            = useToast();
   const { showAlert }            = useAlert();
   const saved                    = useSavedItems('appListing');
-  const aiAvailable              = isAppleIntelligenceAvailable();
+  const aiAvailable              = aiSummariesEnabled && isAppleIntelligenceAvailable();
   const insets                   = useSafeAreaInsets();
 
   const [app,           setApp]           = useState<AppDetail | null>(null);
@@ -461,6 +473,7 @@ export default function AppDetailScreen() {
   const [fromCache,     setFromCache]     = useState(false);
   const [showReview,    setShowReview]    = useState(false);
   const [replyingTo,    setReplyingTo]    = useState<AppReview | null>(null);
+  const [editingReview, setEditingReview] = useState<AppReview | null>(null);
   const [authorProfile, setAuthorProfile] = useState(false);
   const [itunes,        setItunes]        = useState<ItunesMetadata | 'not-found' | null>(null);
   const [itunesLoading, setItunesLoading] = useState(false);
@@ -1627,6 +1640,27 @@ export default function AppDetailScreen() {
                       screenReaderEnabled={screenReaderEnabled}
                       showToast={showToast}
                       isNew={isNewReview}
+                      currentUserUuid={auth.user?.uuid}
+                      onEdit={(r) => setEditingReview(r)}
+                      onDelete={(r) => {
+                        showAlert({
+                          title: 'Delete Review?',
+                          message: 'This cannot be undone.',
+                          buttons: [
+                            { label: 'Delete', style: 'destructive', onPress: async () => {
+                              if (!auth.user?.csrfToken) return;
+                              const res = await api.content.deleteComment('comment_node_ios_app_directory', r.id, auth.user.csrfToken);
+                              if (res.ok) {
+                                setApp(a => a ? { ...a, reviews: a.reviews.filter(x => x.id !== r.id) } : a);
+                                showToast('Review deleted.', 'success');
+                              } else {
+                                showToast('Could not delete review.', 'error');
+                              }
+                            }},
+                            { label: 'Cancel' },
+                          ],
+                        });
+                      }}
                       onReplyTo={() => {
                         if (!auth.isSignedIn) { showAlert({ ...ALERTS.auth.signInRequired('reply to reviews'), onConfirm: () => router.push('/settings-account' as any) }); return; }
                         setReplyingTo(review);
@@ -1789,6 +1823,23 @@ export default function AppDetailScreen() {
             if (id) contentCache.clear(`apps:detail:${id}`);
             loadApp();
           }}
+        />
+      )}
+
+      {/* Edit Review Modal */}
+      {editingReview && auth.user?.csrfToken && (
+        <EditContentModal
+          visible={!!editingReview}
+          onClose={() => setEditingReview(null)}
+          onSaved={(newBody) => {
+            setApp(a => a ? { ...a, reviews: a.reviews.map(r => r.id === editingReview.id ? { ...r, body: newBody } : r) } : a);
+            showToast('Review updated.', 'success');
+          }}
+          commentId={editingReview.id}
+          commentType="comment_node_ios_app_directory"
+          csrfToken={auth.user.csrfToken}
+          initialBody={editingReview.body}
+          label="Review"
         />
       )}
 

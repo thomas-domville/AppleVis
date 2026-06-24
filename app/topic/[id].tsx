@@ -10,11 +10,13 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Screen } from '../../src/components/Screen';
 import { AuthorProfileModal } from '../../src/components/AuthorProfileModal';
+import { EditContentModal } from '../../src/components/EditContentModal';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { useAlert } from '../../src/contexts/AccessibleAlertContext';
+import { usePreferences } from '../../src/contexts/PreferencesContext';
 import { ALERTS } from '../../src/data/alertMessages';
 import { useTip, TIP_KEYS, TIPS } from '../../src/contexts/ContextualTipContext';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
@@ -220,6 +222,7 @@ function ComingSoonShell({ icon, message }: { icon: string; message: string }) {
 function ReplyCard({
   reply, index, total, colors, styles, screenReaderEnabled, showToast,
   topicAuthorId, topicTitle, textSize, onReplyTo, categoryAccent, reduceMotion,
+  currentUserUuid, onEdit, onDelete,
 }: {
   reply: ForumReply;
   index: number;
@@ -234,12 +237,16 @@ function ReplyCard({
   onReplyTo: () => void;
   categoryAccent: string;
   reduceMotion: boolean;
+  currentUserUuid?: string;
+  onEdit: (reply: ForumReply) => void;
+  onDelete: (reply: ForumReply) => void;
 }) {
   const [collapsed, setCollapsed]   = useState(false);
   const pulseAnim                   = useRef(new Animated.Value(1)).current;
   const replyBodySegs               = bodySegments(reply.body);
   const timeStr                     = relativeTime(reply.createdAt);
   const isOP                        = !!topicAuthorId && topicAuthorId === reply.authorId;
+  const isOwnReply                  = !!currentUserUuid && currentUserUuid === reply.authorId;
   const commentSubject              = displayCommentSubject(reply.subject, topicTitle);
   const commentFontSize             = Math.max(13, textSize - 1);
   const avatarBg                    = isOP ? categoryAccent : hashAuthorColor(reply.authorName);
@@ -282,6 +289,10 @@ function ReplyCard({
     },
     { label: 'Mark as Helpful', action: () => showToast('Helpful votes — coming once the Drupal Flags API is confirmed.', 'warning') },
     { label: 'Report Comment',  action: () => showToast('Reporting coming once the Drupal Flags API is confirmed.', 'warning') },
+    ...(isOwnReply ? [
+      { label: 'Edit Comment',   action: () => onEdit(reply) },
+      { label: 'Delete Comment', action: () => onDelete(reply) },
+    ] : []),
   ];
 
   function handleLongPress() {
@@ -465,13 +476,14 @@ export default function TopicDetail() {
   const { id, title: paramTitle } = useLocalSearchParams<{ id: string; title?: string }>();
   const router                    = useRouter();
   const { colors, styles }        = useTheme();
+  const { aiSummariesEnabled }    = usePreferences();
   const { screenReaderEnabled, reduceMotion, reduceTransparency } = useAccessibilityPreferences();
   const auth                      = useAuth();
   const { showToast }             = useToast();
   const { showAlert }             = useAlert();
   const { showTip }               = useTip();
   const saved                     = useSavedItems('forumTopic');
-  const aiAvailable               = isAppleIntelligenceAvailable();
+  const aiAvailable               = aiSummariesEnabled && isAppleIntelligenceAvailable();
   const insets                    = useSafeAreaInsets();
 
   const [topic,        setTopic]        = useState<ForumTopicDetail | null>(null);
@@ -485,6 +497,7 @@ export default function TopicDetail() {
   const [authorProfile,   setAuthorProfile]   = useState(false);
   const [textSize,             setTextSize]             = useState(16);
   const [loadingMoreReplies,  setLoadingMoreReplies]  = useState(false);
+  const [editingReply,        setEditingReply]        = useState<ForumReply | null>(null);
 
   const scrollRef      = useRef<ScrollView>(null);
   const repliesY       = useRef<number>(0);
@@ -1343,6 +1356,27 @@ export default function TopicDetail() {
                       onReplyTo={() => handleReplyToComment(reply)}
                       categoryAccent={catColor}
                       reduceMotion={reduceMotion}
+                      currentUserUuid={auth.user?.uuid}
+                      onEdit={(r) => setEditingReply(r)}
+                      onDelete={(r) => {
+                        showAlert({
+                          title: 'Delete Comment?',
+                          message: 'This cannot be undone.',
+                          buttons: [
+                            { label: 'Delete', style: 'destructive', onPress: async () => {
+                              if (!auth.user?.csrfToken) return;
+                              const res = await api.content.deleteComment('comment_forum', r.id, auth.user.csrfToken);
+                              if (res.ok) {
+                                setTopic(t => t ? { ...t, replies: t.replies.filter(x => x.id !== r.id) } : t);
+                                showToast('Comment deleted.', 'success');
+                              } else {
+                                showToast('Could not delete comment.', 'error');
+                              }
+                            }},
+                            { label: 'Cancel' },
+                          ],
+                        });
+                      }}
                     />
                   </View>
                 );
@@ -1459,6 +1493,26 @@ export default function TopicDetail() {
         </View>
       )}
       </View>
+
+      {/* ── Edit comment modal ────────────────────────────────────────────── */}
+      {editingReply && auth.user?.csrfToken && (
+        <EditContentModal
+          visible={!!editingReply}
+          onClose={() => setEditingReply(null)}
+          onSaved={(newBody) => {
+            setTopic(t => t ? {
+              ...t,
+              replies: t.replies.map(r => r.id === editingReply.id ? { ...r, body: newBody } : r),
+            } : t);
+            showToast('Comment updated.', 'success');
+          }}
+          commentId={editingReply.id}
+          commentType="comment_forum"
+          csrfToken={auth.user.csrfToken}
+          initialBody={editingReply.body}
+          label="Comment"
+        />
+      )}
 
       {/* ── Author profile modal ──────────────────────────────────────────── */}
       {topic?.authorId && (

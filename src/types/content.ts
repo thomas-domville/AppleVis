@@ -1,4 +1,14 @@
 export type ContentKind = 'forumTopic' | 'podcastEpisode' | 'appListing' | 'resource' | 'blogPost';
+export type FollowableKind = ContentKind;
+export type FollowedItem = {
+  id: string;
+  kind: FollowableKind;
+  nodeType: string;
+  title: string;
+  followedAt: string;
+  lastActivityAt?: string;
+  url?: string;
+};
 
 export type PaginatedResult<T> = { items: T[]; hasMore: boolean };
 
@@ -82,6 +92,8 @@ export type Chapter = {
   endTime?: number;
 };
 
+export type PodcastTag = { name: string; tid: number };
+
 export type PodcastEpisode = {
   id: string;
   title: string;
@@ -96,6 +108,7 @@ export type PodcastEpisode = {
   chapters?: Chapter[];
   url?: string;
   authorName?: string;
+  tags?: PodcastTag[];
 };
 
 export type AppListing = {
@@ -136,6 +149,7 @@ export type Resource = {
   id: string;
   title: string;
   kind: 'guide' | 'tutorial' | 'article' | 'event' | 'developer';
+  categories?: { name: string; tid: number }[];
   summary: string;
   createdAt?: string;
   updatedAt: string;
@@ -166,6 +180,7 @@ export type AppReview = {
   id: string;
   subject?: string;
   authorName: string;
+  authorId?: string;
   rating?: number;
   body: string;
   createdAt: string;
@@ -199,4 +214,29 @@ export type UserProfile = {
   memberSince: string;
   postCount: number;
   profileUrl: string;
+};
+
+// ─── Bug reports ──────────────────────────────────────────────────────────────
+
+export type BugReport = {
+  id: string;
+  platform: 'ios' | 'macos';
+  title: string;
+  status: 'active' | 'fixed';
+  severity: 'low' | 'medium' | 'high';
+  firstSeen: string;      // human-readable version string
+  fixedIn?: string;       // human-readable version string, present when fixed
+  feedbackId?: string;    // Apple Feedback Assistant ID e.g. FB12345678
+  commentCount: number;
+  createdAt: string;
+  changedAt: string;
+  url: string;
+};
+
+export type BugReportDetail = BugReport & {
+  body: string;
+  stepsToReproduce?: string;
+  workaround?: string;
+  device?: string;
+  howOften?: 'rarely' | 'sometimes' | 'always';
 };

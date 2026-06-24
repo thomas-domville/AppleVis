@@ -5,9 +5,11 @@ import type { PodcastEpisode, Chapter } from '../types/content';
 import { persistence } from '../services/persistence';
 import { parseChapters } from '../services/id3Parser';
 import { getLocalUri } from '../services/downloads';
+import { sounds } from '../services/sounds';
 import { usePreferences } from '../contexts/PreferencesContext';
 import {
   updateNowPlayingInfo, clearNowPlayingInfo,
+  startPodcastLiveActivity, updatePodcastLiveActivity, endPodcastLiveActivity,
   setupRemoteCommands, setVoiceBoostEnabled, setTrimSilenceEnabled,
 } from '../native/nativeModules';
 
@@ -65,6 +67,7 @@ export function usePodcastPlayer() {
   const soundRef = useRef<Audio.Sound | null>(null);
   const sleepRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const nowPlayingTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const liveActivityTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const queueLoadedRef = useRef(false);
   const episodeRef    = useRef<PodcastEpisode | null>(null);
   const volumeRef     = useRef(1.0);
@@ -170,7 +173,11 @@ export function usePodcastPlayer() {
       soundRef.current?.unloadAsync();
       if (sleepRef.current) clearInterval(sleepRef.current);
       if (nowPlayingTickRef.current) clearInterval(nowPlayingTickRef.current);
-      if (Platform.OS === 'ios') clearNowPlayingInfo();
+      if (liveActivityTickRef.current) clearInterval(liveActivityTickRef.current);
+      if (Platform.OS === 'ios') {
+        clearNowPlayingInfo();
+        endPodcastLiveActivity();
+      }
     };
   }, []);
 
@@ -223,6 +230,46 @@ export function usePodcastPlayer() {
     };
   }, [state.isPlaying, state.episode]);
 
+  // Keep Lock Screen / Dynamic Island Live Activity in sync with playback.
+  useEffect(() => {
+    if (liveActivityTickRef.current) {
+      clearInterval(liveActivityTickRef.current);
+      liveActivityTickRef.current = null;
+    }
+
+    if (Platform.OS !== 'ios') return undefined;
+
+    if (!state.episode) {
+      endPodcastLiveActivity();
+      return undefined;
+    }
+
+    const pushLiveActivityUpdate = () => {
+      setState(prev => {
+        if (prev.episode) {
+          updatePodcastLiveActivity({
+            episodeTitle: prev.episode.title,
+            showTitle: prev.episode.showTitle,
+            episodeId: String(prev.episode.id),
+            isPlaying: prev.isPlaying,
+            position: prev.position,
+            duration: prev.duration,
+            speed: prev.speed,
+            chapterTitle: prev.currentChapter?.title,
+          });
+        }
+        return prev;
+      });
+    };
+
+    pushLiveActivityUpdate();
+    if (state.isPlaying) liveActivityTickRef.current = setInterval(pushLiveActivityUpdate, 5000);
+
+    return () => {
+      if (liveActivityTickRef.current) clearInterval(liveActivityTickRef.current);
+    };
+  }, [state.episode, state.isPlaying]);
+
   function onPlaybackStatus(status: AVPlaybackStatus) {
     if (!status.isLoaded) {
       if (status.error) patch({ error: status.error, isLoading: false });
@@ -257,7 +304,10 @@ export function usePodcastPlayer() {
       // Sleep at end of episode — pause and clear the flag.
       if (prev.sleepAtEndOfEpisode) {
         soundRef.current?.pauseAsync();
-        if (Platform.OS === 'ios') clearNowPlayingInfo();
+        if (Platform.OS === 'ios') {
+          clearNowPlayingInfo();
+          endPodcastLiveActivity();
+        }
         AccessibilityInfo.announceForAccessibility('Sleep timer: episode ended, playback stopped.');
         return { ...prev, isPlaying: false, sleepTimerRemaining: null, sleepAtEndOfEpisode: false };
       }
@@ -271,7 +321,10 @@ export function usePodcastPlayer() {
         return { ...prev, queue: rest, sleepTimerRemaining: null };
       }
 
-      if (Platform.OS === 'ios') clearNowPlayingInfo();
+      if (Platform.OS === 'ios') {
+        clearNowPlayingInfo();
+        endPodcastLiveActivity();
+      }
       return { ...prev, isPlaying: false, sleepTimerRemaining: null };
     });
   }
@@ -385,6 +438,16 @@ export function usePodcastPlayer() {
           elapsedTime:  savedPosition,
           playbackRate: resolvedSpeed,
         });
+        startPodcastLiveActivity({
+          episodeTitle: episode.title,
+          showTitle: episode.showTitle,
+          episodeId: String(episode.id),
+          isPlaying: autoPlay,
+          position: savedPosition,
+          duration: actualDuration,
+          speed: resolvedSpeed,
+          chapterTitle: resolveChapter(episodeWithChapters, savedPosition)?.title,
+        });
       }
 
       // Apply default sleep timer when playback starts (if no timer already running).
@@ -397,10 +460,12 @@ export function usePodcastPlayer() {
   }
 
   async function play() {
+    sounds.podcastPlay().catch(() => {});
     await soundRef.current?.playAsync();
   }
 
   async function pause() {
+    sounds.podcastPause().catch(() => {});
     await soundRef.current?.pauseAsync();
     if (state.episode) {
       await persistence.savePodcastPosition(state.episode.id, state.position);
@@ -417,7 +482,10 @@ export function usePodcastPlayer() {
     await soundRef.current?.unloadAsync().catch(() => {});
     soundRef.current = null;
     if (sleepRef.current) { clearInterval(sleepRef.current); sleepRef.current = null; }
-    if (Platform.OS === 'ios') clearNowPlayingInfo();
+    if (Platform.OS === 'ios') {
+      clearNowPlayingInfo();
+      endPodcastLiveActivity();
+    }
     persistence.setLastEpisode(null).catch(() => {});
     setState(DEFAULT);
   }

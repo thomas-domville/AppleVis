@@ -16,6 +16,7 @@ import {
 } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { sounds } from '../services/sounds';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -139,6 +140,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const showToast = useCallback((message: string, type: ToastType = 'success') => {
     HAPTIC[type]();
+    if (type === 'error') sounds.error().catch(() => {});
     setToast({ id: ++counter.current, message, type });
   }, []);
 

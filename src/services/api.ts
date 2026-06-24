@@ -10,7 +10,7 @@
 
 import { relativeTime } from '../utils/relativeTime';
 import { IOS_PUBLIC_CATEGORY_PATHS } from '../data/appDirectory';
-import type { ForumTopic, ForumReply, ForumTopicDetail, AppListing, AppDetail, AppReview, Resource, ResourceDetail, PodcastEpisode, PaginatedResult, BlogPost, BlogPostDetail, SearchResult, AppCategoryProbe, AppCategory, AppPlatform } from '../types/content';
+import type { ForumTopic, ForumReply, ForumTopicDetail, AppListing, AppDetail, AppReview, Resource, ResourceDetail, PodcastEpisode, PodcastTag, PaginatedResult, BlogPost, BlogPostDetail, SearchResult, AppCategoryProbe, AppCategory, AppPlatform, BugReport, BugReportDetail } from '../types/content';
 
 // ─── Phase 4 gate constants ───────────────────────────────────────────────────
 // Replace each null / placeholder with the confirmed value from the Drupal
@@ -152,7 +152,7 @@ async function publicHtml(path: string): Promise<JsonApiResult<string>> {
 
 // ─── Response shape helpers ───────────────────────────────────────────────────
 
-type JsonApiNode = { id: string; attributes: Record<string, any>; relationships: Record<string, any> };
+type JsonApiNode = { id: string; type: string; attributes: Record<string, any>; relationships: Record<string, any> };
 type JsonApiCollection = { data: JsonApiNode[]; included?: JsonApiNode[]; links?: Record<string, any> };
 
 function pageParams(page: number, limit = 20): string {
@@ -291,6 +291,17 @@ function mapPodcast(node: JsonApiNode, included: JsonApiNode[] = []): PodcastEpi
         .sort((a, b) => a.startTime - b.startTime)
     : undefined;
 
+  // Tags — vocabulary_15 relationship confirmed live (2026-06-20 probe)
+  const tagRefs = (node.relationships?.taxonomy_vocabulary_15?.data as { id: string }[] | undefined) ?? [];
+  const tags: PodcastTag[] = tagRefs
+    .map((ref) => included.find((n) => n.id === ref.id))
+    .filter((n): n is JsonApiNode => !!n && n.type.startsWith('taxonomy_term'))
+    .map((n) => ({
+      name: String(n.attributes.name ?? ''),
+      tid:  Number(n.attributes.drupal_internal__tid ?? 0),
+    }))
+    .filter((t) => t.tid && t.name);
+
   return {
     id: node.id,
     title: a.title ?? '',
@@ -305,6 +316,7 @@ function mapPodcast(node: JsonApiNode, included: JsonApiNode[] = []): PodcastEpi
     chapters,
     url: a.path?.alias ? `${BASE}${a.path.alias}` : undefined,
     authorName,
+    tags: tags.length > 0 ? tags : undefined,
   };
 }
 
@@ -563,6 +575,7 @@ function mapAppReview(node: JsonApiNode, included: JsonApiNode[] = []): AppRevie
     id: node.id,
     subject: (a.subject as string | undefined) || undefined,
     authorName,
+    authorId: uidId ?? undefined,
     body: (a.comment_body?.processed ?? a.comment_body?.value ?? '') as string,
     createdAt: (a.created ?? '') as string,
     appVersion: (a.field_app_version ?? undefined) as string | undefined,
@@ -572,12 +585,23 @@ function mapAppReview(node: JsonApiNode, included: JsonApiNode[] = []): AppRevie
 
 // ─── Resources / Guides ──────────────────────────────────────────────────────
 
-function mapResource(node: JsonApiNode): Resource {
+function mapResource(node: JsonApiNode, included: JsonApiNode[] = []): Resource {
   const a = node.attributes;
+  const categoryRefs = (node.relationships?.taxonomy_vocabulary_3?.data as { id: string }[] | undefined) ?? [];
+  const categories = categoryRefs
+    .map((ref) => included.find((n) => n.id === ref.id))
+    .filter((n): n is JsonApiNode => !!n && n.type.startsWith('taxonomy_term'))
+    .map((term) => ({
+      name: String(term.attributes.name ?? ''),
+      tid: Number(term.attributes.drupal_internal__tid ?? 0),
+    }))
+    .filter((category) => category.name && category.tid > 0);
+
   return {
     id: node.id,
     title: a.title ?? '',
     kind: 'guide',
+    categories,
     summary: a.body?.summary ?? a.body?.value ?? '',
     createdAt: (a.created as string | undefined) ?? undefined,
     updatedAt: a.changed ?? '',
@@ -599,6 +623,47 @@ async function resolveMyUuid(csrfToken: string): Promise<string | null> {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export const api = {
+  follows: {
+    async follow(nodeUuid: string, nodeType: string, token: string) {
+      return jsonApi<{ data: JsonApiNode }>('/flagging/subscribe_node', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': token },
+        body: JSON.stringify({
+          data: {
+            type: 'flagging--subscribe_node',
+            relationships: {
+              flagged_entity: { data: { type: nodeType, id: nodeUuid } },
+            },
+          },
+        }),
+      });
+    },
+
+    async unfollow(nodeUuid: string, token: string): Promise<{ ok: true; data: undefined } | { ok: false; error: string; status?: number }> {
+      const listRes = await jsonApi<JsonApiCollection>(
+        `/flagging/subscribe_node?filter[flagged_entity.id]=${nodeUuid}`,
+      );
+      if (!listRes.ok) return listRes;
+      const flagging = listRes.data.data[0];
+      if (!flagging) return { ok: true as const, data: undefined };
+      const ctrl  = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+      try {
+        const res = await fetch(`${JSONAPI}/flagging/subscribe_node/${flagging.id}`, {
+          method: 'DELETE',
+          headers: { ...COMMON_HEADERS, 'Content-Type': 'application/vnd.api+json', 'X-CSRF-Token': token },
+          signal: ctrl.signal,
+        });
+        if (!res.ok) return { ok: false as const, error: `HTTP ${res.status}` };
+        return { ok: true as const, data: undefined };
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return { ok: false as const, error: 'Request timed out.' };
+        return { ok: false as const, error: err instanceof Error ? err.message : 'Network error' };
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+  },
 
   forums: {
     async list(filter: string, page = 0, sinceDate?: string, appleOnly?: boolean) {
@@ -669,6 +734,72 @@ export const api = {
       return {
         ok: true as const,
         data: { items: res.data.data.map((n) => mapForum(n, res.data.included ?? [])), hasMore: false } satisfies PaginatedResult<ForumTopic>,
+      };
+    },
+
+    // Fetch all Drupal forum taxonomy terms (categories) sorted by name.
+    // Uses JSON:API taxonomy endpoint — no Drupal developer needed.
+    async categories(): Promise<{ ok: true; data: Array<{ name: string; tid: number }> } | { ok: false; error: string }> {
+      const res = await jsonApi<JsonApiCollection>(
+        '/taxonomy_term/forums?fields[taxonomy_term--forums]=name,drupal_internal__tid&sort=name',
+      );
+      if (!res.ok) return res;
+      return {
+        ok: true,
+        data: res.data.data
+          .map((term) => ({
+            name: String(term.attributes.name ?? ''),
+            tid: Number(term.attributes.drupal_internal__tid ?? 0),
+          }))
+          .filter((c) => c.name && c.tid > 0),
+      };
+    },
+
+    // Fetch topics for a specific forum category by taxonomy TID.
+    // Uses JSON:API filter; sorted by last-edit date (closest to "most recently commented").
+    async listByCategory(tid: number, page = 0): Promise<{ ok: true; data: PaginatedResult<ForumTopic> } | { ok: false; error: string }> {
+      const path =
+        `/node/forum` +
+        `?filter[cat][condition][path]=taxonomy_forums.drupal_internal__tid` +
+        `&filter[cat][condition][operator]=%3D` +
+        `&filter[cat][condition][value]=${tid}` +
+        `&sort=-changed` +
+        `&${pageParams(page, 20)}` +
+        `&include=uid,taxonomy_forums`;
+      const res = await jsonApi<JsonApiCollection>(path);
+      if (!res.ok) return res;
+      return {
+        ok: true,
+        data: {
+          items: res.data.data.map((n) => mapForum(n, res.data.included ?? [])),
+          hasMore: hasNextPage(res.data),
+        } satisfies PaginatedResult<ForumTopic>,
+      };
+    },
+
+    async listByCategories(tids: number[], page = 0): Promise<{ ok: true; data: PaginatedResult<ForumTopic> } | { ok: false; error: string }> {
+      if (tids.length === 0) {
+        return { ok: true, data: { items: [], hasMore: false } satisfies PaginatedResult<ForumTopic> };
+      }
+      const values = tids
+        .map((tid, index) => `&filter[cat][condition][value][${index}]=${tid}`)
+        .join('');
+      const path =
+        `/node/forum` +
+        `?filter[cat][condition][path]=taxonomy_forums.drupal_internal__tid` +
+        `&filter[cat][condition][operator]=IN` +
+        values +
+        `&sort=-changed` +
+        `&${pageParams(page, 20)}` +
+        `&include=uid,taxonomy_forums`;
+      const res = await jsonApi<JsonApiCollection>(path);
+      if (!res.ok) return res;
+      return {
+        ok: true,
+        data: {
+          items: res.data.data.map((n) => mapForum(n, res.data.included ?? [])),
+          hasMore: hasNextPage(res.data),
+        } satisfies PaginatedResult<ForumTopic>,
       };
     },
 
@@ -768,18 +899,7 @@ export const api = {
     // follow — creates a flagging--subscribe_node entity via JSON:API.
     // The flag machine name on this site is 'subscribe_node' (confirmed by live API).
     async follow(nodeUuid: string, token: string) {
-      return jsonApi<{ data: JsonApiNode }>('/flagging/subscribe_node', {
-        method: 'POST',
-        headers: { 'X-CSRF-Token': token },
-        body: JSON.stringify({
-          data: {
-            type: 'flagging--subscribe_node',
-            relationships: {
-              flagged_entity: { data: { type: 'node--forum', id: nodeUuid } },
-            },
-          },
-        }),
-      });
+      return api.follows.follow(nodeUuid, 'node--forum', token);
     },
 
     // unfollow — resolves the flagging UUID first, then deletes it.
@@ -810,9 +930,12 @@ export const api = {
   },
 
   podcasts: {
-    async episodes(page = 0, sort: '-created' | '-changed' = '-created') {
+    async episodes(page = 0, sort: '-created' | '-changed' = '-created', tagTid?: number) {
+      const tagFilter = tagTid
+        ? `&filter[taxonomy_vocabulary_15.drupal_internal__tid]=${tagTid}`
+        : '';
       const res = await jsonApi<JsonApiCollection>(
-        `/node/podcast?sort=${sort}&include=field_podcast,uid&${pageParams(page)}`,
+        `/node/podcast?sort=${sort}&include=field_podcast,uid,taxonomy_vocabulary_15&${pageParams(page)}${tagFilter}`,
       );
       if (!res.ok) return res;
       return {
@@ -824,9 +947,31 @@ export const api = {
       };
     },
 
+    // Fetch the live tag vocabulary by sampling 50 episodes and collecting unique tags.
+    // Falls back gracefully — callers use FALLBACK_PODCAST_TAGS if this returns empty.
+    async tagVocabulary(): Promise<{ ok: true; data: PodcastTag[] } | { ok: false; error: string }> {
+      const res = await jsonApi<JsonApiCollection>(
+        `/node/podcast?sort=-created&page[limit]=50&include=taxonomy_vocabulary_15&fields[node--podcast]=id`,
+      );
+      if (!res.ok) return res;
+      const tagMap = new Map<number, string>();
+      for (const term of (res.data.included ?? [])) {
+        if (!term.type.startsWith('taxonomy_term')) continue;
+        const tid  = Number(term.attributes.drupal_internal__tid ?? 0);
+        const name = String(term.attributes.name ?? '');
+        if (tid && name) tagMap.set(tid, name);
+      }
+      return {
+        ok: true,
+        data: [...tagMap.entries()]
+          .map(([tid, name]) => ({ tid, name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      };
+    },
+
     async episode(id: string) {
       const res = await jsonApi<{ data: JsonApiNode; included?: JsonApiNode[] }>(
-        `/node/podcast/${id}?include=field_podcast,uid`,
+        `/node/podcast/${id}?include=field_podcast,uid,taxonomy_vocabulary_15`,
       );
       if (!res.ok) return res;
       return { ok: true as const, data: mapPodcast(res.data.data, res.data.included ?? []) };
@@ -924,11 +1069,21 @@ export const api = {
       return {
         ok: true,
         data: (Array.isArray(res.data) ? res.data : [])
-          .map((category) => ({
-            name: String(category.name ?? ''),
-            slug: String(category.slug ?? ''),
-            count: typeof category.count === 'number' ? category.count : undefined,
-          }))
+          .map((category) => {
+            const rawCount = (category as Record<string, unknown>).count
+              ?? (category as Record<string, unknown>).appCount
+              ?? (category as Record<string, unknown>).app_count;
+            const count = typeof rawCount === 'number'
+              ? rawCount
+              : typeof rawCount === 'string' && rawCount.trim()
+                ? Number(rawCount)
+                : undefined;
+            return {
+              name: String(category.name ?? ''),
+              slug: String(category.slug ?? ''),
+              count: typeof count === 'number' && Number.isFinite(count) ? count : undefined,
+            };
+          })
           .filter((category) => category.name && category.slug),
       };
     },
@@ -1174,17 +1329,144 @@ export const api = {
         }),
       });
     },
+
+    // Submit a new app entry via JSON:API.
+    // All assessment fields are plain strings (confirmed from live node inspection).
+    // Only taxonomy_vocabulary_1 (category) requires a UUID relationship.
+    async submitApp(
+      payload: {
+        appName:               string;
+        appStoreUrl:           string;
+        appVersion:            string;
+        price:                 string;
+        supportedDevices:      string[];
+        appStoreDescription:   string;
+        category:              string;
+        osVersion:             string;
+        voiceOverPerformance:  string;
+        buttonLabelling:       string;
+        usabilityNotes:        string;
+        accessibilityComments: string;
+        otherComments:         string;
+        shortSummary:          string;
+      },
+      csrfToken: string,
+    ): Promise<{ ok: true; data: { nid: number; nodeUrl: string } } | { ok: false; error: string }> {
+      // Vocabulary 1 category UUIDs — fetched from /jsonapi/taxonomy_term/vocabulary_1 2026-06-24.
+      const CATEGORY_UUIDS: Record<string, string> = {
+        'Books':               'bee9a94d-2a9c-4b1d-8ea7-8e9d0c3fc3dd',
+        'Business':            '20dcbad3-c417-48e3-8b5b-ff4069f87d7b',
+        'Catalogs':            '87aae28a-0741-4f66-b440-63aacccaf29f',
+        'Developer Tools':     '16251ccf-925e-453a-848d-8e1b33dffb71',
+        'Education':           '8726dafb-e470-4338-9dd0-a868144a5d7f',
+        'Entertainment':       '7f69826f-a3b0-4fc4-b7d4-7fbdacb5cfcc',
+        'Finance':             '6425c1d3-6ee4-4724-ac76-5443f58ec373',
+        'Food & Drink':        'b1a99efd-7626-4fb5-bfe4-1c14ad0947f2',
+        'Food and Drink':      'b1a99efd-7626-4fb5-bfe4-1c14ad0947f2',
+        'Games':               'a63cc23a-836a-4068-8f23-b3afbf5b994e',
+        'Graphics & Design':   'a2cc7759-0e37-4188-a4a2-b9f2188793ce',
+        'Graphics and Design': 'a2cc7759-0e37-4188-a4a2-b9f2188793ce',
+        'Health & Fitness':    '0cb652cc-2b6c-4d43-bf50-5d42471c8b81',
+        'Health and Fitness':  '0cb652cc-2b6c-4d43-bf50-5d42471c8b81',
+        'Lifestyle':           '387c7f86-4719-43ee-a36f-a2f043b10c44',
+        'Medical':             'c36d6ca0-fef3-41d8-9b96-5530828d4895',
+        'Music':               '042bdef6-e708-4375-bd86-b6b2ee53e484',
+        'Navigation':          '551ed39e-0816-40b5-8c5b-fb9c700eaf9e',
+        'News':                '62329830-4955-46a9-99b4-ccc2ff49a676',
+        'Photo & Video':       'a8cfec9b-e132-42ee-9169-a0e404204656',
+        'Photo and Video':     'a8cfec9b-e132-42ee-9169-a0e404204656',
+        'Productivity':        'cc18cc76-e08e-4037-a3bf-064f5f5b696f',
+        'Reference':           'a4475fb2-444b-420c-9bf5-d2c29bb02044',
+        'Safari Extensions':   '55a3c4a5-1b9f-43f1-8c3d-0eeee3eb57f2',
+        'Shopping':            '21d1f775-a5d3-45de-b421-3e90c9c51873',
+        'Social Networking':   '33821fa2-114a-467f-a7a1-04f699ee53b6',
+        'Sports':              'a901f670-1d53-4eb3-9e43-82653568e1f1',
+        'Sports and Activities': 'a901f670-1d53-4eb3-9e43-82653568e1f1',
+        'Stickers':            '2e3945ff-9876-403d-8aea-1178f4647864',
+        'Travel':              '17c20229-4532-4e40-8853-88da8d9a8c46',
+        'Utilities':           '870e83b5-6299-4d30-96e5-b54ae778dea5',
+        'Weather':             '5df92429-93bc-4d33-a882-a303b899959e',
+      };
+
+      const categoryUuid = CATEGORY_UUIDS[payload.category];
+
+      const attributes: Record<string, unknown> = {
+        title:            payload.appName,
+        field_link2:      { uri: payload.appStoreUrl, title: '', options: [] },
+        field_version:    payload.appVersion,
+        field_cost:       payload.price,
+        field_device_used: payload.supportedDevices.join(', '),
+        field_ios_version: payload.osVersion,
+        field_voiceover:  payload.voiceOverPerformance,
+        field_labelling:  payload.buttonLabelling,
+        field_usability:  payload.usabilityNotes,
+        field_comments:   { value: payload.accessibilityComments, format: 'basic_html' },
+      };
+
+      if (payload.otherComments.trim()) {
+        attributes.field_other_comments = { value: payload.otherComments.trim(), format: 'basic_html' };
+      }
+
+      if (payload.appStoreDescription || payload.shortSummary) {
+        attributes.body = {
+          value:   payload.appStoreDescription || '',
+          summary: payload.shortSummary || '',
+          format:  'basic_html',
+        };
+      }
+
+      const relationships: Record<string, unknown> = categoryUuid
+        ? { taxonomy_vocabulary_1: { data: { type: 'taxonomy_term--vocabulary_1', id: categoryUuid } } }
+        : {};
+
+      const res = await jsonApi<{ data: JsonApiNode }>('/node/ios_app_directory', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({
+          data: {
+            type: 'node--ios_app_directory',
+            attributes,
+            ...(Object.keys(relationships).length > 0 ? { relationships } : {}),
+          },
+        }),
+      });
+
+      if (!res.ok) return res;
+
+      const a   = res.data.data.attributes as Record<string, unknown>;
+      const nid = a.drupal_internal__nid as number;
+      const alias = (a.path as { alias?: string } | undefined)?.alias;
+      return {
+        ok:   true,
+        data: {
+          nid,
+          nodeUrl: alias ? `${BASE}${alias}` : `${BASE}/node/${nid}`,
+        },
+      };
+    },
   },
 
   resources: {
-    async list(page = 0) {
+    async list(page = 0, categoryTids?: number[]) {
+      const categoryFilter = categoryTids?.length
+        ? categoryTids
+          .map((tid, index) => `&filter[category][condition][value][${index}]=${tid}`)
+          .join('')
+        : '';
+      const categoryCondition = categoryTids?.length
+        ? `&filter[category][condition][path]=taxonomy_vocabulary_3.drupal_internal__tid` +
+          `&filter[category][condition][operator]=IN${categoryFilter}`
+        : '';
       const res = await jsonApi<JsonApiCollection>(
-        `/node/guides?sort=-changed&${pageParams(page)}`,
+        `/node/guides?sort=-changed&include=taxonomy_vocabulary_3&${pageParams(page)}${categoryCondition}`,
       );
       if (!res.ok) return res;
       return {
         ok: true as const,
-        data: { items: res.data.data.map(mapResource), hasMore: hasNextPage(res.data) } satisfies PaginatedResult<Resource>,
+        data: {
+          items: res.data.data.map((n) => mapResource(n, res.data.included ?? [])),
+          hasMore: hasNextPage(res.data),
+        } satisfies PaginatedResult<Resource>,
       };
     },
 
@@ -1204,7 +1486,7 @@ export const api = {
       if (!res.ok) return res;
       const node     = res.data.data;
       const included = res.data.included ?? [];
-      const resource = mapResource(node);
+      const resource = mapResource(node, included);
       const body     = String(node.attributes.body?.value ?? node.attributes.body?.processed ?? '');
       const uidId    = (node.relationships?.uid?.data as { id?: string } | undefined)?.id;
       const userNode = uidId ? included.find((n) => n.id === uidId) : undefined;
@@ -1342,7 +1624,7 @@ export const api = {
         `/node/guides?filter[title][operator]=CONTAINS&filter[title][value]=${q}&sort=-changed&page[limit]=10`,
       );
       if (!res.ok) return res;
-      return { ok: true as const, data: { items: res.data.data.map(mapResource), hasMore: false } satisfies PaginatedResult<Resource> };
+      return { ok: true as const, data: { items: res.data.data.map((n) => mapResource(n)), hasMore: false } satisfies PaginatedResult<Resource> };
     },
 
     async publicSite(query: string): Promise<{ ok: true; data: SearchResult[] } | { ok: false; error: string }> {
@@ -1510,6 +1792,150 @@ export const api = {
       drupalRest<{ syncedAt: string }>(`/api/v1/account/sync`, {
         method: 'POST', headers: { 'X-CSRF-Token': csrfToken }, body: JSON.stringify(payload),
       }),
+
+    // Expose resolveMyUuid publicly so AuthContext can persist the UUID after sign-in.
+    resolveUuid: (csrfToken: string) => resolveMyUuid(csrfToken),
+
+    async editProfile(csrfToken: string, fields: Record<string, unknown>): Promise<JsonApiResult<undefined>> {
+      const uuid = await resolveMyUuid(csrfToken);
+      if (!uuid) return { ok: false, error: 'Could not resolve account ID.' };
+      return jsonApi<undefined>(`/user/user/${uuid}`, {
+        method: 'PATCH',
+        headers: { 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ data: { type: 'user--user', id: uuid, attributes: fields } }),
+      });
+    },
+
+    async fetchMyProfile(csrfToken: string) {
+      const uuid = await resolveMyUuid(csrfToken);
+      if (!uuid) return { ok: false as const, error: 'Could not resolve account ID.' };
+      type UserNode = { data: JsonApiNode };
+      const res = await jsonApi<UserNode>(`/user/user/${uuid}`, {
+        headers: { 'X-CSRF-Token': csrfToken },
+      });
+      if (!res.ok) return res;
+      const a = res.data.data.attributes;
+      return {
+        ok: true as const,
+        data: {
+          uuid,
+          displayName:   String(a.display_name ?? a.name ?? ''),
+          realName:      String(a.field_profile_realname ?? ''),
+          bio:           String(a.field_profile_bio ?? ''),
+          location:      String(a.field_profile_location ?? ''),
+          facebook:      String(a.field_profile_facebook ?? ''),
+          twitter:       String(a.field_profile_twitter ?? ''),
+          mastodon:      String(a.field_mastodon_username ?? ''),
+          homepage:      String(a.field_profile_homepage ?? ''),
+          interests:     String(a.field_profile_interests ?? ''),
+        },
+      };
+    },
+  },
+
+  // ─── Content editing & deletion ───────────────────────────────────────────────
+
+  content: {
+    // Fetch raw comment body + format code (needed before a PATCH to preserve format).
+    async fetchRawComment(commentType: string, commentId: string, csrfToken: string) {
+      type Node = { data: JsonApiNode };
+      const res = await jsonApi<Node>(`/comment/${commentType}/${commentId}`, {
+        headers: { 'X-CSRF-Token': csrfToken },
+      });
+      if (!res.ok) return res;
+      const cb = res.data.data.attributes?.comment_body as { value?: string; format?: string } | undefined;
+      return {
+        ok: true as const,
+        data: {
+          rawValue:  String(cb?.value ?? ''),
+          format:    String(cb?.format ?? 'basic_html'),
+        },
+      };
+    },
+
+    async editComment(
+      commentType: string,
+      commentId: string,
+      newBody: string,
+      format: string,
+      csrfToken: string,
+    ): Promise<JsonApiResult<undefined>> {
+      return jsonApi<undefined>(`/comment/${commentType}/${commentId}`, {
+        method: 'PATCH',
+        headers: { 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({
+          data: {
+            type:       `comment--${commentType}`,
+            id:          commentId,
+            attributes: { comment_body: { value: newBody, format } },
+          },
+        }),
+      });
+    },
+
+    async deleteComment(
+      commentType: string,
+      commentId: string,
+      csrfToken: string,
+    ): Promise<JsonApiResult<undefined>> {
+      const ctrl  = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+      try {
+        const res = await fetch(`${JSONAPI}/comment/${commentType}/${commentId}`, {
+          method: 'DELETE',
+          headers: { ...COMMON_HEADERS, 'Content-Type': 'application/vnd.api+json', 'X-CSRF-Token': csrfToken },
+          signal: ctrl.signal,
+        });
+        if (!res.ok) return { ok: false, error: `HTTP ${res.status}`, status: res.status };
+        return { ok: true, data: undefined };
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return { ok: false, error: 'Request timed out.' };
+        return { ok: false, error: err instanceof Error ? err.message : 'Network error' };
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+
+    async editForumPost(
+      nodeId: string,
+      title: string,
+      body: string,
+      csrfToken: string,
+    ): Promise<JsonApiResult<undefined>> {
+      return jsonApi<undefined>(`/node/forum/${nodeId}`, {
+        method: 'PATCH',
+        headers: { 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({
+          data: {
+            type:       'node--forum',
+            id:          nodeId,
+            attributes: { title, body: { value: body, format: 'basic_html' } },
+          },
+        }),
+      });
+    },
+
+    async deleteForumPost(
+      nodeId: string,
+      csrfToken: string,
+    ): Promise<JsonApiResult<undefined>> {
+      const ctrl  = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+      try {
+        const res = await fetch(`${JSONAPI}/node/forum/${nodeId}`, {
+          method: 'DELETE',
+          headers: { ...COMMON_HEADERS, 'Content-Type': 'application/vnd.api+json', 'X-CSRF-Token': csrfToken },
+          signal: ctrl.signal,
+        });
+        if (!res.ok) return { ok: false, error: `HTTP ${res.status}`, status: res.status };
+        return { ok: true, data: undefined };
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return { ok: false, error: 'Request timed out.' };
+        return { ok: false, error: err instanceof Error ? err.message : 'Network error' };
+      } finally {
+        clearTimeout(timer);
+      }
+    },
   },
 
   // ─── User profiles & contact ─────────────────────────────────────────────────
@@ -1566,4 +1992,96 @@ export const api = {
       });
     },
   },
+
+  // ─── Bug Reports ─────────────────────────────────────────────────────────────
+  // Two confirmed content types: node--ios_bug_report and node--os_x_bug_report.
+  // Both confirmed live via JSON:API root enumeration.
+
+  bugs: {
+    async list(platform: 'ios' | 'macos', filter: 'active' | 'all', page = 0) {
+      const nodeType = platform === 'ios' ? 'ios_bug_report' : 'os_x_bug_report';
+      const statusFilter = filter === 'active' ? '&filter[field_status]=1' : '';
+      const res = await jsonApi<JsonApiCollection>(
+        `/node/${nodeType}?sort=-changed${statusFilter}&${pageParams(page)}`,
+      );
+      if (!res.ok) return res;
+      return {
+        ok: true as const,
+        data: {
+          items: res.data.data.map((n) => mapBug(n, platform)),
+          hasMore: hasNextPage(res.data),
+        } satisfies PaginatedResult<BugReport>,
+      };
+    },
+
+    async detail(platform: 'ios' | 'macos', id: string) {
+      const nodeType = platform === 'ios' ? 'ios_bug_report' : 'os_x_bug_report';
+      const res = await jsonApi<{ data: JsonApiNode }>(`/node/${nodeType}/${id}`);
+      if (!res.ok) return res;
+      return { ok: true as const, data: mapBugDetail(res.data.data, platform) };
+    },
+  },
 };
+
+// ─── Bug mappers (defined after `api` to avoid hoisting issues) ───────────────
+
+function formatBugVersion(raw: string, platform: 'ios' | 'macos'): string {
+  if (!raw || raw === 'unknown' || raw === '0') return '';
+  // String term IDs from old taxonomy — numeric-only means no label available
+  if (/^\d+$/.test(raw)) return '';
+  if (raw.startsWith('ios_ipados_')) {
+    return 'iOS/iPadOS ' + raw.replace('ios_ipados_', '').replace(/_/g, '.');
+  }
+  if (raw.startsWith('macos_')) {
+    const parts = raw.replace('macos_', '').split('_');
+    const codeName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+    const version  = parts.slice(1).join('.');
+    return version ? `macOS ${codeName} ${version}` : `macOS ${codeName}`;
+  }
+  // Already human-readable
+  return raw;
+}
+
+function mapBug(n: JsonApiNode, platform: 'ios' | 'macos'): BugReport {
+  const a = n.attributes;
+  const commentKey  = platform === 'ios' ? 'comment_node_ios_bug_report' : 'comment_node_os_x_bug_report';
+  const firstSeen   = platform === 'ios' ? a.field_bug_first_noticed : a.field_bug_first_encountered;
+  const fixedInRaw  = platform === 'ios' ? a.field_fixed_in : a.field_bug_fixed_in;
+  const statusInt   = Number(a.field_status ?? 0);
+  const severityInt = Number(a.field_severity ?? 0);
+  const fixedIn     = fixedInRaw ? formatBugVersion(String(fixedInRaw), platform) : undefined;
+  return {
+    id:           String(n.id),
+    platform,
+    title:        String(a.title ?? ''),
+    status:       statusInt === 1 ? 'active' : 'fixed',
+    severity:     severityInt === 2 ? 'high' : severityInt === 1 ? 'medium' : 'low',
+    firstSeen:    formatBugVersion(String(firstSeen ?? ''), platform),
+    fixedIn:      fixedIn || undefined,
+    feedbackId:   a.field_apple_feedback_ ? String(a.field_apple_feedback_) : undefined,
+    commentCount: Number(a[commentKey]?.comment_count ?? 0),
+    createdAt:    String(a.created ?? ''),
+    changedAt:    String(a.changed ?? ''),
+    url:          a.path?.alias ? `${BASE}${a.path.alias}` : `${BASE}/bugs`,
+  };
+}
+
+function mapBugDetail(n: JsonApiNode, platform: 'ios' | 'macos'): BugReportDetail {
+  const a        = n.attributes;
+  const base     = mapBug(n, platform);
+  const howOftenInt = Number(a.field_how_often_the_bug_occurs ?? 0);
+  return {
+    ...base,
+    body:               textFromHtml(String(a.body?.value ?? a.body?.processed ?? '')),
+    stepsToReproduce:   a.field_steps_to_reproduce?.value
+                          ? textFromHtml(String(a.field_steps_to_reproduce.value))
+                          : undefined,
+    workaround:         a.field_workaround?.value
+                          ? textFromHtml(String(a.field_workaround.value))
+                          : undefined,
+    device:             a.field_device_s_bug_has_been_enco
+                          ? String(a.field_device_s_bug_has_been_enco)
+                          : undefined,
+    howOften:           howOftenInt === 2 ? 'always' : howOftenInt === 1 ? 'sometimes' : 'rarely',
+  };
+}

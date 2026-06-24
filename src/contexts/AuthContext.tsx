@@ -7,6 +7,7 @@ import { getExpoPushToken } from '../services/notifications';
 
 export type AuthUser = {
   uid: string;
+  uuid?: string;   // JSON:API UUID — used for ownership checks on content
   name: string;
   csrfToken: string;
   logoutToken: string;
@@ -127,6 +128,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
         setUser(newUser);
         saveSession(newUser).catch(() => {});
+
+        // Resolve and persist the JSON:API UUID immediately after login.
+        // Best-effort — sign-in succeeds regardless; uuid is used for ownership checks.
+        api.account.resolveUuid(csrf_token).then((uuid) => {
+          if (uuid) {
+            const withUuid: AuthUser = { ...newUser, uuid };
+            setUser(withUuid);
+            saveSession(withUuid).catch(() => {});
+          }
+        }).catch(() => {});
 
         // Register device push token with server so targeted notifications work.
         // Best-effort — sign-in succeeds regardless of token registration outcome.

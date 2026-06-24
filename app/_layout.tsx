@@ -28,6 +28,7 @@ import { AccessibleAlertProvider, useAlert } from '../src/contexts/AccessibleAle
 import { ContextualTipProvider } from '../src/contexts/ContextualTipContext';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { PlayerProvider, usePlayer } from '../src/contexts/PlayerContext';
+import { MiniPlayer } from '../src/components/MiniPlayer';
 
 // Prevent iOS from auto-hiding the launch screen — AppLoader calls hideAsync()
 // as soon as the in-app overlay is ready to take over seamlessly.
@@ -254,7 +255,7 @@ function MagicTapWrapper({ children }: { children: React.ReactNode }) {
     if (player.isPlaying) player.pause();
     else player.play();
   }, [player]);
-  return <View style={{ flex: 1 }} onMagicTap={onMagicTap}>{children}</View>;
+  return <View style={{ flex: 1 }} onAccessibilityTap={onMagicTap}>{children}</View>;
 }
 
 export default function RootLayout() {
@@ -285,6 +286,7 @@ export default function RootLayout() {
                         <Stack screenOptions={{ headerShown: false }}>
                           <Stack.Screen name="player" options={{ presentation: 'modal' }} />
                         </Stack>
+                        <MiniPlayer />
                       </AppLoader>
                     </MagicTapWrapper>
                   </PlayerProvider>

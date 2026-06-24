@@ -62,7 +62,12 @@ export function useRefreshFeedback(
 
   useEffect(() => {
     if (loading === undefined) return;
+    const loadStarted   =  loading && !wasLoading.current;
     const loadCompleted = !loading && wasLoading.current;
+
+    if (loadStarted) {
+      sounds.loadingStart();
+    }
 
     if (loadCompleted) {
       sounds.refreshComplete();

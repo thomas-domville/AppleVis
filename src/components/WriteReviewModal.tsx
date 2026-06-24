@@ -8,6 +8,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useToast } from '../contexts/ToastContext';
 import { useTip, TIP_KEYS, TIPS } from '../contexts/ContextualTipContext';
 import { api } from '../services/api';
+import { sounds } from '../services/sounds';
 
 const PLATFORMS = ['iOS', 'macOS', 'watchOS', 'Apple TV', 'Vision Pro'] as const;
 
@@ -132,6 +133,7 @@ export function WriteReviewModal({ visible, appId, appName, replyToAuthor, reply
     setSubmitting(false);
     if (res.ok) {
       reset();
+      sounds.reply().catch(() => {});
       showToast('Comment submitted! It will appear after moderation.', 'success');
       onSubmitted();
     } else {

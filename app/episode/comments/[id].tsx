@@ -12,6 +12,8 @@ import { useToast } from '../../../src/contexts/ToastContext';
 import { useAlert } from '../../../src/contexts/AccessibleAlertContext';
 import { ALERTS } from '../../../src/data/alertMessages';
 import { useAuth } from '../../../src/contexts/AuthContext';
+import { EditContentModal } from '../../../src/components/EditContentModal';
+import { usePreferences } from '../../../src/contexts/PreferencesContext';
 import { isAppleIntelligenceAvailable, summariseText } from '../../../src/services/intelligenceService';
 import { api } from '../../../src/services/api';
 import { persistence } from '../../../src/services/persistence';
@@ -39,18 +41,22 @@ function SectionDivider({ label }: { label: string }) {
 
 // ─── CommentCard ─────────────────────────────────────────────────────────────
 function CommentCard({
-  comment, index, total, episodeTitle, onReply,
+  comment, index, total, episodeTitle, onReply, currentUserUuid, onEdit, onDelete,
 }: {
   comment: EpisodeComment;
   index: number;
   total: number;
   episodeTitle: string;
   onReply: () => void;
+  currentUserUuid?: string;
+  onEdit: (c: EpisodeComment) => void;
+  onDelete: (c: EpisodeComment) => void;
 }) {
   const { colors, styles } = useTheme();
   const { showToast } = useToast();
-  const timeStr = relativeTime(comment.createdAt);
+  const timeStr        = relativeTime(comment.createdAt);
   const commentSubject = displayCommentSubject(comment.subject, episodeTitle);
+  const isOwnComment   = !!currentUserUuid && currentUserUuid === comment.authorId;
 
   const headerLabel = [
     `Comment ${index + 1} of ${total}.`,
@@ -64,8 +70,16 @@ function CommentCard({
   function showActions() {
     if (Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const baseOptions = ['Cancel', 'Reply to this Comment', 'Copy Comment Text', 'Share Comment', 'Report Comment'];
+      const ownOptions  = isOwnComment ? ['Edit Comment', 'Delete Comment'] : [];
+      const allOptions  = [...baseOptions, ...ownOptions];
       ActionSheetIOS.showActionSheetWithOptions(
-        { title: `Comment by ${comment.authorName}`, options: ['Cancel', 'Reply to this Comment', 'Copy Comment Text', 'Share Comment', 'Report Comment'], cancelButtonIndex: 0, destructiveButtonIndex: 4 },
+        {
+          title: `Comment by ${comment.authorName}`,
+          options: allOptions,
+          cancelButtonIndex: 0,
+          destructiveButtonIndex: isOwnComment ? allOptions.length - 1 : 4,
+        },
         (idx) => {
           if (idx === 1) onReply();
           if (idx === 2) { Clipboard.setString(comment.body); showToast('Comment text copied.'); AccessibilityInfo.announceForAccessibility('Comment text copied'); }
@@ -78,6 +92,8 @@ function CommentCard({
             }).catch(() => {});
           }
           if (idx === 4) { showToast('Report sent — thank you.'); AccessibilityInfo.announceForAccessibility('Report sent'); }
+          if (isOwnComment && idx === 5) onEdit(comment);
+          if (isOwnComment && idx === 6) onDelete(comment);
         },
       );
     }
@@ -185,16 +201,18 @@ export default function EpisodeComments() {
   const router = useRouter();
   const auth   = useAuth();
   const { colors, styles } = useTheme();
+  const { aiSummariesEnabled } = usePreferences();
   const { showToast } = useToast();
   const { showAlert } = useAlert();
-  const aiAvailable = isAppleIntelligenceAvailable();
+  const aiAvailable = aiSummariesEnabled && isAppleIntelligenceAvailable();
 
   // ── State ────────────────────────────────────────────────────────────────
-  const [comments,   setComments]   = useState<EpisodeComment[]>([]);
-  const [loading,    setLoading]    = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [aiWorking,  setAiWorking]  = useState(false);
-  const [aiSummary,  setAiSummary]  = useState<string | null>(null);
+  const [comments,        setComments]        = useState<EpisodeComment[]>([]);
+  const [loading,         setLoading]         = useState(true);
+  const [fetchError,      setFetchError]      = useState<string | null>(null);
+  const [aiWorking,       setAiWorking]       = useState(false);
+  const [aiSummary,       setAiSummary]       = useState<string | null>(null);
+  const [editingComment,  setEditingComment]  = useState<EpisodeComment | null>(null);
 
   const scrollRef          = useRef<ScrollView>(null);
   const headingRef         = useRef<View>(null);
@@ -477,6 +495,27 @@ export default function EpisodeComments() {
                   index={i}
                   total={comments.length}
                   episodeTitle={params.title}
+                  currentUserUuid={auth.user?.uuid}
+                  onEdit={(c) => setEditingComment(c)}
+                  onDelete={(c) => {
+                    showAlert({
+                      title: 'Delete Comment?',
+                      message: 'This cannot be undone.',
+                      buttons: [
+                        { label: 'Delete', style: 'destructive', onPress: async () => {
+                          if (!auth.user?.csrfToken) return;
+                          const res = await api.content.deleteComment('comment_node_podcast', c.id, auth.user.csrfToken);
+                          if (res.ok) {
+                            setComments(prev => prev.filter(x => x.id !== c.id));
+                            showToast('Comment deleted.', 'success');
+                          } else {
+                            showToast('Could not delete comment.', 'error');
+                          }
+                        }},
+                        { label: 'Cancel' },
+                      ],
+                    });
+                  }}
                   onReply={() => {
                     if (!auth.isSignedIn) { showAlert({ ...ALERTS.auth.signInRequired('reply to comments'), onConfirm: () => router.push('/settings-account' as any) }); return; }
                     const plain = comment.body.slice(0, 150).trimEnd() + (comment.body.length > 150 ? '…' : '');
@@ -533,6 +572,22 @@ export default function EpisodeComments() {
         </Pressable>
 
       </ScrollView>
+
+      {editingComment && auth.user?.csrfToken && (
+        <EditContentModal
+          visible={!!editingComment}
+          onClose={() => setEditingComment(null)}
+          onSaved={(newBody) => {
+            setComments(prev => prev.map(c => c.id === editingComment.id ? { ...c, body: newBody } : c));
+            showToast('Comment updated.', 'success');
+          }}
+          commentId={editingComment.id}
+          commentType="comment_node_podcast"
+          csrfToken={auth.user.csrfToken}
+          initialBody={editingComment.body}
+          label="Comment"
+        />
+      )}
     </Screen>
   );
 }

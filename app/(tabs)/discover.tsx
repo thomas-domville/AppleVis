@@ -1,32 +1,56 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  AccessibilityInfo, ActivityIndicator, Linking, Pressable,
-  ScrollView, Share, Text, TextInput, View,
+  AccessibilityInfo, ActivityIndicator, findNodeHandle, Linking, Pressable,
+  ScrollView, Text, TextInput, View,
 } from 'react-native';
 import { useScrollToTop } from '@react-navigation/native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { EmptyState } from '../../src/components/EmptyState';
 import { Screen } from '../../src/components/Screen';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
-import { LoadMoreButton } from '../../src/components/LoadMoreButton';
 import { useSearch } from '../../src/hooks/useSearch';
-import { useAppCategoryExperiment } from '../../src/hooks/useAppCategoryExperiment';
-import { useAppDirectoryCategories } from '../../src/hooks/useAppDirectoryCategories';
-import { useSavedItems } from '../../src/hooks/useSavedItems';
 import { useFocusRestore } from '../../src/hooks/useFocusRestore';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
 import { useTip, TIP_KEYS, TIPS } from '../../src/contexts/ContextualTipContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { usePreferences } from '../../src/contexts/PreferencesContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
+import { useLanguageDetection } from '../../src/hooks/useLanguageDetection';
 import { APPLEVIS_SOCIAL_LINKS } from '../../src/data/socialLinks';
-import { APP_PLATFORMS } from '../../src/data/appDirectory';
 import {
-  readAloud, summariseText, simplifyText,
-  accessibilityConsensus, isAppleIntelligenceAvailable, donateSiriActivity,
+  donateSiriActivity,
+  translateSearchQueryToEnglish,
 } from '../../src/services/intelligenceService';
-import type { ForumTopic, AppListing, AppCategory } from '../../src/types/content';
+import type { ForumTopic } from '../../src/types/content';
+
+// ─── Section accent palette ────────────────────────────────────────────────────
+const SECTION_ACCENTS = {
+  apps:       '#3b82f6',  // blue
+  community:  '#6366f1',  // indigo
+  learn:      '#10b981',  // emerald
+  bugs:       '#f97316',  // orange
+  bemyeyes:   '#00A99D',  // Be My Eyes teal
+  contribute: '#f59e0b',  // amber
+  connect:    '#0ea5e9',  // sky
+} as const;
+
+// Be My Eyes deep link helpers
+// TODO: Replace placeholder schemes with confirmed URLs from Be My Eyes team
+const BME_APP_STORE = 'https://apps.apple.com/us/app/be-my-eyes/id905177575';
+const BME_DEEP_LINKS = {
+  volunteer:  'bemyeyes://volunteer',   // placeholder — awaiting confirmation
+  beMyAI:     'bemyeyes://ai',          // placeholder — awaiting confirmation
+  directory:  'bemyeyes://directory',   // placeholder — awaiting confirmation
+} as const;
+
+const SOCIAL_ACCENT: Record<string, string> = {
+  x:        '#000000',
+  facebook: '#1877F2',
+  mastodon: '#6364FF',
+};
 
 // ─── SearchResultsSection ─────────────────────────────────────────────────────
 
@@ -60,55 +84,72 @@ function SearchResultsSection({
 
 // ─── Hub sections ─────────────────────────────────────────────────────────────
 
-function SectionIntro({ title, subtitle }: { title: string; subtitle: string }) {
+function SectionIntro({ title, subtitle, accentColor }: {
+  title: string;
+  subtitle: string;
+  accentColor?: string;
+}) {
   const { colors } = useTheme();
+  const accent = accentColor ?? colors.accent;
   return (
-    <View style={{ marginTop: 22, marginBottom: 10 }}>
-      <Text
-        style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}
-        accessibilityRole="header"
-      >
-        {title}
-      </Text>
-      <Text style={{ fontSize: 14, lineHeight: 20, color: colors.textSecondary }}>
-        {subtitle}
-      </Text>
+    <View style={{ marginTop: 22, marginBottom: 10, flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+      <View style={{ width: 3, borderRadius: 2, backgroundColor: accent, marginTop: 2, alignSelf: 'stretch', minHeight: 36 }} />
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{ fontSize: 13, fontWeight: '700', color: accent, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}
+          accessibilityRole="header"
+          accessibilityLabel={title}
+        >
+          {title}
+        </Text>
+        <Text style={{ fontSize: 14, lineHeight: 20, color: colors.textSecondary }}>
+          {subtitle}
+        </Text>
+      </View>
     </View>
   );
 }
 
 function HubRow({
-  icon,
-  title,
-  subtitle,
-  onPress,
-  external = false,
+  icon, title, subtitle, onPress, external = false, nodeRef, accentColor, hint,
 }: {
   icon: React.ComponentProps<typeof Ionicons>['name'];
   title: string;
   subtitle: string;
   onPress: () => void;
   external?: boolean;
+  nodeRef?: { current: View | null };
+  accentColor?: string;
+  hint?: string;
 }) {
   const { colors, styles } = useTheme();
+  const { reduceTransparency } = useAccessibilityPreferences();
+  const accent = accentColor ?? colors.accent;
+
   return (
     <Pressable
-      onPress={onPress}
+      ref={nodeRef as any}
+      onPress={() => { Haptics.selectionAsync(); onPress(); }}
       accessible
       accessibilityRole={external ? 'link' : 'button'}
       accessibilityLabel={`${title}. ${subtitle}.${external ? ' Opens in your browser.' : ''}`}
+      accessibilityHint={hint}
       style={({ pressed }) => [
         styles.card,
-        {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 14,
-          marginBottom: 8,
-          opacity: pressed ? 0.75 : 1,
-        },
+        { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 8, opacity: pressed ? 0.75 : 1 },
       ]}
     >
-      <Ionicons name={icon} size={28} color={colors.accent} accessibilityElementsHidden />
+      {/* Tinted icon square — gated by reduceTransparency */}
+      <View
+        style={{
+          width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+          alignItems: 'center', justifyContent: 'center',
+          backgroundColor: reduceTransparency ? colors.inputBackground : accent + '18',
+        }}
+        accessibilityElementsHidden
+      >
+        <Ionicons name={icon} size={24} color={accent} accessibilityElementsHidden />
+      </View>
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 3 }}>
           {title}
@@ -132,16 +173,27 @@ function HubRow({
 export default function DiscoverScreen() {
   const router  = useRouter();
   const { colors, styles } = useTheme();
-  const { screenReaderEnabled } = useAccessibilityPreferences();
+  const { reduceTransparency } = useAccessibilityPreferences();
+  const {
+    nonEnglishDetectionEnabled,
+    searchTranslationEnabled,
+  } = usePreferences();
   const { showToast } = useToast();
   const { showTip }   = useTip();
   const search  = useSearch();
-  const savedApps = useSavedItems('appListing');
-  const appRefs   = useRef<Map<string, View>>(new Map());
+  const appsHubRef    = useRef<View>(null);
+  const forumsHubRef  = useRef<View>(null);
+  const blogHubRef    = useRef<View>(null);
+  const guidesHubRef  = useRef<View>(null);
+  const podcastHubRef = useRef<View>(null);
+  const bugHubRef     = useRef<View>(null);
+  const searchInputRef = useRef<TextInput>(null);
   const { save: saveFocus } = useFocusRestore();
-  const aiAvailable = isAppleIntelligenceAvailable();
   const scrollRef = useRef<ScrollView>(null);
+  const [translatingSearch, setTranslatingSearch] = useState(false);
+  const [translatedFrom, setTranslatedFrom] = useState('');
   useScrollToTop(scrollRef);
+  const searchLanguage = useLanguageDetection(search.query);
 
   useFocusEffect(useCallback(() => {
     showTip(TIP_KEYS.tabDiscover, TIPS.tabDiscover);
@@ -150,11 +202,6 @@ export default function DiscoverScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []));
 
-  const [selectedPlatform, setSelectedPlatform] = useState('ios');
-  const [selectedCategory, setSelectedCategory] = useState<AppCategory | null>(null);
-  const categoryList = useAppDirectoryCategories(selectedPlatform);
-  const categoryProbe = useAppCategoryExperiment(selectedPlatform, selectedCategory);
-  const selectedPlatformName = APP_PLATFORMS.find((platform) => platform.id === selectedPlatform)?.name ?? 'Apps';
 
   useHandoff({
     activityType: 'com.applevis.app.discover',
@@ -172,69 +219,47 @@ export default function DiscoverScreen() {
     AccessibilityInfo.announceForAccessibility(msg);
   }, [search.hasQuery, search.loading, search.totalCount]);
 
-  // ── App card helpers (same pattern as apps.tsx) ─────────────────────────────
+  const showTranslateSearch =
+    nonEnglishDetectionEnabled &&
+    searchTranslationEnabled &&
+    search.hasQuery &&
+    searchLanguage.isConfident &&
+    searchLanguage.isNonEnglish &&
+    translatedFrom.trim() !== search.query.trim();
 
-  function buildAppActions(app: AppListing) {
-    const isSaved = savedApps.isSaved(app.id);
-    return [
-      'Open App Page',
-      ...(app.appStoreUrl ? ['Open in App Store'] : []),
-      isSaved ? 'Unsave App' : 'Save App',
-      ...(!screenReaderEnabled ? ['Read Aloud'] : []),
-      'Share',
-      ...(aiAvailable ? ['Summarise Reviews', 'Accessibility Consensus', 'Simplify'] : []),
-    ];
-  }
-
-  function handleAppAction(action: string, app: AppListing) {
-    if (action === 'Open App Page') {
-      if (app.id.startsWith('public:') && app.url) {
-        Linking.openURL(app.url).catch(() => showToast('Could not open the AppleVis app page.', 'error'));
+  async function handleTranslateSearch() {
+    const original = search.query.trim();
+    if (!original || translatingSearch) return;
+    setTranslatingSearch(true);
+    try {
+      const translated = await translateSearchQueryToEnglish(original);
+      if (!translated) {
+        showToast('In-app search translation requires Apple Intelligence on this device.', 'warning');
         return;
       }
-      saveFocus(appRefs.current.get(app.id) ?? null);
-      donateSiriActivity({ type: 'searchApps', query: app.name });
-      router.push({ pathname: '/app-detail/[id]' as any, params: { id: app.id, name: app.name } });
-    } else if (action === 'Open in App Store') {
-      Linking.openURL(app.appStoreUrl).catch(() => showToast('Could not open the App Store.', 'error'));
-    } else if (action === 'Save App') {
-      savedApps.save({ id: app.id, kind: 'appListing', title: app.name, savedAt: new Date().toISOString() });
-      showToast('App saved.', 'success');
-    } else if (action === 'Unsave App') {
-      savedApps.unsave(app.id);
-      showToast('App unsaved.', 'success');
-    } else if (action === 'Read Aloud') {
-      readAloud([app.name, app.summary].filter(Boolean).join('. '));
-    } else if (action === 'Share') {
-      Share.share({ title: app.name, message: `${app.name} on AppleVis — ${app.url ?? 'https://www.applevis.com/accessibility-apps'}` }).catch(() => {});
-    } else if (action === 'Summarise Reviews') {
-      summariseText(`Summarise accessibility reviews for ${app.name}: ${app.summary}`).then((s) => { if (s) showToast(s, 'success'); });
-    } else if (action === 'Accessibility Consensus') {
-      accessibilityConsensus([app.summary]).then((s) => { if (s) showToast(s, 'success'); });
-    } else if (action === 'Simplify') {
-      simplifyText(app.summary).then((s) => { if (s) showToast(s, 'success'); });
+      setTranslatedFrom(original);
+      search.search(translated);
+      AccessibilityInfo.announceForAccessibility(`Searching translated English query: ${translated}`);
+      setTimeout(() => searchInputRef.current?.focus(), 100);
+    } finally {
+      setTranslatingSearch(false);
     }
   }
 
-  function renderAppCard(app: AppListing) {
-    const isSaved = savedApps.isSaved(app.id);
-    return (
-      <AccessibleCard
-        key={app.id}
-        ref={(el) => { if (el) appRefs.current.set(app.id, el); else appRefs.current.delete(app.id); }}
-        title={app.name}
-        meta={[
-          app.developer || null,
-          app.category  || null,
-          app.reviewCount > 0 ? `${app.reviewCount} reviews` : null,
-          `Updated ${new Date(app.lastUpdatedAt).toLocaleDateString()}`,
-          isSaved ? 'Saved' : null,
-        ].filter(Boolean).join(' · ')}
-        iconUrl={app.iconUrl}
-        actions={buildAppActions(app)}
-        onAction={(a) => handleAppAction(a, app)}
-      />
-    );
+  // ── Be My Eyes deep link launcher ──────────────────────────────────────────
+
+  async function openBME(deepLink: string, label: string) {
+    Haptics.selectionAsync();
+    try {
+      const canOpen = await Linking.canOpenURL(deepLink);
+      if (canOpen) {
+        await Linking.openURL(deepLink);
+      } else {
+        await Linking.openURL(BME_APP_STORE);
+      }
+    } catch {
+      showToast(`Could not open ${label}.`, 'error');
+    }
   }
 
   // ── Search result topic handler ─────────────────────────────────────────────
@@ -265,7 +290,8 @@ export default function DiscoverScreen() {
           <Ionicons name="search" size={17} color={colors.textSecondary}
             style={{ marginRight: 8 }} accessibilityElementsHidden />
           <TextInput
-            value={isSearching ? undefined : ''}
+            ref={searchInputRef}
+            value={search.query}
             onChangeText={search.search}
             placeholder="Search topics, apps, guides…"
             placeholderTextColor={colors.textSecondary}
@@ -280,10 +306,18 @@ export default function DiscoverScreen() {
           />
           {isSearching && (
             <Pressable
-              onPress={search.clear}
+              onPress={() => {
+                search.clear();
+                // Restore VoiceOver focus to the search field after clearing
+                setTimeout(() => {
+                  const handle = findNodeHandle(searchInputRef.current);
+                  if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+                }, 100);
+              }}
               accessible
               accessibilityRole="button"
               accessibilityLabel="Clear search"
+              accessibilityHint="Returns to the browse screen"
               style={{ padding: 4 }}
             >
               <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
@@ -292,6 +326,50 @@ export default function DiscoverScreen() {
         </View>
 
         {/* Title-match disclaimer — only shown while a search is active */}
+        {showTranslateSearch && (
+          <View
+            style={{
+              backgroundColor: colors.pill,
+              borderRadius: 10,
+              borderWidth: 1,
+              borderColor: colors.border,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              marginBottom: 12,
+              gap: 8,
+            }}
+            accessible
+            accessibilityRole="alert"
+            accessibilityLabel="AppleVis search works best in English. Translate this search to English?"
+          >
+            <Text style={{ color: colors.text, fontSize: 14, lineHeight: 20 }} importantForAccessibility="no">
+              AppleVis search works best in English. Translate this search to English?
+            </Text>
+            <Pressable
+              onPress={handleTranslateSearch}
+              disabled={translatingSearch}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={translatingSearch ? 'Translating search, please wait' : 'Translate search to English'}
+              accessibilityState={{ disabled: translatingSearch }}
+              style={{
+                alignItems: 'center',
+                backgroundColor: colors.accent,
+                borderRadius: 8,
+                paddingVertical: 9,
+                opacity: translatingSearch ? 0.7 : 1,
+              }}
+            >
+              {translatingSearch
+                ? <ActivityIndicator color={colors.accentText} />
+                : <Text style={{ color: colors.accentText, fontWeight: '700', fontSize: 14 }}>
+                    Translate Search
+                  </Text>
+              }
+            </Pressable>
+          </View>
+        )}
+
         {isSearching && (
           <Text
             style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 12 }}
@@ -307,10 +385,15 @@ export default function DiscoverScreen() {
         {isSearching && (
           <>
             {search.loading && (
-              <View style={{ alignItems: 'center', paddingVertical: 32 }}>
-                <ActivityIndicator size="large" color={colors.appleVisBlue}
-                  accessibilityLabel="Searching…" />
-                <Text style={[styles.lede, { marginTop: 12, textAlign: 'center' }]}>
+              <View
+                style={{ alignItems: 'center', paddingVertical: 32 }}
+                accessible
+                accessibilityLiveRegion="polite"
+                accessibilityLabel="Searching AppleVis, please wait"
+              >
+                <ActivityIndicator size="large" color={colors.appleVisBlue} accessibilityElementsHidden />
+                <Text style={[styles.lede, { marginTop: 12, textAlign: 'center' }]}
+                  accessibilityElementsHidden>
                   Searching…
                 </Text>
               </View>
@@ -418,205 +501,163 @@ export default function DiscoverScreen() {
             {/* ── App Directory ─────────────────────────────────────────── */}
             <SectionIntro
               title="App Directory"
-              subtitle="Browse accessible apps by platform and category."
+              subtitle="Browse accessible apps by platform and category, or view your saved apps."
+              accentColor={SECTION_ACCENTS.apps}
             />
-
-            {/* Platform tabs */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8, paddingBottom: 12 }}
-              accessibilityRole="tablist"
-              accessibilityLabel="Platform"
-            >
-              {APP_PLATFORMS.map((platform) => {
-                const isSelected = selectedPlatform === platform.id;
-                return (
-                  <Pressable
-                    key={platform.id}
-                    onPress={() => {
-                      setSelectedPlatform(platform.id);
-                      setSelectedCategory(null);
-                      AccessibilityInfo.announceForAccessibility(`${platform.name} selected`);
-                    }}
-                    accessible
-                    accessibilityRole="tab"
-                    accessibilityLabel={platform.name}
-                    accessibilityState={{ selected: isSelected }}
-                    style={{
-                      paddingHorizontal: 14, paddingVertical: 8,
-                      borderRadius: 20, borderWidth: isSelected ? 0 : 1,
-                      borderColor: colors.border,
-                      backgroundColor: isSelected ? colors.accent : colors.inputBackground,
-                    }}
-                  >
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: isSelected ? '#FFF' : colors.text }}>
-                      {platform.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            {/* Category list or filtered app list */}
-            {!selectedCategory ? (
-              <>
-                <Text
-                  style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}
-                  accessibilityRole="header"
-                >
-                  {selectedPlatformName} Categories
-                </Text>
-                <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 10, lineHeight: 18 }}>
-                  {categoryList.categories.length} categories{categoryList.fromFallback && selectedPlatform !== 'ios' ? ' prepared for the app directory API' : ''}
-                </Text>
-                {categoryList.categories.map((category) => (
-                  <Pressable
-                    key={category.slug}
-                    onPress={() => setSelectedCategory(category)}
-                    accessible
-                    accessibilityRole="button"
-                    accessibilityLabel={category.count ? `${category.name}, ${category.count} apps` : category.name}
-                    accessibilityHint="Double tap to browse apps in this category"
-                    style={({ pressed }) => [
-                      styles.card,
-                      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                        marginBottom: 6, opacity: pressed ? 0.75 : 1 },
-                    ]}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 16, color: colors.text, fontWeight: '500' }}>
-                        {category.name}
-                      </Text>
-                      {typeof category.count === 'number' && (
-                        <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
-                          {category.count} apps
-                        </Text>
-                      )}
-                    </View>
-                    <Ionicons name="chevron-forward" size={16} color={colors.textSecondary}
-                      accessibilityElementsHidden />
-                  </Pressable>
-                ))}
-              </>
-            ) : (
-              <>
-                {/* Back button */}
-                <Pressable
-                  onPress={() => setSelectedCategory(null)}
-                  accessible accessibilityRole="button"
-                  accessibilityLabel={`Back to ${selectedPlatformName} categories`}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}
-                >
-                  <Ionicons name="chevron-back" size={16} color={colors.accent} accessibilityElementsHidden />
-                  <Text style={{ fontSize: 15, color: colors.accent, fontWeight: '600' }}>
-                    {selectedPlatformName} Categories
-                  </Text>
-                </Pressable>
-
-                <Text style={{ fontSize: 19, fontWeight: '700', color: colors.text, marginBottom: 14 }}
-                  accessibilityRole="header">
-                  {selectedCategory.name}
-                </Text>
-
-                {categoryProbe.loading && (
-                  <ActivityIndicator size="large" color={colors.appleVisBlue}
-                    accessibilityLabel="Loading apps" style={{ marginVertical: 24 }} />
-                )}
-
-                {!categoryProbe.loading && categoryProbe.error && (
-                  <View style={[styles.card, { backgroundColor: '#FFF8F0' }]}>
-                    <Text style={[styles.cardTitle, { color: colors.text }]}>Could not load this category</Text>
-                    <Text style={[styles.cardMeta, { lineHeight: 19 }]}>
-                      The app tried the app directory API and fallback sources, but no app listings were available.
-                    </Text>
-                    <Pressable
-                      onPress={categoryProbe.retry}
-                      accessible
-                      accessibilityRole="button"
-                      accessibilityLabel="Retry category lookup"
-                      style={{ marginTop: 12 }}
-                    >
-                      <Text style={{ color: colors.appleVisBlue, fontWeight: '700' }}>Retry</Text>
-                    </Pressable>
-                  </View>
-                )}
-
-                {!categoryProbe.loading && !categoryProbe.error && categoryProbe.probe && (
-                  <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 10 }}>
-                    {categoryProbe.probe.source === 'public'
-                      ? 'Using AppleVis public directory page until the app directory API is available.'
-                      : `Loaded from ${categoryProbe.probe.fieldName}.`}
-                  </Text>
-                )}
-
-                {!categoryProbe.loading && !categoryProbe.error && categoryProbe.apps.length === 0 && (
-                  <EmptyState
-                    icon="apps-outline"
-                    title="No apps listed yet"
-                    subtitle={`No ${selectedCategory.name} apps came back for this platform.`}
-                  />
-                )}
-
-                {!categoryProbe.loading && categoryProbe.apps.map(renderAppCard)}
-
-                <LoadMoreButton
-                  hasMore={categoryProbe.hasMore}
-                  isLoadingMore={categoryProbe.isLoadingMore}
-                  onPress={categoryProbe.loadMore}
-                />
-              </>
-            )}
+            <HubRow
+              nodeRef={appsHubRef}
+              icon="apps-outline"
+              title="Browse Apps"
+              subtitle="Search and explore accessible apps across iOS, Mac, Apple Watch, and more"
+              accentColor={SECTION_ACCENTS.apps}
+              hint="Opens the app directory browser"
+              onPress={() => {
+                saveFocus(appsHubRef.current);
+                router.push('/app-browse' as any);
+              }}
+            />
 
             <SectionIntro
               title="Community"
               subtitle="Find discussions and recent posts from AppleVis members."
+              accentColor={SECTION_ACCENTS.community}
             />
             <HubRow
+              nodeRef={forumsHubRef}
               icon="chatbubbles-outline"
               title="Forums"
               subtitle="Browse community discussions about accessibility and Apple products"
-              onPress={() => router.push('/(tabs)/forums' as any)}
+              accentColor={SECTION_ACCENTS.community}
+              hint="Opens the forum browser"
+              onPress={() => {
+                saveFocus(forumsHubRef.current);
+                router.push('/forums-browse' as any);
+              }}
             />
             <HubRow
+              nodeRef={blogHubRef}
               icon="newspaper-outline"
-              title="Community Blog"
-              subtitle="Read recent AppleVis posts, news, reviews, and opinion pieces"
-              external
-              onPress={() => Linking.openURL('https://www.applevis.com/blog').catch(() => showToast('Could not open the AppleVis blog.', 'error'))}
+              title="AppleVis Blog"
+              subtitle="Read AppleVis posts, news, reviews, and opinion pieces in-app"
+              accentColor={SECTION_ACCENTS.community}
+              hint="Opens the blog reader"
+              onPress={() => {
+                saveFocus(blogHubRef.current);
+                router.push('/blog-browse' as any);
+              }}
             />
 
             <SectionIntro
               title="Learn"
               subtitle="Explore guides, podcast episodes, and practical accessibility resources."
+              accentColor={SECTION_ACCENTS.learn}
             />
             <HubRow
+              nodeRef={guidesHubRef}
               icon="book-outline"
               title="Guides and Resources"
               subtitle="How-to articles, getting-started content, and accessibility resources"
-              onPress={() => router.push('/(tabs)/resources' as any)}
+              accentColor={SECTION_ACCENTS.learn}
+              hint="Opens the guides and resources browser"
+              onPress={() => {
+                saveFocus(guidesHubRef.current);
+                router.push('/guide-browse' as any);
+              }}
             />
             <HubRow
+              nodeRef={podcastHubRef}
               icon="radio-outline"
               title="Podcast"
-              subtitle="Episodes, discussions, and community interviews"
-              onPress={() => router.push('/(tabs)/podcasts' as any)}
+              subtitle="Browse episodes, your queue, downloads, and play history"
+              accentColor={SECTION_ACCENTS.learn}
+              hint="Opens the podcast browser"
+              onPress={() => {
+                saveFocus(podcastHubRef.current);
+                router.push('/podcast-browse' as any);
+              }}
+            />
+
+            <SectionIntro
+              title="Bug Tracker"
+              subtitle="Browse active accessibility bugs reported by the AppleVis community."
+              accentColor={SECTION_ACCENTS.bugs}
+            />
+            <HubRow
+              nodeRef={bugHubRef}
+              icon="bug-outline"
+              title="iOS / iPadOS Bugs"
+              subtitle="Active and resolved accessibility bugs on iPhone and iPad"
+              accentColor={SECTION_ACCENTS.bugs}
+              hint="Opens the iOS bug tracker"
+              onPress={() => {
+                saveFocus(bugHubRef.current);
+                router.push({ pathname: '/bug-browse' as any, params: { platform: 'ios' } });
+              }}
+            />
+            <HubRow
+              icon="desktop-outline"
+              title="macOS Bugs"
+              subtitle="Active and resolved accessibility bugs on Mac"
+              accentColor={SECTION_ACCENTS.bugs}
+              hint="Opens the macOS bug tracker"
+              onPress={() => {
+                saveFocus(bugHubRef.current);
+                router.push({ pathname: '/bug-browse' as any, params: { platform: 'macos' } });
+              }}
+            />
+
+            <SectionIntro
+              title="Be My Eyes"
+              subtitle="Free visual assistance — connect with volunteers, AI, and accessible services."
+              accentColor={SECTION_ACCENTS.bemyeyes}
+            />
+            <HubRow
+              icon="people-outline"
+              title="Call a Volunteer"
+              subtitle="Connect instantly with a sighted volunteer via live video, 24/7 in 185 languages"
+              accentColor={SECTION_ACCENTS.bemyeyes}
+              hint="Opens the Be My Eyes app to start a volunteer call"
+              external
+              onPress={() => openBME(BME_DEEP_LINKS.volunteer, 'Be My Eyes')}
+            />
+            <HubRow
+              icon="sparkles-outline"
+              title="Be My AI"
+              subtitle="Ask AI to describe images, read text, or answer visual questions in 36 languages"
+              accentColor={SECTION_ACCENTS.bemyeyes}
+              hint="Opens the Be My Eyes app to the AI assistant"
+              external
+              onPress={() => openBME(BME_DEEP_LINKS.beMyAI, 'Be My Eyes')}
+            />
+            <HubRow
+              icon="business-outline"
+              title="Service Directory"
+              subtitle="Reach accessible customer service at hundreds of companies and government departments"
+              accentColor={SECTION_ACCENTS.bemyeyes}
+              hint="Opens the Be My Eyes app to the service directory"
+              external
+              onPress={() => openBME(BME_DEEP_LINKS.directory, 'Be My Eyes')}
             />
 
             <SectionIntro
               title="Contribute"
               subtitle="Share useful apps, posts, and podcast recommendations with AppleVis."
+              accentColor={SECTION_ACCENTS.contribute}
             />
             <HubRow
               icon="phone-portrait-outline"
               title="Submit an App"
               subtitle="Add an accessible app to the AppleVis directory"
-              onPress={() => router.push('/submit-app')}
+              accentColor={SECTION_ACCENTS.contribute}
+              hint="Opens the app submission screen"
+              onPress={() => router.push('/submit-wizard' as any)}
             />
             <HubRow
               icon="create-outline"
               title="Submit a Blog Post"
               subtitle="Share your expertise or experience with the community"
+              accentColor={SECTION_ACCENTS.contribute}
+              hint="Opens the submission form in your browser"
               external
               onPress={() => Linking.openURL('https://www.applevis.com/form/blog-submission').catch(() => showToast('Could not open the blog submission form.', 'error'))}
             />
@@ -624,42 +665,66 @@ export default function DiscoverScreen() {
               icon="mic-outline"
               title="Submit a Podcast"
               subtitle="Nominate an accessible podcast for the AppleVis directory"
+              accentColor={SECTION_ACCENTS.contribute}
+              hint="Opens the submission form in your browser"
               external
               onPress={() => Linking.openURL('https://www.applevis.com/podcasts/upload').catch(() => showToast('Could not open the podcast submission form.', 'error'))}
+            />
+            <HubRow
+              icon="bug-outline"
+              title="Submit a Bug Report"
+              subtitle="Found an accessibility bug? Report it to the AppleVis community"
+              accentColor={SECTION_ACCENTS.contribute}
+              hint="Opens the bug report submission form in your browser"
+              external
+              onPress={() => Linking.openURL('https://applevis.com/form/community-bug-report-form').catch(() => showToast('Could not open the bug report form.', 'error'))}
             />
 
             <SectionIntro
               title="Connect"
               subtitle="Follow AppleVis on social platforms."
+              accentColor={SECTION_ACCENTS.connect}
             />
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
-              {APPLEVIS_SOCIAL_LINKS.map((link) => (
-                <Pressable
-                  key={link.id}
-                  onPress={() => Linking.openURL(link.url).catch(() => showToast('Could not open link.', 'error'))}
-                  accessible
-                  accessibilityRole="link"
-                  accessibilityLabel={`${link.description}. Opens in your browser.`}
-                  style={({ pressed }) => [
-                    styles.cardSmall,
-                    {
-                      flex: 1,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      minHeight: 86,
-                      marginBottom: 0,
-                      opacity: pressed ? 0.75 : 1,
-                    },
-                  ]}
-                >
-                  <Ionicons name={link.icon as any} size={24} color={colors.accent} accessibilityElementsHidden />
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
-                    {link.label}
-                  </Text>
-                  <Ionicons name="open-outline" size={14} color={colors.textSecondary} accessibilityElementsHidden />
-                </Pressable>
-              ))}
+              {APPLEVIS_SOCIAL_LINKS.map((link) => {
+                const socialAccent = SOCIAL_ACCENT[link.id] ?? SECTION_ACCENTS.connect;
+                return (
+                  <Pressable
+                    key={link.id}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      Linking.openURL(link.url).catch(() => showToast('Could not open link.', 'error'));
+                    }}
+                    accessible
+                    accessibilityRole="link"
+                    accessibilityLabel={`${link.description}. Opens in your browser.`}
+                    accessibilityHint="Double tap to open in your browser"
+                    style={({ pressed }) => [
+                      styles.cardSmall,
+                      {
+                        flex: 1, alignItems: 'center', justifyContent: 'center',
+                        gap: 6, minHeight: 86, marginBottom: 0,
+                        opacity: pressed ? 0.75 : 1,
+                      },
+                    ]}
+                  >
+                    <View
+                      style={{
+                        width: 40, height: 40, borderRadius: 10,
+                        alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: reduceTransparency ? colors.inputBackground : socialAccent + '18',
+                      }}
+                      accessibilityElementsHidden
+                    >
+                      <Ionicons name={link.icon as any} size={22} color={socialAccent} accessibilityElementsHidden />
+                    </View>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
+                      {link.label}
+                    </Text>
+                    <Ionicons name="open-outline" size={13} color={colors.textSecondary} accessibilityElementsHidden />
+                  </Pressable>
+                );
+              })}
             </View>
           </>
         )}

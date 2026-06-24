@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { RefreshBar } from './RefreshBar';
 import { useTheme } from '../contexts/ThemeContext';
 import { usePlayer } from '../contexts/PlayerContext';
+import { sounds } from '../services/sounds';
 
 type Props = {
   title: string;
@@ -47,21 +48,27 @@ export function Screen({
     else player.play();
   }, [player]);
 
+  const goBack = useCallback(() => {
+    if (!showBack || !router.canGoBack()) return;
+    sounds.screenClose().catch(() => {});
+    router.back();
+  }, [router, showBack]);
+
   const showActionRow = showSearch || showSettings || !!headerLeft || !!headerRight;
 
   return (
     <SafeAreaView
       style={styles.screen}
       accessibilityLanguage="en"
-      onAccessibilityEscape={() => { if (showBack && router.canGoBack()) router.back(); }}
-      onMagicTap={onMagicTap}
+      onAccessibilityEscape={goBack}
+      onAccessibilityTap={onMagicTap}
     >
       <View style={styles.content}>
 
         {/* Back button — shown on pushed screens, suppressed on tab root screens */}
         {showBack && router.canGoBack() && (
           <Pressable
-            onPress={() => router.back()}
+            onPress={goBack}
             accessibilityRole="button"
             accessibilityLabel="Go back"
             hitSlop={8}

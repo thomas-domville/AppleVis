@@ -12,6 +12,7 @@ import { FilterPicker } from '../../src/components/FilterPicker';
 import { LoadMoreButton } from '../../src/components/LoadMoreButton';
 import { usePlayer } from '../../src/contexts/PlayerContext';
 import { usePodcastList } from '../../src/hooks/usePodcastList';
+import { usePodcastTags } from '../../src/hooks/usePodcastTags';
 import { useRefreshFeedback } from '../../src/hooks/useRefreshFeedback';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
@@ -20,19 +21,30 @@ import { usePreferences } from '../../src/contexts/PreferencesContext';
 import type { AnnouncementLevel } from '../../src/contexts/PreferencesContext';
 import { readAloud, donateSiriActivity } from '../../src/services/intelligenceService';
 import { trackMeaningfulAction } from '../../src/services/reviewPrompt';
-import { startPodcastLiveActivity, updateCarPlayEpisodes } from '../../src/native/nativeModules';
+import { updateCarPlayEpisodes } from '../../src/native/nativeModules';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 import { useEpisodeMeta } from '../../src/hooks/useEpisodeMeta';
 import { useEpisodeDurations } from '../../src/hooks/useEpisodeDurations';
+import { useFollowedItem } from '../../src/hooks/useFollowedItem';
 import { persistence } from '../../src/services/persistence';
 import type { PlayHistoryEntry } from '../../src/services/persistence';
 import { deleteAllDownloads } from '../../src/services/downloads';
-import type { PodcastEpisode } from '../../src/types/content';
+import type { PodcastEpisode, PodcastTag } from '../../src/types/content';
 
 // ─── Filter constants ─────────────────────────────────────────────────────────
 const PODCAST_FILTERS = ['Latest', 'In Progress', 'Downloads', 'Saved', 'Queue', 'History'] as const;
+const PODCAST_PICKER_FILTERS = ['Latest', 'In Progress'] as const;
 type PodcastFilter = typeof PODCAST_FILTERS[number];
+
+const FILTER_DESCRIPTIONS: Record<PodcastFilter, string> = {
+  Latest:        'Latest episodes from all AppleVis podcasts.',
+  'In Progress': 'Episodes you have started but not finished.',
+  Downloads:     'Episodes saved to your device for offline listening.',
+  Saved:         'Episodes you have bookmarked for later.',
+  Queue:         'Episodes lined up to play next.',
+  History:       'Episodes you have already played.',
+};
 
 // ─── Sort types ───────────────────────────────────────────────────────────────
 type SavedSort     = 'newest-saved' | 'oldest-saved' | 'newest-published' | 'oldest-published' | 'title-az' | 'shortest' | 'longest';
@@ -175,6 +187,16 @@ function SwipeableEpisodeCard({
   styles: ReturnType<typeof useTheme>['styles'];
 }) {
   const translateX = useRef(new Animated.Value(0)).current;
+  const { showToast } = useToast();
+  const followed = useFollowedItem({
+    id: episode.id,
+    kind: 'podcastEpisode',
+    nodeType: 'node--podcast',
+    title: episode.title,
+    followedAt: new Date().toISOString(),
+    lastActivityAt: episode.lastActivityAt ?? episode.publishedAt,
+    url: episode.url,
+  });
   const swipeRef   = useRef(0);
   const THRESHOLD  = 72;
 
@@ -238,16 +260,29 @@ function SwipeableEpisodeCard({
             isDownloading ? 'Download in progress.' : isDownloaded ? 'Swipe left to delete download.' : 'Swipe left to download.',
           ].join(' ')}
           accessibilityActions={[
-            { name: 'play',     label: isCurrent && isPlaying ? 'Pause' : 'Play' },
+            { name: 'play',     label: isCurrent && isPlaying ? 'Stop' : 'Play' },
             { name: 'queue',    label: isQueued ? 'Remove from queue' : 'Add to queue' },
             { name: 'download', label: isDownloading ? 'Downloading…' : isDownloaded ? 'Delete download' : 'Download' },
             { name: 'save',     label: isSaved ? 'Unsave' : 'Save' },
+            { name: 'follow',   label: followed.isFollowing ? 'Unfollow episode' : 'Follow episode' },
           ]}
           onAccessibilityAction={({ nativeEvent }) => {
             if (nativeEvent.actionName === 'play')     onPlay();
             if (nativeEvent.actionName === 'queue')    onQueue();
             if (nativeEvent.actionName === 'download') onDownload();
             if (nativeEvent.actionName === 'save')     onSave();
+            if (nativeEvent.actionName === 'follow') {
+              followed.toggleFollow().then((result) => {
+                showToast(
+                  result === 'unfollowed'
+                    ? 'Unfollowed episode.'
+                    : result === 'followed'
+                      ? 'Following episode.'
+                      : 'Following saved. Server sync is waiting for AppleVis support.',
+                  result === 'followed-local' ? 'warning' : 'success',
+                );
+              });
+            }
           }}
           ref={onRef}
           style={[styles.card, isCurrent && { borderColor: colors.accent, borderWidth: 2 }]}
@@ -340,7 +375,9 @@ export default function Podcasts() {
   const { colors, styles, isDark } = useTheme();
   const { screenReaderEnabled }  = useAccessibilityPreferences();
   const player                   = usePlayer();
-  const list                     = usePodcastList();
+  const { tags }                 = usePodcastTags();
+  const [selectedTag, setSelectedTag] = useState<PodcastTag | null>(null);
+  const list                     = usePodcastList(selectedTag?.tid);
   const meta                     = useEpisodeMeta();
   const cachedDurations          = useEpisodeDurations();
 
@@ -374,6 +411,10 @@ export default function Podcasts() {
   const [history, setHistory]         = useState<PlayHistoryEntry[]>([]);
   const [savedSort,     setSavedSort]     = useState<SavedSort>('newest-saved');
   const [downloadsSort, setDownloadsSort] = useState<DownloadsSort>('newest-published');
+  const podcastPickerOptions = useMemo(
+    () => [...PODCAST_PICKER_FILTERS, ...tags.map(tag => tag.name)],
+    [tags],
+  );
 
   const firstEpisodeRef     = useRef<View | null>(null);
   const episodeItemRefs     = useRef<Record<string, View | null>>({});
@@ -571,14 +612,6 @@ export default function Podcasts() {
     }
     player.loadEpisode(episode, true);
     donateSiriActivity({ type: 'continuePlaying' });
-    startPodcastLiveActivity({
-      episodeTitle: episode.title,
-      showTitle: episode.showTitle,
-      episodeId: String(episode.id),
-      isPlaying: true,
-      position: 0,
-      duration: episode.duration,
-    });
   }
 
   function handleDownload(episode: PodcastEpisode) {
@@ -652,6 +685,25 @@ export default function Podcasts() {
         }
       },
     );
+  }
+
+  function handleFilterChange(nextFilter: string) {
+    const baseFilter = PODCAST_PICKER_FILTERS.find(option => option === nextFilter);
+    if (baseFilter) {
+      setFilter(baseFilter);
+      setSelectedTag(null);
+      setSearchQuery('');
+      AccessibilityInfo.announceForAccessibility(FILTER_DESCRIPTIONS[baseFilter]);
+      return;
+    }
+
+    const tag = tags.find(item => item.name === nextFilter);
+    if (tag) {
+      setFilter('Latest');
+      setSelectedTag(tag);
+      setSearchQuery('');
+      AccessibilityInfo.announceForAccessibility(`${tag.name} selected`);
+    }
   }
 
   function episodeLabel(episode: PodcastEpisode) {
@@ -768,9 +820,9 @@ export default function Podcasts() {
         {/* ── View filter picker ────────────────────────────────────────── */}
         <FilterPicker
           label="View"
-          options={PODCAST_FILTERS}
-          value={filter}
-          onChange={setFilter}
+          options={podcastPickerOptions}
+          value={selectedTag?.name ?? filter}
+          onChange={handleFilterChange}
         />
 
         {/* ── Latest ───────────────────────────────────────────────────── */}
@@ -797,6 +849,11 @@ export default function Podcasts() {
               <EmptyState icon="search-outline" title="No results"
                 subtitle={`No episodes match "${searchQuery}". Try a different search.`}
                 />
+            )}
+
+            {filteredLatest.length === 0 && !list.loading && !list.error && !searchQuery.trim() && selectedTag && (
+              <EmptyState icon="pricetag-outline" title={`No ${selectedTag.name} episodes`}
+                subtitle="No episodes with this topic were found." />
             )}
 
             {filteredLatest.map((episode, index) => {
@@ -931,7 +988,7 @@ export default function Podcasts() {
                         accessibilityLabel={[episodeLabel(episode), 'Downloaded'].join('. ')}
                         accessibilityHint="Double tap to open episode details."
                         accessibilityActions={[
-                          { name: 'play',   label: isCurrent && player.isPlaying ? 'Pause' : 'Play' },
+                          { name: 'play',   label: isCurrent && player.isPlaying ? 'Stop' : 'Play' },
                           { name: 'queue',  label: isQueued ? 'Remove from queue' : 'Add to queue' },
                           { name: 'save',   label: isSaved ? 'Unsave' : 'Save' },
                           { name: 'remove', label: 'Remove download' },
@@ -1065,7 +1122,7 @@ export default function Podcasts() {
                         accessibilityLabel={[episodeLabel(episode), 'Saved'].join('. ')}
                         accessibilityHint="Double tap to open episode details."
                         accessibilityActions={[
-                          { name: 'play',       label: isCurrent && player.isPlaying ? 'Pause' : 'Play' },
+                          { name: 'play',       label: isCurrent && player.isPlaying ? 'Stop' : 'Play' },
                           { name: 'queue',      label: isQueued ? 'Remove from queue' : 'Add to queue' },
                           { name: 'download',   label: isDownloading ? 'Downloading…' : isDownloaded ? 'Delete download' : 'Download' },
                           { name: 'share',      label: 'Share episode' },
@@ -1200,7 +1257,7 @@ export default function Podcasts() {
                       ].filter(Boolean).join('. ')}
                       accessibilityHint="Double tap to open episode details."
                       accessibilityActions={[
-                        { name: 'play',     label: isCurrent && player.isPlaying ? 'Pause' : 'Play now' },
+                        { name: 'play',     label: isCurrent && player.isPlaying ? 'Stop' : 'Play now' },
                         ...(!isFirst  ? [{ name: 'moveUp',   label: 'Move up in queue' }]   : []),
                         ...(!isLast   ? [{ name: 'moveDown', label: 'Move down in queue' }] : []),
                         { name: 'remove',   label: 'Remove from queue' },

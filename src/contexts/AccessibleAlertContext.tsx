@@ -19,6 +19,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from './ThemeContext';
+import { sounds } from '../services/sounds';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -243,6 +244,8 @@ export function AccessibleAlertProvider({ children }: { children: ReactNode }) {
 
   const showAlert = useCallback((options: AlertOptions) => {
     TYPE_CONFIG[options.type ?? 'info'].haptic();
+    if (options.type === 'success') sounds.success().catch(() => {});
+    if (options.type === 'error') sounds.error().catch(() => {});
     setActiveAlert(options);
   }, []);
 

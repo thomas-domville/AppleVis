@@ -13,11 +13,15 @@ type Props = {
   onAction?: (actionName: string) => void;
   /** Optional app icon shown as a 44pt rounded thumbnail beside the title. */
   iconUrl?: string;
+  /** Short badge label (e.g. "NEW") rendered as a colored pill in the top-right corner. */
+  badge?: string;
+  /** Background color for the badge pill. Defaults to the theme accent color. */
+  badgeColor?: string;
 };
 
 export const AccessibleCard = forwardRef<View, Props>(
-  function AccessibleCard({ title, meta, authorLabel, hint = 'Double tap to open.', actions = [], onAction, iconUrl }, ref) {
-    const { styles }            = useTheme();
+  function AccessibleCard({ title, meta, authorLabel, hint = 'Double tap to open.', actions = [], onAction, iconUrl, badge, badgeColor }, ref) {
+    const { styles, colors }    = useTheme();
     const { announcementLevel } = usePreferences();
 
     // Three announcement levels:
@@ -72,7 +76,23 @@ export const AccessibleCard = forwardRef<View, Props>(
             />
           )}
           <View style={iconUrl ? { flex: 1 } : undefined}>
-            <Text style={styles.cardTitle}>{title}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+              <Text style={[styles.cardTitle, { flex: 1 }]}>{title}</Text>
+              {badge && (
+                <View
+                  style={{
+                    backgroundColor: badgeColor ?? colors.accent,
+                    borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+                    alignSelf: 'flex-start',
+                  }}
+                  accessibilityElementsHidden
+                >
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#FFF', letterSpacing: 0.5 }}>
+                    {badge}
+                  </Text>
+                </View>
+              )}
+            </View>
             {meta ? <Text style={styles.cardMeta}>{meta}</Text> : null}
           </View>
         </View>

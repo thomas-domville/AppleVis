@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { AccessibilityInfo, Text, View } from 'react-native';
+import { sounds } from '../services/sounds';
 
 type Props = { fromCache: boolean; cachedAt?: number };
 
@@ -22,7 +23,10 @@ export function OfflineBanner({ fromCache, cachedAt }: Props) {
     : 'Showing saved content. Pull down to refresh when online.';
 
   useEffect(() => {
-    if (fromCache) AccessibilityInfo.announceForAccessibility(label);
+    if (fromCache) {
+      sounds.offline().catch(() => {});
+      AccessibilityInfo.announceForAccessibility(label);
+    }
   }, [fromCache, label]);
 
   if (!fromCache) return null;

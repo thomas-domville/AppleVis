@@ -11,10 +11,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState } from '../../src/components/EmptyState';
 import { Screen } from '../../src/components/Screen';
 import { FeedCard } from '../../src/components/FeedCard';
+import { FilterPicker } from '../../src/components/FilterPicker';
 import { useHomeFeed, DEFAULT_FEED_PREFS } from '../../src/hooks/useHomeFeed';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
+import { useAlert } from '../../src/contexts/AccessibleAlertContext';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { persistence } from '../../src/services/persistence';
 import { useTip, TIP_KEYS, TIPS } from '../../src/contexts/ContextualTipContext';
@@ -71,6 +73,8 @@ function joinParts(parts: string[]): string {
 }
 
 type ItemVisits = Record<string, { seenAt: string; commentCount: number }>;
+const HOME_FILTERS = ['All', 'New'] as const;
+type HomeFilter = typeof HOME_FILTERS[number];
 
 function buildWelcomeSummary(
   items: FeedItem[],
@@ -89,7 +93,7 @@ function buildWelcomeSummary(
     }
   }
 
-  // Replies added to items the user has previously visited
+  // Comments added to items the user has previously visited
   let newComments = 0;
   for (const item of items) {
     const visit = itemVisits[String(item.data.id)];
@@ -108,7 +112,7 @@ function buildWelcomeSummary(
     counts.app     ? plural(counts.app,     'new app entry', 'new app entries') : null,
     counts.guide   ? plural(counts.guide,   'new guide or resource')            : null,
     counts.blog    ? plural(counts.blog,    'new blog post')                    : null,
-    newComments > 0 ? plural(newComments,   'new reply', 'new replies')         : null,
+    newComments > 0 ? plural(newComments,   'new comment')                      : null,
   ].filter((part): part is string => !!part);
 
   const count = Object.values(counts).reduce((total, n) => total + (n ?? 0), 0) + newComments;
@@ -116,7 +120,7 @@ function buildWelcomeSummary(
   if (count === 0 || parts.length === 0) {
     return {
       message: 'You are all caught up — no new content since your last visit.',
-      accessibilityLabel: 'Welcome back to AppleVis. You are all caught up — no new content since your last visit.',
+      accessibilityLabel: 'Here is what is new since your last visit. You are all caught up — no new content since your last visit.',
       count: 0,
     };
   }
@@ -124,7 +128,7 @@ function buildWelcomeSummary(
   const body = `Since your last visit: ${joinParts(parts)}.`;
   return {
     message: body,
-    accessibilityLabel: `Welcome back to AppleVis. ${body}`,
+    accessibilityLabel: `Here is what is new since your last visit. ${body}`,
     count,
   };
 }
@@ -293,10 +297,11 @@ export default function HomeScreen() {
   const { colors, styles } = useTheme();
   const auth         = useAuth();
   const feed         = useHomeFeed();
+  const { showAlert } = useAlert();
   const { showTip }  = useTip();
   const colorScheme  = useColorScheme();
   const a11y         = useAccessibilityPreferences();
-  const { welcomeSummaryEnabled } = usePreferences();
+  const { welcomeSummaryEnabled, defaultForumFilter } = usePreferences();
   const [filterVisible, setFilterVisible] = useState(false);
   const flatListRef       = useRef<FlatList>(null);
   const firstItemRef      = useRef<View | null>(null);
@@ -314,6 +319,8 @@ export default function HomeScreen() {
   const [lastVisitLoaded, setLastVisitLoaded] = useState(false);
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
   const [welcomeFocusToken, setWelcomeFocusToken] = useState(0);
+  const [homeFilter, setHomeFilter] = useState<HomeFilter>(defaultForumFilter);
+  const [itemVisitsLoaded, setItemVisitsLoaded] = useState(false);
   useScrollToTop(flatListRef);
   const modalHeadingRef        = useRef<Text | null>(null);
   const lastFocusedBeforeModal = useRef<View | null>(null);
@@ -331,22 +338,59 @@ export default function HomeScreen() {
     return Math.max(0, current - visit.commentCount);
   }
 
+  function getCommentCount(item: FeedItem): number {
+    return item.kind === 'topic'   ? item.data.replyCount :
+           item.kind === 'app'     ? item.data.reviewCount :
+           item.kind === 'blog'    ? item.data.commentCount :
+           item.kind === 'guide'   ? item.data.commentCount : 0;
+  }
+
+  function isNewActivity(item: FeedItem): boolean {
+    if (getNewCount(item) > 0) return true;
+    if (!lastVisitAt) return false;
+
+    const activityTime = new Date(item.activityAt).getTime();
+    const lastVisitTime = new Date(lastVisitAt).getTime();
+    if (!Number.isFinite(activityTime) || !Number.isFinite(lastVisitTime)) return false;
+    if (activityTime <= lastVisitTime) return false;
+
+    const visit = itemVisits[item.data.id];
+    if (!visit) return true;
+
+    const seenTime = new Date(visit.seenAt).getTime();
+    return !Number.isFinite(seenTime) || seenTime < activityTime;
+  }
+
+  const visibleItems = useMemo(
+    () => homeFilter === 'New'
+      ? feed.items.filter(isNewActivity)
+      : feed.items,
+    [feed.items, homeFilter, itemVisits, lastVisitAt],
+  );
+
+  const newItemsCount = useMemo(
+    () => feed.items.filter(isNewActivity).length,
+    [feed.items, itemVisits, lastVisitAt],
+  );
+
   const unreadCount   = useMemo(
     () => feed.items.filter(i => i.kind === 'topic' && i.data.isUnread).length,
     [feed.items],
   );
-  const latestWelcomeSummaryRef = useRef<WelcomeSummary | null>(null);
   const welcomeSummary = useMemo(
     () => welcomeSummaryEnabled && !welcomeDismissed
       ? buildWelcomeSummary(feed.items, lastVisitAt, itemVisits)
       : null,
     [feed.items, itemVisits, lastVisitAt, welcomeDismissed, welcomeSummaryEnabled],
   );
-  latestWelcomeSummaryRef.current = welcomeSummary;
 
   useEffect(() => {
-    feedItemsRef.current = feed.items;
-  }, [feed.items]);
+    feedItemsRef.current = visibleItems;
+  }, [visibleItems]);
+
+  useEffect(() => {
+    setHomeFilter(defaultForumFilter);
+  }, [defaultForumFilter]);
 
   useFocusEffect(useCallback(() => {
     showTip(TIP_KEYS.tabHome, TIPS.tabHome);
@@ -421,17 +465,11 @@ export default function HomeScreen() {
     focusFirstFeedItem(false);
   }, [itemVisits, focusFirstFeedItem]);
 
-  const focusWelcomeSummary = useCallback((): boolean => {
-    clearFirstItemFocusTimers();
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-    const handle = findNodeHandle(welcomeSummaryRef.current);
-    if (!handle) return false;
-    AccessibilityInfo.setAccessibilityFocus(handle);
-    return true;
-  }, [clearFirstItemFocusTimers]);
-
   useFocusEffect(useCallback(() => {
-    persistence.getAllItemVisits().then(setItemVisits);
+    setItemVisitsLoaded(false);
+    persistence.getAllItemVisits()
+      .then(setItemVisits)
+      .finally(() => setItemVisitsLoaded(true));
     const timers: ReturnType<typeof setTimeout>[] = [];
     timers.push(setTimeout(() => flatListRef.current?.flashScrollIndicators(), 350));
 
@@ -512,27 +550,41 @@ export default function HomeScreen() {
     return () => sub.remove();
   }, [feed.refresh]);
 
-  // On initial load: move VoiceOver focus to the welcome card (or first feed item if no card).
-  // latestWelcomeSummaryRef avoids keeping welcomeSummary in deps, which would cause React's
-  // cleanup to cancel the focus timer every time feed items finish loading.
+  // On initial load: speak a short welcome, then restore VoiceOver focus to
+  // the last visited feed item. The what's-new card stays available near the
+  // top, but no longer steals focus or auto-reads its longer summary.
   useEffect(() => {
-    if (!hasAnnouncedRef.current && lastVisitLoaded && !feed.loading && feed.items.length > 0) {
+    if (!hasAnnouncedRef.current && lastVisitLoaded && itemVisitsLoaded && !feed.loading && feed.items.length > 0) {
       hasAnnouncedRef.current = true;
       pendingFocusRestoreRef.current = false;
       lastTappedIdRef.current = null;
       setFeedLoadedAt(new Date());
-      if (latestWelcomeSummaryRef.current) {
-        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-        const t = setTimeout(() => {
-          if (!focusWelcomeSummary()) focusFirstFeedItem(false);
-        }, 350);
-        return () => clearTimeout(t);
-      } else {
-        focusFirstFeedItem(true);
-      }
+      clearFirstItemFocusTimers();
+      clearWelcomeAnnouncementTimers();
+
+      const welcomeText = lastVisitAt ? 'Welcome back to AppleVis.' : 'Welcome to AppleVis.';
+      AccessibilityInfo.announceForAccessibility(welcomeText);
+
+      const focusDelay = a11y.screenReaderEnabled ? 1200 : 350;
+      const t = setTimeout(() => {
+        focusLastVisitedFeedItem();
+      }, focusDelay);
+      welcomeAnnouncementTimersRef.current = [t];
+      return () => clearTimeout(t);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [feed.loading, feed.items.length, focusFirstFeedItem, focusWelcomeSummary, lastVisitLoaded, welcomeFocusToken]);
+  }, [
+    a11y.screenReaderEnabled,
+    clearFirstItemFocusTimers,
+    clearWelcomeAnnouncementTimers,
+    feed.loading,
+    feed.items.length,
+    focusLastVisitedFeedItem,
+    itemVisitsLoaded,
+    lastVisitAt,
+    lastVisitLoaded,
+    welcomeFocusToken,
+  ]);
 
   // After pull-to-refresh completes: move VoiceOver focus back to the first feed item.
   useEffect(() => {
@@ -584,6 +636,49 @@ export default function HomeScreen() {
     }
   }
 
+  function handleWelcomeSummaryPress() {
+    setWelcomeDismissed(true);
+    setTimeout(() => focusLastVisitedFeedItem(), 50);
+  }
+
+  async function handleMarkRead(item: FeedItem) {
+    const commentCount = getCommentCount(item);
+    await persistence.stampItemVisit(item.data.id, commentCount);
+    if (item.kind === 'topic') await persistence.markRead(item.data.id);
+    setItemVisits((prev) => ({
+      ...prev,
+      [item.data.id]: { seenAt: new Date().toISOString(), commentCount },
+    }));
+    AccessibilityInfo.announceForAccessibility('Marked as read.');
+  }
+
+  function handleMarkAllReadPress() {
+    const itemsToMark = visibleItems.filter(isNewActivity);
+    if (itemsToMark.length === 0) return;
+
+    showAlert({
+      title: 'Mark All as Read?',
+      message: `This will clear ${itemsToMark.length} item${itemsToMark.length === 1 ? '' : 's'} from the New view.`,
+      confirmLabel: 'Mark All as Read',
+      cancelLabel: 'Cancel',
+      type: 'warning',
+      onConfirm: async () => {
+        const now = new Date().toISOString();
+        const nextVisits: ItemVisits = {};
+
+        for (const item of itemsToMark) {
+          const commentCount = getCommentCount(item);
+          nextVisits[item.data.id] = { seenAt: now, commentCount };
+          await persistence.stampItemVisit(item.data.id, commentCount);
+          if (item.kind === 'topic') await persistence.markRead(item.data.id);
+        }
+
+        setItemVisits((prev) => ({ ...prev, ...nextVisits }));
+        AccessibilityInfo.announceForAccessibility('All new activity marked as read.');
+      },
+    });
+  }
+
   // Greeting card at the top
   const greeting = getGreeting();
   const name     = auth.isSignedIn ? (auth.user?.name ?? '') : '';
@@ -595,7 +690,7 @@ export default function HomeScreen() {
     const warnBg     = colorScheme === 'dark' ? 'rgba(255, 152, 0, 0.15)' : '#FFF8F0';
     const warnText   = colorScheme === 'dark' ? '#FFAB40' : '#C05000';
 
-    const kindCounts = feed.items.reduce<Partial<Record<FeedItem['kind'], number>>>((acc, item) => {
+    const kindCounts = visibleItems.reduce<Partial<Record<FeedItem['kind'], number>>>((acc, item) => {
       acc[item.kind] = (acc[item.kind] ?? 0) + 1;
       return acc;
     }, {});
@@ -609,8 +704,8 @@ export default function HomeScreen() {
     const updatedLabel = feedLoadedAt
       ? ` Last updated ${relativeTime(feedLoadedAt.toISOString())}.`
       : '';
-    const feedSummary = feed.items.length > 0
-      ? `${feed.items.length} item${feed.items.length !== 1 ? 's' : ''}: ${countParts.join(', ')}.${updatedLabel}`
+    const feedSummary = visibleItems.length > 0
+      ? `${visibleItems.length} item${visibleItems.length !== 1 ? 's' : ''}: ${countParts.join(', ')}.${updatedLabel}`
       : 'Feed is empty.';
 
     return (
@@ -659,7 +754,7 @@ export default function HomeScreen() {
           >
             <Pressable
               ref={welcomeSummaryRef}
-              onPress={focusLastVisitedFeedItem}
+              onPress={handleWelcomeSummaryPress}
               accessible
               accessibilityRole="button"
               accessibilityLabel={welcomeSummary.accessibilityLabel}
@@ -674,7 +769,7 @@ export default function HomeScreen() {
               <Ionicons name="sparkles-outline" size={19} color={colors.accent} accessibilityElementsHidden />
               <View style={{ flex: 1 }} accessibilityElementsHidden>
                 <Text style={{ fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 3 }}>
-                  Welcome Back
+                  What's New
                 </Text>
                 <Text style={{ fontSize: 15, lineHeight: 21, color: colors.text }}>
                   {welcomeSummary.message}
@@ -745,6 +840,20 @@ export default function HomeScreen() {
         )}
 
         {/* Section header */}
+        <FilterPicker
+          label="Home Feed"
+          value={homeFilter}
+          options={HOME_FILTERS}
+          onChange={(value) => {
+            setHomeFilter(value);
+            AccessibilityInfo.announceForAccessibility(
+              value === 'New'
+                ? `${newItemsCount} new activity item${newItemsCount === 1 ? '' : 's'}.`
+                : 'Showing all Home activity.',
+            );
+          }}
+        />
+
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, marginTop: 4 }}>
           <Text
             style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.textSecondary,
@@ -753,9 +862,29 @@ export default function HomeScreen() {
             accessibilityActions={[{ name: 'feedSummary', label: 'Feed summary' }]}
             onAccessibilityAction={() => AccessibilityInfo.announceForAccessibility(feedSummary)}
           >
-            Latest Activity
+            {homeFilter === 'New' ? 'New Activity' : 'Latest Activity'}
           </Text>
-          {feedLoadedAt && (
+          {homeFilter === 'New' && visibleItems.length > 0 ? (
+            <Pressable
+              onPress={handleMarkAllReadPress}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Mark all new activity as read"
+              accessibilityHint="Clears all items from the New view."
+              style={({ pressed }) => ({
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: colors.border,
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <Text style={{ color: colors.accent, fontSize: 12, fontWeight: '700' }}>
+                Mark All Read
+              </Text>
+            </Pressable>
+          ) : feedLoadedAt && (
             <Text style={{ fontSize: 11, color: colors.textSecondary }} accessibilityElementsHidden>
               Updated {relativeTime(feedLoadedAt.toISOString())}
             </Text>
@@ -773,7 +902,7 @@ export default function HomeScreen() {
         </View>
       );
     }
-    if (!feed.hasMore && feed.items.length > 0) {
+    if (!feed.hasMore && visibleItems.length > 0) {
       return (
         <Text style={{ textAlign: 'center', color: colors.textSecondary, fontSize: 13, paddingVertical: 20 }}
           accessible accessibilityLabel="You've reached the end."
@@ -824,10 +953,38 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Feed */}
-      {!feed.loading && feed.items.length > 0 && (
+      {!feed.loading && feed.items.length > 0 && visibleItems.length === 0 && (
         <FlatList
-          data={feed.items}
+          data={[] as FeedItem[]}
+          renderItem={() => null}
+          keyExtractor={(item) => `${item.kind}-${item.data.id}`}
+          accessibilityLabel="Activity feed"
+          ListHeaderComponent={renderHeader}
+          ListFooterComponent={() => (
+            <EmptyState
+              icon="checkmark-circle-outline"
+              title="No new activity"
+              subtitle="Anything you mark as read will stay out of this view until new activity arrives."
+            />
+          )}
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={feed.refreshing}
+              onRefresh={feed.refresh}
+              tintColor={colors.appleVisBlue}
+              accessibilityLabel="Pull to refresh"
+            />
+          }
+          ref={flatListRef}
+          showsVerticalScrollIndicator
+        />
+      )}
+
+      {/* Feed */}
+      {!feed.loading && visibleItems.length > 0 && (
+        <FlatList
+          data={visibleItems}
           keyExtractor={(item) => `${item.kind}-${item.data.id}`}
           accessibilityLabel="Activity feed"
           renderItem={({ item, index }) => {
@@ -837,6 +994,7 @@ export default function HomeScreen() {
                 item={item}
                 onPress={() => handleItemPress(item)}
                 newCount={getNewCount(item)}
+                onMarkRead={() => handleMarkRead(item)}
                 accentColor={KIND_ACCENT[item.kind as FeedItem['kind']]}
                 cardRef={(el) => {
                   itemRefs.current[key] = el;

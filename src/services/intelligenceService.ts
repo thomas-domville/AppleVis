@@ -169,6 +169,90 @@ export async function simplifyText(text: string): Promise<string | null> {
   );
 }
 
+export type DraftRewriteResult = {
+  subject?: string;
+  body: string;
+};
+
+async function cleanModelText(text: string | null): Promise<string | null> {
+  if (!text) return null;
+  const cleaned = text
+    .replace(/^```(?:text|json)?/i, '')
+    .replace(/```$/i, '')
+    .trim();
+  return cleaned || null;
+}
+
+export async function rewriteDraftFriendly({
+  subject,
+  body,
+  isTopic,
+}: {
+  subject?: string;
+  body: string;
+  isTopic: boolean;
+}): Promise<DraftRewriteResult | null> {
+  if (!isAppleIntelligenceAvailable()) return null;
+
+  const rewrittenBody = await cleanModelText(await runFoundationModel(
+    `Rewrite this AppleVis ${isTopic ? 'forum topic body' : 'comment'} so it is personable, friendly, clear, and respectful. ` +
+    `Preserve the author's meaning, facts, questions, and tone. Do not add new information. ` +
+    `Do not include labels, explanations, markdown fences, or quotation marks around the result.\n\n${body}`,
+  ));
+  if (!rewrittenBody) return null;
+
+  if (!isTopic || !subject?.trim()) return { body: rewrittenBody };
+
+  const rewrittenSubject = await cleanModelText(await runFoundationModel(
+    `Rewrite this AppleVis forum topic subject to be clear, friendly, and concise. ` +
+    `Keep it under 90 characters. Do not add new information. Return only the subject text.\n\n${subject}`,
+  ));
+
+  return {
+    subject: rewrittenSubject ?? subject,
+    body: rewrittenBody,
+  };
+}
+
+export async function translateDraftToEnglish({
+  subject,
+  body,
+  isTopic,
+}: {
+  subject?: string;
+  body: string;
+  isTopic: boolean;
+}): Promise<DraftRewriteResult | null> {
+  if (!isAppleIntelligenceAvailable()) return null;
+
+  const translatedBody = await cleanModelText(await runFoundationModel(
+    `Translate this AppleVis ${isTopic ? 'forum topic body' : 'comment'} into natural English. ` +
+    `Preserve the author's meaning, facts, questions, and intent. Do not add new information. ` +
+    `Return only the translated text.\n\n${body}`,
+  ));
+  if (!translatedBody) return null;
+
+  if (!isTopic || !subject?.trim()) return { body: translatedBody };
+
+  const translatedSubject = await cleanModelText(await runFoundationModel(
+    `Translate this AppleVis forum topic subject into natural English. ` +
+    `Keep it concise. Return only the translated subject text.\n\n${subject}`,
+  ));
+
+  return {
+    subject: translatedSubject ?? subject,
+    body: translatedBody,
+  };
+}
+
+export async function translateSearchQueryToEnglish(query: string): Promise<string | null> {
+  if (!isAppleIntelligenceAvailable()) return null;
+  return cleanModelText(await runFoundationModel(
+    `Translate this AppleVis search query into natural English. ` +
+    `Keep it short and search-friendly. Return only the translated query.\n\n${query.trim()}`,
+  ));
+}
+
 /**
  * Generates a personalised "What's new" digest summarising recent activity.
  * Returns null when Apple Intelligence is not available on the device.

@@ -12,7 +12,7 @@
 const JSONAPI = 'https://www.applevis.com/jsonapi';
 const PROBE_TIMEOUT_MS = 3000;
 
-export type ApiGroup = 'forums' | 'podcasts' | 'apps' | 'resources' | 'blogs';
+export type ApiGroup = 'forums' | 'podcasts' | 'apps' | 'resources' | 'blogs' | 'bugs';
 export type HealthStatus = 'unknown' | 'up' | 'down';
 
 const _status: Record<ApiGroup, HealthStatus> = {
@@ -21,6 +21,7 @@ const _status: Record<ApiGroup, HealthStatus> = {
   apps: 'unknown',
   resources: 'unknown',
   blogs: 'unknown',
+  bugs: 'unknown',
 };
 
 const PROBES: Record<ApiGroup, string> = {
@@ -29,6 +30,7 @@ const PROBES: Record<ApiGroup, string> = {
   apps:      '/node/ios_app_directory?page[limit]=1',
   resources: '/node/guides?page[limit]=1',
   blogs:     '/node/blog2?page[limit]=1',
+  bugs:      '/node/ios_bug_report?page[limit]=1',
 };
 
 export const apiHealth = {

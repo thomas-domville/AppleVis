@@ -24,6 +24,7 @@ import type {
   AppListing, AppDetail,
   Resource, ResourceDetail,
   BlogPost, BlogPostDetail,
+  BugReport, BugReportDetail,
   PaginatedResult,
 } from '../types/content';
 
@@ -120,8 +121,9 @@ export const cachedApi = {
   },
 
   podcasts: {
-    episodes(page = 0): Promise<CachedResult<PaginatedResult<PodcastEpisode>>> {
-      return fetchWithCache('podcasts', `podcasts:episodes:${page}`, () => api.podcasts.episodes(page));
+    episodes(page = 0, tagTid?: number): Promise<CachedResult<PaginatedResult<PodcastEpisode>>> {
+      const key = tagTid ? `podcasts:episodes:${page}:tag:${tagTid}` : `podcasts:episodes:${page}`;
+      return fetchWithCache('podcasts', key, () => api.podcasts.episodes(page, '-created', tagTid));
     },
 
     episode(id: string): Promise<CachedResult<PodcastEpisode>> {
@@ -144,8 +146,9 @@ export const cachedApi = {
   },
 
   resources: {
-    list(page = 0): Promise<CachedResult<PaginatedResult<Resource>>> {
-      return fetchWithCache('resources', `resources:list:${page}`, () => api.resources.list(page));
+    list(page = 0, categoryTids?: number[]): Promise<CachedResult<PaginatedResult<Resource>>> {
+      const categoryKey = categoryTids?.length ? `:categories:${categoryTids.join(',')}` : '';
+      return fetchWithCache('resources', `resources:list:${page}${categoryKey}`, () => api.resources.list(page, categoryTids));
     },
 
     detail(id: string): Promise<CachedResult<ResourceDetail>> {
@@ -163,6 +166,17 @@ export const cachedApi = {
     },
   },
 
+  bugs: {
+    list(platform: 'ios' | 'macos', filter: 'active' | 'all', page = 0): Promise<CachedResult<PaginatedResult<BugReport>>> {
+      const key = `bugs:list:${platform}:${filter}:${page}`;
+      return fetchWithCache('bugs', key, () => api.bugs.list(platform, filter, page));
+    },
+
+    detail(platform: 'ios' | 'macos', id: string): Promise<CachedResult<BugReportDetail>> {
+      return fetchWithCache('bugs', `bugs:detail:${platform}:${id}`, () => api.bugs.detail(platform, id));
+    },
+  },
+
   // Fire the first page of every content group simultaneously so the cache is
   // warm before the user navigates to each tab. Skipped on slow or no
   // connection — let user navigation drive those fetches instead.
@@ -176,6 +190,7 @@ export const cachedApi = {
       cachedApi.apps.list(0),
       cachedApi.resources.list(0),
       cachedApi.blogs.list(0),
+      cachedApi.bugs.list('ios', 'active', 0),
     ]);
   },
 };

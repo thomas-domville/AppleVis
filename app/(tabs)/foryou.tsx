@@ -20,7 +20,10 @@ import { useToast } from '../../src/contexts/ToastContext';
 import { useTip, TIP_KEYS, TIPS } from '../../src/contexts/ContextualTipContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { deleteAllDownloads } from '../../src/services/downloads';
-import type { PodcastEpisode, SavedItem } from '../../src/types/content';
+import { persistence } from '../../src/services/persistence';
+import { cachedApi } from '../../src/services/cachedApi';
+import { api } from '../../src/services/api';
+import type { FollowedItem, ForumTopic, PodcastEpisode, SavedItem } from '../../src/types/content';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -51,9 +54,29 @@ function kindLabel(kind: SavedItem['kind']): string {
   }
 }
 
+function openFollowedItem(router: ReturnType<typeof useRouter>, item: FollowedItem) {
+  switch (item.kind) {
+    case 'forumTopic':
+      router.push({ pathname: '/topic/[id]' as any, params: { id: item.id, title: item.title } });
+      break;
+    case 'podcastEpisode':
+      router.push({ pathname: '/episode/[id]' as any, params: { id: item.id, title: item.title } });
+      break;
+    case 'appListing':
+      router.push({ pathname: '/app-detail/[id]' as any, params: { id: item.id, name: item.title } });
+      break;
+    case 'resource':
+      router.push({ pathname: '/resource-detail/[id]' as any, params: { id: item.id, title: item.title, url: item.url ?? '' } });
+      break;
+    case 'blogPost':
+      router.push({ pathname: '/blog-detail/[id]' as any, params: { id: item.id, title: item.title, url: item.url ?? '' } });
+      break;
+  }
+}
+
 // ─── Tab constants ────────────────────────────────────────────────────────────
 
-const FOR_YOU_TABS = ['Queue', 'Downloads', 'Saved'] as const;
+const FOR_YOU_TABS = ['Queue', 'Downloads', 'Saved', 'Following'] as const;
 type ForYouTab = typeof FOR_YOU_TABS[number];
 
 type SavedFilter = 'All' | 'Topics' | 'Podcasts' | 'Apps' | 'Guides' | 'Blogs';
@@ -71,6 +94,7 @@ const SECTION_ACCENT: Record<ForYouTab, string> = {
   Queue:     '#f97316',
   Downloads: '#10b981',
   Saved:     '#6366f1',
+  Following: '#8b5cf6',
 };
 
 // ─── SavedItemCard ────────────────────────────────────────────────────────────
@@ -423,7 +447,7 @@ function DownloadsSection() {
               ].filter(Boolean).join('. ')}
               accessibilityHint="Double tap to open episode details."
               accessibilityActions={[
-                { name: 'play',   label: isCurrent && player.isPlaying ? 'Pause' : 'Play' },
+                { name: 'play',   label: isCurrent && player.isPlaying ? 'Stop' : 'Play' },
                 { name: 'queue',  label: isQueued ? 'Remove from queue' : 'Add to queue' },
                 { name: 'save',   label: isSaved ? 'Unsave' : 'Save' },
                 { name: 'remove', label: 'Remove download' },
@@ -671,7 +695,7 @@ function SavedSection() {
                   ].filter(Boolean).join('. ')}
                   accessibilityHint="Double tap to open episode details."
                   accessibilityActions={[
-                    { name: 'play',     label: player.episode?.id === item.id && player.isPlaying ? 'Pause' : 'Play' },
+                    { name: 'play',     label: player.episode?.id === item.id && player.isPlaying ? 'Stop' : 'Play' },
                     { name: 'queue',    label: isQueued ? 'Remove from queue' : 'Add to queue' },
                     { name: 'download', label: isDownloading ? 'Downloading…' : isDownloaded ? 'Remove download' : 'Download' },
                     { name: 'unsave',   label: 'Unsave episode' },
@@ -838,6 +862,186 @@ function SavedSection() {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
+function FollowingSection() {
+  const router              = useRouter();
+  const { colors, styles }  = useTheme();
+  const { showToast }       = useToast();
+  const [items, setItems] = useState<FollowedItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
+  const sectionCountRef       = useRef<Text | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const [storedItems, legacyIds] = await Promise.all([
+      persistence.getFollowedItems(),
+      persistence.getFollowedIds(),
+    ]);
+    const knownIds = new Set(storedItems.map((item) => item.id));
+    const legacyOnlyIds = Array.from(legacyIds).filter((id) => !knownIds.has(id));
+    let migratedItems: FollowedItem[] = [];
+
+    if (legacyOnlyIds.length > 0) {
+      const result = await cachedApi.forums.topicsById(legacyOnlyIds);
+      if (result.ok) {
+        migratedItems = result.data.items.map((topic) => ({
+          id: topic.id,
+          kind: 'forumTopic' as const,
+          nodeType: 'node--forum',
+          title: topic.title,
+          followedAt: new Date().toISOString(),
+          lastActivityAt: topic.lastActivityAt,
+          url: topic.url,
+        }));
+        for (const item of migratedItems) await persistence.followItem(item);
+      } else {
+        setError(result.error);
+      }
+    }
+
+    setItems([...storedItems, ...migratedItems].sort(
+      (a, b) => new Date(b.followedAt).getTime() - new Date(a.followedAt).getTime(),
+    ));
+    setLoading(false);
+  }, []);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  async function unfollow(item: FollowedItem) {
+    await persistence.unfollowItem(item.id);
+    setItems((prev) => prev.filter((followed) => followed.id !== item.id));
+    const token = await api.account.getSessionToken();
+    if (token) await api.follows.unfollow(item.id, token).catch(() => {});
+    showToast(`Unfollowed ${kindLabel(item.kind).toLowerCase()}.`, 'success');
+    setTimeout(() => {
+      const handle = findNodeHandle(sectionCountRef.current);
+      if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+    }, 250);
+  }
+
+  if (loading) {
+    return (
+      <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+        <ActivityIndicator size="large" color={colors.appleVisBlue} accessibilityLabel="Loading followed topics" />
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+        <Text
+          style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.textSecondary,
+            textTransform: 'uppercase', letterSpacing: 0.8 }}
+          accessibilityRole="header"
+          accessibilityActions={[{ name: 'summary', label: 'Following summary' }]}
+          onAccessibilityAction={() => AccessibilityInfo.announceForAccessibility(
+            items.length === 0
+              ? 'No followed items.'
+              : `${items.length} followed item${items.length !== 1 ? 's' : ''}.`,
+          )}
+        >
+          Followed Items
+        </Text>
+        <Text
+          ref={sectionCountRef}
+          style={{ fontSize: 12, color: colors.textSecondary }}
+          accessibilityLiveRegion="polite"
+          accessible
+          accessibilityLabel={`${items.length} followed item${items.length !== 1 ? 's' : ''}`}
+        >
+          {items.length} item{items.length !== 1 ? 's' : ''}
+        </Text>
+      </View>
+
+      {error && (
+        <View style={[styles.card, { backgroundColor: '#FFF0F0' }]}>
+          <Text style={[styles.cardTitle, { color: '#D00' }]}>Could not load followed topics</Text>
+          <Text style={styles.cardMeta}>{error}</Text>
+          <Pressable
+            onPress={load}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading followed topics"
+            style={{ marginTop: 12 }}
+          >
+            <Text style={{ color: colors.appleVisBlue, fontWeight: '700' }}>Retry</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {!error && items.length === 0 && (
+        <EmptyState
+          icon="notifications-outline"
+          title="Nothing followed yet"
+          subtitle="Follow topics, podcast episodes, apps, guides, and blogs to find them here quickly."
+        />
+      )}
+
+      {items.map((item) => (
+        <Pressable
+          key={item.id}
+          onPress={() => openFollowedItem(router, item)}
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={[
+            item.title,
+            kindLabel(item.kind),
+            'Following',
+          ].filter(Boolean).join('. ')}
+          accessibilityHint="Double tap to open. Use actions for more options."
+          accessibilityActions={[
+            { name: 'open', label: `Open ${kindLabel(item.kind)}` },
+            { name: 'unfollow', label: `Unfollow ${kindLabel(item.kind)}` },
+          ]}
+          onAccessibilityAction={({ nativeEvent }) => {
+            if (nativeEvent.actionName === 'open') {
+              openFollowedItem(router, item);
+            }
+            if (nativeEvent.actionName === 'unfollow') unfollow(item);
+          }}
+          style={({ pressed }) => [
+            styles.card,
+            { marginBottom: 10, borderLeftWidth: 3, borderLeftColor: '#8b5cf6', opacity: pressed ? 0.75 : 1 },
+          ]}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+            <Text style={{ flex: 1, fontSize: 16, fontWeight: '600', color: colors.text, lineHeight: 22 }} numberOfLines={2}>
+              {item.title}
+            </Text>
+            <Ionicons name="notifications" size={15} color="#8b5cf6" accessibilityElementsHidden style={{ marginTop: 2 }} />
+          </View>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: '#8b5cf6',
+            textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
+            Followed {kindLabel(item.kind)}
+          </Text>
+          <Text style={{ fontSize: 13, color: colors.textSecondary }}>
+            {[
+              kindLabel(item.kind),
+              item.lastActivityAt ? `Last activity ${relativeTime(item.lastActivityAt)}` : null,
+              item.followedAt ? `Followed ${relativeTime(item.followedAt)}` : null,
+            ].filter(Boolean).join(' · ')}
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+            <Pressable
+              onPress={() => unfollow(item)}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={`Unfollow ${kindLabel(item.kind).toLowerCase()}`}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+                backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}
+            >
+              <Ionicons name="notifications-off-outline" size={14} color="#FF3B30" accessibilityElementsHidden />
+              <Text style={{ color: '#FF3B30', fontWeight: '600', fontSize: 13 }}>Unfollow</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      ))}
+    </>
+  );
+}
+
 export default function ForYouScreen() {
   const [tab, setTab] = useState<ForYouTab>('Queue');
   const [refreshing, setRefreshing] = useState(false);
@@ -902,6 +1106,7 @@ export default function ForYouScreen() {
           {tab === 'Queue'     && <QueueSection />}
           {tab === 'Downloads' && <DownloadsSection />}
           {tab === 'Saved'     && <SavedSection />}
+          {tab === 'Following' && <FollowingSection />}
         </View>
       </ScrollView>
     </Screen>

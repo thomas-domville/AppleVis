@@ -1,14 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { persistence } from '../services/persistence';
+import { persistence, setPersistenceSyncPreferences } from '../services/persistence';
+import type { SyncPreferences } from '../services/persistence';
 
 export type AnnouncementLevel = 'simple' | 'normal' | 'all';
-export type DefaultForumFilter = 'Recent' | 'Since Last Visit' | 'Unread';
+export type DefaultForumFilter = 'All' | 'New';
 export type CardDensity = 'comfortable' | 'compact';
 export type PlaybackSpeed = 0.5 | 0.75 | 1.0 | 1.25 | 1.5 | 1.75 | 2.0 | 2.5 | 3.0;
 export type PodcastEQPreset = 'flat' | 'speech' | 'bassBoost' | 'trebleBoost';
 export type PodcastAutoDownload = 'off' | 'wifiOnly' | 'always';
-export type PodcastAutoDelete = 'off' | '1day' | '1week';
+export type PodcastAutoDelete = 'off' | 'immediate' | '1day' | '3days' | '7days';
 export type PodcastResumeRewind = 0 | 10 | 15 | 30;
 
 export type NotificationPrefs = {
@@ -44,6 +45,10 @@ const KEYS = {
   notificationPrefs:          '@applevis_notification_prefs',
   notificationSound:          '@applevis_notification_sound',
   nonEnglishDetectionEnabled: '@applevis_non_english_detection',
+  composeRewriteEnabled:      '@applevis_compose_rewrite_enabled',
+  composeTranslationEnabled:  '@applevis_compose_translation_enabled',
+  searchTranslationEnabled:   '@applevis_search_translation_enabled',
+  aiSummariesEnabled:         '@applevis_ai_summaries_enabled',
   podcastSpeed:               '@applevis_podcast_speed',
   podcastSkipBack:            '@applevis_podcast_skip_back',
   podcastSkipForward:         '@applevis_podcast_skip_forward',
@@ -55,6 +60,12 @@ const KEYS = {
   podcastAutoDelete:          '@applevis_podcast_auto_delete',
   podcastTrimSilence:         '@applevis_podcast_trim_silence',
   podcastResumeRewind:        '@applevis_podcast_resume_rewind',
+  iCloudSync:                 '@applevis_sync_icloud',
+  savedItemsSync:             '@applevis_sync_saved_items',
+  readingPositionSync:        '@applevis_sync_reading_position',
+  podcastPositionSync:        '@applevis_sync_podcast_position',
+  queueSync:                  '@applevis_sync_queue',
+  settingsSync:               '@applevis_sync_settings',
 };
 
 type PreferencesContextValue = {
@@ -83,6 +94,18 @@ type PreferencesContextValue = {
   setNonEnglishDetectionEnabled: (v: boolean) => void;
 
   // ── Podcast player defaults ────────────────────────────────────────────────
+  composeRewriteEnabled:    boolean;
+  setComposeRewriteEnabled: (v: boolean) => void;
+
+  composeTranslationEnabled:    boolean;
+  setComposeTranslationEnabled: (v: boolean) => void;
+
+  searchTranslationEnabled:    boolean;
+  setSearchTranslationEnabled: (v: boolean) => void;
+
+  aiSummariesEnabled:    boolean;
+  setAiSummariesEnabled: (v: boolean) => void;
+
   podcastSpeed:         PlaybackSpeed;
   setPodcastSpeed:      (v: PlaybackSpeed) => void;
 
@@ -116,6 +139,9 @@ type PreferencesContextValue = {
   podcastResumeRewind:    PodcastResumeRewind;
   setPodcastResumeRewind: (v: PodcastResumeRewind) => void;
 
+  syncPreferences:    SyncPreferences;
+  setSyncPreference:  (key: keyof SyncPreferences, value: boolean) => void;
+
   /** True while preferences are being loaded from storage. */
   isLoading: boolean;
 };
@@ -125,13 +151,17 @@ const PreferencesContext = createContext<PreferencesContextValue | null>(null);
 export function PreferencesProvider({ children }: { children: React.ReactNode }) {
   const [isLoading,           setIsLoading]               = useState(true);
   const [announcementLevel,   setAnnouncementLevelState]   = useState<AnnouncementLevel>('all');
-  const [defaultForumFilter,  setDefaultForumFilterState]  = useState<DefaultForumFilter>('Recent');
+  const [defaultForumFilter,  setDefaultForumFilterState]  = useState<DefaultForumFilter>('All');
   const [cardDensity,         setCardDensityState]         = useState<CardDensity>('comfortable');
   const [helpfulTipsEnabled,  setHelpfulTipsEnabledState]  = useState<boolean>(true);
   const [welcomeSummaryEnabled, setWelcomeSummaryEnabledState] = useState<boolean>(true);
   const [notificationPrefs,           setNotificationPrefsState]           = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
   const [notificationSound,           setNotificationSoundState]           = useState<NotificationSound>('mouseSqueak');
   const [nonEnglishDetectionEnabled,  setNonEnglishDetectionEnabledState]  = useState<boolean>(true);
+  const [composeRewriteEnabled,       setComposeRewriteEnabledState]       = useState<boolean>(true);
+  const [composeTranslationEnabled,   setComposeTranslationEnabledState]   = useState<boolean>(true);
+  const [searchTranslationEnabled,    setSearchTranslationEnabledState]    = useState<boolean>(true);
+  const [aiSummariesEnabled,          setAiSummariesEnabledState]          = useState<boolean>(true);
   const [podcastSpeed,        setPodcastSpeedState]        = useState<PlaybackSpeed>(1.0);
   const [podcastSkipBack,     setPodcastSkipBackState]     = useState<number>(15);
   const [podcastSkipForward,  setPodcastSkipForwardState]  = useState<number>(30);
@@ -143,6 +173,14 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const [podcastAutoDelete,   setPodcastAutoDeleteState]   = useState<PodcastAutoDelete>('off');
   const [podcastTrimSilence,    setPodcastTrimSilenceState]    = useState<boolean>(false);
   const [podcastResumeRewind,   setPodcastResumeRewindState]   = useState<PodcastResumeRewind>(15);
+  const [syncPreferences,       setSyncPreferencesState]        = useState<SyncPreferences>({
+    iCloudSync: true,
+    savedItemsSync: true,
+    readingPositionSync: true,
+    podcastPositionSync: true,
+    queueSync: true,
+    settingsSync: true,
+  });
 
   useEffect(() => {
     const uiLoads = Promise.all([
@@ -152,6 +190,10 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       AsyncStorage.getItem(KEYS.notificationPrefs),
       AsyncStorage.getItem(KEYS.notificationSound),
       AsyncStorage.getItem(KEYS.nonEnglishDetectionEnabled),
+      AsyncStorage.getItem(KEYS.composeRewriteEnabled),
+      AsyncStorage.getItem(KEYS.composeTranslationEnabled),
+      AsyncStorage.getItem(KEYS.searchTranslationEnabled),
+      AsyncStorage.getItem(KEYS.aiSummariesEnabled),
     ]);
 
     const podcastLoads = Promise.all([
@@ -170,15 +212,29 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       persistence.getSetting<boolean>(KEYS.welcomeSummaryEnabled, true),
     ]);
 
-    Promise.all([uiLoads, podcastLoads])
-      .then(([[level, filter, density, prefs, sound, nonEnglish],
-              [speed, skipB, skipF, autoPlay, sleep, vBoost, eq, autoDl, autoDel, trimSilence, resumeRewind, helpfulTips, welcomeSummary]]) => {
+    const syncLoads = Promise.all([
+      AsyncStorage.getItem(KEYS.iCloudSync),
+      AsyncStorage.getItem(KEYS.savedItemsSync),
+      AsyncStorage.getItem(KEYS.readingPositionSync),
+      AsyncStorage.getItem(KEYS.podcastPositionSync),
+      AsyncStorage.getItem(KEYS.queueSync),
+      AsyncStorage.getItem(KEYS.settingsSync),
+    ]);
+
+    Promise.all([uiLoads, podcastLoads, syncLoads])
+      .then(([[level, filter, density, prefs, sound, nonEnglish, composeRewrite, composeTranslation, searchTranslation, aiSummaries],
+              [speed, skipB, skipF, autoPlay, sleep, vBoost, eq, autoDl, autoDel, trimSilence, resumeRewind, helpfulTips, welcomeSummary],
+              [iCloudSync, savedItemsSync, readingPositionSync, podcastPositionSync, queueSync, settingsSync]]) => {
         if (level)      setAnnouncementLevelState(level as AnnouncementLevel);
-        if (filter)     setDefaultForumFilterState(filter as DefaultForumFilter);
+        if (filter === 'All' || filter === 'New') setDefaultForumFilterState(filter);
         if (density)    setCardDensityState(density as CardDensity);
         if (prefs)      setNotificationPrefsState(JSON.parse(prefs) as NotificationPrefs);
         if (sound)      setNotificationSoundState(sound as NotificationSound);
         if (nonEnglish) setNonEnglishDetectionEnabledState(nonEnglish === 'true');
+        if (composeRewrite)     setComposeRewriteEnabledState(composeRewrite === 'true');
+        if (composeTranslation) setComposeTranslationEnabledState(composeTranslation === 'true');
+        if (searchTranslation)  setSearchTranslationEnabledState(searchTranslation === 'true');
+        if (aiSummaries)        setAiSummariesEnabledState(aiSummaries === 'true');
 
         setPodcastSpeedState(speed);
         setPodcastSkipBackState(skipB);
@@ -188,14 +244,28 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
         setPodcastVoiceBoostState(vBoost);
         setPodcastEQState(eq);
         setPodcastAutoDownloadState(autoDl);
-        setPodcastAutoDeleteState(autoDel);
+        setPodcastAutoDeleteState((autoDel as PodcastAutoDelete | '1week') === '1week' ? '7days' : autoDel);
         setPodcastTrimSilenceState(trimSilence);
         setPodcastResumeRewindState(resumeRewind);
         setHelpfulTipsEnabledState(helpfulTips);
         setWelcomeSummaryEnabledState(welcomeSummary);
+        const nextSyncPreferences: SyncPreferences = {
+          iCloudSync: iCloudSync !== 'false',
+          savedItemsSync: savedItemsSync !== 'false',
+          readingPositionSync: readingPositionSync !== 'false',
+          podcastPositionSync: podcastPositionSync !== 'false',
+          queueSync: queueSync !== 'false',
+          settingsSync: settingsSync !== 'false',
+        };
+        setSyncPreferencesState(nextSyncPreferences);
+        setPersistenceSyncPreferences(nextSyncPreferences);
       })
       .finally(() => setIsLoading(false));
   }, []);
+
+  useEffect(() => {
+    setPersistenceSyncPreferences(syncPreferences);
+  }, [syncPreferences]);
 
   const setAnnouncementLevel = useCallback((v: AnnouncementLevel) => {
     setAnnouncementLevelState(v);
@@ -235,6 +305,26 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const setNonEnglishDetectionEnabled = useCallback((v: boolean) => {
     setNonEnglishDetectionEnabledState(v);
     AsyncStorage.setItem(KEYS.nonEnglishDetectionEnabled, String(v)).catch(() => {});
+  }, []);
+
+  const setComposeRewriteEnabled = useCallback((v: boolean) => {
+    setComposeRewriteEnabledState(v);
+    AsyncStorage.setItem(KEYS.composeRewriteEnabled, String(v)).catch(() => {});
+  }, []);
+
+  const setComposeTranslationEnabled = useCallback((v: boolean) => {
+    setComposeTranslationEnabledState(v);
+    AsyncStorage.setItem(KEYS.composeTranslationEnabled, String(v)).catch(() => {});
+  }, []);
+
+  const setSearchTranslationEnabled = useCallback((v: boolean) => {
+    setSearchTranslationEnabledState(v);
+    AsyncStorage.setItem(KEYS.searchTranslationEnabled, String(v)).catch(() => {});
+  }, []);
+
+  const setAiSummariesEnabled = useCallback((v: boolean) => {
+    setAiSummariesEnabledState(v);
+    AsyncStorage.setItem(KEYS.aiSummariesEnabled, String(v)).catch(() => {});
   }, []);
 
   const setPodcastSpeed = useCallback((v: PlaybackSpeed) => {
@@ -282,6 +372,29 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     persistence.setSetting(KEYS.podcastResumeRewind, v).catch(() => {});
   }, []);
 
+  const setSyncPreference = useCallback((key: keyof SyncPreferences, value: boolean) => {
+    setSyncPreferencesState((prev) => {
+      const next = { ...prev, [key]: value };
+      if (key === 'iCloudSync' && !value) {
+        next.savedItemsSync = false;
+        next.readingPositionSync = false;
+        next.podcastPositionSync = false;
+        next.queueSync = false;
+        next.settingsSync = false;
+      }
+      if (key !== 'iCloudSync' && value) next.iCloudSync = true;
+
+      AsyncStorage.setItem(KEYS.iCloudSync, String(next.iCloudSync)).catch(() => {});
+      AsyncStorage.setItem(KEYS.savedItemsSync, String(next.savedItemsSync)).catch(() => {});
+      AsyncStorage.setItem(KEYS.readingPositionSync, String(next.readingPositionSync)).catch(() => {});
+      AsyncStorage.setItem(KEYS.podcastPositionSync, String(next.podcastPositionSync)).catch(() => {});
+      AsyncStorage.setItem(KEYS.queueSync, String(next.queueSync)).catch(() => {});
+      AsyncStorage.setItem(KEYS.settingsSync, String(next.settingsSync)).catch(() => {});
+      setPersistenceSyncPreferences(next);
+      return next;
+    });
+  }, []);
+
   const value = useMemo<PreferencesContextValue>(() => ({
     announcementLevel,  setAnnouncementLevel,
     defaultForumFilter, setDefaultForumFilter,
@@ -291,6 +404,10 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     notificationPrefs,  setNotificationPrefs,
     notificationSound,  setNotificationSound,
     nonEnglishDetectionEnabled, setNonEnglishDetectionEnabled,
+    composeRewriteEnabled, setComposeRewriteEnabled,
+    composeTranslationEnabled, setComposeTranslationEnabled,
+    searchTranslationEnabled, setSearchTranslationEnabled,
+    aiSummariesEnabled, setAiSummariesEnabled,
     podcastSpeed,        setPodcastSpeed,
     podcastSkipBack,     setPodcastSkipBack,
     podcastSkipForward,  setPodcastSkipForward,
@@ -302,18 +419,22 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     podcastAutoDelete,    setPodcastAutoDelete,
     podcastTrimSilence,   setPodcastTrimSilence,
     podcastResumeRewind,  setPodcastResumeRewind,
+    syncPreferences,      setSyncPreference,
     isLoading,
   }), [
     announcementLevel, defaultForumFilter, cardDensity,
     helpfulTipsEnabled, welcomeSummaryEnabled, notificationPrefs, notificationSound, nonEnglishDetectionEnabled,
+    composeRewriteEnabled, composeTranslationEnabled, searchTranslationEnabled, aiSummariesEnabled,
     podcastSpeed, podcastSkipBack, podcastSkipForward, podcastAutoPlay,
     podcastSleepTimer, podcastVoiceBoost, podcastEQ, podcastAutoDownload, podcastAutoDelete, podcastTrimSilence,
+    syncPreferences,
     isLoading,
     setAnnouncementLevel, setDefaultForumFilter, setCardDensity, setHelpfulTipsEnabled, setWelcomeSummaryEnabled,
     setNotificationPrefs, setNotificationSound, setNonEnglishDetectionEnabled,
+    setComposeRewriteEnabled, setComposeTranslationEnabled, setSearchTranslationEnabled, setAiSummariesEnabled,
     setPodcastSpeed, setPodcastSkipBack, setPodcastSkipForward, setPodcastAutoPlay,
     setPodcastSleepTimer, setPodcastVoiceBoost, setPodcastEQ, setPodcastAutoDownload, setPodcastAutoDelete,
-    setPodcastTrimSilence, podcastResumeRewind, setPodcastResumeRewind,
+    setPodcastTrimSilence, podcastResumeRewind, setPodcastResumeRewind, setSyncPreference,
   ]);
 
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;

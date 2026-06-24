@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Modal, PanResponder, Pressable, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, Modal, PanResponder, Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { sounds } from '../services/sounds';
 
 type Props<T extends string> = {
   label: string;
@@ -36,6 +37,7 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
   const currentIdx = options.indexOf(value);
 
   function select(option: T) {
+    if (option !== value) sounds.pickerTick().catch(() => {});
     onChange(option);
     setOpen(false);
   }
@@ -44,6 +46,7 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
     const nextIdx = Math.max(0, Math.min(options.length - 1, currentIdx + delta));
     const next = options[nextIdx];
     if (next !== value) {
+      sounds.pickerTick().catch(() => {});
       onChange(next);
       AccessibilityInfo.announceForAccessibility(`${label}: ${next}`);
     }
@@ -135,39 +138,41 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
             {label}
           </Text>
 
-          {options.map((option) => {
-            const isSelected = option === value;
-            return (
-              <Pressable
-                key={option}
-                onPress={() => select(option)}
-                accessibilityRole="button"
-                accessibilityLabel={option}
-                accessibilityState={{ selected: isSelected }}
-                style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingHorizontal: 20,
-                  paddingVertical: 15,
-                  backgroundColor: pressed ? colors.inputBackground : 'transparent',
-                })}
-              >
-                <Text
-                  style={{
-                    fontSize: 17,
-                    color: isSelected ? colors.accent : colors.text,
-                    fontWeight: isSelected ? '600' : '400',
-                  }}
+          <ScrollView bounces={false} style={{ maxHeight: 420 }}>
+            {options.map((option) => {
+              const isSelected = option === value;
+              return (
+                <Pressable
+                  key={option}
+                  onPress={() => select(option)}
+                  accessibilityRole="button"
+                  accessibilityLabel={option}
+                  accessibilityState={{ selected: isSelected }}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingHorizontal: 20,
+                    paddingVertical: 15,
+                    backgroundColor: pressed ? colors.inputBackground : 'transparent',
+                  })}
                 >
-                  {option}
-                </Text>
-                {isSelected && (
-                  <Ionicons name="checkmark" size={20} color={colors.accent} accessibilityElementsHidden />
-                )}
-              </Pressable>
-            );
-          })}
+                  <Text
+                    style={{
+                      fontSize: 17,
+                      color: isSelected ? colors.accent : colors.text,
+                      fontWeight: isSelected ? '600' : '400',
+                    }}
+                  >
+                    {option}
+                  </Text>
+                  {isSelected && (
+                    <Ionicons name="checkmark" size={20} color={colors.accent} accessibilityElementsHidden />
+                  )}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         </Animated.View>
         </View>
       </Modal>

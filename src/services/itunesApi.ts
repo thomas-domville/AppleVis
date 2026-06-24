@@ -122,6 +122,56 @@ export async function fetchItunesMetadata(
   }
 }
 
+// ─── Search ───────────────────────────────────────────────────────────────────
+
+export type ItunesSearchHit = {
+  appStoreId:    string;
+  appName:       string;
+  developerName: string;
+  category:      string;
+  price:         string;
+  artworkUrl:    string;
+  appStoreUrl:   string;
+  bundleId:      string;
+};
+
+export type ItunesSearchEntity = 'software' | 'macSoftware' | 'tvSoftware';
+
+export async function searchItunesApps(
+  query: string,
+  entity: ItunesSearchEntity,
+  limit = 20,
+): Promise<ItunesSearchHit[] | null> {
+  if (!query.trim()) return [];
+  try {
+    const params = new URLSearchParams({
+      term: query.trim(),
+      entity,
+      limit: String(limit),
+      country: 'us',
+      lang: 'en_us',
+    });
+    const res = await fetch(
+      `https://itunes.apple.com/search?${params.toString()}`,
+      { headers: { Accept: 'application/json' } },
+    );
+    if (!res.ok) return null;
+    const json = await res.json() as { results?: Record<string, unknown>[] };
+    return (json.results ?? []).map((r) => ({
+      appStoreId:    String(r.trackId ?? ''),
+      appName:       (r.trackName  as string | undefined) ?? '',
+      developerName: (r.artistName as string | undefined) ?? '',
+      category:      (r.primaryGenreName as string | undefined) ?? '',
+      price:         (r.formattedPrice   as string | undefined) ?? (r.price === 0 ? 'Free' : `$${r.price}`),
+      artworkUrl:    (r.artworkUrl100    as string | undefined) ?? (r.artworkUrl60 as string | undefined) ?? '',
+      appStoreUrl:   (r.trackViewUrl     as string | undefined) ?? '',
+      bundleId:      (r.bundleId         as string | undefined) ?? '',
+    })).filter(h => h.appStoreId && h.appName);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Fetch other apps published by the same developer.
  * Uses the artistId (developer numeric ID) from a prior iTunes lookup.

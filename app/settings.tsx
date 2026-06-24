@@ -1,9 +1,10 @@
-import { useRef } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { AccessibilityInfo, findNodeHandle, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../src/components/Screen';
 import { useTheme } from '../src/contexts/ThemeContext';
+import { useAccessibilityPreferences } from '../src/hooks/useAccessibilityPreferences';
 import { useFocusRestore } from '../src/hooks/useFocusRestore';
 import { SETTINGS_SECTIONS } from '../src/data/settingsData';
 
@@ -12,9 +13,10 @@ function settingsSummary(sectionId: string, itemCount: number): string {
     case 'appearance': return 'Themes and layout density';
     case 'accessibility': return 'VoiceOver and low vision controls';
     case 'notifications': return 'Alerts, sounds, and activity';
-    case 'forums': return 'Forum reading preferences';
+    case 'forums': return 'Home feed filter defaults';
     case 'podcasts': return 'Playback and download defaults';
-    case 'privacy': return 'Sync, storage, and privacy';
+    case 'savedSync': return 'Saved items and iCloud sync';
+    case 'privacy': return 'Privacy and data handling';
     case 'help': return 'Guides and support';
     default: return `${itemCount} settings`;
   }
@@ -33,12 +35,53 @@ function sectionAccent(sectionId: string): string {
   }
 }
 
+function countByStatus(section: (typeof SETTINGS_SECTIONS)[number]) {
+  return section.items.reduce(
+    (counts, item) => {
+      const status = item.status ?? 'live';
+      counts[status] += 1;
+      return counts;
+    },
+    { live: 0, coming: 0, ios: 0 },
+  );
+}
+
+function sectionStatusLabel(section: (typeof SETTINGS_SECTIONS)[number]): string {
+  const counts = countByStatus(section);
+  const parts = [
+    counts.live ? `${counts.live} live` : null,
+    counts.ios ? `${counts.ios} iOS` : null,
+    counts.coming ? `${counts.coming} coming soon` : null,
+  ].filter(Boolean);
+  return parts.join(', ');
+}
+
 export default function Settings() {
   const router             = useRouter();
   const { colors, styles } = useTheme();
+  const a11y               = useAccessibilityPreferences();
   const { save }           = useFocusRestore();
   const sectionRefs        = useRef<Map<string, View>>(new Map());
+  const firstHeadingRef    = useRef<Text | null>(null);
+  const didFocusFirstHeadingRef = useRef(false);
   const visibleSections    = SETTINGS_SECTIONS.filter((section) => section.id !== 'account');
+  const totalSettings      = visibleSections.reduce((total, section) => total + section.items.length, 0) + 1;
+  const settingsSummaryText = `${visibleSections.length + 1} sections and ${totalSettings} settings areas. Appearance, accessibility, notifications, forums, podcasts, privacy, help, and storage. Account tools are in Profile.`;
+
+  useEffect(() => {
+    const timers = [350, 700, 1100].map((delay) =>
+      setTimeout(() => {
+        if (didFocusFirstHeadingRef.current) return;
+        const handle = findNodeHandle(firstHeadingRef.current);
+        if (handle) {
+          didFocusFirstHeadingRef.current = true;
+          AccessibilityInfo.setAccessibilityFocus(handle);
+        }
+      }, delay),
+    );
+
+    return () => timers.forEach(clearTimeout);
+  }, []);
 
   return (
     <Screen title="Settings" showSettings={false}>
@@ -48,11 +91,15 @@ export default function Settings() {
             marginBottom: 14,
             borderLeftWidth: 4,
             borderLeftColor: colors.accent,
+            overflow: 'hidden',
           }]}
-          accessible
-          accessibilityRole="text"
-          accessibilityLabel={`Settings. ${visibleSections.length + 1} sections. Appearance, accessibility, notifications, forums, podcasts, privacy, help, and storage. Account tools are in Profile.`}
         >
+          {!a11y.reduceTransparency && (
+            <View
+              style={{ ...StyleSheet.absoluteFillObject, backgroundColor: colors.accent, opacity: 0.06 }}
+              pointerEvents="none"
+            />
+          )}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <View
               style={{
@@ -68,7 +115,17 @@ export default function Settings() {
               <Ionicons name="options-outline" size={24} color={colors.accent} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.cardTitle} accessibilityRole="header">
+              <Text
+                ref={firstHeadingRef}
+                style={styles.cardTitle}
+                accessibilityRole="header"
+                accessibilityActions={[{ name: 'readSettingsSummary', label: 'Read Settings Summary' }]}
+                onAccessibilityAction={(event) => {
+                  if (event.nativeEvent.actionName === 'readSettingsSummary') {
+                    AccessibilityInfo.announceForAccessibility(`Settings. ${settingsSummaryText}`);
+                  }
+                }}
+              >
                 Settings Center
               </Text>
               <Text style={[styles.cardMeta, { lineHeight: 20 }]}>
@@ -81,8 +138,51 @@ export default function Settings() {
           </View>
         </View>
 
+        <Pressable
+          onPress={() => router.push('/profile' as any)}
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel="Account tools are in Profile"
+          accessibilityHint="Opens Profile for sign in, account settings, saved items, and app information."
+          style={({ pressed }) => [styles.cardSmall, {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            borderLeftWidth: 3,
+            borderLeftColor: colors.border,
+          }, pressed && { opacity: 0.85 }]}
+        >
+          <View
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 9,
+              backgroundColor: colors.pill,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            accessibilityElementsHidden
+          >
+            <Ionicons name="person-circle-outline" size={19} color={colors.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>Account tools are in Profile</Text>
+            <Text style={[styles.cardMeta, { marginTop: 1 }]}>Sign in, saved items, support info, and credits</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} accessibilityElementsHidden />
+        </Pressable>
+
+        <Text
+          style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
+            textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 10, marginBottom: 8 }}
+          accessibilityRole="header"
+        >
+          Settings Sections
+        </Text>
+
         {visibleSections.map((section) => {
           const accent = sectionAccent(section.id);
+          const statusLabel = sectionStatusLabel(section);
           return (
           <Pressable
             key={section.id}
@@ -98,6 +198,8 @@ export default function Settings() {
                 notifications: '/settings-notifications',
                 forums:        '/settings-forums',
                 podcasts:      '/settings-podcast',
+                savedSync:     '/settings-saved-sync',
+                privacy:       '/settings-privacy',
                 help:          '/help',
               };
               const route = directRoutes[section.id];
@@ -109,13 +211,20 @@ export default function Settings() {
             }}
             accessible
             accessibilityRole="button"
-            accessibilityLabel={`${section.title}. ${settingsSummary(section.id, section.items.length)}. ${section.items.length} ${section.items.length === 1 ? 'setting' : 'settings'}. ${section.description}`}
+            accessibilityLabel={`${section.title}. ${settingsSummary(section.id, section.items.length)}. ${statusLabel}. ${section.description}`}
             accessibilityHint="Opens this settings section."
             style={({ pressed }) => [styles.card, {
               borderLeftWidth: 4,
               borderLeftColor: accent,
+              overflow: 'hidden',
             }, pressed && { opacity: 0.85 }]}
           >
+            {!a11y.reduceTransparency && (
+              <View
+                style={{ ...StyleSheet.absoluteFillObject, backgroundColor: accent, opacity: 0.04 }}
+                pointerEvents="none"
+              />
+            )}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <View
                 style={{
@@ -135,18 +244,22 @@ export default function Settings() {
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <Text style={styles.cardTitle}>{section.title}</Text>
-                  <View style={{
+                  <View
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
+                    style={{
                     backgroundColor: `${accent}22`,
                     borderRadius: 6,
                     paddingHorizontal: 7,
                     paddingVertical: 2,
                   }}>
                     <Text style={{ color: accent, fontSize: 11, fontWeight: '800' }}>
-                      {section.items.length}
+                      {section.items.length} Settings
                     </Text>
                   </View>
                 </View>
                 <Text style={[styles.cardMeta, { marginTop: 2 }]}>{settingsSummary(section.id, section.items.length)}</Text>
+                <Text style={[styles.cardMeta, { marginTop: 2, fontSize: 13 }]}>{statusLabel}</Text>
                 <Text style={[styles.cardMeta, { marginTop: 3, lineHeight: 19 }]}>{section.description}</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} accessibilityElementsHidden />
@@ -166,8 +279,15 @@ export default function Settings() {
             marginTop: 8,
             borderLeftWidth: 4,
             borderLeftColor: '#8E8E93',
+            overflow: 'hidden',
           }, pressed && { opacity: 0.85 }]}
         >
+          {!a11y.reduceTransparency && (
+            <View
+              style={{ ...StyleSheet.absoluteFillObject, backgroundColor: '#8E8E93', opacity: 0.05 }}
+              pointerEvents="none"
+            />
+          )}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <View
               style={{

@@ -17,7 +17,8 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { useAlert } from '../../src/contexts/AccessibleAlertContext';
 import { ALERTS } from '../../src/data/alertMessages';
-import { donateSiriActivity, readAloud, summariseText, simplifyText } from '../../src/services/intelligenceService';
+import { usePreferences } from '../../src/contexts/PreferencesContext';
+import { donateSiriActivity, isAppleIntelligenceAvailable, readAloud, summariseText, simplifyText } from '../../src/services/intelligenceService';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 
@@ -30,6 +31,8 @@ export default function Forums() {
   const saved = useSavedItems('forumTopic');
   const { showToast } = useToast();
   const { showAlert } = useAlert();
+  const { aiSummariesEnabled } = usePreferences();
+  const aiAvailable = aiSummariesEnabled && isAppleIntelligenceAvailable();
   const topicRefs = useRef<Map<string, View>>(new Map());
   const { save }  = useFocusRestore();
 
@@ -247,8 +250,7 @@ export default function Forums() {
                 : 'Sign in to Follow',
               'Mark as Read',
               ...(!screenReaderEnabled ? ['Read Aloud'] : []),
-              'Summarise',
-              'Simplify',
+              ...(aiAvailable ? ['Summarise', 'Simplify'] : []),
               'Share',
             ]}
             onAction={(action) => handleAction(topic.id, topic.title, action)}

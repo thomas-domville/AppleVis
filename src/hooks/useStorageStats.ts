@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { contentCache } from '../services/contentCache';
 import { getDownloadedSize } from '../services/downloads';
+import { persistence } from '../services/persistence';
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -13,6 +14,8 @@ function formatBytes(bytes: number): string {
 export type StorageStats = {
   downloadsBytes: number;
   cacheBytes: number;
+  downloadCount: number;
+  cacheCount: number;
   formattedDownloads: string;
   formattedCache: string;
   formattedTotal: string;
@@ -23,16 +26,22 @@ export type StorageStats = {
 export function useStorageStats(): StorageStats {
   const [downloadsBytes, setDownloadsBytes] = useState(0);
   const [cacheBytes, setCacheBytes] = useState(0);
+  const [downloadCount, setDownloadCount] = useState(0);
+  const [cacheCount, setCacheCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
-    const [dl, cache] = await Promise.all([
+    const [dl, cache, downloads, cacheEntries] = await Promise.all([
       getDownloadedSize(),
       contentCache.getByteSize(),
+      persistence.getDownloadedEpisodes(),
+      contentCache.count(),
     ]);
     setDownloadsBytes(dl);
     setCacheBytes(cache);
+    setDownloadCount(Object.keys(downloads).length);
+    setCacheCount(cacheEntries);
     setIsLoading(false);
   }, []);
 
@@ -41,6 +50,8 @@ export function useStorageStats(): StorageStats {
   return {
     downloadsBytes,
     cacheBytes,
+    downloadCount,
+    cacheCount,
     formattedDownloads: formatBytes(downloadsBytes),
     formattedCache: formatBytes(cacheBytes),
     formattedTotal: formatBytes(downloadsBytes + cacheBytes),

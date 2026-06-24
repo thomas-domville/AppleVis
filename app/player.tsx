@@ -55,7 +55,7 @@ export default function PlayerScreen() {
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.background }}
-      onMagicTap={onMagicTap}
+      onAccessibilityTap={onMagicTap}
       onAccessibilityEscape={() => router.back()}
     >
 

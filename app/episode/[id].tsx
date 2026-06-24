@@ -805,11 +805,17 @@ export default function EpisodeDetail() {
   const player  = usePlayer();
   const auth    = useAuth();
   const { colors, styles } = useTheme();
-  const { podcastTrimSilence, setPodcastTrimSilence, podcastVoiceBoost, setPodcastVoiceBoost } = usePreferences();
+  const {
+    podcastTrimSilence,
+    setPodcastTrimSilence,
+    podcastVoiceBoost,
+    setPodcastVoiceBoost,
+    aiSummariesEnabled,
+  } = usePreferences();
   const { showToast } = useToast();
   const { showAlert } = useAlert();
   const { showTip }   = useTip();
-  const aiAvailable = isAppleIntelligenceAvailable();
+  const aiAvailable = aiSummariesEnabled && isAppleIntelligenceAvailable();
   const insets = useSafeAreaInsets();
   const { screenReaderEnabled, reduceMotion, reduceTransparency } = useAccessibilityPreferences();
 
@@ -1311,8 +1317,8 @@ export default function EpisodeDetail() {
 
   return (
     <Screen title="Episode" showSettings={false} titleAccessible={false}>
-      {/* onMagicTap lets VoiceOver two-finger double tap play/pause anywhere */}
-      <View onMagicTap={handlePlayPause} style={{ flex: 1 }}>
+      {/* VoiceOver magic tap lets a two-finger double tap play or pause anywhere. */}
+      <View onAccessibilityTap={handlePlayPause} style={{ flex: 1 }}>
         {/* Reading progress bar — purely visual, hidden from VoiceOver/braille */}
         <View
           style={{ height: 5, backgroundColor: colors.border }}

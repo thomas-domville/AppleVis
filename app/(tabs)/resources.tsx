@@ -11,7 +11,8 @@ import { useRefreshFeedback } from '../../src/hooks/useRefreshFeedback';
 import { useFocusRestore } from '../../src/hooks/useFocusRestore';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
-import { readAloud, summariseText, simplifyText } from '../../src/services/intelligenceService';
+import { usePreferences } from '../../src/contexts/PreferencesContext';
+import { isAppleIntelligenceAvailable, readAloud, summariseText, simplifyText } from '../../src/services/intelligenceService';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 
@@ -21,6 +22,8 @@ export default function Resources() {
   const { screenReaderEnabled } = useAccessibilityPreferences();
   const list               = useResourceList();
   const { showToast }      = useToast();
+  const { aiSummariesEnabled } = usePreferences();
+  const aiAvailable        = aiSummariesEnabled && isAppleIntelligenceAvailable();
   const resourceRefs       = useRef<Map<string, View>>(new Map());
   const { save }           = useFocusRestore();
 
@@ -126,7 +129,14 @@ export default function Resources() {
             }}
             title={item.title}
             meta={[item.kind, `Updated ${new Date(item.updatedAt).toLocaleDateString()}`].join(' · ')}
-            actions={['Open', 'Save', ...(!screenReaderEnabled ? ['Read Aloud'] : []), 'Summarise', 'Simplify', 'Share', 'Copy Link']}
+            actions={[
+              'Open',
+              'Save',
+              ...(!screenReaderEnabled ? ['Read Aloud'] : []),
+              ...(aiAvailable ? ['Summarise', 'Simplify'] : []),
+              'Share',
+              'Copy Link',
+            ]}
             onAction={(action) => {
               if (action === 'Open') {
                 save(resourceRefs.current.get(item.id) ?? null);

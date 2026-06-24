@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo, ActivityIndicator, Linking, Pressable,
   RefreshControl, ScrollView, Share, Text, TextInput, View,
@@ -16,6 +16,7 @@ import { useRefreshFeedback } from '../../src/hooks/useRefreshFeedback';
 import { useFocusRestore } from '../../src/hooks/useFocusRestore';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
+import { usePreferences } from '../../src/contexts/PreferencesContext';
 import {
   donateSiriActivity, readAloud,
   summariseText, simplifyText, accessibilityConsensus,
@@ -23,6 +24,8 @@ import {
 } from '../../src/services/intelligenceService';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
+import { persistence } from '../../src/services/persistence';
+import { api } from '../../src/services/api';
 
 // ─── Filter ───────────────────────────────────────────────────────────────────
 
@@ -72,14 +75,22 @@ export default function Apps() {
   const list                    = useAppList();
   const saved                   = useSavedItems('appListing');
   const { showToast }           = useToast();
+  const { aiSummariesEnabled }  = usePreferences();
   const appRefs                 = useRef<Map<string, View>>(new Map());
   const { save: saveFocus }     = useFocusRestore();
-  const aiAvailable             = isAppleIntelligenceAvailable();
+  const aiAvailable             = aiSummariesEnabled && isAppleIntelligenceAvailable();
 
   const [filter, setFilter]               = useState<AppFilter>('Latest');
   const [searchQuery, setSearchQuery]     = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>('iOS');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [followedIds, setFollowedIds]     = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    persistence.getFollowedItems()
+      .then((items) => setFollowedIds(new Set(items.filter((item) => item.kind === 'appListing').map((item) => item.id))))
+      .catch(() => {});
+  }, []);
 
   // ── Derived lists ─────────────────────────────────────────────────────────
 
@@ -115,11 +126,13 @@ export default function Apps() {
 
   function buildActions(app: { id: string; appStoreUrl: string }) {
     const isSaved     = saved.isSaved(app.id);
+    const isFollowing = followedIds.has(app.id);
     const hasStoreUrl = !!app.appStoreUrl;
     return [
       'Open App Page',
       ...(hasStoreUrl ? ['Open in App Store'] : []),
       isSaved ? 'Unsave App' : 'Save App',
+      isFollowing ? 'Unfollow App' : 'Follow App',
       ...(!screenReaderEnabled ? ['Read Aloud'] : []),
       'Share',
       ...(aiAvailable ? ['Summarise Reviews', 'Accessibility Consensus', 'Simplify'] : []),
@@ -127,7 +140,7 @@ export default function Apps() {
   }
 
   function handleAction(action: string, app: {
-    id: string; name: string; summary: string; appStoreUrl: string;
+    id: string; name: string; summary: string; appStoreUrl: string; lastUpdatedAt: string; url?: string;
   }) {
     if (action === 'Open App Page') {
       saveFocus(appRefs.current.get(app.id) ?? null);
@@ -141,6 +154,32 @@ export default function Apps() {
     } else if (action === 'Unsave App') {
       saved.unsave(app.id);
       showToast('App unsaved.', 'success');
+    } else if (action === 'Follow App') {
+      persistence.followItem({
+        id: app.id,
+        kind: 'appListing',
+        nodeType: 'node--ios_app_directory',
+        title: app.name,
+        followedAt: new Date().toISOString(),
+        lastActivityAt: app.lastUpdatedAt,
+        url: app.url,
+      }).then(async () => {
+        setFollowedIds((prev) => new Set([...prev, app.id]));
+        const token = await api.account.getSessionToken();
+        if (token) {
+          const res = await api.follows.follow(app.id, 'node--ios_app_directory', token);
+          showToast(res.ok ? 'Following app.' : 'Following saved. Server sync is waiting for AppleVis support.', res.ok ? 'success' : 'warning');
+        } else {
+          showToast('Following saved locally. Sign in again to sync with AppleVis.', 'warning');
+        }
+      });
+    } else if (action === 'Unfollow App') {
+      persistence.unfollowItem(app.id).then(async () => {
+        setFollowedIds((prev) => { const next = new Set(prev); next.delete(app.id); return next; });
+        const token = await api.account.getSessionToken();
+        if (token) await api.follows.unfollow(app.id, token).catch(() => {});
+        showToast('Unfollowed app.', 'success');
+      });
     } else if (action === 'Read Aloud') {
       readAloud([app.name, app.summary].filter(Boolean).join('. '));
     } else if (action === 'Share') {

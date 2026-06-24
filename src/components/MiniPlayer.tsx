@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { usePlayer } from '../contexts/PlayerContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -17,12 +17,14 @@ const barBg   = '#48484A';
 export function MiniPlayer() {
   const player             = usePlayer();
   const insets             = useSafeAreaInsets();
+  const pathname           = usePathname();
   const { colors, isDark, themeId } = useTheme();
   const reduceTransparency = useReduceTransparency();
 
   if (!player.episode) return null;
 
-  const bottomOffset   = TAB_BAR_HEIGHT + insets.bottom;
+  const tabVisible     = pathname === '/' || pathname === '/discover' || pathname === '/foryou';
+  const bottomOffset   = (tabVisible ? TAB_BAR_HEIGHT : 0) + insets.bottom;
   const progress       = player.duration > 0 ? player.position / player.duration : 0;
   const isHighContrast = themeId === 'highContrastLight' || themeId === 'highContrastDark';
   const useGlass       = !reduceTransparency && !isHighContrast;

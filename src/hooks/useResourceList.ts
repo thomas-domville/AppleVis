@@ -3,7 +3,7 @@ import { cachedApi } from '../services/cachedApi';
 import { apiHealth } from '../services/apiHealth';
 import type { Resource } from '../types/content';
 
-export function useResourceList() {
+export function useResourceList(categoryTids?: number[]) {
   const [resources, setResources]         = useState<Resource[]>([]);
   const [loading, setLoading]             = useState(true);
   const [refreshing, setRefreshing]       = useState(false);
@@ -24,7 +24,7 @@ export function useResourceList() {
       setHasMore(false);
     }
 
-    const result = await cachedApi.resources.list(0);
+    const result = await cachedApi.resources.list(0, categoryTids);
 
     if (result.ok) {
       setResources(result.data.items);
@@ -40,20 +40,20 @@ export function useResourceList() {
 
     if (background) setRefreshing(false);
     else setLoading(false);
-  }, []);
+  }, [categoryTids]);
 
   const loadMore = useCallback(async () => {
     if (!hasMore || isLoadingMore) return;
     setIsLoadingMore(true);
     const nextPage = page + 1;
-    const result = await cachedApi.resources.list(nextPage);
+    const result = await cachedApi.resources.list(nextPage, categoryTids);
     if (result.ok) {
       setResources((prev) => [...prev, ...result.data.items]);
       setHasMore(result.data.hasMore);
       setPage(nextPage);
     }
     setIsLoadingMore(false);
-  }, [hasMore, isLoadingMore, page]);
+  }, [hasMore, isLoadingMore, page, categoryTids]);
 
   // Pull-to-refresh: keep existing resources visible while fetching fresh content.
   const refresh = useCallback(async () => {

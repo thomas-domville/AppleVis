@@ -13,8 +13,32 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { icloudStorage } from './icloudStorage';
-import type { SavedItem, PodcastEpisode, Chapter } from '../types/content';
+import type { SavedItem, PodcastEpisode, Chapter, FollowedItem } from '../types/content';
 import type { PlaybackSpeed } from '../hooks/usePodcastPlayer';
+
+export type SyncPreferences = {
+  iCloudSync: boolean;
+  savedItemsSync: boolean;
+  readingPositionSync: boolean;
+  podcastPositionSync: boolean;
+  queueSync: boolean;
+  settingsSync: boolean;
+};
+
+const DEFAULT_SYNC_PREFS: SyncPreferences = {
+  iCloudSync: true,
+  savedItemsSync: true,
+  readingPositionSync: true,
+  podcastPositionSync: true,
+  queueSync: true,
+  settingsSync: true,
+};
+
+let syncPrefs: SyncPreferences = DEFAULT_SYNC_PREFS;
+
+export function setPersistenceSyncPreferences(next: SyncPreferences): void {
+  syncPrefs = next;
+}
 
 export type PlayHistoryEntry = {
   id: string;
@@ -29,6 +53,7 @@ export type PlayHistoryEntry = {
 const CK = {
   SAVED_ITEMS:    'applevis:savedItems',
   FOLLOWED_IDS:   'applevis:followedIds',
+  FOLLOWED_ITEMS: 'applevis:followedItems',
   READ_IDS:       'applevis:readIds',
   POD_POSITIONS:  'applevis:podcastPositions',
   SETTINGS:       'applevis:settings',
@@ -62,76 +87,155 @@ async function localSet<T>(key: string, value: T): Promise<void> {
   try { await AsyncStorage.setItem(key, JSON.stringify(value)); } catch (_e) { /* non-critical */ }
 }
 
+function localCloudKey(key: string): string {
+  return `applevis:local:${key}`;
+}
+
+function syncEnabled(area: keyof Omit<SyncPreferences, 'iCloudSync'>): boolean {
+  return syncPrefs.iCloudSync && syncPrefs[area];
+}
+
+async function getStoredJSON<T>(enabled: boolean, key: string, fallback: T): Promise<T> {
+  return enabled ? icloudStorage.getJSON<T>(key, fallback) : localGet<T>(localCloudKey(key), fallback);
+}
+
+async function setStoredJSON<T>(enabled: boolean, key: string, value: T): Promise<void> {
+  return enabled ? icloudStorage.setJSON(key, value) : localSet(localCloudKey(key), value);
+}
+
+async function getStoredString(enabled: boolean, key: string, fallback = ''): Promise<string> {
+  if (enabled) return icloudStorage.getString(key, fallback);
+  const value = await AsyncStorage.getItem(localCloudKey(key)).catch(() => null);
+  return value ?? fallback;
+}
+
+async function setStoredString(enabled: boolean, key: string, value: string): Promise<void> {
+  if (enabled) return icloudStorage.setString(key, value);
+  await AsyncStorage.setItem(localCloudKey(key), value).catch(() => {});
+}
+
+async function getStoredSet(enabled: boolean, key: string): Promise<Set<string>> {
+  const arr = await getStoredJSON<string[]>(enabled, key, []);
+  return new Set(arr);
+}
+
+async function addToStoredSet(enabled: boolean, key: string, id: string): Promise<void> {
+  const s = await getStoredSet(enabled, key);
+  s.add(id);
+  await setStoredJSON(enabled, key, Array.from(s));
+}
+
+async function removeFromStoredSet(enabled: boolean, key: string, id: string): Promise<void> {
+  const s = await getStoredSet(enabled, key);
+  s.delete(id);
+  await setStoredJSON(enabled, key, Array.from(s));
+}
+
+async function isInStoredSet(enabled: boolean, key: string, id: string): Promise<boolean> {
+  const s = await getStoredSet(enabled, key);
+  return s.has(id);
+}
+
 export const persistence = {
 
   // ── Saved items (iCloud) ──────────────────────────────────────────────────
 
-  getSavedItems: () => icloudStorage.getJSON<SavedItem[]>(CK.SAVED_ITEMS, []),
+  getSavedItems: () => getStoredJSON<SavedItem[]>(syncEnabled('savedItemsSync'), CK.SAVED_ITEMS, []),
 
   async saveItem(item: SavedItem): Promise<SavedItem[]> {
     const existing = await persistence.getSavedItems();
     const updated = existing.some((s) => s.id === item.id) ? existing : [item, ...existing];
-    await icloudStorage.setJSON(CK.SAVED_ITEMS, updated);
+    await setStoredJSON(syncEnabled('savedItemsSync'), CK.SAVED_ITEMS, updated);
     return updated;
   },
 
   async unsaveItem(id: string): Promise<SavedItem[]> {
     const existing = await persistence.getSavedItems();
     const updated = existing.filter((s) => s.id !== id);
-    await icloudStorage.setJSON(CK.SAVED_ITEMS, updated);
+    await setStoredJSON(syncEnabled('savedItemsSync'), CK.SAVED_ITEMS, updated);
     return updated;
   },
 
-  isSaved: (id: string) => icloudStorage.isInSet(CK.SAVED_ITEMS + ':ids', id),
+  isSaved: (id: string) => isInStoredSet(syncEnabled('savedItemsSync'), CK.SAVED_ITEMS + ':ids', id),
 
   // ── Followed topic IDs (iCloud) ───────────────────────────────────────────
 
-  getFollowedIds: () => icloudStorage.getSet(CK.FOLLOWED_IDS),
+  getFollowedIds: () => getStoredSet(syncEnabled('savedItemsSync'), CK.FOLLOWED_IDS),
 
-  followTopic: (id: string) => icloudStorage.addToSet(CK.FOLLOWED_IDS, id),
+  getFollowedItems: () => getStoredJSON<FollowedItem[]>(syncEnabled('savedItemsSync'), CK.FOLLOWED_ITEMS, []),
 
-  unfollowTopic: (id: string) => icloudStorage.removeFromSet(CK.FOLLOWED_IDS, id),
+  async followItem(item: FollowedItem): Promise<FollowedItem[]> {
+    const existing = await persistence.getFollowedItems();
+    const updated = existing.some((f) => f.id === item.id)
+      ? existing.map((f) => (f.id === item.id ? { ...f, ...item } : f))
+      : [item, ...existing];
+    await setStoredJSON(syncEnabled('savedItemsSync'), CK.FOLLOWED_ITEMS, updated);
+    if (item.kind === 'forumTopic') await addToStoredSet(syncEnabled('savedItemsSync'), CK.FOLLOWED_IDS, item.id);
+    return updated;
+  },
 
-  isFollowing: (id: string) => icloudStorage.isInSet(CK.FOLLOWED_IDS, id),
+  async unfollowItem(id: string): Promise<FollowedItem[]> {
+    const existing = await persistence.getFollowedItems();
+    const updated = existing.filter((f) => f.id !== id);
+    await setStoredJSON(syncEnabled('savedItemsSync'), CK.FOLLOWED_ITEMS, updated);
+    await removeFromStoredSet(syncEnabled('savedItemsSync'), CK.FOLLOWED_IDS, id);
+    return updated;
+  },
+
+  async isFollowingItem(id: string): Promise<boolean> {
+    const items = await persistence.getFollowedItems();
+    if (items.some((f) => f.id === id)) return true;
+    return isInStoredSet(syncEnabled('savedItemsSync'), CK.FOLLOWED_IDS, id);
+  },
+
+  async followTopic(id: string): Promise<void> {
+    await addToStoredSet(syncEnabled('savedItemsSync'), CK.FOLLOWED_IDS, id);
+  },
+
+  async unfollowTopic(id: string): Promise<void> {
+    await persistence.unfollowItem(id);
+  },
+
+  isFollowing: (id: string) => isInStoredSet(syncEnabled('savedItemsSync'), CK.FOLLOWED_IDS, id),
 
   // ── Read topic IDs (iCloud) ───────────────────────────────────────────────
   // Any topic the user has opened is considered read.
 
-  getReadIds: () => icloudStorage.getSet(CK.READ_IDS),
+  getReadIds: () => getStoredSet(syncEnabled('readingPositionSync'), CK.READ_IDS),
 
-  markRead: (id: string) => icloudStorage.addToSet(CK.READ_IDS, id),
+  markRead: (id: string) => addToStoredSet(syncEnabled('readingPositionSync'), CK.READ_IDS, id),
 
-  isRead: (id: string) => icloudStorage.isInSet(CK.READ_IDS, id),
+  isRead: (id: string) => isInStoredSet(syncEnabled('readingPositionSync'), CK.READ_IDS, id),
 
   // ── Podcast playback positions (iCloud) ───────────────────────────────────
 
   getPodcastPositions: () =>
-    icloudStorage.getJSON<Record<string, number>>(CK.POD_POSITIONS, {}),
+    getStoredJSON<Record<string, number>>(syncEnabled('podcastPositionSync'), CK.POD_POSITIONS, {}),
 
   async savePodcastPosition(episodeId: string, positionSeconds: number): Promise<void> {
     const positions = await persistence.getPodcastPositions();
-    await icloudStorage.setJSON(CK.POD_POSITIONS, { ...positions, [episodeId]: positionSeconds });
+    await setStoredJSON(syncEnabled('podcastPositionSync'), CK.POD_POSITIONS, { ...positions, [episodeId]: positionSeconds });
   },
 
   async clearPodcastPosition(episodeId: string): Promise<void> {
     const positions = await persistence.getPodcastPositions();
     const { [episodeId]: _, ...rest } = positions;
-    await icloudStorage.setJSON(CK.POD_POSITIONS, rest);
+    await setStoredJSON(syncEnabled('podcastPositionSync'), CK.POD_POSITIONS, rest);
   },
 
   // ── Last visit timestamp (iCloud) ─────────────────────────────────────────
   // Stored as an ISO-8601 string. Used for "Since Last Visit" forum filter.
   // Updated whenever the app goes to background.
 
-  getLastVisit: () => icloudStorage.getString(CK.LAST_VISIT),
+  getLastVisit: () => getStoredString(syncEnabled('readingPositionSync'), CK.LAST_VISIT),
 
   stampVisit(): Promise<void> {
-    return icloudStorage.setString(CK.LAST_VISIT, new Date().toISOString());
+    return setStoredString(syncEnabled('readingPositionSync'), CK.LAST_VISIT, new Date().toISOString());
   },
 
   // ── Settings (iCloud) ─────────────────────────────────────────────────────
 
-  getSettings: () => icloudStorage.getJSON<Record<string, unknown>>(CK.SETTINGS, {}),
+  getSettings: () => getStoredJSON<Record<string, unknown>>(syncEnabled('settingsSync'), CK.SETTINGS, {}),
 
   async getSetting<T>(key: string, fallback: T): Promise<T> {
     const settings = await persistence.getSettings();
@@ -140,7 +244,7 @@ export const persistence = {
 
   async setSetting(key: string, value: unknown): Promise<void> {
     const settings = await persistence.getSettings();
-    await icloudStorage.setJSON(CK.SETTINGS, { ...settings, [key]: value });
+    await setStoredJSON(syncEnabled('settingsSync'), CK.SETTINGS, { ...settings, [key]: value });
   },
 
   // ── Downloaded episodes (device-local) ────────────────────────────────────
@@ -201,8 +305,8 @@ export const persistence = {
 
   // ── Podcast queue (device-local) ─────────────────────────────────────────
 
-  getQueue: () => localGet<PodcastEpisode[]>(LK.QUEUE, []),
-  setQueue: (queue: PodcastEpisode[]) => localSet(LK.QUEUE, queue),
+  getQueue: () => getStoredJSON<PodcastEpisode[]>(syncEnabled('queueSync'), LK.QUEUE, []),
+  setQueue: (queue: PodcastEpisode[]) => setStoredJSON(syncEnabled('queueSync'), LK.QUEUE, queue),
 
   // ── Last played episode (device-local) ────────────────────────────────────
   // Restored on launch so the mini-player reappears at the saved position.
@@ -286,17 +390,17 @@ export const persistence = {
   //   • Show "X new" comment counts on home tab feed cards
 
   async getItemVisit(id: string): Promise<{ seenAt: string; commentCount: number } | null> {
-    const map = await localGet<Record<string, { seenAt: string; commentCount: number }>>(LK.ITEM_VISITS, {});
+    const map = await getStoredJSON<Record<string, { seenAt: string; commentCount: number }>>(syncEnabled('readingPositionSync'), LK.ITEM_VISITS, {});
     return map[id] ?? null;
   },
 
   async stampItemVisit(id: string, commentCount: number): Promise<void> {
-    const map = await localGet<Record<string, { seenAt: string; commentCount: number }>>(LK.ITEM_VISITS, {});
-    await localSet(LK.ITEM_VISITS, { ...map, [id]: { seenAt: new Date().toISOString(), commentCount } });
+    const map = await getStoredJSON<Record<string, { seenAt: string; commentCount: number }>>(syncEnabled('readingPositionSync'), LK.ITEM_VISITS, {});
+    await setStoredJSON(syncEnabled('readingPositionSync'), LK.ITEM_VISITS, { ...map, [id]: { seenAt: new Date().toISOString(), commentCount } });
   },
 
   async getAllItemVisits(): Promise<Record<string, { seenAt: string; commentCount: number }>> {
-    return localGet<Record<string, { seenAt: string; commentCount: number }>>(LK.ITEM_VISITS, {});
+    return getStoredJSON<Record<string, { seenAt: string; commentCount: number }>>(syncEnabled('readingPositionSync'), LK.ITEM_VISITS, {});
   },
 
   // ── Per-show playback speed (device-local) ────────────────────────────────

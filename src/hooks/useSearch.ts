@@ -10,6 +10,7 @@ export type SearchResults = {
 };
 
 export type SearchState = {
+  query:     string;
   results:   SearchResults;
   loading:   boolean;
   error:     string | null;
@@ -95,5 +96,5 @@ export function useSearch(): SearchState {
 
   const totalCount = results.site.length + results.forums.length + results.apps.length + results.resources.length;
 
-  return { results, loading, error, hasQuery: query.trim().length >= 2, totalCount, source, search, clear };
+  return { query, results, loading, error, hasQuery: query.trim().length >= 2, totalCount, source, search, clear };
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Clipboard, Dimensions, findNodeHandle, Image, Linking,
   Platform, Pressable, ScrollView, Switch, Text, TextInput, View, ActivityIndicator,
-  useColorScheme } from 'react-native';
+  StyleSheet, useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
@@ -62,12 +62,30 @@ function NavRow({ label, hint, icon, onPress, external = false, destructive = fa
       accessibilityHint={hint}
       style={({ pressed }) => [
         styles.cardSmall,
-        { flexDirection: 'row', alignItems: 'center', gap: 12 },
+        {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          borderLeftWidth: 3,
+          borderLeftColor: destructive ? '#B91C1C' : colors.border,
+        },
         destructive && { backgroundColor: '#FFF0F0', borderColor: '#FCA5A5', borderWidth: 1 },
         pressed && { opacity: 0.85 },
       ]}
     >
-      <Ionicons name={icon as any} size={20} color={color} accessibilityElementsHidden />
+      <View
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 9,
+          backgroundColor: destructive ? '#FEE2E2' : colors.pill,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        accessibilityElementsHidden
+      >
+        <Ionicons name={icon as any} size={18} color={color} />
+      </View>
       <Text style={[styles.body, { flex: 1, marginBottom: 0, color: destructive ? '#B91C1C' : colors.text }]}>
         {label}
       </Text>
@@ -129,6 +147,15 @@ function AboutSection({ colors, styles, showToast, router }: {
     `Grayscale ${a11y.grayscaleEnabled       ? 'On' : 'Off'}`,
     `Dynamic Type ${dynType.scale.toFixed(2)}×${dynType.isAccessibilitySize ? ', accessibility size' : ''}`,
   ].join('. ');
+  const supportSummary = [
+    `App version ${APP_VERSION}, build ${BUILD_NUMBER}.`,
+    `${DEVICE_TYPE}, ${DEVICE_MODEL}.`,
+    `iOS ${IOS_VERSION}, build ${OS_BUILD_ID}.`,
+    `${themeLabel}.`,
+    `Locale ${locale}.`,
+    `Network ${netType}.`,
+    accessibilitySummary,
+  ].join(' ');
 
   function buildSupportInfo(): string {
     return [
@@ -164,6 +191,29 @@ function AboutSection({ colors, styles, showToast, router }: {
     ].join('\n');
   }
 
+  function openSupportEmail() {
+    const subject = 'AppleVis App Bug, Feedback, Suggestion, or Recommendation';
+    const body = [
+      'Hello AppleVis Support,',
+      '',
+      'I am contacting you about the AppleVis app.',
+      '',
+      'Type of message: Bug / Feedback / Suggestion / Recommendation',
+      '',
+      'What happened or what would you like to suggest?',
+      '',
+      '',
+      'Steps to reproduce, if this is a bug:',
+      '1.',
+      '2.',
+      '3.',
+      '',
+      buildSupportInfo(),
+    ].join('\n');
+    const url = `mailto:support@applevis.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    Linking.openURL(url).catch(() => showToast('Could not open Mail.', 'error'));
+  }
+
   return (
     <>
       <View
@@ -192,9 +242,16 @@ function AboutSection({ colors, styles, showToast, router }: {
       <SectionHeader label="Support Information" colors={colors} />
       <Pressable
         onPress={() => { Clipboard.setString(buildSupportInfo()); showToast('Support information copied.', 'success'); }}
-        accessible accessibilityRole="button"
-        accessibilityLabel={`Copy support information. App version ${APP_VERSION}, build ${BUILD_NUMBER}. ${DEVICE_TYPE}, ${DEVICE_MODEL}. iOS build ${OS_BUILD_ID}. ${themeLabel}. Locale ${locale}. Network: ${netType}. ${accessibilitySummary}.`}
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel="Copy Support Information"
         accessibilityHint="Copies app version, device, accessibility, locale, and network details to the clipboard for feedback or bug reports."
+        accessibilityActions={[{ name: 'readSupportSummary', label: 'Read Support Summary' }]}
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === 'readSupportSummary') {
+            AccessibilityInfo.announceForAccessibility(`Support information. ${supportSummary}`);
+          }
+        }}
         style={({ pressed }) => [styles.card, {
           borderColor: colors.accent,
           borderWidth: 1.5,
@@ -277,13 +334,9 @@ function AboutSection({ colors, styles, showToast, router }: {
         hint="The people and contributors behind AppleVis."
         onPress={() => router.push('/credits' as any)}
         colors={colors} styles={styles} />
-      <NavRow label="Report a Bug"         icon="bug-outline" external
-        hint="Opens applevis.com/contact in Safari."
-        onPress={() => Linking.openURL(`${BASE}/contact`).catch(() => showToast('Could not open link.', 'error'))}
-        colors={colors} styles={styles} />
-      <NavRow label="Send Feedback"        icon="chatbubble-ellipses-outline" external
-        hint="Opens applevis.com/contact in Safari."
-        onPress={() => Linking.openURL(`${BASE}/contact`).catch(() => showToast('Could not open link.', 'error'))}
+      <NavRow label="Contact App Support"  icon="chatbubble-ellipses-outline" external
+        hint="Opens your default Mail app with support at applevis.com, a subject line, and app support details already filled in."
+        onPress={openSupportEmail}
         colors={colors} styles={styles} />
 
       <Text
@@ -305,6 +358,7 @@ export default function Profile() {
   const { colors, styles } = useTheme();
   const auth               = useAuth();
   const { showToast }      = useToast();
+  const a11y               = useAccessibilityPreferences();
 
   // Sign-in form state (used in signed-out view)
   const [showForm,   setShowForm]   = useState(false);
@@ -314,6 +368,8 @@ export default function Profile() {
   const [signingIn,  setSigningIn]  = useState(false);
   const loginRef       = useRef<TextInput>(null);
   const signInBtnRef   = useRef<View>(null);
+  const firstHeadingRef = useRef<Text | null>(null);
+  const didFocusFirstHeadingRef = useRef(false);
 
   const restoreToSignInBtn = useCallback(() => {
     setTimeout(() => {
@@ -330,6 +386,26 @@ export default function Profile() {
     }, 150);
     return () => clearTimeout(t);
   }, [showForm]);
+
+  useEffect(() => {
+    didFocusFirstHeadingRef.current = false;
+  }, [auth.isSignedIn, auth.user?.name]);
+
+  useEffect(() => {
+    if (showForm) return;
+    const timers = [350, 700, 1100].map((delay) =>
+      setTimeout(() => {
+        if (didFocusFirstHeadingRef.current) return;
+        const handle = findNodeHandle(firstHeadingRef.current);
+        if (handle) {
+          didFocusFirstHeadingRef.current = true;
+          AccessibilityInfo.setAccessibilityFocus(handle);
+        }
+      }, delay),
+    );
+
+    return () => timers.forEach(clearTimeout);
+  }, [auth.isSignedIn, auth.user?.name, showForm]);
 
   const savedTopics    = useSavedItems('forumTopic');
   const savedApps      = useSavedItems('appListing');
@@ -399,7 +475,7 @@ export default function Profile() {
           {/* Not signed in / sign-in form */}
           {!showForm ? (
             <View style={[styles.card, { marginBottom: 4, borderLeftWidth: 4, borderLeftColor: colors.accent }]}>
-              <Text style={styles.cardTitle} accessibilityRole="header">Sign In</Text>
+              <Text ref={firstHeadingRef} style={styles.cardTitle} accessibilityRole="header">Sign In</Text>
               <Text style={[styles.cardMeta, { marginBottom: 14 }]}>
                 Sign in to post, follow topics, receive notifications, and sync across devices.
               </Text>
@@ -425,7 +501,7 @@ export default function Profile() {
             </View>
           ) : (
             <View style={[styles.card, { gap: 16, marginBottom: 4 }]}>
-              <Text style={styles.cardTitle} accessibilityRole="header">Sign In</Text>
+              <Text ref={firstHeadingRef} style={styles.cardTitle} accessibilityRole="header">Sign In</Text>
               <View>
                 <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 6 }}
                   importantForAccessibility="no-hide-descendants">Username or email</Text>
@@ -511,12 +587,20 @@ export default function Profile() {
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* Identity card */}
-        <View style={[styles.card, { marginBottom: 8, borderLeftWidth: 4, borderLeftColor: colors.accent }]}>
+        <View style={[styles.card, {
+          marginBottom: 8,
+          borderLeftWidth: 4,
+          borderLeftColor: colors.accent,
+          overflow: 'hidden',
+        }]}>
+          {!a11y.reduceTransparency && (
+            <View
+              style={{ ...StyleSheet.absoluteFillObject, backgroundColor: colors.accent, opacity: 0.06 }}
+              pointerEvents="none"
+            />
+          )}
           <View
             style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 14 }}
-            accessible
-            accessibilityRole="header"
-            accessibilityLabel={`Signed in as ${auth.user.name}. AppleVis community member.`}
           >
             <View style={{ width: 52, height: 52, borderRadius: 26,
               backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}
@@ -526,8 +610,29 @@ export default function Profile() {
               </Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 20, fontWeight: '700', color: colors.text }}>{auth.user.name}</Text>
+              <Text
+                ref={firstHeadingRef}
+                style={{ fontSize: 22, fontWeight: '800', color: colors.text }}
+                accessibilityRole="header"
+                accessibilityLabel={`Signed in as ${auth.user.name}`}
+              >
+                {auth.user.name}
+              </Text>
               <Text style={{ fontSize: 14, color: colors.textSecondary }}>AppleVis community member</Text>
+            </View>
+            <View
+              style={{
+                backgroundColor: colors.pill,
+                borderRadius: 999,
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+              }}
+              accessible
+              accessibilityLabel="Signed in"
+            >
+              <Text style={{ color: colors.pillText, fontSize: 12, fontWeight: '700' }}>
+                Signed In
+              </Text>
             </View>
           </View>
           <Pressable
@@ -546,6 +651,13 @@ export default function Profile() {
 
         {/* Account */}
         <SectionHeader label="Account" colors={colors} />
+        <NavRow
+          label="Edit Profile"
+          hint="Update your display name, bio, location, and social links."
+          icon="person-outline"
+          onPress={() => router.push('/edit-profile' as any)}
+          colors={colors} styles={styles}
+        />
         <NavRow
           label="Account Settings on applevis.com"
           hint="Opens your account settings in Safari."
@@ -576,7 +688,7 @@ export default function Profile() {
           accessibilityLabel="Settings"
           accessibilityHint="Opens Appearance, Accessibility, Notifications, Podcasts, and all other app settings."
           style={({ pressed }) => [styles.card, { flexDirection: 'row', alignItems: 'center',
-            gap: 12, marginBottom: 8 }, pressed && { opacity: 0.85 }]}
+            gap: 12, marginBottom: 8, borderLeftWidth: 4, borderLeftColor: colors.accent }, pressed && { opacity: 0.85 }]}
         >
           <View style={{ width: 40, height: 40, borderRadius: 10,
             backgroundColor: colors.pill, alignItems: 'center', justifyContent: 'center' }}
@@ -584,7 +696,7 @@ export default function Profile() {
             <Ionicons name="settings-outline" size={20} color={colors.accent} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Settings</Text>
+            <Text style={styles.cardTitle} accessibilityRole="header">Settings</Text>
             <Text style={styles.cardMeta}>Appearance, Accessibility, Notifications, Podcasts, and more</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} accessibilityElementsHidden />
@@ -594,35 +706,35 @@ export default function Profile() {
         <SectionHeader label="Saved Items" colors={colors} />
         <View
           style={[styles.card, {
-            flexDirection: 'row',
-            gap: 8,
             marginBottom: 8,
+            borderLeftWidth: 3,
+            borderLeftColor: colors.border,
           }]}
-          accessible
-          accessibilityLabel={`Saved summary. ${topicCount} forum topics, ${appCount} apps, and ${resourceCount} resources saved.`}
         >
           {[
-            { label: 'Topics', count: topicCount },
-            { label: 'Apps', count: appCount },
-            { label: 'Resources', count: resourceCount },
+            { label: 'Saved Forum Topics', count: topicCount },
+            { label: 'Saved Apps', count: appCount },
+            { label: 'Saved Resources', count: resourceCount },
           ].map((item) => (
             <View
               key={item.label}
               style={{
-                flex: 1,
-                minWidth: 0,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
                 backgroundColor: colors.pill,
                 borderRadius: 8,
-                paddingVertical: 10,
-                paddingHorizontal: 8,
-                alignItems: 'center',
+                paddingVertical: 11,
+                paddingHorizontal: 12,
+                marginBottom: item.label === 'Saved Resources' ? 0 : 8,
               }}
-              accessibilityElementsHidden
+              accessible
+              accessibilityLabel={`${item.label}: ${item.count}`}
             >
-              <Text style={{ fontSize: 20, fontWeight: '800', color: colors.accent }}>
+              <Text style={{ width: 44, fontSize: 22, fontWeight: '800', color: colors.accent, textAlign: 'center' }}>
                 {item.count}
               </Text>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.pillText, textAlign: 'center' }}>
+              <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: colors.pillText }}>
                 {item.label}
               </Text>
             </View>
@@ -643,7 +755,7 @@ export default function Profile() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <Ionicons name={icon as any} size={22} color={colors.accent} accessibilityElementsHidden />
               <View style={{ flex: 1 }}>
-                <Text style={styles.cardTitle}>{label}</Text>
+                <Text style={styles.cardTitle} accessibilityRole="header">{label}</Text>
                 <Text style={styles.cardMeta}>{count} saved</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} accessibilityElementsHidden />

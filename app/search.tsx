@@ -9,11 +9,14 @@ import { TranslationBanner } from '../src/components/TranslationBanner';
 import { translateContent, readAloud } from '../src/services/intelligenceService';
 import { relativeTime } from '../src/utils/relativeTime';
 import { useTheme } from '../src/contexts/ThemeContext';
+import { usePreferences } from '../src/contexts/PreferencesContext';
 import { useAccessibilityPreferences } from '../src/hooks/useAccessibilityPreferences';
+import { sounds } from '../src/services/sounds';
 
 export default function SearchScreen() {
   const router = useRouter();
   const { colors, styles } = useTheme();
+  const { nonEnglishDetectionEnabled } = usePreferences();
   const { screenReaderEnabled } = useAccessibilityPreferences();
   const { results, loading, error, hasQuery, totalCount, search } = useSearch();
   const inputRef   = useRef<TextInput>(null);
@@ -38,6 +41,7 @@ export default function SearchScreen() {
   // Announce result count to VoiceOver when results change.
   useEffect(() => {
     if (!hasQuery || loading) return;
+    sounds.searchComplete().catch(() => {});
     const msg = totalCount === 0
       ? 'No results found.'
       : `${totalCount} result${totalCount === 1 ? '' : 's'} found: ` +
@@ -84,7 +88,7 @@ export default function SearchScreen() {
       </View>
 
       {/* ── Non-English query detection ───────────────────────────────────── */}
-      {isNonEnglish && isConfident && !bannerDismissed && (
+      {nonEnglishDetectionEnabled && isNonEnglish && isConfident && !bannerDismissed && (
         <TranslationBanner
           onTranslate={() => translateContent(queryRef.current)}
           onDismiss={() => setBannerDismissed(true)}

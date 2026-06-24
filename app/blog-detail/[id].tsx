@@ -9,10 +9,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Screen } from '../../src/components/Screen';
 import { AuthorProfileModal } from '../../src/components/AuthorProfileModal';
+import { EditContentModal } from '../../src/components/EditContentModal';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { useAlert } from '../../src/contexts/AccessibleAlertContext';
+import { usePreferences } from '../../src/contexts/PreferencesContext';
 import { ALERTS } from '../../src/data/alertMessages';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
 import { useHandoff } from '../../src/hooks/useHandoff';
@@ -131,11 +133,12 @@ export default function BlogDetailScreen() {
     id: string; title?: string; url?: string;
   }>();
   const { colors, styles } = useTheme();
+  const { aiSummariesEnabled } = usePreferences();
   const auth               = useAuth();
   const { showToast }      = useToast();
   const { showAlert }      = useAlert();
   const saved              = useSavedItems('blogPost');
-  const aiAvailable        = isAppleIntelligenceAvailable();
+  const aiAvailable        = aiSummariesEnabled && isAppleIntelligenceAvailable();
   const { reduceMotion, reduceTransparency, screenReaderEnabled } = useAccessibilityPreferences();
 
   const router = useRouter();
@@ -154,6 +157,7 @@ export default function BlogDetailScreen() {
   const [commentsLoading,       setCommentsLoading]       = useState(false);
   const [lastSeenAt,            setLastSeenAt]            = useState<string | null>(null);
   const [collapsedComments,     setCollapsedComments]     = useState<Record<string, boolean>>({});
+  const [editingComment,        setEditingComment]        = useState<ForumReply | null>(null);
 
   const scrollRef          = useRef<ScrollView>(null);
   const heroRef            = useRef<Text>(null);
@@ -894,6 +898,7 @@ export default function BlogDetailScreen() {
                 const avatarColor    = hashAuthorColor(c.authorName);
                 const isCollapsed    = collapsedComments[c.id] ?? false;
                 const commentFontSize = Math.max(13, textSize - 1);
+                const isOwnComment   = !!auth.user?.uuid && auth.user.uuid === c.authorId;
 
                 if (isNewComment && !newBadgeAnims[c.id]) {
                   newBadgeAnims[c.id] = new Animated.Value(1);
@@ -917,8 +922,16 @@ export default function BlogDetailScreen() {
                 function showCommentActions() {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   if (Platform.OS === 'ios') {
+                    const baseOptions = ['Cancel', 'Reply to this Comment', 'Copy Comment Text', 'Share Comment'];
+                    const ownOptions  = isOwnComment ? ['Edit Comment', 'Delete Comment'] : [];
+                    const allOptions  = [...baseOptions, ...ownOptions];
                     ActionSheetIOS.showActionSheetWithOptions(
-                      { title: `Comment by ${c.authorName}`, options: ['Cancel', 'Reply to this Comment', 'Copy Comment Text', 'Share Comment'], cancelButtonIndex: 0 },
+                      {
+                        title: `Comment by ${c.authorName}`,
+                        options: allOptions,
+                        cancelButtonIndex: 0,
+                        destructiveButtonIndex: isOwnComment ? allOptions.length - 1 : undefined,
+                      },
                       (buttonIdx) => {
                         if (buttonIdx === 1) handleReply();
                         if (buttonIdx === 2) { Clipboard.setString(plain); showToast('Comment text copied.', 'success'); AccessibilityInfo.announceForAccessibility('Comment text copied'); }
@@ -930,6 +943,26 @@ export default function BlogDetailScreen() {
                               plain,
                             ].filter(Boolean).join('\n\n'),
                           }).catch(() => {});
+                        }
+                        if (isOwnComment && buttonIdx === 4) setEditingComment(c);
+                        if (isOwnComment && buttonIdx === 5) {
+                          showAlert({
+                            title: 'Delete Comment?',
+                            message: 'This cannot be undone.',
+                            buttons: [
+                              { label: 'Delete', style: 'destructive', onPress: async () => {
+                                if (!auth.user?.csrfToken) return;
+                                const res = await api.content.deleteComment('comment_node_blog2', c.id, auth.user.csrfToken);
+                                if (res.ok) {
+                                  setComments(prev => prev.filter(x => x.id !== c.id));
+                                  showToast('Comment deleted.', 'success');
+                                } else {
+                                  showToast('Could not delete comment.', 'error');
+                                }
+                              }},
+                              { label: 'Cancel' },
+                            ],
+                          });
                         }
                       },
                     );
@@ -1109,6 +1142,23 @@ export default function BlogDetailScreen() {
           </View>
         )}
       </View>
+
+      {/* Edit comment modal */}
+      {editingComment && auth.user?.csrfToken && (
+        <EditContentModal
+          visible={!!editingComment}
+          onClose={() => setEditingComment(null)}
+          onSaved={(newBody) => {
+            setComments(prev => prev.map(c => c.id === editingComment.id ? { ...c, body: newBody } : c));
+            showToast('Comment updated.', 'success');
+          }}
+          commentId={editingComment.id}
+          commentType="comment_node_blog2"
+          csrfToken={auth.user.csrfToken}
+          initialBody={editingComment.body}
+          label="Comment"
+        />
+      )}
 
       {/* Author profile modal */}
       {blog?.authorId && (

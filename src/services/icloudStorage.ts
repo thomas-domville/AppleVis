@@ -12,6 +12,7 @@
 
 import { NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { sounds } from './sounds';
 
 const Native = NativeModules.AppleVisCloudSync as {
   getItem: (key: string) => Promise<string | null>;
@@ -21,6 +22,16 @@ const Native = NativeModules.AppleVisCloudSync as {
 } | undefined;
 
 const isAvailable = !!Native;
+let syncCompleteTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleSyncCompleteSound(): void {
+  if (!isAvailable) return;
+  if (syncCompleteTimer) clearTimeout(syncCompleteTimer);
+  syncCompleteTimer = setTimeout(() => {
+    syncCompleteTimer = null;
+    sounds.syncComplete().catch(() => {});
+  }, 750);
+}
 
 async function get(key: string): Promise<string | null> {
   try {
@@ -35,6 +46,7 @@ async function set(key: string, value: string): Promise<void> {
   try {
     if (isAvailable) {
       await Native!.setItem(key, value);
+      scheduleSyncCompleteSound();
     } else {
       await AsyncStorage.setItem(key, value);
     }
@@ -47,6 +59,7 @@ async function remove(key: string): Promise<void> {
   try {
     if (isAvailable) {
       await Native!.removeItem(key);
+      scheduleSyncCompleteSound();
     } else {
       await AsyncStorage.removeItem(key);
     }

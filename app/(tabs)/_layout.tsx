@@ -4,10 +4,10 @@ import { useEffect, useRef } from 'react';
 import { AccessibilityInfo, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useNavigationState } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
-import { MiniPlayer } from '../../src/components/MiniPlayer';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { usePlayer } from '../../src/contexts/PlayerContext';
 import { useReduceTransparency } from '../../src/hooks/useReduceTransparency';
+import { sounds } from '../../src/services/sounds';
 
 const iconMap: Record<string, string> = {
   index:    'home-outline',
@@ -60,7 +60,10 @@ function AccessibleTabButton({
   return (
     <Pressable
       onPress={(event) => {
-        if (!selected) shouldAnnounce.current = true;
+        if (!selected) {
+          shouldAnnounce.current = true;
+          sounds.tabChange().catch(() => {});
+        }
         onPress?.(event);
       }}
       onLongPress={onLongPress}
@@ -145,10 +148,5 @@ function ThemedTabs() {
 }
 
 export default function TabLayout() {
-  return (
-    <>
-      <ThemedTabs />
-      <MiniPlayer />
-    </>
-  );
+  return <ThemedTabs />;
 }

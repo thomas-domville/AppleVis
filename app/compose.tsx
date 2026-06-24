@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, findNodeHandle, KeyboardAvoidingView,
-  Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+  Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Screen } from '../src/components/Screen';
 import { GuidelinesReminder } from '../src/components/GuidelinesReminder';
@@ -10,11 +10,18 @@ import { useTheme } from '../src/contexts/ThemeContext';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useToast } from '../src/contexts/ToastContext';
 import { useAlert } from '../src/contexts/AccessibleAlertContext';
+import { usePreferences } from '../src/contexts/PreferencesContext';
 import { ALERTS } from '../src/data/alertMessages';
 import { useGuidelinesCheck } from '../src/hooks/useGuidelinesCheck';
 import { useLanguageDetection } from '../src/hooks/useLanguageDetection';
-import { translateContent } from '../src/services/intelligenceService';
+import {
+  rewriteDraftFriendly,
+  translateContent,
+  translateDraftToEnglish,
+  type DraftRewriteResult,
+} from '../src/services/intelligenceService';
 import { api } from '../src/services/api';
+import { sounds } from '../src/services/sounds';
 
 const MIN_BODY_LENGTH = 10;
 const MIN_SUBJECT_LENGTH = 3;
@@ -38,6 +45,11 @@ export default function Compose() {
   const auth          = useAuth();
   const { showToast } = useToast();
   const { showAlert } = useAlert();
+  const {
+    nonEnglishDetectionEnabled,
+    composeRewriteEnabled,
+    composeTranslationEnabled,
+  } = usePreferences();
 
   const [subject, setSubject] = useState(() => {
     if (replyToAuthor && topicTitle) {
@@ -53,6 +65,13 @@ export default function Compose() {
     return '';
   });
   const [submitting,      setSubmitting]      = useState(false);
+  const [draftHelping,    setDraftHelping]    = useState(false);
+  const [draftSuggestion, setDraftSuggestion] = useState<{
+    mode: 'rewrite' | 'translate';
+    originalSubject?: string;
+    originalBody: string;
+    result: DraftRewriteResult;
+  } | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const subjectRef = useRef<TextInput>(null);
   const bodyRef    = useRef<TextInput>(null);
@@ -78,6 +97,66 @@ export default function Compose() {
     ? subject.trim().length >= MIN_SUBJECT_LENGTH && body.trim().length >= MIN_BODY_LENGTH && !submitting
     : body.trim().length >= MIN_BODY_LENGTH && !submitting;
   const remaining = MAX_BODY_LENGTH - body.length;
+  const shouldOfferTranslation = nonEnglishDetectionEnabled && composeTranslationEnabled && isNonEnglish && isConfident;
+  const draftMode = shouldOfferTranslation ? 'translate' : 'rewrite';
+  const draftActionLabel = draftMode === 'translate' ? 'Translate to English' : 'Rewrite Draft';
+  const canUseDraftHelper =
+    body.trim().length >= MIN_BODY_LENGTH &&
+    !submitting &&
+    !draftHelping &&
+    (draftMode === 'translate' ? composeTranslationEnabled : composeRewriteEnabled);
+
+  const handleDraftHelper = useCallback(async () => {
+    if (!canUseDraftHelper) return;
+    setDraftHelping(true);
+    try {
+      const originalSubject = isNewTopic ? subject.trim() : undefined;
+      const originalBody = body.trim();
+      const result = draftMode === 'translate'
+        ? await translateDraftToEnglish({ subject: originalSubject, body: originalBody, isTopic: isNewTopic })
+        : await rewriteDraftFriendly({ subject: originalSubject, body: originalBody, isTopic: isNewTopic });
+
+      if (!result) {
+        if (draftMode === 'translate') {
+          showAlert({
+            title: 'Translation Unavailable',
+            message: 'In-app translation requires Apple Intelligence on this device. You can still use the existing Google Translate option in the language warning.',
+            confirmLabel: 'OK',
+            type: 'info',
+          });
+        } else {
+          showAlert({
+            title: 'Rewrite Unavailable',
+            message: 'Friendly rewrite requires Apple Intelligence on this device. Your draft has not been changed.',
+            confirmLabel: 'OK',
+            type: 'info',
+          });
+        }
+        return;
+      }
+
+      setDraftSuggestion({
+        mode: draftMode,
+        originalSubject,
+        originalBody,
+        result,
+      });
+    } finally {
+      setDraftHelping(false);
+    }
+  }, [body, canUseDraftHelper, draftMode, isNewTopic, showAlert, subject]);
+
+  function useDraftSuggestion() {
+    if (!draftSuggestion) return;
+    if (isNewTopic && draftSuggestion.result.subject) setSubject(draftSuggestion.result.subject);
+    setBody(draftSuggestion.result.body);
+    setDraftSuggestion(null);
+    AccessibilityInfo.announceForAccessibility(
+      draftSuggestion.mode === 'translate'
+        ? 'English translation inserted.'
+        : 'Suggested rewrite inserted.',
+    );
+  }
 
   const handleSubmit = useCallback(async () => {
     if (!canSubmit || !auth.user) return;
@@ -97,19 +176,19 @@ export default function Compose() {
     } else if (isEpisodeComment) {
       const res = await api.podcasts.submitComment(episodeId!, body.trim(), token);
       setSubmitting(false);
-      if (res.ok) { showToast('Comment posted successfully.', 'success'); router.back(); }
+      if (res.ok) { sounds.reply().catch(() => {}); showToast('Comment posted successfully.', 'success'); router.back(); }
       else if (res.error.includes('403') || res.error.includes('401')) { showAlert(ALERTS.auth.sessionExpired()); }
       else { showAlert(ALERTS.compose.commentFailed(res.error)); }
     } else if (isResourceComment) {
       const res = await api.resources.submitComment(topicId, body.trim(), token);
       setSubmitting(false);
-      if (res.ok) { showToast('Comment posted successfully.', 'success'); router.back(); }
+      if (res.ok) { sounds.reply().catch(() => {}); showToast('Comment posted successfully.', 'success'); router.back(); }
       else if (res.error.includes('403') || res.error.includes('401')) { showAlert(ALERTS.auth.sessionExpired()); }
       else { showAlert(ALERTS.compose.commentFailed(res.error)); }
     } else if (isBlogComment) {
       const res = await api.blogs.submitComment(topicId, body.trim(), token);
       setSubmitting(false);
-      if (res.ok) { showToast('Comment posted successfully.', 'success'); router.back(); }
+      if (res.ok) { sounds.reply().catch(() => {}); showToast('Comment posted successfully.', 'success'); router.back(); }
       else if (res.error.includes('403') || res.error.includes('401')) { showAlert(ALERTS.auth.sessionExpired()); }
       else { showAlert(ALERTS.compose.commentFailed(res.error)); }
     } else {
@@ -118,7 +197,7 @@ export default function Compose() {
         isReplyToComment ? (subject.trim() || 'Reply') : undefined,
       );
       setSubmitting(false);
-      if (res.ok) { showToast('Comment posted successfully.', 'success'); router.back(); }
+      if (res.ok) { sounds.reply().catch(() => {}); showToast('Comment posted successfully.', 'success'); router.back(); }
       else if (res.error.includes('403') || res.error.includes('401')) { showAlert(ALERTS.auth.sessionExpired()); }
       else { showAlert(ALERTS.compose.commentFailed(res.error)); }
     }
@@ -288,7 +367,7 @@ export default function Compose() {
           )}
 
           {/* Non-English detection */}
-          {isNonEnglish && isConfident && !bannerDismissed && (
+          {shouldOfferTranslation && !bannerDismissed && (
             <TranslationBanner
               onTranslate={() => translateContent(body)}
               onDismiss={() => setBannerDismissed(true)}
@@ -339,6 +418,34 @@ export default function Compose() {
 
           {/* Submit / Cancel */}
           <View style={{ gap: 10 }}>
+            <Pressable
+              onPress={handleDraftHelper}
+              disabled={!canUseDraftHelper}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={draftMode === 'translate'
+                ? 'Translate this draft to English'
+                : 'Rewrite this draft in a friendly AppleVis style'}
+              accessibilityHint="Shows a preview before changing your draft."
+              accessibilityState={{ disabled: !canUseDraftHelper }}
+              style={{
+                backgroundColor: colors.card,
+                borderColor: canUseDraftHelper ? colors.accent : colors.border,
+                borderWidth: 1.5,
+                borderRadius: 14,
+                paddingVertical: 14,
+                alignItems: 'center',
+                opacity: canUseDraftHelper ? 1 : 0.65,
+              }}
+            >
+              {draftHelping
+                ? <ActivityIndicator color={colors.accent} />
+                : <Text style={{ color: canUseDraftHelper ? colors.accent : colors.textSecondary, fontWeight: '700', fontSize: 16 }}>
+                    {draftActionLabel}
+                  </Text>
+              }
+            </Pressable>
+
             <Pressable
               onPress={handleSubmit}
               disabled={!canSubmit}
@@ -391,6 +498,95 @@ export default function Compose() {
           <View style={{ height: 48 }} />
         </ScrollView>
       </KeyboardAvoidingView>
+      <Modal
+        visible={!!draftSuggestion}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setDraftSuggestion(null)}
+        accessibilityViewIsModal
+      >
+        <View style={{ flex: 1, backgroundColor: colors.background, padding: 16 }}>
+          <Text
+            accessibilityRole="header"
+            style={{ fontSize: 22, fontWeight: '700', color: colors.text, marginBottom: 8 }}
+          >
+            {draftSuggestion?.mode === 'translate' ? 'English Translation' : 'Suggested Rewrite'}
+          </Text>
+          <Text style={{ fontSize: 14, lineHeight: 20, color: colors.textSecondary, marginBottom: 14 }}>
+            Review the suggestion before replacing your draft.
+          </Text>
+
+          <ScrollView showsVerticalScrollIndicator>
+            {!!draftSuggestion?.originalSubject && (
+              <>
+                <Text accessibilityRole="header" style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 6 }}>
+                  Original Subject
+                </Text>
+                <Text style={{ color: colors.text, fontSize: 15, lineHeight: 21, marginBottom: 14 }}>
+                  {draftSuggestion.originalSubject}
+                </Text>
+                <Text accessibilityRole="header" style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 6 }}>
+                  Suggested Subject
+                </Text>
+                <Text style={{ color: colors.text, fontSize: 15, lineHeight: 21, marginBottom: 18 }}>
+                  {draftSuggestion.result.subject ?? draftSuggestion.originalSubject}
+                </Text>
+              </>
+            )}
+
+            <Text accessibilityRole="header" style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 6 }}>
+              Original
+            </Text>
+            <Text style={{ color: colors.text, fontSize: 15, lineHeight: 21, marginBottom: 18 }}>
+              {draftSuggestion?.originalBody}
+            </Text>
+
+            <Text accessibilityRole="header" style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 6 }}>
+              {draftSuggestion?.mode === 'translate' ? 'English Translation' : 'Suggested Rewrite'}
+            </Text>
+            <Text style={{ color: colors.text, fontSize: 15, lineHeight: 21, marginBottom: 24 }}>
+              {draftSuggestion?.result.body}
+            </Text>
+          </ScrollView>
+
+          <View style={{ gap: 10, paddingTop: 12 }}>
+            <Pressable
+              onPress={useDraftSuggestion}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={draftSuggestion?.mode === 'translate' ? 'Use translation' : 'Use rewrite'}
+              style={{ backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 15, alignItems: 'center' }}
+            >
+              <Text style={{ color: colors.accentText, fontWeight: '700', fontSize: 16 }}>
+                {draftSuggestion?.mode === 'translate' ? 'Use Translation' : 'Use Rewrite'}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                const mode = draftSuggestion?.mode;
+                setDraftSuggestion(null);
+                setTimeout(() => handleDraftHelper(), 50);
+                AccessibilityInfo.announceForAccessibility(mode === 'translate' ? 'Trying another translation.' : 'Trying another rewrite.');
+              }}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={draftSuggestion?.mode === 'translate' ? 'Try another translation' : 'Try another rewrite'}
+              style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
+            >
+              <Text style={{ color: colors.text, fontWeight: '600', fontSize: 15 }}>Try Again</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setDraftSuggestion(null)}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Keep original draft"
+              style={{ borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
+            >
+              <Text style={{ color: colors.textSecondary, fontWeight: '600', fontSize: 15 }}>Keep Original</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }

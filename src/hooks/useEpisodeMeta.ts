@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { persistence } from '../services/persistence';
 import { downloadEpisode, deleteDownload } from '../services/downloads';
+import { sounds } from '../services/sounds';
 import type { PodcastEpisode, SavedItem } from '../types/content';
 
 export function useEpisodeMeta() {
@@ -39,6 +40,7 @@ export function useEpisodeMeta() {
     if (result.ok && result.localUri) {
       setDownloaded(prev => ({ ...prev, [episode.id]: result.localUri! }));
       setDownloadedMeta(prev => ({ ...prev, [episode.id]: episode }));
+      sounds.downloadComplete().catch(() => {});
     }
     return result;
   }, []);
