@@ -1,27 +1,18 @@
-// Share Extension for submitting App Store apps to AppleVis.
+// Share Extension for AppleVis.
 //
-// When a user finds an accessible iOS app in the App Store (or Safari) they
-// can tap Share → AppleVis to open the in-app submission form pre-filled with
-// that app's details.
+// Handles three types of shared content:
+//   • App Store URLs  → applevis://submit-app?url=…
+//   • Plain text / .txt/.md files → applevis://submit-blog?text=…
+//   • Podcast URLs (anchor.fm, podcasts.apple.com, etc.) → applevis://submit-podcast?url=…
 //
-// Flow:
-//   1. User taps Share → AppleVis in the system share sheet
-//   2. This view controller validates the shared URL is an App Store link
-//   3. Writes the URL to App Group UserDefaults as a fallback
-//   4. Opens applevis://submit-app?url=[encoded] to bring the main app to
-//      foreground with the URL already available
-//   5. Calls extensionContext?.completeRequest() to dismiss the share sheet
+// No UI is shown — the extension deep-links and dismisses immediately.
 //
 // Xcode setup:
-//   • Add a new "Share Extension" target named "AppleVisShareExtension"
-//   • Set NSExtensionPrincipalClass to AppleVisShareExtensionViewController
-//   • Add App Groups entitlement (group.com.applevis.app) to BOTH the main
-//     app target AND this extension target
-//   • Add NSExtensionActivationRule to Info.plist (see Info.plist in this dir)
-//   • Add URL scheme "applevis" to the main app target's Info.plist so iOS
-//     knows to route applevis:// to AppleVis
-//
-// No UI is shown — the extension immediately deep-links and dismisses.
+//   • Share Extension target "AppleVisShareExtension"
+//   • NSExtensionPrincipalClass = AppleVisShareExtensionViewController
+//   • App Groups entitlement (group.com.applevis.app) on BOTH targets
+//   • Info.plist NSExtensionActivationRule allows URLs and text
+//   • URL scheme "applevis" in main app Info.plist
 
 import MobileCoreServices
 import Social
@@ -30,114 +21,175 @@ import UniformTypeIdentifiers
 
 class AppleVisShareExtensionViewController: UIViewController {
 
-  private static let appGroupSuite = "group.com.applevis.app"
-  private static let pendingURLKey  = "pendingAppShareURL"
+  private static let appGroupSuite       = "group.com.applevis.app"
+  private static let pendingURLKey        = "pendingAppShareURL"
+  private static let pendingBlogTextKey   = "pendingBlogText"
+  private static let pendingPodcastURLKey = "pendingPodcastURL"
 
   override func viewDidLoad() {
     super.viewDidLoad()
-    extractAppStoreURL { [weak self] url in
+    classify { [weak self] action in
       guard let self else { return }
-      if let url {
-        self.handleAppStoreURL(url)
-      } else {
-        // Not an App Store URL — dismiss silently.
+      switch action {
+      case .appStore(let url):   self.handleAppStoreURL(url)
+      case .podcast(let url):    self.handlePodcastURL(url)
+      case .blogText(let text):  self.handleBlogText(text)
+      case .none:
         self.extensionContext?.cancelRequest(withError: NSError(
-          domain: "com.applevis.shareextension",
-          code: 1,
-          userInfo: [NSLocalizedDescriptionKey: "Not an App Store URL"]
+          domain: "com.applevis.shareextension", code: 1,
+          userInfo: [NSLocalizedDescriptionKey: "Unsupported content type"]
         ))
       }
     }
   }
 
-  // ── URL extraction ──────────────────────────────────────────────────────────
+  // ── Classification ──────────────────────────────────────────────────────────
 
-  private func extractAppStoreURL(completion: @escaping (URL?) -> Void) {
+  private enum ShareAction {
+    case appStore(URL)
+    case podcast(URL)
+    case blogText(String)
+    case none
+  }
+
+  private func classify(completion: @escaping (ShareAction) -> Void) {
     guard
-      let item = extensionContext?.inputItems.first as? NSExtensionItem,
+      let item        = extensionContext?.inputItems.first as? NSExtensionItem,
       let attachments = item.attachments
-    else {
-      completion(nil)
-      return
-    }
+    else { completion(.none); return }
 
-    // Try public.url first (Safari, App Store share)
     let urlType: String
+    let textType: String
+    let fileType: String
     if #available(iOS 14.0, *) {
-      urlType = UTType.url.identifier
+      urlType  = UTType.url.identifier
+      textType = UTType.plainText.identifier
+      fileType = UTType.data.identifier
     } else {
-      urlType = kUTTypeURL as String
+      urlType  = kUTTypeURL as String
+      textType = kUTTypePlainText as String
+      fileType = kUTTypeData as String
     }
 
+    // 1. Check for URL items first
     for provider in attachments {
       if provider.hasItemConformingToTypeIdentifier(urlType) {
         provider.loadItem(forTypeIdentifier: urlType, options: nil) { item, _ in
           let url: URL? = {
-            if let u = item as? URL { return u }
+            if let u = item as? URL    { return u }
             if let s = item as? String { return URL(string: s) }
             return nil
           }()
           DispatchQueue.main.async {
-            completion(url.flatMap { Self.isAppStoreURL($0) ? $0 : nil })
+            guard let url else { completion(.none); return }
+            if Self.isAppStoreURL(url) {
+              completion(.appStore(url))
+            } else if Self.isPodcastURL(url) {
+              completion(.podcast(url))
+            } else {
+              completion(.none)
+            }
           }
         }
         return
       }
     }
 
-    // Try plain text (in case the URL comes as a string)
-    let textType: String
-    if #available(iOS 14.0, *) {
-      textType = UTType.plainText.identifier
-    } else {
-      textType = kUTTypePlainText as String
-    }
-
+    // 2. Check for plain text (could be blog draft or a URL as text)
     for provider in attachments {
       if provider.hasItemConformingToTypeIdentifier(textType) {
         provider.loadItem(forTypeIdentifier: textType, options: nil) { item, _ in
-          let url: URL? = {
-            if let s = item as? String, let u = URL(string: s) { return u }
-            return nil
-          }()
+          let text: String? = item as? String
           DispatchQueue.main.async {
-            completion(url.flatMap { Self.isAppStoreURL($0) ? $0 : nil })
+            guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !text.isEmpty else {
+              completion(.none)
+              return
+            }
+            // Could be a URL pasted as text
+            if let url = URL(string: text) {
+              if Self.isAppStoreURL(url) { completion(.appStore(url)); return }
+              if Self.isPodcastURL(url)  { completion(.podcast(url));  return }
+            }
+            completion(.blogText(text))
           }
         }
         return
       }
     }
 
-    completion(nil)
+    // 3. Check for file attachments (.txt, .md)
+    for provider in attachments {
+      if provider.hasItemConformingToTypeIdentifier(fileType) {
+        provider.loadItem(forTypeIdentifier: fileType, options: nil) { item, _ in
+          let fileURL: URL? = item as? URL
+          DispatchQueue.main.async {
+            guard let fileURL,
+                  let text = try? String(contentsOf: fileURL, encoding: .utf8),
+                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            else { completion(.none); return }
+            completion(.blogText(text.trimmingCharacters(in: .whitespacesAndNewlines)))
+          }
+        }
+        return
+      }
+    }
+
+    completion(.none)
   }
+
+  // ── URL helpers ─────────────────────────────────────────────────────────────
 
   private static func isAppStoreURL(_ url: URL) -> Bool {
     let host = url.host ?? ""
     return host == "apps.apple.com" || host == "itunes.apple.com"
   }
 
-  // ── Deep link into main app ──────────────────────────────────────────────────
+  private static func isPodcastURL(_ url: URL) -> Bool {
+    let host = url.host ?? ""
+    return host.contains("podcasts.apple.com")
+        || host.contains("anchor.fm")
+        || host.contains("spotify.com")
+        || host.contains("overcast.fm")
+        || host.contains("pocketcasts.com")
+        || host.contains("castbox.fm")
+  }
 
-  private func handleAppStoreURL(_ appStoreURL: URL) {
-    // Write to App Group UserDefaults as a belt-and-suspenders fallback.
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
+  private func handleAppStoreURL(_ url: URL) {
     let defaults = UserDefaults(suiteName: Self.appGroupSuite)
-    defaults?.set(appStoreURL.absoluteString, forKey: Self.pendingURLKey)
+    defaults?.set(url.absoluteString, forKey: Self.pendingURLKey)
     defaults?.synchronize()
+    deepLink(host: "submit-app", query: [URLQueryItem(name: "url", value: url.absoluteString)])
+  }
 
-    // Build the deep-link URL with the App Store URL encoded as a query param.
-    var components = URLComponents()
-    components.scheme = "applevis"
-    components.host   = "submit-app"
-    components.queryItems = [URLQueryItem(name: "url", value: appStoreURL.absoluteString)]
+  private func handlePodcastURL(_ url: URL) {
+    let defaults = UserDefaults(suiteName: Self.appGroupSuite)
+    defaults?.set(url.absoluteString, forKey: Self.pendingPodcastURLKey)
+    defaults?.synchronize()
+    deepLink(host: "submit-podcast", query: [URLQueryItem(name: "url", value: url.absoluteString)])
+  }
 
-    guard let deepLink = components.url else {
+  private func handleBlogText(_ text: String) {
+    let defaults = UserDefaults(suiteName: Self.appGroupSuite)
+    defaults?.set(text, forKey: Self.pendingBlogTextKey)
+    defaults?.synchronize()
+    deepLink(host: "submit-blog", query: [URLQueryItem(name: "text", value: text)])
+  }
+
+  private func deepLink(host: String, query: [URLQueryItem]) {
+    var components      = URLComponents()
+    components.scheme   = "applevis"
+    components.host     = host
+    components.queryItems = query
+
+    guard let url = components.url else {
       extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
       return
     }
 
-    // Open the main app. extensionContext?.open is the only API available in
-    // a Share Extension (UIApplication.shared is not accessible).
-    extensionContext?.open(deepLink, completionHandler: { [weak self] _ in
+    extensionContext?.open(url, completionHandler: { [weak self] _ in
       self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
     })
   }

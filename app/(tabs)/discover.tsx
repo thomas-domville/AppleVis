@@ -657,27 +657,24 @@ export default function DiscoverScreen() {
               title="Submit a Blog Post"
               subtitle="Share your expertise or experience with the community"
               accentColor={SECTION_ACCENTS.contribute}
-              hint="Opens the submission form in your browser"
-              external
-              onPress={() => Linking.openURL('https://www.applevis.com/form/blog-submission').catch(() => showToast('Could not open the blog submission form.', 'error'))}
+              hint="Opens the blog submission wizard"
+              onPress={() => router.push('/submit-blog' as any)}
             />
             <HubRow
               icon="mic-outline"
               title="Submit a Podcast"
               subtitle="Nominate an accessible podcast for the AppleVis directory"
               accentColor={SECTION_ACCENTS.contribute}
-              hint="Opens the submission form in your browser"
-              external
-              onPress={() => Linking.openURL('https://www.applevis.com/podcasts/upload').catch(() => showToast('Could not open the podcast submission form.', 'error'))}
+              hint="Opens the podcast submission wizard"
+              onPress={() => router.push('/submit-podcast' as any)}
             />
             <HubRow
               icon="bug-outline"
               title="Submit a Bug Report"
               subtitle="Found an accessibility bug? Report it to the AppleVis community"
               accentColor={SECTION_ACCENTS.contribute}
-              hint="Opens the bug report submission form in your browser"
-              external
-              onPress={() => Linking.openURL('https://applevis.com/form/community-bug-report-form').catch(() => showToast('Could not open the bug report form.', 'error'))}
+              hint="Opens the community bug report wizard"
+              onPress={() => router.push('/submit-bug' as any)}
             />
 
             <SectionIntro

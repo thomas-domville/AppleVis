@@ -1,6 +1,6 @@
 {
   "name": "applevis-expo",
-  "version": "2026.0.2",
+  "version": "2026.0.4",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -23,6 +23,7 @@
     "expo-build-properties": "~1.0.10",
     "expo-constants": "~18.0.13",
     "expo-device": "~8.0.10",
+    "expo-document-picker": "~13.0.3",
     "expo-file-system": "~19.0.23",
     "expo-haptics": "~15.0.8",
     "expo-linking": "~8.0.12",

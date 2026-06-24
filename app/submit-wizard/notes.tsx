@@ -14,6 +14,7 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { isAppleIntelligenceAvailable, summariseText } from '../../src/services/intelligenceService';
 import { sounds } from '../../src/services/sounds';
 import { api } from '../../src/services/api';
+import { ThankYouScreen } from '../submit-blog/review';
 
 // ─── Step 5: Notes + Assessment + Submit ──────────────────────────────────────
 
@@ -297,6 +298,7 @@ export default function NotesScreen() {
 
   const [aiDrafting, setAiDrafting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitted,  setSubmitted]  = useState(false);
 
   const platform    = state.platform ?? 'ios';
   const meta        = state.fullMeta;
@@ -381,11 +383,8 @@ export default function NotesScreen() {
       sounds.bookmarkSaved().catch(() => {});
 
       if (result.ok) {
-        Alert.alert(
-          'Submission Received!',
-          `Thank you! Your entry for ${meta.appName} has been submitted to AppleVis for review. It will appear in the App Directory once approved.`,
-          [{ text: 'Done', onPress: () => router.replace('/(tabs)/discover' as any) }],
-        );
+        setSubmitted(true);
+        AccessibilityInfo.announceForAccessibility('App entry submitted successfully.');
       } else {
         // Native submission failed — fall back to clipboard + web form.
         Clipboard.setString(state.accessibilityComments.trim());
@@ -414,6 +413,15 @@ export default function NotesScreen() {
   }
 
   // ── Validation ─────────────────────────────────────────────────────────────
+
+  if (submitted) {
+    return (
+      <ThankYouScreen
+        type="app"
+        onDone={() => { router.replace('/(tabs)/discover' as any); }}
+      />
+    );
+  }
 
   const charCount = state.accessibilityComments.trim().length;
   const canSubmit =

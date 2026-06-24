@@ -65,6 +65,26 @@ export function handleIncomingUrl(url: string): boolean {
       return true;
     }
 
+    if (action === 'submit-blog') {
+      const text = params.get('text') ?? '';
+      if (text) {
+        router.push({ pathname: '/submit-blog' as any, params: { prefillText: text } });
+      } else {
+        router.push('/submit-blog' as any);
+      }
+      return true;
+    }
+
+    if (action === 'submit-podcast') {
+      router.push('/submit-podcast' as any);
+      return true;
+    }
+
+    if (action === 'submit-bug') {
+      router.push('/submit-bug' as any);
+      return true;
+    }
+
     if (action === 'share') {
       // Generic share — route to forums; refine per content type in future.
       router.push('/(tabs)/forums');

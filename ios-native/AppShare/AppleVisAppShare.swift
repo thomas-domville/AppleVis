@@ -1,16 +1,15 @@
-// Native module for the App Submission Share flow.
+// Native module for the AppleVis Share flow.
 //
-// Reads and clears a pending App Store URL written by the AppleVis Share
-// Extension into the shared App Group UserDefaults. Called on app foreground
-// to catch any URL that arrived before the Linking listener was registered.
+// Reads and clears pending values written by the Share Extension into the
+// shared App Group UserDefaults. Call each consumer on app foreground to
+// catch content that arrived before the Linking listener was registered.
+//
+// Keys:
+//   pendingAppShareURL  – App Store URL shared via Share Extension
+//   pendingBlogText     – Plain text / file content for blog submission
+//   pendingPodcastURL   – Podcast URL shared via Share Extension
 //
 // App Group: group.com.applevis.app
-// UserDefaults key: pendingAppShareURL
-//
-// After prebuild: copy both this file and AppleVisAppShare.m into the main
-// Xcode target (ios/AppleVis/).
-// Add App Groups entitlement to both the main app AND the Share Extension:
-//   com.apple.security.application-groups = ["group.com.applevis.app"]
 
 import Foundation
 
@@ -19,20 +18,34 @@ class AppleVisAppShare: NSObject {
 
   @objc static func requiresMainQueueSetup() -> Bool { false }
 
-  private static let appGroupSuite = "group.com.applevis.app"
-  private static let pendingURLKey  = "pendingAppShareURL"
+  private static let appGroupSuite       = "group.com.applevis.app"
+  private static let pendingURLKey        = "pendingAppShareURL"
+  private static let pendingBlogTextKey   = "pendingBlogText"
+  private static let pendingPodcastURLKey = "pendingPodcastURL"
 
-  /// Reads the pending App Store URL written by the Share Extension and
-  /// immediately clears it so the next call returns nil.
-  /// Returns nil (NSNull) if no URL is waiting.
+  private func consume(key: String, resolve: @escaping RCTPromiseResolveBlock) {
+    let defaults = UserDefaults(suiteName: Self.appGroupSuite)
+    let value    = defaults?.string(forKey: key)
+    defaults?.removeObject(forKey: key)
+    defaults?.synchronize()
+    resolve(value as Any)
+  }
+
+  /// App Store URL → applevis://submit-app
   @objc func consumePendingURL(
     _ resolve: @escaping RCTPromiseResolveBlock,
       reject:  @escaping RCTPromiseRejectBlock
-  ) {
-    let defaults = UserDefaults(suiteName: Self.appGroupSuite)
-    let url = defaults?.string(forKey: Self.pendingURLKey)
-    defaults?.removeObject(forKey: Self.pendingURLKey)
-    defaults?.synchronize()
-    resolve(url as Any)
-  }
+  ) { consume(key: Self.pendingURLKey, resolve: resolve) }
+
+  /// Blog text → applevis://submit-blog
+  @objc func consumePendingBlogText(
+    _ resolve: @escaping RCTPromiseResolveBlock,
+      reject:  @escaping RCTPromiseRejectBlock
+  ) { consume(key: Self.pendingBlogTextKey, resolve: resolve) }
+
+  /// Podcast URL → applevis://submit-podcast
+  @objc func consumePendingPodcastURL(
+    _ resolve: @escaping RCTPromiseResolveBlock,
+      reject:  @escaping RCTPromiseRejectBlock
+  ) { consume(key: Self.pendingPodcastURLKey, resolve: resolve) }
 }
