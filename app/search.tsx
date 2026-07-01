@@ -1,238 +1,109 @@
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Linking, ScrollView, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '../src/components/Screen';
-import { AccessibleCard } from '../src/components/AccessibleCard';
+import { AppleVisSearchInput } from '../src/components/search/AppleVisSearchInput';
+import { SearchResultsGrouped } from '../src/components/search/SearchResultsGrouped';
+import { SearchEmptyState } from '../src/components/search/SearchEmptyState';
+import { SearchLoadingState } from '../src/components/search/SearchLoadingState';
+import { SearchErrorState } from '../src/components/search/SearchErrorState';
+import { SearchTranslationPrompt } from '../src/components/search/SearchTranslationPrompt';
 import { useSearch } from '../src/hooks/useSearch';
-import { useLanguageDetection } from '../src/hooks/useLanguageDetection';
-import { TranslationBanner } from '../src/components/TranslationBanner';
-import { translateContent, readAloud } from '../src/services/intelligenceService';
-import { relativeTime } from '../src/utils/relativeTime';
+import { useSearchTranslation } from '../src/hooks/useSearchTranslation';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { usePreferences } from '../src/contexts/PreferencesContext';
+import { useToast } from '../src/contexts/ToastContext';
 import { useAccessibilityPreferences } from '../src/hooks/useAccessibilityPreferences';
 import { sounds } from '../src/services/sounds';
 
 export default function SearchScreen() {
   const router = useRouter();
-  const { colors, styles } = useTheme();
-  const { nonEnglishDetectionEnabled } = usePreferences();
+  const { styles } = useTheme();
+  const { nonEnglishDetectionEnabled, searchTranslationEnabled, searchAutoFocusEnabled } = usePreferences();
   const { screenReaderEnabled } = useAccessibilityPreferences();
-  const { results, loading, error, hasQuery, totalCount, search } = useSearch();
-  const inputRef   = useRef<TextInput>(null);
-  const queryRef   = useRef('');
-  // Separate state for language detection so the hook receives a stable
-  // render-time value, not a ref (refs must not be read during render).
-  const [detectionQuery,  setDetectionQuery]  = useState('');
-  const [bannerDismissed, setBannerDismissed] = useState(false);
-  const { isNonEnglish, isConfident } = useLanguageDetection(detectionQuery);
+  const { showToast } = useToast();
+  const search = useSearch();
+  const { results, loading, error, hasQuery, totalCount } = search;
+  const inputRef = useRef<TextInput>(null);
+  const lastAnnouncedCountRef = useRef<number | null>(null);
 
-  // Reset dismissed when the query becomes English again
-  useEffect(() => {
-    if (!isNonEnglish) setBannerDismissed(false);
-  }, [isNonEnglish]);
+  const { visible: showTranslateSearch, translating: translatingSearch, translate: handleTranslateSearch } =
+    useSearchTranslation(
+      search,
+      nonEnglishDetectionEnabled,
+      searchTranslationEnabled,
+      () => showToast('In-app search translation requires Apple Intelligence on this device.', 'warning'),
+      inputRef,
+    );
 
-  // Auto-focus the input on mount.
+  // Auto-focus the input on mount — configurable, since immediately raising the
+  // keyboard can be disorienting for some VoiceOver users who want to get
+  // oriented on the screen first.
   useEffect(() => {
+    if (!searchAutoFocusEnabled) return;
     const timer = setTimeout(() => inputRef.current?.focus(), 300);
     return () => clearTimeout(timer);
-  }, []);
+  }, [searchAutoFocusEnabled]);
 
-  // Announce result count to VoiceOver when results change.
+  // Announce result count to VoiceOver when a search settles, and only play the
+  // completion sound when the count actually changed — not on every debounced update.
+  // Kept concise ("12 results found in 4 categories.") — each section heading
+  // (Site Results, Forum Topics, Apps, Guides and Resources) gives the detail.
   useEffect(() => {
     if (!hasQuery || loading) return;
-    sounds.searchComplete().catch(() => {});
+    const categoryCount = [results.site, results.forums, results.apps, results.resources]
+      .filter((group) => group.length > 0).length;
     const msg = totalCount === 0
       ? 'No results found.'
-      : `${totalCount} result${totalCount === 1 ? '' : 's'} found: ` +
-        [
-          results.forums.length    > 0 ? `${results.forums.length} forum topic${results.forums.length    === 1 ? '' : 's'}`    : '',
-          results.site.length      > 0 ? `${results.site.length} site result${results.site.length      === 1 ? '' : 's'}`       : '',
-          results.apps.length      > 0 ? `${results.apps.length} app${results.apps.length      === 1 ? '' : 's'}`              : '',
-          results.resources.length > 0 ? `${results.resources.length} resource${results.resources.length === 1 ? '' : 's'}`    : '',
-        ].filter(Boolean).join(', ');
+      : `${totalCount} result${totalCount === 1 ? '' : 's'} found in ${categoryCount} categor${categoryCount === 1 ? 'y' : 'ies'}.`;
     AccessibilityInfo.announceForAccessibility(msg);
-  }, [totalCount, hasQuery, loading, results]);
 
-  function handleChange(text: string) {
-    queryRef.current = text;
-    setDetectionQuery(text);
-    search(text);
-  }
+    if (lastAnnouncedCountRef.current !== totalCount) {
+      sounds.searchComplete().catch(() => {});
+      lastAnnouncedCountRef.current = totalCount;
+    }
+  }, [totalCount, hasQuery, loading, results]);
 
   return (
     <Screen title="Search" showSettings={false}>
-      {/* ── Search field ──────────────────────────────────────────────────── */}
-      <View style={{ marginBottom: 12 }}>
-        <TextInput
-          ref={inputRef}
-          onChangeText={handleChange}
-          placeholder="Search forums, apps, resources…"
-          placeholderTextColor={colors.secondary}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-          accessible
-          accessibilityLabel="Search AppleVis"
-          accessibilityHint="Type to search forum topics, app listings, and resources."
-          style={{
-            borderWidth: 1.5,
-            borderColor: colors.border,
-            borderRadius: 12,
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-            fontSize: 17,
-            color: colors.text,
-            backgroundColor: '#FAFAFA',
-          }}
-        />
-      </View>
+      <AppleVisSearchInput
+        ref={inputRef}
+        value={search.query}
+        onChangeText={search.search}
+        onClear={search.clear}
+        placeholder="Search forums, apps, resources…"
+      />
 
-      {/* ── Non-English query detection ───────────────────────────────────── */}
-      {nonEnglishDetectionEnabled && isNonEnglish && isConfident && !bannerDismissed && (
-        <TranslationBanner
-          onTranslate={() => translateContent(queryRef.current)}
-          onDismiss={() => setBannerDismissed(true)}
-        />
+      {showTranslateSearch && (
+        <SearchTranslationPrompt translating={translatingSearch} onTranslate={handleTranslateSearch} />
       )}
 
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-        {/* ── Loading ───────────────────────────────────────────────────────── */}
-        {loading && (
-          <View
-            accessible
-            accessibilityLiveRegion="polite"
-            accessibilityLabel="Searching, please wait"
-            style={{ alignItems: 'center', paddingVertical: 32 }}
-          >
-            <ActivityIndicator size="large" color={colors.appleVisBlue} />
-            <Text style={[styles.lede, { marginTop: 10, textAlign: 'center' }]}>Searching…</Text>
-          </View>
-        )}
+        {loading && <SearchLoadingState />}
 
-        {/* ── Error ─────────────────────────────────────────────────────────── */}
-        {!loading && error && (
-          <View style={[styles.card, { backgroundColor: '#FFF8E1' }]}>
-            <Text style={[styles.cardMeta, { color: '#856404' }]}>{error}</Text>
-          </View>
-        )}
+        {!loading && error && <SearchErrorState message={error} />}
 
-        {/* ── Empty state ───────────────────────────────────────────────────── */}
         {!loading && hasQuery && totalCount === 0 && !error && (
-          <View style={[styles.card, { alignItems: 'center', paddingVertical: 32 }]}>
-            <Text style={styles.cardTitle}>No results</Text>
-            <Text style={[styles.cardMeta, { textAlign: 'center', marginTop: 4 }]}>
-              Try different keywords or check your spelling.
-            </Text>
-          </View>
+          <SearchEmptyState
+            query={search.query}
+            onClearSearch={search.clear}
+            onBrowseDiscover={() => router.push('/(tabs)/discover' as any)}
+          />
         )}
 
-        {/* ── Prompt when no query yet ──────────────────────────────────────── */}
         {!hasQuery && !loading && (
           <Text style={styles.lede}>
             Search AppleVis. Public site results are used until the search API is available.
           </Text>
         )}
 
-        {/* ── Forum results ─────────────────────────────────────────────────── */}
-        {!loading && results.site.length > 0 && (
-          <>
-            <Text
-              style={[styles.cardTitle, { marginBottom: 8, marginTop: 4 }]}
-              accessibilityRole="header"
-            >
-              Site Results ({results.site.length})
-            </Text>
-            {results.site.map((item) => (
-              <AccessibleCard
-                key={item.id}
-                title={item.title}
-                meta={[
-                  item.contentType !== 'unknown' ? item.contentType : null,
-                  item.source === 'public' ? 'AppleVis public search' : 'AppleVis search API',
-                ].filter(Boolean).join(' · ')}
-                actions={['Open Result', ...(!screenReaderEnabled ? ['Read Aloud'] : [])]}
-                onAction={(action) => {
-                  if (action === 'Open Result') Linking.openURL(item.url).catch(() => {});
-                  if (action === 'Read Aloud') readAloud(`${item.title}. ${item.summary ?? ''}`);
-                }}
-              />
-            ))}
-          </>
-        )}
-
-        {!loading && results.forums.length > 0 && (
-          <>
-            <Text
-              style={[styles.cardTitle, { marginBottom: 8, marginTop: 4 }]}
-              accessibilityRole="header"
-            >
-              Forum Topics ({results.forums.length})
-            </Text>
-            {results.forums.map((topic) => (
-              <AccessibleCard
-                key={topic.id}
-                title={topic.title}
-                meta={topic.meta}
-                actions={['Open', ...(!screenReaderEnabled ? ['Read Aloud'] : [])]}
-                onAction={(action) => {
-                  if (action === 'Open') router.push({ pathname: '/topic/[id]' as any, params: { id: topic.id, title: topic.title } });
-                  if (action === 'Read Aloud') readAloud(`${topic.title}. ${topic.meta}`);
-                }}
-              />
-            ))}
-          </>
-        )}
-
-        {/* ── App results ───────────────────────────────────────────────────── */}
-        {!loading && results.apps.length > 0 && (
-          <>
-            <Text
-              style={[styles.cardTitle, { marginBottom: 8, marginTop: 12 }]}
-              accessibilityRole="header"
-            >
-              Apps ({results.apps.length})
-            </Text>
-            {results.apps.map((app) => (
-              <AccessibleCard
-                key={app.id}
-                title={app.name}
-                meta={[
-                  app.developer   || null,
-                  app.reviewCount > 0 ? `${app.reviewCount} reviews` : null,
-                ].filter(Boolean).join(' · ')}
-                actions={['Open App Page', ...(!screenReaderEnabled ? ['Read Aloud'] : [])]}
-                onAction={(action) => {
-                  if (action === 'Open App Page') router.push({ pathname: '/app-detail/[id]' as any, params: { id: app.id, name: app.name } });
-                  if (action === 'Read Aloud') readAloud(`${app.name}. ${app.summary}`);
-                }}
-              />
-            ))}
-          </>
-        )}
-
-        {/* ── Resource results ──────────────────────────────────────────────── */}
-        {!loading && results.resources.length > 0 && (
-          <>
-            <Text
-              style={[styles.cardTitle, { marginBottom: 8, marginTop: 12 }]}
-              accessibilityRole="header"
-            >
-              Resources ({results.resources.length})
-            </Text>
-            {results.resources.map((item) => (
-              <AccessibleCard
-                key={item.id}
-                title={item.title}
-                meta={`${item.kind} · Updated ${relativeTime(item.updatedAt)}`}
-                actions={['Open', ...(!screenReaderEnabled ? ['Read Aloud'] : [])]}
-                onAction={(action) => {
-                  if (action === 'Open') router.push({ pathname: '/resource-detail/[id]' as any, params: { id: item.id, title: item.title, url: item.url } });
-                  if (action === 'Read Aloud') readAloud(`${item.title}. ${item.summary}`);
-                }}
-              />
-            ))}
-          </>
+        {!loading && (
+          <SearchResultsGrouped
+            results={results}
+            screenReaderEnabled={screenReaderEnabled}
+            onOpenExternalError={() => showToast('Could not open the AppleVis result.', 'error')}
+          />
         )}
 
         <View style={{ height: 96 }} />

@@ -9,11 +9,14 @@ type Props<T extends string> = {
   value: T;
   options: readonly T[];
   onChange: (value: T) => void;
+  /** Optional display-label override (e.g. append a count) — the underlying value stays plain. */
+  getLabel?: (option: T) => string;
 };
 
-export function FilterPicker<T extends string>({ label, value, options, onChange }: Props<T>) {
+export function FilterPicker<T extends string>({ label, value, options, onChange, getLabel }: Props<T>) {
   const [open, setOpen] = useState(false);
   const { colors } = useTheme();
+  const displayLabel = (option: T) => getLabel?.(option) ?? option;
 
   const sheetY = useRef(new Animated.Value(0)).current;
   const pan = useRef(
@@ -48,7 +51,7 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
     if (next !== value) {
       sounds.pickerTick().catch(() => {});
       onChange(next);
-      AccessibilityInfo.announceForAccessibility(`${label}: ${next}`);
+      AccessibilityInfo.announceForAccessibility(`${label}: ${displayLabel(next)}`);
     }
   }
 
@@ -65,7 +68,7 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
         accessible
         accessibilityRole="adjustable"
         accessibilityLabel={label}
-        accessibilityValue={{ text: value }}
+        accessibilityValue={{ text: displayLabel(value) }}
         accessibilityHint="Swipe up or down to change. Double tap to see all options."
         onAccessibilityAction={({ nativeEvent }) => {
           if (nativeEvent.actionName === 'increment') cycleBy(1);
@@ -85,7 +88,7 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
           marginBottom: 12,
         }}
       >
-        <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{value}</Text>
+        <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{displayLabel(value)}</Text>
         <Ionicons
           name={open ? 'chevron-up' : 'chevron-down'}
           size={14}
@@ -146,7 +149,7 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
                   key={option}
                   onPress={() => select(option)}
                   accessibilityRole="button"
-                  accessibilityLabel={option}
+                  accessibilityLabel={displayLabel(option)}
                   accessibilityState={{ selected: isSelected }}
                   style={({ pressed }) => ({
                     flexDirection: 'row',
@@ -164,7 +167,7 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
                       fontWeight: isSelected ? '600' : '400',
                     }}
                   >
-                    {option}
+                    {displayLabel(option)}
                   </Text>
                   {isSelected && (
                     <Ionicons name="checkmark" size={20} color={colors.accent} accessibilityElementsHidden />

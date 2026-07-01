@@ -319,8 +319,8 @@ export const TIPS: Record<keyof typeof TIP_KEYS, TipOptions> = {
     message:
       'This is the heart of AppleVis. Your Home feed brings together the latest forum ' +
       'discussions, podcast episodes, accessible app news, guides, and blog posts from ' +
-      'the community.\n\nPull down at any time to refresh. Use the filter button at the ' +
-      'top right to choose which types of content appear here.',
+      'the community.\n\nPull down at any time to refresh. Use the Customize Home button at the ' +
+      'top left to choose which types of content appear here.',
   },
   tabDiscover: {
     title: 'Explore All of AppleVis',

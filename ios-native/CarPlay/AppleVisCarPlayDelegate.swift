@@ -49,6 +49,9 @@ class AppleVisCarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDeleg
 
   static weak var shared: AppleVisCarPlaySceneDelegate?
   private var interfaceController: CPInterfaceController?
+  // Retain the list template so we can update its sections in-place
+  // rather than pushing a new root and blowing away the navigation stack.
+  private var listTemplate: CPListTemplate?
 
   func templateApplicationScene(
     _ templateApplicationScene: CPTemplateApplicationScene,
@@ -60,11 +63,11 @@ class AppleVisCarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDeleg
     AppleVisCarPlayModule.shared?.sendEvent(
       withName: "carPlayConnected", body: nil)
 
-    let template = makeListTemplate(
-      episodes: AppleVisCarPlayModule.shared.map { m in
-        m.value(forKey: "episodes") as? [[String: Any]] ?? []
-      } ?? []
-    )
+    let episodes = AppleVisCarPlayModule.shared.map { m in
+      m.value(forKey: "episodes") as? [[String: Any]] ?? []
+    } ?? []
+    let template = makeListTemplate(episodes: episodes)
+    listTemplate = template
     interfaceController.setRootTemplate(template, animated: false, completion: nil)
   }
 
@@ -73,35 +76,49 @@ class AppleVisCarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDeleg
     didDisconnect interfaceController: CPInterfaceController
   ) {
     self.interfaceController = nil
+    listTemplate = nil
     AppleVisCarPlayModule.shared?.sendEvent(
       withName: "carPlayDisconnected", body: nil)
   }
 
   func reloadList(episodes: [[String: Any]]) {
-    guard let controller = interfaceController else { return }
-    let template = makeListTemplate(episodes: episodes)
-    controller.setRootTemplate(template, animated: true, completion: nil)
+    let items = makeListItems(episodes: episodes)
+    if let existing = listTemplate {
+      // Update sections in-place — preserves the nav stack (e.g. Now Playing screen)
+      existing.updateSections([CPListSection(items: items)])
+    } else if let controller = interfaceController {
+      let template = CPListTemplate(title: "AppleVis Podcasts",
+                                   sections: [CPListSection(items: items)])
+      listTemplate = template
+      controller.setRootTemplate(template, animated: false, completion: nil)
+    }
   }
 
   // ── Build the episode browse list ─────────────────────────────────────────
-  private func makeListTemplate(episodes: [[String: Any]]) -> CPListTemplate {
-    let items: [CPListItem] = episodes.prefix(100).map { ep in
-      let title    = ep["title"]     as? String ?? "Episode"
+
+  private func makeListItems(episodes: [[String: Any]]) -> [CPListItem] {
+    episodes.prefix(100).map { ep in
+      let title     = ep["title"]     as? String ?? "Episode"
       let showTitle = ep["showTitle"] as? String ?? ""
-      let duration = ep["duration"]  as? Double ?? 0
-      let mins     = Int(duration / 60)
-      let detail   = mins > 0 ? "\(showTitle) · \(mins) min" : showTitle
+      let duration  = ep["duration"]  as? Double ?? 0
+      let mins      = Int(duration / 60)
+      let downloaded = ep["isDownloaded"] as? Bool ?? false
+      var detail    = mins > 0 ? "\(showTitle) · \(mins) min" : showTitle
+      if downloaded { detail += " · Downloaded" }
 
       let item = CPListItem(text: title, detailText: detail)
+      item.accessoryType = .disclosureIndicator
       item.handler = { [weak self] _, completion in
         self?.playEpisode(ep)
         completion()
       }
       return item
     }
+  }
 
-    let section  = CPListSection(items: items)
-    let template = CPListTemplate(title: "AppleVis Podcasts", sections: [section])
+  private func makeListTemplate(episodes: [[String: Any]]) -> CPListTemplate {
+    let template = CPListTemplate(title: "AppleVis Podcasts",
+                                  sections: [CPListSection(items: makeListItems(episodes: episodes))])
     return template
   }
 

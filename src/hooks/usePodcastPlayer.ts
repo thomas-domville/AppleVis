@@ -69,8 +69,10 @@ export function usePodcastPlayer() {
   const nowPlayingTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const liveActivityTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const queueLoadedRef = useRef(false);
-  const episodeRef    = useRef<PodcastEpisode | null>(null);
-  const volumeRef     = useRef(1.0);
+  const episodeRef      = useRef<PodcastEpisode | null>(null);
+  const queueRef        = useRef<PodcastEpisode[]>([]);
+  const loadEpisodeRef  = useRef<(ep: PodcastEpisode, autoPlay?: boolean) => Promise<void>>(async () => {});
+  const volumeRef       = useRef(1.0);
   const [state, setState] = useState<PlayerState>(DEFAULT);
   const {
     podcastAutoPlay, podcastSleepTimer, podcastSpeed, setPodcastSpeed,
@@ -88,6 +90,12 @@ export function usePodcastPlayer() {
     pause: async () => {
       await soundRef.current?.pauseAsync();
     },
+    togglePlayPause: async () => {
+      const s = await soundRef.current?.getStatusAsync();
+      if (!s?.isLoaded) return;
+      if (s.isPlaying) await soundRef.current?.pauseAsync();
+      else await soundRef.current?.playAsync();
+    },
     skipBack: async () => {
       const s = await soundRef.current?.getStatusAsync();
       if (s?.isLoaded) {
@@ -102,6 +110,15 @@ export function usePodcastPlayer() {
       }
     },
     seekTo: (seconds: number) => soundRef.current?.setPositionAsync(seconds * 1000),
+    nextTrack: () => {
+      const [next, ...rest] = queueRef.current;
+      if (next) {
+        patch({ queue: rest });
+        loadEpisodeRef.current(next, true);
+      }
+    },
+    // Standard podcast behaviour: previous = restart from beginning.
+    previousTrack: () => { soundRef.current?.setPositionAsync(0); },
   });
 
   // Register lock screen / AirPods / CarPlay remote commands once, re-register on skip interval change.
@@ -110,9 +127,12 @@ export function usePodcastPlayer() {
     setupRemoteCommands({
       onPlay:         () => actionsRef.current.play(),
       onPause:        () => actionsRef.current.pause(),
+      onTogglePlayPause: () => actionsRef.current.togglePlayPause(),
       onSkipBackward: () => actionsRef.current.skipBack(),
       onSkipForward:  () => actionsRef.current.skipForward(),
       onSeek:         (s) => actionsRef.current.seekTo(s),
+      onNextTrack:     () => actionsRef.current.nextTrack(),
+      onPreviousTrack: () => actionsRef.current.previousTrack(),
       skipBackInterval:    podcastSkipBack,
       skipForwardInterval: podcastSkipForward,
     });
@@ -128,8 +148,9 @@ export function usePodcastPlayer() {
     if (Platform.OS === 'ios') setTrimSilenceEnabled(podcastTrimSilence);
   }, [podcastTrimSilence]);
 
-  // Keep a stable ref to the current episode so AppState callback never goes stale.
+  // Keep stable refs so remote command callbacks never capture stale closures.
   useEffect(() => { episodeRef.current = state.episode; }, [state.episode]);
+  useEffect(() => { queueRef.current   = state.queue;   }, [state.queue]);
 
   // On launch: restore saved volume and the last-played episode (paused at saved position).
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -202,12 +223,24 @@ export function usePodcastPlayer() {
     patch({ skipBackSeconds: podcastSkipBack, skipForwardSeconds: podcastSkipForward });
   }, [podcastSkipBack, podcastSkipForward, patch]);
 
-  // Push elapsed time to lock screen every 5 seconds while playing.
+  // Push elapsed time to lock screen, and keep the Now Playing owner active even while paused.
   useEffect(() => {
     if (nowPlayingTickRef.current) {
       clearInterval(nowPlayingTickRef.current);
       nowPlayingTickRef.current = null;
     }
+
+    if (state.episode && Platform.OS === 'ios') {
+      updateNowPlayingInfo({
+        title:       state.episode.title,
+        artist:      state.episode.showTitle,
+        artworkUrl:  state.episode.artworkUrl,
+        duration:    state.duration,
+        elapsedTime: state.position,
+        playbackRate: state.isPlaying ? state.speed : 0,
+      });
+    }
+
     if (state.isPlaying && state.episode && Platform.OS === 'ios') {
       nowPlayingTickRef.current = setInterval(() => {
         setState(prev => {
@@ -218,7 +251,7 @@ export function usePodcastPlayer() {
               artworkUrl:  prev.episode.artworkUrl,
               duration:    prev.duration,
               elapsedTime: prev.position,
-              playbackRate: prev.speed,
+              playbackRate: prev.isPlaying ? prev.speed : 0,
             });
           }
           return prev;
@@ -228,7 +261,7 @@ export function usePodcastPlayer() {
     return () => {
       if (nowPlayingTickRef.current) clearInterval(nowPlayingTickRef.current);
     };
-  }, [state.isPlaying, state.episode]);
+  }, [state.isPlaying, state.episode, state.duration, state.speed]);
 
   // Keep Lock Screen / Dynamic Island Live Activity in sync with playback.
   useEffect(() => {
@@ -459,6 +492,11 @@ export function usePodcastPlayer() {
     }
   }
 
+  // Keep loadEpisodeRef current so nextTrack callback (registered once in remote
+  // commands setup) always calls the latest version of this function.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadEpisodeRef.current = loadEpisode; });
+
   async function play() {
     sounds.podcastPlay().catch(() => {});
     await soundRef.current?.playAsync();
@@ -478,7 +516,9 @@ export function usePodcastPlayer() {
       if (s?.isLoaded && state.episode) {
         await persistence.savePodcastPosition(state.episode.id, s.positionMillis / 1000);
       }
-    } catch {}
+    } catch {
+      // Non-critical: failing to persist the last position on stop must not block teardown.
+    }
     await soundRef.current?.unloadAsync().catch(() => {});
     soundRef.current = null;
     if (sleepRef.current) { clearInterval(sleepRef.current); sleepRef.current = null; }

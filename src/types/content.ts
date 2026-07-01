@@ -92,7 +92,7 @@ export type Chapter = {
   endTime?: number;
 };
 
-export type PodcastTag = { name: string; tid: number };
+export type PodcastTag = { name: string; tid: number; count?: number };
 
 export type PodcastEpisode = {
   id: string;
@@ -109,6 +109,7 @@ export type PodcastEpisode = {
   url?: string;
   authorName?: string;
   tags?: PodcastTag[];
+  commentCount?: number;
 };
 
 export type AppListing = {
@@ -119,10 +120,16 @@ export type AppListing = {
   category: string;
   reviewCount: number;
   lastUpdatedAt: string;
-  createdAt?: string;      // original submission date (Drupal 'created')
-  submittedBy?: string;    // submitter display_name from uid relationship
+  lastActivityAt?: string;  // comment_node_ios_app_directory.last_comment_timestamp
+  createdAt?: string;       // original submission date (Drupal 'created')
+  submittedBy?: string;     // submitter display_name from uid relationship
   appStoreUrl: string;
   iconUrl?: string;
+  price?: string;            // field_cost — e.g. "Free", "Free With In-App Purchase", "$2.99"
+  supportedDevices?: string[]; // field_device_used — e.g. ["iPhone", "iPad"]
+  voiceOverPerformance?: string; // field_voiceover — Excellent/Good/Fair/Poor when available
+  buttonLabelling?: string;      // field_labelling — Excellent/Good/Fair/Poor when available
+  usabilityNotes?: string;       // field_usability — Excellent/Good/Fair/Poor when available
   summary: string;
   url?: string;
 };
@@ -133,8 +140,9 @@ export type AppPlatform = {
 };
 
 export type AppCategory = {
-  name: string;
-  slug: string;
+  name:   string;
+  slug:   string;
+  tid?:   string;   // Drupal taxonomy term ID — used in /api/v1/apps/{platform}/categories/{tid}
   count?: number;
 };
 
@@ -149,6 +157,8 @@ export type Resource = {
   id: string;
   title: string;
   kind: 'guide' | 'tutorial' | 'article' | 'event' | 'developer';
+  authorName?: string;
+  authorId?: string;
   categories?: { name: string; tid: number }[];
   summary: string;
   createdAt?: string;
@@ -184,8 +194,6 @@ export type AppReview = {
   rating?: number;
   body: string;
   createdAt: string;
-  appVersion?: string;
-  platform?: string;
 };
 
 export type AppDetail = AppListing & {
@@ -195,16 +203,11 @@ export type AppDetail = AppListing & {
   reviewedVersion?: string;         // field_version — version on AppleVis at time of submission
   testedOnIOS?: string;             // field_ios_version (raw value; may be taxonomy term ID)
   accessibilityComments?: string;   // field_comments — submitter's accessibility evaluation
-  voiceOverPerformance?: string;    // field_voiceover
-  buttonLabelling?: string;         // field_labelling
-  usabilityNotes?: string;          // field_usability
   otherComments?: string;           // field_other_comments
 };
 
 export type ResourceDetail = Resource & {
   body: string;
-  authorName?: string;
-  authorId?: string;
 };
 
 export type UserProfile = {
@@ -230,6 +233,7 @@ export type BugReport = {
   commentCount: number;
   createdAt: string;
   changedAt: string;
+  summary?: string;
   url: string;
 };
 

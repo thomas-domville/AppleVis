@@ -67,7 +67,7 @@ struct LiveActivityLockScreenView: View {
       }
     }
     .padding()
-    .activityBackgroundTint(.black.opacity(0.7))
+    .activityBackgroundTint(Color(.systemBackground).opacity(0.85))
   }
 }
 
@@ -103,13 +103,16 @@ struct AppleVisLiveActivity: Widget {
       } compactLeading: {
         Image(systemName: "radio.fill").foregroundColor(.blue).font(.caption)
       } compactTrailing: {
+        // waveform = playing (animated feel), play.circle.fill = paused (tap to resume)
         Image(
-          systemName: context.state.isPlaying ? "waveform" : "pause.circle.fill"
+          systemName: context.state.isPlaying ? "waveform" : "play.circle.fill"
         ).foregroundColor(.blue).font(.caption)
       } minimal: {
-        Image(systemName: "radio.fill").foregroundColor(.blue)
+        Image(systemName: context.state.isPlaying ? "waveform" : "radio.fill")
+          .foregroundColor(.blue)
       }
       .keylineTint(.blue)
+      .supplementalActivityFamilies([.small]) // StandBy mode (iOS 17+)
     }
   }
 }

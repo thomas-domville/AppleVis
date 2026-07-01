@@ -19,9 +19,11 @@ import { usePreferences } from '../../src/contexts/PreferencesContext';
 import { useAlert } from '../../src/contexts/AccessibleAlertContext';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { persistence } from '../../src/services/persistence';
+import { sounds } from '../../src/services/sounds';
 import { useTip, TIP_KEYS, TIPS } from '../../src/contexts/ContextualTipContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 import { relativeTime } from '../../src/utils/relativeTime';
+import { restoreAccessibilityFocus } from '../../src/utils/restoreAccessibilityFocus';
 import type { FeedItem, FeedPrefs } from '../../src/types/content';
 
 // ─── Greeting ─────────────────────────────────────────────────────────────────
@@ -147,7 +149,7 @@ const FILTER_ROWS: FilterRow[] = [
   { key: 'podcasts',  label: 'Latest Podcasts and Comments',      subLabel: 'New episodes and episode discussion' },
   { key: 'apps',      label: 'Latest App Entries and Comments',   subLabel: 'New app listings and accessibility comments' },
   { key: 'guides',    label: 'Latest Blogs, Guides and Comments', subLabel: 'Blog posts, guides, tutorials, and how-tos' },
-  { key: 'appleOnly', label: 'Apple-Related Topics Only',         subLabel: 'Filter topics to Apple products and services only' },
+  { key: 'appleOnly', label: 'Apple-Related Forum Topics Only',   subLabel: 'Filter topics to Apple products and services only' },
 ];
 
 function FeedFilterModal({
@@ -168,10 +170,7 @@ function FeedFilterModal({
 
   useEffect(() => {
     if (!visible) return;
-    const timer = setTimeout(() => {
-      const handle = findNodeHandle(headingRef.current);
-      if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
-    }, 400);
+    const timer = restoreAccessibilityFocus(headingRef, { delay: 400 });
     return () => clearTimeout(timer);
   }, [visible, headingRef]);
 
@@ -301,7 +300,7 @@ export default function HomeScreen() {
   const { showTip }  = useTip();
   const colorScheme  = useColorScheme();
   const a11y         = useAccessibilityPreferences();
-  const { welcomeSummaryEnabled, defaultForumFilter } = usePreferences();
+  const { welcomeSummaryEnabled, defaultForumFilter, homeStartupBehavior } = usePreferences();
   const [filterVisible, setFilterVisible] = useState(false);
   const flatListRef       = useRef<FlatList>(null);
   const firstItemRef      = useRef<View | null>(null);
@@ -311,9 +310,15 @@ export default function HomeScreen() {
   const feedItemsRef      = useRef<FeedItem[]>([]);
   const firstItemFocusTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const prevRefreshingRef = useRef(false);
+  // True only while a refresh triggered by the user's pull gesture is in flight —
+  // distinguishes it from the programmatic refresh() call after returning from
+  // a long background absence, which should stay quiet.
+  const isManualRefreshRef = useRef(false);
   const hasAnnouncedRef = useRef(false);
   const appStateRef = useRef(AppState.currentState);
   const welcomeAnnouncementTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const loadingStatusRef = useRef<View | null>(null);
+  const hasFocusedLoadingStatusRef = useRef(false);
   const [itemVisits, setItemVisits] = useState<Record<string, { seenAt: string; commentCount: number }>>({});
   const [lastVisitAt, setLastVisitAt] = useState<string | null>(null);
   const [lastVisitLoaded, setLastVisitLoaded] = useState(false);
@@ -325,13 +330,23 @@ export default function HomeScreen() {
   const modalHeadingRef        = useRef<Text | null>(null);
   const lastFocusedBeforeModal = useRef<View | null>(null);
   const welcomeSummaryRef      = useRef<View | null>(null);
+  const activityHeadingRef     = useRef<Text | null>(null);
   const [feedLoadedAt, setFeedLoadedAt] = useState<Date | null>(null);
+  const isPreparingInitialHome = feedLoadedAt == null && (feed.loading || !lastVisitLoaded || !itemVisitsLoaded);
+
+  // Tab-focus tracking — lets us skip sounds/announcements when the user is on another tab.
+  const isTabFocusedRef = useRef(false);
+  // Set true on first mount and whenever AppState returns after a 30-min absence.
+  const pendingWelcomeRef = useRef(true);
+  const lastWelcomeAnnouncedAtRef = useRef<number>(0);
+  const WELCOME_MIN_GAP_MS = 30 * 60 * 1000;
 
   function getNewCount(item: FeedItem): number {
     const visit = itemVisits[item.data.id];
     if (!visit) return 0;
     const current =
       item.kind === 'topic'   ? item.data.replyCount :
+      item.kind === 'podcast' ? (item.data.commentCount ?? 0) :
       item.kind === 'app'     ? item.data.reviewCount :
       item.kind === 'blog'    ? item.data.commentCount :
       item.kind === 'guide'   ? item.data.commentCount : 0;
@@ -340,6 +355,7 @@ export default function HomeScreen() {
 
   function getCommentCount(item: FeedItem): number {
     return item.kind === 'topic'   ? item.data.replyCount :
+           item.kind === 'podcast' ? (item.data.commentCount ?? 0) :
            item.kind === 'app'     ? item.data.reviewCount :
            item.kind === 'blog'    ? item.data.commentCount :
            item.kind === 'guide'   ? item.data.commentCount : 0;
@@ -397,6 +413,16 @@ export default function HomeScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []));
 
+  useFocusEffect(useCallback(() => {
+    isTabFocusedRef.current = true;
+    // If a welcome is still pending (set by AppState after a long absence), kick
+    // the welcome effect now that the tab is visible.
+    if (pendingWelcomeRef.current) {
+      setWelcomeFocusToken((t) => t + 1);
+    }
+    return () => { isTabFocusedRef.current = false; };
+  }, []));
+
   const clearFirstItemFocusTimers = useCallback(() => {
     firstItemFocusTimersRef.current.forEach(clearTimeout);
     firstItemFocusTimersRef.current = [];
@@ -429,6 +455,19 @@ export default function HomeScreen() {
   useEffect(() => clearFirstItemFocusTimers, [clearFirstItemFocusTimers]);
   useEffect(() => clearWelcomeAnnouncementTimers, [clearWelcomeAnnouncementTimers]);
 
+  useEffect(() => {
+    if (!isPreparingInitialHome || hasFocusedLoadingStatusRef.current) return;
+    hasFocusedLoadingStatusRef.current = true;
+    sounds.loadingStart().catch(() => {});
+
+    const timer = restoreAccessibilityFocus(loadingStatusRef, {
+      delay: 300,
+      fallbackAnnouncement: 'Opening AppleVis. Loading your Home feed.',
+    });
+
+    return () => clearTimeout(timer);
+  }, [isPreparingInitialHome]);
+
   const focusLastVisitedFeedItem = useCallback(() => {
     const sorted = Object.entries(itemVisits)
       .sort(([, a], [, b]) => new Date(b.seenAt).getTime() - new Date(a.seenAt).getTime());
@@ -442,6 +481,8 @@ export default function HomeScreen() {
       const key = `${feedItem.kind}-${feedItem.data.id}`;
       const index = feedItemsRef.current.indexOf(feedItem);
       if (index >= 0) {
+        // Non-critical: scrollToIndex can throw if the list hasn't measured this row yet;
+        // focus restoration below still runs regardless.
         try { flatListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.3 }); }
         catch {}
       }
@@ -532,6 +573,10 @@ export default function HomeScreen() {
       }
 
       if (state === 'active' && wasInactive) {
+        const now = Date.now();
+        const sinceLastWelcome = now - lastWelcomeAnnouncedAtRef.current;
+        const shouldAnnounce = sinceLastWelcome >= WELCOME_MIN_GAP_MS;
+
         persistence.getLastVisit()
           .then((iso) => {
             setLastVisitAt(iso);
@@ -540,6 +585,18 @@ export default function HomeScreen() {
             pendingFocusRestoreRef.current = false;
             lastTappedIdRef.current = null;
             setWelcomeFocusToken((token) => token + 1);
+
+            if (shouldAnnounce) {
+              pendingWelcomeRef.current = true;
+            }
+
+            // Only reset the loading indicator when the Home tab is in front —
+            // avoids triggering the loading sound while the user is elsewhere.
+            if (isTabFocusedRef.current) {
+              hasFocusedLoadingStatusRef.current = false;
+              setFeedLoadedAt(null);
+            }
+
             feed.refresh();
           })
           .finally(() => {
@@ -550,28 +607,48 @@ export default function HomeScreen() {
     return () => sub.remove();
   }, [feed.refresh]);
 
-  // On initial load: speak a short welcome, then restore VoiceOver focus to
-  // the last visited feed item. The what's-new card stays available near the
-  // top, but no longer steals focus or auto-reads its longer summary.
+  // Speak a welcome and restore VoiceOver focus to the last visited feed item.
+  // Only fires when the Home tab is in front and a welcome is actually pending —
+  // prevents announcements and sounds while the user is on another tab.
   useEffect(() => {
-    if (!hasAnnouncedRef.current && lastVisitLoaded && itemVisitsLoaded && !feed.loading && feed.items.length > 0) {
-      hasAnnouncedRef.current = true;
-      pendingFocusRestoreRef.current = false;
-      lastTappedIdRef.current = null;
-      setFeedLoadedAt(new Date());
-      clearFirstItemFocusTimers();
-      clearWelcomeAnnouncementTimers();
+    if (
+      !pendingWelcomeRef.current ||
+      !isTabFocusedRef.current ||
+      !lastVisitLoaded ||
+      !itemVisitsLoaded ||
+      feed.loading ||
+      feed.items.length === 0
+    ) return;
 
-      const welcomeText = lastVisitAt ? 'Welcome back to AppleVis.' : 'Welcome to AppleVis.';
+    pendingWelcomeRef.current = false;
+    hasAnnouncedRef.current = true;
+    lastWelcomeAnnouncedAtRef.current = Date.now();
+    pendingFocusRestoreRef.current = false;
+    lastTappedIdRef.current = null;
+    setFeedLoadedAt(new Date());
+    clearFirstItemFocusTimers();
+    clearWelcomeAnnouncementTimers();
+
+    // Home Startup Behavior: Quiet skips the sound and announcement entirely (focus still
+    // moves so screen reader users land somewhere sensible); Helpful is the short greeting;
+    // Detailed also speaks the what's-new summary instead of making the user find it.
+    if (homeStartupBehavior !== 'quiet') {
+      sounds.welcome().catch(() => {});
+      const baseText = lastVisitAt
+        ? 'Welcome back to AppleVis. Returning to where you left off.'
+        : 'Welcome to AppleVis. Home is ready.';
+      const welcomeText = homeStartupBehavior === 'detailed' && welcomeSummary
+        ? `${baseText} ${welcomeSummary.message}`
+        : baseText;
       AccessibilityInfo.announceForAccessibility(welcomeText);
-
-      const focusDelay = a11y.screenReaderEnabled ? 1200 : 350;
-      const t = setTimeout(() => {
-        focusLastVisitedFeedItem();
-      }, focusDelay);
-      welcomeAnnouncementTimersRef.current = [t];
-      return () => clearTimeout(t);
     }
+
+    const focusDelay = a11y.screenReaderEnabled ? 1200 : 350;
+    const t = setTimeout(() => {
+      focusLastVisitedFeedItem();
+    }, focusDelay);
+    welcomeAnnouncementTimersRef.current = [t];
+    return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     a11y.screenReaderEnabled,
@@ -580,20 +657,42 @@ export default function HomeScreen() {
     feed.loading,
     feed.items.length,
     focusLastVisitedFeedItem,
+    homeStartupBehavior,
     itemVisitsLoaded,
     lastVisitAt,
     lastVisitLoaded,
     welcomeFocusToken,
+    welcomeSummary,
   ]);
 
-  // After pull-to-refresh completes: move VoiceOver focus back to the first feed item.
+  // After a refresh completes: only pull focus to the first item when the
+  // refresh was user-triggered (pull-to-refresh, not a background/AppState
+  // refresh) AND results meaningfully changed AND VoiceOver is running.
+  // An unconditional focus jump on every refresh — even background ones the
+  // user didn't ask for — is disorienting, so a quiet announcement replaces it.
   useEffect(() => {
     if (prevRefreshingRef.current && !feed.refreshing && feed.items.length > 0) {
       setFeedLoadedAt(new Date());
-      focusFirstFeedItem(true);
+      const wasManual = isManualRefreshRef.current;
+      isManualRefreshRef.current = false;
+      if (wasManual) {
+        if (newItemsCount > 0) {
+          AccessibilityInfo.announceForAccessibility(
+            `Home updated. ${newItemsCount} new item${newItemsCount === 1 ? '' : 's'}.`,
+          );
+          if (a11y.screenReaderEnabled) focusFirstFeedItem(true);
+        } else {
+          AccessibilityInfo.announceForAccessibility('Refreshed. No new items.');
+        }
+      }
     }
     prevRefreshingRef.current = feed.refreshing;
-  }, [feed.refreshing, feed.items.length, focusFirstFeedItem]);
+  }, [feed.refreshing, feed.items.length, newItemsCount, focusFirstFeedItem, a11y.screenReaderEnabled]);
+
+  function handlePullToRefresh() {
+    isManualRefreshRef.current = true;
+    feed.refresh();
+  }
 
   function handleItemPress(item: FeedItem) {
     lastTappedIdRef.current = `${item.kind}-${item.data.id}`;
@@ -639,6 +738,14 @@ export default function HomeScreen() {
   function handleWelcomeSummaryPress() {
     setWelcomeDismissed(true);
     setTimeout(() => focusLastVisitedFeedItem(), 50);
+  }
+
+  function handleDismissWelcomeSummary() {
+    setWelcomeDismissed(true);
+    restoreAccessibilityFocus(activityHeadingRef, {
+      delay: 150,
+      fallbackAnnouncement: homeFilter === 'New' ? 'New Activity' : 'Latest Activity',
+    });
   }
 
   async function handleMarkRead(item: FeedItem) {
@@ -778,7 +885,7 @@ export default function HomeScreen() {
             </Pressable>
 
             <Pressable
-              onPress={() => setWelcomeDismissed(true)}
+              onPress={handleDismissWelcomeSummary}
               accessible
               accessibilityRole="button"
               accessibilityLabel="Dismiss welcome summary"
@@ -826,16 +933,31 @@ export default function HomeScreen() {
         {/* Per-source error banners — only shown if something failed */}
         {anyErrors && (
           <View style={{
-            flexDirection: 'row', gap: 8, alignItems: 'flex-start',
+            flexDirection: 'row', gap: 8, alignItems: 'center',
             backgroundColor: warnBg, borderRadius: 10, padding: 12, marginBottom: 10,
-          }}
-            accessible
-            accessibilityLabel={`Some content could not be loaded: ${Object.keys(feed.errors).join(', ')}.`}
-          >
-            <Ionicons name="warning-outline" size={16} color={warnText} accessibilityElementsHidden style={{ marginTop: 1 }} />
-            <Text style={{ flex: 1, fontSize: 13, color: warnText, lineHeight: 18 }}>
-              Some sources could not be loaded. Pull down to retry.
-            </Text>
+          }}>
+            <View
+              style={{ flex: 1, flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}
+              accessible
+              accessibilityLabel={`Some content could not be loaded: ${Object.keys(feed.errors).join(', ')}.`}
+            >
+              <Ionicons name="warning-outline" size={16} color={warnText} accessibilityElementsHidden style={{ marginTop: 1 }} />
+              <Text style={{ flex: 1, fontSize: 13, color: warnText, lineHeight: 18 }}>
+                Some sources could not be loaded.
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => feed.refresh()}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Retry Now. Retry loading Home feed"
+              style={({ pressed }) => ({
+                borderRadius: 8, borderWidth: 1, borderColor: warnText,
+                paddingHorizontal: 10, paddingVertical: 6, opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <Text style={{ color: warnText, fontSize: 12, fontWeight: '700' }}>Retry Now</Text>
+            </Pressable>
           </View>
         )}
 
@@ -856,6 +978,7 @@ export default function HomeScreen() {
 
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, marginTop: 4 }}>
           <Text
+            ref={activityHeadingRef}
             style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.textSecondary,
               textTransform: 'uppercase', letterSpacing: 0.8 }}
             accessibilityRole="header"
@@ -934,15 +1057,23 @@ export default function HomeScreen() {
       }
     >
       {/* Loading state */}
-      {feed.loading && (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 }}>
-          <ActivityIndicator size="large" color={colors.appleVisBlue} accessibilityLabel="Loading Home" />
-          <Text style={[styles.lede, { marginTop: 14, textAlign: 'center' }]}>Loading…</Text>
+      {isPreparingInitialHome && (
+        <View
+          ref={loadingStatusRef}
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 }}
+          accessible
+          accessibilityRole="text"
+          accessibilityLabel="Opening AppleVis. Loading your Home feed."
+        >
+          <ActivityIndicator size="large" color={colors.appleVisBlue} accessibilityElementsHidden />
+          <Text style={[styles.lede, { marginTop: 14, textAlign: 'center' }]} accessibilityElementsHidden>
+            Opening AppleVis. Loading your Home feed.
+          </Text>
         </View>
       )}
 
       {/* Empty state — all sources off or all failed */}
-      {!feed.loading && feed.items.length === 0 && (
+      {!isPreparingInitialHome && feed.items.length === 0 && (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <EmptyState
             icon="newspaper-outline"
@@ -953,7 +1084,7 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {!feed.loading && feed.items.length > 0 && visibleItems.length === 0 && (
+      {!isPreparingInitialHome && feed.items.length > 0 && visibleItems.length === 0 && (
         <FlatList
           data={[] as FeedItem[]}
           renderItem={() => null}
@@ -965,13 +1096,20 @@ export default function HomeScreen() {
               icon="checkmark-circle-outline"
               title="No new activity"
               subtitle="Anything you mark as read will stay out of this view until new activity arrives."
+              primaryAction={{
+                label: 'Show Latest Activity',
+                onPress: () => {
+                  setHomeFilter('All');
+                  AccessibilityInfo.announceForAccessibility('Showing all Home activity.');
+                },
+              }}
             />
           )}
           contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
           refreshControl={
             <RefreshControl
               refreshing={feed.refreshing}
-              onRefresh={feed.refresh}
+              onRefresh={handlePullToRefresh}
               tintColor={colors.appleVisBlue}
               accessibilityLabel="Pull to refresh"
             />
@@ -982,7 +1120,7 @@ export default function HomeScreen() {
       )}
 
       {/* Feed */}
-      {!feed.loading && visibleItems.length > 0 && (
+      {!isPreparingInitialHome && visibleItems.length > 0 && (
         <FlatList
           data={visibleItems}
           keyExtractor={(item) => `${item.kind}-${item.data.id}`}
@@ -1001,6 +1139,7 @@ export default function HomeScreen() {
                   if (index === 0) firstItemRef.current = el;
                 }}
                 onFocus={() => { lastFocusedBeforeModal.current = itemRefs.current[key]; }}
+                onItemDeleted={() => feed.refresh()}
               />
             );
           }}
@@ -1012,7 +1151,7 @@ export default function HomeScreen() {
           refreshControl={
             <RefreshControl
               refreshing={feed.refreshing}
-              onRefresh={feed.refresh}
+              onRefresh={handlePullToRefresh}
               tintColor={colors.appleVisBlue}
               accessibilityLabel="Pull to refresh"
             />

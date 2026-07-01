@@ -1,31 +1,29 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
-  AccessibilityInfo, ActivityIndicator, Animated, findNodeHandle,
-  KeyboardAvoidingView, Platform, Pressable, ScrollView,
-  Text, TextInput, View,
+  AccessibilityInfo, ActivityIndicator, Clipboard, KeyboardAvoidingView,
+  Platform, Pressable, Text, TextInput, View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { WizardLayout } from '../../src/components/WizardLayout';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useBlogWizard } from '../../src/contexts/BlogWizardContext';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
-import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
+import { useAlert } from '../../src/contexts/AccessibleAlertContext';
 import { isAppleIntelligenceAvailable, summariseText } from '../../src/services/intelligenceService';
 import { sounds } from '../../src/services/sounds';
 
-// ─── Step 2: Write / Import / Paste your blog content ─────────────────────────
+// ─── Step 2: Write / Import / Paste blog content ──────────────────────────────
 
 type InputMode = 'write' | 'import' | 'paste';
 
 export default function BlogStep2() {
-  const { colors }                            = useTheme();
-  const router                                = useRouter();
-  const { state, update }                     = useBlogWizard();
-  const { aiSummariesEnabled }                = usePreferences();
-  const { screenReaderEnabled, reduceMotion } = useAccessibilityPreferences();
+  const { colors }         = useTheme();
+  const { state, update, reset } = useBlogWizard();
+  const { aiSummariesEnabled }   = usePreferences();
+  const { showAlert }      = useAlert();
 
-  const headingRef  = useRef<Text>(null);
-  const fadeAnim    = useRef(new Animated.Value(reduceMotion || screenReaderEnabled ? 1 : 0)).current;
+  const charCountRef    = useRef(state.blogContent.trim().length);
   const [mode, setMode] = useState<InputMode>('write');
   const [aiDrafting, setAiDrafting] = useState(false);
 
@@ -33,24 +31,28 @@ export default function BlogStep2() {
   const charCount   = state.blogContent.trim().length;
   const canContinue = charCount >= 50;
 
-  useEffect(() => {
-    if (!reduceMotion && !screenReaderEnabled) {
-      Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
-    }
-    if (screenReaderEnabled) {
-      const id = setTimeout(() => {
-        const node = findNodeHandle(headingRef.current);
-        if (node) AccessibilityInfo.setAccessibilityFocus(node);
-      }, 350);
-      return () => clearTimeout(id);
-    }
-  }, []);
+  function handleNext() {
+    sounds.articleOpen().catch(() => {});
+    router.push('/submit-blog/review' as any);
+  }
+
+  function handleCancel() {
+    showAlert({
+      title: 'Discard this submission?',
+      message: 'Your blog post will be discarded.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep Editing',
+      type: 'warning',
+      onConfirm: () => {
+        reset();
+        router.replace('/(tabs)/discover' as any);
+      },
+    });
+  }
 
   async function handleImport() {
     try {
-      // expo-document-picker must be installed: npx expo install expo-document-picker
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { getDocumentAsync } = await import('expo-document-picker') as any;
+      const { getDocumentAsync } = await import('expo-document-picker');
       const result = await getDocumentAsync({
         type: ['text/plain', 'text/markdown', 'text/x-markdown'],
         copyToCacheDirectory: true,
@@ -70,8 +72,6 @@ export default function BlogStep2() {
 
   async function handlePaste() {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { default: Clipboard } = await import('@react-native-clipboard/clipboard') as any;
       const text = await Clipboard.getString();
       if (!text?.trim()) {
         AccessibilityInfo.announceForAccessibility('Clipboard is empty.');
@@ -82,7 +82,6 @@ export default function BlogStep2() {
       sounds.pickerTick().catch(() => {});
       AccessibilityInfo.announceForAccessibility(`${text.trim().length} characters pasted from clipboard.`);
     } catch {
-      // Fallback for environments where clipboard module isn't available
       AccessibilityInfo.announceForAccessibility('Could not read clipboard. Please paste manually into the text field.');
       setMode('write');
     }
@@ -107,226 +106,190 @@ export default function BlogStep2() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={100}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: fadeAnim.interpolate({ inputRange: [0,1], outputRange: [16,0] }) }] }}>
-
-          {/* Back */}
-          <Pressable onPress={() => router.back()} accessible accessibilityRole="button" accessibilityLabel="Back to title and category"
-            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 20, opacity: pressed ? 0.7 : 1 })}>
-            <Ionicons name="chevron-back" size={18} color={colors.accent} />
-            <Text style={{ fontSize: 15, color: colors.accent, fontWeight: '600' }}>Back</Text>
-          </Pressable>
-
-          {/* Heading */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 8 }}>
-            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accent, justifyContent: 'center', alignItems: 'center' }} accessibilityElementsHidden>
-              <Ionicons name="create-outline" size={22} color="#fff" />
-            </View>
-            <Text ref={headingRef} accessibilityRole="header" style={{ fontSize: 24, fontWeight: '800', color: colors.text, flex: 1 }}>
-              Your blog post
-            </Text>
-          </View>
-          <Text style={{ fontSize: 14, color: colors.textSecondary, marginBottom: 20, lineHeight: 21 }}>
-            Write, import a text file, or paste from another app.
-          </Text>
-
-          {/* Mode tabs */}
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20, backgroundColor: colors.card, borderRadius: 12, padding: 4 }}
-            accessible={false}>
-            {([['write', 'pencil-outline', 'Write'], ['import', 'document-text-outline', 'Import file'], ['paste', 'clipboard-outline', 'Paste']] as const).map(([m, icon, label]) => (
-              <Pressable
-                key={m}
-                onPress={() => { setMode(m); sounds.pickerTick().catch(() => {}); }}
-                accessible
-                accessibilityRole="tab"
-                accessibilityLabel={label}
-                accessibilityState={{ selected: mode === m }}
-                style={({ pressed }) => ({
-                  flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                  gap: 5, paddingVertical: 10, borderRadius: 10,
-                  backgroundColor: mode === m ? colors.accent : 'transparent',
-                  opacity: pressed ? 0.8 : 1,
-                })}
-              >
-                <Ionicons name={icon as any} size={15} color={mode === m ? '#fff' : colors.textSecondary} accessibilityElementsHidden />
-                <Text style={{ fontSize: 13, fontWeight: mode === m ? '700' : '400', color: mode === m ? '#fff' : colors.textSecondary }}>
-                  {label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          {/* Write mode */}
-          {mode === 'write' && (
-            <>
-              <TextInput
-                value={state.blogContent}
-                onChangeText={v => update({ blogContent: v })}
-                placeholder="Start writing your blog post here…"
-                placeholderTextColor={colors.textSecondary}
-                multiline
-                style={{
-                  backgroundColor: colors.card, borderRadius: 14, padding: 14,
-                  fontSize: 16, color: colors.text, lineHeight: 24,
-                  borderWidth: 1.5, borderColor: canContinue ? colors.accent : colors.border,
-                  minHeight: 240, textAlignVertical: 'top',
-                }}
-                accessible
-                accessibilityLabel="Blog post content"
-                accessibilityHint="Write your full blog post here. Minimum 50 characters required."
-              />
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, marginBottom: 4 }} accessibilityElementsHidden>
-                <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                  {charCount < 50 ? `${50 - charCount} more characters needed` : 'Minimum reached ✓'}
-                </Text>
-                <Text style={{ fontSize: 12, color: canContinue ? colors.accent : colors.textSecondary, fontWeight: '600' }}>
-                  {charCount} chars
-                </Text>
-              </View>
-            </>
-          )}
-
-          {/* Import mode */}
-          {mode === 'import' && (
-            <View style={{ alignItems: 'center', gap: 16, paddingVertical: 32 }}>
-              <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: `${colors.accent}18`, justifyContent: 'center', alignItems: 'center' }} accessibilityElementsHidden>
-                <Ionicons name="folder-open-outline" size={36} color={colors.accent} />
-              </View>
-              <Text accessibilityRole="header" style={{ fontSize: 18, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
-                Import a text file
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={60}>
+      <WizardLayout
+        step={2}
+        totalSteps={3}
+        title="Your blog post"
+        description="Write, import a text file, or paste from another app. Minimum 50 characters required."
+        onNext={handleNext}
+        nextLabel="Continue to Review"
+        nextDisabled={!canContinue}
+        hideSkip
+        onCancel={handleCancel}
+      >
+        {/* Mode tabs */}
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20, backgroundColor: colors.card, borderRadius: 12, padding: 4 }}
+          accessible={false}>
+          {([['write', 'pencil-outline', 'Write'], ['import', 'document-text-outline', 'Import file'], ['paste', 'clipboard-outline', 'Paste']] as const).map(([m, icon, label]) => (
+            <Pressable
+              key={m}
+              onPress={() => { setMode(m); sounds.pickerTick().catch(() => {}); }}
+              accessible
+              accessibilityRole="tab"
+              accessibilityLabel={label}
+              accessibilityState={{ selected: mode === m }}
+              style={({ pressed }) => ({
+                flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                gap: 5, paddingVertical: 10, borderRadius: 10,
+                backgroundColor: mode === m ? colors.accent : 'transparent',
+                opacity: pressed ? 0.8 : 1,
+              })}
+            >
+              <Ionicons name={icon as any} size={15} color={mode === m ? '#fff' : colors.textSecondary} accessibilityElementsHidden />
+              <Text style={{ fontSize: 13, fontWeight: mode === m ? '700' : '400', color: mode === m ? '#fff' : colors.textSecondary }}>
+                {label}
               </Text>
-              <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 21, maxWidth: 300 }}>
-                Choose a .txt or .md file from Files, iCloud Drive, or any document provider.
-              </Text>
-              <Pressable
-                onPress={() => void handleImport()}
-                accessible
-                accessibilityRole="button"
-                accessibilityLabel="Browse for a text or Markdown file"
-                style={({ pressed }) => ({
-                  backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 28,
-                  flexDirection: 'row', alignItems: 'center', gap: 8, opacity: pressed ? 0.85 : 1,
-                })}
-              >
-                <Ionicons name="document-text-outline" size={18} color="#fff" accessibilityElementsHidden />
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>Browse Files</Text>
-              </Pressable>
-              {state.blogContent ? (
-                <Text style={{ fontSize: 13, color: colors.accent, fontWeight: '600' }} accessibilityLiveRegion="polite">
-                  File loaded — {state.blogContent.length} characters
-                </Text>
-              ) : null}
-            </View>
-          )}
+            </Pressable>
+          ))}
+        </View>
 
-          {/* Paste mode */}
-          {mode === 'paste' && (
-            <View style={{ alignItems: 'center', gap: 16, paddingVertical: 32 }}>
-              <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: `${colors.accent}18`, justifyContent: 'center', alignItems: 'center' }} accessibilityElementsHidden>
-                <Ionicons name="clipboard-outline" size={36} color={colors.accent} />
-              </View>
-              <Text accessibilityRole="header" style={{ fontSize: 18, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
-                Paste from clipboard
-              </Text>
-              <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 21, maxWidth: 300 }}>
-                Write your post in Notes, Pages, or any other app, then copy and paste it here.
-              </Text>
-              <Pressable
-                onPress={() => void handlePaste()}
-                accessible
-                accessibilityRole="button"
-                accessibilityLabel="Paste text from clipboard"
-                style={({ pressed }) => ({
-                  backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 28,
-                  flexDirection: 'row', alignItems: 'center', gap: 8, opacity: pressed ? 0.85 : 1,
-                })}
-              >
-                <Ionicons name="clipboard-outline" size={18} color="#fff" accessibilityElementsHidden />
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>Paste from Clipboard</Text>
-              </Pressable>
-              {state.blogContent ? (
-                <Text style={{ fontSize: 13, color: colors.accent, fontWeight: '600' }} accessibilityLiveRegion="polite">
-                  Content ready — {state.blogContent.length} characters
-                </Text>
-              ) : null}
-            </View>
-          )}
-
-          {/* Cover note */}
-          <View style={{ marginTop: 28 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
-              Note to editors <Text style={{ fontWeight: '400', textTransform: 'none' }}>(optional)</Text>
-            </Text>
-            <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginBottom: 8 }}>
-              Tell the editorial team anything they should know — background, why you wrote this, related links, etc.
-            </Text>
+        {/* Write mode */}
+        {mode === 'write' && (
+          <>
             <TextInput
-              value={state.coverNote}
-              onChangeText={v => update({ coverNote: v })}
-              placeholder="e.g. This is based on my own experience using VoiceOver daily…"
+              value={state.blogContent}
+              onChangeText={v => update({ blogContent: v })}
+              placeholder="Start writing your blog post here…"
               placeholderTextColor={colors.textSecondary}
               multiline
               style={{
                 backgroundColor: colors.card, borderRadius: 14, padding: 14,
-                fontSize: 16, color: colors.text, lineHeight: 22,
-                borderWidth: 1.5, borderColor: state.coverNote ? colors.accent : colors.border,
-                minHeight: 100, textAlignVertical: 'top',
+                fontSize: 16, color: colors.text, lineHeight: 24,
+                borderWidth: 1.5, borderColor: canContinue ? colors.accent : colors.border,
+                minHeight: 240, textAlignVertical: 'top',
               }}
               accessible
-              accessibilityLabel="Note to editors"
-              accessibilityHint="Optional. Any context or background you want the editorial team to know."
+              accessibilityLabel="Blog post content"
+              accessibilityHint="Write your full blog post here. Minimum 50 characters required."
             />
-          </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, marginBottom: 4 }} accessibilityElementsHidden>
+              <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                {charCount < 50 ? `${50 - charCount} more characters needed` : 'Minimum reached ✓'}
+              </Text>
+              <Text style={{ fontSize: 12, color: canContinue ? colors.accent : colors.textSecondary, fontWeight: '600' }}>
+                {charCount} chars
+              </Text>
+            </View>
+          </>
+        )}
 
-          {/* AI cover note button */}
-          {aiAvailable && state.blogContent.length >= 50 && (
+        {/* Import mode */}
+        {mode === 'import' && (
+          <View style={{ alignItems: 'center', gap: 16, paddingVertical: 32 }}>
+            <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: `${colors.accent}18`, justifyContent: 'center', alignItems: 'center' }} accessibilityElementsHidden>
+              <Ionicons name="folder-open-outline" size={36} color={colors.accent} />
+            </View>
+            <Text accessibilityRole="header" style={{ fontSize: 18, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
+              Import a text file
+            </Text>
+            <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 21, maxWidth: 300 }}>
+              Choose a .txt or .md file from Files, iCloud Drive, or any document provider.
+            </Text>
             <Pressable
-              onPress={() => void handleAiCoverNote()}
-              disabled={aiDrafting}
+              onPress={() => void handleImport()}
               accessible
               accessibilityRole="button"
-              accessibilityLabel={aiDrafting ? 'Drafting cover note with Apple Intelligence…' : 'Draft editor note with Apple Intelligence'}
+              accessibilityLabel="Browse for a text or Markdown file"
               style={({ pressed }) => ({
-                flexDirection: 'row', alignItems: 'center', gap: 8,
-                alignSelf: 'flex-start', marginTop: 10,
-                backgroundColor: colors.card, borderRadius: 20,
-                paddingVertical: 9, paddingHorizontal: 14,
-                borderWidth: 1.5, borderColor: colors.border,
-                opacity: pressed || aiDrafting ? 0.7 : 1,
+                backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 28,
+                flexDirection: 'row', alignItems: 'center', gap: 8, opacity: pressed ? 0.85 : 1,
               })}
             >
-              {aiDrafting ? <ActivityIndicator size="small" color={colors.accent} /> : <Ionicons name="sparkles" size={15} color={colors.accent} />}
-              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.accent }}>
-                {aiDrafting ? 'Drafting…' : 'Draft with Apple Intelligence'}
-              </Text>
+              <Ionicons name="document-text-outline" size={18} color="#fff" accessibilityElementsHidden />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>Browse Files</Text>
             </Pressable>
-          )}
+            {state.blogContent ? (
+              <Text style={{ fontSize: 13, color: colors.accent, fontWeight: '600' }} accessibilityLiveRegion="polite">
+                File loaded — {state.blogContent.length} characters
+              </Text>
+            ) : null}
+          </View>
+        )}
 
-          {/* Continue */}
+        {/* Paste mode */}
+        {mode === 'paste' && (
+          <View style={{ alignItems: 'center', gap: 16, paddingVertical: 32 }}>
+            <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: `${colors.accent}18`, justifyContent: 'center', alignItems: 'center' }} accessibilityElementsHidden>
+              <Ionicons name="clipboard-outline" size={36} color={colors.accent} />
+            </View>
+            <Text accessibilityRole="header" style={{ fontSize: 18, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
+              Paste from clipboard
+            </Text>
+            <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 21, maxWidth: 300 }}>
+              Write your post in Notes, Pages, or any other app, then copy and paste it here.
+            </Text>
+            <Pressable
+              onPress={() => void handlePaste()}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Paste text from clipboard"
+              style={({ pressed }) => ({
+                backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 28,
+                flexDirection: 'row', alignItems: 'center', gap: 8, opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <Ionicons name="clipboard-outline" size={18} color="#fff" accessibilityElementsHidden />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>Paste from Clipboard</Text>
+            </Pressable>
+            {state.blogContent ? (
+              <Text style={{ fontSize: 13, color: colors.accent, fontWeight: '600' }} accessibilityLiveRegion="polite">
+                Content ready — {state.blogContent.length} characters
+              </Text>
+            ) : null}
+          </View>
+        )}
+
+        {/* Cover note */}
+        <View style={{ marginTop: 28 }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+            Note to editors <Text style={{ fontWeight: '400', textTransform: 'none' }}>(optional)</Text>
+          </Text>
+          <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginBottom: 8 }}>
+            Tell the editorial team anything they should know — background, why you wrote this, related links, etc.
+          </Text>
+          <TextInput
+            value={state.coverNote}
+            onChangeText={v => update({ coverNote: v })}
+            placeholder="e.g. This is based on my own experience using VoiceOver daily…"
+            placeholderTextColor={colors.textSecondary}
+            multiline
+            style={{
+              backgroundColor: colors.card, borderRadius: 14, padding: 14,
+              fontSize: 16, color: colors.text, lineHeight: 22,
+              borderWidth: 1.5, borderColor: state.coverNote ? colors.accent : colors.border,
+              minHeight: 100, textAlignVertical: 'top',
+            }}
+            accessible
+            accessibilityLabel="Note to editors"
+            accessibilityHint="Optional. Any context or background you want the editorial team to know."
+          />
+        </View>
+
+        {/* AI cover note button */}
+        {aiAvailable && state.blogContent.length >= 50 && (
           <Pressable
-            onPress={() => { sounds.articleOpen().catch(() => {}); router.push('/submit-blog/review' as any); }}
-            disabled={!canContinue}
+            onPress={() => void handleAiCoverNote()}
+            disabled={aiDrafting}
             accessible
             accessibilityRole="button"
-            accessibilityLabel={canContinue ? 'Continue to review' : `Continue — ${50 - charCount} more characters needed`}
-            accessibilityState={{ disabled: !canContinue }}
+            accessibilityLabel={aiDrafting ? 'Drafting cover note with Apple Intelligence…' : 'Draft editor note with Apple Intelligence'}
             style={({ pressed }) => ({
-              marginTop: 28,
-              backgroundColor: canContinue ? colors.accent : colors.border,
-              borderRadius: 16, paddingVertical: 16,
-              alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8,
-              opacity: pressed ? 0.85 : 1,
+              flexDirection: 'row', alignItems: 'center', gap: 8,
+              alignSelf: 'flex-start', marginTop: 10,
+              backgroundColor: colors.card, borderRadius: 20,
+              paddingVertical: 9, paddingHorizontal: 14,
+              borderWidth: 1.5, borderColor: colors.border,
+              opacity: pressed || aiDrafting ? 0.7 : 1,
             })}
           >
-            <Text style={{ fontSize: 17, fontWeight: '700', color: canContinue ? '#fff' : colors.textSecondary }}>
-              Continue
+            {aiDrafting ? <ActivityIndicator size="small" color={colors.accent} /> : <Ionicons name="sparkles" size={15} color={colors.accent} />}
+            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.accent }}>
+              {aiDrafting ? 'Drafting…' : 'Draft with Apple Intelligence'}
             </Text>
-            <Ionicons name="arrow-forward" size={18} color={canContinue ? '#fff' : colors.textSecondary} accessibilityElementsHidden />
           </Pressable>
-
-        </Animated.View>
-      </ScrollView>
+        )}
+      </WizardLayout>
     </KeyboardAvoidingView>
   );
 }

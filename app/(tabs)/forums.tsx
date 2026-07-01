@@ -1,3 +1,6 @@
+// DEPRECATED (hidden tab, href: null) — kept only as a compatibility net.
+// No in-app code routes here anymore; see src/navigation/routeResolver.ts and
+// app/forums-browse.tsx, which is the current replacement.
 import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Share, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';

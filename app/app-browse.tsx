@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AccessibilityInfo, ActivityIndicator, Pressable,
+  AccessibilityInfo, ActivityIndicator, findNodeHandle, Pressable,
   RefreshControl, ScrollView, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +14,7 @@ import { useTheme } from '../src/contexts/ThemeContext';
 import { useAccessibilityPreferences } from '../src/hooks/useAccessibilityPreferences';
 import { APP_PLATFORMS } from '../src/data/appDirectory';
 import { relativeTime } from '../src/utils/relativeTime';
+import { sounds } from '../src/services/sounds';
 import type { AppCategory } from '../src/types/content';
 
 const APP_ACCENT = '#3b82f6';
@@ -57,6 +58,8 @@ export default function AppBrowse() {
   const [platformId,   setPlatformId]   = useState('ios');
   const [feedLoadedAt, setFeedLoadedAt] = useState<Date | null>(null);
   const prevLoadingRef = useRef(false);
+  const summaryRef = useRef<Text | null>(null);
+  const focusedInitialSummaryRef = useRef(false);
 
   const categoryList = useAppDirectoryCategories(platformId);
   const categoryRefs = useRef<Map<string, View>>(new Map());
@@ -68,6 +71,16 @@ export default function AppBrowse() {
       setFeedLoadedAt(new Date());
     }
     prevLoadingRef.current = categoryList.loading;
+  }, [categoryList.loading, categoryList.categories.length]);
+
+  useEffect(() => {
+    if (focusedInitialSummaryRef.current || categoryList.loading || categoryList.categories.length === 0) return;
+    focusedInitialSummaryRef.current = true;
+    const timer = setTimeout(() => {
+      const handle = findNodeHandle(summaryRef.current);
+      if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+    }, 450);
+    return () => clearTimeout(timer);
   }, [categoryList.loading, categoryList.categories.length]);
 
   useEffect(() => {
@@ -110,6 +123,7 @@ export default function AppBrowse() {
   }
 
   function navigateToCategory(category: AppCategory) {
+    sounds.articleOpen().catch(() => {});
     save(categoryRefs.current.get(category.slug) ?? null);
     router.push({
       pathname: '/app-category' as any,
@@ -117,6 +131,7 @@ export default function AppBrowse() {
         platform: platformId,
         platformName,
         categorySlug: category.slug,
+        categoryTid: category.tid ?? '',
         categoryName: category.name,
       },
     });
@@ -147,11 +162,11 @@ export default function AppBrowse() {
         {!categoryList.loading && categoryList.categories.length > 0 && (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
             <Text
+              ref={summaryRef}
               style={{ flex: 1, fontSize: 13, fontWeight: '700',
                 color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8 }}
               accessibilityRole="header"
-              accessibilityActions={[{ name: 'feedSummary', label: 'Feed summary' }]}
-              onAccessibilityAction={() => AccessibilityInfo.announceForAccessibility(feedSummaryLabel)}
+              accessibilityLabel={feedSummaryLabel}
             >
               {platformName} · {categoryList.categories.length} categories
             </Text>
@@ -193,7 +208,6 @@ export default function AppBrowse() {
               const icon     = CATEGORY_ICONS[category.slug] ?? 'apps-outline';
               const hasCount = category.count !== undefined;
               const iconBg   = a11y.reduceTransparency ? colors.inputBackground : APP_ACCENT + '18';
-              const title    = hasCount ? `${category.name} (${category.count})` : category.name;
 
               return (
                 <Pressable
@@ -206,7 +220,7 @@ export default function AppBrowse() {
                   accessible
                   accessibilityRole="button"
                   accessibilityLabel={[
-                    title,
+                    category.name,
                     hasCount ? `${category.count} apps` : null,
                     'Double tap to browse',
                   ].filter(Boolean).join('. ')}
@@ -224,7 +238,7 @@ export default function AppBrowse() {
                   </View>
 
                   <Text style={{ flex: 1, fontSize: 16, fontWeight: '500', color: colors.text }}>
-                    {title}
+                    {category.name}
                   </Text>
 
                   {hasCount && (

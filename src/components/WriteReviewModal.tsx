@@ -10,7 +10,6 @@ import { useTip, TIP_KEYS, TIPS } from '../contexts/ContextualTipContext';
 import { api } from '../services/api';
 import { sounds } from '../services/sounds';
 
-const PLATFORMS = ['iOS', 'macOS', 'watchOS', 'Apple TV', 'Vision Pro'] as const;
 
 type Props = {
   visible: boolean;
@@ -66,8 +65,6 @@ export function WriteReviewModal({ visible, appId, appName, replyToAuthor, reply
   const { showTip }        = useTip();
 
   const [rating,      setRating]      = useState(0);
-  const [platform,    setPlatform]    = useState<string>('iOS');
-  const [version,     setVersion]     = useState('');
   const [body,        setBody]        = useState('');
   const [submitting,  setSubmitting]  = useState(false);
 
@@ -92,8 +89,6 @@ export function WriteReviewModal({ visible, appId, appName, replyToAuthor, reply
 
   function reset() {
     setRating(0);
-    setPlatform('iOS');
-    setVersion('');
     setBody('');
     setSubmitting(false);
   }
@@ -126,10 +121,7 @@ export function WriteReviewModal({ visible, appId, appName, replyToAuthor, reply
       ? body.trim()
       : `Accessibility rating: ${rating}/5 (${ratingLabel})\n\n${body.trim()}`;
 
-    const res = await api.apps.submitReview(appId, fullBody, token, {
-      platform: platform,
-      appVersion: version || undefined,
-    });
+    const res = await api.apps.submitReview(appId, fullBody, token);
     setSubmitting(false);
     if (res.ok) {
       reset();
@@ -199,58 +191,6 @@ export function WriteReviewModal({ visible, appId, appName, replyToAuthor, reply
                 {['', 'Very poor', 'Poor', 'Average', 'Good', 'Excellent'][rating]} accessibility
               </Text>
             )}
-          </View>
-
-          {/* Platform */}
-          <View style={{ gap: 8 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
-              textTransform: 'uppercase', letterSpacing: 0.8 }}>
-              Platform
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {PLATFORMS.map((p) => {
-                const isSelected = platform === p;
-                return (
-                  <Pressable
-                    key={p}
-                    onPress={() => setPlatform(p)}
-                    accessible accessibilityRole="radio"
-                    accessibilityLabel={p}
-                    accessibilityState={{ checked: isSelected }}
-                    style={{
-                      paddingHorizontal: 12, paddingVertical: 7,
-                      borderRadius: 20, borderWidth: isSelected ? 0 : 1,
-                      borderColor: colors.border,
-                      backgroundColor: isSelected ? colors.accent : colors.inputBackground,
-                    }}
-                  >
-                    <Text style={{
-                      fontSize: 14, fontWeight: '600',
-                      color: isSelected ? '#FFF' : colors.text,
-                    }}>{p}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* App version */}
-          <View style={{ gap: 8 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
-              textTransform: 'uppercase', letterSpacing: 0.8 }}>
-              App Version (optional)
-            </Text>
-            <TextInput
-              value={version}
-              onChangeText={setVersion}
-              placeholder="e.g. 3.2.1"
-              placeholderTextColor={colors.textSecondary}
-              style={[styles.card, { fontSize: 16, color: colors.text, paddingVertical: 12 }]}
-              accessible accessibilityLabel="App version"
-              accessibilityHint="Enter the version of the app you are reviewing"
-              keyboardType="default"
-              returnKeyType="next"
-            />
           </View>
 
           {/* Review body */}

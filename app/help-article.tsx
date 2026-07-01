@@ -1,11 +1,25 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { AccessibilityInfo, findNodeHandle, ScrollView, Text, View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { AccessibilityInfo, findNodeHandle, Pressable, ScrollView, Text, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../src/components/Screen';
 import { useTheme } from '../src/contexts/ThemeContext';
-import { findHelpArticle } from '../src/data/helpContent';
-import type { ContentBlock } from '../src/data/helpContent';
+import { findHelpArticle, HELP_CONTENT_TYPE_META } from '../src/data/helpContent';
+import type { ContentBlock, RelatedLink, RelatedLinkType } from '../src/data/helpContent';
+
+const RELATED_ICON: Record<RelatedLinkType, React.ComponentProps<typeof Ionicons>['name']> = {
+  guide: 'book-outline',
+  quickStart: 'flash-outline',
+  tutorial: 'walk-outline',
+  faq: 'help-circle-outline',
+  troubleshooting: 'construct-outline',
+  spotlight: 'sparkles-outline',
+  accessibilityLesson: 'accessibility-outline',
+  whatsNew: 'megaphone-outline',
+  releaseNote: 'document-text-outline',
+  forum: 'chatbubbles-outline',
+  podcast: 'mic-outline',
+};
 
 function Block({ block, colors }: { block: ContentBlock; colors: ReturnType<typeof useTheme>['colors'] }) {
   switch (block.type) {
@@ -60,6 +74,24 @@ function Block({ block, colors }: { block: ContentBlock; colors: ReturnType<type
       return <Callout label="Note" text={block.text} color="#2563EB" background="#EFF6FF" />;
     case 'warning':
       return <Callout label="Important" text={block.text} color="#D97706" background="#FFFBEB" />;
+    case 'faq':
+      return (
+        <View
+          style={{ marginBottom: 14 }}
+          accessible
+          accessibilityLabel={`Question: ${block.question}. Answer: ${block.answer}`}
+        >
+          <Text
+            accessibilityElementsHidden
+            style={{ fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 6, lineHeight: 22 }}
+          >
+            {block.question}
+          </Text>
+          <Text accessibilityElementsHidden style={{ fontSize: 15, lineHeight: 22, color: colors.textSecondary }}>
+            {block.answer}
+          </Text>
+        </View>
+      );
     default:
       return null;
   }
@@ -77,6 +109,46 @@ function Callout({ label, text, color, background }: { label: string; text: stri
         {label}
       </Text>
       <Text style={{ fontSize: 15, lineHeight: 22, color: '#111827' }}>{text}</Text>
+    </View>
+  );
+}
+
+function RelatedLinks({ links, colors, styles }: {
+  links: RelatedLink[];
+  colors: ReturnType<typeof useTheme>['colors'];
+  styles: ReturnType<typeof useTheme>['styles'];
+}) {
+  const router = useRouter();
+  return (
+    <View style={{ marginTop: 8, marginBottom: 12 }}>
+      <Text
+        accessibilityRole="header"
+        style={{ fontSize: 13, fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8 }}
+      >
+        Related
+      </Text>
+      {links.map((link, i) => (
+        <Pressable
+          key={i}
+          onPress={() => {
+            if (link.helpArticleId) router.push({ pathname: '/help-article', params: { articleId: link.helpArticleId } });
+            else if (link.route) router.push({ pathname: link.route as any, params: link.params });
+          }}
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={`${link.label}. ${link.type}.`}
+          accessibilityHint="Opens this related content."
+          style={({ pressed }) => [
+            styles.cardSmall,
+            { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <Ionicons name={RELATED_ICON[link.type]} size={18} color={colors.accent} accessibilityElementsHidden />
+          <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: colors.text }}>{link.label}</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} accessibilityElementsHidden />
+        </Pressable>
+      ))}
     </View>
   );
 }
@@ -124,20 +196,36 @@ export default function HelpArticle() {
         <View
           accessible
           accessibilityRole="summary"
-          accessibilityLabel={`Article summary. ${article.summary}`}
+          accessibilityLabel={`Article summary. ${article.contentType ? HELP_CONTENT_TYPE_META[article.contentType].label + '. ' : ''}${article.summary}`}
           style={[styles.card, { marginBottom: 18, borderLeftWidth: 4, borderLeftColor: colors.accent }]}
         >
           <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
-            <Ionicons name="document-text-outline" size={22} color={colors.accent} accessibilityElementsHidden />
-            <Text style={{ flex: 1, fontSize: 15, lineHeight: 22, color: colors.textSecondary }}>
-              {article.summary}
-            </Text>
+            <Ionicons
+              name={(article.contentType ? HELP_CONTENT_TYPE_META[article.contentType].icon : 'document-text-outline') as any}
+              size={22}
+              color={colors.accent}
+              accessibilityElementsHidden
+            />
+            <View style={{ flex: 1 }}>
+              {article.contentType && (
+                <Text style={{ fontSize: 12, fontWeight: '800', color: colors.accent, textTransform: 'uppercase', marginBottom: 4 }} accessibilityElementsHidden>
+                  {HELP_CONTENT_TYPE_META[article.contentType].label}
+                </Text>
+              )}
+              <Text style={{ fontSize: 15, lineHeight: 22, color: colors.textSecondary }}>
+                {article.summary}
+              </Text>
+            </View>
           </View>
         </View>
 
         {article.content.map((block, i) => (
           <Block key={i} block={block} colors={colors} />
         ))}
+
+        {article.relatedLinks?.length ? (
+          <RelatedLinks links={article.relatedLinks} colors={colors} styles={styles} />
+        ) : null}
 
         <View style={{ height: 96 }} />
       </ScrollView>

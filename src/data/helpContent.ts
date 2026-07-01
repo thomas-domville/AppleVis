@@ -12,13 +12,53 @@ export type ContentBlock =
   | { type: 'steps'; items: string[] }
   | { type: 'tip'; text: string }
   | { type: 'note'; text: string }
-  | { type: 'warning'; text: string };
+  | { type: 'warning'; text: string }
+  | { type: 'faq'; question: string; answer: string };
+
+/** What kind of help content this is — lets Help/Discover surface the right icon and filter by type. */
+export type HelpContentType =
+  | 'guide'
+  | 'quickStart'
+  | 'tutorial'
+  | 'faq'
+  | 'troubleshooting'
+  | 'spotlight'
+  | 'accessibilityLesson'
+  | 'whatsNew'
+  | 'releaseNote';
+
+/** Display label and icon for each content type — shared by the Help list and article screens. */
+export const HELP_CONTENT_TYPE_META: Record<HelpContentType, { label: string; icon: string }> = {
+  guide: { label: 'Guide', icon: 'book-outline' },
+  quickStart: { label: 'Quick Start', icon: 'flash-outline' },
+  tutorial: { label: 'Tutorial', icon: 'walk-outline' },
+  faq: { label: 'FAQ', icon: 'help-circle-outline' },
+  troubleshooting: { label: 'Troubleshooting', icon: 'construct-outline' },
+  spotlight: { label: 'Feature Spotlight', icon: 'sparkles-outline' },
+  accessibilityLesson: { label: 'Accessibility Lesson', icon: 'accessibility-outline' },
+  whatsNew: { label: "What's New", icon: 'megaphone-outline' },
+  releaseNote: { label: 'Release Note', icon: 'document-text-outline' },
+};
+
+export type RelatedLinkType = HelpContentType | 'forum' | 'podcast';
+
+export type RelatedLink = {
+  label: string;
+  type: RelatedLinkType;
+  /** Link to another Help article by id. */
+  helpArticleId?: string;
+  /** Link to any other in-app route (forum topic, podcast episode, etc). */
+  route?: string;
+  params?: Record<string, string>;
+};
 
 export type HelpArticle = {
   id: string;
   title: string;
   summary: string;
   content: ContentBlock[];
+  contentType?: HelpContentType;
+  relatedLinks?: RelatedLink[];
 };
 
 export type HelpSection = {
@@ -32,7 +72,7 @@ export type HelpSection = {
 export const HELP_SECTIONS: HelpSection[] = [
   {
     id: 'start',
-    title: 'Start Here',
+    title: 'Getting Started',
     icon: 'compass-outline',
     description: 'A quick tour of AppleVis, the tabs, signing in, and where common tools live.',
     articles: [
@@ -45,12 +85,17 @@ export const HELP_SECTIONS: HelpSection[] = [
           { type: 'heading', text: 'What you can do' },
           { type: 'bullets', items: [
             'Read what is new since your last visit from Home.',
-            'Browse Discover for forums, blogs, guides, podcasts, app directory content, and site search.',
+            'Browse Discover for forums, blogs, guides, podcasts, app directory content, site search, and the Bug Tracker.',
             'Use For You to find saved items, following, downloads, queue, and personal activity.',
-            'Play podcasts with background audio, queue, chapters, speed controls, Live Activities, Dynamic Island, and CarPlay.',
+            'Play podcasts with background audio, queue, chapters, speed controls, Live Activities, Dynamic Island, CarPlay, and AirPods gestures.',
             'Post topics, replies, comments, app reviews, and app submissions when signed in.',
+            'Use Apple Intelligence features — summaries, rewrite, translate, and accessibility consensus — on supported devices.',
           ] },
           { type: 'note', text: 'Most browsing works without signing in. Posting, following, personalized notifications, and some account tools require an AppleVis account.' },
+        ],
+        contentType: 'guide',
+        relatedLinks: [
+          { label: 'Take the Welcome Tour', type: 'tutorial', route: '/guided-experience/welcome' },
         ],
       },
       {
@@ -67,7 +112,7 @@ export const HELP_SECTIONS: HelpSection[] = [
           { type: 'heading', text: 'Podcasts' },
           { type: 'body', text: 'Podcasts gives you the full AppleVis podcast experience, including playback controls, queue, downloads, chapters, speed, sleep timer, Dynamic Island, Lock Screen controls, and CarPlay.' },
           { type: 'heading', text: 'Profile and Settings' },
-          { type: 'body', text: 'Profile contains account tools, support information, legal links, credits, and app support email. Settings controls appearance, accessibility, notifications, podcasts, privacy, storage, sync, and smart features.' },
+          { type: 'body', text: 'Profile contains account tools, support information, legal links, credits, and a Contact App Support button that opens the in-app contact wizard. Settings controls appearance, accessibility, notifications, podcasts, privacy, storage, sync, and smart features.' },
         ],
       },
       {
@@ -92,6 +137,42 @@ export const HELP_SECTIONS: HelpSection[] = [
           { type: 'note', text: 'Your password is not stored in the app. The app keeps a secure session token in the iOS Keychain.' },
         ],
       },
+      {
+        id: 'start-faq',
+        title: 'Frequently Asked Questions',
+        summary: 'Quick answers to the questions members ask most.',
+        contentType: 'faq',
+        content: [
+          { type: 'faq', question: 'How do I search AppleVis?', answer: 'Open the Search tab, or use the embedded search at the top of Discover. Results are grouped into Site Results, Forum Topics, Apps, and Guides and Resources.' },
+          { type: 'faq', question: 'Where are my saved items?', answer: 'Open For You and choose the Saved section. Use the kind filter to narrow by content type if you have saved a lot of items.' },
+          { type: 'faq', question: 'What is the difference between Save and Follow?', answer: 'Save bookmarks an item so you can find it again. Follow keeps it in For You > Following and, where supported, notifies you when it has new activity. See Save, Follow, and Download: What’s the Difference? for the full comparison.' },
+          { type: 'faq', question: 'How do I download podcast episodes?', answer: 'Open the episode and choose Download, or use the download action on an episode card. Downloaded episodes appear in For You > Downloads for offline listening.' },
+          { type: 'faq', question: 'How do I change my VoiceOver detail level?', answer: 'Open Settings > Accessibility > VoiceOver Detail Level and choose Simple, Normal, or All.' },
+          { type: 'faq', question: 'Why am I not receiving notifications?', answer: 'Check that AppleVis notifications are allowed in iOS Settings, that the specific category is enabled in AppleVis Settings > Notifications, and that you are signed in for personalized categories.' },
+          { type: 'faq', question: 'How do I report a bug?', answer: 'Open Discover, scroll to Contribute, and tap Submit a Bug Report. You must be signed in. See Submitting a Bug Report for the full four-step walkthrough.' },
+        ],
+        relatedLinks: [
+          { label: 'Using Search', type: 'guide', helpArticleId: 'search-overview' },
+          { label: 'Submitting a Bug Report', type: 'guide', helpArticleId: 'community-submit-bug' },
+        ],
+      },
+      {
+        id: 'start-whats-new',
+        title: "What's New and Release Notes",
+        summary: 'See what changed in the latest AppleVis app update.',
+        contentType: 'whatsNew',
+        content: [
+          { type: 'body', text: 'The What\'s New screen lists recent AppleVis app updates — new features, improvements, and fixes — for each released version.' },
+          { type: 'steps', items: [
+            'Open Profile.',
+            'Scroll to What\'s New and tap it.',
+            'Review the release notes for the current and previous versions.',
+          ] },
+        ],
+        relatedLinks: [
+          { label: "Open What's New", type: 'whatsNew', route: '/whats-new' },
+        ],
+      },
     ],
   },
   {
@@ -104,10 +185,12 @@ export const HELP_SECTIONS: HelpSection[] = [
         id: 'tutorial-first-visit',
         title: 'First Visit Checklist',
         summary: 'A practical first-run path through the app.',
+        contentType: 'quickStart',
         content: [
           { type: 'steps', items: [
             'Open Home and listen to the welcome message.',
             'Review the What is New area if you want to catch up.',
+            'Tap Customize Home in the top-left corner to choose which content types appear in your feed.',
             'Open Discover and explore Forums, Blog, Guides, Podcasts, and App Directory.',
             'Open For You to see saved, following, downloads, and queue areas.',
             'Open Settings and review Appearance, Accessibility, Notifications, Podcasts, Saved and Sync, Privacy, Storage, and Apple Intelligence.',
@@ -167,17 +250,18 @@ export const HELP_SECTIONS: HelpSection[] = [
       {
         id: 'tutorial-podcast',
         title: 'Play and Queue Podcasts',
-        summary: 'Play episodes, use Dynamic Island, and build a queue.',
+        summary: 'Play episodes, use Dynamic Island, build a queue, and use AirPods and CarPlay.',
         content: [
           { type: 'steps', items: [
             'Open Podcasts.',
             'Choose an episode and press Play.',
-            'Use the mini player, full player, Lock Screen, Dynamic Island, Control Center, AirPods, or CarPlay to control playback.',
-            'Use Add to Queue or Play Next to build a listening list.',
+            'Use the mini player at the bottom of any tab, the full player, Lock Screen, Dynamic Island, Control Center, AirPods, or CarPlay to control playback.',
+            'Use Add to Queue or Play Next to build a listening list. When an episode ends, the next item in your queue plays automatically.',
+            'To skip to the next queued episode, use the next-track button on the Lock Screen or the next-track AirPods gesture. To restart the current episode, use the previous-track button.',
             'Use Downloads when you want offline listening.',
-            'Use Settings > Podcasts to adjust speed, skip times, sleep timer, voice boost, trim silence, and auto-delete.',
+            'Use Settings > Podcasts to adjust speed, skip intervals, sleep timer, voice boost, trim silence, and auto-play.',
           ] },
-          { type: 'note', text: 'When a podcast is playing, Live Activities and Dynamic Island show the episode title, progress, playback state, and chapter when available.' },
+          { type: 'note', text: 'When a podcast is playing, Live Activities and Dynamic Island show the episode title, progress, playback state, and chapter name on supported iPhone models.' },
         ],
       },
       {
@@ -215,6 +299,24 @@ export const HELP_SECTIONS: HelpSection[] = [
           { type: 'tip', text: 'Liquid Glass and blur effects are automatically reduced when Reduce Transparency or a high contrast theme is active.' },
         ],
       },
+      {
+        id: 'tutorial-replay-welcome-tour',
+        title: 'Replay the Welcome Tour',
+        summary: 'Revisit the short guided tour of Home, Discover, For You, Search, Profile, and Settings.',
+        contentType: 'tutorial',
+        content: [
+          { type: 'body', text: 'The Welcome Tour is a short, optional walkthrough of the app shown after setup. You can replay it any time — it never repeats automatically once you have seen it.' },
+          { type: 'steps', items: [
+            'Open Profile.',
+            'Scroll to Replay Welcome Tour and tap it.',
+            'The tour restarts from the beginning. Use Skip Tour at any point to exit, or Back to revisit an earlier step.',
+          ] },
+          { type: 'tip', text: 'Choose Explore This Screen on any tour step to pause the tour and try the real screen — a Resume Tour button appears so you can pick up right where you left off.' },
+        ],
+        relatedLinks: [
+          { label: 'Take the Welcome Tour', type: 'tutorial', route: '/guided-experience/welcome' },
+        ],
+      },
     ],
   },
   {
@@ -227,6 +329,7 @@ export const HELP_SECTIONS: HelpSection[] = [
         id: 'accessibility-everyone',
         title: 'Accessibility for Everyone',
         summary: 'AppleVis is designed for multiple ways of using iPhone.',
+        contentType: 'accessibilityLesson',
         content: [
           { type: 'body', text: 'AppleVis is not only for one access method. It supports direct touch, VoiceOver, braille displays, Switch Control, Voice Control, Dynamic Type, high contrast themes, reduced motion, reduced transparency, and hardware keyboards.' },
           { type: 'heading', text: 'How instructions are written' },
@@ -237,6 +340,7 @@ export const HELP_SECTIONS: HelpSection[] = [
         id: 'accessibility-voiceover',
         title: 'VoiceOver Basics',
         summary: 'How to navigate, use actions, and control playback with VoiceOver.',
+        contentType: 'accessibilityLesson',
         content: [
           { type: 'bullets', items: [
             'Swipe right or left to move through controls and content.',
@@ -247,12 +351,21 @@ export const HELP_SECTIONS: HelpSection[] = [
             'Use two-finger double tap to play or pause podcasts from anywhere.',
           ] },
           { type: 'note', text: 'Most list screens move VoiceOver focus to the first useful item after loading, so you do not have to hunt for the beginning of the list.' },
+          { type: 'heading', text: 'VoiceOver Detail Level' },
+          { type: 'body', text: 'Settings > Accessibility > VoiceOver Detail Level controls how much detail cards announce when you navigate forum topics, apps, and podcast episodes.' },
+          { type: 'bullets', items: [
+            'Simple (Fastest) — title and content type only.',
+            'Normal (Recommended) — title plus author and comment count.',
+            'All (Most Detailed) — everything: title, author, comment count, posted date, and last comment time.',
+          ] },
+          { type: 'tip', text: 'Normal is the recommended default — switch to All if you want every detail read every time, or Simple if you prefer to scan quickly and check details only when you need them.' },
         ],
       },
       {
         id: 'accessibility-braille',
         title: 'Braille Display Tips',
         summary: 'How braille users can move efficiently through Help and content.',
+        contentType: 'accessibilityLesson',
         content: [
           { type: 'bullets', items: [
             'Use headings to jump between sections in Help, Settings, Discover, and long articles.',
@@ -267,6 +380,7 @@ export const HELP_SECTIONS: HelpSection[] = [
         id: 'accessibility-low-vision',
         title: 'Low Vision and Visual Comfort',
         summary: 'Themes, contrast, Liquid Glass, Dynamic Type, and motion settings.',
+        contentType: 'accessibilityLesson',
         content: [
           { type: 'bullets', items: [
             'Use Appearance to choose System, Light, Dark, or high contrast themes.',
@@ -394,6 +508,64 @@ export const HELP_SECTIONS: HelpSection[] = [
         content: [
           { type: 'body', text: 'Filters and pickers let you narrow large lists. Podcasts can be filtered by content type and tags. The App Directory can be filtered by platform and category, and categories announce counts such as "Books, 26 apps."' },
           { type: 'note', text: 'VoiceOver users can navigate by headings where available. Sighted and low-vision users can scan the same headings visually.' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'foryou-search',
+    title: 'For You and Search',
+    icon: 'star-outline',
+    description: 'Your personal hub — queue, downloads, saved items, following — and how to search across AppleVis.',
+    articles: [
+      {
+        id: 'foryou-overview',
+        title: 'Using For You',
+        summary: 'Your personal AppleVis hub: queue, downloads, saved items, and following.',
+        contentType: 'guide',
+        content: [
+          { type: 'body', text: 'For You is your personal AppleVis hub — not a recommendation feed. It only shows content you chose to keep, continue, or follow.' },
+          { type: 'heading', text: 'The four sections' },
+          { type: 'bullets', items: [
+            'Queue — episodes lined up to play next, in order. Reorder or remove any episode.',
+            'Downloads — episodes saved to this device for offline listening.',
+            'Saved — topics, apps, guides, blog posts, and episodes you bookmarked. Filter by content type.',
+            'Following — items you follow for easy access and, where supported, notifications when they update.',
+          ] },
+          { type: 'tip', text: 'Use the Section picker at the top of For You to switch between Queue, Downloads, Saved, and Following. VoiceOver announces which section is selected.' },
+        ],
+        relatedLinks: [
+          { label: 'Save, Follow, and Download: What’s the Difference?', type: 'faq', helpArticleId: 'foryou-save-follow-download-faq' },
+        ],
+      },
+      {
+        id: 'foryou-save-follow-download-faq',
+        title: 'Save, Follow, and Download: What’s the Difference?',
+        summary: 'Three different ways to keep content close, and when to use each.',
+        contentType: 'faq',
+        content: [
+          { type: 'faq', question: 'What does Save do?', answer: 'Save bookmarks a topic, app, guide, blog post, or episode so you can find it again quickly in For You > Saved. It does not download anything or notify you of updates.' },
+          { type: 'faq', question: 'What does Follow do?', answer: 'Follow keeps an item in For You > Following and, where supported, notifies you when it has new activity — for example, new replies on a forum topic. Use Follow for things you want to keep up with over time.' },
+          { type: 'faq', question: 'What does Download do?', answer: 'Download applies to podcast episodes only. It saves the audio file to your device so you can listen without an internet connection. Downloaded episodes appear in For You > Downloads.' },
+          { type: 'faq', question: 'Can I do more than one at once?', answer: 'Yes — a podcast episode can be saved, followed, and downloaded all at the same time. Each is independent, so removing one does not affect the others.' },
+        ],
+      },
+      {
+        id: 'search-overview',
+        title: 'Using Search',
+        summary: 'Find discussions, apps, guides, podcast episodes, and help across AppleVis.',
+        contentType: 'guide',
+        content: [
+          { type: 'body', text: 'Search helps you find discussions, apps, guides, podcast episodes, and Help articles from one place — either the dedicated Search tab, or the embedded search at the top of Discover.' },
+          { type: 'heading', text: 'Results are grouped' },
+          { type: 'bullets', items: [
+            'Site Results — general AppleVis site content.',
+            'Forum Topics — community discussions.',
+            'Apps — App Directory entries.',
+            'Guides and Resources — tutorials and how-to articles.',
+          ] },
+          { type: 'tip', text: 'If your query looks like it is in a language other than English, AppleVis may offer to translate it — AppleVis search works best in English.' },
+          { type: 'note', text: 'VoiceOver announces a concise result count and category breakdown, for example: "12 results found in 4 categories." Each section heading gives more detail.' },
         ],
       },
     ],
@@ -695,16 +867,20 @@ export const HELP_SECTIONS: HelpSection[] = [
       {
         id: 'content-podcasts',
         title: 'Podcasts',
-        summary: 'Playback, queue, chapters, downloads, Dynamic Island, CarPlay, and settings.',
+        summary: 'Playback, queue, chapters, downloads, Dynamic Island, CarPlay, AirPods, and settings.',
         content: [
           { type: 'bullets', items: [
-            'Play, pause, seek, skip, and change speed from the player.',
-            'Use queue and Play Next to control what plays after the current episode.',
+            'Play, pause, seek, skip forward and back, and change speed from the player or the mini player at the bottom of the screen.',
+            'Use Add to Queue or Play Next to control what plays after the current episode.',
             'Download episodes for offline listening.',
-            'Use chapters when available.',
-            'Use Live Activities and Dynamic Island on supported iPhone models.',
-            'Use Lock Screen, Control Center, AirPods, and CarPlay controls.',
+            'Navigate chapters using the chapter strip when the episode includes chapter markers.',
+            'Lock Screen shows the episode title, artwork, progress bar, and playback controls.',
+            'Dynamic Island and Live Activities show the episode title and chapter on supported iPhone models while you use other apps.',
+            'CarPlay displays the podcast episode list and allows playback from the car.',
+            'AirPods: double tap to play or pause. On episodes with a queue, use the next-track gesture on AirPods or the next button on the Lock Screen to skip to the next queued episode. The previous-track gesture restarts the current episode from the beginning.',
+            'Control Center shows a Now Playing card with artwork, title, and controls.',
           ] },
+          { type: 'tip', text: 'Use Settings > Podcasts to adjust speed, skip intervals, sleep timer, voice boost, trim silence, auto-play, resume rewind, and volume.' },
         ],
       },
       {
@@ -778,24 +954,47 @@ export const HELP_SECTIONS: HelpSection[] = [
         ],
       },
       {
-        id: 'settings-privacy-storage',
-        title: 'Privacy, Sync, and Storage',
-        summary: 'Control data sync, local storage, cache, downloads, and privacy.',
+        id: 'settings-privacy-sync',
+        title: 'Privacy and Sync',
+        summary: 'What syncs through iCloud, and how account and local data are handled.',
+        contentType: 'guide',
         content: [
           { type: 'bullets', items: [
-            'Saved and Sync controls what goes through iCloud.',
-            'Privacy explains account data, Keychain, iCloud, smart features, and local data.',
-            'Storage and Cache manages downloaded audio, cached content, cache retention, and cleanup.',
+            'Saved and Sync controls what goes through iCloud: saved items, following, reading position, podcast position, queue, and preferences.',
+            'Privacy explains account data, Keychain, iCloud, smart features, and local data — and what never leaves the device.',
             'Clear Local Data signs out and removes AppleVis data stored on this device without deleting your applevis.com account.',
           ] },
+          { type: 'note', text: 'Apple Intelligence features process everything on-device — no post, comment, or search text is sent to a server.' },
+        ],
+      },
+      {
+        id: 'settings-storage-cache',
+        title: 'Storage and Cache',
+        summary: 'Manage downloaded audio, cached content, and free up space.',
+        contentType: 'guide',
+        content: [
+          { type: 'body', text: 'Storage and Cache shows how much space AppleVis is using on this device and lets you manage it.' },
+          { type: 'bullets', items: [
+            'Downloaded podcast episodes for offline listening.',
+            'Cached images and content for faster browsing.',
+            'Cache retention — how long cached content is kept before automatic cleanup.',
+          ] },
+          { type: 'steps', items: [
+            'Open Settings > Storage and Cache.',
+            'Review the breakdown of downloads and cache size.',
+            'Use Clear Cache to remove cached content without affecting downloads or saved items.',
+            'Remove individual downloads from For You > Downloads if you only want to free up specific episodes.',
+          ] },
+          { type: 'tip', text: 'Clearing the cache does not delete downloaded episodes, saved items, or your account data — only temporary cached content.' },
         ],
       },
       {
         id: 'settings-support',
         title: 'Profile and App Support',
-        summary: 'Get app support and include useful device information.',
+        summary: 'Get app support using the in-app contact wizard.',
         content: [
-          { type: 'body', text: 'Profile includes Copy Support Information and Contact App Support. Contact App Support opens Mail addressed to support@applevis.com with a subject and support details already filled in.' },
+          { type: 'body', text: 'Profile includes a Contact App Support button that opens the native in-app contact wizard. You can send a bug report, feedback, suggestion, or recommendation directly to the AppleVis team without leaving the app.' },
+          { type: 'tip', text: 'Choosing Bug Report in the wizard adds a system information toggle. Turn it on to automatically append your app version and iOS version to the message — useful when reporting a crash or unexpected behaviour.' },
         ],
       },
     ],
@@ -812,26 +1011,74 @@ export const HELP_SECTIONS: HelpSection[] = [
         summary: 'Read Aloud, summaries, simplification, rewrite, and translation.',
         content: [
           { type: 'bullets', items: [
-            'Read Aloud reads content using device speech.',
-            'Summarise condenses long posts, discussions, show notes, and app information.',
-            'Simplify rewrites complex text in plain language.',
-            'Accessibility Consensus summarizes community app accessibility feedback.',
-            'Friendly Rewrite helps polish posts before submitting.',
-            'Translate to English helps with drafts and search queries.',
+            'Read Aloud reads content out loud using device speech — available on any device.',
+            'Summarise condenses long posts, discussions, show notes, and app descriptions — requires Apple Intelligence.',
+            'Simplify rewrites complex text in plain language — requires Apple Intelligence.',
+            'Accessibility Consensus summarises community app accessibility feedback into a short paragraph — requires Apple Intelligence.',
+            'Friendly Rewrite polishes your draft before submitting — requires Apple Intelligence.',
+            'Translate to English helps with drafts and search queries — requires Apple Intelligence.',
           ] },
+          { type: 'note', text: 'Apple Intelligence features require iPhone 15 Pro or later, iOS 26 or later, and Apple Intelligence enabled in iOS Settings. See Smart Features > Apple Intelligence Features for full details.' },
         ],
       },
       {
         id: 'smart-siri-widgets',
-        title: 'Siri, Widgets, Spotlight, and Focus',
+        title: 'Siri, Widgets, Control Center, and Spotlight',
         summary: 'Use AppleVis from system features outside the app.',
         content: [
+          { type: 'heading', text: 'Siri phrases' },
+          { type: 'body', text: 'AppleVis registers voice shortcuts you can say to Siri at any time. You can also add them to your own phrases in Settings > Siri.' },
           { type: 'bullets', items: [
-            'Siri phrases can open AppleVis sections, play the latest podcast, continue playback, search apps, or show unread activity.',
-            'Widgets can show unread counts, latest podcast information, saved counts, and what is new.',
-            'Spotlight can find AppleVis topics, apps, podcasts, and resources from iOS Search.',
-            'Focus Filters can control which AppleVis notification categories break through a Focus mode.',
+            '"Open AppleVis Forums" — opens the Forums tab.',
+            '"Show unread AppleVis topics" — opens Forums filtered to Unread.',
+            '"Resume my AppleVis podcast" — resumes the last episode you were listening to.',
+            '"Play the latest AppleVis podcast" — opens Podcasts and starts the newest episode.',
+            '"Search AppleVis for [your query]" — opens search with your words pre-filled.',
+            '"Open my AppleVis saved items" — opens the Saved section in For You.',
           ] },
+          { type: 'heading', text: 'Widgets' },
+          { type: 'body', text: 'AppleVis widgets can be added to your Home Screen, Today View, Lock Screen, or StandBy display.' },
+          { type: 'bullets', items: [
+            'Continue Listening — shows the title, show, and progress of the current podcast episode with a play or pause button. Available in small, medium, accessory rectangular, accessory circular, and accessory inline sizes.',
+            'Unread Forums — shows your unread topic count with a direct tap to the Unread filter. Available in small, accessory circular, and accessory inline sizes.',
+          ] },
+          { type: 'heading', text: 'Control Center (iOS 18 and later)' },
+          { type: 'bullets', items: [
+            'AppleVis Podcast toggle — play or pause the current AppleVis podcast episode from Control Center without unlocking your phone.',
+            'AppleVis Forums button — open unread forum topics directly from Control Center.',
+            'Add these from iOS Settings > Control Center.',
+          ] },
+          { type: 'heading', text: 'Spotlight' },
+          { type: 'body', text: 'Spotlight can find AppleVis topics, apps, podcasts, and resources from iOS Search. Items you open are indexed so they appear in future Spotlight results.' },
+        ],
+      },
+      {
+        id: 'smart-apple-intelligence',
+        title: 'Apple Intelligence Features',
+        summary: 'What Apple Intelligence powers in AppleVis, which devices support it, and how to enable it.',
+        content: [
+          { type: 'body', text: 'AppleVis uses Apple Intelligence to power several on-device AI features. All processing happens on your device — no text or content is sent to a server.' },
+          { type: 'heading', text: 'Requirements' },
+          { type: 'bullets', items: [
+            'iPhone 15 Pro, iPhone 16, or later (Apple Intelligence requires the A17 Pro chip or M-series chip).',
+            'iOS 26 or later for the full feature set using the FoundationModels framework.',
+            'Apple Intelligence enabled in Settings > Apple Intelligence and Siri.',
+            'English language preferred in Settings > General > Language and Region.',
+          ] },
+          { type: 'heading', text: 'What Apple Intelligence powers in AppleVis' },
+          { type: 'bullets', items: [
+            'Summarise — condenses long forum topics, blog posts, guides, and app descriptions.',
+            'Simplify — rewrites complex text in plain, easy-to-read language.',
+            'Accessibility Consensus — summarises community VoiceOver and usability feedback for an app into a short paragraph.',
+            'Friendly Rewrite — polishes your forum reply or comment draft before you post it.',
+            'Translate to English — translates your post or search query from another language.',
+            'Draft with Apple Intelligence — generates a short editor note or summary from your submission content in the blog and app submission wizards.',
+            'Guidelines Check — scans your draft for common posting issues and gives friendly advisory notes.',
+          ] },
+          { type: 'heading', text: 'When Apple Intelligence is not available' },
+          { type: 'body', text: 'On devices or iOS versions that do not support Apple Intelligence, these features are hidden automatically. The app works fully without them — they are enhancements, not requirements.' },
+          { type: 'note', text: 'To check whether Apple Intelligence is active on your device, open Settings > Apple Intelligence and Siri. If the toggle is visible and on, AppleVis AI features are enabled.' },
+          { type: 'tip', text: 'If you disclose AI assistance in a post, a brief note such as "Polished with Friendly Rewrite" is appreciated by the community.' },
         ],
       },
       {
@@ -863,6 +1110,30 @@ export const HELP_SECTIONS: HelpSection[] = [
           { type: 'tip', text: 'If AppleVis does not appear in your share sheet, scroll to the end of the app row and tap More to find and enable it.' },
         ],
       },
+      {
+        id: 'smart-system-integrations',
+        title: 'Handoff, Apple Watch, Background Refresh, and AirPlay',
+        summary: 'What each system integration does and how to turn it off if you prefer not to use it.',
+        contentType: 'guide',
+        content: [
+          { type: 'heading', text: 'Handoff' },
+          { type: 'body', text: 'AppleVis advertises the screen you are viewing (Home, Discover, a podcast episode, and similar) so you can pick up on a nearby Mac or iPad using the Handoff icon in the Dock or App Switcher. Only a screen name and, where relevant, a public content link are shared — no account details, tokens, or private data leave the device.' },
+          { type: 'tip', text: 'To turn Handoff off entirely for all apps, use iOS Settings > General > AirPlay & Handoff > Handoff.' },
+          { type: 'heading', text: 'Apple Watch' },
+          { type: 'body', text: 'When a companion watch app is installed, it mirrors Now Playing controls for AppleVis podcasts — play, pause, and skip — from your wrist.' },
+          { type: 'note', text: 'Remove the AppleVis Watch app from the Watch app on iPhone if you do not want this mirroring.' },
+          { type: 'heading', text: 'Background Refresh' },
+          { type: 'body', text: 'AppleVis periodically refreshes downloaded episode metadata and checks for followed-topic activity while in the background, so content is current the next time you open the app.' },
+          { type: 'tip', text: 'Turn this off in iOS Settings > General > Background App Refresh > AppleVis. Podcast playback itself keeps working in the background either way — only the periodic content refresh is affected.' },
+          { type: 'heading', text: 'AirPlay and Route Picker' },
+          { type: 'body', text: 'The route picker in the podcast player lets you send audio to AirPlay speakers, HomePod, or Bluetooth devices, the same way any other audio app does.' },
+          { type: 'heading', text: 'iCloud Sync' },
+          { type: 'body', text: 'Saved items, following, reading position, podcast position, queue, and preferences can sync through your private iCloud account. Each of these can be turned on or off individually in Settings > Saved and Sync.' },
+        ],
+        relatedLinks: [
+          { label: 'Saved and Sync Settings', type: 'guide', route: '/settings-saved-sync' },
+        ],
+      },
     ],
   },
   {
@@ -875,6 +1146,7 @@ export const HELP_SECTIONS: HelpSection[] = [
         id: 'trouble-sign-in',
         title: 'Sign-In Problems',
         summary: 'What to check when your AppleVis account does not sign in.',
+        contentType: 'troubleshooting',
         content: [
           { type: 'bullets', items: [
             'Use your applevis.com account credentials.',
@@ -888,6 +1160,7 @@ export const HELP_SECTIONS: HelpSection[] = [
         id: 'trouble-sync-notifications',
         title: 'Sync and Notification Problems',
         summary: 'Checks for iCloud sync and push notifications.',
+        contentType: 'troubleshooting',
         content: [
           { type: 'bullets', items: [
             'Confirm iCloud Sync is on in Settings > Saved and Sync.',
@@ -902,27 +1175,51 @@ export const HELP_SECTIONS: HelpSection[] = [
         id: 'trouble-podcast-search',
         title: 'Podcast, Search, and Display Problems',
         summary: 'Quick fixes for playback, search results, and visual comfort.',
+        contentType: 'troubleshooting',
         content: [
           { type: 'bullets', items: [
             'If playback seems stuck, pause and play again, or open the episode page and press Play.',
             'If search results are poor, try fewer words or translate a non-English query to English.',
             'If the app feels too bright, too dense, or too animated, review Appearance and iOS Display & Text Size.',
             'If storage grows, use Settings > Storage and Cache.',
+            'If a download fails, check your connection and try again from the episode or Downloads list — partial downloads are removed automatically.',
+            'If content will not refresh, pull down to refresh, or check Settings > Saved and Sync if you expect it to sync from another device.',
+            'If you cannot find saved content, open For You > Saved and check the kind filter — it may be set to a specific content type. Use Clear Filter to see everything again.',
           ] },
         ],
       },
       {
         id: 'trouble-contact',
         title: 'Contact App Support',
-        summary: 'Send bugs, feedback, suggestions, and recommendations.',
+        summary: 'Send bugs, feedback, suggestions, and recommendations using the in-app contact wizard.',
+        contentType: 'troubleshooting',
         content: [
+          { type: 'body', text: 'The in-app contact wizard sends your message directly to the AppleVis team. No email app needed. You can reach it from Profile or from Help. The wizard has three steps when signed in, or four steps when not signed in.' },
+          { type: 'heading', text: 'Step 1 — Choose a type' },
           { type: 'steps', items: [
-            'Open Profile.',
-            'Choose Contact App Support.',
-            'Mail opens addressed to support@applevis.com.',
-            'Describe the bug, suggestion, recommendation, or feedback.',
-            'Keep the included support information in the message when reporting a bug.',
+            'Open Profile and tap Contact App Support, or open Help and scroll to the Contact section.',
+            'Choose what kind of message you are sending: App Bug Report, App Feedback, App Suggestion, or App Recommendation.',
+            'Tap the card for your chosen type. The subject is set automatically from the type you choose.',
+            'Tap Continue.',
           ] },
+          { type: 'heading', text: 'Step 2 — Your contact details (not signed in only)' },
+          { type: 'body', text: 'If you are not signed in, this step appears before the message step. Enter your name and email address so the team can reply to you. If you are signed in, your name and email are already known and this step is skipped.' },
+          { type: 'heading', text: 'Step 2 (signed in) or Step 3 (not signed in) — Write your message' },
+          { type: 'steps', items: [
+            'Type your message in the large text area.',
+            'If you chose Bug Report, a toggle appears to include system information. Turn it on to append your app version and iOS version automatically.',
+            'Tap Continue.',
+          ] },
+          { type: 'heading', text: 'Final step — Review and send' },
+          { type: 'steps', items: [
+            'Review the summary: your message type, subject, and message preview are shown.',
+            'Your name and email are shown in the From section. If you are signed in they are read-only. If you are not signed in they are editable here.',
+            'Check the declaration to confirm the message is genuine.',
+            'Tap Send Message.',
+            'A confirmation screen appears. The team will typically respond within two to three business days.',
+          ] },
+          { type: 'tip', text: 'The Help screen also has a Contact App Support button at the bottom if you find a relevant help article first and still need to get in touch.' },
+          { type: 'note', text: 'You do not need to be signed in to use the contact wizard. Not signed in adds one extra step for your name and email.' },
         ],
       },
     ],

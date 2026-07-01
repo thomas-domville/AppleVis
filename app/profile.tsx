@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type Ref } from 'react';
 import { AccessibilityInfo, Clipboard, Dimensions, findNodeHandle, Image, Linking,
   Platform, Pressable, ScrollView, Switch, Text, TextInput, View, ActivityIndicator,
   StyleSheet, useColorScheme } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
@@ -16,6 +16,7 @@ import type { ToastType } from '../src/contexts/ToastContext';
 import { useSavedItems } from '../src/hooks/useSavedItems';
 import { useAccessibilityPreferences } from '../src/hooks/useAccessibilityPreferences';
 import { useDynamicType } from '../src/hooks/useDynamicType';
+import { guidedExperienceStore } from '../src/services/guidedExperienceStore';
 
 const APP_VERSION  = Constants.expoConfig?.version ?? '2026.0.2';
 const BUILD_NUMBER = Constants.expoConfig?.ios?.buildNumber ?? '6';
@@ -47,15 +48,17 @@ function SectionHeader({ label, colors }: { label: string; colors: ReturnType<ty
   );
 }
 
-function NavRow({ label, hint, icon, onPress, external = false, destructive = false, colors, styles }: {
+function NavRow({ label, hint, icon, onPress, external = false, destructive = false, colors, styles, rowRef }: {
   label: string; hint?: string; icon: string; onPress: () => void;
   external?: boolean; destructive?: boolean;
   colors: ReturnType<typeof useTheme>['colors'];
   styles: ReturnType<typeof useTheme>['styles'];
+  rowRef?: Ref<View>;
 }) {
   const color = destructive ? '#B91C1C' : colors.accent;
   return (
     <Pressable
+      ref={rowRef}
       onPress={onPress}
       accessible accessibilityRole="button"
       accessibilityLabel={label}
@@ -112,11 +115,13 @@ function contentSizeCategory(scale: number): string {
   return 'Accessibility XXX Large';
 }
 
-function AboutSection({ colors, styles, showToast, router }: {
+function AboutSection({ colors, styles, showToast, router, contactSupportRef, onContactSupportPress }: {
   colors: ReturnType<typeof useTheme>['colors'];
   styles: ReturnType<typeof useTheme>['styles'];
   showToast: (msg: string, kind?: ToastType) => void;
   router: ReturnType<typeof useRouter>;
+  contactSupportRef?: Ref<View>;
+  onContactSupportPress: () => void;
 }) {
   const a11y        = useAccessibilityPreferences();
   const dynType     = useDynamicType();
@@ -295,6 +300,14 @@ function AboutSection({ colors, styles, showToast, router }: {
         <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} accessibilityElementsHidden />
       </Pressable>
 
+      <NavRow label="Replay Welcome Tour" icon="play-circle-outline"
+        hint="Replays the short guided tour of Home, Discover, For You, Search, Profile, and Settings."
+        onPress={() => {
+          guidedExperienceStore.restart('welcome').catch(() => {});
+          router.push({ pathname: '/guided-experience/[experienceId]', params: { experienceId: 'welcome' } } as any);
+        }}
+        colors={colors} styles={styles} />
+
       <SectionHeader label="Legal & Credits" colors={colors} />
       <NavRow label="Privacy Policy"       icon="shield-checkmark-outline" external
         hint="Opens applevis.com/privacy in Safari."
@@ -313,8 +326,9 @@ function AboutSection({ colors, styles, showToast, router }: {
         onPress={() => router.push('/credits' as any)}
         colors={colors} styles={styles} />
       <NavRow label="Contact App Support"  icon="chatbubble-ellipses-outline"
+        rowRef={contactSupportRef}
         hint="Opens the in-app contact wizard to send a bug report, feedback, suggestion, or recommendation to the AppleVis team."
-        onPress={() => router.push('/contact' as any)}
+        onPress={onContactSupportPress}
         colors={colors} styles={styles} />
 
       <Text
@@ -333,6 +347,7 @@ function AboutSection({ colors, styles, showToast, router }: {
 
 export default function Profile() {
   const router             = useRouter();
+  const params             = useLocalSearchParams<{ focus?: string }>();
   const { colors, styles } = useTheme();
   const auth               = useAuth();
   const { showToast }      = useToast();
@@ -346,8 +361,20 @@ export default function Profile() {
   const [signingIn,  setSigningIn]  = useState(false);
   const loginRef       = useRef<TextInput>(null);
   const signInBtnRef   = useRef<View>(null);
+  const contactSupportRef = useRef<View>(null);
+  const contactSupportFocusTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const firstHeadingRef = useRef<Text | null>(null);
   const didFocusFirstHeadingRef = useRef(false);
+
+  const clearContactSupportFocusTimers = useCallback(() => {
+    contactSupportFocusTimersRef.current.forEach(clearTimeout);
+    contactSupportFocusTimersRef.current = [];
+  }, []);
+
+  const handleContactSupportPress = useCallback(() => {
+    clearContactSupportFocusTimers();
+    router.push('/contact' as any);
+  }, [clearContactSupportFocusTimers, router]);
 
   const restoreToSignInBtn = useCallback(() => {
     setTimeout(() => {
@@ -370,6 +397,7 @@ export default function Profile() {
   }, [auth.isSignedIn, auth.user?.name]);
 
   useEffect(() => {
+    if (params.focus === 'contactSupport') return;
     if (showForm) return;
     const timers = [350, 700, 1100].map((delay) =>
       setTimeout(() => {
@@ -383,7 +411,20 @@ export default function Profile() {
     );
 
     return () => timers.forEach(clearTimeout);
-  }, [auth.isSignedIn, auth.user?.name, showForm]);
+  }, [auth.isSignedIn, auth.user?.name, params.focus, showForm]);
+
+  useEffect(() => {
+    if (params.focus !== 'contactSupport') return;
+    didFocusFirstHeadingRef.current = true;
+    clearContactSupportFocusTimers();
+    contactSupportFocusTimersRef.current = [250, 600, 1000].map((delay) =>
+      setTimeout(() => {
+        const handle = findNodeHandle(contactSupportRef.current);
+        if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+      }, delay),
+    );
+    return clearContactSupportFocusTimers;
+  }, [clearContactSupportFocusTimers, params.focus]);
 
   const savedTopics    = useSavedItems('forumTopic');
   const savedApps      = useSavedItems('appListing');
@@ -549,7 +590,14 @@ export default function Profile() {
           )}
 
           <SectionHeader label="About AppleVis" colors={colors} />
-          <AboutSection colors={colors} styles={styles} showToast={showToast} router={router} />
+          <AboutSection
+            colors={colors}
+            styles={styles}
+            showToast={showToast}
+            router={router}
+            contactSupportRef={contactSupportRef}
+            onContactSupportPress={handleContactSupportPress}
+          />
 
           <View style={{ height: 96 }} />
         </ScrollView>
@@ -719,13 +767,13 @@ export default function Profile() {
           ))}
         </View>
         {[
-          { label: 'Forum Topics', count: topicCount,    icon: 'chatbubbles-outline', route: '/(tabs)/forums'    },
-          { label: 'Apps',         count: appCount,      icon: 'apps-outline',        route: '/(tabs)/apps'      },
-          { label: 'Resources',    count: resourceCount, icon: 'library-outline',     route: '/(tabs)/resources' },
-        ].map(({ label, count, icon, route }) => (
+          { label: 'Forum Topics', count: topicCount,    icon: 'chatbubbles-outline', savedType: 'forumTopic' },
+          { label: 'Apps',         count: appCount,      icon: 'apps-outline',        savedType: 'appListing' },
+          { label: 'Resources',    count: resourceCount, icon: 'library-outline',     savedType: 'resource'   },
+        ].map(({ label, count, icon, savedType }) => (
           <Pressable
             key={label}
-            onPress={() => router.push(route as any)}
+            onPress={() => router.push({ pathname: '/(tabs)/foryou' as any, params: { section: 'saved', savedType } })}
             accessible accessibilityRole="button"
             accessibilityLabel={`${label}: ${count} saved. Tap to view.`}
             style={({ pressed }) => [styles.card, { marginBottom: 8 }, pressed && { opacity: 0.85 }]}
@@ -743,7 +791,14 @@ export default function Profile() {
 
         {/* About */}
         <SectionHeader label="About AppleVis" colors={colors} />
-        <AboutSection colors={colors} styles={styles} showToast={showToast} router={router} />
+        <AboutSection
+          colors={colors}
+          styles={styles}
+          showToast={showToast}
+          router={router}
+          contactSupportRef={contactSupportRef}
+          onContactSupportPress={handleContactSupportPress}
+        />
 
         <View style={{ height: 96 }} />
       </ScrollView>

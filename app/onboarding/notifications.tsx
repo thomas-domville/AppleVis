@@ -38,8 +38,11 @@ const SOUNDS: SoundOption[] = [
 ];
 
 export default function NotificationsStep() {
-  const { colors }   = useTheme();
+  const { colors, isDark } = useTheme();
   const { showToast } = useToast();
+  const warnBg   = isDark ? 'rgba(255, 152, 0, 0.15)' : '#FFF3E0';
+  const warnText = isDark ? '#FFAB40' : '#92400E';
+  const warnIcon = isDark ? '#FFAB40' : '#D97706';
   const {
     notificationPrefs,  setNotificationPrefs,
     notificationSound,  setNotificationSound,
@@ -80,7 +83,7 @@ export default function NotificationsStep() {
   return (
     <WizardLayout
       step={5}
-      totalSteps={5}
+      totalSteps={6}
       title="Notifications"
       description="Choose which notifications to receive and how they sound. You can adjust these any time in Settings → Notifications."
       onNext={handleAllow}
@@ -156,8 +159,8 @@ export default function NotificationsStep() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{label}</Text>
                 {requiresAuth && (
-                  <View style={{ backgroundColor: '#FFF3E0', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#92400E' }}>Account required</Text>
+                  <View style={{ backgroundColor: warnBg, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: warnText }}>Account required</Text>
                   </View>
                 )}
               </View>
@@ -175,12 +178,12 @@ export default function NotificationsStep() {
         accessibilityLabel="Note: Forum Replies, Mentions, and Followed Topic Activity require an AppleVis account. Your preferences are saved and will activate when you sign in."
         style={{
           flexDirection: 'row', gap: 8, alignItems: 'flex-start',
-          backgroundColor: '#FFF3E0', borderRadius: 10, padding: 12,
+          backgroundColor: warnBg, borderRadius: 10, padding: 12,
           marginTop: 10, marginBottom: 4,
         }}
       >
-        <Ionicons name="information-circle-outline" size={16} color="#D97706" style={{ marginTop: 1 }} accessibilityElementsHidden />
-        <Text style={{ fontSize: 13, color: '#92400E', flex: 1, lineHeight: 18 }}>
+        <Ionicons name="information-circle-outline" size={16} color={warnIcon} style={{ marginTop: 1 }} accessibilityElementsHidden />
+        <Text style={{ fontSize: 13, color: warnText, flex: 1, lineHeight: 18 }}>
           Forum Replies, Mentions, and Followed Topic Activity require an AppleVis account. Your preferences are saved and will activate when you sign in.
         </Text>
       </View>
@@ -260,11 +263,11 @@ export default function NotificationsStep() {
           onPress={() => router.push('/onboarding/ready')}
           accessible
           accessibilityRole="button"
-          accessibilityLabel="Skip notifications for now"
-          accessibilityHint="Saves your selections but skips the iOS permission request. You can grant permission later in Settings."
+          accessibilityLabel="Not Now"
+          accessibilityHint="Your notification preferences will be saved. You can allow notifications later from Settings."
           style={{ alignItems: 'center', paddingVertical: 12, marginTop: 4 }}
         >
-          <Text style={{ color: colors.textSecondary, fontSize: 15 }}>Skip for now</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 15 }}>Not Now</Text>
         </Pressable>
       )}
     </WizardLayout>

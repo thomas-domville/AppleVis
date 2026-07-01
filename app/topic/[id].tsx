@@ -16,6 +16,7 @@ import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPre
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { useAlert } from '../../src/contexts/AccessibleAlertContext';
+import { confirmDestructiveAction } from '../../src/utils/confirmDestructiveAction';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
 import { ALERTS } from '../../src/data/alertMessages';
 import { useTip, TIP_KEYS, TIPS } from '../../src/contexts/ContextualTipContext';
@@ -498,6 +499,9 @@ export default function TopicDetail() {
   const [textSize,             setTextSize]             = useState(16);
   const [loadingMoreReplies,  setLoadingMoreReplies]  = useState(false);
   const [editingReply,        setEditingReply]        = useState<ForumReply | null>(null);
+  const [editingTopic,        setEditingTopic]        = useState(false);
+
+  const isOwnTopic = (!!auth.user?.uuid && !!topic?.authorId && auth.user.uuid === topic.authorId) || !!auth.user?.isAdmin;
 
   const scrollRef      = useRef<ScrollView>(null);
   const repliesY       = useRef<number>(0);
@@ -633,6 +637,69 @@ export default function TopicDetail() {
   function handleOpenInBrowser() {
     if (!topic) return;
     Linking.openURL(topic.url).catch(() => showToast('Could not open Safari.', 'error'));
+  }
+
+  function handleTopicOptions() {
+    if (!topic) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (Platform.OS === 'ios') {
+      if (auth.user?.isAdmin) {
+        ActionSheetIOS.showActionSheetWithOptions(
+          { title: topic.title, options: ['Cancel', 'Edit Topic', 'Unpublish Topic', 'Delete Topic'],
+            cancelButtonIndex: 0, destructiveButtonIndex: 3 },
+          (index) => {
+            if (index === 1) setEditingTopic(true);
+            if (index === 2) handleUnpublishTopic();
+            if (index === 3) handleDeleteTopic();
+          },
+        );
+      } else {
+        ActionSheetIOS.showActionSheetWithOptions(
+          { title: topic.title, options: ['Cancel', 'Edit Topic', 'Delete Topic'],
+            cancelButtonIndex: 0, destructiveButtonIndex: 2 },
+          (index) => {
+            if (index === 1) setEditingTopic(true);
+            if (index === 2) handleDeleteTopic();
+          },
+        );
+      }
+    } else {
+      setEditingTopic(true);
+    }
+  }
+
+  function handleDeleteTopic() {
+    if (!topic || !auth.user?.csrfToken) return;
+    showAlert({
+      title: 'Delete Topic?',
+      message: 'This will permanently delete your topic and all its comments. This cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      type: 'warning',
+      onConfirm: async () => {
+        const res = await api.content.deleteForumPost(topic.id, auth.user!.csrfToken);
+        if (res.ok) {
+          showToast('Topic deleted.', 'success');
+          router.back();
+        } else {
+          showToast(res.error ?? 'Could not delete topic. Please try again.', 'error');
+        }
+      },
+    });
+  }
+
+  function handleUnpublishTopic() {
+    if (!topic || !auth.user?.csrfToken) return;
+    showAlert({
+      title: 'Unpublish Topic',
+      message: `"${topic.title}" will be hidden from all users but not deleted.`,
+      confirmLabel: 'Unpublish', cancelLabel: 'Cancel', type: 'warning',
+      onConfirm: async () => {
+        const res = await api.content.unpublishNode(topic.id, 'forum', auth.user!.csrfToken);
+        if (res.ok) { showToast('Topic unpublished.', 'success'); router.back(); }
+        else showToast(res.error ?? 'Could not unpublish. Please try again.', 'error');
+      },
+    });
   }
 
   function handleAddComment() {
@@ -847,17 +914,31 @@ export default function TopicDetail() {
                   />
                 )}
                 <View style={{ padding: 16 }}>
-                  {/* Hero title — VoiceOver auto-focuses here on load (swipe 1) */}
-                  <Text
-                    ref={heroRef}
-                    accessible
-                    accessibilityRole="header"
-                    accessibilityLabel={displayTitle}
-                    style={{ fontSize: 20, fontWeight: '800', color: colors.text, lineHeight: 27,
-                      marginBottom: 12 }}
-                  >
-                    {displayTitle}
-                  </Text>
+                  {/* Hero title row — VoiceOver auto-focuses here on load (swipe 1) */}
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
+                    <Text
+                      ref={heroRef}
+                      accessible
+                      accessibilityRole="header"
+                      accessibilityLabel={displayTitle}
+                      style={{ flex: 1, fontSize: 20, fontWeight: '800', color: colors.text, lineHeight: 27 }}
+                    >
+                      {displayTitle}
+                    </Text>
+                    {isOwnTopic && (
+                      <Pressable
+                        onPress={handleTopicOptions}
+                        accessible
+                        accessibilityRole="button"
+                        accessibilityLabel="Topic options"
+                        accessibilityHint="Edit or delete this topic"
+                        style={({ pressed }) => ({ padding: 6, opacity: pressed ? 0.55 : 1, marginTop: 2 })}
+                      >
+                        <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary}
+                          accessibilityElementsHidden />
+                      </Pressable>
+                    )}
+                  </View>
 
                   {/* Author / submitter — swipe 2 */}
                   <Pressable
@@ -1359,22 +1440,20 @@ export default function TopicDetail() {
                       currentUserUuid={auth.user?.uuid}
                       onEdit={(r) => setEditingReply(r)}
                       onDelete={(r) => {
-                        showAlert({
+                        confirmDestructiveAction(showAlert, {
                           title: 'Delete Comment?',
                           message: 'This cannot be undone.',
-                          buttons: [
-                            { label: 'Delete', style: 'destructive', onPress: async () => {
-                              if (!auth.user?.csrfToken) return;
-                              const res = await api.content.deleteComment('comment_forum', r.id, auth.user.csrfToken);
-                              if (res.ok) {
-                                setTopic(t => t ? { ...t, replies: t.replies.filter(x => x.id !== r.id) } : t);
-                                showToast('Comment deleted.', 'success');
-                              } else {
-                                showToast('Could not delete comment.', 'error');
-                              }
-                            }},
-                            { label: 'Cancel' },
-                          ],
+                          confirmLabel: 'Delete',
+                          onConfirm: async () => {
+                            if (!auth.user?.csrfToken) return;
+                            const res = await api.content.deleteComment('comment_forum', r.id, auth.user.csrfToken);
+                            if (res.ok) {
+                              setTopic(t => t ? { ...t, replies: t.replies.filter(x => x.id !== r.id) } : t);
+                              showToast('Comment deleted.', 'success');
+                            } else {
+                              showToast('Could not delete comment.', 'error');
+                            }
+                          },
                         });
                       }}
                     />
@@ -1511,6 +1590,23 @@ export default function TopicDetail() {
           csrfToken={auth.user.csrfToken}
           initialBody={editingReply.body}
           label="Comment"
+        />
+      )}
+
+      {/* ── Edit topic modal (own topics only) ───────────────────────────── */}
+      {editingTopic && topic && auth.user?.csrfToken && (
+        <EditContentModal
+          visible={editingTopic}
+          onClose={() => setEditingTopic(false)}
+          onSaved={(newBody, newTitle) => {
+            setTopic(t => t ? { ...t, body: newBody, title: newTitle ?? t.title } : t);
+            showToast('Topic updated.', 'success');
+          }}
+          nodeId={topic.id}
+          initialTitle={topic.title}
+          initialBody={topic.body}
+          csrfToken={auth.user.csrfToken}
+          label="Topic"
         />
       )}
 

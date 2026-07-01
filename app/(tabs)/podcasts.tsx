@@ -1,3 +1,6 @@
+// DEPRECATED (hidden tab, href: null) — kept only as a compatibility net.
+// No in-app code routes here anymore; see src/navigation/routeResolver.ts and
+// app/podcast-browse.tsx, which is the current replacement.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo, ActionSheetIOS, ActivityIndicator, Animated,
@@ -16,6 +19,8 @@ import { usePodcastTags } from '../../src/hooks/usePodcastTags';
 import { useRefreshFeedback } from '../../src/hooks/useRefreshFeedback';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
+import { useAlert } from '../../src/contexts/AccessibleAlertContext';
+import { confirmDestructiveAction } from '../../src/utils/confirmDestructiveAction';
 import { useTip, TIP_KEYS, TIPS } from '../../src/contexts/ContextualTipContext';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
 import type { AnnouncementLevel } from '../../src/contexts/PreferencesContext';
@@ -160,11 +165,15 @@ function buildEpisodeLabel(
 }
 
 // ─── Swipeable episode card ───────────────────────────────────────────────────
+function isAction(actionName: string, semanticName: string, label: string): boolean {
+  return actionName === semanticName || actionName === label;
+}
+
 function SwipeableEpisodeCard({
   episode, isCurrent, isPlaying, isNew, progress,
   isQueued, isDownloaded, isDownloading, isSaved,
   accessibilityLabel,
-  onPress, onPlay, onQueue, onDownload, onSave, onRef,
+  onPress, onPlay, onQueue, onDownload, onSave, onShare, onRef,
   colors, styles,
 }: {
   episode: PodcastEpisode;
@@ -182,6 +191,7 @@ function SwipeableEpisodeCard({
   onQueue: () => void;
   onDownload: () => void;
   onSave: () => void;
+  onShare: () => void;
   onRef?: (el: View | null) => void;
   colors: ReturnType<typeof useTheme>['colors'];
   styles: ReturnType<typeof useTheme>['styles'];
@@ -225,6 +235,12 @@ function SwipeableEpisodeCard({
 
   const publishedLabel = episode.publishedAt ? formatPublishedDate(episode.publishedAt) : null;
   const dur = formatDuration(episode.duration);
+  const playActionLabel = isCurrent && isPlaying ? 'Stop this Episode' : 'Play this Episode';
+  const queueActionLabel = isQueued ? 'Remove from Queue' : 'Queue this Episode';
+  const downloadActionLabel = isDownloading ? 'Downloading...' : isDownloaded ? 'Delete Download' : 'Download this Episode';
+  const saveActionLabel = isSaved ? 'Remove from Saved' : 'Save this Episode';
+  const followActionLabel = followed.isFollowing ? 'Unfollow this Episode' : 'Follow this Episode';
+  const shareActionLabel = 'Share this Episode';
 
   return (
     <View style={{ position: 'relative', marginBottom: 0 }}>
@@ -252,7 +268,7 @@ function SwipeableEpisodeCard({
         <Pressable
           onPress={onPress}
           accessible
-          accessibilityRole="none"
+          accessibilityRole="button"
           accessibilityLabel={accessibilityLabel}
           accessibilityHint={[
             'Double tap to open episode details.',
@@ -260,18 +276,21 @@ function SwipeableEpisodeCard({
             isDownloading ? 'Download in progress.' : isDownloaded ? 'Swipe left to delete download.' : 'Swipe left to download.',
           ].join(' ')}
           accessibilityActions={[
-            { name: 'play',     label: isCurrent && isPlaying ? 'Stop' : 'Play' },
-            { name: 'queue',    label: isQueued ? 'Remove from queue' : 'Add to queue' },
-            { name: 'download', label: isDownloading ? 'Downloading…' : isDownloaded ? 'Delete download' : 'Download' },
-            { name: 'save',     label: isSaved ? 'Unsave' : 'Save' },
-            { name: 'follow',   label: followed.isFollowing ? 'Unfollow episode' : 'Follow episode' },
+            { name: playActionLabel,     label: playActionLabel },
+            { name: queueActionLabel,    label: queueActionLabel },
+            { name: isDownloading ? 'Downloading...' : isDownloaded ? 'Delete Download' : 'Download this Episode', label: isDownloading ? 'Downloading...' : isDownloaded ? 'Delete Download' : 'Download this Episode' },
+            { name: saveActionLabel,     label: saveActionLabel },
+            { name: followActionLabel,   label: followActionLabel },
+            { name: shareActionLabel,    label: shareActionLabel },
           ]}
           onAccessibilityAction={({ nativeEvent }) => {
-            if (nativeEvent.actionName === 'play')     onPlay();
-            if (nativeEvent.actionName === 'queue')    onQueue();
-            if (nativeEvent.actionName === 'download') onDownload();
-            if (nativeEvent.actionName === 'save')     onSave();
-            if (nativeEvent.actionName === 'follow') {
+            const actionName = nativeEvent.actionName;
+            if (isAction(actionName, 'play', playActionLabel))         onPlay();
+            if (isAction(actionName, 'queue', queueActionLabel))       onQueue();
+            if (isAction(actionName, 'download', downloadActionLabel) || actionName.startsWith('Downloading')) onDownload();
+            if (isAction(actionName, 'save', saveActionLabel))         onSave();
+            if (isAction(actionName, 'share', shareActionLabel))       onShare();
+            if (isAction(actionName, 'follow', followActionLabel)) {
               followed.toggleFollow().then((result) => {
                 showToast(
                   result === 'unfollowed'
@@ -309,11 +328,11 @@ function SwipeableEpisodeCard({
             </View>
           )}
 
-          <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
             <Pressable
               onPress={onPlay}
               accessible accessibilityRole="button"
-              accessibilityLabel={isCurrent && isPlaying ? 'Pause' : 'Play'}
+              accessibilityLabel={isCurrent && isPlaying ? 'Stop this Episode' : 'Play this Episode'}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                 backgroundColor: colors.accent, borderRadius: 8,
                 paddingHorizontal: 12, paddingVertical: 8 }}
@@ -325,41 +344,60 @@ function SwipeableEpisodeCard({
             </Pressable>
             <Pressable
               onPress={onQueue}
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel={isQueued ? 'Remove from queue' : 'Add to queue'}
+              accessible accessibilityRole="button"
+              accessibilityLabel={isQueued ? 'Remove from Queue' : 'Queue this Episode'}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                 backgroundColor: isQueued ? colors.accent + '22' : colors.pill,
                 borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}
             >
               <Ionicons
                 name={isQueued ? 'remove-circle-outline' : 'add-circle-outline'}
-                size={14}
-                color={colors.accent}
-                accessibilityElementsHidden
+                size={14} color={colors.accent} accessibilityElementsHidden
               />
               <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>
-                {isQueued ? 'Remove from Queue' : 'Add to Queue'}
+                {isQueued ? 'Remove' : 'Queue'}
               </Text>
             </Pressable>
             <Pressable
               onPress={onSave}
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel={isSaved ? 'Unsave episode' : 'Save episode'}
+              accessible accessibilityRole="button"
+              accessibilityLabel={isSaved ? 'Remove from Saved' : 'Save this Episode'}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                 backgroundColor: isSaved ? colors.accent + '22' : colors.pill,
                 borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}
             >
               <Ionicons
                 name={isSaved ? 'bookmark' : 'bookmark-outline'}
-                size={14}
-                color={colors.accent}
-                accessibilityElementsHidden
+                size={14} color={colors.accent} accessibilityElementsHidden
               />
               <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>
-                {isSaved ? 'Unsave' : 'Save'}
+                {isSaved ? 'Saved' : 'Save'}
               </Text>
+            </Pressable>
+            <Pressable
+              onPress={onDownload}
+              accessible accessibilityRole="button"
+              accessibilityLabel={isDownloading ? 'Downloading' : isDownloaded ? 'Delete Download' : 'Download this Episode'}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+                backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}
+            >
+              <Ionicons
+                name={isDownloading ? 'cloud-download-outline' : isDownloaded ? 'trash-outline' : 'arrow-down-circle-outline'}
+                size={14} color={isDownloaded ? '#FF3B30' : colors.accent} accessibilityElementsHidden
+              />
+              <Text style={{ color: isDownloaded ? '#FF3B30' : colors.accent, fontWeight: '600', fontSize: 13 }}>
+                {isDownloading ? 'Saving…' : isDownloaded ? 'Remove' : 'Download'}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={onShare}
+              accessible accessibilityRole="button"
+              accessibilityLabel="Share this Episode"
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+                backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}
+            >
+              <Ionicons name="share-outline" size={14} color={colors.accent} accessibilityElementsHidden />
+              <Text style={{ color: colors.accent, fontWeight: '600', fontSize: 13 }}>Share</Text>
             </Pressable>
           </View>
         </Pressable>
@@ -389,6 +427,7 @@ export default function Podcasts() {
     [list.episodes, cachedDurations],
   );
   const { showToast }            = useToast();
+  const { showAlert }            = useAlert();
   const { showTip }              = useTip();
   const { announcementLevel, podcastAutoDelete } = usePreferences();
 
@@ -734,7 +773,7 @@ export default function Podcasts() {
           <Pressable
             onPress={() => navigateToEpisode(player.episode!)}
             accessible
-            accessibilityRole="none"
+            accessibilityRole="button"
             accessibilityLabel={[
               'Now playing',
               player.episode.title,
@@ -858,8 +897,12 @@ export default function Podcasts() {
 
             {filteredLatest.map((episode, index) => {
               const isCurrent   = isCurrentEpisode(episode.id);
+              const savedPos    = meta.positions[episode.id] ?? 0;
               const epProgress  = isCurrent && player.duration > 0
-                ? player.position / player.duration : undefined;
+                ? player.position / player.duration
+                : savedPos > 30 && episode.duration > 0
+                  ? savedPos / episode.duration
+                  : undefined;
               const epIsQueued  = player.queue.some(q => q.id === episode.id);
               return (
                 <SwipeableEpisodeCard
@@ -887,6 +930,7 @@ export default function Podcasts() {
                   }}
                   onDownload={() => handleDownload(episode)}
                   onSave={() => handleSave(episode)}
+                  onShare={() => handleShare(episode)}
                   onRef={el => {
                     episodeItemRefs.current[episode.id] = el;
                     if (index === 0) firstEpisodeRef.current = el;
@@ -942,6 +986,7 @@ export default function Podcasts() {
                     }}
                     onDownload={() => handleDownload(episode)}
                     onSave={() => handleSave(episode)}
+                    onShare={() => handleShare(episode)}
                     colors={colors}
                     styles={styles}
                   />
@@ -969,10 +1014,19 @@ export default function Podcasts() {
                   </Pressable>
                   <View style={{ flex: 1 }} accessibilityElementsHidden />
                   <Pressable
-                    onPress={async () => { await deleteAllDownloads(); meta.reload(); showToast('All downloads removed.', 'success'); }}
+                    onPress={() => confirmDestructiveAction(showAlert, {
+                      title: 'Remove Downloads?',
+                      message: `This will delete all ${downloadedEpisodes.length} downloaded episode${downloadedEpisodes.length === 1 ? '' : 's'} from this device. Queue and Saved items will not be affected.`,
+                      confirmLabel: 'Remove Downloads',
+                      onConfirm: async () => {
+                        await deleteAllDownloads();
+                        meta.reload();
+                        showToast('All downloads removed.', 'success');
+                      },
+                    })}
                     accessible accessibilityRole="button" accessibilityLabel="Remove all downloads"
                     style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: colors.pill, borderRadius: 8 }}>
-                    <Text style={{ fontSize: 13, color: '#FF3B30', fontWeight: '600' }}>Remove All</Text>
+                    <Text style={{ fontSize: 13, color: '#FF3B30', fontWeight: '600' }}>Remove Downloads</Text>
                   </Pressable>
                 </View>
 
@@ -984,21 +1038,31 @@ export default function Podcasts() {
                     <View key={episode.id} style={styles.card}>
                       <Pressable
                         onPress={() => navigateToEpisode(episode)}
-                        accessible accessibilityRole="none"
+                        accessible accessibilityRole="button"
                         accessibilityLabel={[episodeLabel(episode), 'Downloaded'].join('. ')}
                         accessibilityHint="Double tap to open episode details."
                         accessibilityActions={[
-                          { name: 'play',   label: isCurrent && player.isPlaying ? 'Stop' : 'Play' },
-                          { name: 'queue',  label: isQueued ? 'Remove from queue' : 'Add to queue' },
-                          { name: 'save',   label: isSaved ? 'Unsave' : 'Save' },
-                          { name: 'remove', label: 'Remove download' },
+                          { name: isCurrent && player.isPlaying ? 'Stop this Episode' : 'Play this Episode', label: isCurrent && player.isPlaying ? 'Stop this Episode' : 'Play this Episode' },
+                          { name: isQueued ? 'Remove from Queue' : 'Queue this Episode', label: isQueued ? 'Remove from Queue' : 'Queue this Episode' },
+                          { name: isSaved ? 'Remove from Saved' : 'Save this Episode', label: isSaved ? 'Remove from Saved' : 'Save this Episode' },
+                          { name: 'Share this Episode', label: 'Share this Episode' },
+                          { name: 'Delete Download', label: 'Delete Download' },
                         ]}
                         onAccessibilityAction={({ nativeEvent }) => {
                           switch (nativeEvent.actionName) {
-                            case 'play':   playEpisode(episode); break;
-                            case 'queue':  isQueued ? (player.removeFromQueue(episode.id), showToast('Removed from queue.', 'success')) : (player.enqueue(episode), showToast('Added to queue.', 'success')); break;
-                            case 'save':   handleSave(episode); break;
-                            case 'remove': meta.removeDownload(episode.id); showToast('Download removed.', 'success'); break;
+                            case 'play':
+                            case 'Play this Episode':
+                            case 'Stop this Episode':   playEpisode(episode); break;
+                            case 'queue':
+                            case 'Queue this Episode':
+                            case 'Remove from Queue':  isQueued ? (player.removeFromQueue(episode.id), showToast('Removed from queue.', 'success')) : (player.enqueue(episode), showToast('Added to queue.', 'success')); break;
+                            case 'save':
+                            case 'Save this Episode':
+                            case 'Remove from Saved':   handleSave(episode); break;
+                            case 'share':
+                            case 'Share this Episode':  handleShare(episode); break;
+                            case 'remove':
+                            case 'Delete Download': meta.removeDownload(episode.id); showToast('Download removed.', 'success'); break;
                           }
                         }}
                       >
@@ -1009,10 +1073,10 @@ export default function Podcasts() {
                           {episode.publishedAt ? `  ·  ${formatPublishedDate(episode.publishedAt)}` : ''}
                         </Text>
                       </Pressable>
-                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 2 }}>
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
                         <Pressable onPress={() => playEpisode(episode)}
                           accessible accessibilityRole="button"
-                          accessibilityLabel={isCurrent && player.isPlaying ? 'Pause' : 'Play'}
+                          accessibilityLabel={isCurrent && player.isPlaying ? 'Stop this Episode' : 'Play this Episode'}
                           style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                             backgroundColor: colors.accent, borderRadius: 8,
                             paddingHorizontal: 14, paddingVertical: 8, flex: 1 }}>
@@ -1024,18 +1088,18 @@ export default function Podcasts() {
                         <Pressable
                           onPress={() => { if (isQueued) { player.removeFromQueue(episode.id); showToast('Removed from queue.', 'success'); } else { player.enqueue(episode); showToast('Added to queue.', 'success'); } }}
                           accessible accessibilityRole="button"
-                          accessibilityLabel={isQueued ? 'Remove from queue' : 'Add to queue'}
+                          accessibilityLabel={isQueued ? 'Remove from Queue' : 'Queue this Episode'}
                           style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                             backgroundColor: isQueued ? colors.accent + '22' : colors.pill,
                             borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
                           <Ionicons name={isQueued ? 'remove-circle-outline' : 'add-circle-outline'} size={14} color={colors.accent} accessibilityElementsHidden />
                           <Text style={{ color: colors.accent, fontWeight: '600', fontSize: 13 }}>
-                            {isQueued ? 'In Queue' : 'Queue'}
+                            {isQueued ? 'Queued' : 'Queue'}
                           </Text>
                         </Pressable>
                         <Pressable onPress={() => handleSave(episode)}
                           accessible accessibilityRole="button"
-                          accessibilityLabel={isSaved ? 'Unsave episode' : 'Save episode'}
+                          accessibilityLabel={isSaved ? 'Remove from Saved' : 'Save this Episode'}
                           style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                             backgroundColor: isSaved ? colors.accent + '22' : colors.pill,
                             borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
@@ -1044,12 +1108,19 @@ export default function Podcasts() {
                             {isSaved ? 'Saved' : 'Save'}
                           </Text>
                         </Pressable>
+                        <Pressable onPress={() => handleShare(episode)}
+                          accessible accessibilityRole="button" accessibilityLabel="Share this Episode"
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+                            backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
+                          <Ionicons name="share-outline" size={14} color={colors.accent} accessibilityElementsHidden />
+                          <Text style={{ color: colors.accent, fontWeight: '600', fontSize: 13 }}>Share</Text>
+                        </Pressable>
                         <Pressable onPress={() => { meta.removeDownload(episode.id); showToast('Download removed.', 'success'); }}
-                          accessible accessibilityRole="button" accessibilityLabel="Remove download"
+                          accessible accessibilityRole="button" accessibilityLabel="Delete Download"
                           style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                             backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
                           <Ionicons name="trash-outline" size={14} color="#FF3B30" accessibilityElementsHidden />
-                          <Text style={{ color: '#FF3B30', fontWeight: '600', fontSize: 13 }}>Remove</Text>
+                          <Text style={{ color: '#FF3B30', fontWeight: '600', fontSize: 13 }}>Delete</Text>
                         </Pressable>
                       </View>
                     </View>
@@ -1099,10 +1170,15 @@ export default function Podcasts() {
                     <Text style={{ fontSize: 13, color: colors.accent, fontWeight: '600' }}>Download All</Text>
                   </Pressable>
                   <Pressable
-                    onPress={async () => {
-                      for (const ep of savedEpisodes) await meta.unsaveEpisode(ep.id).catch(() => {});
-                      showToast('All saved episodes removed.', 'success');
-                    }}
+                    onPress={() => confirmDestructiveAction(showAlert, {
+                      title: 'Unsave All?',
+                      message: `This will remove all ${savedEpisodes.length} saved episode${savedEpisodes.length === 1 ? '' : 's'} from Saved. Downloads and Queue will not be affected.`,
+                      confirmLabel: 'Unsave All',
+                      onConfirm: async () => {
+                        for (const ep of savedEpisodes) await meta.unsaveEpisode(ep.id).catch(() => {});
+                        showToast('All saved episodes removed.', 'success');
+                      },
+                    })}
                     accessible accessibilityRole="button" accessibilityLabel="Unsave all saved episodes"
                     style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: colors.pill, borderRadius: 8 }}>
                     <Text style={{ fontSize: 13, color: '#FF3B30', fontWeight: '600' }}>Unsave All</Text>
@@ -1118,25 +1194,35 @@ export default function Podcasts() {
                     <View key={episode.id} style={styles.card}>
                       <Pressable
                         onPress={() => navigateToEpisode(episode)}
-                        accessible accessibilityRole="none"
+                        accessible accessibilityRole="button"
                         accessibilityLabel={[episodeLabel(episode), 'Saved'].join('. ')}
                         accessibilityHint="Double tap to open episode details."
                         accessibilityActions={[
-                          { name: 'play',       label: isCurrent && player.isPlaying ? 'Stop' : 'Play' },
-                          { name: 'queue',      label: isQueued ? 'Remove from queue' : 'Add to queue' },
-                          { name: 'download',   label: isDownloading ? 'Downloading…' : isDownloaded ? 'Delete download' : 'Download' },
-                          { name: 'share',      label: 'Share episode' },
-                          { name: 'markPlayed', label: 'Mark as played' },
-                          { name: 'unsave',     label: 'Unsave episode' },
+                          { name: isCurrent && player.isPlaying ? 'Stop this Episode' : 'Play this Episode', label: isCurrent && player.isPlaying ? 'Stop this Episode' : 'Play this Episode' },
+                          { name: isQueued ? 'Remove from Queue' : 'Queue this Episode', label: isQueued ? 'Remove from Queue' : 'Queue this Episode' },
+                          { name: isDownloading ? 'Downloading...' : isDownloaded ? 'Delete Download' : 'Download this Episode', label: isDownloading ? 'Downloading...' : isDownloaded ? 'Delete Download' : 'Download this Episode' },
+                          { name: 'Share this Episode', label: 'Share this Episode' },
+                          { name: 'Mark as Played', label: 'Mark as Played' },
+                          { name: 'Remove from Saved', label: 'Remove from Saved' },
                         ]}
                         onAccessibilityAction={({ nativeEvent }) => {
                           switch (nativeEvent.actionName) {
-                            case 'play':       playEpisode(episode); break;
-                            case 'queue':      isQueued ? (player.removeFromQueue(episode.id), showToast('Removed from queue.', 'success')) : (player.enqueue(episode), showToast('Added to queue.', 'success')); break;
-                            case 'download':   handleDownload(episode); break;
-                            case 'share':      handleShare(episode); break;
-                            case 'markPlayed': handleMarkPlayed(episode); break;
-                            case 'unsave':     meta.unsaveEpisode(episode.id).then(() => showToast('Episode unsaved.', 'success')); break;
+                            case 'play':
+                            case 'Play this Episode':
+                            case 'Stop this Episode':       playEpisode(episode); break;
+                            case 'queue':
+                            case 'Queue this Episode':
+                            case 'Remove from Queue':      isQueued ? (player.removeFromQueue(episode.id), showToast('Removed from queue.', 'success')) : (player.enqueue(episode), showToast('Added to queue.', 'success')); break;
+                            case 'download':
+                            case 'Download this Episode':
+                            case 'Delete Download':
+                            case 'Downloading':   handleDownload(episode); break;
+                            case 'share':
+                            case 'Share this Episode':      handleShare(episode); break;
+                            case 'markPlayed':
+                            case 'Mark as Played': handleMarkPlayed(episode); break;
+                            case 'unsave':
+                            case 'Remove from Saved':     meta.unsaveEpisode(episode.id).then(() => showToast('Episode unsaved.', 'success')); break;
                           }
                         }}
                       >
@@ -1152,11 +1238,11 @@ export default function Podcasts() {
                         </Text>
                       </Pressable>
 
-                      {/* Row 1: Play · Queue · Unsave */}
-                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 2, marginBottom: 8 }}>
+                      {/* Row 1: Play · Queue · Save */}
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 2, marginBottom: 8, flexWrap: 'wrap' }}>
                         <Pressable onPress={() => playEpisode(episode)}
                           accessible accessibilityRole="button"
-                          accessibilityLabel={isCurrent && player.isPlaying ? 'Pause' : 'Play'}
+                          accessibilityLabel={isCurrent && player.isPlaying ? 'Stop this Episode' : 'Play this Episode'}
                           style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                             backgroundColor: colors.accent, borderRadius: 8,
                             paddingHorizontal: 14, paddingVertical: 8, flex: 1 }}>
@@ -1168,17 +1254,17 @@ export default function Podcasts() {
                         <Pressable
                           onPress={() => { if (isQueued) { player.removeFromQueue(episode.id); showToast('Removed from queue.', 'success'); } else { player.enqueue(episode); showToast('Added to queue.', 'success'); } }}
                           accessible accessibilityRole="button"
-                          accessibilityLabel={isQueued ? 'Remove from queue' : 'Add to queue'}
+                          accessibilityLabel={isQueued ? 'Remove from Queue' : 'Queue this Episode'}
                           style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                             backgroundColor: isQueued ? colors.accent + '22' : colors.pill,
                             borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
                           <Ionicons name={isQueued ? 'remove-circle-outline' : 'add-circle-outline'} size={14} color={colors.accent} accessibilityElementsHidden />
                           <Text style={{ color: colors.accent, fontWeight: '600', fontSize: 13 }}>
-                            {isQueued ? 'In Queue' : 'Queue'}
+                            {isQueued ? 'Queued' : 'Queue'}
                           </Text>
                         </Pressable>
                         <Pressable onPress={() => meta.unsaveEpisode(episode.id).then(() => showToast('Episode unsaved.', 'success'))}
-                          accessible accessibilityRole="button" accessibilityLabel="Unsave episode"
+                          accessible accessibilityRole="button" accessibilityLabel="Remove from Saved"
                           style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                             backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
                           <Ionicons name="bookmark-outline" size={14} color="#FF3B30" accessibilityElementsHidden />
@@ -1187,28 +1273,28 @@ export default function Podcasts() {
                       </View>
 
                       {/* Row 2: Download · Share · Mark Played */}
-                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
                         <Pressable onPress={() => handleDownload(episode)}
                           accessible accessibilityRole="button"
-                          accessibilityLabel={isDownloading ? 'Downloading' : isDownloaded ? 'Remove download' : 'Download'}
+                          accessibilityLabel={isDownloading ? 'Downloading' : isDownloaded ? 'Delete Download' : 'Download this Episode'}
                           style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                             backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
                           <Ionicons
                             name={isDownloading ? 'cloud-download-outline' : isDownloaded ? 'trash-outline' : 'arrow-down-circle-outline'}
                             size={14} color={isDownloaded ? '#FF3B30' : colors.accent} accessibilityElementsHidden />
                           <Text style={{ color: isDownloaded ? '#FF3B30' : colors.accent, fontWeight: '600', fontSize: 13 }}>
-                            {isDownloading ? 'Downloading…' : isDownloaded ? 'Remove' : 'Download'}
+                            {isDownloading ? 'Saving…' : isDownloaded ? 'Delete' : 'Download'}
                           </Text>
                         </Pressable>
                         <Pressable onPress={() => handleShare(episode)}
-                          accessible accessibilityRole="button" accessibilityLabel="Share episode"
+                          accessible accessibilityRole="button" accessibilityLabel="Share this Episode"
                           style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                             backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
                           <Ionicons name="share-outline" size={14} color={colors.accent} accessibilityElementsHidden />
                           <Text style={{ color: colors.accent, fontWeight: '600', fontSize: 13 }}>Share</Text>
                         </Pressable>
                         <Pressable onPress={() => handleMarkPlayed(episode)}
-                          accessible accessibilityRole="button" accessibilityLabel="Mark as played"
+                          accessible accessibilityRole="button" accessibilityLabel="Mark as Played"
                           style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                             backgroundColor: colors.pill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
                           <Ionicons name="checkmark-circle-outline" size={14} color={colors.accent} accessibilityElementsHidden />
@@ -1229,7 +1315,15 @@ export default function Podcasts() {
                 />
             : <>
                 <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 12 }}>
-                  <Pressable onPress={() => { player.clearQueue(); showToast('Queue cleared.', 'success'); }}
+                  <Pressable onPress={() => confirmDestructiveAction(showAlert, {
+                      title: 'Clear Queue?',
+                      message: 'This will remove all episodes from your queue. Downloaded episodes will not be deleted.',
+                      confirmLabel: 'Clear Queue',
+                      onConfirm: () => {
+                        player.clearQueue();
+                        showToast('Queue cleared.', 'success');
+                      },
+                    })}
                     accessible accessibilityRole="button" accessibilityLabel="Clear queue"
                     style={{ paddingHorizontal: 12, paddingVertical: 6,
                       backgroundColor: colors.pill, borderRadius: 8 }}>
@@ -1247,7 +1341,7 @@ export default function Podcasts() {
                       key={episode.id}
                       onPress={() => navigateToEpisode(episode)}
                       accessible
-                      accessibilityRole="none"
+                      accessibilityRole="button"
                       accessibilityLabel={[
                         `Queue position ${index + 1} of ${queueTotal}`,
                         episode.title,
@@ -1257,14 +1351,16 @@ export default function Podcasts() {
                       ].filter(Boolean).join('. ')}
                       accessibilityHint="Double tap to open episode details."
                       accessibilityActions={[
-                        { name: 'play',     label: isCurrent && player.isPlaying ? 'Stop' : 'Play now' },
+                        { name: isCurrent && player.isPlaying ? 'Stop this Episode' : 'Play this Episode', label: isCurrent && player.isPlaying ? 'Stop this Episode' : 'Play this Episode' },
                         ...(!isFirst  ? [{ name: 'moveUp',   label: 'Move up in queue' }]   : []),
                         ...(!isLast   ? [{ name: 'moveDown', label: 'Move down in queue' }] : []),
-                        { name: 'remove',   label: 'Remove from queue' },
+                        { name: 'Remove from Queue', label: 'Remove from Queue' },
                       ]}
                       onAccessibilityAction={({ nativeEvent }) => {
                         switch (nativeEvent.actionName) {
                           case 'play':
+                            case 'Play this Episode':
+                            case 'Stop this Episode':
                             playEpisode(episode);
                             navigateToEpisode(episode);
                             break;
@@ -1279,6 +1375,7 @@ export default function Podcasts() {
                               `Moved to position ${index + 2} of ${queueTotal}.`);
                             break;
                           case 'remove':
+                            case 'Remove from Queue':
                             player.removeFromQueue(episode.id);
                             showToast('Removed from queue.', 'success');
                             break;
@@ -1373,7 +1470,7 @@ export default function Podcasts() {
                           showToast('Episode no longer in feed.', 'warning');
                         }
                       }}
-                      accessible accessibilityRole="none"
+                      accessible accessibilityRole="button"
                       accessibilityLabel={[
                         entry.title, entry.showTitle,
                         formatDuration(entry.duration),

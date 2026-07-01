@@ -14,6 +14,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { useAlert } from '../../src/contexts/AccessibleAlertContext';
+import { confirmDestructiveAction } from '../../src/utils/confirmDestructiveAction';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
 import { ALERTS } from '../../src/data/alertMessages';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
@@ -152,6 +153,7 @@ export default function ResourceDetailScreen() {
   const [lastSeenAt,            setLastSeenAt]            = useState<string | null>(null);
   const [collapsedComments,     setCollapsedComments]     = useState<Record<string, boolean>>({});
   const [editingComment,        setEditingComment]        = useState<ForumReply | null>(null);
+  const [editingNode,           setEditingNode]           = useState(false);
 
   const scrollRef          = useRef<ScrollView>(null);
   const heroRef            = useRef<Text>(null);
@@ -244,6 +246,54 @@ export default function ResourceDetailScreen() {
     if (!resource) return;
     if (isSaved) { saved.unsave(id!); showToast('Removed from saved.', 'success'); }
     else { saved.save({ id: id!, kind: 'resource', title: resource.title, savedAt: new Date().toISOString() }); showToast(`${kindLabel} saved.`, 'success'); }
+  }
+
+  function handleNodeOptions() {
+    if (!resource || !auth.user?.csrfToken) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { title: resource.title, options: ['Cancel', 'Edit Guide', 'Unpublish Guide', 'Delete Guide'],
+          cancelButtonIndex: 0, destructiveButtonIndex: 3 },
+        (index) => {
+          if (index === 1) setEditingNode(true);
+          if (index === 2) handleAdminUnpublish();
+          if (index === 3) handleAdminDelete();
+        },
+      );
+    } else {
+      setEditingNode(true);
+    }
+  }
+
+  function handleAdminDelete() {
+    if (!resource || !auth.user?.csrfToken) return;
+    const token = auth.user.csrfToken;
+    showAlert({
+      title: 'Delete Guide',
+      message: `Permanently delete "${resource.title}"? This cannot be undone.`,
+      confirmLabel: 'Delete', cancelLabel: 'Cancel', type: 'error',
+      onConfirm: async () => {
+        const res = await api.content.deleteNode(resource.id, 'guides', token);
+        if (res.ok) { showToast('Guide deleted.', 'success'); router.back(); }
+        else showToast('Could not delete. Please try again.', 'error');
+      },
+    });
+  }
+
+  function handleAdminUnpublish() {
+    if (!resource || !auth.user?.csrfToken) return;
+    const token = auth.user.csrfToken;
+    showAlert({
+      title: 'Unpublish Guide',
+      message: `"${resource.title}" will be hidden from all users but not deleted.`,
+      confirmLabel: 'Unpublish', cancelLabel: 'Cancel', type: 'warning',
+      onConfirm: async () => {
+        const res = await api.content.unpublishNode(resource.id, 'guides', token);
+        if (res.ok) { showToast('Guide unpublished.', 'success'); router.back(); }
+        else showToast('Could not unpublish. Please try again.', 'error');
+      },
+    });
   }
 
   function handleShare() {
@@ -375,16 +425,31 @@ export default function ResourceDetailScreen() {
                     />
                   )}
                   <View style={{ padding: 16 }}>
-                    {/* Title — VoiceOver auto-focuses here on load */}
-                    <Text
-                      ref={heroRef}
-                      accessible
-                      accessibilityRole="header"
-                      accessibilityLabel={displayTitle}
-                      style={{ fontSize: 20, fontWeight: '800', color: colors.text, lineHeight: 27, marginBottom: 12 }}
-                    >
-                      {displayTitle}
-                    </Text>
+                    {/* Title row — VoiceOver auto-focuses here on load */}
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
+                      <Text
+                        ref={heroRef}
+                        accessible
+                        accessibilityRole="header"
+                        accessibilityLabel={displayTitle}
+                        style={{ flex: 1, fontSize: 20, fontWeight: '800', color: colors.text, lineHeight: 27 }}
+                      >
+                        {displayTitle}
+                      </Text>
+                      {auth.user?.isAdmin && (
+                        <Pressable
+                          onPress={handleNodeOptions}
+                          accessible
+                          accessibilityRole="button"
+                          accessibilityLabel="Guide options"
+                          accessibilityHint="Edit, unpublish, or delete this guide"
+                          style={({ pressed }) => ({ padding: 6, opacity: pressed ? 0.55 : 1, marginTop: 2 })}
+                        >
+                          <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary}
+                            accessibilityElementsHidden />
+                        </Pressable>
+                      )}
+                    </View>
 
                     {/* Author / submitter */}
                     <Pressable
@@ -948,22 +1013,20 @@ export default function ResourceDetailScreen() {
                         }
                         if (isOwnComment && buttonIdx === 4) setEditingComment(c);
                         if (isOwnComment && buttonIdx === 5) {
-                          showAlert({
+                          confirmDestructiveAction(showAlert, {
                             title: 'Delete Comment?',
                             message: 'This cannot be undone.',
-                            buttons: [
-                              { label: 'Delete', style: 'destructive', onPress: async () => {
-                                if (!auth.user?.csrfToken) return;
-                                const res = await api.content.deleteComment('comment_node_guides', c.id, auth.user.csrfToken);
-                                if (res.ok) {
-                                  setComments(prev => prev.filter(x => x.id !== c.id));
-                                  showToast('Comment deleted.', 'success');
-                                } else {
-                                  showToast('Could not delete comment.', 'error');
-                                }
-                              }},
-                              { label: 'Cancel' },
-                            ],
+                            confirmLabel: 'Delete',
+                            onConfirm: async () => {
+                              if (!auth.user?.csrfToken) return;
+                              const res = await api.content.deleteComment('comment_node_guides', c.id, auth.user.csrfToken);
+                              if (res.ok) {
+                                setComments(prev => prev.filter(x => x.id !== c.id));
+                                showToast('Comment deleted.', 'success');
+                              } else {
+                                showToast('Could not delete comment.', 'error');
+                              }
+                            },
                           });
                         }
                       },
@@ -1154,6 +1217,24 @@ export default function ResourceDetailScreen() {
           authorName={resource.authorName ?? ''}
           isSignedIn={auth.isSignedIn}
           showToast={showToast}
+        />
+      )}
+
+      {/* Admin Edit Node Modal */}
+      {editingNode && resource && auth.user?.csrfToken && (
+        <EditContentModal
+          visible={editingNode}
+          onClose={() => setEditingNode(false)}
+          onSaved={(newBody, newTitle) => {
+            setResource(r => r ? { ...r, body: newBody, title: newTitle ?? r.title } : r);
+            showToast('Guide updated.', 'success');
+          }}
+          nodeId={resource.id}
+          nodeType="guides"
+          initialTitle={resource.title}
+          csrfToken={auth.user.csrfToken}
+          initialBody={resource.body}
+          label="Guide"
         />
       )}
 

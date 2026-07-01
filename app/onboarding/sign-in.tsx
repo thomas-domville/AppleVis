@@ -85,7 +85,7 @@ export default function SignInStep() {
   return (
     <WizardLayout
       step={2}
-      totalSteps={5}
+      totalSteps={6}
       title="Sign in to your account"
       description="Sign in to post in the forums, follow topics, and receive push notifications."
       onNext={handleSignIn}
@@ -215,7 +215,7 @@ export default function SignInStep() {
         accessible
         accessibilityRole="button"
         accessibilityLabel="Next: skip sign in for now"
-        accessibilityHint="You can sign in later from the Settings tab."
+        accessibilityHint="You can sign in later from the Profile tab."
         style={{ alignItems: 'center', paddingVertical: 10 }}
       >
         <Text style={{ color: colors.accent, fontSize: 16, fontWeight: '600' }}>

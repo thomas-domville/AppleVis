@@ -1,4 +1,5 @@
 import { NativeModules } from 'react-native';
+import { logDev } from '../utils/logger';
 
 // ─── Apple Intelligence (Foundation Models) ──────────────────────────────────
 
@@ -6,24 +7,14 @@ import { NativeModules } from 'react-native';
  * Returns true when the device supports Apple Intelligence AND the user has
  * enabled it in Settings → Apple Intelligence & Siri.
  *
- * Native side (Swift, requires iOS 18.1+):
- *
- *   import FoundationModels
- *
- *   @objc class AppleVisIntelligenceModule: NSObject {
- *     @objc var isAvailable: Bool {
- *       if #available(iOS 18.1, *) {
- *         return LanguageModelSession.isAvailable
- *       }
- *       return false
- *     }
- *   }
+ * Native side: ios-native/Intelligence/AppleVisIntelligence.swift
+ * Requires iOS 26+ (FoundationModels is a public API from iOS 26).
  *
  * Returns false in all cases where AI cannot run:
  *   - Native module not yet built (Expo Go / simulator)
  *   - Device predates iPhone 15 Pro
  *   - User has not enabled Apple Intelligence in Settings
- *   - iOS version < 18.1
+ *   - iOS version < 26.0
  */
 export function isAppleIntelligenceAvailable(): boolean {
   return NativeModules.AppleVisIntelligence?.isAvailable ?? false;
@@ -33,27 +24,7 @@ export function isAppleIntelligenceAvailable(): boolean {
  * Sends a prompt to the on-device Foundation Models LLM and returns the
  * response text. Returns null when Apple Intelligence is unavailable.
  *
- * Native side (Swift):
- *
- *   import FoundationModels
- *
- *   @objc func respond(_ prompt: String,
- *                      resolve: @escaping RCTPromiseResolveBlock,
- *                      reject: @escaping RCTPromiseRejectBlock) {
- *     guard #available(iOS 18.1, *), LanguageModelSession.isAvailable else {
- *       resolve(nil); return
- *     }
- *     Task {
- *       do {
- *         let session  = LanguageModelSession()
- *         let response = try await session.respond(to: prompt)
- *         resolve(response.content)
- *       } catch {
- *         reject("AI_ERROR", error.localizedDescription, error)
- *       }
- *     }
- *   }
- *
+ * Native side: ios-native/Intelligence/AppleVisIntelligence.swift
  * All processing is on-device. No data leaves the device.
  */
 export async function runFoundationModel(prompt: string): Promise<string | null> {
@@ -194,7 +165,7 @@ export type FocusFilterConfig = {
  * Info.plist: no extra keys needed beyond existing notification entitlements.
  */
 export function registerFocusFilter(_config: FocusFilterConfig): void {
-  if (__DEV__) console.log('[NativeModules] registerFocusFilter — native module not yet built.');
+  logDev('NativeModules', 'registerFocusFilter — native module not yet built.');
 }
 
 // ─── Share Extension ──────────────────────────────────────────────────────────
@@ -237,7 +208,7 @@ export type SharedItem = {
  * App Group entitlement needed to pass data between extension and main app.
  */
 export function handleIncomingShare(_item: SharedItem): void {
-  if (__DEV__) console.log('[NativeModules] handleIncomingShare — native module not yet built.', _item);
+  logDev('NativeModules', 'handleIncomingShare — native module not yet built.', _item);
 }
 
 /**
@@ -267,7 +238,7 @@ export function handleIncomingShare(_item: SharedItem): void {
  *   com.apple.security.application-groups = ["group.com.applevis.app"]
  */
 export async function consumePendingShareURL(): Promise<string | null> {
-  if (__DEV__) console.log('[NativeModules] consumePendingShareURL — native module not yet built.');
+  logDev('NativeModules', 'consumePendingShareURL — native module not yet built.');
   return null;
 }
 
@@ -315,7 +286,7 @@ export async function consumePendingShareURL(): Promise<string | null> {
  * Info.plist: no extra keys needed (Vision is a system framework).
  */
 export async function describeImage(_imageUrl: string): Promise<string | null> {
-  if (__DEV__) console.log('[NativeModules] describeImage — native module not yet built.');
+  logDev('NativeModules', 'describeImage — native module not yet built.');
   return null;
 }
 
@@ -358,7 +329,7 @@ export type HandoffActivity = {
  * Entitlements: com.apple.developer.associated-domains (already in app.json).
  */
 export function advertiseHandoff(_activity: HandoffActivity): void {
-  if (__DEV__) console.log('[NativeModules] advertiseHandoff — native module not yet built.', _activity.activityType);
+  logDev('NativeModules', 'advertiseHandoff — native module not yet built.', _activity.activityType);
 }
 
 /**
@@ -369,7 +340,7 @@ export function advertiseHandoff(_activity: HandoffActivity): void {
  *   currentActivity?.resignCurrent()
  */
 export function resignHandoff(): void {
-  if (__DEV__) console.log('[NativeModules] resignHandoff — native module not yet built.');
+  logDev('NativeModules', 'resignHandoff — native module not yet built.');
 }
 
 // ─── Keyboard Shortcuts (iPadOS hardware keyboard) ────────────────────────────
@@ -418,7 +389,7 @@ export type KeyboardShortcut = {
  *   ⌘,  — Settings
  */
 export function registerKeyboardShortcuts(_shortcuts: KeyboardShortcut[]): void {
-  if (__DEV__) console.log('[NativeModules] registerKeyboardShortcuts — native module not yet built.', _shortcuts.length);
+  logDev('NativeModules', 'registerKeyboardShortcuts — native module not yet built.', _shortcuts.length);
 }
 
 // ─── Increase Contrast (iOS Accessibility) ────────────────────────────────────
@@ -438,7 +409,7 @@ export function registerKeyboardShortcuts(_shortcuts: KeyboardShortcut[]): void 
  * Wire as an event emitter so the JS layer can subscribe via a hook.
  */
 export async function isIncreaseContrastEnabled(): Promise<boolean> {
-  if (__DEV__) console.log('[NativeModules] isIncreaseContrastEnabled — native module not yet built.');
+  logDev('NativeModules', 'isIncreaseContrastEnabled — native module not yet built.');
   return false;
 }
 
@@ -469,7 +440,7 @@ export async function isIncreaseContrastEnabled(): Promise<boolean> {
  * Can also use Foundation Models to suggest related search terms.
  */
 export async function expandSearchQuery(_query: string): Promise<string[]> {
-  if (__DEV__) console.log('[NativeModules] expandSearchQuery — native module not yet built.');
+  logDev('NativeModules', 'expandSearchQuery — native module not yet built.');
   return [_query];
 }
 
@@ -518,12 +489,12 @@ export function updateNowPlayingInfo(info: NowPlayingInfo): void {
   NativeModules.AppleVisNowPlaying?.updateNowPlaying(
     info.title,
     info.artist,
-    info.artist,           // albumTitle = show name
+    info.artist,              // albumTitle = show name
     info.duration,
     info.elapsedTime,
     info.playbackRate,
-    info.playbackRate > 0, // isPlaying
-    null,                  // artworkData — native side handles URL fetch separately
+    info.playbackRate > 0,    // isPlaying
+    info.artworkUrl ?? null,  // native side fetches image async from this URL
   );
 }
 
@@ -538,20 +509,28 @@ export function clearNowPlayingInfo(): void {
  * Pass callbacks that call the corresponding player methods.
  */
 export function setupRemoteCommands(opts: {
-  onPlay:         () => void;
-  onPause:        () => void;
-  onSkipBackward: () => void;
-  onSkipForward:  () => void;
-  onSeek:         (seconds: number) => void;
-  skipBackInterval:   number;
+  onPlay:            () => void;
+  onPause:           () => void;
+  onTogglePlayPause: () => void;
+  onSkipBackward:    () => void;
+  onSkipForward:     () => void;
+  onSeek:            (seconds: number) => void;
+  /** Called when the user taps the next-track button (lock screen / AirPods). */
+  onNextTrack?:      () => void;
+  /** Called when the user taps the previous-track button. */
+  onPreviousTrack?:  () => void;
+  skipBackInterval:    number;
   skipForwardInterval: number;
 }): void {
   NativeModules.AppleVisNowPlaying?.setupRemoteCommands(
     () => opts.onPlay(),
     () => opts.onPause(),
+    () => opts.onTogglePlayPause(),
     () => opts.onSkipBackward(),
     () => opts.onSkipForward(),
     ([pos]: number[]) => opts.onSeek(pos),
+    () => opts.onNextTrack?.(),
+    () => opts.onPreviousTrack?.(),
     opts.skipBackInterval,
     opts.skipForwardInterval,
   );

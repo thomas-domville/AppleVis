@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, Linking, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../src/components/Screen';
+import { SettingsPickerRow } from '../src/components/SettingsPickerRow';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { usePreferences } from '../src/contexts/PreferencesContext';
 import { useAccessibilityPreferences } from '../src/hooks/useAccessibilityPreferences';
@@ -19,21 +21,21 @@ const LEVELS: LevelOption[] = [
   {
     id: 'simple',
     label: 'Simple',
-    badge: 'Minimal',
+    badge: 'Fastest',
     description: 'Title and content type only. Fast to scan; author, date, and comment count are a swipe away.',
     preview: '"iOS 18 VoiceOver Tips. Forum."',
   },
   {
     id: 'normal',
     label: 'Normal',
-    badge: 'Balanced',
+    badge: 'Recommended',
     description: 'Title plus author and comment count, giving useful context without the full date history.',
     preview: '"iOS 18 VoiceOver Tips. Forum. By JaneD. 14 comments."',
   },
   {
     id: 'all',
     label: 'All',
-    badge: 'Recommended',
+    badge: 'Most Detailed',
     description: 'Everything at once: title, author, comment count, posted date, and last comment time.',
     preview: '"iOS 18 VoiceOver Tips. Forum. By JaneD. 14 comments. Posted 2 days ago. Last comment 3 hours ago."',
   },
@@ -171,6 +173,7 @@ function IosStatusRow({
 }
 
 export default function AccessibilitySettings() {
+  const router = useRouter();
   const { colors, styles } = useTheme();
   const a11y = useAccessibilityPreferences();
   const {
@@ -180,11 +183,15 @@ export default function AccessibilitySettings() {
     setHelpfulTipsEnabled,
     welcomeSummaryEnabled,
     setWelcomeSummaryEnabled,
+    homeStartupBehavior,
+    setHomeStartupBehavior,
+    searchAutoFocusEnabled,
+    setSearchAutoFocusEnabled,
   } = usePreferences();
   const firstHeadingRef = useRef<Text | null>(null);
   const didFocusFirstHeadingRef = useRef(false);
   const selectedLevel = LEVELS.find((level) => level.id === announcementLevel) ?? LEVELS[2];
-  const accessibilitySummary = `VoiceOver detail level is ${selectedLevel.label}. AppleVis Tips are ${helpfulTipsEnabled ? 'on' : 'off'}. Welcome Summary is ${welcomeSummaryEnabled ? 'on' : 'off'}. iOS settings such as Dynamic Type, Reduce Motion, Bold Text, Reduce Transparency, Invert Colors, VoiceOver, Switch Control, and Grayscale are followed automatically.`;
+  const accessibilitySummary = `VoiceOver detail level is ${selectedLevel.label}. AppleVis Tips are ${helpfulTipsEnabled ? 'on' : 'off'}. Welcome Summary is ${welcomeSummaryEnabled ? 'on' : 'off'}. Home Startup Behavior is ${homeStartupBehavior}. iOS settings such as Dynamic Type, Reduce Motion, Bold Text, Reduce Transparency, Invert Colors, VoiceOver, Switch Control, and Grayscale are followed automatically.`;
 
   useEffect(() => {
     const timers = [350, 700, 1100].map((delay) =>
@@ -259,6 +266,23 @@ export default function AccessibilitySettings() {
           value={welcomeSummaryEnabled}
           onChange={setWelcomeSummaryEnabled}
         />
+        <SettingsPickerRow
+          label="Home Startup Behavior"
+          description="Controls how much sound and spoken announcement Home produces when you open or return to it."
+          value={homeStartupBehavior}
+          options={[
+            { value: 'quiet',    label: 'Quiet' },
+            { value: 'helpful',  label: 'Helpful' },
+            { value: 'detailed', label: 'Detailed' },
+          ]}
+          onSelect={setHomeStartupBehavior}
+        />
+        <ToggleCard
+          label="Auto-Focus Search Field"
+          description="Automatically focuses and raises the keyboard when you open Search. Turn off if you prefer to get oriented on the screen first."
+          value={searchAutoFocusEnabled}
+          onChange={setSearchAutoFocusEnabled}
+        />
 
         <SectionHeader label="VoiceOver Detail Level" colors={colors} />
         {LEVELS.map((opt) => {
@@ -317,6 +341,24 @@ export default function AccessibilitySettings() {
             </Pressable>
           );
         })}
+
+        <Pressable
+          onPress={() => router.push({ pathname: '/help-article', params: { articleId: 'accessibility-voiceover' } })}
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel="Learn more about VoiceOver in AppleVis in Help"
+          style={({ pressed }) => [
+            styles.cardSmall,
+            { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <Ionicons name="help-buoy-outline" size={18} color={colors.accent} accessibilityElementsHidden />
+          <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: colors.accent }}>
+            Learn more about VoiceOver in AppleVis
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} accessibilityElementsHidden />
+        </Pressable>
 
         <SectionHeader label="Controlled by iOS" colors={colors} />
         <View

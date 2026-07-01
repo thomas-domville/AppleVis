@@ -1,59 +1,75 @@
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../src/components/Screen';
 import { useTheme } from '../src/contexts/ThemeContext';
+
+type ChangeLink =
+  | { label: string; kind: 'helpArticle'; articleId: string }
+  | { label: string; kind: 'route'; route: string };
 
 type ChangeItem = {
   icon: string;
   title: string;
   description: string;
   tag: 'New' | 'Improved' | 'Fixed';
+  link?: ChangeLink;
 };
 
-const CURRENT_VERSION = '2026.0.5';
+const CURRENT_VERSION = '2026.0.6';
 
 const CHANGES: ChangeItem[] = [
   {
-    icon: 'bug-outline',
+    icon: 'chatbubble-ellipses-outline',
     tag: 'New',
-    title: 'Submit a Bug Report In-App',
-    description: 'Report accessibility bugs without leaving AppleVis. The four-step wizard guides you through platform and OS version, bug title and Apple Feedback number, a detailed description, and recognition preference. Open Discover → Contribute → Submit a Bug Report.',
+    title: 'Contact App Support — No Mail App Needed',
+    description: 'Reach the AppleVis team without ever leaving the app. The new contact wizard lets you choose what you need help with, write your message, and send it in a few taps. If you are signed in, your name and email are filled in automatically. Open Profile → Contact App Support.',
+    link: { label: 'Learn More', kind: 'helpArticle', articleId: 'trouble-contact' },
   },
   {
-    icon: 'create-outline',
+    icon: 'sparkles-outline',
     tag: 'New',
-    title: 'Submit a Blog Post In-App',
-    description: 'Write, import a text or Markdown file, or paste from the clipboard to submit a blog post to the AppleVis Editorial Team. A three-step wizard handles title, category, content, and review — no need to open a browser.',
+    title: 'Apple Intelligence Features',
+    description: 'On iPhone 15 Pro or later running iOS 26 with Apple Intelligence turned on, AppleVis can now summarise long forum threads, simplify complex text into plain language, give you an accessibility snapshot for any app, rewrite your draft in a friendly tone, and translate non-English text — all on your device, privately, without sending anything to a server.',
+    link: { label: 'Open Setting', kind: 'route', route: '/settings-intelligence' },
   },
   {
-    icon: 'mic-outline',
+    icon: 'mic-circle-outline',
     tag: 'New',
-    title: 'Submit a Podcast In-App',
-    description: 'Upload a podcast episode directly from the app. Pick an MP3, AAC, M4A, WAV, or AIFF file from Files or iCloud Drive, add a description, and submit. The three-step wizard keeps the process simple.',
+    title: 'Three New Siri Shortcuts',
+    description: 'AppleVis now understands three more Siri phrases. Say "Resume my AppleVis podcast" to pick up where you left off. Say "Search AppleVis for accessibility tips" — or any topic — to open search with your words already filled in. Say "Open my AppleVis saved items" to jump straight to your saved content.',
+    link: { label: 'Learn More', kind: 'helpArticle', articleId: 'smart-siri-widgets' },
   },
   {
-    icon: 'phone-portrait-outline',
+    icon: 'headset-outline',
     tag: 'New',
-    title: 'Submit an App Entry In-App',
-    description: 'Add a new app to the AppleVis App Directory without visiting the website. The five-step wizard searches iTunes, confirms app details, and walks you through VoiceOver performance, labelling, and usability ratings. Entries are published immediately when submitted by a signed-in member.',
+    title: 'Skip to the Next Episode with AirPods',
+    description: 'When you have episodes in your podcast queue, use the next-track gesture on your AirPods or the next-track button on the Lock Screen to skip to the next episode. The previous-track button restarts the current episode from the beginning.',
   },
   {
-    icon: 'share-outline',
+    icon: 'image-outline',
     tag: 'Improved',
-    title: 'Share Extension Handles More Content Types',
-    description: 'The AppleVis Share Extension now recognises three types of shared content: App Store URLs open the app submission wizard, podcast URLs (from Podcasts, Overcast, Spotify, Pocket Casts, and others) open the podcast wizard, and plain text or text files open the blog post wizard with your content pre-loaded.',
+    title: 'Podcast Artwork on the Lock Screen',
+    description: 'The episode artwork now appears on your Lock Screen, in Dynamic Island, and in the Control Center Now Playing card while a podcast is playing. Previously the artwork area was blank during playback.',
   },
   {
-    icon: 'help-circle-outline',
+    icon: 'book-outline',
     tag: 'Improved',
-    title: 'Help Centre: Step-by-Step Wizard Guides',
-    description: 'Settings → Help now includes dedicated step-by-step guides for all four submission wizards — Submit a Bug Report, Submit a Blog Post, Submit a Podcast, and Submit an App Entry. Tap any guide to jump straight to the article. The Bug Tracker and Be My Eyes articles have also been updated.',
+    title: 'Help Centre Refreshed',
+    description: 'Every guide has been reviewed and updated to match what the app does today. A brand-new Apple Intelligence guide explains which features it powers, which devices support it, and how to turn it on. The Siri article now lists every phrase you can say by name. The Contact App Support guide reflects the new in-app wizard.',
+    link: { label: 'Open Help Centre', kind: 'route', route: '/help' },
   },
   {
-    icon: 'musical-notes-outline',
+    icon: 'color-palette-outline',
     tag: 'Improved',
-    title: 'Refreshed UI Sounds',
-    description: 'The refresh and screen-close sounds have been updated to cleaner versions. Eight older duplicate sound files have been removed, leaving a single consistent set of audio assets.',
+    title: 'App Icon Adapts to Your Style',
+    description: 'The AppleVis app icon now comes in three versions — light, dark, and tinted — and switches automatically to match your iPhone Home Screen appearance on iOS 18 and later.',
+  },
+  {
+    icon: 'construct-outline',
+    tag: 'Fixed',
+    title: 'Dynamic Island and CarPlay Polished',
+    description: 'The Dynamic Island compact view now shows the play icon when paused — not the pause icon — making the playback state easier to read at a glance. The CarPlay episode list now refreshes in place without pushing you back to the top of the navigation stack when new episodes arrive.',
   },
 ];
 
@@ -65,6 +81,7 @@ const TAG_STYLES: Record<ChangeItem['tag'], { bg: string; text: string }> = {
 
 export default function WhatsNew() {
   const { colors, styles } = useTheme();
+  const router = useRouter();
 
   return (
     <Screen title="What's New" showSettings={false}>
@@ -79,21 +96,23 @@ export default function WhatsNew() {
             Version {CURRENT_VERSION}
           </Text>
           <Text style={{ fontSize: 16, color: colors.textSecondary, textAlign: 'center', lineHeight: 23 }}>
-            Four in-app submission wizards (bug reports, blog posts, podcasts, app entries), extended Share Extension, wizard guides in Help Centre, and refreshed UI sounds.
+            In-app contact wizard, Apple Intelligence on iOS 26, three new Siri shortcuts, AirPods next-episode, Lock Screen artwork, and a fully refreshed Help Centre.
           </Text>
         </View>
 
         {/* Change list */}
-        {CHANGES.map(({ icon, tag, title, description }) => {
+        {CHANGES.map(({ icon, tag, title, description, link }) => {
           const tagStyle = TAG_STYLES[tag];
           return (
             <View
               key={title}
               style={styles.card}
-              accessible
-              accessibilityLabel={`${tag}: ${title}. ${description}`}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+              <View
+                style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}
+                accessible
+                accessibilityLabel={`${tag}: ${title}. ${description}`}
+              >
                 <View style={{ width: 36, height: 36, borderRadius: 10,
                   backgroundColor: colors.pill, alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0, marginTop: 2 }} accessibilityElementsHidden>
@@ -112,11 +131,75 @@ export default function WhatsNew() {
                   </Text>
                 </View>
               </View>
+              {link && (
+                <Pressable
+                  onPress={() => {
+                    if (link.kind === 'helpArticle') {
+                      router.push({ pathname: '/help-article', params: { articleId: link.articleId } });
+                    } else {
+                      router.push(link.route as any);
+                    }
+                  }}
+                  accessible
+                  accessibilityRole="button"
+                  accessibilityLabel={link.label}
+                  style={({ pressed }) => ({
+                    alignSelf: 'flex-start', marginTop: 10, marginLeft: 48,
+                    opacity: pressed ? 0.7 : 1,
+                  })}
+                >
+                  <Text style={{ color: colors.accent, fontSize: 14, fontWeight: '700' }}>{link.label} →</Text>
+                </Pressable>
+              )}
             </View>
           );
         })}
 
         {/* Previous version notes */}
+        <View style={[styles.card, { backgroundColor: colors.pill, borderColor: colors.border, borderWidth: 1, marginBottom: 10 }]}
+          accessible accessibilityLabel="Also in version 2026.0.5: submit bug reports, blog posts, podcasts, and app entries inside the app. Extended Share Extension. Step-by-step wizard guides in Help Centre. Refreshed UI sounds.">
+          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
+            textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>
+            Also in 2026.0.5
+          </Text>
+          {[
+            'Submit a bug report inside the app — four-step wizard with platform, OS version, title, Feedback ID, description, and recognition preference',
+            'Submit a blog post inside the app — write, import a text or Markdown file, or paste from the clipboard',
+            'Submit a podcast episode inside the app — upload your audio file directly from Files or iCloud Drive',
+            'Submit an app entry to the App Directory inside the app — iTunes search, accessibility ratings, and immediate publication',
+            'Share Extension now recognises App Store links, podcast URLs, and text files — each opens the right wizard automatically',
+            'Help Centre step-by-step guides for all four submission wizards',
+            'Refreshed UI sounds — cleaner versions throughout',
+          ].map((item) => (
+            <View key={item} style={{ flexDirection: 'row', gap: 8, marginBottom: 6 }}
+              accessible accessibilityLabel={item}>
+              <Text style={{ color: colors.accent, fontSize: 15 }} accessibilityElementsHidden>•</Text>
+              <Text style={{ flex: 1, fontSize: 14, color: colors.textSecondary, lineHeight: 20 }}>{item}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={[styles.card, { backgroundColor: colors.pill, borderColor: colors.border, borderWidth: 1, marginBottom: 10 }]}
+          accessible accessibilityLabel="Also in version 2026.0.4 and 2026.0.3: admin edit and delete from detail pages, app detail redesign, topic category hero cards, blog and guide detail redesign, Home tab improvements.">
+          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
+            textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>
+            Also in 2026.0.4 – 2026.0.3
+          </Text>
+          {[
+            'Edit and delete your own posts and reviews directly from detail pages inside the app',
+            'App Directory detail page redesigned — VoiceOver, labelling, and usability ratings, developer contact, iTunes link, and supported devices',
+            'Forum topic category hero card, animated replies, braille-friendly paragraph splits, per-author avatar colours, and thread summary action',
+            'Blog and guide detail pages match the forum topic visual design and VoiceOver behaviour',
+            'Home tab welcome flow redesigned — focus-based, no announcements, jumps to last-read position',
+          ].map((item) => (
+            <View key={item} style={{ flexDirection: 'row', gap: 8, marginBottom: 6 }}
+              accessible accessibilityLabel={item}>
+              <Text style={{ color: colors.accent, fontSize: 15 }} accessibilityElementsHidden>•</Text>
+              <Text style={{ flex: 1, fontSize: 14, color: colors.textSecondary, lineHeight: 20 }}>{item}</Text>
+            </View>
+          ))}
+        </View>
+
         <View style={[styles.card, { backgroundColor: colors.pill, borderColor: colors.border, borderWidth: 1, marginBottom: 10 }]}
           accessible accessibilityLabel="Also in version 2026.0.2: Golden Retriever Bark alert sound, balanced alert volumes, smarter welcome summary, three VoiceOver detail levels, follow forum topics, in-app blog posts and guides, write app reviews in-app, load more and jump to first unread, episode duration on feed cards, app directory revamp, richer forum threads, redesigned detail pages, VoiceOver focus after feed loads, pitch correction fix.">
           <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
@@ -173,36 +256,11 @@ export default function WhatsNew() {
           ))}
         </View>
 
-        <View style={[styles.card, { backgroundColor: colors.pill, borderColor: colors.border, borderWidth: 1, marginBottom: 10 }]}
-          accessible accessibilityLabel="Also in version 2026.0.1.2: search, sort and filter bars, Liquid Glass, forum filter pill, podcast speed pill, VoiceOver tab positions, sign-in fixes, settings routing fixes.">
-          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
-            textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>
-            Also in 2026.0.1.2
-          </Text>
-          {[
-            'Back button added to every settings, detail, and sub-screen',
-            'Forum filter replaced with a single pill — one tap to switch',
-            'Podcast speed replaced with a single pill — one tap to change',
-            'VoiceOver now reads tab position (e.g. "Forums, 2 of 5")',
-            'Settings pages now open the real interactive controls',
-            'Six settings that were saved but ignored are now wired up',
-            'Sign in now accepts username or email, and actually works',
-            'Magic tap (two-finger double tap) plays and pauses podcasts',
-            'Episode detail screen with show notes, chapters, and actions',
-          ].map((item) => (
-            <View key={item} style={{ flexDirection: 'row', gap: 8, marginBottom: 6 }}
-              accessible accessibilityLabel={item}>
-              <Text style={{ color: colors.accent, fontSize: 15 }} accessibilityElementsHidden>•</Text>
-              <Text style={{ flex: 1, fontSize: 14, color: colors.textSecondary, lineHeight: 20 }}>{item}</Text>
-            </View>
-          ))}
-        </View>
-
         <View style={[styles.card, { backgroundColor: colors.pill, borderColor: colors.border, borderWidth: 1 }]}
-          accessible accessibilityLabel="Also in version 2026.0.1.1: forum topic detail, reply to topics, app detail screen, resource detail screen, profile screen, interactive podcast and notification settings, appearance and accessibility settings.">
+          accessible accessibilityLabel="Also in version 2026.0.1.1 and 2026.0.1.2: full forum threads, post replies, app listings with reviews, read guides in-app, working podcast and notification settings, theme and card size settings, VoiceOver Detail Level setting.">
           <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
             textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>
-            Also in 2026.0.1.1
+            Also in 2026.0.1.1 – 2026.0.1.2
           </Text>
           {[
             'Read full forum threads with all replies inside the app',
@@ -213,6 +271,8 @@ export default function WhatsNew() {
             'Notification settings with real on/off toggles for each category',
             'Theme and card size settings with instant preview',
             'VoiceOver Detail Level setting — choose Simple, Normal, or All',
+            'Back button added to every settings, detail, and sub-screen',
+            'Magic tap (two-finger double tap) plays and pauses podcasts',
           ].map((item) => (
             <View key={item} style={{ flexDirection: 'row', gap: 8, marginBottom: 6 }}
               accessible accessibilityLabel={item}>

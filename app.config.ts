@@ -1,7 +1,7 @@
 const config = {
   name: 'AppleVis',
   slug: 'applevis',
-  version: '2026.0.2',
+  version: '2026.0.6',
   orientation: 'default',
   icon: './assets/icons/app-icon.png',
   scheme: 'applevis',
@@ -15,9 +15,14 @@ const config = {
   },
 
   ios: {
+    icon: {
+      any:    './assets/icons/app-icon.png',
+      dark:   './assets/icons/app-icon-dark.png',
+      tinted: './assets/icons/app-icon-tinted.png',
+    },
     supportsTablet: true,
     bundleIdentifier: 'com.applevis.app',
-    buildNumber: '6',
+    buildNumber: '10',
     minimumOsVersion: '16.0',
     usesNonExemptEncryption: false,
     requireFullScreen: false,
@@ -85,6 +90,7 @@ const config = {
     './plugins/withLiveActivities',
     './plugins/withWidgetKit',
     './plugins/withSpotlight',
+    './plugins/withIntelligence',
     './plugins/withSiri',
     './plugins/withRoutePicker',
     './plugins/withAudioEffects',

@@ -1,19 +1,19 @@
-import { useEffect } from 'react';
 import { Image, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { WizardLayout } from '../../src/components/WizardLayout';
-import { sounds } from '../../src/services/sounds';
+
+// Single welcome/launch sound policy: Home owns the one "welcome" sound moment
+// when the user first lands there after finishing or skipping setup — the
+// wizard itself stays quiet so users don't hear it twice back to back.
 
 export default function WelcomeStep() {
   const { colors } = useTheme();
 
-  useEffect(() => { sounds.welcome().catch(() => {}); }, []);
-
   return (
     <WizardLayout
       step={1}
-      totalSteps={5}
+      totalSteps={6}
       title="Welcome to AppleVis"
       description="The premier community for blind, DeafBlind, and low vision Apple users — empowering you to get the most from every Apple product and service."
       onNext={() => router.push('/onboarding/sign-in')}

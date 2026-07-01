@@ -17,6 +17,7 @@ import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPre
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { useAlert } from '../../src/contexts/AccessibleAlertContext';
+import { confirmDestructiveAction } from '../../src/utils/confirmDestructiveAction';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
 import { ALERTS } from '../../src/data/alertMessages';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
@@ -222,7 +223,7 @@ function RatingGauge({
         }} />
       </View>
       <Text style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 17 }}>
-        {config.descriptions[descriptionKey]}
+        {`Rating: ${ratingWord}. ${config.descriptions[descriptionKey]}`}
       </Text>
     </View>
   );
@@ -369,8 +370,7 @@ function CommentCard({
     }
   }
 
-  const ratingLabel  = review.rating    ? `${review.rating} out of 5 stars. ` : '';
-  const versionLabel = review.appVersion ? `Tested in version ${review.appVersion}. ` : '';
+  const ratingLabel  = review.rating ? `${review.rating} out of 5 stars. ` : '';
 
   return (
     <View style={[styles.card, { marginBottom: 10, padding: 0 }, isNew && { borderLeftWidth: 3, borderLeftColor: colors.accent }]}>
@@ -383,7 +383,7 @@ function CommentCard({
           (isNew ? 'New comment. ' : '') +
           `Comment ${index + 1} of ${total} by ${review.authorName}. ` +
           (commentSubject ? `Subject: ${commentSubject}. ` : '') +
-          ratingLabel + versionLabel +
+          ratingLabel +
           `${relativeTime(review.createdAt)}. Hold for options.`
         }
         accessibilityActions={actions.map(a => ({ name: a.label, label: a.label }))}
@@ -417,7 +417,7 @@ function CommentCard({
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
               {review.rating ? <StarRow rating={review.rating} size={12} /> : null}
               <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                {review.appVersion ? `v${review.appVersion}  ·  ` : ''}{relativeTime(review.createdAt)}
+                {relativeTime(review.createdAt)}
               </Text>
             </View>
           </View>
@@ -427,11 +427,6 @@ function CommentCard({
                 <Text style={{ color: colors.accentText, fontSize: 12, fontWeight: '700' }}>NEW</Text>
               </View>
             )}
-            {review.platform ? (
-              <View style={{ backgroundColor: colors.pill, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                <Text style={{ color: colors.pillText, fontSize: 11, fontWeight: '600' }}>{review.platform}</Text>
-              </View>
-            ) : null}
             <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '500' }}>{index + 1}/{total}</Text>
           </View>
         </View>
@@ -488,6 +483,7 @@ export default function AppDetailScreen() {
   const itunesNotFound = itunes === 'not-found';
 
   const [lastSeenAt,    setLastSeenAt]    = useState<string | null>(null);
+  const [editingNode,   setEditingNode]   = useState(false);
 
   const scrollRef            = useRef<ScrollView>(null);
   const commentsY            = useRef<number>(0);
@@ -649,6 +645,54 @@ export default function AppDetailScreen() {
     Linking.openURL(link).catch(() => showToast('Could not open Safari.', 'error'));
   }
 
+  function handleNodeOptions() {
+    if (!app || !auth.user?.csrfToken) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { title: app.name, options: ['Cancel', 'Edit App Entry', 'Unpublish App Entry', 'Delete App Entry'],
+          cancelButtonIndex: 0, destructiveButtonIndex: 3 },
+        (index) => {
+          if (index === 1) setEditingNode(true);
+          if (index === 2) handleAdminUnpublish();
+          if (index === 3) handleAdminDelete();
+        },
+      );
+    } else {
+      setEditingNode(true);
+    }
+  }
+
+  function handleAdminDelete() {
+    if (!app || !auth.user?.csrfToken) return;
+    const token = auth.user.csrfToken;
+    showAlert({
+      title: 'Delete App Entry',
+      message: `Permanently delete "${app.name}"? This cannot be undone.`,
+      confirmLabel: 'Delete', cancelLabel: 'Cancel', type: 'error',
+      onConfirm: async () => {
+        const res = await api.content.deleteNode(app.id, 'ios_app_directory', token);
+        if (res.ok) { showToast('App entry deleted.', 'success'); router.back(); }
+        else showToast('Could not delete. Please try again.', 'error');
+      },
+    });
+  }
+
+  function handleAdminUnpublish() {
+    if (!app || !auth.user?.csrfToken) return;
+    const token = auth.user.csrfToken;
+    showAlert({
+      title: 'Unpublish App Entry',
+      message: `"${app.name}" will be hidden from all users but not deleted.`,
+      confirmLabel: 'Unpublish', cancelLabel: 'Cancel', type: 'warning',
+      onConfirm: async () => {
+        const res = await api.content.unpublishNode(app.id, 'ios_app_directory', token);
+        if (res.ok) { showToast('App entry unpublished.', 'success'); router.back(); }
+        else showToast('Could not unpublish. Please try again.', 'error');
+      },
+    });
+  }
+
   function handleWriteReview() {
     if (!auth.isSignedIn) {
       showAlert({ ...ALERTS.auth.signInRequired('write a review'), onConfirm: () => router.push('/settings-account' as any) });
@@ -755,7 +799,7 @@ export default function AppDetailScreen() {
 
   return (
     <Screen title={displayName} showSettings={false} showSearch={false} titleAccessible={false}>
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, position: 'relative' }}>
       {/* Reading progress bar — purely visual, hidden from VoiceOver/braille */}
       {app && (
         <View style={{ height: 5, backgroundColor: colors.border }}
@@ -772,7 +816,7 @@ export default function AppDetailScreen() {
         ref={scrollRef}
         showsVerticalScrollIndicator
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 16, paddingBottom: TOOLBAR_H + 16 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: TOOLBAR_H + insets.bottom + 24 }}
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
@@ -868,22 +912,33 @@ export default function AppDetailScreen() {
                 )}
               </View>
 
-              {/* Swipe 1: title — direct child of card, Screen already renders header role so omit it here */}
-              <Text
-                ref={heroRef}
-                accessible
-                accessibilityRole="header"
-                accessibilityLabel={displayName}
-                style={{
-                  fontSize: 21, fontWeight: '800', color: colors.text, lineHeight: 26,
-                  marginLeft: 86,
-                  marginTop: -72,
-                  minHeight: 72,
-                  marginBottom: 8,
-                  textAlignVertical: 'top',
-                }}>
-                {displayName}
-              </Text>
+              {/* Swipe 1: title row — direct child of card */}
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginLeft: 86, marginTop: -72, minHeight: 72, marginBottom: 8 }}>
+                <Text
+                  ref={heroRef}
+                  accessible
+                  accessibilityRole="header"
+                  accessibilityLabel={displayName}
+                  style={{
+                    flex: 1, fontSize: 21, fontWeight: '800', color: colors.text, lineHeight: 26,
+                    textAlignVertical: 'top',
+                  }}>
+                  {displayName}
+                </Text>
+                {auth.user?.isAdmin && (
+                  <Pressable
+                    onPress={handleNodeOptions}
+                    accessible
+                    accessibilityRole="button"
+                    accessibilityLabel="App entry options"
+                    accessibilityHint="Edit, unpublish, or delete this app entry"
+                    style={({ pressed }) => ({ padding: 6, opacity: pressed ? 0.55 : 1, marginTop: 2 })}
+                  >
+                    <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary}
+                      accessibilityElementsHidden />
+                  </Pressable>
+                )}
+              </View>
 
               {/* Swipe 2 (only shown when App Store title differs): original AppleVis name */}
               {titleUpdated && (
@@ -1643,22 +1698,20 @@ export default function AppDetailScreen() {
                       currentUserUuid={auth.user?.uuid}
                       onEdit={(r) => setEditingReview(r)}
                       onDelete={(r) => {
-                        showAlert({
+                        confirmDestructiveAction(showAlert, {
                           title: 'Delete Review?',
                           message: 'This cannot be undone.',
-                          buttons: [
-                            { label: 'Delete', style: 'destructive', onPress: async () => {
-                              if (!auth.user?.csrfToken) return;
-                              const res = await api.content.deleteComment('comment_node_ios_app_directory', r.id, auth.user.csrfToken);
-                              if (res.ok) {
-                                setApp(a => a ? { ...a, reviews: a.reviews.filter(x => x.id !== r.id) } : a);
-                                showToast('Review deleted.', 'success');
-                              } else {
-                                showToast('Could not delete review.', 'error');
-                              }
-                            }},
-                            { label: 'Cancel' },
-                          ],
+                          confirmLabel: 'Delete',
+                          onConfirm: async () => {
+                            if (!auth.user?.csrfToken) return;
+                            const res = await api.content.deleteComment('comment_node_ios_app_directory', r.id, auth.user.csrfToken);
+                            if (res.ok) {
+                              setApp(a => a ? { ...a, reviews: a.reviews.filter(x => x.id !== r.id) } : a);
+                              showToast('Review deleted.', 'success');
+                            } else {
+                              showToast('Could not delete review.', 'error');
+                            }
+                          },
                         });
                       }}
                       onReplyTo={() => {
@@ -1751,8 +1804,14 @@ export default function AppDetailScreen() {
       {app && (
         <View
           style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 10,
             flexDirection: 'row',
-            height: TOOLBAR_H,
+            minHeight: TOOLBAR_H,
+            paddingBottom: insets.bottom,
             paddingHorizontal: 4,
             backgroundColor: colors.card,
             borderTopWidth: StyleSheet.hairlineWidth,
@@ -1823,6 +1882,24 @@ export default function AppDetailScreen() {
             if (id) contentCache.clear(`apps:detail:${id}`);
             loadApp();
           }}
+        />
+      )}
+
+      {/* Admin Edit Node Modal */}
+      {editingNode && app && auth.user?.csrfToken && (
+        <EditContentModal
+          visible={editingNode}
+          onClose={() => setEditingNode(false)}
+          onSaved={(newBody, newTitle) => {
+            setApp(a => a ? { ...a, body: newBody, name: newTitle ?? a.name } : a);
+            showToast('App entry updated.', 'success');
+          }}
+          nodeId={app.id}
+          nodeType="ios_app_directory"
+          initialTitle={app.name}
+          csrfToken={auth.user.csrfToken}
+          initialBody={app.body}
+          label="App Entry"
         />
       )}
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AccessibilityInfo, ActivityIndicator, Linking, Pressable,
+  AccessibilityInfo, ActivityIndicator, findNodeHandle, Linking, Pressable,
   RefreshControl, ScrollView, Share, Text, TextInput, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,7 +17,9 @@ import { useRefreshFeedback } from '../src/hooks/useRefreshFeedback';
 import { useToast } from '../src/contexts/ToastContext';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { usePreferences } from '../src/contexts/PreferencesContext';
+import { useAuth } from '../src/contexts/AuthContext';
 import { useAccessibilityPreferences } from '../src/hooks/useAccessibilityPreferences';
+import { WriteReviewModal } from '../src/components/WriteReviewModal';
 import { persistence } from '../src/services/persistence';
 import { api } from '../src/services/api';
 import { relativeTime } from '../src/utils/relativeTime';
@@ -32,6 +34,71 @@ const APP_ACCENT = '#3b82f6';
 // Days within which an app is considered "new" to this category (relative to last visit)
 const NEW_DAYS = 30;
 
+function fullMonthYear(input: string | Date | null | undefined): string {
+  if (!input) return '';
+  const date = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(date.getTime())) return '';
+  const month = new Intl.DateTimeFormat(undefined, { month: 'long' }).format(date);
+  return `${month}, ${date.getFullYear()}`;
+}
+
+function normaliseAppNameForGrouping(name: string): string {
+  return name
+    .replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '')
+    .trim();
+}
+
+function stripPreviewText(text: string): string {
+  return text
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildDescriptionPreview(app: AppListing): string | null {
+  const text = stripPreviewText(app.summary || '');
+  if (!text) return null;
+  const preview = text.length > 260 ? `${text.slice(0, 257).trimEnd()}...` : text;
+  return `Preview: ${preview}`;
+}
+
+function buildActivityPreview(app: AppListing): string | null {
+  if (app.lastActivityAt) {
+    const lastActive = relativeTime(app.lastActivityAt);
+    return lastActive ? `Last active ${lastActive}` : null;
+  }
+
+  const updated = relativeTime(app.lastUpdatedAt);
+  return updated ? `Updated ${updated}` : null;
+}
+
+function buildTimelinePreview(app: AppListing, isSaved: boolean): string | null {
+  const added = fullMonthYear(app.createdAt);
+  const parts = [
+    buildActivityPreview(app),
+    added ? `Added ${added}` : null,
+    isSaved ? 'Saved' : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' - ') : null;
+}
+
+function buildAppCardMeta(app: AppListing, isNew: boolean, isSaved: boolean): string {
+  return [
+    [isNew ? 'New' : null, app.price || null].filter(Boolean).join(' - ') || null,
+    app.usabilityNotes ? `Usability: ${app.usabilityNotes}` : null,
+    buildTimelinePreview(app, isSaved),
+    buildDescriptionPreview(app),
+  ].filter(Boolean).join('\n');
+}
+
 export default function AppCategory() {
   const router             = useRouter();
   const { colors, styles } = useTheme();
@@ -39,26 +106,30 @@ export default function AppCategory() {
   const { screenReaderEnabled } = useAccessibilityPreferences();
   const { showToast }      = useToast();
   const { save }           = useFocusRestore();
+  const { isSignedIn }     = useAuth();
   const savedApps          = useSavedItems('appListing');
+  const [reviewApp, setReviewApp] = useState<AppListing | null>(null);
   const aiAvailable        = aiSummariesEnabled && isAppleIntelligenceAvailable();
 
   const {
     platform    = 'ios',
     platformName = 'iOS and iPadOS',
     categorySlug = '',
+    categoryTid  = '',
     categoryName  = '',
   } = useLocalSearchParams<{
     platform:     string;
     platformName: string;
     categorySlug: string;
+    categoryTid:  string;
     categoryName:  string;
   }>();
 
   const category = useMemo(() =>
-    categorySlug && categoryName
-      ? { name: String(categoryName), slug: String(categorySlug) }
+    categoryName
+      ? { name: String(categoryName), slug: String(categorySlug), tid: categoryTid || undefined }
       : null,
-  [categorySlug, categoryName]);
+  [categorySlug, categoryTid, categoryName]);
 
   const probe  = useAppCategoryExperiment(String(platform), category);
   const appRefs = useRef<Map<string, View>>(new Map());
@@ -69,6 +140,8 @@ export default function AppCategory() {
   const [followedIds,  setFollowedIds]  = useState<Set<string>>(new Set());
   const prevLoadingRef = useRef(false);
   const firstAppRef    = useRef<View | null>(null);
+  const summaryRef     = useRef<Text | null>(null);
+  const focusedInitialSummaryRef = useRef(false);
 
   // Persist per-category lastVisit: read on focus, write on blur
   const visitKey = `lastVisitedCategory_${platform}_${categorySlug}`;
@@ -117,11 +190,28 @@ export default function AppCategory() {
     );
   }, [probe.apps, searchQuery]);
 
+  useEffect(() => {
+    if (focusedInitialSummaryRef.current || probe.loading || visibleApps.length === 0) return;
+    focusedInitialSummaryRef.current = true;
+    const timer = setTimeout(() => {
+      const handle = findNodeHandle(summaryRef.current);
+      if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [probe.loading, visibleApps.length]);
+
   const groupedVisibleApps = useMemo(() => {
+    const sorted = [...visibleApps].sort((a, b) =>
+      normaliseAppNameForGrouping(a.name).localeCompare(
+        normaliseAppNameForGrouping(b.name),
+        undefined,
+        { sensitivity: 'base' },
+      ),
+    );
     const groups: Array<{ letter: string; apps: AppListing[] }> = [];
     let currentLetter = '';
-    for (const app of visibleApps) {
-      const first = app.name.trim().charAt(0).toUpperCase();
+    for (const app of sorted) {
+      const first = normaliseAppNameForGrouping(app.name).charAt(0).toUpperCase();
       const letter = first && first >= 'A' && first <= 'Z' ? first : '#';
       if (letter !== currentLetter) {
         currentLetter = letter;
@@ -156,18 +246,19 @@ export default function AppCategory() {
     const isSaved = savedApps.isSaved(app.id);
     const isFollowing = followedIds.has(app.id);
     return [
-      'Open App Page',
-      ...(app.appStoreUrl ? ['Open in App Store'] : []),
-      isSaved ? 'Unsave App' : 'Save App',
-      isFollowing ? 'Unfollow App' : 'Follow App',
+      'View AppleVis Details',
+      'Add New Comment',
+      ...(app.appStoreUrl ? ['Get This App in App Store'] : []),
+      isSaved ? 'Remove from Saved' : 'Save this App Entry',
+      isFollowing ? 'Unfollow this App' : 'Follow this App',
       ...(!screenReaderEnabled ? ['Read Aloud'] : []),
-      'Share',
+      'Share this App Entry',
       ...(aiAvailable ? ['Summarise Reviews', 'Accessibility Consensus', 'Simplify'] : []),
     ];
   }
 
   function handleAppAction(action: string, app: AppListing) {
-    if (action === 'Open App Page') {
+    if (action === 'View AppleVis Details') {
       if (app.id.startsWith('public:') && app.url) {
         Linking.openURL(app.url).catch(() => showToast('Could not open the AppleVis app page.', 'error'));
         return;
@@ -175,22 +266,25 @@ export default function AppCategory() {
       save(appRefs.current.get(app.id) ?? null);
       donateSiriActivity({ type: 'searchApps', query: app.name });
       router.push({ pathname: '/app-detail/[id]' as any, params: { id: app.id, name: app.name } });
-    } else if (action === 'Open in App Store') {
+    } else if (action === 'Add New Comment') {
+      if (!isSignedIn) { showToast('Sign in to add a new comment.', 'warning'); return; }
+      setReviewApp(app);
+    } else if (action === 'Get This App in App Store') {
       Linking.openURL(app.appStoreUrl).catch(() => showToast('Could not open the App Store.', 'error'));
-    } else if (action === 'Save App') {
+    } else if (action === 'Save this App Entry') {
       savedApps.save({ id: app.id, kind: 'appListing', title: app.name, savedAt: new Date().toISOString() });
-      showToast('App saved.', 'success');
-    } else if (action === 'Unsave App') {
+      showToast('App entry saved.', 'success');
+    } else if (action === 'Remove from Saved') {
       savedApps.unsave(app.id);
-      showToast('App unsaved.', 'success');
-    } else if (action === 'Follow App') {
+      showToast('Removed from saved.', 'success');
+    } else if (action === 'Follow this App') {
       persistence.followItem({
         id: app.id,
         kind: 'appListing',
         nodeType: 'node--ios_app_directory',
         title: app.name,
         followedAt: new Date().toISOString(),
-        lastActivityAt: app.lastUpdatedAt,
+        lastActivityAt: app.lastActivityAt ?? app.lastUpdatedAt,
         url: app.url,
       }).then(async () => {
         setFollowedIds((prev) => new Set([...prev, app.id]));
@@ -202,7 +296,7 @@ export default function AppCategory() {
           showToast('Following saved locally. Sign in again to sync with AppleVis.', 'warning');
         }
       });
-    } else if (action === 'Unfollow App') {
+    } else if (action === 'Unfollow this App') {
       persistence.unfollowItem(app.id).then(async () => {
         setFollowedIds((prev) => { const next = new Set(prev); next.delete(app.id); return next; });
         const token = await api.account.getSessionToken();
@@ -211,7 +305,7 @@ export default function AppCategory() {
       });
     } else if (action === 'Read Aloud') {
       readAloud([app.name, app.summary].filter(Boolean).join('. '));
-    } else if (action === 'Share') {
+    } else if (action === 'Share this App Entry') {
       Share.share({
         title: app.name,
         message: `${app.name} on AppleVis — ${app.url ?? 'https://www.applevis.com/accessibility-apps'}`,
@@ -229,10 +323,22 @@ export default function AppCategory() {
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  const screenTitle = `${String(categoryName)} · ${String(platformName)}`;
+  const screenTitle = `${String(categoryName)} - ${String(platformName)}`;
 
   return (
     <Screen title={screenTitle}>
+      {reviewApp && (
+        <WriteReviewModal
+          visible={!!reviewApp}
+          appId={reviewApp.id}
+          appName={reviewApp.name}
+          onClose={() => setReviewApp(null)}
+          onSubmitted={() => {
+            setReviewApp(null);
+            showToast('Comment submitted! It will appear after moderation.', 'success');
+          }}
+        />
+      )}
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
         showsVerticalScrollIndicator
@@ -264,14 +370,16 @@ export default function AppCategory() {
         {!probe.loading && visibleApps.length > 0 && (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, marginTop: 4 }}>
             <Text
+              ref={summaryRef}
               style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.textSecondary,
                 textTransform: 'uppercase', letterSpacing: 0.8 }}
               accessibilityRole="header"
-              accessibilityActions={[{ name: 'feedSummary', label: 'Feed summary' }]}
+              accessibilityLabel={feedSummaryLabel}
+              accessibilityActions={[{ name: 'readCount', label: 'Read count' }]}
               onAccessibilityAction={() => AccessibilityInfo.announceForAccessibility(feedSummaryLabel)}
             >
               {String(categoryName)}
-              {newCount > 0 ? `  ·  ${newCount} new` : ''}
+              {newCount > 0 ? `  -  ${newCount} new` : ''}
             </Text>
             {feedLoadedAt && (
               <Text
@@ -373,16 +481,7 @@ export default function AppCategory() {
                     if (isFirst) firstAppRef.current = el;
                   }}
                   title={app.name}
-                  meta={[
-                    isNew ? 'New' : null,
-                    app.developer || null,
-                    app.category  || null,
-                    app.reviewCount > 0 ? `${app.reviewCount} review${app.reviewCount !== 1 ? 's' : ''}` : null,
-                    app.createdAt
-                      ? `Added ${relativeTime(app.createdAt)}`
-                      : `Updated ${new Date(app.lastUpdatedAt).toLocaleDateString()}`,
-                    isSaved ? 'Saved' : null,
-                  ].filter(Boolean).join(' · ')}
+                  meta={buildAppCardMeta(app, isNew, isSaved)}
                   iconUrl={app.iconUrl}
                   badge={isNew ? 'NEW' : undefined}
                   badgeColor={APP_ACCENT}

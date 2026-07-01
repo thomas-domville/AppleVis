@@ -129,7 +129,9 @@ export function useHomeFeed() {
         try {
           const saved = JSON.parse(raw) as Partial<FeedPrefs>;
           setPrefs({ ...DEFAULT_FEED_PREFS, ...saved });
-        } catch {}
+        } catch {
+          // Non-critical: corrupt/legacy stored prefs fall back to defaults already in state.
+        }
       }
       setPrefsLoaded(true);
     });

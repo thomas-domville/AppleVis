@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useRef } from 'react';
 import { AccessibilityInfo, Animated, findNodeHandle, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAccessibilityPreferences } from '../hooks/useAccessibilityPreferences';
 import { onboarding } from '../services/onboarding';
@@ -19,13 +20,19 @@ type Props = {
   hideSkip?: boolean;
   /** Hide the step progress dots and step count (e.g. on the summary screen). */
   hideStepIndicator?: boolean;
+  /** Override accent colour for stripe, dots, and Next button (e.g. contact wizard type colour). */
+  accentColor?: string;
+  /** When provided, shows a × Cancel button in the header and calls this instead of the skip link. */
+  onCancel?: () => void;
 };
 
 export function WizardLayout({
   step, totalSteps, title, description, children,
   onNext, nextLabel = 'Next', nextDisabled = false, hideSkip = false, hideStepIndicator = false,
+  accentColor, onCancel,
 }: Props) {
   const { colors } = useTheme();
+  const resolvedAccent = accentColor ?? colors.accent;
   const { reduceMotion } = useAccessibilityPreferences();
   const headingRef = useRef<Text>(null);
 
@@ -91,12 +98,50 @@ export function WizardLayout({
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      onAccessibilityEscape={() => { if (router.canGoBack()) router.back(); }}
+    >
+      {/* ── Header: Back (step > 1) and optional Cancel ─────────────────── */}
+      {(step > 1 || onCancel) && (
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+          paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4,
+        }}>
+          {step > 1 ? (
+            <Pressable
+              onPress={() => { if (router.canGoBack()) router.back(); }}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+              accessibilityHint="Returns to the previous step."
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 2, opacity: pressed ? 0.6 : 1 })}
+            >
+              <Ionicons name="chevron-back" size={22} color={colors.accent} accessibilityElementsHidden />
+              <Text style={{ color: colors.accent, fontSize: 17 }} accessibilityElementsHidden>Back</Text>
+            </Pressable>
+          ) : <View />}
+          {onCancel && (
+            <Pressable
+              onPress={onCancel}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
+              accessibilityHint="Cancels and closes this form."
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+            >
+              <Ionicons name="close-circle" size={28} color={colors.textSecondary} />
+            </Pressable>
+          )}
+        </View>
+      )}
       {/* ── Top progress stripe ─────────────────────────────────────────── */}
       <View style={{ height: 4, backgroundColor: colors.border }}>
         <Animated.View style={{
           height: 4,
-          backgroundColor: colors.accent,
+          backgroundColor: resolvedAccent,
           width: stripeAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }),
         }} />
       </View>
@@ -120,7 +165,7 @@ export function WizardLayout({
                   width: dotWidths[i],
                   height: 8,
                   borderRadius: 4,
-                  backgroundColor: i + 1 === step ? colors.accent : colors.border,
+                  backgroundColor: i + 1 === step ? resolvedAccent : colors.border,
                 }}
               />
             ))}
@@ -164,7 +209,7 @@ export function WizardLayout({
             accessibilityLabel={nextLabel}
             accessibilityState={{ disabled: nextDisabled }}
             style={{
-              backgroundColor: nextDisabled ? colors.border : colors.accent,
+              backgroundColor: nextDisabled ? colors.border : resolvedAccent,
               borderRadius: 14,
               paddingVertical: 16,
               alignItems: 'center',
@@ -180,11 +225,11 @@ export function WizardLayout({
               onPress={handleSkip}
               accessible
               accessibilityRole="button"
-              accessibilityLabel="I'll set this up later"
-              accessibilityHint="Exits the setup wizard. Everything can be changed any time in the Settings tab."
+              accessibilityLabel="Skip setup for now and open AppleVis"
+              accessibilityHint="You can change these choices later in Settings."
               style={{ alignItems: 'center', paddingVertical: 12 }}
             >
-              <Text style={{ color: colors.textSecondary, fontSize: 15 }}>{"I'll set this up later"}</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 15 }}>Maybe Later</Text>
             </Pressable>
           )}
         </View>

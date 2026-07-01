@@ -1,16 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
-  AccessibilityInfo, ActivityIndicator, findNodeHandle, Linking, Pressable,
+  AccessibilityInfo, Linking, Pressable,
   ScrollView, Text, TextInput, View,
 } from 'react-native';
 import { useScrollToTop } from '@react-navigation/native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { EmptyState } from '../../src/components/EmptyState';
 import { Screen } from '../../src/components/Screen';
-import { AccessibleCard } from '../../src/components/AccessibleCard';
+import { AppleVisSearchInput } from '../../src/components/search/AppleVisSearchInput';
+import { SearchResultsGrouped } from '../../src/components/search/SearchResultsGrouped';
+import { SearchEmptyState } from '../../src/components/search/SearchEmptyState';
+import { SearchLoadingState } from '../../src/components/search/SearchLoadingState';
+import { SearchErrorState } from '../../src/components/search/SearchErrorState';
+import { SearchTranslationPrompt } from '../../src/components/search/SearchTranslationPrompt';
 import { useSearch } from '../../src/hooks/useSearch';
+import { useSearchTranslation } from '../../src/hooks/useSearchTranslation';
 import { useFocusRestore } from '../../src/hooks/useFocusRestore';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
@@ -18,13 +23,8 @@ import { useTip, TIP_KEYS, TIPS } from '../../src/contexts/ContextualTipContext'
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
-import { useLanguageDetection } from '../../src/hooks/useLanguageDetection';
 import { APPLEVIS_SOCIAL_LINKS } from '../../src/data/socialLinks';
-import {
-  donateSiriActivity,
-  translateSearchQueryToEnglish,
-} from '../../src/services/intelligenceService';
-import type { ForumTopic } from '../../src/types/content';
+import { sounds } from '../../src/services/sounds';
 
 // ─── Section accent palette ────────────────────────────────────────────────────
 const SECTION_ACCENTS = {
@@ -37,13 +37,12 @@ const SECTION_ACCENTS = {
   connect:    '#0ea5e9',  // sky
 } as const;
 
-// Be My Eyes deep link helpers
-// TODO: Replace placeholder schemes with confirmed URLs from Be My Eyes team
+// Be My Eyes deep link helpers — partner_id confirmed: 'applevis' (2026-06-25)
 const BME_APP_STORE = 'https://apps.apple.com/us/app/be-my-eyes/id905177575';
 const BME_DEEP_LINKS = {
-  volunteer:  'bemyeyes://volunteer',   // placeholder — awaiting confirmation
-  beMyAI:     'bemyeyes://ai',          // placeholder — awaiting confirmation
-  directory:  'bemyeyes://directory',   // placeholder — awaiting confirmation
+  volunteer:  'bemyeyes://volunteer',            // open volunteer call screen
+  beMyAI:     'bemyeyes://ai',                   // open Be My AI screen
+  directory:  'bemyeyes://partner/applevis',     // open AppleVis specialized support channel
 } as const;
 
 const SOCIAL_ACCENT: Record<string, string> = {
@@ -51,36 +50,6 @@ const SOCIAL_ACCENT: Record<string, string> = {
   facebook: '#1877F2',
   mastodon: '#6364FF',
 };
-
-// ─── SearchResultsSection ─────────────────────────────────────────────────────
-
-function SearchResultsSection({
-  title,
-  count,
-  children,
-}: {
-  title: string;
-  count: number;
-  children: React.ReactNode;
-}) {
-  const { colors } = useTheme();
-  if (count === 0) return null;
-  return (
-    <View style={{ marginBottom: 8 }}>
-      <Text
-        style={{
-          fontSize: 13, fontWeight: '700', color: colors.textSecondary,
-          textTransform: 'uppercase', letterSpacing: 0.8,
-          marginBottom: 8, marginTop: 4,
-        }}
-        accessibilityRole="header"
-      >
-        {title} ({count})
-      </Text>
-      {children}
-    </View>
-  );
-}
 
 // ─── Hub sections ─────────────────────────────────────────────────────────────
 
@@ -111,13 +80,14 @@ function SectionIntro({ title, subtitle, accentColor }: {
 }
 
 function HubRow({
-  icon, title, subtitle, onPress, external = false, nodeRef, accentColor, hint,
+  icon, title, subtitle, onPress, external = false, externalApp = false, nodeRef, accentColor, hint,
 }: {
   icon: React.ComponentProps<typeof Ionicons>['name'];
   title: string;
   subtitle: string;
   onPress: () => void;
-  external?: boolean;
+  external?: boolean;    // opens in browser — appends "Opens in your browser" to VoiceOver label
+  externalApp?: boolean; // opens another app — link role + open icon, no browser text
   nodeRef?: { current: View | null };
   accentColor?: string;
   hint?: string;
@@ -125,13 +95,18 @@ function HubRow({
   const { colors, styles } = useTheme();
   const { reduceTransparency } = useAccessibilityPreferences();
   const accent = accentColor ?? colors.accent;
+  const isExternal = external || externalApp;
 
   return (
     <Pressable
       ref={nodeRef as any}
-      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      onPress={() => {
+        Haptics.selectionAsync();
+        sounds.articleOpen().catch(() => {});
+        onPress();
+      }}
       accessible
-      accessibilityRole={external ? 'link' : 'button'}
+      accessibilityRole={isExternal ? 'link' : 'button'}
       accessibilityLabel={`${title}. ${subtitle}.${external ? ' Opens in your browser.' : ''}`}
       accessibilityHint={hint}
       style={({ pressed }) => [
@@ -159,7 +134,7 @@ function HubRow({
         </Text>
       </View>
       <Ionicons
-        name={external ? 'open-outline' : 'chevron-forward'}
+        name={isExternal ? 'open-outline' : 'chevron-forward'}
         size={16}
         color={colors.textSecondary}
         accessibilityElementsHidden
@@ -173,7 +148,7 @@ function HubRow({
 export default function DiscoverScreen() {
   const router  = useRouter();
   const { colors, styles } = useTheme();
-  const { reduceTransparency } = useAccessibilityPreferences();
+  const { reduceTransparency, screenReaderEnabled } = useAccessibilityPreferences();
   const {
     nonEnglishDetectionEnabled,
     searchTranslationEnabled,
@@ -190,10 +165,17 @@ export default function DiscoverScreen() {
   const searchInputRef = useRef<TextInput>(null);
   const { save: saveFocus } = useFocusRestore();
   const scrollRef = useRef<ScrollView>(null);
-  const [translatingSearch, setTranslatingSearch] = useState(false);
-  const [translatedFrom, setTranslatedFrom] = useState('');
+  const lastAnnouncedCountRef = useRef<number | null>(null);
   useScrollToTop(scrollRef);
-  const searchLanguage = useLanguageDetection(search.query);
+
+  const { visible: showTranslateSearch, translating: translatingSearch, translate: handleTranslateSearch } =
+    useSearchTranslation(
+      search,
+      nonEnglishDetectionEnabled,
+      searchTranslationEnabled,
+      () => showToast('In-app search translation requires Apple Intelligence on this device.', 'warning'),
+      searchInputRef,
+    );
 
   useFocusEffect(useCallback(() => {
     showTip(TIP_KEYS.tabDiscover, TIPS.tabDiscover);
@@ -209,42 +191,25 @@ export default function DiscoverScreen() {
     webpageURL: 'https://www.applevis.com',
   });
 
-  // Announce result count to VoiceOver when a search completes
+  // Announce result count to VoiceOver when a search settles, and only play the
+  // completion sound when the count actually changed — not on every debounced update.
+  // Kept concise ("12 results found in 4 categories.") — each section heading
+  // (Site Results, Forum Topics, Apps, Guides and Resources) gives the detail.
   useEffect(() => {
     if (!search.hasQuery || search.loading) return;
     const total = search.totalCount;
+    const categoryCount = [search.results.site, search.results.forums, search.results.apps, search.results.resources]
+      .filter((group) => group.length > 0).length;
     const msg = total === 0
-      ? 'No results found'
-      : `${total} result${total === 1 ? '' : 's'} found`;
+      ? 'No results found.'
+      : `${total} result${total === 1 ? '' : 's'} found in ${categoryCount} categor${categoryCount === 1 ? 'y' : 'ies'}.`;
     AccessibilityInfo.announceForAccessibility(msg);
-  }, [search.hasQuery, search.loading, search.totalCount]);
 
-  const showTranslateSearch =
-    nonEnglishDetectionEnabled &&
-    searchTranslationEnabled &&
-    search.hasQuery &&
-    searchLanguage.isConfident &&
-    searchLanguage.isNonEnglish &&
-    translatedFrom.trim() !== search.query.trim();
-
-  async function handleTranslateSearch() {
-    const original = search.query.trim();
-    if (!original || translatingSearch) return;
-    setTranslatingSearch(true);
-    try {
-      const translated = await translateSearchQueryToEnglish(original);
-      if (!translated) {
-        showToast('In-app search translation requires Apple Intelligence on this device.', 'warning');
-        return;
-      }
-      setTranslatedFrom(original);
-      search.search(translated);
-      AccessibilityInfo.announceForAccessibility(`Searching translated English query: ${translated}`);
-      setTimeout(() => searchInputRef.current?.focus(), 100);
-    } finally {
-      setTranslatingSearch(false);
+    if (lastAnnouncedCountRef.current !== total) {
+      sounds.searchComplete().catch(() => {});
+      lastAnnouncedCountRef.current = total;
     }
-  }
+  }, [search.hasQuery, search.loading, search.totalCount]);
 
   // ── Be My Eyes deep link launcher ──────────────────────────────────────────
 
@@ -253,19 +218,15 @@ export default function DiscoverScreen() {
     try {
       const canOpen = await Linking.canOpenURL(deepLink);
       if (canOpen) {
+        AccessibilityInfo.announceForAccessibility(`Opening ${label} app.`);
         await Linking.openURL(deepLink);
       } else {
+        AccessibilityInfo.announceForAccessibility(`${label} is not installed. Opening its App Store page instead.`);
         await Linking.openURL(BME_APP_STORE);
       }
     } catch {
       showToast(`Could not open ${label}.`, 'error');
     }
-  }
-
-  // ── Search result topic handler ─────────────────────────────────────────────
-
-  function handleTopicPress(topic: ForumTopic) {
-    router.push({ pathname: '/topic/[id]' as any, params: { id: topic.id, title: topic.title } });
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -281,93 +242,16 @@ export default function DiscoverScreen() {
       >
 
         {/* ── Search bar ────────────────────────────────────────────────── */}
-        <View style={{
-          flexDirection: 'row', alignItems: 'center',
-          backgroundColor: colors.inputBackground,
-          borderRadius: 12, borderWidth: 1, borderColor: colors.border,
-          paddingHorizontal: 12, paddingVertical: 10, marginBottom: 4,
-        }}>
-          <Ionicons name="search" size={17} color={colors.textSecondary}
-            style={{ marginRight: 8 }} accessibilityElementsHidden />
-          <TextInput
-            ref={searchInputRef}
-            value={search.query}
-            onChangeText={search.search}
-            placeholder="Search topics, apps, guides…"
-            placeholderTextColor={colors.textSecondary}
-            style={{ flex: 1, fontSize: 16, color: colors.text }}
-            accessible
-            accessibilityRole="search"
-            accessibilityLabel="Search AppleVis"
-            accessibilityHint="Type to search topics, apps, and guides"
-            returnKeyType="search"
-            clearButtonMode="while-editing"
-            onSubmitEditing={(e) => search.search(e.nativeEvent.text)}
-          />
-          {isSearching && (
-            <Pressable
-              onPress={() => {
-                search.clear();
-                // Restore VoiceOver focus to the search field after clearing
-                setTimeout(() => {
-                  const handle = findNodeHandle(searchInputRef.current);
-                  if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
-                }, 100);
-              }}
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-              accessibilityHint="Returns to the browse screen"
-              style={{ padding: 4 }}
-            >
-              <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
-            </Pressable>
-          )}
-        </View>
+        <AppleVisSearchInput
+          ref={searchInputRef}
+          value={search.query}
+          onChangeText={search.search}
+          onClear={search.clear}
+        />
 
-        {/* Title-match disclaimer — only shown while a search is active */}
+        {/* Search-query translation prompt — only shown while a search is active */}
         {showTranslateSearch && (
-          <View
-            style={{
-              backgroundColor: colors.pill,
-              borderRadius: 10,
-              borderWidth: 1,
-              borderColor: colors.border,
-              paddingHorizontal: 12,
-              paddingVertical: 10,
-              marginBottom: 12,
-              gap: 8,
-            }}
-            accessible
-            accessibilityRole="alert"
-            accessibilityLabel="AppleVis search works best in English. Translate this search to English?"
-          >
-            <Text style={{ color: colors.text, fontSize: 14, lineHeight: 20 }} importantForAccessibility="no">
-              AppleVis search works best in English. Translate this search to English?
-            </Text>
-            <Pressable
-              onPress={handleTranslateSearch}
-              disabled={translatingSearch}
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel={translatingSearch ? 'Translating search, please wait' : 'Translate search to English'}
-              accessibilityState={{ disabled: translatingSearch }}
-              style={{
-                alignItems: 'center',
-                backgroundColor: colors.accent,
-                borderRadius: 8,
-                paddingVertical: 9,
-                opacity: translatingSearch ? 0.7 : 1,
-              }}
-            >
-              {translatingSearch
-                ? <ActivityIndicator color={colors.accentText} />
-                : <Text style={{ color: colors.accentText, fontWeight: '700', fontSize: 14 }}>
-                    Translate Search
-                  </Text>
-              }
-            </Pressable>
-          </View>
+          <SearchTranslationPrompt translating={translatingSearch} onTranslate={handleTranslateSearch} />
         )}
 
         {isSearching && (
@@ -384,111 +268,20 @@ export default function DiscoverScreen() {
         ════════════════════════════════════════════════════════════════ */}
         {isSearching && (
           <>
-            {search.loading && (
-              <View
-                style={{ alignItems: 'center', paddingVertical: 32 }}
-                accessible
-                accessibilityLiveRegion="polite"
-                accessibilityLabel="Searching AppleVis, please wait"
-              >
-                <ActivityIndicator size="large" color={colors.appleVisBlue} accessibilityElementsHidden />
-                <Text style={[styles.lede, { marginTop: 12, textAlign: 'center' }]}
-                  accessibilityElementsHidden>
-                  Searching…
-                </Text>
-              </View>
-            )}
+            {search.loading && <SearchLoadingState />}
 
             {!search.loading && search.totalCount === 0 && (
-              <EmptyState
-                icon="search-outline"
-                title="No results"
-                subtitle="Nothing matched your search. Try different keywords."
-              />
+              <SearchEmptyState query={search.query} onClearSearch={search.clear} />
             )}
 
-            {search.error && (
-              <View style={{
-                flexDirection: 'row', gap: 8, alignItems: 'flex-start',
-                backgroundColor: '#FFF8F0', borderRadius: 10, padding: 12, marginBottom: 10,
-              }}
-                accessible accessibilityLabel="Some search results may be incomplete. Check your connection."
-              >
-                <Ionicons name="warning-outline" size={16} color="#C05000"
-                  accessibilityElementsHidden style={{ marginTop: 1 }} />
-                <Text style={{ flex: 1, fontSize: 13, color: '#C05000', lineHeight: 18 }}>
-                  {search.error}
-                </Text>
-              </View>
-            )}
+            {search.error && <SearchErrorState message={search.error} />}
 
             {!search.loading && (
-              <>
-                <SearchResultsSection title="Site Results" count={search.results.site.length}>
-                  {search.results.site.map((item) => (
-                    <AccessibleCard
-                      key={item.id}
-                      title={item.title}
-                      meta={[
-                        item.contentType !== 'unknown' ? item.contentType : null,
-                        item.source === 'public' ? 'AppleVis public search' : 'AppleVis search API',
-                      ].filter(Boolean).join(' · ')}
-                      actions={['Open Result']}
-                      onAction={() => Linking.openURL(item.url).catch(() => showToast('Could not open the AppleVis result.', 'error'))}
-                    />
-                  ))}
-                </SearchResultsSection>
-
-                {/* Topics */}
-                <SearchResultsSection title="Topics" count={search.results.forums.length}>
-                  {search.results.forums.map((topic) => (
-                    <AccessibleCard
-                      key={topic.id}
-                      title={topic.title}
-                      meta={[
-                        topic.replyCount > 0 ? `${topic.replyCount} repl${topic.replyCount === 1 ? 'y' : 'ies'}` : 'No replies',
-                        topic.authorName || null,
-                        new Date(topic.lastActivityAt).toLocaleDateString(),
-                      ].filter(Boolean).join(' · ')}
-                      actions={['Open Topic']}
-                      onAction={() => handleTopicPress(topic)}
-                    />
-                  ))}
-                </SearchResultsSection>
-
-                {/* Apps */}
-                <SearchResultsSection title="Apps" count={search.results.apps.length}>
-                  {search.results.apps.map((app) => (
-                    <AccessibleCard
-                      key={app.id}
-                      title={app.name}
-                      meta={[
-                        app.developer || null,
-                        app.reviewCount > 0 ? `${app.reviewCount} reviews` : null,
-                      ].filter(Boolean).join(' · ')}
-                      iconUrl={app.iconUrl}
-                      actions={['Open App Page']}
-                      onAction={() => {
-                        donateSiriActivity({ type: 'searchApps', query: app.name });
-                        router.push({ pathname: '/app-detail/[id]' as any, params: { id: app.id, name: app.name } });
-                      }}
-                    />
-                  ))}
-                </SearchResultsSection>
-
-                {/* Guides */}
-                <SearchResultsSection title="Guides" count={search.results.resources.length}>
-                  {search.results.resources.map((item) => (
-                    <AccessibleCard
-                      key={item.id}
-                      title={item.title}
-                      meta={[item.kind, `Updated ${new Date(item.updatedAt).toLocaleDateString()}`].join(' · ')}
-                      actions={['Open Guide']}
-                      onAction={() => router.push({ pathname: '/resource-detail/[id]' as any, params: { id: item.id, title: item.title, url: item.url } })}
-                    />
-                  ))}
-                </SearchResultsSection>
-              </>
+              <SearchResultsGrouped
+                results={search.results}
+                screenReaderEnabled={screenReaderEnabled}
+                onOpenExternalError={() => showToast('Could not open the AppleVis result.', 'error')}
+              />
             )}
           </>
         )}
@@ -605,6 +398,14 @@ export default function DiscoverScreen() {
                 router.push({ pathname: '/bug-browse' as any, params: { platform: 'macos' } });
               }}
             />
+            <HubRow
+              icon="add-circle-outline"
+              title="Report a New Bug"
+              subtitle="Found an accessibility bug not yet in the tracker? Submit it here"
+              accentColor={SECTION_ACCENTS.bugs}
+              hint="Opens the bug report submission wizard"
+              onPress={() => router.push('/submit-bug' as any)}
+            />
 
             <SectionIntro
               title="Be My Eyes"
@@ -617,7 +418,7 @@ export default function DiscoverScreen() {
               subtitle="Connect instantly with a sighted volunteer via live video, 24/7 in 185 languages"
               accentColor={SECTION_ACCENTS.bemyeyes}
               hint="Opens the Be My Eyes app to start a volunteer call"
-              external
+              externalApp
               onPress={() => openBME(BME_DEEP_LINKS.volunteer, 'Be My Eyes')}
             />
             <HubRow
@@ -626,7 +427,7 @@ export default function DiscoverScreen() {
               subtitle="Ask AI to describe images, read text, or answer visual questions in 36 languages"
               accentColor={SECTION_ACCENTS.bemyeyes}
               hint="Opens the Be My Eyes app to the AI assistant"
-              external
+              externalApp
               onPress={() => openBME(BME_DEEP_LINKS.beMyAI, 'Be My Eyes')}
             />
             <HubRow
@@ -635,7 +436,7 @@ export default function DiscoverScreen() {
               subtitle="Reach accessible customer service at hundreds of companies and government departments"
               accentColor={SECTION_ACCENTS.bemyeyes}
               hint="Opens the Be My Eyes app to the service directory"
-              external
+              externalApp
               onPress={() => openBME(BME_DEEP_LINKS.directory, 'Be My Eyes')}
             />
 

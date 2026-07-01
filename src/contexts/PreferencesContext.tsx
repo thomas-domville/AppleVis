@@ -4,6 +4,7 @@ import { persistence, setPersistenceSyncPreferences } from '../services/persiste
 import type { SyncPreferences } from '../services/persistence';
 
 export type AnnouncementLevel = 'simple' | 'normal' | 'all';
+export type HomeStartupBehavior = 'quiet' | 'helpful' | 'detailed';
 export type DefaultForumFilter = 'All' | 'New';
 export type CardDensity = 'comfortable' | 'compact';
 export type PlaybackSpeed = 0.5 | 0.75 | 1.0 | 1.25 | 1.5 | 1.75 | 2.0 | 2.5 | 3.0;
@@ -42,9 +43,11 @@ const KEYS = {
   cardDensity:                '@applevis_card_density',
   helpfulTipsEnabled:         '@applevis_helpful_tips_enabled',
   welcomeSummaryEnabled:      '@applevis_welcome_summary_enabled',
+  homeStartupBehavior:        '@applevis_home_startup_behavior',
   notificationPrefs:          '@applevis_notification_prefs',
   notificationSound:          '@applevis_notification_sound',
   nonEnglishDetectionEnabled: '@applevis_non_english_detection',
+  searchAutoFocusEnabled:     '@applevis_search_auto_focus',
   composeRewriteEnabled:      '@applevis_compose_rewrite_enabled',
   composeTranslationEnabled:  '@applevis_compose_translation_enabled',
   searchTranslationEnabled:   '@applevis_search_translation_enabled',
@@ -84,6 +87,10 @@ type PreferencesContextValue = {
   welcomeSummaryEnabled:    boolean;
   setWelcomeSummaryEnabled: (v: boolean) => void;
 
+  /** Controls how much sound/announcement Home produces on launch and return: Quiet, Helpful, or Detailed. */
+  homeStartupBehavior:    HomeStartupBehavior;
+  setHomeStartupBehavior: (v: HomeStartupBehavior) => void;
+
   notificationPrefs:    NotificationPrefs;
   setNotificationPrefs: (v: NotificationPrefs) => void;
 
@@ -92,6 +99,10 @@ type PreferencesContextValue = {
 
   nonEnglishDetectionEnabled:    boolean;
   setNonEnglishDetectionEnabled: (v: boolean) => void;
+
+  /** Whether the Search tab auto-focuses the search field on open — some VoiceOver users prefer to get oriented first. */
+  searchAutoFocusEnabled:    boolean;
+  setSearchAutoFocusEnabled: (v: boolean) => void;
 
   // ── Podcast player defaults ────────────────────────────────────────────────
   composeRewriteEnabled:    boolean;
@@ -150,14 +161,16 @@ const PreferencesContext = createContext<PreferencesContextValue | null>(null);
 
 export function PreferencesProvider({ children }: { children: React.ReactNode }) {
   const [isLoading,           setIsLoading]               = useState(true);
-  const [announcementLevel,   setAnnouncementLevelState]   = useState<AnnouncementLevel>('all');
+  const [announcementLevel,   setAnnouncementLevelState]   = useState<AnnouncementLevel>('normal');
   const [defaultForumFilter,  setDefaultForumFilterState]  = useState<DefaultForumFilter>('All');
   const [cardDensity,         setCardDensityState]         = useState<CardDensity>('comfortable');
   const [helpfulTipsEnabled,  setHelpfulTipsEnabledState]  = useState<boolean>(true);
   const [welcomeSummaryEnabled, setWelcomeSummaryEnabledState] = useState<boolean>(true);
+  const [homeStartupBehavior, setHomeStartupBehaviorState] = useState<HomeStartupBehavior>('helpful');
   const [notificationPrefs,           setNotificationPrefsState]           = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
   const [notificationSound,           setNotificationSoundState]           = useState<NotificationSound>('mouseSqueak');
   const [nonEnglishDetectionEnabled,  setNonEnglishDetectionEnabledState]  = useState<boolean>(true);
+  const [searchAutoFocusEnabled,      setSearchAutoFocusEnabledState]      = useState<boolean>(true);
   const [composeRewriteEnabled,       setComposeRewriteEnabledState]       = useState<boolean>(true);
   const [composeTranslationEnabled,   setComposeTranslationEnabledState]   = useState<boolean>(true);
   const [searchTranslationEnabled,    setSearchTranslationEnabledState]    = useState<boolean>(true);
@@ -190,6 +203,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       AsyncStorage.getItem(KEYS.notificationPrefs),
       AsyncStorage.getItem(KEYS.notificationSound),
       AsyncStorage.getItem(KEYS.nonEnglishDetectionEnabled),
+      AsyncStorage.getItem(KEYS.searchAutoFocusEnabled),
       AsyncStorage.getItem(KEYS.composeRewriteEnabled),
       AsyncStorage.getItem(KEYS.composeTranslationEnabled),
       AsyncStorage.getItem(KEYS.searchTranslationEnabled),
@@ -210,6 +224,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       persistence.getSetting<PodcastResumeRewind>(KEYS.podcastResumeRewind, 15),
       persistence.getSetting<boolean>(KEYS.helpfulTipsEnabled, true),
       persistence.getSetting<boolean>(KEYS.welcomeSummaryEnabled, true),
+      persistence.getSetting<HomeStartupBehavior>(KEYS.homeStartupBehavior, 'helpful'),
     ]);
 
     const syncLoads = Promise.all([
@@ -222,8 +237,8 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     ]);
 
     Promise.all([uiLoads, podcastLoads, syncLoads])
-      .then(([[level, filter, density, prefs, sound, nonEnglish, composeRewrite, composeTranslation, searchTranslation, aiSummaries],
-              [speed, skipB, skipF, autoPlay, sleep, vBoost, eq, autoDl, autoDel, trimSilence, resumeRewind, helpfulTips, welcomeSummary],
+      .then(([[level, filter, density, prefs, sound, nonEnglish, searchAutoFocus, composeRewrite, composeTranslation, searchTranslation, aiSummaries],
+              [speed, skipB, skipF, autoPlay, sleep, vBoost, eq, autoDl, autoDel, trimSilence, resumeRewind, helpfulTips, welcomeSummary, startupBehavior],
               [iCloudSync, savedItemsSync, readingPositionSync, podcastPositionSync, queueSync, settingsSync]]) => {
         if (level)      setAnnouncementLevelState(level as AnnouncementLevel);
         if (filter === 'All' || filter === 'New') setDefaultForumFilterState(filter);
@@ -231,6 +246,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
         if (prefs)      setNotificationPrefsState(JSON.parse(prefs) as NotificationPrefs);
         if (sound)      setNotificationSoundState(sound as NotificationSound);
         if (nonEnglish) setNonEnglishDetectionEnabledState(nonEnglish === 'true');
+        if (searchAutoFocus) setSearchAutoFocusEnabledState(searchAutoFocus === 'true');
         if (composeRewrite)     setComposeRewriteEnabledState(composeRewrite === 'true');
         if (composeTranslation) setComposeTranslationEnabledState(composeTranslation === 'true');
         if (searchTranslation)  setSearchTranslationEnabledState(searchTranslation === 'true');
@@ -249,6 +265,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
         setPodcastResumeRewindState(resumeRewind);
         setHelpfulTipsEnabledState(helpfulTips);
         setWelcomeSummaryEnabledState(welcomeSummary);
+        setHomeStartupBehaviorState(startupBehavior);
         const nextSyncPreferences: SyncPreferences = {
           iCloudSync: iCloudSync !== 'false',
           savedItemsSync: savedItemsSync !== 'false',
@@ -292,6 +309,11 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     persistence.setSetting(KEYS.welcomeSummaryEnabled, v).catch(() => {});
   }, []);
 
+  const setHomeStartupBehavior = useCallback((v: HomeStartupBehavior) => {
+    setHomeStartupBehaviorState(v);
+    persistence.setSetting(KEYS.homeStartupBehavior, v).catch(() => {});
+  }, []);
+
   const setNotificationPrefs = useCallback((v: NotificationPrefs) => {
     setNotificationPrefsState(v);
     AsyncStorage.setItem(KEYS.notificationPrefs, JSON.stringify(v)).catch(() => {});
@@ -305,6 +327,11 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const setNonEnglishDetectionEnabled = useCallback((v: boolean) => {
     setNonEnglishDetectionEnabledState(v);
     AsyncStorage.setItem(KEYS.nonEnglishDetectionEnabled, String(v)).catch(() => {});
+  }, []);
+
+  const setSearchAutoFocusEnabled = useCallback((v: boolean) => {
+    setSearchAutoFocusEnabledState(v);
+    AsyncStorage.setItem(KEYS.searchAutoFocusEnabled, String(v)).catch(() => {});
   }, []);
 
   const setComposeRewriteEnabled = useCallback((v: boolean) => {
@@ -401,9 +428,11 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     cardDensity,        setCardDensity,
     helpfulTipsEnabled, setHelpfulTipsEnabled,
     welcomeSummaryEnabled, setWelcomeSummaryEnabled,
+    homeStartupBehavior, setHomeStartupBehavior,
     notificationPrefs,  setNotificationPrefs,
     notificationSound,  setNotificationSound,
     nonEnglishDetectionEnabled, setNonEnglishDetectionEnabled,
+    searchAutoFocusEnabled, setSearchAutoFocusEnabled,
     composeRewriteEnabled, setComposeRewriteEnabled,
     composeTranslationEnabled, setComposeTranslationEnabled,
     searchTranslationEnabled, setSearchTranslationEnabled,
@@ -423,14 +452,16 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     isLoading,
   }), [
     announcementLevel, defaultForumFilter, cardDensity,
-    helpfulTipsEnabled, welcomeSummaryEnabled, notificationPrefs, notificationSound, nonEnglishDetectionEnabled,
+    helpfulTipsEnabled, welcomeSummaryEnabled, homeStartupBehavior, notificationPrefs, notificationSound, nonEnglishDetectionEnabled,
+    searchAutoFocusEnabled,
     composeRewriteEnabled, composeTranslationEnabled, searchTranslationEnabled, aiSummariesEnabled,
     podcastSpeed, podcastSkipBack, podcastSkipForward, podcastAutoPlay,
     podcastSleepTimer, podcastVoiceBoost, podcastEQ, podcastAutoDownload, podcastAutoDelete, podcastTrimSilence,
     syncPreferences,
     isLoading,
     setAnnouncementLevel, setDefaultForumFilter, setCardDensity, setHelpfulTipsEnabled, setWelcomeSummaryEnabled,
-    setNotificationPrefs, setNotificationSound, setNonEnglishDetectionEnabled,
+    setHomeStartupBehavior,
+    setNotificationPrefs, setNotificationSound, setNonEnglishDetectionEnabled, setSearchAutoFocusEnabled,
     setComposeRewriteEnabled, setComposeTranslationEnabled, setSearchTranslationEnabled, setAiSummariesEnabled,
     setPodcastSpeed, setPodcastSkipBack, setPodcastSkipForward, setPodcastAutoPlay,
     setPodcastSleepTimer, setPodcastVoiceBoost, setPodcastEQ, setPodcastAutoDownload, setPodcastAutoDelete,

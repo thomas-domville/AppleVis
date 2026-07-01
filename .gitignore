@@ -4,6 +4,11 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Local tooling / handoff artifacts — never ship these in source ZIPs
+.claude/
+Temp/
+*.log
+
 # Native
 ios/
 android/

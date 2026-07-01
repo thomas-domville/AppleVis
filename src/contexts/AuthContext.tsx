@@ -5,12 +5,20 @@ import { getExpoPushToken } from '../services/notifications';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+// Drupal role machine names that grant admin-level access in the app.
+// Display name "Site Admin" → machine name is typically 'site_admin', etc.
+// If the check doesn't fire after sign-in, log roles to confirm the machine names
+// by reading auth.user.roles in a debug screen.
+export const ADMIN_ROLES = ['administrator', 'site_admin', 'site_editor'] as const;
+
 export type AuthUser = {
   uid: string;
-  uuid?: string;   // JSON:API UUID — used for ownership checks on content
+  uuid?: string;    // JSON:API UUID — used for ownership checks on content
   name: string;
   csrfToken: string;
   logoutToken: string;
+  roles?: string[]; // all Drupal role machine names assigned to this user
+  isAdmin?: boolean; // true when any role in `roles` matches ADMIN_ROLES
 };
 
 type AuthContextValue = {
@@ -129,14 +137,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(newUser);
         saveSession(newUser).catch(() => {});
 
-        // Resolve and persist the JSON:API UUID immediately after login.
-        // Best-effort — sign-in succeeds regardless; uuid is used for ownership checks.
-        api.account.resolveUuid(csrf_token).then((uuid) => {
-          if (uuid) {
-            const withUuid: AuthUser = { ...newUser, uuid };
-            setUser(withUuid);
-            saveSession(withUuid).catch(() => {});
-          }
+        // Resolve and persist the JSON:API UUID + Drupal roles immediately after login.
+        // Best-effort — sign-in succeeds regardless; uuid/roles are used for ownership/admin checks.
+        api.account.resolveUuid(csrf_token).then(async (uuid) => {
+          if (!uuid) return;
+          const roles  = await api.account.resolveRoles(uuid, csrf_token).catch(() => [] as string[]);
+          const isAdmin = roles.some(r => (ADMIN_ROLES as readonly string[]).includes(r));
+          const withUuid: AuthUser = { ...newUser, uuid, roles, isAdmin };
+          setUser(withUuid);
+          saveSession(withUuid).catch(() => {});
         }).catch(() => {});
 
         // Register device push token with server so targeted notifications work.

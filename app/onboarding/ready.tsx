@@ -5,14 +5,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useAlert } from '../../src/contexts/AccessibleAlertContext';
 import { WizardLayout } from '../../src/components/WizardLayout';
 import { onboarding } from '../../src/services/onboarding';
+import { tour } from '../../src/services/tour';
+import { guidedExperienceStore } from '../../src/services/guidedExperienceStore';
 import { THEMES } from '../../src/theme/themes';
 
 export default function ReadyStep() {
   const { colors, themeId } = useTheme();
   const { announcementLevel, notificationPrefs } = usePreferences();
   const auth = useAuth();
+  const { showAlert } = useAlert();
 
   const themeName    = THEMES[themeId].name;
   const levelLabels  = { simple: 'Simple', normal: 'Normal', all: 'All' };
@@ -27,10 +31,6 @@ export default function ReadyStep() {
   ].filter(Boolean) as string[];
 
   useEffect(() => {
-    onboarding.markComplete().catch(() => {});
-  }, []);
-
-  useEffect(() => {
     const summary = summaryItems.join('. ');
     const t = setTimeout(() => {
       AccessibilityInfo.announceForAccessibility(`Setup complete. ${summary}.`);
@@ -41,11 +41,38 @@ export default function ReadyStep() {
 
   return (
     <WizardLayout
-      step={5}
-      totalSteps={5}
+      step={6}
+      totalSteps={6}
       title="You're all set!"
       description="You're now part of the premier community for blind, DeafBlind, and low vision Apple users. Everything you chose here can be changed any time in Settings."
-      onNext={() => router.replace('/(tabs)')}
+      onNext={async () => {
+        await onboarding.markComplete().catch(() => {});
+        router.replace('/(tabs)');
+
+        // Let Home's own welcome sound/announcement/focus settle first, then
+        // — if the user hasn't finished/skipped the tour and hasn't opted out — offer it.
+        const [autoPromptEnabled, welcomeProgress] = await Promise.all([
+          tour.autoPromptEnabled(),
+          guidedExperienceStore.getProgress('welcome'),
+        ]);
+        const shouldPrompt = autoPromptEnabled && !welcomeProgress.completed && !welcomeProgress.skipped;
+        if (shouldPrompt) {
+          setTimeout(() => {
+            showAlert({
+              title: 'Take a quick tour of AppleVis?',
+              message: 'See a short, skippable walkthrough of Home, Discover, For You, Search, Profile, and Settings.',
+              buttons: [
+                { label: 'Start Tour', onPress: () => router.push({ pathname: '/guided-experience/[experienceId]', params: { experienceId: 'welcome' } } as any) },
+                { label: 'Maybe Later', style: 'cancel' },
+                {
+                  label: 'No Thanks',
+                  onPress: () => { tour.disableAutoPrompt().catch(() => {}); },
+                },
+              ],
+            });
+          }, 2500);
+        }
+      }}
       nextLabel="Start Exploring"
       hideSkip
       hideStepIndicator
@@ -74,10 +101,10 @@ export default function ReadyStep() {
         Where to start
       </Text>
       {[
-        { icon: '💬', text: 'Forums — browse recent topics, follow discussions, and post your own.' },
-        { icon: '📱', text: 'App Directories — find accessibility reviews for thousands of iOS and macOS apps.' },
-        { icon: '🎙️', text: 'Podcasts — listen to AppleVis episodes with the built-in accessible player.' },
-        { icon: '📖', text: 'Resources — guides, tutorials, and how-to articles for every skill level.' },
+        { icon: '🏠', text: 'Home — Catch up on the latest AppleVis activity.' },
+        { icon: '🧭', text: 'Discover — Browse apps, community discussions, guides, podcasts, the bug tracker, and more.' },
+        { icon: '⭐', text: 'For You — Return to your queue, downloads, saved items, and followed content.' },
+        { icon: '🔎', text: 'Search — Find discussions, apps, guides, podcast episodes, and help.' },
       ].map(({ icon, text }) => (
         <View key={text} style={{ flexDirection: 'row', gap: 12, marginBottom: 14, alignItems: 'flex-start' }}
           accessible accessibilityLabel={text}>

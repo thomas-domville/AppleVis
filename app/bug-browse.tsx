@@ -44,6 +44,40 @@ const FILTER_OPTIONS = ['Active', 'All Bugs'] as const;
 type FilterLabel = typeof FILTER_OPTIONS[number];
 const FILTER_TO_API: Record<FilterLabel, Filter> = { 'Active': 'active', 'All Bugs': 'all' };
 
+function stripPreviewText(text: string): string {
+  return text
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildBugPreview(bug: BugReport): string | null {
+  const text = stripPreviewText(bug.summary || '');
+  if (!text) return null;
+  const preview = text.length > 260 ? `${text.slice(0, 257).trimEnd()}...` : text;
+  return `Preview: ${preview}`;
+}
+
+function buildBugMetaLines(bug: BugReport): string[] {
+  const sev = SEVERITY_CONFIG[bug.severity];
+  const status = STATUS_CONFIG[bug.status];
+  const platformLabel = bug.platform === 'ios' ? 'iOS/iPadOS' : 'macOS';
+  return [
+    [status.label, bug.fixedIn ? `Fixed in ${bug.fixedIn}` : bug.firstSeen ? `First seen in ${bug.firstSeen}` : platformLabel].filter(Boolean).join(' - '),
+    `Severity: ${sev.label}`,
+    `Reported ${relativeTime(bug.createdAt)} - Updated ${relativeTime(bug.changedAt)}`,
+    buildBugPreview(bug),
+  ].filter(Boolean) as string[];
+}
+
 // ─── Bug card ─────────────────────────────────────────────────────────────────
 
 function BugCard({
@@ -60,18 +94,15 @@ function BugCard({
   const { reduceTransparency } = useAccessibilityPreferences();
   const sev    = SEVERITY_CONFIG[bug.severity];
   const status = STATUS_CONFIG[bug.status];
+  const metaLines = buildBugMetaLines(bug);
+  const spokenMeta = metaLines.join('. ');
 
   const a11yLabel = announcementLevel === 'simple'
     ? `${bug.title}. ${status.label}.`
     : [
         bug.title,
-        `Severity: ${sev.label}`,
-        `Status: ${status.label}`,
-        bug.firstSeen ? `First seen in ${bug.firstSeen}` : null,
-        bug.fixedIn   ? `Fixed in ${bug.fixedIn}` : null,
+        spokenMeta,
         bug.commentCount > 0 ? `${bug.commentCount} comment${bug.commentCount !== 1 ? 's' : ''}` : null,
-        `Reported ${relativeTime(bug.createdAt)}`,
-        `Last updated ${relativeTime(bug.changedAt)}`,
       ].filter(Boolean).join('. ');
 
   const actions = [
@@ -180,43 +211,22 @@ function BugCard({
         {bug.title}
       </Text>
 
-      {/* Version row */}
-      {(bug.firstSeen || bug.fixedIn) && (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 8 }}>
-          {bug.firstSeen ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Ionicons name="alert-circle-outline" size={12} color={colors.textSecondary} accessibilityElementsHidden />
-              <Text style={{ fontSize: 12, color: colors.textSecondary }} accessibilityElementsHidden>
-                First seen: {bug.firstSeen}
-              </Text>
-            </View>
-          ) : null}
-          {bug.fixedIn ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Ionicons name="checkmark-circle-outline" size={12} color="#16a34a" accessibilityElementsHidden />
-              <Text style={{ fontSize: 12, color: '#16a34a' }} accessibilityElementsHidden>
-                Fixed: {bug.fixedIn}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      )}
-
-      {/* Reported · Updated dates */}
-      <View
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}
-        accessible
-        accessibilityLabel={`Reported ${relativeTime(bug.createdAt)}. Last updated ${relativeTime(bug.changedAt)}.`}
-      >
-        <Ionicons name="calendar-outline" size={11} color={colors.textSecondary} accessibilityElementsHidden />
-        <Text style={{ fontSize: 11, color: colors.textSecondary }} accessibilityElementsHidden>
-          Reported {relativeTime(bug.createdAt)}
-        </Text>
-        <Text style={{ fontSize: 11, color: colors.textSecondary }} accessibilityElementsHidden>·</Text>
-        <Ionicons name="refresh-outline" size={11} color={colors.textSecondary} accessibilityElementsHidden />
-        <Text style={{ fontSize: 11, color: colors.textSecondary }} accessibilityElementsHidden>
-          Updated {relativeTime(bug.changedAt)}
-        </Text>
+      {/* Metadata and preview */}
+      <View style={{ marginBottom: 8 }} accessibilityElementsHidden>
+        {metaLines.map((line, index) => (
+          <Text
+            key={`${line}-${index}`}
+            style={{
+              fontSize: 12,
+              color: colors.textSecondary,
+              lineHeight: 17,
+              marginTop: index === 0 ? 0 : 2,
+            }}
+            numberOfLines={line.startsWith('Preview:') ? 5 : undefined}
+          >
+            {line}
+          </Text>
+        ))}
       </View>
 
       {/* Footer: comments + chevron */}

@@ -28,7 +28,9 @@ import { AccessibleAlertProvider, useAlert } from '../src/contexts/AccessibleAle
 import { ContextualTipProvider } from '../src/contexts/ContextualTipContext';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { PlayerProvider, usePlayer } from '../src/contexts/PlayerContext';
+import { GuidedExperienceProvider } from '../src/contexts/GuidedExperienceContext';
 import { MiniPlayer } from '../src/components/MiniPlayer';
+import { GuidedExperienceResumePrompt } from '../src/components/guidedExperience/GuidedExperienceResumePrompt';
 
 // Prevent iOS from auto-hiding the launch screen — AppLoader calls hideAsync()
 // as soon as the in-app overlay is ready to take over seamlessly.
@@ -152,11 +154,6 @@ function AppLoader({ children }: { children: React.ReactNode }) {
 
     const dest = readyDestRef.current;
 
-    if (!dest) {
-      // Returning user arriving at home — play welcome tone and announce readiness.
-      sounds.welcome().catch(() => {});
-    }
-
     Animated.timing(fadeAnim, { toValue: 0, duration: 350, useNativeDriver: true })
       .start(() => {
         setOverlayVisible(false);
@@ -255,7 +252,15 @@ function MagicTapWrapper({ children }: { children: React.ReactNode }) {
     if (player.isPlaying) player.pause();
     else player.play();
   }, [player]);
-  return <View style={{ flex: 1 }} onAccessibilityTap={onMagicTap}>{children}</View>;
+  return (
+    <View
+      style={{ flex: 1 }}
+      onMagicTap={onMagicTap}
+      onAccessibilityTap={onMagicTap}
+    >
+      {children}
+    </View>
+  );
 }
 
 export default function RootLayout() {
@@ -278,17 +283,20 @@ export default function RootLayout() {
               <ContextualTipProvider>
                 <AuthProvider>
                   <PlayerProvider>
-                    <AuthExpiryHandler />
-                    <AppServices />
-                    <ThemedStatusBar />
-                    <MagicTapWrapper>
-                      <AppLoader>
-                        <Stack screenOptions={{ headerShown: false }}>
-                          <Stack.Screen name="player" options={{ presentation: 'modal' }} />
-                        </Stack>
-                        <MiniPlayer />
-                      </AppLoader>
-                    </MagicTapWrapper>
+                    <GuidedExperienceProvider>
+                      <AuthExpiryHandler />
+                      <AppServices />
+                      <ThemedStatusBar />
+                      <MagicTapWrapper>
+                        <AppLoader>
+                          <Stack screenOptions={{ headerShown: false }}>
+                            <Stack.Screen name="player" options={{ presentation: 'modal' }} />
+                          </Stack>
+                          <MiniPlayer />
+                          <GuidedExperienceResumePrompt />
+                        </AppLoader>
+                      </MagicTapWrapper>
+                    </GuidedExperienceProvider>
                   </PlayerProvider>
                 </AuthProvider>
               </ContextualTipProvider>

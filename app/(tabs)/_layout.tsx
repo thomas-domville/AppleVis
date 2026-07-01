@@ -138,7 +138,17 @@ function ThemedTabs() {
       <Tabs.Screen name="discover" options={{ title: 'Discover' }} />
       <Tabs.Screen name="foryou"   options={{ title: 'For You', tabBarBadge: queueBadge }} />
 
-      {/* ── Legacy tabs — hidden from tab bar, still navigable ── */}
+      {/*
+        ── DEPRECATED — hidden from tab bar, still navigable ──
+        As of the 2026-07-01 legacy route migration, no in-app code (Profile,
+        notifications, universal links, submission success) routes here anymore —
+        see src/navigation/routeResolver.ts for the current replacements
+        (/forums-browse, /podcast-browse, /app-browse, /guide-browse).
+        Kept only as a compatibility net for one release in case an external
+        deep link still targets these paths. Do not add new references to them.
+        Candidate for conversion to redirect shims, then removal, in a future
+        release once confirmed unused (see Temp/phases/PHASE_06_*.md).
+      */}
       <Tabs.Screen name="forums"    options={{ href: null }} />
       <Tabs.Screen name="podcasts"  options={{ href: null }} />
       <Tabs.Screen name="apps"      options={{ href: null }} />

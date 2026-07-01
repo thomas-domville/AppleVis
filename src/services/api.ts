@@ -21,9 +21,10 @@ import type { ForumTopic, ForumReply, ForumTopicDetail, AppListing, AppDetail, A
 const BLOG_CONTENT_TYPE: string | null = 'blog2';
 //
 // Gate 2 — Forum Apple-related filter:
-//   Non-Apple forum TIDs confirmed by developer:
+//   Non-Apple forum TIDs confirmed via live /jsonapi/taxonomy_term/forums probe (2026-06-25):
 //     265 = Windows, 266 = Android, 267 = Smart Home Tech and Gadgets, 269 = Assistive Technology
-//   All other 13 forums are Apple-related. Filter uses NOT IN on drupal_internal__tid.
+//   Full 17-category list: 37,38,42,43,65,118,151,153,188,200,250,254,265,266,267,269,271
+//   All others are Apple-related. Filter uses NOT IN on drupal_internal__tid.
 const FORUM_NON_APPLE_TIDS = [265, 266, 267, 269];
 //
 // Gate 3 — Full-text Search API:
@@ -317,6 +318,7 @@ function mapPodcast(node: JsonApiNode, included: JsonApiNode[] = []): PodcastEpi
     url: a.path?.alias ? `${BASE}${a.path.alias}` : undefined,
     authorName,
     tags: tags.length > 0 ? tags : undefined,
+    commentCount: Number(a.comment_node_podcast?.comment_count ?? 0),
   };
 }
 
@@ -384,8 +386,18 @@ type DirectoryApiListing = Partial<{
   path: string;
   appStoreUrl: string;
   app_store_url: string;
+  price: string;
+  cost: string;
+  field_cost: string;
   lastUpdatedAt: string;
   last_updated_at: string;
+  lastActivityAt: string;
+  last_activity_at: string;
+  lastCommentTimestamp: string | number;
+  last_comment_timestamp: string | number;
+  createdAt: string;
+  created_at: string;
+  created: string;
   changed: string;
   updated: string;
   reviewCount: number;
@@ -394,11 +406,40 @@ type DirectoryApiListing = Partial<{
   comment_count: number;
   iconUrl: string;
   icon_url: string;
+  voiceOverPerformance: string;
+  voice_over_performance: string;
+  field_voiceover: string;
+  buttonLabelling: string;
+  buttonLabeling: string;
+  button_labelling: string;
+  button_labeling: string;
+  field_labelling: string;
+  usabilityNotes: string;
+  usability: string;
+  field_usability: string;
 }>;
+
+function normaliseTimestamp(input: unknown): string | undefined {
+  if (input === null || input === undefined || input === '') return undefined;
+  if (typeof input === 'number' && Number.isFinite(input)) {
+    return new Date(input > 10_000_000_000 ? input : input * 1000).toISOString();
+  }
+  const text = String(input).trim();
+  if (!text) return undefined;
+  if (/^\d+$/.test(text)) {
+    const value = Number(text);
+    if (Number.isFinite(value)) return new Date(value > 10_000_000_000 ? value : value * 1000).toISOString();
+  }
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
 
 function mapDirectoryApiListing(item: DirectoryApiListing, platform: string, category: string): AppListing {
   const url = String(item.url ?? item.path ?? '');
-  const changed = String(item.lastUpdatedAt ?? item.last_updated_at ?? item.changed ?? item.updated ?? new Date().toISOString());
+  const rawChanged = String(item.lastUpdatedAt ?? item.last_updated_at ?? item.changed ?? item.updated ?? new Date().toISOString());
+  const rawSummary = String(item.summary ?? item.body ?? '');
+  const lastActivityAt = normaliseTimestamp(item.lastActivityAt ?? item.last_activity_at ?? item.lastCommentTimestamp ?? item.last_comment_timestamp);
+  const createdAt = normaliseTimestamp(item.createdAt ?? item.created_at ?? item.created);
   return {
     id: String(item.id ?? item.uuid ?? item.nid ?? url),
     name: String(item.name ?? item.title ?? ''),
@@ -406,10 +447,16 @@ function mapDirectoryApiListing(item: DirectoryApiListing, platform: string, cat
     platform: String(item.platform ?? platform),
     category: String(item.category ?? category),
     reviewCount: Number(item.reviewCount ?? item.review_count ?? item.commentCount ?? item.comment_count ?? 0),
-    lastUpdatedAt: changed,
+    lastUpdatedAt: rawChanged.trim(),
+    lastActivityAt,
+    createdAt,
     appStoreUrl: String(item.appStoreUrl ?? item.app_store_url ?? ''),
     iconUrl: item.iconUrl ?? item.icon_url,
-    summary: String(item.summary ?? item.body ?? ''),
+    price: item.price ?? item.cost ?? item.field_cost,
+    voiceOverPerformance: item.voiceOverPerformance ?? item.voice_over_performance ?? item.field_voiceover,
+    buttonLabelling: item.buttonLabelling ?? item.buttonLabeling ?? item.button_labelling ?? item.button_labeling ?? item.field_labelling,
+    usabilityNotes: item.usabilityNotes ?? item.usability ?? item.field_usability,
+    summary: textFromHtml(rawSummary).trim(),
     url: url || undefined,
   };
 }
@@ -506,6 +553,10 @@ function parsePublicSearch(html: string): SearchResult[] {
 
 function mapApp(node: JsonApiNode, included: JsonApiNode[] = []): AppListing {
   const a = node.attributes;
+  const deviceUsed = a.field_device_used;
+  const supportedDevices: string[] = Array.isArray(deviceUsed)
+    ? deviceUsed.map(String).filter(Boolean)
+    : deviceUsed ? [String(deviceUsed)] : [];
   return {
     id: node.id,
     name: a.title ?? '',
@@ -513,7 +564,14 @@ function mapApp(node: JsonApiNode, included: JsonApiNode[] = []): AppListing {
     platform: 'iOS',
     category: relatedTermName(node, included, APP_CATEGORY_RELATIONSHIP_CANDIDATES),
     reviewCount: a.comment_node_ios_app_directory?.comment_count ?? 0,
-    lastUpdatedAt: a.changed ?? '',
+    lastUpdatedAt: (a.changed as string | undefined)?.trim() ?? '',
+    lastActivityAt: normaliseTimestamp(a.comment_node_ios_app_directory?.last_comment_timestamp),
+    createdAt: normaliseTimestamp(a.created),
+    price: (a.field_cost as string | undefined) || undefined,
+    supportedDevices: supportedDevices.length > 0 ? supportedDevices : undefined,
+    voiceOverPerformance: a.field_voiceover ? String(a.field_voiceover) : undefined,
+    buttonLabelling: a.field_labelling ? String(a.field_labelling) : undefined,
+    usabilityNotes: a.field_usability ? String(a.field_usability) : undefined,
     appStoreUrl: a.field_link2?.uri ?? a.field_link3?.uri ?? '',
     summary: a.body?.summary ?? a.body?.value ?? '',
     url: a.path?.alias ? `${BASE}${a.path.alias}` : undefined,
@@ -578,8 +636,6 @@ function mapAppReview(node: JsonApiNode, included: JsonApiNode[] = []): AppRevie
     authorId: uidId ?? undefined,
     body: (a.comment_body?.processed ?? a.comment_body?.value ?? '') as string,
     createdAt: (a.created ?? '') as string,
-    appVersion: (a.field_app_version ?? undefined) as string | undefined,
-    platform: (a.field_platform ?? undefined) as string | undefined,
   };
 }
 
@@ -587,6 +643,11 @@ function mapAppReview(node: JsonApiNode, included: JsonApiNode[] = []): AppRevie
 
 function mapResource(node: JsonApiNode, included: JsonApiNode[] = []): Resource {
   const a = node.attributes;
+  const uidId = (node.relationships?.uid?.data as { id?: string } | undefined)?.id;
+  const userNode = uidId ? included.find((n) => n.id === uidId) : undefined;
+  const authorName = String(
+    userNode?.attributes?.display_name ?? userNode?.attributes?.name ?? a.field_author ?? '',
+  );
   const categoryRefs = (node.relationships?.taxonomy_vocabulary_3?.data as { id: string }[] | undefined) ?? [];
   const categories = categoryRefs
     .map((ref) => included.find((n) => n.id === ref.id))
@@ -601,6 +662,8 @@ function mapResource(node: JsonApiNode, included: JsonApiNode[] = []): Resource 
     id: node.id,
     title: a.title ?? '',
     kind: 'guide',
+    authorName: authorName || undefined,
+    authorId: uidId ?? undefined,
     categories,
     summary: a.body?.summary ?? a.body?.value ?? '',
     createdAt: (a.created as string | undefined) ?? undefined,
@@ -947,26 +1010,19 @@ export const api = {
       };
     },
 
-    // Fetch the live tag vocabulary by sampling 50 episodes and collecting unique tags.
-    // Falls back gracefully — callers use FALLBACK_PODCAST_TAGS if this returns empty.
+    // Fetch the live podcast tag vocabulary. Confirmed endpoint: /api/v1/podcast/categories.
+    // Returns [{ tid: "108", name: "Accessories", count: "39" }] — confirmed 2026-06-25.
     async tagVocabulary(): Promise<{ ok: true; data: PodcastTag[] } | { ok: false; error: string }> {
-      const res = await jsonApi<JsonApiCollection>(
-        `/node/podcast?sort=-created&page[limit]=50&include=taxonomy_vocabulary_15&fields[node--podcast]=id`,
-      );
+      const res = await drupalRest<Array<{ tid: string; name: string; count?: string }>>('/api/v1/podcast/categories');
       if (!res.ok) return res;
-      const tagMap = new Map<number, string>();
-      for (const term of (res.data.included ?? [])) {
-        if (!term.type.startsWith('taxonomy_term')) continue;
-        const tid  = Number(term.attributes.drupal_internal__tid ?? 0);
-        const name = String(term.attributes.name ?? '');
-        if (tid && name) tagMap.set(tid, name);
-      }
-      return {
-        ok: true,
-        data: [...tagMap.entries()]
-          .map(([tid, name]) => ({ tid, name }))
-          .sort((a, b) => a.name.localeCompare(b.name)),
-      };
+      const tags: PodcastTag[] = (Array.isArray(res.data) ? res.data : [])
+        .map((raw) => ({
+          tid:   Number(raw.tid),
+          name:  String(raw.name ?? ''),
+          count: raw.count != null ? Number(raw.count) : undefined,
+        }))
+        .filter((t) => t.tid && t.name);
+      return { ok: true, data: tags };
     },
 
     async episode(id: string) {
@@ -1070,17 +1126,20 @@ export const api = {
         ok: true,
         data: (Array.isArray(res.data) ? res.data : [])
           .map((category) => {
-            const rawCount = (category as Record<string, unknown>).count
-              ?? (category as Record<string, unknown>).appCount
-              ?? (category as Record<string, unknown>).app_count;
+            const raw = category as Record<string, unknown>;
+            const name = String(raw.name ?? '');
+            const tid = raw.tid != null ? String(raw.tid) : undefined;
+            const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+            const rawCount = raw.count ?? raw.appCount ?? raw.app_count;
             const count = typeof rawCount === 'number'
               ? rawCount
               : typeof rawCount === 'string' && rawCount.trim()
                 ? Number(rawCount)
                 : undefined;
             return {
-              name: String(category.name ?? ''),
-              slug: String(category.slug ?? ''),
+              name,
+              slug,
+              tid,
               count: typeof count === 'number' && Number.isFinite(count) ? count : undefined,
             };
           })
@@ -1092,7 +1151,8 @@ export const api = {
       | { ok: true; data: PaginatedResult<AppListing> & { probe: AppCategoryProbe } }
       | { ok: false; error: string; attemptedFields: string[]; status?: number }
     > {
-      const path = `/api/v1/apps/${encodeURIComponent(platform)}/categories/${encodeURIComponent(category.slug)}?page=${page}&limit=${limit}`;
+      const categoryId = category.tid ?? category.slug;
+      const path = `/api/v1/apps/${encodeURIComponent(platform)}/categories/${encodeURIComponent(categoryId)}?page=${page + 1}&limit=${limit}`;
       const res = await drupalRest<{ items?: DirectoryApiListing[]; hasMore?: boolean } | DirectoryApiListing[]>(path);
       if (!res.ok) {
         return { ok: false, error: res.error, status: res.status, attemptedFields: ['custom app directory API'] };
@@ -1307,8 +1367,8 @@ export const api = {
     },
 
     // Submit an app review. Bundle confirmed: comment_node_ios_app_directory.
-    // field_app_version and field_platform are written to the same fields mapAppReview reads.
-    async submitReview(appId: string, body: string, csrfToken: string, opts?: { platform?: string; appVersion?: string }) {
+    // Only subject + comment_body exist on this bundle (no field_app_version, no field_platform).
+    async submitReview(appId: string, body: string, csrfToken: string) {
       return jsonApi<{ data: JsonApiNode }>('/comment/comment_node_ios_app_directory', {
         method: 'POST',
         headers: { 'X-CSRF-Token': csrfToken },
@@ -1318,8 +1378,6 @@ export const api = {
             attributes: {
               subject: 'Review',
               comment_body: { value: body, format: 'basic_html' },
-              ...(opts?.appVersion ? { field_app_version: opts.appVersion } : {}),
-              ...(opts?.platform   ? { field_platform:   opts.platform }   : {}),
             },
             relationships: {
               entity_id: { data: { type: 'node--ios_app_directory', id: appId } },
@@ -1392,6 +1450,7 @@ export const api = {
 
       const attributes: Record<string, unknown> = {
         title:            payload.appName,
+        status:           true,
         field_link2:      { uri: payload.appStoreUrl, title: '', options: [] },
         field_version:    payload.appVersion,
         field_cost:       payload.price,
@@ -1458,7 +1517,7 @@ export const api = {
           `&filter[category][condition][operator]=IN${categoryFilter}`
         : '';
       const res = await jsonApi<JsonApiCollection>(
-        `/node/guides?sort=-changed&include=taxonomy_vocabulary_3&${pageParams(page)}${categoryCondition}`,
+        `/node/guides?sort=-changed&include=taxonomy_vocabulary_3,uid&${pageParams(page)}${categoryCondition}`,
       );
       if (!res.ok) return res;
       return {
@@ -1796,6 +1855,17 @@ export const api = {
     // Expose resolveMyUuid publicly so AuthContext can persist the UUID after sign-in.
     resolveUuid: (csrfToken: string) => resolveMyUuid(csrfToken),
 
+    // Returns all Drupal role machine names assigned to this user.
+    // AuthContext checks this against ADMIN_ROLES to set isAdmin.
+    async resolveRoles(uuid: string, csrfToken: string): Promise<string[]> {
+      type UserNode = { data: { relationships?: { roles?: { data?: { id: string }[] } } } };
+      const res = await jsonApi<UserNode>(`/user/user/${uuid}`, {
+        headers: { 'X-CSRF-Token': csrfToken },
+      });
+      if (!res.ok) return [];
+      return (res.data.data.relationships?.roles?.data ?? []).map((r) => r.id);
+    },
+
     async editProfile(csrfToken: string, fields: Record<string, unknown>): Promise<JsonApiResult<undefined>> {
       const uuid = await resolveMyUuid(csrfToken);
       if (!uuid) return { ok: false, error: 'Could not resolve account ID.' };
@@ -1919,10 +1989,20 @@ export const api = {
       nodeId: string,
       csrfToken: string,
     ): Promise<JsonApiResult<undefined>> {
+      return api.content.deleteNode(nodeId, 'forum', csrfToken);
+    },
+
+    // Generic node DELETE — works for any Drupal content type.
+    // nodeType is the JSON:API type suffix: 'forum', 'podcast', 'ios_app_directory', 'guides', 'blog2'
+    async deleteNode(
+      nodeId: string,
+      nodeType: string,
+      csrfToken: string,
+    ): Promise<JsonApiResult<undefined>> {
       const ctrl  = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
       try {
-        const res = await fetch(`${JSONAPI}/node/forum/${nodeId}`, {
+        const res = await fetch(`${JSONAPI}/node/${nodeType}/${nodeId}`, {
           method: 'DELETE',
           headers: { ...COMMON_HEADERS, 'Content-Type': 'application/vnd.api+json', 'X-CSRF-Token': csrfToken },
           signal: ctrl.signal,
@@ -1935,6 +2015,42 @@ export const api = {
       } finally {
         clearTimeout(timer);
       }
+    },
+
+    // Generic node unpublish — sets status: false via PATCH.
+    async unpublishNode(
+      nodeId: string,
+      nodeType: string,
+      csrfToken: string,
+    ): Promise<JsonApiResult<undefined>> {
+      return jsonApi<undefined>(`/node/${nodeType}/${nodeId}`, {
+        method: 'PATCH',
+        headers: { 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({
+          data: { type: `node--${nodeType}`, id: nodeId, attributes: { status: false } },
+        }),
+      });
+    },
+
+    // Generic node edit — PATCH title + body for any Drupal content type.
+    async editNode(
+      nodeId: string,
+      nodeType: string,
+      title: string,
+      body: string,
+      csrfToken: string,
+    ): Promise<JsonApiResult<undefined>> {
+      return jsonApi<undefined>(`/node/${nodeType}/${nodeId}`, {
+        method: 'PATCH',
+        headers: { 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({
+          data: {
+            type:       `node--${nodeType}`,
+            id:          nodeId,
+            attributes: { title, body: { value: body, format: 'basic_html' } },
+          },
+        }),
+      });
     },
   },
 
@@ -2062,6 +2178,7 @@ function mapBug(n: JsonApiNode, platform: 'ios' | 'macos'): BugReport {
     commentCount: Number(a[commentKey]?.comment_count ?? 0),
     createdAt:    String(a.created ?? ''),
     changedAt:    String(a.changed ?? ''),
+    summary:      textFromHtml(String(a.body?.summary ?? a.body?.value ?? a.body?.processed ?? '')).trim() || undefined,
     url:          a.path?.alias ? `${BASE}${a.path.alias}` : `${BASE}/bugs`,
   };
 }

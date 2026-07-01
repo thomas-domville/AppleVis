@@ -116,7 +116,7 @@ export default function QueueScreen() {
                   key={episode.id}
                   onPress={() => navigateToEpisode(episode.id)}
                   accessible
-                  accessibilityRole="none"
+                  accessibilityRole="button"
                   accessibilityLabel={[
                     `${index + 1} of ${queue.length}`,
                     episode.title,

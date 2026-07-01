@@ -1,3 +1,6 @@
+// DEPRECATED (hidden tab, href: null) — kept only as a compatibility net.
+// No in-app code routes here anymore; see src/navigation/routeResolver.ts and
+// app/app-browse.tsx, which is the current replacement.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo, ActivityIndicator, Linking, Pressable,
@@ -16,6 +19,8 @@ import { useRefreshFeedback } from '../../src/hooks/useRefreshFeedback';
 import { useFocusRestore } from '../../src/hooks/useFocusRestore';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
+import { useAlert } from '../../src/contexts/AccessibleAlertContext';
+import { confirmDestructiveAction } from '../../src/utils/confirmDestructiveAction';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
 import {
   donateSiriActivity, readAloud,
@@ -75,6 +80,7 @@ export default function Apps() {
   const list                    = useAppList();
   const saved                   = useSavedItems('appListing');
   const { showToast }           = useToast();
+  const { showAlert }           = useAlert();
   const { aiSummariesEnabled }  = usePreferences();
   const appRefs                 = useRef<Map<string, View>>(new Map());
   const { save: saveFocus }     = useFocusRestore();
@@ -493,10 +499,15 @@ export default function Apps() {
                 {/* Bulk action */}
                 <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 12 }}>
                   <Pressable
-                    onPress={async () => {
-                      for (const item of saved.items) await saved.unsave(item.id).catch(() => {});
-                      showToast('All saved apps removed.', 'success');
-                    }}
+                    onPress={() => confirmDestructiveAction(showAlert, {
+                      title: 'Unsave All?',
+                      message: `This will remove all ${saved.items.length} saved app${saved.items.length === 1 ? '' : 's'} from Saved.`,
+                      confirmLabel: 'Unsave All',
+                      onConfirm: async () => {
+                        for (const item of saved.items) await saved.unsave(item.id).catch(() => {});
+                        showToast('All saved apps removed.', 'success');
+                      },
+                    })}
                     accessible accessibilityRole="button" accessibilityLabel="Unsave all apps"
                     style={{ paddingHorizontal: 12, paddingVertical: 6,
                       backgroundColor: colors.pill, borderRadius: 8 }}>

@@ -10,6 +10,7 @@ import { Screen } from '../../../src/components/Screen';
 import { useTheme } from '../../../src/contexts/ThemeContext';
 import { useToast } from '../../../src/contexts/ToastContext';
 import { useAlert } from '../../../src/contexts/AccessibleAlertContext';
+import { confirmDestructiveAction } from '../../../src/utils/confirmDestructiveAction';
 import { ALERTS } from '../../../src/data/alertMessages';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { EditContentModal } from '../../../src/components/EditContentModal';
@@ -498,22 +499,20 @@ export default function EpisodeComments() {
                   currentUserUuid={auth.user?.uuid}
                   onEdit={(c) => setEditingComment(c)}
                   onDelete={(c) => {
-                    showAlert({
+                    confirmDestructiveAction(showAlert, {
                       title: 'Delete Comment?',
                       message: 'This cannot be undone.',
-                      buttons: [
-                        { label: 'Delete', style: 'destructive', onPress: async () => {
-                          if (!auth.user?.csrfToken) return;
-                          const res = await api.content.deleteComment('comment_node_podcast', c.id, auth.user.csrfToken);
-                          if (res.ok) {
-                            setComments(prev => prev.filter(x => x.id !== c.id));
-                            showToast('Comment deleted.', 'success');
-                          } else {
-                            showToast('Could not delete comment.', 'error');
-                          }
-                        }},
-                        { label: 'Cancel' },
-                      ],
+                      confirmLabel: 'Delete',
+                      onConfirm: async () => {
+                        if (!auth.user?.csrfToken) return;
+                        const res = await api.content.deleteComment('comment_node_podcast', c.id, auth.user.csrfToken);
+                        if (res.ok) {
+                          setComments(prev => prev.filter(x => x.id !== c.id));
+                          showToast('Comment deleted.', 'success');
+                        } else {
+                          showToast('Could not delete comment.', 'error');
+                        }
+                      },
                     });
                   }}
                   onReply={() => {

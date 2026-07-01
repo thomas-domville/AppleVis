@@ -84,7 +84,7 @@ export default function ThemeStep() {
   return (
     <WizardLayout
       step={3}
-      totalSteps={5}
+      totalSteps={6}
       title="Choose your theme"
       description="Pick how AppleVis looks. You can change this any time in Settings → Appearance. The app previews your choice as you select it."
       onNext={() => router.push('/onboarding/announcement')}

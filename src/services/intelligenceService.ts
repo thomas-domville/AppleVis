@@ -21,6 +21,7 @@
 import { Linking } from 'react-native';
 import * as Speech from 'expo-speech';
 import { isAppleIntelligenceAvailable as nativeIsAvailable, runFoundationModel } from '../native/nativeModules';
+import { logDev } from '../utils/logger';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -141,9 +142,7 @@ export function isAppleIntelligenceAvailable(): boolean {
  *   // Register via: INInteraction(intent:, response:).donate()
  */
 export function donateSiriActivity(intent: SiriIntent): void {
-  if (__DEV__) {
-    console.log('[AppleIntelligence] donateSiriActivity — native module not yet built:', intent);
-  }
+  logDev('AppleIntelligence', 'donateSiriActivity — native module not yet built:', intent);
 }
 
 /**
@@ -359,7 +358,5 @@ export async function checkAgainstGuidelinesAI(
  *   CSSearchableIndex.default().indexSearchableItems([searchItem])
  */
 export function indexInSpotlight(_item: SpotlightItem): void {
-  if (__DEV__) {
-    console.log('[AppleIntelligence] indexInSpotlight — native module not yet built:', _item.id);
-  }
+  logDev('AppleIntelligence', 'indexInSpotlight — native module not yet built:', _item.id);
 }

@@ -14,6 +14,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { useAlert } from '../../src/contexts/AccessibleAlertContext';
+import { confirmDestructiveAction } from '../../src/utils/confirmDestructiveAction';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
 import { ALERTS } from '../../src/data/alertMessages';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
@@ -158,6 +159,7 @@ export default function BlogDetailScreen() {
   const [lastSeenAt,            setLastSeenAt]            = useState<string | null>(null);
   const [collapsedComments,     setCollapsedComments]     = useState<Record<string, boolean>>({});
   const [editingComment,        setEditingComment]        = useState<ForumReply | null>(null);
+  const [editingNode,           setEditingNode]           = useState(false);
 
   const scrollRef          = useRef<ScrollView>(null);
   const heroRef            = useRef<Text>(null);
@@ -231,6 +233,54 @@ export default function BlogDetailScreen() {
     if (!blog) return;
     if (isSaved) { saved.unsave(id!); showToast('Removed from saved.', 'success'); }
     else { saved.save({ id: id!, kind: 'blogPost', title: blog.title, savedAt: new Date().toISOString() }); showToast('Blog post saved.', 'success'); }
+  }
+
+  function handleNodeOptions() {
+    if (!blog || !auth.user?.csrfToken) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { title: blog.title, options: ['Cancel', 'Edit Blog Post', 'Unpublish Blog Post', 'Delete Blog Post'],
+          cancelButtonIndex: 0, destructiveButtonIndex: 3 },
+        (index) => {
+          if (index === 1) setEditingNode(true);
+          if (index === 2) handleAdminUnpublish();
+          if (index === 3) handleAdminDelete();
+        },
+      );
+    } else {
+      setEditingNode(true);
+    }
+  }
+
+  function handleAdminDelete() {
+    if (!blog || !auth.user?.csrfToken) return;
+    const token = auth.user.csrfToken;
+    showAlert({
+      title: 'Delete Blog Post',
+      message: `Permanently delete "${blog.title}"? This cannot be undone.`,
+      confirmLabel: 'Delete', cancelLabel: 'Cancel', type: 'error',
+      onConfirm: async () => {
+        const res = await api.content.deleteNode(blog.id, 'blog2', token);
+        if (res.ok) { showToast('Blog post deleted.', 'success'); router.back(); }
+        else showToast('Could not delete. Please try again.', 'error');
+      },
+    });
+  }
+
+  function handleAdminUnpublish() {
+    if (!blog || !auth.user?.csrfToken) return;
+    const token = auth.user.csrfToken;
+    showAlert({
+      title: 'Unpublish Blog Post',
+      message: `"${blog.title}" will be hidden from all users but not deleted.`,
+      confirmLabel: 'Unpublish', cancelLabel: 'Cancel', type: 'warning',
+      onConfirm: async () => {
+        const res = await api.content.unpublishNode(blog.id, 'blog2', token);
+        if (res.ok) { showToast('Blog post unpublished.', 'success'); router.back(); }
+        else showToast('Could not unpublish. Please try again.', 'error');
+      },
+    });
   }
 
   function handleShare() {
@@ -381,16 +431,31 @@ export default function BlogDetailScreen() {
                     />
                   )}
                   <View style={{ padding: 16 }}>
-                    {/* Title — VoiceOver auto-focuses here on load */}
-                    <Text
-                      ref={heroRef}
-                      accessible
-                      accessibilityRole="header"
-                      accessibilityLabel={displayTitle}
-                      style={{ fontSize: 20, fontWeight: '800', color: colors.text, lineHeight: 27, marginBottom: 12 }}
-                    >
-                      {displayTitle}
-                    </Text>
+                    {/* Title row — VoiceOver auto-focuses here on load */}
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
+                      <Text
+                        ref={heroRef}
+                        accessible
+                        accessibilityRole="header"
+                        accessibilityLabel={displayTitle}
+                        style={{ flex: 1, fontSize: 20, fontWeight: '800', color: colors.text, lineHeight: 27 }}
+                      >
+                        {displayTitle}
+                      </Text>
+                      {auth.user?.isAdmin && (
+                        <Pressable
+                          onPress={handleNodeOptions}
+                          accessible
+                          accessibilityRole="button"
+                          accessibilityLabel="Blog post options"
+                          accessibilityHint="Edit, unpublish, or delete this blog post"
+                          style={({ pressed }) => ({ padding: 6, opacity: pressed ? 0.55 : 1, marginTop: 2 })}
+                        >
+                          <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary}
+                            accessibilityElementsHidden />
+                        </Pressable>
+                      )}
+                    </View>
 
                     {/* Author / submitter */}
                     <Pressable
@@ -946,22 +1011,20 @@ export default function BlogDetailScreen() {
                         }
                         if (isOwnComment && buttonIdx === 4) setEditingComment(c);
                         if (isOwnComment && buttonIdx === 5) {
-                          showAlert({
+                          confirmDestructiveAction(showAlert, {
                             title: 'Delete Comment?',
                             message: 'This cannot be undone.',
-                            buttons: [
-                              { label: 'Delete', style: 'destructive', onPress: async () => {
-                                if (!auth.user?.csrfToken) return;
-                                const res = await api.content.deleteComment('comment_node_blog2', c.id, auth.user.csrfToken);
-                                if (res.ok) {
-                                  setComments(prev => prev.filter(x => x.id !== c.id));
-                                  showToast('Comment deleted.', 'success');
-                                } else {
-                                  showToast('Could not delete comment.', 'error');
-                                }
-                              }},
-                              { label: 'Cancel' },
-                            ],
+                            confirmLabel: 'Delete',
+                            onConfirm: async () => {
+                              if (!auth.user?.csrfToken) return;
+                              const res = await api.content.deleteComment('comment_node_blog2', c.id, auth.user.csrfToken);
+                              if (res.ok) {
+                                setComments(prev => prev.filter(x => x.id !== c.id));
+                                showToast('Comment deleted.', 'success');
+                              } else {
+                                showToast('Could not delete comment.', 'error');
+                              }
+                            },
                           });
                         }
                       },
@@ -1142,6 +1205,24 @@ export default function BlogDetailScreen() {
           </View>
         )}
       </View>
+
+      {/* Admin Edit Node Modal */}
+      {editingNode && blog && auth.user?.csrfToken && (
+        <EditContentModal
+          visible={editingNode}
+          onClose={() => setEditingNode(false)}
+          onSaved={(newBody, newTitle) => {
+            setBlog(b => b ? { ...b, body: newBody, title: newTitle ?? b.title } : b);
+            showToast('Blog post updated.', 'success');
+          }}
+          nodeId={blog.id}
+          nodeType="blog2"
+          initialTitle={blog.title}
+          csrfToken={auth.user.csrfToken}
+          initialBody={blog.body}
+          label="Blog Post"
+        />
+      )}
 
       {/* Edit comment modal */}
       {editingComment && auth.user?.csrfToken && (

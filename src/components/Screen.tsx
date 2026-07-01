@@ -60,10 +60,16 @@ export function Screen({
     <SafeAreaView
       style={styles.screen}
       accessibilityLanguage="en"
-      onAccessibilityEscape={goBack}
-      onAccessibilityTap={onMagicTap}
     >
-      <View style={styles.content}>
+      {/* Inner View carries both magic-tap and escape so the handlers fire on any
+          focused descendant — SafeAreaView from react-native-safe-area-context does
+          not always forward these props to the native layer. */}
+      <View
+        style={styles.content}
+        onAccessibilityEscape={goBack}
+        onMagicTap={onMagicTap}
+        onAccessibilityTap={onMagicTap}
+      >
 
         {/* Back button — shown on pushed screens, suppressed on tab root screens */}
         {showBack && router.canGoBack() && (

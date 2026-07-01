@@ -4,7 +4,7 @@ import {
   RefreshControl, ScrollView, Share, Text, View,
 } from 'react-native';
 import { useScrollToTop } from '@react-navigation/native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { relativeTime } from '../../src/utils/relativeTime';
 import { Ionicons } from '@expo/vector-icons';
 import { EmptyState } from '../../src/components/EmptyState';
@@ -12,6 +12,8 @@ import { Screen } from '../../src/components/Screen';
 import { FilterPicker } from '../../src/components/FilterPicker';
 import { AccessibleCard } from '../../src/components/AccessibleCard';
 import { usePlayer } from '../../src/contexts/PlayerContext';
+import { useAlert } from '../../src/contexts/AccessibleAlertContext';
+import { confirmDestructiveAction } from '../../src/utils/confirmDestructiveAction';
 import { useEpisodeMeta } from '../../src/hooks/useEpisodeMeta';
 import { useEpisodeDurations } from '../../src/hooks/useEpisodeDurations';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
@@ -81,6 +83,16 @@ type ForYouTab = typeof FOR_YOU_TABS[number];
 
 type SavedFilter = 'All' | 'Topics' | 'Podcasts' | 'Apps' | 'Guides' | 'Blogs';
 const SAVED_FILTERS: SavedFilter[] = ['All', 'Topics', 'Podcasts', 'Apps', 'Guides', 'Blogs'];
+
+// Maps the content-model kind names used in deep-link params (e.g. from Profile's
+// saved rows) to the UI-level Saved filter labels used by the picker above.
+const SAVED_TYPE_TO_FILTER: Record<string, SavedFilter> = {
+  forumTopic: 'Topics',
+  podcastEpisode: 'Podcasts',
+  appListing: 'Apps',
+  resource: 'Guides',
+  blogPost: 'Blogs',
+};
 
 const KIND_ACCENT_SAVED: Record<SavedItem['kind'], string> = {
   forumTopic:      '#6366f1',
@@ -161,6 +173,7 @@ function QueueSection() {
   const router             = useRouter();
   const { colors, styles } = useTheme();
   const player             = usePlayer();
+  const { showAlert }      = useAlert();
   const cachedDurations    = useEpisodeDurations();
   const enrich             = (ep: PodcastEpisode): PodcastEpisode =>
     cachedDurations[ep.id] ? { ...ep, duration: cachedDurations[ep.id] } : ep;
@@ -245,6 +258,7 @@ function QueueSection() {
           icon="list-outline"
           title="Queue is empty"
           subtitle="Add episodes using the Queue action on any episode card."
+          primaryAction={{ label: 'Browse Podcasts', onPress: () => router.push('/podcast-browse' as any) }}
         />
       ) : (
         <>
@@ -268,11 +282,19 @@ function QueueSection() {
               Up Next ({queue.length})
             </Text>
             <Pressable
-              onPress={player.clearQueue}
+              onPress={() => confirmDestructiveAction(showAlert, {
+                title: 'Clear Queue?',
+                message: 'This will remove all episodes from your queue. Downloaded episodes will not be deleted.',
+                confirmLabel: 'Clear Queue',
+                onConfirm: () => {
+                  player.clearQueue();
+                  AccessibilityInfo.announceForAccessibility('Queue cleared.');
+                },
+              })}
               accessible accessibilityRole="button" accessibilityLabel="Clear entire queue"
               style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.pill }}
             >
-              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.pillText }}>Clear All</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.pillText }}>Clear Queue</Text>
             </Pressable>
           </View>
 
@@ -284,7 +306,7 @@ function QueueSection() {
                 key={episode.id}
                 onPress={() => navigateToEpisode(episode)}
                 accessible
-                accessibilityRole="none"
+                accessibilityRole="button"
                 accessibilityLabel={[
                   `${index + 1} of ${queue.length}`,
                   episode.title,
@@ -353,6 +375,7 @@ function DownloadsSection() {
   const player             = usePlayer();
   const meta               = useEpisodeMeta();
   const { showToast }      = useToast();
+  const { showAlert }      = useAlert();
   const cachedDurations    = useEpisodeDurations();
   const enrich             = (ep: PodcastEpisode): PodcastEpisode =>
     cachedDurations[ep.id] ? { ...ep, duration: cachedDurations[ep.id] } : ep;
@@ -383,6 +406,7 @@ function DownloadsSection() {
         icon="cloud-download-outline"
         title="No downloaded episodes"
         subtitle="Download any episode to listen offline — no internet needed."
+        primaryAction={{ label: 'Browse Podcasts', onPress: () => router.push('/podcast-browse' as any) }}
       />
     );
   }
@@ -416,16 +440,21 @@ function DownloadsSection() {
           </Text>
         </View>
         <Pressable
-          onPress={async () => {
-            await deleteAllDownloads();
-            meta.reload();
-            showToast('All downloads removed.', 'success');
-            AccessibilityInfo.announceForAccessibility('All downloads removed.');
-          }}
+          onPress={() => confirmDestructiveAction(showAlert, {
+            title: 'Remove Downloads?',
+            message: `This will delete all ${downloadedEpisodes.length} downloaded episode${downloadedEpisodes.length === 1 ? '' : 's'} from this device. Queue and Saved items will not be affected.`,
+            confirmLabel: 'Remove Downloads',
+            onConfirm: async () => {
+              await deleteAllDownloads();
+              meta.reload();
+              showToast('All downloads removed.', 'success');
+              AccessibilityInfo.announceForAccessibility('All downloads removed.');
+            },
+          })}
           accessible accessibilityRole="button" accessibilityLabel="Remove all downloads"
           style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.pill, borderRadius: 8 }}
         >
-          <Text style={{ fontSize: 13, color: '#FF3B30', fontWeight: '600' }}>Remove All</Text>
+          <Text style={{ fontSize: 13, color: '#FF3B30', fontWeight: '600' }}>Remove Downloads</Text>
         </Pressable>
       </View>
 
@@ -439,7 +468,7 @@ function DownloadsSection() {
           <View key={episode.id} style={[styles.card, { marginBottom: 10 }]}>
             <Pressable
               onPress={() => navigateToEpisode(episode)}
-              accessible accessibilityRole="none"
+              accessible accessibilityRole="button"
               accessibilityLabel={[
                 episode.title, episode.showTitle,
                 episode.duration > 0 ? formatDuration(episode.duration) : null,
@@ -518,18 +547,19 @@ function DownloadsSection() {
 
 // ─── Saved section ────────────────────────────────────────────────────────────
 
-function SavedSection() {
+function SavedSection({ initialFilter }: { initialFilter?: SavedFilter }) {
   const router             = useRouter();
   const { colors, styles } = useTheme();
   const player             = usePlayer();
   const meta               = useEpisodeMeta();
   const saved              = useSavedItems();
   const { showToast }      = useToast();
+  const { showAlert }      = useAlert();
   const cachedDurations    = useEpisodeDurations();
   const enrich             = (ep: PodcastEpisode): PodcastEpisode =>
     cachedDurations[ep.id] ? { ...ep, duration: cachedDurations[ep.id] } : ep;
 
-  const [kindFilter, setKindFilter] = useState<SavedFilter>('All');
+  const [kindFilter, setKindFilter] = useState<SavedFilter>(initialFilter ?? 'All');
   const sectionCountRef = useRef<Text | null>(null);
 
   // Reload meta when section comes into focus (covers unsave from other screens)
@@ -634,14 +664,19 @@ function SavedSection() {
       {filteredItems.length > 0 && (
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 12 }}>
           <Pressable
-            onPress={async () => {
-              for (const item of filteredItems) await saved.unsave(item.id).catch(() => {});
-              showToast('Removed saved items.', 'success');
-              setTimeout(() => {
-                const handle = findNodeHandle(sectionCountRef.current);
-                if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
-              }, 300);
-            }}
+            onPress={() => confirmDestructiveAction(showAlert, {
+              title: 'Unsave All?',
+              message: `This will remove all ${filteredItems.length} saved ${kindFilter === 'All' ? 'item' : kindFilter.toLowerCase().replace(/s$/, '')}${filteredItems.length === 1 ? '' : 's'} from Saved. This does not delete the original content.`,
+              confirmLabel: 'Unsave All',
+              onConfirm: async () => {
+                for (const item of filteredItems) await saved.unsave(item.id).catch(() => {});
+                showToast('Removed saved items.', 'success');
+                setTimeout(() => {
+                  const handle = findNodeHandle(sectionCountRef.current);
+                  if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+                }, 300);
+              },
+            })}
             accessible accessibilityRole="button"
             accessibilityLabel={`Unsave all ${kindFilter === 'All' ? '' : kindFilter.toLowerCase() + ' '}items`}
             style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.pill, borderRadius: 8 }}
@@ -656,7 +691,21 @@ function SavedSection() {
         <EmptyState
           icon="bookmark-outline"
           title={kindFilter === 'All' ? 'Nothing saved yet' : `No saved ${kindFilter.toLowerCase()}`}
-          subtitle="Save topics, episodes, apps, and guides using the Save action on any card."
+          subtitle={
+            kindFilter === 'All'
+              ? 'Save topics, episodes, apps, and guides using the Save action on any card.'
+              : `You have no saved ${kindFilter.toLowerCase()}. Try a different filter or browse Discover.`
+          }
+          primaryAction={
+            kindFilter !== 'All'
+              ? { label: 'Clear Filter', onPress: () => setKindFilter('All') }
+              : { label: 'Browse Discover', onPress: () => router.push('/(tabs)/discover' as any) }
+          }
+          secondaryAction={
+            kindFilter !== 'All'
+              ? { label: 'Browse Discover', onPress: () => router.push('/(tabs)/discover' as any) }
+              : undefined
+          }
         />
       )}
 
@@ -687,7 +736,7 @@ function SavedSection() {
                       url: episode.url ?? '',
                     },
                   })}
-                  accessible accessibilityRole="none"
+                  accessible accessibilityRole="button"
                   accessibilityLabel={[
                     episode.title, episode.showTitle,
                     episode.duration > 0 ? formatDuration(episode.duration) : null,
@@ -976,6 +1025,7 @@ function FollowingSection() {
           icon="notifications-outline"
           title="Nothing followed yet"
           subtitle="Follow topics, podcast episodes, apps, guides, and blogs to find them here quickly."
+          primaryAction={{ label: 'Browse Community', onPress: () => router.push('/forums-browse' as any) }}
         />
       )}
 
@@ -1043,11 +1093,15 @@ function FollowingSection() {
 }
 
 export default function ForYouScreen() {
+  const { colors } = useTheme();
+  const params = useLocalSearchParams<{ section?: string; savedType?: string }>();
   const [tab, setTab] = useState<ForYouTab>('Queue');
+  const [initialSavedFilter, setInitialSavedFilter] = useState<SavedFilter | undefined>(undefined);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const { showTip } = useTip();
+  const skipNextTabAnnounceRef = useRef(false);
   useScrollToTop(scrollRef);
 
   useFocusEffect(useCallback(() => {
@@ -1057,14 +1111,42 @@ export default function ForYouScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []));
 
+  // Deep link from Profile's saved rows (?section=saved&savedType=forumTopic, etc.) —
+  // select the Saved section and, if a recognized kind was given, its matching filter.
   useEffect(() => {
-    AccessibilityInfo.announceForAccessibility(tab);
+    if (params.section !== 'saved') return;
+    const mappedFilter = params.savedType ? SAVED_TYPE_TO_FILTER[params.savedType] : undefined;
+    skipNextTabAnnounceRef.current = true;
+    setTab('Saved');
+    setInitialSavedFilter(mappedFilter);
+    AccessibilityInfo.announceForAccessibility(
+      mappedFilter ? `Saved ${mappedFilter} selected.` : 'Saved items selected.',
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.section, params.savedType]);
+
+  const TAB_ANNOUNCEMENT: Record<ForYouTab, string> = {
+    Queue: 'Queue selected.',
+    Downloads: 'Downloads selected.',
+    Saved: 'Saved items selected.',
+    Following: 'Following selected.',
+  };
+
+  useEffect(() => {
+    if (skipNextTabAnnounceRef.current) {
+      skipNextTabAnnounceRef.current = false;
+      return;
+    }
+    AccessibilityInfo.announceForAccessibility(TAB_ANNOUNCEMENT[tab]);
   }, [tab]);
 
   function handleRefresh() {
     setRefreshing(true);
     setRefreshKey((k) => k + 1);
-    setTimeout(() => setRefreshing(false), 1200);
+    setTimeout(() => {
+      setRefreshing(false);
+      AccessibilityInfo.announceForAccessibility(`${tab} refreshed.`);
+    }, 1200);
   }
 
   useHandoff({
@@ -1088,6 +1170,14 @@ export default function ForYouScreen() {
           />
         }
       >
+        {/* Orientation text */}
+        <Text
+          style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 12, lineHeight: 18 }}
+          accessibilityElementsHidden
+        >
+          Your personal AppleVis hub. Continue listening, manage downloads, revisit saved items, and keep up with content you follow.
+        </Text>
+
         {/* Section switcher */}
         <FilterPicker
           label="Section"
@@ -1105,7 +1195,10 @@ export default function ForYouScreen() {
         <View key={refreshKey} style={{ marginTop: 0 }}>
           {tab === 'Queue'     && <QueueSection />}
           {tab === 'Downloads' && <DownloadsSection />}
-          {tab === 'Saved'     && <SavedSection />}
+          {/* Only apply the deep-linked filter on first mount — after a manual
+              pull-to-refresh remount, fall back to the normal 'All' default
+              rather than silently re-snapping back to the linked filter. */}
+          {tab === 'Saved'     && <SavedSection initialFilter={refreshKey === 0 ? initialSavedFilter : undefined} />}
           {tab === 'Following' && <FollowingSection />}
         </View>
       </ScrollView>

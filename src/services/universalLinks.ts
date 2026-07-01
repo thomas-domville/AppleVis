@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
+import { routeForContentDestination } from '../navigation/routeResolver';
 
 /**
  * Universal Links handler for applevis.com URLs.
  *
- * Apple associated domains entitlement (already in app.json):
+ * Apple associated domains entitlement (already in app.config.ts):
  *   applinks:www.applevis.com
  *   applinks:applevis.com
  *
@@ -85,9 +86,40 @@ export function handleIncomingUrl(url: string): boolean {
       return true;
     }
 
+    if (action === 'forums') {
+      router.push(routeForContentDestination('forums') as any);
+      return true;
+    }
+
+    // podcasts?action=resume|play|pause|playLatest
+    // Navigating to the browse screen is sufficient: usePodcastPlayer restores the
+    // last episode on launch, and the player bar appears immediately if audio was
+    // previously active. The action param is reserved for future in-tab dispatch.
+    if (action === 'podcasts') {
+      router.push(routeForContentDestination('podcasts') as any);
+      return true;
+    }
+
+    // applevis://saved — Saved / Queue / Downloads live in the For You tab
+    if (action === 'saved') {
+      router.push(routeForContentDestination('saved') as any);
+      return true;
+    }
+
+    // applevis://search?q=VoiceOver tips
+    if (action === 'search') {
+      const q = params.get('q') ?? '';
+      if (q) {
+        router.push({ pathname: '/search', params: { q } });
+      } else {
+        router.push('/search');
+      }
+      return true;
+    }
+
     if (action === 'share') {
-      // Generic share — route to forums; refine per content type in future.
-      router.push('/(tabs)/forums');
+      // Generic share — route to the forum browse screen; refine per content type in future.
+      router.push(routeForContentDestination('forums') as any);
       return true;
     }
 
@@ -101,22 +133,22 @@ export function handleIncomingUrl(url: string): boolean {
   const path = parsed.path;
 
   if (/^\/(forum|node\/\d+|community)/.test(path)) {
-    router.push('/(tabs)/forums');
+    router.push(routeForContentDestination('forums') as any);
     return true;
   }
 
   if (/^\/(accessibility-apps?|app\/)/.test(path)) {
-    router.push('/(tabs)/apps');
+    router.push(routeForContentDestination('apps') as any);
     return true;
   }
 
   if (/^\/(podcast|audio|episode)/.test(path)) {
-    router.push('/(tabs)/podcasts');
+    router.push(routeForContentDestination('podcasts') as any);
     return true;
   }
 
   if (/^\/(resource|guide|tutorial|article|help)/.test(path)) {
-    router.push('/(tabs)/resources');
+    router.push(routeForContentDestination('resources') as any);
     return true;
   }
 

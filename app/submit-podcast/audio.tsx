@@ -1,14 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
-import {
-  AccessibilityInfo, Animated, findNodeHandle,
-  Platform, Pressable, ScrollView, Text, View,
-} from 'react-native';
-import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { AccessibilityInfo, Platform, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { WizardLayout } from '../../src/components/WizardLayout';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { usePodcastWizard, AUDIO_MIME_TYPES, type AudioFileInfo } from '../../src/contexts/PodcastWizardContext';
-import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
+import { useAlert } from '../../src/contexts/AccessibleAlertContext';
 import { sounds } from '../../src/services/sounds';
+
+// ─── Step 2: Attach audio file ────────────────────────────────────────────────
 
 const SUPPORTED_FORMATS = ['MP3', 'AAC / M4A', 'WAV', 'AIFF'];
 
@@ -20,39 +20,18 @@ function formatBytes(bytes: number): string {
 }
 
 export default function PodcastStep2() {
-  const { colors }                            = useTheme();
-  const router                                = useRouter();
-  const { state, update }                     = usePodcastWizard();
-  const { screenReaderEnabled, reduceMotion } = useAccessibilityPreferences();
-
-  const headingRef = useRef<Text>(null);
-  const fadeAnim   = useRef(new Animated.Value(reduceMotion || screenReaderEnabled ? 1 : 0)).current;
+  const { colors }    = useTheme();
+  const { state, update, reset } = usePodcastWizard();
+  const { showAlert } = useAlert();
   const [importing, setImporting] = useState(false);
-
-  useEffect(() => {
-    if (!reduceMotion && !screenReaderEnabled) {
-      Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
-    }
-    if (screenReaderEnabled) {
-      const id = setTimeout(() => {
-        const node = findNodeHandle(headingRef.current);
-        if (node) AccessibilityInfo.setAccessibilityFocus(node);
-      }, 350);
-      return () => clearTimeout(id);
-    }
-  }, []);
 
   const canContinue = !!state.audioFile;
 
   async function handlePickFile() {
     setImporting(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { getDocumentAsync } = await import('expo-document-picker') as any;
-      const result = await getDocumentAsync({
-        type: AUDIO_MIME_TYPES,
-        copyToCacheDirectory: true,
-      });
+      const { getDocumentAsync } = await import('expo-document-picker');
+      const result = await getDocumentAsync({ type: AUDIO_MIME_TYPES, copyToCacheDirectory: true });
       if (result.canceled || !result.assets?.length) return;
       const asset = result.assets[0];
       const fileInfo: AudioFileInfo = {
@@ -73,166 +52,123 @@ export default function PodcastStep2() {
     }
   }
 
-  function handleContinue() {
+  function handleCancel() {
+    showAlert({
+      title: 'Discard this submission?',
+      message: 'Your podcast details will be discarded.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep Editing',
+      type: 'warning',
+      onConfirm: () => {
+        reset();
+        router.replace('/(tabs)/discover' as any);
+      },
+    });
+  }
+
+  function handleNext() {
     sounds.articleOpen().catch(() => {});
     router.push('/submit-podcast/review' as any);
   }
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-      <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: fadeAnim.interpolate({ inputRange: [0,1], outputRange: [16,0] }) }] }}>
-
-        {/* Back */}
-        <Pressable onPress={() => router.back()} accessible accessibilityRole="button" accessibilityLabel="Back to podcast description"
-          style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 20, opacity: pressed ? 0.7 : 1 })}>
-          <Ionicons name="chevron-back" size={18} color={colors.accent} />
-          <Text style={{ fontSize: 15, color: colors.accent, fontWeight: '600' }}>Back</Text>
-        </Pressable>
-
-        {/* Heading */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 8 }}>
-          <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accent, justifyContent: 'center', alignItems: 'center' }} accessibilityElementsHidden>
-            <Ionicons name="musical-notes-outline" size={24} color="#fff" />
+    <WizardLayout
+      step={2}
+      totalSteps={3}
+      title="Attach your audio"
+      description="Upload the audio file for your podcast episode. You can choose from Files, iCloud Drive, or any document provider."
+      onNext={handleNext}
+      nextLabel="Continue to Review"
+      nextDisabled={!canContinue}
+      hideSkip
+      onCancel={handleCancel}
+    >
+      {/* Supported formats */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }} accessibilityElementsHidden>
+        {SUPPORTED_FORMATS.map(fmt => (
+          <View key={fmt} style={{ backgroundColor: `${colors.accent}18`, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: colors.accent }}>{fmt}</Text>
           </View>
-          <Text ref={headingRef} accessibilityRole="header" style={{ fontSize: 24, fontWeight: '800', color: colors.text, flex: 1 }}>
-            Attach your audio
+        ))}
+      </View>
+      <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 24 }}
+        accessibilityLabel="Supported audio formats: MP3, AAC, M4A, WAV, AIFF">
+        Supported formats: {SUPPORTED_FORMATS.join(', ')}
+      </Text>
+
+      {/* File state */}
+      {state.audioFile ? (
+        <View
+          style={{ backgroundColor: `${colors.accent}0F`, borderRadius: 20, borderWidth: 2, borderColor: colors.accent, padding: 20, marginBottom: 20, alignItems: 'center', gap: 12 }}
+          accessible
+          accessibilityLabel={`Audio file selected: ${state.audioFile.name}. Size: ${formatBytes(state.audioFile.size)}.`}
+        >
+          <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.accent, justifyContent: 'center', alignItems: 'center' }} accessibilityElementsHidden>
+            <Ionicons name="checkmark-circle" size={36} color="#fff" />
+          </View>
+          <View style={{ alignItems: 'center' }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, textAlign: 'center' }}>{state.audioFile.name}</Text>
+            <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>{formatBytes(state.audioFile.size)}</Text>
+          </View>
+          <Pressable
+            onPress={() => void handlePickFile()}
+            accessible accessibilityRole="button" accessibilityLabel="Replace audio file"
+            style={({ pressed }) => ({
+              flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12,
+              paddingVertical: 10, paddingHorizontal: 16,
+              borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.card,
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <Ionicons name="refresh-outline" size={16} color={colors.accent} accessibilityElementsHidden />
+            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.accent }}>Replace file</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View
+          style={{ borderRadius: 20, borderWidth: 2, borderColor: colors.border, borderStyle: 'dashed', padding: 32, marginBottom: 20, alignItems: 'center', gap: 14 }}
+          accessible={false}
+        >
+          <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: `${colors.accent}18`, justifyContent: 'center', alignItems: 'center' }} accessibilityElementsHidden>
+            <Ionicons name="folder-open-outline" size={36} color={colors.accent} />
+          </View>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, textAlign: 'center' }}>No file selected</Text>
+          <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20, maxWidth: 260 }}>
+            Tap below to browse your device, iCloud Drive, or any connected storage.
           </Text>
         </View>
-        <Text style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 21, marginBottom: 24 }}>
-          Upload the audio file for your podcast episode. Choose a file from Files, iCloud Drive, or any document provider.
-        </Text>
+      )}
 
-        {/* Supported formats */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }} accessibilityElementsHidden>
-          {SUPPORTED_FORMATS.map(fmt => (
-            <View key={fmt} style={{ backgroundColor: `${colors.accent}18`, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.accent }}>{fmt}</Text>
-            </View>
-          ))}
+      {/* Browse button */}
+      <Pressable
+        onPress={() => void handlePickFile()}
+        disabled={importing}
+        accessible accessibilityRole="button"
+        accessibilityLabel={importing ? 'Opening file picker…' : 'Browse for audio file'}
+        accessibilityState={{ disabled: importing }}
+        style={({ pressed }) => ({
+          backgroundColor: state.audioFile ? colors.card : colors.accent,
+          borderRadius: 16, paddingVertical: 16,
+          alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8,
+          borderWidth: state.audioFile ? 1.5 : 0, borderColor: colors.border,
+          opacity: pressed || importing ? 0.85 : 1, marginBottom: 16,
+        })}
+      >
+        <Ionicons name="document-attach-outline" size={20} color={state.audioFile ? colors.accent : '#fff'} accessibilityElementsHidden />
+        <Text style={{ fontSize: 17, fontWeight: '700', color: state.audioFile ? colors.accent : '#fff' }}>
+          {importing ? 'Opening…' : state.audioFile ? 'Replace file' : 'Browse Files'}
+        </Text>
+      </Pressable>
+
+      {/* iOS share tip */}
+      {Platform.OS === 'ios' && (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+          <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} style={{ marginTop: 1 }} accessibilityElementsHidden />
+          <Text style={{ flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 19 }}>
+            You can also share an audio file to AppleVis from the Files app using the Share menu.
+          </Text>
         </View>
-        <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 24 }} accessibilityLabel="Supported audio formats: MP3, AAC, M4A, WAV, AIFF">
-          Supported formats: {SUPPORTED_FORMATS.join(', ')}
-        </Text>
-
-        {/* File picker area */}
-        {state.audioFile ? (
-          /* File selected state */
-          <View
-            style={{
-              backgroundColor: `${colors.accent}0F`, borderRadius: 20,
-              borderWidth: 2, borderColor: colors.accent, borderStyle: 'solid',
-              padding: 20, marginBottom: 20, alignItems: 'center', gap: 12,
-            }}
-            accessible
-            accessibilityLabel={`Audio file selected: ${state.audioFile.name}. Size: ${formatBytes(state.audioFile.size)}.`}
-          >
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.accent, justifyContent: 'center', alignItems: 'center' }} accessibilityElementsHidden>
-              <Ionicons name="checkmark-circle" size={36} color="#fff" />
-            </View>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
-                {state.audioFile.name}
-              </Text>
-              <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
-                {formatBytes(state.audioFile.size)}
-              </Text>
-            </View>
-            <Pressable
-              onPress={() => void handlePickFile()}
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel="Replace audio file"
-              style={({ pressed }) => ({
-                flexDirection: 'row', alignItems: 'center', gap: 6,
-                borderRadius: 12, paddingVertical: 10, paddingHorizontal: 16,
-                borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.card,
-                opacity: pressed ? 0.8 : 1,
-              })}
-            >
-              <Ionicons name="refresh-outline" size={16} color={colors.accent} accessibilityElementsHidden />
-              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.accent }}>Replace file</Text>
-            </Pressable>
-          </View>
-        ) : (
-          /* Empty state */
-          <View
-            style={{
-              borderRadius: 20, borderWidth: 2, borderColor: colors.border, borderStyle: 'dashed',
-              padding: 32, marginBottom: 20, alignItems: 'center', gap: 14,
-            }}
-            accessible={false}
-          >
-            <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: `${colors.accent}18`, justifyContent: 'center', alignItems: 'center' }} accessibilityElementsHidden>
-              <Ionicons name="folder-open-outline" size={36} color={colors.accent} />
-            </View>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
-              No file selected
-            </Text>
-            <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20, maxWidth: 260 }}>
-              Tap below to browse your device, iCloud Drive, or any connected storage.
-            </Text>
-          </View>
-        )}
-
-        {/* Pick file button */}
-        <Pressable
-          onPress={() => void handlePickFile()}
-          disabled={importing}
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel={importing ? 'Opening file picker…' : 'Browse for audio file'}
-          accessibilityState={{ disabled: importing }}
-          style={({ pressed }) => ({
-            backgroundColor: state.audioFile ? colors.card : colors.accent,
-            borderRadius: 16, paddingVertical: 16,
-            alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8,
-            borderWidth: state.audioFile ? 1.5 : 0, borderColor: colors.border,
-            opacity: pressed || importing ? 0.85 : 1, marginBottom: 20,
-          })}
-        >
-          <Ionicons
-            name="document-attach-outline"
-            size={20}
-            color={state.audioFile ? colors.accent : '#fff'}
-            accessibilityElementsHidden
-          />
-          <Text style={{ fontSize: 17, fontWeight: '700', color: state.audioFile ? colors.accent : '#fff' }}>
-            {importing ? 'Opening…' : state.audioFile ? 'Replace file' : 'Browse Files'}
-          </Text>
-        </Pressable>
-
-        {/* iOS note */}
-        {Platform.OS === 'ios' && (
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 24 }}>
-            <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} style={{ marginTop: 1 }} accessibilityElementsHidden />
-            <Text style={{ flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 19 }}>
-              You can also share an audio file to AppleVis from the Files app using the Share menu.
-            </Text>
-          </View>
-        )}
-
-        {/* Continue */}
-        <Pressable
-          onPress={handleContinue}
-          disabled={!canContinue}
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel={canContinue ? 'Continue to review and submit' : 'Continue — select an audio file to proceed'}
-          accessibilityState={{ disabled: !canContinue }}
-          style={({ pressed }) => ({
-            backgroundColor: canContinue ? colors.accent : colors.border,
-            borderRadius: 16, paddingVertical: 16,
-            alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8,
-            opacity: pressed ? 0.85 : 1,
-          })}
-        >
-          <Text style={{ fontSize: 17, fontWeight: '700', color: canContinue ? '#fff' : colors.textSecondary }}>
-            Continue
-          </Text>
-          <Ionicons name="arrow-forward" size={18} color={canContinue ? '#fff' : colors.textSecondary} accessibilityElementsHidden />
-        </Pressable>
-
-      </Animated.View>
-    </ScrollView>
+      )}
+    </WizardLayout>
   );
 }

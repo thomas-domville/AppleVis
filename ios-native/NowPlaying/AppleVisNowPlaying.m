@@ -13,15 +13,18 @@ RCT_EXTERN_METHOD(
   position:(double)position
   speed:(double)speed
   isPlaying:(BOOL)isPlaying
-  artworkData:(NSData *)artworkData
+  artworkURLString:(NSString *)artworkURLString
 )
 
 RCT_EXTERN_METHOD(
   setupRemoteCommands:(RCTResponseSenderBlock)onPlay
   onPause:(RCTResponseSenderBlock)onPause
+  onTogglePlayPause:(RCTResponseSenderBlock)onTogglePlayPause
   onSkipBackward:(RCTResponseSenderBlock)onSkipBackward
   onSkipForward:(RCTResponseSenderBlock)onSkipForward
   onSeek:(RCTResponseSenderBlock)onSeek
+  onNextTrack:(RCTResponseSenderBlock)onNextTrack
+  onPreviousTrack:(RCTResponseSenderBlock)onPreviousTrack
   skipBackInterval:(double)skipBackInterval
   skipForwardInterval:(double)skipForwardInterval
 )

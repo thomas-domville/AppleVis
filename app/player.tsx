@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AccessibilityInfo, Image, Pressable, Text, View } from 'react-native';
+import { AccessibilityInfo, ActionSheetIOS, Image, Platform, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { usePlayer } from '../src/contexts/PlayerContext';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { useTip, TIP_KEYS, TIPS } from '../src/contexts/ContextualTipContext';
 import { SPEED_OPTIONS } from '../src/hooks/usePodcastPlayer';
+
+const SLEEP_TIMER_OPTIONS = [5, 15, 30, 45, 60];
 
 function formatTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -49,12 +52,45 @@ export default function PlayerScreen() {
   function seekToX(locationX: number) {
     if (barWidth <= 0 || player.duration <= 0) return;
     const ratio = Math.max(0, Math.min(1, locationX / barWidth));
-    player.seekTo(ratio * player.duration);
+    const target = ratio * player.duration;
+    player.seekTo(target);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    AccessibilityInfo.announceForAccessibility(`Seeked to ${formatTime(target)}.`);
+  }
+
+  function handleSleepTimerPress() {
+    if (Platform.OS !== 'ios') return;
+    const isActive = player.sleepTimerRemaining !== null;
+    const durationOptions = SLEEP_TIMER_OPTIONS.map((m) => `${m} minutes`);
+    const options = isActive
+      ? ['Cancel Sleep Timer', ...durationOptions, 'Dismiss']
+      : [...durationOptions, 'Dismiss'];
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options,
+        cancelButtonIndex: options.length - 1,
+        destructiveButtonIndex: isActive ? 0 : undefined,
+      },
+      (index) => {
+        if (isActive && index === 0) {
+          player.cancelSleepTimer();
+          AccessibilityInfo.announceForAccessibility('Sleep timer cancelled.');
+          return;
+        }
+        const durationIndex = isActive ? index - 1 : index;
+        if (durationIndex >= 0 && durationIndex < SLEEP_TIMER_OPTIONS.length) {
+          const minutes = SLEEP_TIMER_OPTIONS[durationIndex];
+          player.startSleepTimer(minutes);
+          AccessibilityInfo.announceForAccessibility(`Sleep timer set for ${minutes} minutes.`);
+        }
+      },
+    );
   }
 
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.background }}
+      onMagicTap={onMagicTap}
       onAccessibilityTap={onMagicTap}
       onAccessibilityEscape={() => router.back()}
     >
@@ -240,21 +276,28 @@ export default function PlayerScreen() {
           </Text>
         </Pressable>
 
-        {player.sleepTimerRemaining !== null && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+        <Pressable
+          onPress={handleSleepTimerPress}
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={player.sleepTimerRemaining !== null
+            ? `Sleep timer: ${formatTime(player.sleepTimerRemaining)} remaining`
+            : 'Sleep timer: off'}
+          accessibilityHint="Double tap to set or change the sleep timer."
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
             backgroundColor: colors.pill, borderRadius: 20,
-            paddingHorizontal: 14, paddingVertical: 8 }}>
-            <Ionicons name="moon-outline" size={14} color={colors.textSecondary}
-              accessibilityElementsHidden />
-            <Text
-              style={{ fontSize: 13, color: colors.textSecondary }}
-              accessible
-              accessibilityLabel={`Sleep timer: ${formatTime(player.sleepTimerRemaining)} remaining`}
-            >
-              {formatTime(player.sleepTimerRemaining)}
-            </Text>
-          </View>
-        )}
+            paddingHorizontal: 14, paddingVertical: 8 }}
+        >
+          <Ionicons
+            name={player.sleepTimerRemaining !== null ? 'moon' : 'moon-outline'}
+            size={14}
+            color={player.sleepTimerRemaining !== null ? colors.accent : colors.textSecondary}
+            accessibilityElementsHidden
+          />
+          <Text style={{ fontSize: 13, color: player.sleepTimerRemaining !== null ? colors.accent : colors.textSecondary }}>
+            {player.sleepTimerRemaining !== null ? formatTime(player.sleepTimerRemaining) : 'Sleep'}
+          </Text>
+        </Pressable>
       </View>
 
     </SafeAreaView>

@@ -1,7 +1,8 @@
 // Siri App Intents for AppleVis.
 // Registers voice phrases so users can say things like:
 //   "Hey Siri, open AppleVis Forums"
-//   "Hey Siri, play the latest AppleVis podcast"
+//   "Hey Siri, resume my AppleVis podcast"
+//   "Hey Siri, search AppleVis for VoiceOver tips"
 //   "Hey Siri, show unread AppleVis topics"
 //
 // AppIntents are discovered automatically by the system — no bridge or JS call needed.
@@ -19,7 +20,6 @@ struct OpenAppleVisForumsIntent: AppIntent {
   static var openAppWhenRun: Bool = true
 
   func perform() async throws -> some IntentResult {
-    // The app opens via openAppWhenRun; the URL scheme navigates to the right tab.
     await UIApplication.shared.open(URL(string: "applevis://forums")!)
     return .result()
   }
@@ -47,6 +47,40 @@ struct PlayLatestPodcastIntent: AppIntent {
 
   func perform() async throws -> some IntentResult {
     await UIApplication.shared.open(URL(string: "applevis://podcasts?action=playLatest")!)
+    return .result()
+  }
+}
+
+// MARK: - Resume Podcast (continue last-played episode)
+
+struct ResumeAppleVisPodcastIntent: AppIntent {
+  static var title: LocalizedStringResource = "Resume AppleVis Podcast"
+  static var description = IntentDescription(
+    "Resumes the last-played AppleVis podcast episode from where you left off."
+  )
+  static var openAppWhenRun: Bool = true
+
+  func perform() async throws -> some IntentResult {
+    await UIApplication.shared.open(URL(string: "applevis://podcasts?action=resume")!)
+    return .result()
+  }
+}
+
+// MARK: - Search AppleVis (parameterised)
+
+struct SearchAppleVisIntent: AppIntent {
+  static var title: LocalizedStringResource = "Search AppleVis"
+  static var description = IntentDescription(
+    "Searches AppleVis for forum topics, apps, podcast episodes, or guides."
+  )
+  static var openAppWhenRun: Bool = true
+
+  @Parameter(title: "Search Query", description: "What to search for on AppleVis.")
+  var query: String
+
+  func perform() async throws -> some IntentResult {
+    let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+    await UIApplication.shared.open(URL(string: "applevis://search?q=\(encoded)")!)
     return .result()
   }
 }
@@ -89,6 +123,16 @@ struct AppleVisShortcuts: AppShortcutsProvider {
       systemImageName: "envelope.badge.fill"
     )
     AppShortcut(
+      intent: ResumeAppleVisPodcastIntent(),
+      phrases: [
+        "Resume my \(.applicationName) podcast",
+        "Continue \(.applicationName) podcast",
+        "Keep playing \(.applicationName)",
+      ],
+      shortTitle: "Resume Podcast",
+      systemImageName: "play.circle.fill"
+    )
+    AppShortcut(
       intent: PlayLatestPodcastIntent(),
       phrases: [
         "Play the latest \(.applicationName) podcast",
@@ -99,10 +143,21 @@ struct AppleVisShortcuts: AppShortcutsProvider {
       systemImageName: "radio.fill"
     )
     AppShortcut(
+      intent: SearchAppleVisIntent(),
+      phrases: [
+        "Search \(.applicationName) for \(\.$query)",
+        "Find \(\.$query) on \(.applicationName)",
+        "Look up \(\.$query) on \(.applicationName)",
+      ],
+      shortTitle: "Search AppleVis",
+      systemImageName: "magnifyingglass"
+    )
+    AppShortcut(
       intent: OpenSavedItemsIntent(),
       phrases: [
         "Open my \(.applicationName) saved items",
         "Show \(.applicationName) saved",
+        "My \(.applicationName) bookmarks",
       ],
       shortTitle: "Saved Items",
       systemImageName: "bookmark.fill"

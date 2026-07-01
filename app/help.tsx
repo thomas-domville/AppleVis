@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../src/components/Screen';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { useFocusRestore } from '../src/hooks/useFocusRestore';
-import { HELP_SECTIONS } from '../src/data/helpContent';
+import { HELP_SECTIONS, HELP_CONTENT_TYPE_META } from '../src/data/helpContent';
 
 export default function HelpScreen() {
   const router = useRouter();
@@ -16,7 +16,7 @@ export default function HelpScreen() {
   const [query, setQuery] = useState('');
 
   const articleCount = HELP_SECTIONS.reduce((total, section) => total + section.articles.length, 0);
-  const helpSummary = `${HELP_SECTIONS.length} help sections and ${articleCount} articles. Includes getting started, tutorials, accessibility, Home and Discover, community posting, apps, podcasts, settings, smart features, troubleshooting, and support.`;
+  const helpSummary = `${HELP_SECTIONS.length} help sections and ${articleCount} articles. Includes getting started, tutorials, accessibility, Home and Discover, For You and Search, community posting, apps, podcasts, settings, smart features, troubleshooting, and support.`;
   const filteredSections = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return HELP_SECTIONS;
@@ -180,7 +180,7 @@ export default function HelpScreen() {
                 }}
                 accessible
                 accessibilityRole="button"
-                accessibilityLabel={`${article.title}. ${article.summary}`}
+                accessibilityLabel={`${article.title}. ${article.contentType ? HELP_CONTENT_TYPE_META[article.contentType].label + '. ' : ''}${article.summary}`}
                 accessibilityHint="Opens this help article."
                 style={({ pressed }) => [
                   styles.cardSmall,
@@ -190,7 +190,19 @@ export default function HelpScreen() {
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.cardTitle, { fontSize: 16, marginBottom: 2 }]}>{article.title}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                      <Text style={[styles.cardTitle, { fontSize: 16 }]}>{article.title}</Text>
+                      {article.contentType && (
+                        <View
+                          accessibilityElementsHidden
+                          style={{ borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: colors.pill }}
+                        >
+                          <Text style={{ color: colors.accent, fontSize: 10, fontWeight: '800' }}>
+                            {HELP_CONTENT_TYPE_META[article.contentType].label}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={[styles.cardMeta, { fontSize: 13, lineHeight: 18 }]}>{article.summary}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} accessibilityElementsHidden />

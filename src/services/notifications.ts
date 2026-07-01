@@ -3,10 +3,11 @@ import { Platform } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import { persistence } from './persistence';
+import { routeForContentDestination } from '../navigation/routeResolver';
 import type { NotificationSound } from '../contexts/PreferencesContext';
 
 // Maps the in-app sound preference key to the .wav filename bundled in the iOS build.
-// These filenames must match what is listed under expo-notifications.sounds in app.json.
+// These filenames must match what is listed under expo-notifications.sounds in app.config.ts.
 export const NOTIFICATION_SOUND_FILE: Record<NotificationSound, string> = {
   mouseSqueak:         'Mouse Squeak.wav',
   appleCrunch:         'Apple Crunch.wav',
@@ -100,7 +101,7 @@ export async function getExpoPushToken(): Promise<string | null> {
     const { status } = await Notifications.getPermissionsAsync();
     if (status !== 'granted') return null;
     if (!EAS_PROJECT_ID) {
-      if (__DEV__) console.warn('[Notifications] expo.extra.eas.projectId not set in app.json — push tokens unavailable.');
+      if (__DEV__) console.warn('[Notifications] expo.extra.eas.projectId not set in app.config.ts — push tokens unavailable.');
       return null;
     }
     const token = await Notifications.getExpoPushTokenAsync({ projectId: EAS_PROJECT_ID });
@@ -126,6 +127,10 @@ export function handleNotificationResponse(response: Notifications.NotificationR
   // LATER: user deferred — no navigation needed.
   if (actionId === 'LATER') return;
 
+  // Fallbacks below intentionally avoid the hidden legacy tabs (/(tabs)/forums,
+  // /(tabs)/podcasts, /(tabs)/apps, /(tabs)/resources) — item-specific routes are
+  // used whenever an ID is present; otherwise navigation lands on the current
+  // browse/Discover routes instead. See routeResolver.ts.
   if (
     category === 'forumReply' || category === 'mention' ||
     category === 'newTopic'   || category === 'followedTopic'
@@ -133,21 +138,22 @@ export function handleNotificationResponse(response: Notifications.NotificationR
     const shouldNav = isDefault || actionId === 'VIEW_POST' || actionId === 'OPEN'
                                 || actionId === 'VIEW_REPLY' || actionId === 'REPLY';
     if (shouldNav) {
-      router.push(data.topicId ? (`/topic/${data.topicId}` as any) : '/(tabs)/forums');
+      router.push(data.topicId ? (`/topic/${data.topicId}` as any) : routeForContentDestination('forums') as any);
     }
   } else if (category === 'newEpisode') {
     if (isDefault || actionId === 'PLAY' || actionId === 'DOWNLOAD') {
-      router.push(data.episodeId ? (`/episode/${data.episodeId}` as any) : '/(tabs)/podcasts');
+      router.push(data.episodeId ? (`/episode/${data.episodeId}` as any) : routeForContentDestination('podcasts') as any);
     }
   } else if (category === 'appUpdate') {
     if (isDefault || actionId === 'VIEW_APP') {
-      router.push(data.appId ? (`/app-detail/${data.appId}` as any) : '/(tabs)/apps');
+      router.push(data.appId ? (`/app-detail/${data.appId}` as any) : routeForContentDestination('apps') as any);
     }
   } else if (category === 'newResource' || category === 'announcement') {
     if (isDefault || actionId === 'READ' || actionId === 'VIEW') {
       if (data.blogId)           router.push(`/blog-detail/${data.blogId}` as any);
       else if (data.resourceId)  router.push(`/resource-detail/${data.resourceId}` as any);
-      else                       router.push('/(tabs)/resources');
+      else if (category === 'newResource') router.push(routeForContentDestination('resources') as any);
+      else                       router.push(routeForContentDestination('discover') as any);
     }
   }
 }

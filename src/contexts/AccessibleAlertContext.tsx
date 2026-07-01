@@ -25,6 +25,14 @@ import { sounds } from '../services/sounds';
 
 export type AlertType = 'info' | 'success' | 'warning' | 'error';
 
+export type AlertButtonStyle = 'default' | 'cancel' | 'destructive';
+
+export type AlertButton = {
+  label: string;
+  style?: AlertButtonStyle;
+  onPress?: () => void;
+};
+
 export type AlertOptions = {
   title: string;
   message: string;
@@ -33,6 +41,7 @@ export type AlertOptions = {
   onConfirm?: () => void;
   onCancel?: () => void;
   type?: AlertType;
+  buttons?: AlertButton[];
 };
 
 type AlertContextValue = {
@@ -56,6 +65,8 @@ type TypeConfig = {
   confirmBg: string;
   haptic: () => void;
 };
+
+const DESTRUCTIVE_COLOR = '#B91C1C';
 
 const TYPE_CONFIG: Record<AlertType, TypeConfig> = {
   info: {
@@ -110,9 +121,24 @@ function AlertModal({
     onConfirm,
     onCancel,
     type = 'info',
+    buttons,
   } = options;
 
   const { icon, iconColor, bgColor, confirmBg } = TYPE_CONFIG[type];
+
+  // Buttons array takes priority; otherwise fall back to the legacy confirm/cancel pair.
+  const resolvedButtons: AlertButton[] = buttons?.length
+    ? buttons
+    : [
+        ...(cancelLabel ? [{ label: cancelLabel, style: 'cancel' as const, onPress: onCancel }] : []),
+        { label: confirmLabel, style: type === 'error' ? 'destructive' as const : 'default' as const, onPress: onConfirm },
+      ];
+
+  // The last non-destructive button reads as the "safe" choice for escape gestures,
+  // matching the previous cancel/backdrop/back-button behavior.
+  const escapeButton =
+    resolvedButtons.find((b) => b.style === 'cancel') ??
+    resolvedButtons[resolvedButtons.length - 1];
 
   function handleShow() {
     Animated.parallel([
@@ -131,14 +157,24 @@ function AlertModal({
     }, 400);
   }
 
-  function handleConfirm() {
+  function handlePress(button: AlertButton) {
     onDismiss();
-    onConfirm?.();
+    button.onPress?.();
   }
 
-  function handleCancel() {
-    onDismiss();
-    onCancel?.();
+  function handleEscape() {
+    handlePress(escapeButton);
+  }
+
+  function getButtonVisual(button: AlertButton, index: number) {
+    if (button.style === 'destructive') {
+      return { backgroundColor: DESTRUCTIVE_COLOR, textColor: '#FFFFFF', bordered: false };
+    }
+    const isLast = index === resolvedButtons.length - 1;
+    if (button.style === 'cancel' || (isLast && resolvedButtons.length > 1)) {
+      return { backgroundColor: undefined, textColor: colors.text, bordered: true };
+    }
+    return { backgroundColor: confirmBg, textColor: '#FFFFFF', bordered: false };
   }
 
   return (
@@ -147,12 +183,12 @@ function AlertModal({
       transparent
       animationType="none"
       onShow={handleShow}
-      onRequestClose={handleCancel}
+      onRequestClose={handleEscape}
     >
-      {/* Semi-transparent backdrop — tapping it dismisses (same as cancel) */}
+      {/* Semi-transparent backdrop — tapping it dismisses (same as escape) */}
       <Pressable
         style={styles.backdrop}
-        onPress={cancelLabel ? handleCancel : handleConfirm}
+        onPress={handleEscape}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       />
@@ -169,7 +205,7 @@ function AlertModal({
             },
           ]}
           accessibilityViewIsModal
-          onAccessibilityEscape={handleCancel}
+          onAccessibilityEscape={handleEscape}
         >
           {/* Icon circle */}
           <View style={[styles.iconCircle, { backgroundColor: bgColor }]}>
@@ -200,36 +236,39 @@ function AlertModal({
             {message}
           </Text>
 
-          {/* Buttons */}
-          <View style={[styles.buttonRow, cancelLabel ? {} : { justifyContent: 'center' }]}>
-            {cancelLabel && (
-              <Pressable
-                onPress={handleCancel}
-                accessible
-                accessibilityRole="button"
-                accessibilityLabel={cancelLabel}
-                style={[styles.button, styles.buttonSecondary, { borderColor: colors.border }]}
-              >
-                <Text style={[styles.buttonText, { color: colors.text }]}>
-                  {cancelLabel}
-                </Text>
-              </Pressable>
-            )}
-            <Pressable
-              onPress={handleConfirm}
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel={confirmLabel}
-              style={[
-                styles.button,
-                styles.buttonPrimary,
-                { backgroundColor: confirmBg, flex: cancelLabel ? 1 : undefined, minWidth: cancelLabel ? undefined : 180 },
-              ]}
-            >
-              <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>
-                {confirmLabel}
-              </Text>
-            </Pressable>
+          {/* Buttons — row for 1-2, stacked for 3+ so labels stay readable */}
+          <View style={[
+            styles.buttonRow,
+            resolvedButtons.length === 1 ? { justifyContent: 'center' } : {},
+            resolvedButtons.length > 2 ? { flexDirection: 'column' } : {},
+          ]}>
+            {resolvedButtons.map((button, i) => {
+              const visual = getButtonVisual(button, i);
+              return (
+                <Pressable
+                  key={`${button.label}-${i}`}
+                  onPress={() => handlePress(button)}
+                  accessible
+                  accessibilityRole="button"
+                  accessibilityLabel={button.style === 'destructive' ? `${button.label}, destructive action` : button.label}
+                  style={[
+                    styles.button,
+                    visual.bordered ? styles.buttonSecondary : styles.buttonPrimary,
+                    {
+                      backgroundColor: visual.backgroundColor,
+                      borderColor: visual.bordered ? colors.border : undefined,
+                      flex: resolvedButtons.length === 1 || resolvedButtons.length > 2 ? undefined : 1,
+                      minWidth: resolvedButtons.length === 1 ? 180 : undefined,
+                      width: resolvedButtons.length > 2 ? '100%' : undefined,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.buttonText, { color: visual.textColor }]}>
+                    {button.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </Animated.View>
       </View>

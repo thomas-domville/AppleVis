@@ -467,6 +467,7 @@ export default function ForumsBrowse() {
               save(topicRefs.current.get(topic.id) ?? null);
               router.push({ pathname: '/topic/[id]' as any, params: { id: topic.id, title: topic.title } });
             }}
+            onItemDeleted={() => forum.refresh()}
           />
         ))}
 

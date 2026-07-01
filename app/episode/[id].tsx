@@ -9,6 +9,7 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Screen } from '../../src/components/Screen';
+import { EditContentModal } from '../../src/components/EditContentModal';
 import { usePlayer } from '../../src/contexts/PlayerContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
@@ -882,6 +883,9 @@ export default function EpisodeDetail() {
   // ── Download state ───────────────────────────────────────────────────────
   const [downloadState, setDownloadState] = useState<DownloadState>('idle');
 
+  // ── Admin edit state ────────────────────────────────────────────────────
+  const [editingNode, setEditingNode] = useState(false);
+
   // ── AI state ─────────────────────────────────────────────────────────────
   const [aiWorking, setAiWorking] = useState(false);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
@@ -1197,6 +1201,55 @@ export default function EpisodeDetail() {
     }
   }
 
+  // ── Admin node options ───────────────────────────────────────────────────
+  function handleNodeOptions() {
+    if (!episode || !auth.user?.csrfToken) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { title: episode.title, options: ['Cancel', 'Edit Episode', 'Unpublish Episode', 'Delete Episode'],
+          cancelButtonIndex: 0, destructiveButtonIndex: 3 },
+        (index) => {
+          if (index === 1) setEditingNode(true);
+          if (index === 2) handleAdminUnpublish();
+          if (index === 3) handleAdminDelete();
+        },
+      );
+    } else {
+      setEditingNode(true);
+    }
+  }
+
+  function handleAdminDelete() {
+    if (!episode || !auth.user?.csrfToken) return;
+    const token = auth.user.csrfToken;
+    showAlert({
+      title: 'Delete Episode',
+      message: `Permanently delete "${episode.title}"? This cannot be undone.`,
+      confirmLabel: 'Delete', cancelLabel: 'Cancel', type: 'error',
+      onConfirm: async () => {
+        const res = await api.content.deleteNode(episode.id, 'podcast', token);
+        if (res.ok) { showToast('Episode deleted.', 'success'); router.back(); }
+        else showToast('Could not delete. Please try again.', 'error');
+      },
+    });
+  }
+
+  function handleAdminUnpublish() {
+    if (!episode || !auth.user?.csrfToken) return;
+    const token = auth.user.csrfToken;
+    showAlert({
+      title: 'Unpublish Episode',
+      message: `"${episode.title}" will be hidden from all users but not deleted.`,
+      confirmLabel: 'Unpublish', cancelLabel: 'Cancel', type: 'warning',
+      onConfirm: async () => {
+        const res = await api.content.unpublishNode(episode.id, 'podcast', token);
+        if (res.ok) { showToast('Episode unpublished.', 'success'); router.back(); }
+        else showToast('Could not unpublish. Please try again.', 'error');
+      },
+    });
+  }
+
   // ── Share ────────────────────────────────────────────────────────────────
   function handleShare() {
     const url = episodeUrl ?? 'https://www.applevis.com/podcasts';
@@ -1401,6 +1454,19 @@ export default function EpisodeDetail() {
                   {params.title}
                 </Text>
                 {isCurrent && <NowPlayingIndicator isPlaying={player.isPlaying} color={colors.accent} />}
+                {auth.user?.isAdmin && episode && (
+                  <Pressable
+                    onPress={handleNodeOptions}
+                    accessible
+                    accessibilityRole="button"
+                    accessibilityLabel="Episode options"
+                    accessibilityHint="Edit, unpublish, or delete this episode"
+                    style={({ pressed }) => ({ padding: 6, opacity: pressed ? 0.55 : 1 })}
+                  >
+                    <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary}
+                      accessibilityElementsHidden />
+                  </Pressable>
+                )}
               </View>
               {/* Show title + pills — combined accessible element (swipe 2) */}
               <View
@@ -2099,6 +2165,24 @@ export default function EpisodeDetail() {
           <ToolbarButton icon="pencil-outline" label={'Add New\nComment'} onPress={handleAddComment} accent />
         </View>
       </View>
+
+      {/* Admin Edit Episode Modal */}
+      {editingNode && episode && auth.user?.csrfToken && (
+        <EditContentModal
+          visible={editingNode}
+          onClose={() => setEditingNode(false)}
+          onSaved={(newBody, newTitle) => {
+            setFetchedData(e => e ? { ...e, description: newBody, title: newTitle ?? e.title } : e);
+            showToast('Episode updated.', 'success');
+          }}
+          nodeId={episode.id}
+          nodeType="podcast"
+          initialTitle={episode.title}
+          csrfToken={auth.user.csrfToken}
+          initialBody={episode.description}
+          label="Episode"
+        />
+      )}
     </Screen>
   );
 }
