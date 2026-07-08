@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import { persistence } from './persistence';
+import { api } from './api';
 import { routeForContentDestination } from '../navigation/routeResolver';
 import type { NotificationSound } from '../contexts/PreferencesContext';
 
@@ -107,6 +108,27 @@ export async function getExpoPushToken(): Promise<string | null> {
     const token = await Notifications.getExpoPushTokenAsync({ projectId: EAS_PROJECT_ID });
     return token.data;
   } catch { return null; }
+}
+
+export type PushRegistrationSyncResult =
+  | { ok: true; token: string }
+  | { ok: false; reason: 'permission' | 'token' | 'server'; error?: string };
+
+export async function syncPushRegistration(
+  csrfToken: string,
+  notificationSound: NotificationSound,
+): Promise<PushRegistrationSyncResult> {
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') return { ok: false, reason: 'permission' };
+
+  const token = await getExpoPushToken();
+  if (!token) return { ok: false, reason: 'token' };
+
+  const soundFile = NOTIFICATION_SOUND_FILE[notificationSound] ?? 'default';
+  const result = await api.account.registerPushToken(token, csrfToken, soundFile);
+  if (!result.ok) return { ok: false, reason: 'server', error: result.error };
+
+  return { ok: true, token };
 }
 
 // ─── Tap / action handler ─────────────────────────────────────────────────────

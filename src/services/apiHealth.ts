@@ -2,15 +2,23 @@
  * Session-scoped API health monitor.
  *
  * Call probe() once on app start. It fires a minimal request to each endpoint
- * group and marks any that fail as 'down' for the lifetime of the session.
- * If a live API call later fails, markDown() can be called to disable that
- * group for the rest of the session too.
+ * group and marks any that fail as 'down'. If a live API call later fails,
+ * markDown() can be called to disable that group too. A "down" mark expires
+ * after RECOVERY_MS so a single transient failure (e.g. a slow cold-launch
+ * probe) doesn't lock a whole content category out of live fetches for the
+ * rest of the session.
  *
  * Unknown groups are treated as available (optimistic default).
  */
 
 const JSONAPI = 'https://www.applevis.com/jsonapi';
 const PROBE_TIMEOUT_MS = 3000;
+
+// A single slow/failed request (e.g. a cold-launch probe timing out on a
+// weak connection) shouldn't lock a whole content category out for the rest
+// of the session. Treat "down" as stale after this long so the next fetch
+// gets a real retry instead of an automatic offline error.
+const RECOVERY_MS = 60_000;
 
 export type ApiGroup = 'forums' | 'podcasts' | 'apps' | 'resources' | 'blogs' | 'bugs';
 export type HealthStatus = 'unknown' | 'up' | 'down';
@@ -23,6 +31,13 @@ const _status: Record<ApiGroup, HealthStatus> = {
   blogs: 'unknown',
   bugs: 'unknown',
 };
+
+const _downSince: Partial<Record<ApiGroup, number>> = {};
+
+function setDown(group: ApiGroup): void {
+  _status[group] = 'down';
+  _downSince[group] = Date.now();
+}
 
 const PROBES: Record<ApiGroup, string> = {
   forums:    '/node/forum?page[limit]=1',
@@ -44,9 +59,10 @@ export const apiHealth = {
             headers: { Accept: 'application/vnd.api+json' },
             signal: ctrl.signal,
           });
-          _status[group] = res.ok ? 'up' : 'down';
+          if (res.ok) { _status[group] = 'up'; delete _downSince[group]; }
+          else setDown(group);
         } catch {
-          _status[group] = 'down';
+          setDown(group);
         } finally {
           clearTimeout(timer);
         }
@@ -54,13 +70,21 @@ export const apiHealth = {
     );
   },
 
-  // Returns true for 'unknown' (not yet probed) and 'up'; false only for 'down'.
+  // Returns true for 'unknown' and 'up', and for 'down' once the cooldown
+  // has elapsed (self-recovery from a one-off transient failure).
   isAvailable(group: ApiGroup): boolean {
-    return _status[group] !== 'down';
+    if (_status[group] !== 'down') return true;
+    const since = _downSince[group];
+    if (since !== undefined && Date.now() - since > RECOVERY_MS) {
+      _status[group] = 'unknown';
+      delete _downSince[group];
+      return true;
+    }
+    return false;
   },
 
   markDown(group: ApiGroup): void {
-    _status[group] = 'down';
+    setDown(group);
   },
 
   getStatus(): Readonly<Record<ApiGroup, HealthStatus>> {
@@ -72,8 +96,9 @@ export const apiHealth = {
   reset(group?: ApiGroup): void {
     if (group) {
       _status[group] = 'unknown';
+      delete _downSince[group];
     } else {
-      (Object.keys(_status) as ApiGroup[]).forEach((g) => { _status[g] = 'unknown'; });
+      (Object.keys(_status) as ApiGroup[]).forEach((g) => { _status[g] = 'unknown'; delete _downSince[g]; });
     }
   },
 

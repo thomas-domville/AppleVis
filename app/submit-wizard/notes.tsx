@@ -7,6 +7,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { WizardLayout } from '../../src/components/WizardLayout';
+import { GlassView } from '../../src/components/GlassView';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useWizard } from '../../src/contexts/SubmitWizardContext';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
@@ -140,9 +141,9 @@ function WizardPicker({ label, value, options, onChange, placeholder = 'Select a
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)} accessibilityViewIsModal>
         <View style={{ flex: 1 }} onAccessibilityEscape={() => setOpen(false)}>
           <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} onPress={() => setOpen(false)} accessible accessibilityRole="button" accessibilityLabel="Close" />
-          <Animated.View {...pan.panHandlers} style={{
+          <Animated.View {...pan.panHandlers} style={{ transform: [{ translateY: sheetY }] }}>
+          <GlassView style={{
             backgroundColor: colors.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingTop: 8, paddingBottom: 40,
-            transform: [{ translateY: sheetY }],
           }}>
             <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 14 }} accessible={false} />
             <Text accessibilityRole="header" style={{ fontSize: 17, fontWeight: '700', color: colors.text, paddingHorizontal: 20, marginBottom: 6 }}>{label}</Text>
@@ -170,6 +171,7 @@ function WizardPicker({ label, value, options, onChange, placeholder = 'Select a
                 );
               })}
             </ScrollView>
+          </GlassView>
           </Animated.View>
         </View>
       </Modal>

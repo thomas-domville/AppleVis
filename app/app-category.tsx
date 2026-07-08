@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Screen } from '../src/components/Screen';
+import { GlassView } from '../src/components/GlassView';
 import { AccessibleCard } from '../src/components/AccessibleCard';
 import { AutoLoadMoreFooter } from '../src/components/AutoLoadMoreFooter';
 import { EmptyState } from '../src/components/EmptyState';
@@ -347,7 +348,7 @@ export default function AppCategory() {
       >
 
         {/* ── Search ────────────────────────────────────────────────────── */}
-        <View style={{ flexDirection: 'row', alignItems: 'center',
+        <GlassView style={{ flexDirection: 'row', alignItems: 'center',
           backgroundColor: colors.inputBackground, borderRadius: 10, borderWidth: 1,
           borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 }}>
           <Ionicons name="search" size={16} color={colors.textSecondary}
@@ -364,7 +365,7 @@ export default function AppCategory() {
             returnKeyType="search"
             clearButtonMode="while-editing"
           />
-        </View>
+        </GlassView>
 
         {/* ── Section header ────────────────────────────────────────────── */}
         {!probe.loading && visibleApps.length > 0 && (

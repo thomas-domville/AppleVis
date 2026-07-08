@@ -3,10 +3,11 @@ import {
   AccessibilityInfo, ActivityIndicator, Pressable,
   RefreshControl, ScrollView, Text, TextInput, View,
 } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { EmptyState } from '../src/components/EmptyState';
 import { Screen } from '../src/components/Screen';
+import { GlassView } from '../src/components/GlassView';
 import { FeedCard } from '../src/components/FeedCard';
 import { FilterPicker } from '../src/components/FilterPicker';
 import { AutoLoadMoreFooter } from '../src/components/AutoLoadMoreFooter';
@@ -70,6 +71,11 @@ const TOPIC_ACCENT = '#6366f1';
 
 export default function ForumsBrowse() {
   const router             = useRouter();
+  // Deep link support (Unread Forums widget / Siri): applevis://forums?filter=Unread
+  // opens this screen pre-restricted to topics with unread replies, independent
+  // of the category FilterPicker below.
+  const params              = useLocalSearchParams<{ filter?: string }>();
+  const unreadOnly          = params.filter === 'Unread';
   const { colors, styles } = useTheme();
   const auth               = useAuth();
   const forum              = useForumState();
@@ -213,10 +219,20 @@ export default function ForumsBrowse() {
   }, [sourceTopics, searchQuery]);
 
   // Client-side Apple / Non-Apple slice on top of the broad 'Recent' feed
-  const visibleTopics = useMemo(() => {
+  const categoryFilteredTopics = useMemo(() => {
     if (browseFilter === 'Apple Related') return searchedTopics.filter((t) => t.category && !isNonApple(t.category));
     return searchedTopics;
   }, [searchedTopics, browseFilter]);
+
+  // Independent unread-only overlay, driven by the ?filter=Unread deep link
+  // param rather than the category FilterPicker above.
+  const visibleTopics = useMemo(() => {
+    if (!unreadOnly) return categoryFilteredTopics;
+    return categoryFilteredTopics.filter((t) => {
+      const visit = itemVisits[t.id];
+      return !visit || t.replyCount > visit.commentCount;
+    });
+  }, [categoryFilteredTopics, unreadOnly, itemVisits]);
 
   // Unified status for the current mode
   const isLoading     = usesCategoryTopics ? catLoading     : forum.loading;
@@ -281,13 +297,16 @@ export default function ForumsBrowse() {
           accessibilityRole="button"
           accessibilityLabel="New Topic"
           accessibilityHint={auth.isSignedIn ? 'Start a new forum topic' : 'Sign in to start a new forum topic'}
-          style={{
-            padding: 8, borderRadius: 10,
-            backgroundColor: colors.inputBackground,
-            borderWidth: 1, borderColor: colors.border,
-          }}
         >
-          <Ionicons name="create-outline" size={20} color={colors.accent} accessibilityElementsHidden />
+          <GlassView
+            style={{
+              padding: 8, borderRadius: 10,
+              backgroundColor: colors.inputBackground,
+              borderWidth: 1, borderColor: colors.border,
+            }}
+          >
+            <Ionicons name="create-outline" size={20} color={colors.accent} accessibilityElementsHidden />
+          </GlassView>
         </Pressable>
       }
     >
@@ -307,7 +326,7 @@ export default function ForumsBrowse() {
         }
       >
         {/* Search */}
-        <View style={{
+        <GlassView style={{
           flexDirection: 'row', alignItems: 'center',
           backgroundColor: colors.inputBackground, borderRadius: 10, borderWidth: 1,
           borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10,
@@ -326,7 +345,7 @@ export default function ForumsBrowse() {
             returnKeyType="search"
             clearButtonMode="while-editing"
           />
-        </View>
+        </GlassView>
 
         {/* Filter — 4 broad options + all 17 Drupal categories */}
         <FilterPicker

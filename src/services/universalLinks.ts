@@ -86,8 +86,14 @@ export function handleIncomingUrl(url: string): boolean {
       return true;
     }
 
+    // forums?filter=Unread — from the Unread Forums widget/Control.
     if (action === 'forums') {
-      router.push(routeForContentDestination('forums') as any);
+      const filter = params.get('filter');
+      if (filter) {
+        router.push({ pathname: routeForContentDestination('forums') as any, params: { filter } });
+      } else {
+        router.push(routeForContentDestination('forums') as any);
+      }
       return true;
     }
 

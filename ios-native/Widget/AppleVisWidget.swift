@@ -9,6 +9,14 @@ import SwiftUI
 
 private let sharedDefaults = UserDefaults(suiteName: "group.com.applevis.app")
 
+// AppIntents running inside the widget extension can't call
+// UIApplication.shared.open(_:) — it's unavailable in app extensions.
+// openAppWhenRun already brings the host app to the foreground, so intents
+// just record what to do here; the app reads and clears this on foreground.
+private func setPendingWidgetAction(_ action: String) {
+  sharedDefaults?.set(action, forKey: "pendingWidgetAction")
+}
+
 // MARK: - Shared UserDefaults data model
 
 struct WidgetData {
@@ -78,9 +86,24 @@ struct WidgetTogglePlayPauseIntent: AppIntent {
   static var openAppWhenRun: Bool = true
 
   func perform() async throws -> some IntentResult {
-    let action = WidgetData.isPlaying ? "pause" : "play"
-    await UIApplication.shared.open(URL(string: "applevis://podcasts?action=\(action)")!)
+    setPendingWidgetAction(WidgetData.isPlaying ? "podcasts?action=pause" : "podcasts?action=play")
     return .result()
+  }
+}
+
+// MARK: - Cross-version widget background
+
+extension View {
+  // containerBackground(_:for:) is required on iOS 17+ but doesn't exist
+  // before it; the widget's deployment target is 16.0, so fall back to a
+  // plain background on older systems.
+  @ViewBuilder
+  func widgetContainerBackground() -> some View {
+    if #available(iOS 17.0, *) {
+      self.containerBackground(.fill, for: .widget)
+    } else {
+      self.background(Color(.systemBackground))
+    }
   }
 }
 
@@ -133,7 +156,7 @@ struct ContinueListeningWidgetView: View {
       }
     }
     .padding(10)
-    .containerBackground(.fill, for: .widget)
+    .widgetContainerBackground()
     .widgetURL(URL(string: "applevis://podcasts"))
     .accessibilityLabel(
       entry.title.isEmpty || entry.title == "Nothing playing"
@@ -157,7 +180,7 @@ struct UnreadWidgetView: View {
         .font(.caption2)
         .foregroundColor(.secondary)
     }
-    .containerBackground(.fill, for: .widget)
+    .widgetContainerBackground()
     .widgetURL(URL(string: "applevis://forums?filter=Unread"))
     .accessibilityLabel(
       entry.unreadCount == 0
@@ -212,8 +235,7 @@ struct TogglePodcastControlIntent: SetValueIntent {
   var value: Bool
 
   func perform() async throws -> some IntentResult {
-    let action = value ? "play" : "pause"
-    await UIApplication.shared.open(URL(string: "applevis://podcasts?action=\(action)")!)
+    setPendingWidgetAction(value ? "podcasts?action=play" : "podcasts?action=pause")
     return .result()
   }
 }
@@ -247,7 +269,7 @@ struct OpenForumsControlIntent: AppIntent {
   static var openAppWhenRun: Bool = true
 
   func perform() async throws -> some IntentResult {
-    await UIApplication.shared.open(URL(string: "applevis://forums?filter=Unread")!)
+    setPendingWidgetAction("forums?filter=Unread")
     return .result()
   }
 }
@@ -270,7 +292,7 @@ struct AppleVisForumsControl: ControlWidget {
       ControlWidgetButton(
         "AppleVis Forums",
         action: OpenForumsControlIntent()
-      ) {
+      ) { _ in
         Label(
           unreadCount > 0 ? "\(unreadCount) unread" : "Forums",
           systemImage: "bubble.left.and.bubble.right.fill"

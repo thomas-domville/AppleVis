@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { EmptyState } from '../src/components/EmptyState';
 import { Screen } from '../src/components/Screen';
+import { GlassView } from '../src/components/GlassView';
 import { FilterPicker } from '../src/components/FilterPicker';
 import { AutoLoadMoreFooter } from '../src/components/AutoLoadMoreFooter';
 import { usePlayer } from '../src/contexts/PlayerContext';
@@ -25,7 +26,6 @@ import { usePreferences } from '../src/contexts/PreferencesContext';
 import type { AnnouncementLevel } from '../src/contexts/PreferencesContext';
 import { donateSiriActivity } from '../src/services/intelligenceService';
 import { trackMeaningfulAction } from '../src/services/reviewPrompt';
-import { updateCarPlayEpisodes } from '../src/native/nativeModules';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { useEpisodeMeta } from '../src/hooks/useEpisodeMeta';
 import { useEpisodeDurations } from '../src/hooks/useEpisodeDurations';
@@ -513,16 +513,7 @@ export default function PodcastBrowse() {
 
   useRefreshFeedback(list.refreshing, 'Podcasts', list.loading, () => firstEpisodeRef.current);
 
-  // Push feed to CarPlay
-  useEffect(() => {
-    if (!episodes.length) return;
-    updateCarPlayEpisodes(episodes.slice(0, 100).map(ep => ({
-      id: ep.id, title: ep.title, showTitle: ep.showTitle,
-      duration: ep.duration, isDownloaded: !!meta.downloadedMeta[ep.id],
-    })));
-  }, [episodes, meta.downloadedMeta]);
-
-  // Track near-end of episode for review prompt
+// Track near-end of episode for review prompt
   useEffect(() => {
     if (!player.episode || player.duration <= 0) return;
     const nearEnd = player.position >= player.duration - 10;
@@ -933,7 +924,7 @@ export default function PodcastBrowse() {
         )}
 
         {/* ── Search bar ─────────────────────────────────────────────────── */}
-        <View style={{ flexDirection: 'row', alignItems: 'center',
+        <GlassView style={{ flexDirection: 'row', alignItems: 'center',
           backgroundColor: colors.inputBackground, borderRadius: 10, borderWidth: 1,
           borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 }}>
           <Ionicons name="search" size={16} color={colors.textSecondary}
@@ -950,7 +941,7 @@ export default function PodcastBrowse() {
             returnKeyType="search"
             clearButtonMode="while-editing"
           />
-        </View>
+        </GlassView>
 
         {/* ── Filter picker ──────────────────────────────────────────────── */}
         <FilterPicker

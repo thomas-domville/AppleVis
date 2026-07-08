@@ -6,9 +6,10 @@
  * no extension target or special entitlement is needed — Foundation Models is
  * available to any app on iOS 26+ when Apple Intelligence is enabled.
  */
-const { withDangerousMod } = require('@expo/config-plugins');
+const { withDangerousMod, withXcodeProject } = require('@expo/config-plugins');
 const path = require('path');
 const fs   = require('fs');
+const { addNativeModuleSources } = require('./lib/addNativeModuleSources');
 
 const withIntelligence = (config) => {
   config = withDangerousMod(config, ['ios', (cfg) => {
@@ -21,6 +22,11 @@ const withIntelligence = (config) => {
     }
     return cfg;
   }]);
+
+  config = withXcodeProject(config, (cfg) => {
+    addNativeModuleSources(cfg.modResults, cfg.modRequest.projectRoot, cfg.modRequest.projectName, 'Intelligence');
+    return cfg;
+  });
 
   return config;
 };

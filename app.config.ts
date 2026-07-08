@@ -1,7 +1,8 @@
 const config = {
   name: 'AppleVis',
   slug: 'applevis',
-  version: '2026.0.6',
+  owner: 'mouseteam',
+  version: '2026.0.7',
   orientation: 'default',
   icon: './assets/icons/app-icon.png',
   scheme: 'applevis',
@@ -22,7 +23,7 @@ const config = {
     },
     supportsTablet: true,
     bundleIdentifier: 'com.applevis.app',
-    buildNumber: '10',
+    buildNumber: '11',
     minimumOsVersion: '16.0',
     usesNonExemptEncryption: false,
     requireFullScreen: false,
@@ -35,7 +36,7 @@ const config = {
       'com.apple.developer.siri': true,
     },
     infoPlist: {
-      UIBackgroundModes: ['audio', 'remote-notification', 'fetch', 'processing'],
+      UIBackgroundModes: ['audio', 'remote-notification', 'fetch'],
       NSMicrophoneUsageDescription:
         'Required by the audio framework used for podcast playback. AppleVis does not record audio.',
       NSUserTrackingUsageDescription:
@@ -94,7 +95,13 @@ const config = {
     './plugins/withSiri',
     './plugins/withRoutePicker',
     './plugins/withAudioEffects',
-    './plugins/withCarPlay',
+    './plugins/withAppShare',
+    './plugins/withShareExtension',
+    './plugins/withHandoff',
+    './plugins/withKeyboardShortcuts',
+    './plugins/withFocusFilter',
+    './plugins/withVision',
+    './plugins/withWatch',
     [
       'expo-build-properties',
       {
@@ -130,7 +137,29 @@ const config = {
 
   extra: {
     eas: {
-      projectId: 'applevis-2026',
+      projectId: 'c60f518d-b244-451b-bcc0-0e19e248f790',
+      build: {
+        experimental: {
+          ios: {
+            appExtensions: [
+              {
+                targetName: 'AppleVisWidget',
+                bundleIdentifier: 'com.applevis.app.widget',
+                entitlements: {
+                  'com.apple.security.application-groups': ['group.com.applevis.app'],
+                },
+              },
+              {
+                targetName: 'AppleVisLiveActivity',
+                bundleIdentifier: 'com.applevis.app.liveactivity',
+                entitlements: {
+                  'com.apple.security.application-groups': ['group.com.applevis.app'],
+                },
+              },
+            ],
+          },
+        },
+      },
     },
   },
 };

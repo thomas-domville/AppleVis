@@ -73,6 +73,7 @@ struct LiveActivityLockScreenView: View {
 
 // MARK: - Live Activity widget
 
+@main
 @available(iOS 16.2, *)
 struct AppleVisLiveActivity: Widget {
   var body: some WidgetConfiguration {
@@ -112,7 +113,11 @@ struct AppleVisLiveActivity: Widget {
           .foregroundColor(.blue)
       }
       .keylineTint(.blue)
-      .supplementalActivityFamilies([.small]) // StandBy mode (iOS 17+)
     }
+    // Smart Stack / StandBy presentation via supplementalActivityFamilies([.small])
+    // requires iOS 18 and can't be safely branched with #available here — a
+    // Widget's `some WidgetConfiguration` body has no builder support for
+    // divergent concrete types across branches (unlike `some View`). Dropped
+    // for now; the Lock Screen and Dynamic Island presentations are unaffected.
   }
 }

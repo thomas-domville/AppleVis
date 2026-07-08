@@ -339,6 +339,7 @@ function buildActions(
     isSaved: boolean;
     isFollowing: boolean;
     isOwnTopic: boolean;
+    isOwnApp: boolean;
     isAdmin: boolean;
     showToast: (msg: string, type?: 'success' | 'warning' | 'error') => void;
     onPlay: () => void;
@@ -358,7 +359,7 @@ function buildActions(
     onAdminUnpublish: () => void;
   },
 ): Action[] {
-  const { isSignedIn, voiceOverOn, isQueued, isCurrentPodcastPlaying, isDownloaded, isDownloading, isSaved, isFollowing, isOwnTopic, isAdmin, showToast, onPlay, onQueue, onPlayNext, onDownload, onReply, onWriteReview, onSave, onAddEpisodeComment, onToggleFollow, onOpenTopicInBrowser, onEditOwnTopic, onDeleteOwnTopic, onAdminEdit, onAdminDelete, onAdminUnpublish } = opts;
+  const { isSignedIn, voiceOverOn, isQueued, isCurrentPodcastPlaying, isDownloaded, isDownloading, isSaved, isFollowing, isOwnTopic, isOwnApp, isAdmin, showToast, onPlay, onQueue, onPlayNext, onDownload, onReply, onWriteReview, onSave, onAddEpisodeComment, onToggleFollow, onOpenTopicInBrowser, onEditOwnTopic, onDeleteOwnTopic, onAdminEdit, onAdminDelete, onAdminUnpublish } = opts;
   const title = getTitle(item);
   const stub  = () => showToast('Coming soon.', 'warning');
   const commentStub = () => {
@@ -445,9 +446,11 @@ function buildActions(
           onPress: () => Linking.openURL(item.data.appStoreUrl).catch(() => showToast('Could not open App Store.', 'error')),
         });
       }
-      if (isAdmin) {
+      if (isAdmin || isOwnApp) {
         actions.push({ label: 'Edit App Entry',      name: 'editItem',   onPress: onAdminEdit });
-        actions.push({ label: 'Unpublish App Entry', name: 'unpublish',  onPress: onAdminUnpublish });
+        if (isAdmin) {
+          actions.push({ label: 'Unpublish App Entry', name: 'unpublish',  onPress: onAdminUnpublish });
+        }
         actions.push({ label: 'Delete App Entry',    name: 'deleteItem', onPress: onAdminDelete });
       }
       actions.push(shareAction);
@@ -518,6 +521,8 @@ export const FeedCard = memo(function FeedCard({ item, onPress, cardRef, newCoun
   const isOwnTopic = item.kind === 'topic' && (
     isAdmin || (!!auth.user?.uuid && !!item.data.authorId && auth.user.uuid === item.data.authorId)
   );
+  const isOwnApp = item.kind === 'app' &&
+    !!auth.user?.uuid && !!item.data.submitterUid && auth.user.uuid === item.data.submitterUid;
 
   const title      = getTitle(item);
   const meta       = getMeta(item);
@@ -774,6 +779,7 @@ export const FeedCard = memo(function FeedCard({ item, onPress, cardRef, newCoun
       isSaved: isSavedItem,
       isFollowing: isFollowingItem,
       isOwnTopic,
+      isOwnApp,
       isAdmin,
       showToast,
       onPlay: handlePlay,

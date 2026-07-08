@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { RefreshBar } from './RefreshBar';
+import { GlassView } from './GlassView';
 import { useTheme } from '../contexts/ThemeContext';
 import { usePlayer } from '../contexts/PlayerContext';
 import { sounds } from '../services/sounds';
@@ -60,11 +61,13 @@ export function Screen({
     <SafeAreaView
       style={styles.screen}
       accessibilityLanguage="en"
+      onAccessibilityEscape={goBack}
     >
       {/* Inner View carries both magic-tap and escape so the handlers fire on any
           focused descendant — SafeAreaView from react-native-safe-area-context does
           not always forward these props to the native layer. */}
       <View
+        collapsable={false}
         style={styles.content}
         onAccessibilityEscape={goBack}
         onMagicTap={onMagicTap}
@@ -121,23 +124,26 @@ export function Screen({
                   accessibilityRole="search"
                   accessibilityLabel={t('screen.a11ySearch')}
                   accessibilityHint={t('screen.a11ySearchHint')}
-                  style={{
-                    flex: 1,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 8,
-                    backgroundColor: colors.inputBackground,
-                    borderRadius: 10,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    paddingHorizontal: 10,
-                    paddingVertical: 9,
-                  }}
+                  style={{ flex: 1 }}
                 >
-                  <Ionicons name="search-outline" size={16} color={colors.textSecondary} accessibilityElementsHidden />
-                  <Text style={{ fontSize: 15, color: colors.textSecondary }}>
-                    {t('screen.a11ySearch')}
-                  </Text>
+                  <GlassView
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 8,
+                      backgroundColor: colors.inputBackground,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      paddingHorizontal: 10,
+                      paddingVertical: 9,
+                    }}
+                  >
+                    <Ionicons name="search-outline" size={16} color={colors.textSecondary} accessibilityElementsHidden />
+                    <Text style={{ fontSize: 15, color: colors.textSecondary }}>
+                      {t('screen.a11ySearch')}
+                    </Text>
+                  </GlassView>
                 </Pressable>
               )}
               {headerRight}
@@ -148,15 +154,18 @@ export function Screen({
                   accessibilityLabel="Profile and Settings"
                   accessibilityHint="Opens your profile, account, and app settings."
                   hitSlop={8}
-                  style={{
-                    padding: 8,
-                    borderRadius: 10,
-                    backgroundColor: colors.inputBackground,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                  }}
                 >
-                  <Ionicons name="person-circle-outline" size={20} color={colors.accent} accessibilityElementsHidden />
+                  <GlassView
+                    style={{
+                      padding: 8,
+                      borderRadius: 10,
+                      backgroundColor: colors.inputBackground,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                  >
+                    <Ionicons name="person-circle-outline" size={20} color={colors.accent} accessibilityElementsHidden />
+                  </GlassView>
                 </Pressable>
               )}
             </View>

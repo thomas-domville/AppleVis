@@ -5,9 +5,10 @@
  * target during prebuild so forum topics, podcast episodes, and app listings
  * appear in iOS system Search (swipe down from Home Screen).
  */
-const { withDangerousMod } = require('@expo/config-plugins');
+const { withDangerousMod, withXcodeProject } = require('@expo/config-plugins');
 const path = require('path');
 const fs   = require('fs');
+const { addNativeModuleSources } = require('./lib/addNativeModuleSources');
 
 const withSpotlight = (config) => {
   config = withDangerousMod(config, ['ios', (cfg) => {
@@ -20,6 +21,11 @@ const withSpotlight = (config) => {
     }
     return cfg;
   }]);
+
+  config = withXcodeProject(config, (cfg) => {
+    addNativeModuleSources(cfg.modResults, cfg.modRequest.projectRoot, cfg.modRequest.projectName, 'Spotlight');
+    return cfg;
+  });
 
   return config;
 };

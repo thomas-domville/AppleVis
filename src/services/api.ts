@@ -557,6 +557,13 @@ function mapApp(node: JsonApiNode, included: JsonApiNode[] = []): AppListing {
   const supportedDevices: string[] = Array.isArray(deviceUsed)
     ? deviceUsed.map(String).filter(Boolean)
     : deviceUsed ? [String(deviceUsed)] : [];
+  // Submitter — uid relationship → display_name + UUID (same pattern as mapBlog).
+  // Requires the caller's JSON:API request to include `?include=uid`; when it
+  // doesn't, this simply resolves to undefined (ownership checks fall back
+  // to admin-only, same as before this field existed).
+  const uidId = (node.relationships?.uid?.data as { id?: string } | undefined)?.id;
+  const userNode = uidId ? included.find((n) => n.id === uidId) : undefined;
+  const submittedBy = userNode ? String(userNode.attributes?.display_name ?? userNode.attributes?.name ?? '') : undefined;
   return {
     id: node.id,
     name: a.title ?? '',
@@ -567,6 +574,8 @@ function mapApp(node: JsonApiNode, included: JsonApiNode[] = []): AppListing {
     lastUpdatedAt: (a.changed as string | undefined)?.trim() ?? '',
     lastActivityAt: normaliseTimestamp(a.comment_node_ios_app_directory?.last_comment_timestamp),
     createdAt: normaliseTimestamp(a.created),
+    submittedBy: submittedBy || undefined,
+    submitterUid: uidId ?? undefined,
     price: (a.field_cost as string | undefined) || undefined,
     supportedDevices: supportedDevices.length > 0 ? supportedDevices : undefined,
     voiceOverPerformance: a.field_voiceover ? String(a.field_voiceover) : undefined,
@@ -1175,12 +1184,12 @@ export const api = {
 
     async list(page = 0) {
       const res = await jsonApi<JsonApiCollection>(
-        `/node/ios_app_directory?sort=-changed&${pageParams(page)}`,
+        `/node/ios_app_directory?include=uid&sort=-changed&${pageParams(page)}`,
       );
       if (!res.ok) return res;
       return {
         ok: true as const,
-        data: { items: res.data.data.map((n) => mapApp(n)), hasMore: hasNextPage(res.data) } satisfies PaginatedResult<AppListing>,
+        data: { items: res.data.data.map((n) => mapApp(n, res.data.included ?? [])), hasMore: hasNextPage(res.data) } satisfies PaginatedResult<AppListing>,
       };
     },
 
@@ -1203,7 +1212,7 @@ export const api = {
       for (const fieldName of APP_CATEGORY_RELATIONSHIP_CANDIDATES) {
         attemptedFields.push(fieldName);
         const res = await jsonApi<JsonApiCollection>(
-          `/node/ios_app_directory?include=${fieldName}&filter[${fieldName}.name]=${encoded}&sort=title&${pageParams(page)}`,
+          `/node/ios_app_directory?include=${fieldName},uid&filter[${fieldName}.name]=${encoded}&sort=title&${pageParams(page)}`,
         );
 
         if (!res.ok) {
@@ -1348,12 +1357,12 @@ export const api = {
 
     async updates(page = 0) {
       const res = await jsonApi<JsonApiCollection>(
-        `/node/ios_app_directory?sort=-changed&${pageParams(page)}`,
+        `/node/ios_app_directory?include=uid&sort=-changed&${pageParams(page)}`,
       );
       if (!res.ok) return res;
       return {
         ok: true as const,
-        data: { items: res.data.data.map((n) => mapApp(n)), hasMore: hasNextPage(res.data) } satisfies PaginatedResult<AppListing>,
+        data: { items: res.data.data.map((n) => mapApp(n, res.data.included ?? [])), hasMore: hasNextPage(res.data) } satisfies PaginatedResult<AppListing>,
       };
     },
 
@@ -1671,10 +1680,10 @@ export const api = {
     async apps(query: string) {
       const q = encodeURIComponent(query.trim());
       const res = await jsonApi<JsonApiCollection>(
-        `/node/ios_app_directory?filter[title][operator]=CONTAINS&filter[title][value]=${q}&sort=-changed&page[limit]=10`,
+        `/node/ios_app_directory?include=uid&filter[title][operator]=CONTAINS&filter[title][value]=${q}&sort=-changed&page[limit]=10`,
       );
       if (!res.ok) return res;
-      return { ok: true as const, data: { items: res.data.data.map((n) => mapApp(n)), hasMore: false } satisfies PaginatedResult<AppListing> };
+      return { ok: true as const, data: { items: res.data.data.map((n) => mapApp(n, res.data.included ?? [])), hasMore: false } satisfies PaginatedResult<AppListing> };
     },
 
     async resources(query: string) {
@@ -1857,13 +1866,26 @@ export const api = {
 
     // Returns all Drupal role machine names assigned to this user.
     // AuthContext checks this against ADMIN_ROLES to set isAdmin.
+    //
+    // The relationship's `id` is the role's UUID, never its machine name —
+    // JSON:API relationship identifiers are always UUIDs, even for config
+    // entities like user_role. The machine name (e.g. "administrator",
+    // "site_editor") is exposed separately via `meta.drupal_internal__target_id`.
     async resolveRoles(uuid: string, csrfToken: string): Promise<string[]> {
-      type UserNode = { data: { relationships?: { roles?: { data?: { id: string }[] } } } };
+      type UserNode = {
+        data: {
+          relationships?: {
+            roles?: { data?: { id: string; meta?: { drupal_internal__target_id?: string } }[] };
+          };
+        };
+      };
       const res = await jsonApi<UserNode>(`/user/user/${uuid}`, {
         headers: { 'X-CSRF-Token': csrfToken },
       });
       if (!res.ok) return [];
-      return (res.data.data.relationships?.roles?.data ?? []).map((r) => r.id);
+      return (res.data.data.relationships?.roles?.data ?? [])
+        .map((r) => r.meta?.drupal_internal__target_id)
+        .filter((id): id is string => !!id);
     },
 
     async editProfile(csrfToken: string, fields: Record<string, unknown>): Promise<JsonApiResult<undefined>> {

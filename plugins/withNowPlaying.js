@@ -8,9 +8,10 @@
  * After `npx expo prebuild`, copy ios-native/NowPlaying/ files into the
  * generated ios/<AppName>/ folder in Xcode and add them to the main target.
  */
-const { withInfoPlist, withDangerousMod } = require('@expo/config-plugins');
+const { withInfoPlist, withDangerousMod, withXcodeProject } = require('@expo/config-plugins');
 const path = require('path');
 const fs = require('fs');
+const { addNativeModuleSources } = require('./lib/addNativeModuleSources');
 
 const withNowPlaying = (config) => {
   // Ensure background audio mode
@@ -37,6 +38,11 @@ const withNowPlaying = (config) => {
       return cfg;
     },
   ]);
+
+  config = withXcodeProject(config, (cfg) => {
+    addNativeModuleSources(cfg.modResults, cfg.modRequest.projectRoot, cfg.modRequest.projectName, 'NowPlaying');
+    return cfg;
+  });
 
   return config;
 };

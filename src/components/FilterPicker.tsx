@@ -3,6 +3,7 @@ import { AccessibilityInfo, Animated, Modal, PanResponder, Pressable, ScrollView
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { sounds } from '../services/sounds';
+import { GlassView } from './GlassView';
 
 type Props<T extends string> = {
   label: string;
@@ -74,27 +75,29 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
           if (nativeEvent.actionName === 'increment') cycleBy(1);
           if (nativeEvent.actionName === 'decrement') cycleBy(-1);
         }}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 6,
-          alignSelf: 'flex-start',
-          backgroundColor: colors.inputBackground,
-          borderWidth: 1,
-          borderColor: colors.border,
-          borderRadius: 10,
-          paddingHorizontal: 12,
-          paddingVertical: 9,
-          marginBottom: 12,
-        }}
+        style={{ alignSelf: 'flex-start', marginBottom: 12 }}
       >
-        <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{displayLabel(value)}</Text>
-        <Ionicons
-          name={open ? 'chevron-up' : 'chevron-down'}
-          size={14}
-          color={colors.textSecondary}
-          accessibilityElementsHidden
-        />
+        <GlassView
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            backgroundColor: colors.inputBackground,
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 9,
+          }}
+        >
+          <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{displayLabel(value)}</Text>
+          <Ionicons
+            name={open ? 'chevron-up' : 'chevron-down'}
+            size={14}
+            color={colors.textSecondary}
+            accessibilityElementsHidden
+          />
+        </GlassView>
       </Pressable>
 
       {/* Options modal — for sighted users or VoiceOver users who want to jump */}
@@ -116,6 +119,9 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
 
         <Animated.View
           {...pan.panHandlers}
+          style={{ transform: [{ translateY: sheetY }] }}
+        >
+        <GlassView
           style={{
             backgroundColor: colors.card,
             borderTopLeftRadius: 20,
@@ -123,7 +129,6 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
             paddingTop: 8,
             paddingBottom: 40,
             paddingHorizontal: 0,
-            transform: [{ translateY: sheetY }],
           }}
         >
           <View
@@ -176,6 +181,7 @@ export function FilterPicker<T extends string>({ label, value, options, onChange
               );
             })}
           </ScrollView>
+        </GlassView>
         </Animated.View>
         </View>
       </Modal>

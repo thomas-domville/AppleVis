@@ -5,8 +5,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
 import { useToast } from '../../src/contexts/ToastContext';
+import { useAuth } from '../../src/contexts/AuthContext';
 import { WizardLayout } from '../../src/components/WizardLayout';
-import { requestNotificationPermissions } from '../../src/services/notifications';
+import { requestNotificationPermissions, syncPushRegistration } from '../../src/services/notifications';
 import { sounds } from '../../src/services/sounds';
 import type { NotificationPrefs, NotificationSound } from '../../src/contexts/PreferencesContext';
 
@@ -40,6 +41,7 @@ const SOUNDS: SoundOption[] = [
 export default function NotificationsStep() {
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
+  const { user } = useAuth();
   const warnBg   = isDark ? 'rgba(255, 152, 0, 0.15)' : '#FFF3E0';
   const warnText = isDark ? '#FFAB40' : '#92400E';
   const warnIcon = isDark ? '#FFAB40' : '#D97706';
@@ -71,6 +73,9 @@ export default function NotificationsStep() {
     }
     setRequesting(true);
     const granted = await requestNotificationPermissions();
+    if (granted && user) {
+      syncPushRegistration(user.csrfToken, notificationSound).catch(() => {});
+    }
     setRequesting(false);
     if (granted) {
       showToast('Notifications enabled.', 'success');

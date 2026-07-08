@@ -54,7 +54,7 @@ class AppleVisNowPlaying: NSObject {
 
   // ── Remote command handlers ────────────────────────────────────────────────
   //
-  // Registers lock screen / Control Center / CarPlay / AirPods controls.
+  // Registers lock screen / Control Center / AirPods controls.
   // onNextTrack / onPreviousTrack: pass empty arrays [] as placeholder; JS
   // uses them to advance to the next/previous episode.
 

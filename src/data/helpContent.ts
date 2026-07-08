@@ -87,7 +87,7 @@ export const HELP_SECTIONS: HelpSection[] = [
             'Read what is new since your last visit from Home.',
             'Browse Discover for forums, blogs, guides, podcasts, app directory content, site search, and the Bug Tracker.',
             'Use For You to find saved items, following, downloads, queue, and personal activity.',
-            'Play podcasts with background audio, queue, chapters, speed controls, Live Activities, Dynamic Island, CarPlay, and AirPods gestures.',
+            'Play podcasts with background audio, queue, chapters, speed controls, Live Activities, Dynamic Island, and AirPods gestures.',
             'Post topics, replies, comments, app reviews, and app submissions when signed in.',
             'Use Apple Intelligence features — summaries, rewrite, translate, and accessibility consensus — on supported devices.',
           ] },
@@ -110,7 +110,7 @@ export const HELP_SECTIONS: HelpSection[] = [
           { type: 'heading', text: 'For You' },
           { type: 'body', text: 'For You collects personal content: saved items, followed items, downloads, podcast queue, and other items you chose to keep close.' },
           { type: 'heading', text: 'Podcasts' },
-          { type: 'body', text: 'Podcasts gives you the full AppleVis podcast experience, including playback controls, queue, downloads, chapters, speed, sleep timer, Dynamic Island, Lock Screen controls, and CarPlay.' },
+          { type: 'body', text: 'Podcasts gives you the full AppleVis podcast experience, including playback controls, queue, downloads, chapters, speed, sleep timer, Dynamic Island, and Lock Screen controls.' },
           { type: 'heading', text: 'Profile and Settings' },
           { type: 'body', text: 'Profile contains account tools, support information, legal links, credits, and a Contact App Support button that opens the in-app contact wizard. Settings controls appearance, accessibility, notifications, podcasts, privacy, storage, sync, and smart features.' },
         ],
@@ -250,12 +250,12 @@ export const HELP_SECTIONS: HelpSection[] = [
       {
         id: 'tutorial-podcast',
         title: 'Play and Queue Podcasts',
-        summary: 'Play episodes, use Dynamic Island, build a queue, and use AirPods and CarPlay.',
+        summary: 'Play episodes, use Dynamic Island, build a queue, and use AirPods.',
         content: [
           { type: 'steps', items: [
             'Open Podcasts.',
             'Choose an episode and press Play.',
-            'Use the mini player at the bottom of any tab, the full player, Lock Screen, Dynamic Island, Control Center, AirPods, or CarPlay to control playback.',
+            'Use the mini player at the bottom of any tab, the full player, Lock Screen, Dynamic Island, Control Center, or AirPods to control playback.',
             'Use Add to Queue or Play Next to build a listening list. When an episode ends, the next item in your queue plays automatically.',
             'To skip to the next queued episode, use the next-track button on the Lock Screen or the next-track AirPods gesture. To restart the current episode, use the previous-track button.',
             'Use Downloads when you want offline listening.',
@@ -867,7 +867,7 @@ export const HELP_SECTIONS: HelpSection[] = [
       {
         id: 'content-podcasts',
         title: 'Podcasts',
-        summary: 'Playback, queue, chapters, downloads, Dynamic Island, CarPlay, AirPods, and settings.',
+        summary: 'Playback, queue, chapters, downloads, Dynamic Island, AirPods, and settings.',
         content: [
           { type: 'bullets', items: [
             'Play, pause, seek, skip forward and back, and change speed from the player or the mini player at the bottom of the screen.',
@@ -876,7 +876,6 @@ export const HELP_SECTIONS: HelpSection[] = [
             'Navigate chapters using the chapter strip when the episode includes chapter markers.',
             'Lock Screen shows the episode title, artwork, progress bar, and playback controls.',
             'Dynamic Island and Live Activities show the episode title and chapter on supported iPhone models while you use other apps.',
-            'CarPlay displays the podcast episode list and allows playback from the car.',
             'AirPods: double tap to play or pause. On episodes with a queue, use the next-track gesture on AirPods or the next button on the Lock Screen to skip to the next queued episode. The previous-track gesture restarts the current episode from the beginning.',
             'Control Center shows a Now Playing card with artwork, title, and controls.',
           ] },

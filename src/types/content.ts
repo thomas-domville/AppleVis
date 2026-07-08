@@ -123,6 +123,7 @@ export type AppListing = {
   lastActivityAt?: string;  // comment_node_ios_app_directory.last_comment_timestamp
   createdAt?: string;       // original submission date (Drupal 'created')
   submittedBy?: string;     // submitter display_name from uid relationship
+  submitterUid?: string;    // Drupal user UUID — used for ownership checks (edit/delete own entry) and author profile
   appStoreUrl: string;
   iconUrl?: string;
   price?: string;            // field_cost — e.g. "Free", "Free With In-App Purchase", "$2.99"
@@ -199,7 +200,6 @@ export type AppReview = {
 export type AppDetail = AppListing & {
   body: string;
   reviews: AppReview[];
-  submitterUid?: string;            // Drupal user UUID — used to open author profile modal
   reviewedVersion?: string;         // field_version — version on AppleVis at time of submission
   testedOnIOS?: string;             // field_ios_version (raw value; may be taxonomy term ID)
   accessibilityComments?: string;   // field_comments — submitter's accessibility evaluation

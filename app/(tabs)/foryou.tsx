@@ -19,7 +19,6 @@ import { useEpisodeDurations } from '../../src/hooks/useEpisodeDurations';
 import { useSavedItems } from '../../src/hooks/useSavedItems';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
-import { useTip, TIP_KEYS, TIPS } from '../../src/contexts/ContextualTipContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { deleteAllDownloads } from '../../src/services/downloads';
 import { persistence } from '../../src/services/persistence';
@@ -1100,15 +1099,12 @@ export default function ForYouScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
-  const { showTip } = useTip();
   const skipNextTabAnnounceRef = useRef(false);
   useScrollToTop(scrollRef);
 
   useFocusEffect(useCallback(() => {
-    showTip(TIP_KEYS.tabForYou, TIPS.tabForYou);
     const t = setTimeout(() => scrollRef.current?.flashScrollIndicators(), 350);
     return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []));
 
   // Deep link from Profile's saved rows (?section=saved&savedType=forumTopic, etc.) —

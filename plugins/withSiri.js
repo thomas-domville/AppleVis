@@ -6,9 +6,10 @@
  * extension target is needed. The Siri entitlement and NSSiriUsageDescription
  * are already set in app.config.ts.
  */
-const { withDangerousMod } = require('@expo/config-plugins');
+const { withDangerousMod, withXcodeProject } = require('@expo/config-plugins');
 const path = require('path');
 const fs   = require('fs');
+const { addNativeModuleSources } = require('./lib/addNativeModuleSources');
 
 const withSiri = (config) => {
   config = withDangerousMod(config, ['ios', (cfg) => {
@@ -21,6 +22,11 @@ const withSiri = (config) => {
     }
     return cfg;
   }]);
+
+  config = withXcodeProject(config, (cfg) => {
+    addNativeModuleSources(cfg.modResults, cfg.modRequest.projectRoot, cfg.modRequest.projectName, 'Siri');
+    return cfg;
+  });
 
   return config;
 };

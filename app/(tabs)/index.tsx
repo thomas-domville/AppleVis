@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   AccessibilityInfo, ActivityIndicator, AppState, findNodeHandle, FlatList,
-  Modal, Pressable, RefreshControl, StyleSheet, Text, useColorScheme, View,
+  Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, useColorScheme, View,
 } from 'react-native';
 import { useScrollToTop } from '@react-navigation/native';
 import { Tabs, useFocusEffect, useRouter } from 'expo-router';
@@ -20,10 +20,10 @@ import { useAlert } from '../../src/contexts/AccessibleAlertContext';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { persistence } from '../../src/services/persistence';
 import { sounds } from '../../src/services/sounds';
-import { useTip, TIP_KEYS, TIPS } from '../../src/contexts/ContextualTipContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 import { relativeTime } from '../../src/utils/relativeTime';
 import { restoreAccessibilityFocus } from '../../src/utils/restoreAccessibilityFocus';
+import { updateWidgetSnapshot, updateWatchState } from '../../src/native/nativeModules';
 import type { FeedItem, FeedPrefs } from '../../src/types/content';
 
 // ─── Greeting ─────────────────────────────────────────────────────────────────
@@ -95,17 +95,18 @@ function buildWelcomeSummary(
     }
   }
 
-  // Comments added to items the user has previously visited
-  let newComments = 0;
+  // Replies or comments added to items the user has previously visited.
+  let newRepliesOrComments = 0;
   for (const item of items) {
     const visit = itemVisits[String(item.data.id)];
     if (!visit) continue;
     const current =
       item.kind === 'topic'   ? (item.data.replyCount  ?? 0) :
+      item.kind === 'podcast' ? (item.data.commentCount ?? 0) :
       item.kind === 'app'     ? (item.data.reviewCount  ?? 0) :
       item.kind === 'blog'    ? (item.data.commentCount ?? 0) :
       item.kind === 'guide'   ? (item.data.commentCount ?? 0) : 0;
-    newComments += Math.max(0, current - visit.commentCount);
+    newRepliesOrComments += Math.max(0, current - visit.commentCount);
   }
 
   const parts = [
@@ -114,10 +115,10 @@ function buildWelcomeSummary(
     counts.app     ? plural(counts.app,     'new app entry', 'new app entries') : null,
     counts.guide   ? plural(counts.guide,   'new guide or resource')            : null,
     counts.blog    ? plural(counts.blog,    'new blog post')                    : null,
-    newComments > 0 ? plural(newComments,   'new comment')                      : null,
+    newRepliesOrComments > 0 ? plural(newRepliesOrComments, 'new reply or comment', 'new replies or comments') : null,
   ].filter((part): part is string => !!part);
 
-  const count = Object.values(counts).reduce((total, n) => total + (n ?? 0), 0) + newComments;
+  const count = Object.values(counts).reduce((total, n) => total + (n ?? 0), 0) + newRepliesOrComments;
 
   if (count === 0 || parts.length === 0) {
     return {
@@ -297,7 +298,6 @@ export default function HomeScreen() {
   const auth         = useAuth();
   const feed         = useHomeFeed();
   const { showAlert } = useAlert();
-  const { showTip }  = useTip();
   const colorScheme  = useColorScheme();
   const a11y         = useAccessibilityPreferences();
   const { welcomeSummaryEnabled, defaultForumFilter, homeStartupBehavior } = usePreferences();
@@ -306,6 +306,7 @@ export default function HomeScreen() {
   const firstItemRef      = useRef<View | null>(null);
   const itemRefs          = useRef<Record<string, View | null>>({});
   const lastTappedIdRef   = useRef<string | null>(null);
+  const lastFocusedHomeItemKeyRef = useRef<string | null>(null);
   const pendingFocusRestoreRef = useRef(false);
   const feedItemsRef      = useRef<FeedItem[]>([]);
   const firstItemFocusTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -314,6 +315,7 @@ export default function HomeScreen() {
   // distinguishes it from the programmatic refresh() call after returning from
   // a long background absence, which should stay quiet.
   const isManualRefreshRef = useRef(false);
+  const pendingAppResumeFocusRef = useRef(false);
   const hasAnnouncedRef = useRef(false);
   const appStateRef = useRef(AppState.currentState);
   const welcomeAnnouncementTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -393,6 +395,14 @@ export default function HomeScreen() {
     () => feed.items.filter(i => i.kind === 'topic' && i.data.isUnread).length,
     [feed.items],
   );
+
+  // Keep the Unread Forums widget in sync whenever this count changes.
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      updateWidgetSnapshot({ unreadForumCount: unreadCount });
+      updateWatchState({ unreadCount });
+    }
+  }, [unreadCount]);
   const welcomeSummary = useMemo(
     () => welcomeSummaryEnabled && !welcomeDismissed
       ? buildWelcomeSummary(feed.items, lastVisitAt, itemVisits)
@@ -407,11 +417,6 @@ export default function HomeScreen() {
   useEffect(() => {
     setHomeFilter(defaultForumFilter);
   }, [defaultForumFilter]);
-
-  useFocusEffect(useCallback(() => {
-    showTip(TIP_KEYS.tabHome, TIPS.tabHome);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []));
 
   useFocusEffect(useCallback(() => {
     isTabFocusedRef.current = true;
@@ -469,23 +474,14 @@ export default function HomeScreen() {
   }, [isPreparingInitialHome]);
 
   const focusLastVisitedFeedItem = useCallback(() => {
-    const sorted = Object.entries(itemVisits)
-      .sort(([, a], [, b]) => new Date(b.seenAt).getTime() - new Date(a.seenAt).getTime());
+    clearFirstItemFocusTimers();
 
-    for (const [visitedId] of sorted) {
-      const feedItem = feedItemsRef.current.find(
-        (item) => String(item.data.id) === String(visitedId),
-      );
-      if (!feedItem) continue;
+    const focusItemByKey = (key: string): boolean => {
+      const index = feedItemsRef.current.findIndex((item) => `${item.kind}-${item.data.id}` === key);
+      if (index < 0) return false;
 
-      const key = `${feedItem.kind}-${feedItem.data.id}`;
-      const index = feedItemsRef.current.indexOf(feedItem);
-      if (index >= 0) {
-        // Non-critical: scrollToIndex can throw if the list hasn't measured this row yet;
-        // focus restoration below still runs regardless.
-        try { flatListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.3 }); }
-        catch {}
-      }
+      try { flatListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.3 }); }
+      catch {}
 
       const tryFocus = (retries: number) => {
         const node = itemRefs.current[key];
@@ -498,13 +494,30 @@ export default function HomeScreen() {
           focusFirstFeedItem(false);
         }
       };
+
       const t = setTimeout(() => tryFocus(2), 300);
       firstItemFocusTimersRef.current.push(t);
-      return;
+      return true;
+    };
+
+    const focusedKey = lastFocusedHomeItemKeyRef.current;
+    if (focusedKey && focusItemByKey(focusedKey)) return;
+
+    const sorted = Object.entries(itemVisits)
+      .sort(([, a], [, b]) => new Date(b.seenAt).getTime() - new Date(a.seenAt).getTime());
+
+    for (const [visitedId] of sorted) {
+      const feedItem = feedItemsRef.current.find(
+        (item) => String(item.data.id) === String(visitedId),
+      );
+      if (!feedItem) continue;
+
+      const key = `${feedItem.kind}-${feedItem.data.id}`;
+      if (focusItemByKey(key)) return;
     }
 
     focusFirstFeedItem(false);
-  }, [itemVisits, focusFirstFeedItem]);
+  }, [clearFirstItemFocusTimers, itemVisits, focusFirstFeedItem]);
 
   useFocusEffect(useCallback(() => {
     setItemVisitsLoaded(false);
@@ -576,6 +589,7 @@ export default function HomeScreen() {
         const now = Date.now();
         const sinceLastWelcome = now - lastWelcomeAnnouncedAtRef.current;
         const shouldAnnounce = sinceLastWelcome >= WELCOME_MIN_GAP_MS;
+        const isHomeFocused = isTabFocusedRef.current;
 
         persistence.getLastVisit()
           .then((iso) => {
@@ -584,15 +598,16 @@ export default function HomeScreen() {
             hasAnnouncedRef.current = false;
             pendingFocusRestoreRef.current = false;
             lastTappedIdRef.current = null;
-            setWelcomeFocusToken((token) => token + 1);
+            pendingAppResumeFocusRef.current = isHomeFocused;
 
-            if (shouldAnnounce) {
+            if (shouldAnnounce && isHomeFocused) {
               pendingWelcomeRef.current = true;
+              setWelcomeFocusToken((token) => token + 1);
             }
 
             // Only reset the loading indicator when the Home tab is in front —
             // avoids triggering the loading sound while the user is elsewhere.
-            if (isTabFocusedRef.current) {
+            if (isHomeFocused) {
               hasFocusedLoadingStatusRef.current = false;
               setFeedLoadedAt(null);
             }
@@ -671,11 +686,19 @@ export default function HomeScreen() {
   // An unconditional focus jump on every refresh — even background ones the
   // user didn't ask for — is disorienting, so a quiet announcement replaces it.
   useEffect(() => {
-    if (prevRefreshingRef.current && !feed.refreshing && feed.items.length > 0) {
-      setFeedLoadedAt(new Date());
+    if (prevRefreshingRef.current && !feed.refreshing) {
       const wasManual = isManualRefreshRef.current;
+      const shouldRestoreResumeFocus = pendingAppResumeFocusRef.current;
       isManualRefreshRef.current = false;
+      pendingAppResumeFocusRef.current = false;
+      if (feed.items.length === 0) {
+        prevRefreshingRef.current = feed.refreshing;
+        return;
+      }
+
+      setFeedLoadedAt(new Date());
       if (wasManual) {
+        setWelcomeDismissed(true);
         if (newItemsCount > 0) {
           AccessibilityInfo.announceForAccessibility(
             `Home updated. ${newItemsCount} new item${newItemsCount === 1 ? '' : 's'}.`,
@@ -684,13 +707,23 @@ export default function HomeScreen() {
         } else {
           AccessibilityInfo.announceForAccessibility('Refreshed. No new items.');
         }
+      } else if (shouldRestoreResumeFocus && a11y.screenReaderEnabled) {
+        focusLastVisitedFeedItem();
       }
     }
     prevRefreshingRef.current = feed.refreshing;
-  }, [feed.refreshing, feed.items.length, newItemsCount, focusFirstFeedItem, a11y.screenReaderEnabled]);
+  }, [
+    feed.refreshing,
+    feed.items.length,
+    newItemsCount,
+    focusFirstFeedItem,
+    focusLastVisitedFeedItem,
+    a11y.screenReaderEnabled,
+  ]);
 
   function handlePullToRefresh() {
     isManualRefreshRef.current = true;
+    setWelcomeDismissed(true);
     feed.refresh();
   }
 
@@ -781,6 +814,7 @@ export default function HomeScreen() {
         }
 
         setItemVisits((prev) => ({ ...prev, ...nextVisits }));
+        setWelcomeDismissed(true);
         AccessibilityInfo.announceForAccessibility('All new activity marked as read.');
       },
     });
@@ -1138,7 +1172,10 @@ export default function HomeScreen() {
                   itemRefs.current[key] = el;
                   if (index === 0) firstItemRef.current = el;
                 }}
-                onFocus={() => { lastFocusedBeforeModal.current = itemRefs.current[key]; }}
+                onFocus={() => {
+                  lastFocusedBeforeModal.current = itemRefs.current[key];
+                  lastFocusedHomeItemKeyRef.current = key;
+                }}
                 onItemDeleted={() => feed.refresh()}
               />
             );

@@ -7,4 +7,14 @@ RCT_EXTERN_METHOD(
   reject:(RCTPromiseRejectBlock)reject
 )
 
+RCT_EXTERN_METHOD(
+  consumePendingBlogText:(RCTPromiseResolveBlock)resolve
+  reject:(RCTPromiseRejectBlock)reject
+)
+
+RCT_EXTERN_METHOD(
+  consumePendingPodcastURL:(RCTPromiseResolveBlock)resolve
+  reject:(RCTPromiseRejectBlock)reject
+)
+
 @end

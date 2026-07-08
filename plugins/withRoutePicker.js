@@ -5,9 +5,10 @@
  * during prebuild, enabling programmatic presentation of the system
  * AirPlay / Bluetooth audio route picker sheet.
  */
-const { withDangerousMod } = require('@expo/config-plugins');
+const { withDangerousMod, withXcodeProject } = require('@expo/config-plugins');
 const path = require('path');
 const fs   = require('fs');
+const { addNativeModuleSources } = require('./lib/addNativeModuleSources');
 
 const withRoutePicker = (config) => {
   config = withDangerousMod(config, ['ios', (cfg) => {
@@ -20,6 +21,11 @@ const withRoutePicker = (config) => {
     }
     return cfg;
   }]);
+
+  config = withXcodeProject(config, (cfg) => {
+    addNativeModuleSources(cfg.modResults, cfg.modRequest.projectRoot, cfg.modRequest.projectName, 'RoutePicker');
+    return cfg;
+  });
 
   return config;
 };

@@ -7,6 +7,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { EmptyState } from '../src/components/EmptyState';
 import { Screen } from '../src/components/Screen';
+import { GlassView } from '../src/components/GlassView';
 import { FeedCard } from '../src/components/FeedCard';
 import { FilterPicker } from '../src/components/FilterPicker';
 import { AutoLoadMoreFooter } from '../src/components/AutoLoadMoreFooter';
@@ -167,7 +168,7 @@ export default function GuideBrowse() {
         }
       >
         {/* Search */}
-        <View style={{
+        <GlassView style={{
           flexDirection: 'row', alignItems: 'center',
           backgroundColor: colors.inputBackground, borderRadius: 10, borderWidth: 1,
           borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10,
@@ -186,7 +187,7 @@ export default function GuideBrowse() {
             returnKeyType="search"
             clearButtonMode="while-editing"
           />
-        </View>
+        </GlassView>
 
         {/* Kind filter */}
         <FilterPicker

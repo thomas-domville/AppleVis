@@ -6,12 +6,13 @@
  * audio session access is already granted by the existing 'audio'
  * UIBackgroundMode.
  */
-const { withDangerousMod } = require('@expo/config-plugins');
+const { withDangerousMod, withXcodeProject } = require('@expo/config-plugins');
 const path = require('path');
 const fs = require('fs');
+const { addNativeModuleSources } = require('./lib/addNativeModuleSources');
 
-const withAudioEffects = (config) =>
-  withDangerousMod(config, [
+const withAudioEffects = (config) => {
+  config = withDangerousMod(config, [
     'ios',
     (cfg) => {
       const src  = path.join(cfg.modRequest.projectRoot, 'ios-native', 'AudioEffects');
@@ -23,5 +24,13 @@ const withAudioEffects = (config) =>
       return cfg;
     },
   ]);
+
+  config = withXcodeProject(config, (cfg) => {
+    addNativeModuleSources(cfg.modResults, cfg.modRequest.projectRoot, cfg.modRequest.projectName, 'AudioEffects');
+    return cfg;
+  });
+
+  return config;
+};
 
 module.exports = withAudioEffects;

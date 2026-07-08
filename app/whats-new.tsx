@@ -16,60 +16,44 @@ type ChangeItem = {
   link?: ChangeLink;
 };
 
-const CURRENT_VERSION = '2026.0.6';
+const CURRENT_VERSION = '2026.0.7';
 
 const CHANGES: ChangeItem[] = [
   {
-    icon: 'chatbubble-ellipses-outline',
+    icon: 'watch-outline',
     tag: 'New',
-    title: 'Contact App Support — No Mail App Needed',
-    description: 'Reach the AppleVis team without ever leaving the app. The new contact wizard lets you choose what you need help with, write your message, and send it in a few taps. If you are signed in, your name and email are filled in automatically. Open Profile → Contact App Support.',
-    link: { label: 'Learn More', kind: 'helpArticle', articleId: 'trouble-contact' },
+    title: 'AppleVis on Apple Watch',
+    description: 'A brand-new Apple Watch app lets you see what episode is playing, play or pause, and skip forward or back right from your wrist — no need to take out your phone. It also shows how many forum replies are waiting for you.',
   },
   {
-    icon: 'sparkles-outline',
+    icon: 'share-outline',
     tag: 'New',
-    title: 'Apple Intelligence Features',
-    description: 'On iPhone 15 Pro or later running iOS 26 with Apple Intelligence turned on, AppleVis can now summarise long forum threads, simplify complex text into plain language, give you an accessibility snapshot for any app, rewrite your draft in a friendly tone, and translate non-English text — all on your device, privately, without sending anything to a server.',
-    link: { label: 'Open Setting', kind: 'route', route: '/settings-intelligence' },
+    title: 'Share Into AppleVis From Other Apps',
+    description: 'Found an app, podcast, or article somewhere else? Use the Share button in Safari or any other app and choose AppleVis. It opens the right submission form automatically with the link already filled in.',
   },
   {
-    icon: 'mic-circle-outline',
+    icon: 'laptop-outline',
     tag: 'New',
-    title: 'Three New Siri Shortcuts',
-    description: 'AppleVis now understands three more Siri phrases. Say "Resume my AppleVis podcast" to pick up where you left off. Say "Search AppleVis for accessibility tips" — or any topic — to open search with your words already filled in. Say "Open my AppleVis saved items" to jump straight to your saved content.',
-    link: { label: 'Learn More', kind: 'helpArticle', articleId: 'smart-siri-widgets' },
+    title: 'Pick Up Where You Left Off on Another Device',
+    description: 'Reading a topic or listening to a podcast on your iPhone? With Handoff, an AppleVis icon appears on your nearby iPad or Mac so you can jump straight back in on that device.',
   },
   {
-    icon: 'headset-outline',
+    icon: 'keypad-outline',
     tag: 'New',
-    title: 'Skip to the Next Episode with AirPods',
-    description: 'When you have episodes in your podcast queue, use the next-track gesture on your AirPods or the next-track button on the Lock Screen to skip to the next episode. The previous-track button restarts the current episode from the beginning.',
+    title: 'Keyboard Shortcuts on iPad',
+    description: 'If you use an external keyboard with your iPad, hold down the Command key to see new shortcuts — jump to Search, Settings, or straight to Forums, Apps, Podcasts, or Resources.',
   },
   {
-    icon: 'image-outline',
-    tag: 'Improved',
-    title: 'Podcast Artwork on the Lock Screen',
-    description: 'The episode artwork now appears on your Lock Screen, in Dynamic Island, and in the Control Center Now Playing card while a podcast is playing. Previously the artwork area was blank during playback.',
-  },
-  {
-    icon: 'book-outline',
-    tag: 'Improved',
-    title: 'Help Centre Refreshed',
-    description: 'Every guide has been reviewed and updated to match what the app does today. A brand-new Apple Intelligence guide explains which features it powers, which devices support it, and how to turn it on. The Siri article now lists every phrase you can say by name. The Contact App Support guide reflects the new in-app wizard.',
-    link: { label: 'Open Help Centre', kind: 'route', route: '/help' },
-  },
-  {
-    icon: 'color-palette-outline',
-    tag: 'Improved',
-    title: 'App Icon Adapts to Your Style',
-    description: 'The AppleVis app icon now comes in three versions — light, dark, and tinted — and switches automatically to match your iPhone Home Screen appearance on iOS 18 and later.',
-  },
-  {
-    icon: 'construct-outline',
+    icon: 'checkmark-done-circle-outline',
     tag: 'Fixed',
-    title: 'Dynamic Island and CarPlay Polished',
-    description: 'The Dynamic Island compact view now shows the play icon when paused — not the pause icon — making the playback state easier to read at a glance. The CarPlay episode list now refreshes in place without pushing you back to the top of the navigation stack when new episodes arrive.',
+    title: 'Several Features Now Actually Work',
+    description: 'A thorough check turned up a number of features that looked fine but were not fully working behind the scenes. Apple Intelligence, Siri Shortcuts, AirPlay, Spotlight search results, Lock Screen and Control Center playback controls, Voice Boost, Trim Silence, on-device podcast artwork descriptions, and iCloud sync of your podcast library are now all working properly.',
+  },
+  {
+    icon: 'notifications-outline',
+    tag: 'Improved',
+    title: 'AppleVis Categories in Focus Settings',
+    description: 'AppleVis notification categories now appear in Settings → Focus, so you can start choosing which ones — like mentions or new episodes — you want to allow through during a Focus mode.',
   },
 ];
 
@@ -96,7 +80,7 @@ export default function WhatsNew() {
             Version {CURRENT_VERSION}
           </Text>
           <Text style={{ fontSize: 16, color: colors.textSecondary, textAlign: 'center', lineHeight: 23 }}>
-            In-app contact wizard, Apple Intelligence on iOS 26, three new Siri shortcuts, AirPods next-episode, Lock Screen artwork, and a fully refreshed Help Centre.
+            A new Apple Watch app, sharing into AppleVis from other apps, picking up where you left off on another device, iPad keyboard shortcuts, and a big pass making sure everything actually works as expected.
           </Text>
         </View>
 
@@ -156,6 +140,30 @@ export default function WhatsNew() {
         })}
 
         {/* Previous version notes */}
+        <View style={[styles.card, { backgroundColor: colors.pill, borderColor: colors.border, borderWidth: 1, marginBottom: 10 }]}
+          accessible accessibilityLabel="Also in version 2026.0.6: in-app contact wizard, Apple Intelligence features, three new Siri shortcuts, AirPods next-episode skip, podcast artwork on the Lock Screen, refreshed Help Centre, adaptive app icon, Dynamic Island fix.">
+          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,
+            textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>
+            Also in 2026.0.6
+          </Text>
+          {[
+            'Contact App Support wizard — reach the AppleVis team without leaving the app or using Mail',
+            'Apple Intelligence features — summarize, simplify, and translate text on-device (iPhone 15 Pro+, iOS 26)',
+            'Three new Siri Shortcuts — resume your podcast, search AppleVis, or open saved items by voice',
+            'Skip to the next queued episode using AirPods or the Lock Screen',
+            'Podcast artwork appears on the Lock Screen, Dynamic Island, and Control Center',
+            'Help Centre fully refreshed to match the current app',
+            'App icon adapts automatically to your Home Screen style (iOS 18+)',
+            'Dynamic Island shows the correct play or pause icon',
+          ].map((item) => (
+            <View key={item} style={{ flexDirection: 'row', gap: 8, marginBottom: 6 }}
+              accessible accessibilityLabel={item}>
+              <Text style={{ color: colors.accent, fontSize: 15 }} accessibilityElementsHidden>•</Text>
+              <Text style={{ flex: 1, fontSize: 14, color: colors.textSecondary, lineHeight: 20 }}>{item}</Text>
+            </View>
+          ))}
+        </View>
+
         <View style={[styles.card, { backgroundColor: colors.pill, borderColor: colors.border, borderWidth: 1, marginBottom: 10 }]}
           accessible accessibilityLabel="Also in version 2026.0.5: submit bug reports, blog posts, podcasts, and app entries inside the app. Extended Share Extension. Step-by-step wizard guides in Help Centre. Refreshed UI sounds.">
           <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary,

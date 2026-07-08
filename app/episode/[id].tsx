@@ -9,6 +9,7 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Screen } from '../../src/components/Screen';
+import { GlassView } from '../../src/components/GlassView';
 import { EditContentModal } from '../../src/components/EditContentModal';
 import { usePlayer } from '../../src/contexts/PlayerContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
@@ -25,7 +26,7 @@ import { persistence } from '../../src/services/persistence';
 import { useEpisodeDurations } from '../../src/hooks/useEpisodeDurations';
 import { api } from '../../src/services/api';
 import { cachedApi } from '../../src/services/cachedApi';
-import { showAirPlayPicker } from '../../src/native/nativeModules';
+import { showAirPlayPicker, describeImage } from '../../src/native/nativeModules';
 import { isAppleIntelligenceAvailable, readAloud, summariseText } from '../../src/services/intelligenceService';
 import { relativeTime } from '../../src/utils/relativeTime';
 import { displayCommentSubject, subjectLabel } from '../../src/utils/commentSubject';
@@ -257,10 +258,11 @@ function ShowNotes({
                 accessibilityRole="button"
                 accessibilityLabel="Close transcript"
                 hitSlop={12}
-                style={{ backgroundColor: colors.pill, borderRadius: 14,
-                  paddingHorizontal: 14, paddingVertical: 6 }}
               >
-                <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>Done</Text>
+                <GlassView style={{ backgroundColor: colors.pill, borderRadius: 14,
+                  paddingHorizontal: 14, paddingVertical: 6 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>Done</Text>
+                </GlassView>
               </Pressable>
             </View>
             <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 48 }}>
@@ -880,6 +882,17 @@ export default function EpisodeDetail() {
   // ── Save state ───────────────────────────────────────────────────────────
   const [isSaved, setIsSaved] = useState(false);
 
+  // ── Artwork auto-description (on-device Vision) ──────────────────────────
+  const [artworkDescription, setArtworkDescription] = useState<string | null>(null);
+  useEffect(() => {
+    if (!params.artworkUrl) return;
+    let cancelled = false;
+    describeImage(params.artworkUrl).then((description) => {
+      if (!cancelled && description) setArtworkDescription(description);
+    });
+    return () => { cancelled = true; };
+  }, [params.artworkUrl]);
+
   // ── Download state ───────────────────────────────────────────────────────
   const [downloadState, setDownloadState] = useState<DownloadState>('idle');
 
@@ -1433,7 +1446,9 @@ export default function EpisodeDetail() {
                     <Image source={{ uri: params.artworkUrl }}
                       style={{ width: 220, height: 220, borderRadius: 16 }}
                       resizeMode="cover" accessible accessibilityRole="image"
-                      accessibilityLabel={`Podcast artwork. ${params.showTitle}`}
+                      accessibilityLabel={artworkDescription
+                        ? `Podcast artwork. ${artworkDescription}`
+                        : `Podcast artwork. ${params.showTitle}`}
                       accessibilityIgnoresInvertColors />
                   </View>
                 ) : (

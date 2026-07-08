@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { api } from '../services/api';
+import { GlassView } from './GlassView';
 
 export type EditContentModalProps = {
   visible: boolean;
@@ -123,7 +124,7 @@ export function EditContentModal({
         onAccessibilityEscape={onClose}
       >
         {/* Header */}
-        <View style={[ss.header, { borderBottomColor: colors.border, backgroundColor: colors.card }]}>
+        <GlassView style={[ss.header, { borderBottomColor: colors.border, backgroundColor: colors.card }]}>
           <Pressable
             onPress={onClose}
             accessible accessibilityRole="button" accessibilityLabel="Cancel"
@@ -149,7 +150,7 @@ export function EditContentModal({
               : <Text style={[ss.headerBtnText, { color: colors.accent, fontWeight: '700' }]}>Save</Text>
             }
           </Pressable>
-        </View>
+        </GlassView>
 
         {loading
           ? (

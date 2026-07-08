@@ -19,7 +19,6 @@ import { useSearchTranslation } from '../../src/hooks/useSearchTranslation';
 import { useFocusRestore } from '../../src/hooks/useFocusRestore';
 import { useHandoff } from '../../src/hooks/useHandoff';
 import { useToast } from '../../src/contexts/ToastContext';
-import { useTip, TIP_KEYS, TIPS } from '../../src/contexts/ContextualTipContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { usePreferences } from '../../src/contexts/PreferencesContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
@@ -154,7 +153,6 @@ export default function DiscoverScreen() {
     searchTranslationEnabled,
   } = usePreferences();
   const { showToast } = useToast();
-  const { showTip }   = useTip();
   const search  = useSearch();
   const appsHubRef    = useRef<View>(null);
   const forumsHubRef  = useRef<View>(null);
@@ -178,10 +176,8 @@ export default function DiscoverScreen() {
     );
 
   useFocusEffect(useCallback(() => {
-    showTip(TIP_KEYS.tabDiscover, TIPS.tabDiscover);
     const t = setTimeout(() => scrollRef.current?.flashScrollIndicators(), 350);
     return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []));
 
 

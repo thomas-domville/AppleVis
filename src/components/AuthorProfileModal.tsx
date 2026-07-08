@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../contexts/ThemeContext';
 import { api } from '../services/api';
+import { GlassView } from './GlassView';
 
 const APPLEVIS_BASE = 'https://www.applevis.com';
 
@@ -131,7 +132,7 @@ export function AuthorProfileModal({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1, justifyContent: 'flex-end' }}
       >
-        <View
+        <GlassView
           onAccessibilityEscape={onClose}
           style={{
             backgroundColor: colors.card,
@@ -379,7 +380,7 @@ export function AuthorProfileModal({
               <Text style={{ fontSize: 16, color: colors.textSecondary }}>Close</Text>
             </Pressable>
           </ScrollView>
-        </View>
+        </GlassView>
       </KeyboardAvoidingView>
     </Modal>
   );

@@ -1,7 +1,8 @@
 import '../src/i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, I18nManager, Image, Platform, StyleSheet, View,
+  ActivityIndicator, Animated, AppState, I18nManager, Image, NativeEventEmitter, NativeModules,
+  Platform, StyleSheet, View,
 } from 'react-native';
 import { Stack, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -13,9 +14,12 @@ import { apiHealth } from '../src/services/apiHealth';
 import { cachedApi } from '../src/services/cachedApi';
 import { sounds } from '../src/services/sounds';
 import { authEvents } from '../src/services/authEvents';
-import { setupNotifications, handleNotificationResponse, NOTIFICATION_SOUND_FILE } from '../src/services/notifications';
-import { api } from '../src/services/api';
+import { setupNotifications, handleNotificationResponse, syncPushRegistration } from '../src/services/notifications';
 import { handleIncomingUrl } from '../src/services/universalLinks';
+import { routeForContentDestination } from '../src/navigation/routeResolver';
+import {
+  consumePendingWidgetAction, consumePendingAppShareURL, consumePendingBlogText, consumePendingPodcastShareURL,
+} from '../src/native/nativeModules';
 import { registerBackgroundFetch } from '../src/tasks/backgroundFetch';
 import { registerBackgroundTasks } from '../src/services/backgroundFetch';
 import { onboarding } from '../src/services/onboarding';
@@ -70,8 +74,29 @@ function AuthExpiryHandler() {
 
 function AppServices() {
   useKeyboardShortcuts();
+
+  // Dispatches iPadOS hardware keyboard shortcuts (⌘F, ⌘1-4, ⌘,) registered
+  // by useKeyboardShortcuts() — see APP_KEYBOARD_SHORTCUTS for the full list.
+  useEffect(() => {
+    if (Platform.OS !== 'ios' || !NativeModules.AppleVisKeyboardShortcuts) return;
+    const emitter = new NativeEventEmitter(NativeModules.AppleVisKeyboardShortcuts);
+    const sub = emitter.addListener('onKeyCommand', ({ identifier }: { identifier: string }) => {
+      switch (identifier) {
+        case 'search':        router.push('/search'); break;
+        case 'tab_forums':    router.push(routeForContentDestination('forums') as any); break;
+        case 'tab_apps':      router.push(routeForContentDestination('apps') as any); break;
+        case 'tab_podcasts':  router.push(routeForContentDestination('podcasts') as any); break;
+        case 'tab_resources': router.push(routeForContentDestination('resources') as any); break;
+        case 'settings':      router.push('/settings' as any); break;
+        default: break;
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   const { notificationPrefs, notificationSound } = usePreferences();
   const { user } = useAuth();
+  const player = usePlayer();
 
   // Reactive foreground notification handler — re-registers when prefs change.
   useEffect(() => {
@@ -91,14 +116,17 @@ function AppServices() {
     });
   }, [notificationPrefs, notificationSound]);
 
-  // Sync the user's chosen notification sound to the server whenever they
-  // sign in or change the sound picker. Drupal reads field_push_sound to
-  // include the right sound file name in push notification payloads.
+  // Keep the signed-in user's Expo push token and chosen sound registered with
+  // AppleVis. This also covers the common case where notification permission is
+  // granted after sign-in, so the original sign-in-time token upload was skipped.
+  // Category changes retry the sync as a repair path; Drupal still owns deciding
+  // which categories generate remote pushes.
   useEffect(() => {
     if (!user) return;
-    const soundFile = NOTIFICATION_SOUND_FILE[notificationSound] ?? 'default';
-    api.account.updatePushSound(soundFile, user.csrfToken).catch(() => {});
-  }, [user, notificationSound]);
+    const anyNotificationEnabled = Object.values(notificationPrefs).some(Boolean);
+    if (!anyNotificationEnabled) return;
+    syncPushRegistration(user.csrfToken, notificationSound).catch(() => {});
+  }, [user, notificationPrefs, notificationSound]);
 
   useEffect(() => {
     setupNotifications().catch(() => {});
@@ -113,6 +141,43 @@ function AppServices() {
     const linkSub = Linking.addEventListener('url', ({ url }) => handleIncomingUrl(url));
 
     return () => { notifSub.remove(); linkSub.remove(); };
+  }, []);
+
+  // Widget interactive buttons (play/pause, iOS 18 Controls) can't open a URL
+  // from inside the extension, so they leave a "pendingWidgetAction" signal
+  // in shared storage and rely on openAppWhenRun to bring the app forward.
+  // Check for it on cold launch and every time the app returns to foreground.
+  const playerRef = useRef(player);
+  playerRef.current = player;
+
+  useEffect(() => {
+    async function checkPendingWidgetAction() {
+      const action = await consumePendingWidgetAction();
+      if (!action) return;
+      if (action === 'podcasts?action=play')  { playerRef.current.play();  return; }
+      if (action === 'podcasts?action=pause') { playerRef.current.pause(); return; }
+      handleIncomingUrl(`applevis://${action}`);
+    }
+    // Content shared into AppleVis via the Share Extension (Safari/App Store/
+    // Podcasts share sheet) — the extension can't open a URL from inside
+    // itself for text/file shares, so it leaves the value in shared storage
+    // as a fallback alongside its own deep-link attempt.
+    async function checkPendingShare() {
+      const appUrl = await consumePendingAppShareURL();
+      if (appUrl) { handleIncomingUrl(`applevis://submit-app?url=${encodeURIComponent(appUrl)}`); return; }
+
+      const podcastUrl = await consumePendingPodcastShareURL();
+      if (podcastUrl) { handleIncomingUrl('applevis://submit-podcast'); return; }
+
+      const blogText = await consumePendingBlogText();
+      if (blogText) { handleIncomingUrl(`applevis://submit-blog?text=${encodeURIComponent(blogText)}`); return; }
+    }
+    checkPendingWidgetAction();
+    checkPendingShare();
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') { checkPendingWidgetAction(); checkPendingShare(); }
+    });
+    return () => sub.remove();
   }, []);
 
   return null;

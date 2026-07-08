@@ -7,6 +7,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { EmptyState } from '../src/components/EmptyState';
 import { Screen } from '../src/components/Screen';
+import { GlassView } from '../src/components/GlassView';
 import { FeedCard } from '../src/components/FeedCard';
 import { AutoLoadMoreFooter } from '../src/components/AutoLoadMoreFooter';
 import { useBlogList } from '../src/hooks/useBlogList';
@@ -118,7 +119,7 @@ export default function BlogBrowse() {
         }
       >
         {/* Search */}
-        <View style={{
+        <GlassView style={{
           flexDirection: 'row', alignItems: 'center',
           backgroundColor: colors.inputBackground, borderRadius: 10, borderWidth: 1,
           borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10,
@@ -137,7 +138,7 @@ export default function BlogBrowse() {
             returnKeyType="search"
             clearButtonMode="while-editing"
           />
-        </View>
+        </GlassView>
 
         {/* Section header */}
         {!blog.loading && visibleBlogs.length > 0 && (

@@ -1,5 +1,5 @@
 import { Audio, AVPlaybackStatus } from 'expo-av';
-import { AccessibilityInfo, AppState, Platform } from 'react-native';
+import { AccessibilityInfo, AppState, NativeEventEmitter, NativeModules, Platform } from 'react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PodcastEpisode, Chapter } from '../types/content';
 import { persistence } from '../services/persistence';
@@ -11,6 +11,7 @@ import {
   updateNowPlayingInfo, clearNowPlayingInfo,
   startPodcastLiveActivity, updatePodcastLiveActivity, endPodcastLiveActivity,
   setupRemoteCommands, setVoiceBoostEnabled, setTrimSilenceEnabled,
+  updateWidgetSnapshot, updateWatchState,
 } from '../native/nativeModules';
 
 export type PlaybackSpeed = 0.5 | 0.75 | 1.0 | 1.25 | 1.5 | 1.75 | 2.0 | 2.5 | 3.0;
@@ -121,7 +122,7 @@ export function usePodcastPlayer() {
     previousTrack: () => { soundRef.current?.setPositionAsync(0); },
   });
 
-  // Register lock screen / AirPods / CarPlay remote commands once, re-register on skip interval change.
+  // Register lock screen / AirPods remote commands once, re-register on skip interval change.
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
     setupRemoteCommands({
@@ -137,6 +138,22 @@ export function usePodcastPlayer() {
       skipForwardInterval: podcastSkipForward,
     });
   }, [podcastSkipBack, podcastSkipForward]);
+
+  // Dispatch play/pause/skip actions sent from the paired Apple Watch app.
+  useEffect(() => {
+    if (Platform.OS !== 'ios' || !NativeModules.AppleVisWatchConnectivity) return undefined;
+    const emitter = new NativeEventEmitter(NativeModules.AppleVisWatchConnectivity);
+    const sub = emitter.addListener('onWatchAction', ({ action }: { action: string }) => {
+      switch (action) {
+        case 'play':         actionsRef.current.play(); break;
+        case 'pause':        actionsRef.current.pause(); break;
+        case 'skipBack':     actionsRef.current.skipBack(); break;
+        case 'skipForward':  actionsRef.current.skipForward(); break;
+        default: break;
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   // Sync voice boost native state with preference.
   useEffect(() => {
@@ -198,6 +215,8 @@ export function usePodcastPlayer() {
       if (Platform.OS === 'ios') {
         clearNowPlayingInfo();
         endPodcastLiveActivity();
+        updateWidgetSnapshot({ nowPlayingTitle: '', nowPlayingShow: '', nowPlayingProgress: 0, isPlaying: false });
+        updateWatchState({ episodeId: '', episodeTitle: '', showTitle: '', progress: 0, isPlaying: false });
       }
     };
   }, []);
@@ -239,6 +258,22 @@ export function usePodcastPlayer() {
         elapsedTime: state.position,
         playbackRate: state.isPlaying ? state.speed : 0,
       });
+      // Widgets refresh on their own 15-minute timeline policy — only push
+      // on discrete state changes (episode/play-pause) here, not every tick,
+      // since WidgetKit throttles how often reloadAllTimelines() can fire.
+      updateWidgetSnapshot({
+        nowPlayingTitle: state.episode.title,
+        nowPlayingShow: state.episode.showTitle,
+        nowPlayingProgress: state.duration > 0 ? state.position / state.duration : 0,
+        isPlaying: state.isPlaying,
+      });
+      updateWatchState({
+        episodeId: state.episode.id,
+        episodeTitle: state.episode.title,
+        showTitle: state.episode.showTitle,
+        progress: state.duration > 0 ? state.position / state.duration : 0,
+        isPlaying: state.isPlaying,
+      });
     }
 
     if (state.isPlaying && state.episode && Platform.OS === 'ios') {
@@ -274,6 +309,8 @@ export function usePodcastPlayer() {
 
     if (!state.episode) {
       endPodcastLiveActivity();
+      updateWidgetSnapshot({ nowPlayingTitle: '', nowPlayingShow: '', nowPlayingProgress: 0, isPlaying: false });
+      updateWatchState({ episodeId: '', episodeTitle: '', showTitle: '', progress: 0, isPlaying: false });
       return undefined;
     }
 
@@ -340,6 +377,8 @@ export function usePodcastPlayer() {
         if (Platform.OS === 'ios') {
           clearNowPlayingInfo();
           endPodcastLiveActivity();
+          updateWidgetSnapshot({ nowPlayingTitle: '', nowPlayingShow: '', nowPlayingProgress: 0, isPlaying: false });
+          updateWatchState({ episodeId: '', episodeTitle: '', showTitle: '', progress: 0, isPlaying: false });
         }
         AccessibilityInfo.announceForAccessibility('Sleep timer: episode ended, playback stopped.');
         return { ...prev, isPlaying: false, sleepTimerRemaining: null, sleepAtEndOfEpisode: false };
@@ -357,6 +396,8 @@ export function usePodcastPlayer() {
       if (Platform.OS === 'ios') {
         clearNowPlayingInfo();
         endPodcastLiveActivity();
+        updateWidgetSnapshot({ nowPlayingTitle: '', nowPlayingShow: '', nowPlayingProgress: 0, isPlaying: false });
+        updateWatchState({ episodeId: '', episodeTitle: '', showTitle: '', progress: 0, isPlaying: false });
       }
       return { ...prev, isPlaying: false, sleepTimerRemaining: null };
     });
@@ -525,6 +566,8 @@ export function usePodcastPlayer() {
     if (Platform.OS === 'ios') {
       clearNowPlayingInfo();
       endPodcastLiveActivity();
+      updateWidgetSnapshot({ nowPlayingTitle: '', nowPlayingShow: '', nowPlayingProgress: 0, isPlaying: false });
+      updateWatchState({ episodeId: '', episodeTitle: '', showTitle: '', progress: 0, isPlaying: false });
     }
     persistence.setLastEpisode(null).catch(() => {});
     setState(DEFAULT);

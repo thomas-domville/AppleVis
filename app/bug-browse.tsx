@@ -8,6 +8,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Screen } from '../src/components/Screen';
+import { GlassView } from '../src/components/GlassView';
 import { EmptyState } from '../src/components/EmptyState';
 import { AutoLoadMoreFooter } from '../src/components/AutoLoadMoreFooter';
 import { FilterPicker } from '../src/components/FilterPicker';
@@ -404,7 +405,7 @@ export default function BugBrowse() {
         />
 
         {/* Search */}
-        <View style={{
+        <GlassView style={{
           flexDirection: 'row', alignItems: 'center',
           backgroundColor: colors.inputBackground, borderRadius: 10, borderWidth: 1,
           borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 12,
@@ -423,11 +424,11 @@ export default function BugBrowse() {
             returnKeyType="search"
             clearButtonMode="while-editing"
           />
-        </View>
+        </GlassView>
 
         {/* Section header */}
         {!loading && visibleBugs.length > 0 && (
-          <View style={{
+          <GlassView style={{
             flexDirection: 'row', alignItems: 'center', marginBottom: 10,
             backgroundColor: colors.inputBackground,
             borderRadius: 10, borderWidth: 1, borderColor: colors.border,
@@ -458,7 +459,7 @@ export default function BugBrowse() {
                 {visibleBugs.length}
               </Text>
             </View>
-          </View>
+          </GlassView>
         )}
 
         {/* Loading */}

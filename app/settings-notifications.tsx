@@ -8,7 +8,7 @@ import { useTheme } from '../src/contexts/ThemeContext';
 import { usePreferences } from '../src/contexts/PreferencesContext';
 import { useToast } from '../src/contexts/ToastContext';
 import { useAuth } from '../src/contexts/AuthContext';
-import { requestNotificationPermissions } from '../src/services/notifications';
+import { requestNotificationPermissions, syncPushRegistration } from '../src/services/notifications';
 import { sounds } from '../src/services/sounds';
 import type { NotificationPrefs, NotificationSound } from '../src/contexts/PreferencesContext';
 
@@ -82,7 +82,7 @@ export default function NotificationSettings() {
   const { colors, styles } = useTheme();
   const { showToast } = useToast();
   const router = useRouter();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, user } = useAuth();
   const {
     notificationPrefs,
     setNotificationPrefs,
@@ -144,6 +144,9 @@ export default function NotificationSettings() {
 
   async function handleRequestPermissions() {
     const granted = await requestNotificationPermissions();
+    if (granted && user) {
+      syncPushRegistration(user.csrfToken, notificationSound).catch(() => {});
+    }
     refreshPermissionStatus();
     showToast(
       granted

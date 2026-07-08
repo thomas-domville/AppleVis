@@ -98,75 +98,82 @@ export type WidgetSnapshot = {
   nowPlayingTitle: string;
   nowPlayingShow: string;
   nowPlayingProgress: number;  // 0.0–1.0
+  isPlaying: boolean;
   unreadForumCount: number;
   savedItemCount: number;
 };
 
 /**
  * Writes widget data to the shared App Group container so the WidgetKit
- * extension can read it and refresh the home/lock screen widgets.
+ * extension can read it and refresh the Continue Listening / Unread Forums
+ * home/lock screen widgets and iOS 18 Controls.
  *
- * Planned widgets:
- *   • Small  — unread topic count badge
- *   • Medium — latest podcast episode + unread count
- *   • Large  — "What's New" digest (new topics, new episodes, updated apps)
- *   • Lock Screen — unread count or now-playing episode title
+ * Accepts a *partial* snapshot — the native side (AppleVisWidgetDataWriter.swift)
+ * only overwrites the keys present in the object passed here, so the player
+ * can push just its own fields without needing to know the current unread
+ * count, and vice versa.
  *
- * Native side (Swift, requires WidgetKit + App Group entitlement):
- *
- *   import WidgetKit
- *
- *   // Write to shared container:
- *   let defaults = UserDefaults(suiteName: "group.com.applevis.app")
- *   defaults?.set(snapshot.unreadTopicCount, forKey: "unreadTopicCount")
- *   defaults?.set(snapshot.latestPodcastTitle, forKey: "latestPodcastTitle")
- *
- *   // Tell WidgetKit to reload:
- *   WidgetCenter.shared.reloadAllTimelines()
- *
+ * Native side: ios-native/Widget/AppleVisWidgetDataWriter.swift
  * Entitlements: com.apple.security.application-groups = ["group.com.applevis.app"]
  */
-export function updateWidgetSnapshot(snapshot: WidgetSnapshot): void {
+export function updateWidgetSnapshot(snapshot: Partial<WidgetSnapshot>): void {
   NativeModules.AppleVisWidgetDataWriter?.update(snapshot);
 }
 
-// ─── Focus Filter ─────────────────────────────────────────────────────────────
+// ─── Watch (WatchConnectivity) ─────────────────────────────────────────────
 
-export type FocusFilterConfig = {
-  /** Which notification types to allow through during this Focus. */
-  allowedCategories: ('forumReply' | 'mention' | 'newEpisode' | 'appUpdate')[];
+export type WatchSnapshot = {
+  episodeId: string;
+  episodeTitle: string;
+  showTitle: string;
+  progress: number; // 0.0–1.0
+  isPlaying: boolean;
+  unreadCount: number;
 };
 
 /**
- * Registers an App Intent that appears in Settings → Focus → [mode] → App Filters,
- * letting users choose which AppleVis notification categories break through
- * their Focus mode (e.g. allow Mentions but mute everything else).
+ * Pushes a *partial* Now Playing / unread-count snapshot to the paired
+ * Apple Watch app via WatchConnectivity's updateApplicationContext — only
+ * the keys present are overwritten, delivered even if the watch app isn't
+ * currently running.
  *
- * Native side (Swift, requires AppIntents + UserNotifications):
- *
- *   import AppIntents
- *
- *   struct AppleVisFocusFilterIntent: SetFocusFilterIntent {
- *     static var title: LocalizedStringResource = "AppleVis"
- *     static var description = IntentDescription(
- *       "Choose which AppleVis notifications to allow during Focus."
- *     )
- *
- *     @Parameter(title: "Allowed notification categories")
- *     var allowedCategories: [NotificationCategory]
- *
- *     func perform() async throws -> some IntentResult {
- *       // Persist allowedCategories; use in UNUserNotificationCenter delegate
- *       // to filter outgoing notifications.
- *       return .result()
- *     }
- *   }
- *
- * Info.plist: no extra keys needed beyond existing notification entitlements.
+ * Native side: ios-native/Watch/AppleVisWatchConnectivity.swift
+ * Watch-side consumer: ios-native/Watch/AppleVisWatchApp.swift (WatchModel)
  */
-export function registerFocusFilter(_config: FocusFilterConfig): void {
-  logDev('NativeModules', 'registerFocusFilter — native module not yet built.');
+export function updateWatchState(snapshot: Partial<WatchSnapshot>): void {
+  NativeModules.AppleVisWatchConnectivity?.update(snapshot);
 }
+
+/**
+ * Reads and clears the action written by the widget's interactive buttons
+ * (play/pause toggle, iOS 18 Controls) — those run inside the extension,
+ * which can't call UIApplication.shared.open(_:), so they leave a signal
+ * here instead (key: pendingWidgetAction) and rely on openAppWhenRun to
+ * bring the app forward. Call on app foreground to act on it.
+ *
+ * Returns a string like "podcasts?action=play" or "forums?filter=Unread"
+ * (same shape as the applevis:// URL scheme, minus the scheme+host), or
+ * null if there's nothing pending.
+ *
+ * Native side: ios-native/Widget/AppleVisWidgetDataWriter.swift
+ */
+export async function consumePendingWidgetAction(): Promise<string | null> {
+  return NativeModules.AppleVisWidgetDataWriter?.consumePendingAction() ?? null;
+}
+
+// ─── Focus Filter ─────────────────────────────────────────────────────────────
+//
+// Focus Filters are entirely OS-driven: the user picks allowed notification
+// categories in Settings → Focus → [mode] → App Filters, and iOS calls the
+// AppIntent's perform() directly — there's no JS entry point to "register"
+// one from inside the app.
+//
+// The AppIntent itself (ios-native/FocusFilter/AppleVisFocusFilterIntent.swift)
+// persists the chosen categories to shared UserDefaults (App Group
+// group.com.applevis.app, key: focusFilterAllowedCategories) so a future
+// Notification Service Extension could read them to suppress deliveries.
+// No such extension exists yet, so today this only drives the Settings UI —
+// it doesn't yet silence any notifications.
 
 // ─── Share Extension ──────────────────────────────────────────────────────────
 
@@ -222,24 +229,30 @@ export function handleIncomingShare(_item: SharedItem): void {
  *
  * Returns null if no pending URL is waiting.
  *
- * Native side (AppleVisAppShare.swift — ios-native/AppShare/):
- *
- *   @objc func consumePendingURL(
- *     _ resolve: @escaping RCTPromiseResolveBlock,
- *       reject:  @escaping RCTPromiseRejectBlock
- *   ) {
- *     let defaults = UserDefaults(suiteName: "group.com.applevis.app")
- *     let url = defaults?.string(forKey: "pendingAppShareURL")
- *     defaults?.removeObject(forKey: "pendingAppShareURL")
- *     resolve(url)
- *   }
- *
- * Entitlement needed (main app target):
- *   com.apple.security.application-groups = ["group.com.applevis.app"]
+ * Native side: ios-native/AppShare/AppleVisAppShare.swift
  */
-export async function consumePendingShareURL(): Promise<string | null> {
-  logDev('NativeModules', 'consumePendingShareURL — native module not yet built.');
-  return null;
+export async function consumePendingAppShareURL(): Promise<string | null> {
+  return NativeModules.AppleVisAppShare?.consumePendingURL() ?? null;
+}
+
+/**
+ * Reads and clears pending blog draft text written by the Share Extension
+ * when the user shares plain text or a .txt/.md file (key: pendingBlogText).
+ *
+ * Native side: ios-native/AppShare/AppleVisAppShare.swift
+ */
+export async function consumePendingBlogText(): Promise<string | null> {
+  return NativeModules.AppleVisAppShare?.consumePendingBlogText() ?? null;
+}
+
+/**
+ * Reads and clears a pending podcast URL written by the Share Extension
+ * (key: pendingPodcastURL).
+ *
+ * Native side: ios-native/AppShare/AppleVisAppShare.swift
+ */
+export async function consumePendingPodcastShareURL(): Promise<string | null> {
+  return NativeModules.AppleVisAppShare?.consumePendingPodcastURL() ?? null;
 }
 
 // ─── Vision Framework — Image Description ────────────────────────────────────
@@ -257,6 +270,8 @@ export async function consumePendingShareURL(): Promise<string | null> {
  *              + iOS 18 Visual Intelligence APIs):
  *
  *   import Vision
+ *
+ *   (See ios-native/Vision/AppleVisVision.swift for the real implementation.)
  *
  *   func describeImage(url: URL) async throws -> String {
  *     // Download image
@@ -283,11 +298,11 @@ export async function consumePendingShareURL(): Promise<string | null> {
  *   }
  *
  * Privacy: all processing is on-device. No image data leaves the device.
- * Info.plist: no extra keys needed (Vision is a system framework).
+ *
+ * Native side: ios-native/Vision/AppleVisVision.swift
  */
-export async function describeImage(_imageUrl: string): Promise<string | null> {
-  logDev('NativeModules', 'describeImage — native module not yet built.');
-  return null;
+export async function describeImage(imageUrl: string): Promise<string | null> {
+  return NativeModules.AppleVisVision?.describeImage(imageUrl) ?? null;
 }
 
 // ─── Handoff / NSUserActivity ─────────────────────────────────────────────────
@@ -325,22 +340,26 @@ export type HandoffActivity = {
  *   func application(_ app, continue userActivity: NSUserActivity, ...) -> Bool
  *   Then deep-link using userActivity.activityType and userActivity.userInfo.
  *
- * Info.plist: NSUserActivityTypes array (already in app.json).
- * Entitlements: com.apple.developer.associated-domains (already in app.json).
+ * Info.plist: NSUserActivityTypes array (added by plugins/withHandoff.js).
+ * Native side: ios-native/Handoff/AppleVisHandoff.swift
  */
-export function advertiseHandoff(_activity: HandoffActivity): void {
-  logDev('NativeModules', 'advertiseHandoff — native module not yet built.', _activity.activityType);
+export function advertiseHandoff(activity: HandoffActivity): void {
+  NativeModules.AppleVisHandoff?.advertise(
+    activity.activityType,
+    activity.title,
+    activity.webpageURL ?? null,
+    activity.userInfo ?? null,
+  );
 }
 
 /**
  * Resigns the current NSUserActivity so Handoff no longer shows on nearby devices.
  * Call when the user navigates away from the screen or the app backgrounds.
  *
- * Native side:
- *   currentActivity?.resignCurrent()
+ * Native side: ios-native/Handoff/AppleVisHandoff.swift
  */
 export function resignHandoff(): void {
-  logDev('NativeModules', 'resignHandoff — native module not yet built.');
+  NativeModules.AppleVisHandoff?.resign();
 }
 
 // ─── Keyboard Shortcuts (iPadOS hardware keyboard) ────────────────────────────
@@ -359,26 +378,6 @@ export type KeyboardShortcut = {
  * Registers application-level keyboard shortcuts visible in the iPadOS
  * keyboard shortcut overlay (hold ⌘ while app is in focus).
  *
- * Native side (Swift, UIKeyCommand):
- *
- *   override var keyCommands: [UIKeyCommand]? {
- *     return shortcuts.map { s in
- *       UIKeyCommand(
- *         title: s.discoverabilityTitle,
- *         action: #selector(handleKeyCommand(_:)),
- *         input: s.input,
- *         modifierFlags: s.modifierFlags
- *       )
- *     }
- *   }
- *
- *   @objc func handleKeyCommand(_ command: UIKeyCommand) {
- *     // Send identifier back to JS via event emitter
- *     sendEvent("onKeyCommand", ["identifier": command.title])
- *   }
- *
- * Subscribe to the "onKeyCommand" event on the JS side to handle shortcuts.
- *
  * Default shortcuts to register:
  *   ⌘F  — Search
  *   ⌘R  — Refresh
@@ -387,9 +386,13 @@ export type KeyboardShortcut = {
  *   ⌘3  — Podcasts tab
  *   ⌘4  — Resources tab
  *   ⌘,  — Settings
+ *
+ * Native side: ios-native/KeyboardShortcuts/AppleVisKeyboardShortcuts.swift
+ * Subscribe to the "onKeyCommand" event via NativeEventEmitter to handle taps
+ * (see app/_layout.tsx).
  */
-export function registerKeyboardShortcuts(_shortcuts: KeyboardShortcut[]): void {
-  logDev('NativeModules', 'registerKeyboardShortcuts — native module not yet built.', _shortcuts.length);
+export function registerKeyboardShortcuts(shortcuts: KeyboardShortcut[]): void {
+  NativeModules.AppleVisKeyboardShortcuts?.registerShortcuts(shortcuts);
 }
 
 // ─── Increase Contrast (iOS Accessibility) ────────────────────────────────────
@@ -505,7 +508,7 @@ export function clearNowPlayingInfo(): void {
 
 /**
  * Registers MPRemoteCommandCenter handlers so play/pause/skip work from
- * the lock screen, Control Center, AirPods double-tap, and CarPlay.
+ * the lock screen, Control Center, and AirPods double-tap.
  * Pass callbacks that call the corresponding player methods.
  */
 export function setupRemoteCommands(opts: {
@@ -558,28 +561,6 @@ export function setVoiceBoostEnabled(enabled: boolean): void {
  */
 export function setTrimSilenceEnabled(enabled: boolean): void {
   NativeModules.AppleVisAudioEffects?.setTrimSilence(enabled);
-}
-
-// ─── CarPlay ──────────────────────────────────────────────────────────────────
-
-/**
- * Pushes the latest episode list to the CarPlay browsable template so
- * the in-car display reflects current podcast content.
- *
- * Call after the feed loads or refreshes.
- *
- * Native side: ios-native/CarPlay/AppleVisCarPlayDelegate.swift
- */
-export type CarPlayEpisodeItem = {
-  id: string;
-  title: string;
-  showTitle: string;
-  duration: number;
-  isDownloaded: boolean;
-};
-
-export function updateCarPlayEpisodes(episodes: CarPlayEpisodeItem[]): void {
-  NativeModules.AppleVisCarPlay?.updateEpisodes(episodes);
 }
 
 // ─── AirPlay / Audio Route Picker ────────────────────────────────────────────

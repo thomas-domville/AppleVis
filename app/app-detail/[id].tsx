@@ -649,13 +649,19 @@ export default function AppDetailScreen() {
     if (!app || !auth.user?.csrfToken) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (Platform.OS === 'ios') {
+      // Unpublish stays admin-only — the original submitter can edit or
+      // delete their own entry, but not unpublish it.
+      const canUnpublish = !!auth.user?.isAdmin;
+      const options = canUnpublish
+        ? ['Cancel', 'Edit App Entry', 'Unpublish App Entry', 'Delete App Entry']
+        : ['Cancel', 'Edit App Entry', 'Delete App Entry'];
+      const deleteIndex = options.length - 1;
       ActionSheetIOS.showActionSheetWithOptions(
-        { title: app.name, options: ['Cancel', 'Edit App Entry', 'Unpublish App Entry', 'Delete App Entry'],
-          cancelButtonIndex: 0, destructiveButtonIndex: 3 },
+        { title: app.name, options, cancelButtonIndex: 0, destructiveButtonIndex: deleteIndex },
         (index) => {
           if (index === 1) setEditingNode(true);
-          if (index === 2) handleAdminUnpublish();
-          if (index === 3) handleAdminDelete();
+          if (canUnpublish && index === 2) handleAdminUnpublish();
+          if (index === deleteIndex) handleAdminDelete();
         },
       );
     } else {
@@ -763,6 +769,8 @@ export default function AppDetailScreen() {
   const newReviewCount   = lastSeenAt && app
     ? app.reviews.filter(r => r.createdAt > lastSeenAt).length
     : 0;
+
+  const isOwnApp = !!auth.user?.uuid && !!app?.submitterUid && auth.user.uuid === app.submitterUid;
 
   const displayName      = itunesMeta?.appName      || app?.name      || paramName || 'App';
   const displayDeveloper = itunesMeta?.developerName || app?.developer || '';
@@ -925,13 +933,13 @@ export default function AppDetailScreen() {
                   }}>
                   {displayName}
                 </Text>
-                {auth.user?.isAdmin && (
+                {(auth.user?.isAdmin || isOwnApp) && (
                   <Pressable
                     onPress={handleNodeOptions}
                     accessible
                     accessibilityRole="button"
                     accessibilityLabel="App entry options"
-                    accessibilityHint="Edit, unpublish, or delete this app entry"
+                    accessibilityHint={auth.user?.isAdmin ? 'Edit, unpublish, or delete this app entry' : 'Edit or delete this app entry'}
                     style={({ pressed }) => ({ padding: 6, opacity: pressed ? 0.55 : 1, marginTop: 2 })}
                   >
                     <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary}

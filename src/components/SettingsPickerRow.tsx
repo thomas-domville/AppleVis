@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { GlassView } from './GlassView';
 
 type Props<T extends string | number> = {
   label: string;
@@ -98,12 +99,12 @@ export function SettingsPickerRow<T extends string | number>({
           accessibilityRole="button"
           accessibilityLabel="Dismiss picker"
         />
-        <Animated.View style={{
+        <Animated.View style={{ transform: [{ translateY: sheetY }] }}>
+        <GlassView style={{
           backgroundColor: colors.card,
           borderTopLeftRadius: 22, borderTopRightRadius: 22,
           borderTopWidth: 1, borderTopColor: colors.border,
           maxHeight: '70%',
-          transform: [{ translateY: sheetY }],
         }}>
           {/* Handle + header — drag here to dismiss */}
           <View {...pan.panHandlers} style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 4 }}>
@@ -161,6 +162,7 @@ export function SettingsPickerRow<T extends string | number>({
             })}
             <View style={{ height: 40 }} />
           </ScrollView>
+        </GlassView>
         </Animated.View>
         </View>
       </Modal>

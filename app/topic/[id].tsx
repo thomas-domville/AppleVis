@@ -877,9 +877,6 @@ export default function TopicDetail() {
           <View style={[styles.card, { borderColor: '#FCA5A5', borderWidth: 1 }]}>
             <Text style={[styles.cardTitle, { color: '#B91C1C' }]}>Could not load topic</Text>
             <Text style={styles.cardMeta}>{error}</Text>
-            <Text style={[styles.cardMeta, { marginTop: 8 }]}>
-              The Drupal developer needs to confirm the comment entity type and filter path.
-            </Text>
             <Pressable
               onPress={loadTopic}
               accessible accessibilityRole="button" accessibilityLabel="Retry loading topic"

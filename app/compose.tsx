@@ -505,7 +505,10 @@ export default function Compose() {
         onRequestClose={() => setDraftSuggestion(null)}
         accessibilityViewIsModal
       >
-        <View style={{ flex: 1, backgroundColor: colors.background, padding: 16 }}>
+        <View
+          onAccessibilityEscape={() => setDraftSuggestion(null)}
+          style={{ flex: 1, backgroundColor: colors.background, padding: 16 }}
+        >
           <Text
             accessibilityRole="header"
             style={{ fontSize: 22, fontWeight: '700', color: colors.text, marginBottom: 8 }}

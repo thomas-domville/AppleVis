@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from './ThemeContext';
 import { sounds } from '../services/sounds';
+import { GlassView } from '../components/GlassView';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -111,13 +112,22 @@ function TipModal({
           style={[
             styles.card,
             {
-              backgroundColor: isDark ? colors.card : '#FFFFFF',
               transform: [{ scale: scaleAnim }],
               opacity: opacityAnim,
             },
           ]}
           accessibilityViewIsModal
+          onAccessibilityEscape={onDismiss}
         >
+          {/* Glass backdrop — see AccessibleAlertContext for why this is a
+              separate absolutely-filled layer rather than the card's own background. */}
+          <GlassView
+            style={[
+              StyleSheet.absoluteFillObject,
+              { backgroundColor: isDark ? colors.card : '#FFFFFF', borderRadius: 22 },
+            ]}
+          />
+
           {/* Header strip */}
           <View style={styles.header}>
             <View style={styles.iconBadge}>
@@ -235,9 +245,6 @@ export const TIP_KEYS = {
   reviewStarRating:         'review_star_rating',
   settingsIntelligence:     'settings_intelligence',
   followTopicNotifications: 'follow_topic_notifications',
-  tabHome:                  'tab_home',
-  tabDiscover:              'tab_discover',
-  tabForYou:                'tab_for_you',
 } as const;
 
 // ─── Tip content library ──────────────────────────────────────────────────────
@@ -312,32 +319,6 @@ export const TIPS: Record<keyof typeof TIP_KEYS, TipOptions> = {
       'To see all your followed topics or turn off notifications for specific ones, ' +
       'go to your Profile → Followed Topics, or adjust notification settings in ' +
       'Settings → Notifications.',
-  },
-  tabHome: {
-    title: 'Welcome to Your Home Feed',
-    icon: 'home-outline',
-    message:
-      'This is the heart of AppleVis. Your Home feed brings together the latest forum ' +
-      'discussions, podcast episodes, accessible app news, guides, and blog posts from ' +
-      'the community.\n\nPull down at any time to refresh. Use the Customize Home button at the ' +
-      'top left to choose which types of content appear here.',
-  },
-  tabDiscover: {
-    title: 'Explore All of AppleVis',
-    icon: 'compass-outline',
-    message:
-      'The Discover tab is your browsing hub. Here you can explore the AppleVis forums, ' +
-      'listen to the podcast, browse the App Directory for accessible apps, and read guides ' +
-      'and blog posts.\n\nUse the search bar at the top to find specific topics, apps, or ' +
-      'episodes by name.',
-  },
-  tabForYou: {
-    title: 'Your Personalised Space',
-    icon: 'heart-outline',
-    message:
-      'The For You tab is yours. Your episode queue lives here — episodes you have added to ' +
-      'play next — along with your saved items.\n\nContent here updates as you read, save, ' +
-      'and follow topics across the app.',
   },
 };
 

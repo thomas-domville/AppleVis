@@ -26,7 +26,6 @@ import { usePreferences } from '../../src/contexts/PreferencesContext';
 import type { AnnouncementLevel } from '../../src/contexts/PreferencesContext';
 import { readAloud, donateSiriActivity } from '../../src/services/intelligenceService';
 import { trackMeaningfulAction } from '../../src/services/reviewPrompt';
-import { updateCarPlayEpisodes } from '../../src/native/nativeModules';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAccessibilityPreferences } from '../../src/hooks/useAccessibilityPreferences';
 import { useEpisodeMeta } from '../../src/hooks/useEpisodeMeta';
@@ -528,19 +527,7 @@ export default function Podcasts() {
   const isCurrentEpisode = useCallback((id: string) => player.episode?.id === id, [player.episode]);
   const playerProgress   = player.duration > 0 ? player.position / player.duration : 0;
 
-  // Push feed to CarPlay list template after every load/refresh.
-  useEffect(() => {
-    if (!episodes.length) return;
-    updateCarPlayEpisodes(episodes.slice(0, 100).map(ep => ({
-      id:           ep.id,
-      title:        ep.title,
-      showTitle:    ep.showTitle,
-      duration:     ep.duration,
-      isDownloaded: !!meta.downloadedMeta[ep.id],
-    })));
-  }, [episodes, meta.downloadedMeta]);
-
-  // Merged known episodes map (downloaded metadata + live feed)
+// Merged known episodes map (downloaded metadata + live feed)
   const allKnownEpisodes = useMemo<Record<string, PodcastEpisode>>(() => {
     const map: Record<string, PodcastEpisode> = { ...meta.downloadedMeta };
     episodes.forEach(ep => { map[ep.id] = ep; });

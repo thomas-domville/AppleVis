@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from './ThemeContext';
 import { sounds } from '../services/sounds';
+import { GlassView } from '../components/GlassView';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -199,7 +200,6 @@ function AlertModal({
           style={[
             styles.card,
             {
-              backgroundColor: isDark ? colors.card : '#FFFFFF',
               transform: [{ scale: scaleAnim }],
               opacity: opacityAnim,
             },
@@ -207,6 +207,16 @@ function AlertModal({
           accessibilityViewIsModal
           onAccessibilityEscape={handleEscape}
         >
+          {/* Glass backdrop — absolutely filled behind the content below so the
+              card's shadow (on this outer node) isn't clipped by the blur's
+              own overflow:hidden. */}
+          <GlassView
+            style={[
+              StyleSheet.absoluteFillObject,
+              { backgroundColor: isDark ? colors.card : '#FFFFFF', borderRadius: 22 },
+            ]}
+          />
+
           {/* Icon circle */}
           <View style={[styles.iconCircle, { backgroundColor: bgColor }]}>
             <Ionicons
