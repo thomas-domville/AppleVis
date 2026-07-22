@@ -1,0 +1,305 @@
+import SwiftUI
+
+// MARK: - Mini Player (shown above the tab bar in ContentView)
+
+struct MiniPlayerView: View {
+    @EnvironmentObject private var player: PlayerStore
+    @State private var showFullPlayer = false
+
+    var body: some View {
+        if let episode = player.currentEpisode {
+            HStack(spacing: 12) {
+                AsyncImage(url: episode.artworkUrl.flatMap(URL.init)) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Image(systemName: "mic.fill").foregroundStyle(.secondary)
+                }
+                .frame(width: 44, height: 44)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(episode.title)
+                        .font(.subheadline).fontWeight(.medium)
+                        .lineLimit(1)
+                    Text(episode.showTitle)
+                        .font(.caption).foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button {
+                    player.togglePlayPause()
+                } label: {
+                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.title3)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
+
+                Button {
+                    Task { await player.skip(by: 30) }
+                } label: {
+                    Image(systemName: "goforward.30")
+                        .font(.title3)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Skip forward 30 seconds")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .padding(.horizontal, 8)
+            .contentShape(Rectangle())
+            .onTapGesture { showFullPlayer = true }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(
+                "\(episode.title) by \(episode.showTitle). " +
+                "\(player.isPlaying ? "Playing" : "Paused"). Double-tap to open player."
+            )
+            .sheet(isPresented: $showFullPlayer) {
+                FullPlayerView()
+            }
+        }
+    }
+}
+
+// MARK: - Full Player (sheet)
+
+struct FullPlayerView: View {
+    @EnvironmentObject private var player: PlayerStore
+    @Environment(\.dismiss) private var dismiss
+
+    private let speedOptions: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
+
+    var body: some View {
+        NavigationStack {
+            if let episode = player.currentEpisode {
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // Artwork
+                        AsyncImage(url: episode.artworkUrl.flatMap(URL.init)) { image in
+                            image.resizable().scaledToFill()
+                        } placeholder: {
+                            RoundedRectangle(cornerRadius: 18)
+                                .fill(Color.secondary.opacity(0.2))
+                                .overlay(
+                                    Image(systemName: "mic.fill")
+                                        .font(.system(size: 60))
+                                        .foregroundStyle(.secondary)
+                                )
+                        }
+                        .frame(width: 220, height: 220)
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                        .shadow(radius: 20, y: 8)
+                        .padding(.top, 24)
+                        .padding(.bottom, 28)
+                        .accessibilityHidden(true)
+
+                        // Episode info
+                        VStack(spacing: 6) {
+                            Text(episode.title)
+                                .font(.title3).fontWeight(.bold)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(3)
+                            Text(episode.showTitle)
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 28)
+                        .padding(.bottom, 28)
+
+                        // Scrubber
+                        ScrubberView()
+                            .padding(.horizontal, 28)
+                            .padding(.bottom, 4)
+
+                        // Time labels
+                        HStack {
+                            Text(formatTime(player.position))
+                            Spacer()
+                            Text("-\(formatTime(max(0, player.duration - player.position)))")
+                        }
+                        .font(.caption).foregroundStyle(.secondary)
+                        .padding(.horizontal, 28)
+                        .padding(.bottom, 24)
+                        .accessibilityHidden(true)
+
+                        // Transport controls
+                        transportControls
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 28)
+
+                        // Speed + Sleep Timer + AirPlay
+                        HStack(spacing: 12) {
+                            speedButton
+                            sleepTimerButton
+                            RoutePickerView()
+                                .frame(width: 32, height: 32)
+                                .accessibilityLabel("Audio output")
+                        }
+                        .padding(.bottom, 32)
+                    }
+                }
+                .navigationTitle("Now Playing")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Done") { dismiss() }
+                    }
+                }
+            }
+        }
+        // Keyboard shortcuts — useful with a hardware keyboard (iPad/Mac Catalyst).
+        .background {
+            Button("") { player.togglePlayPause() }
+                .keyboardShortcut(.space, modifiers: [])
+                .opacity(0)
+            Button("") { Task { await player.skip(by: -15) } }
+                .keyboardShortcut(.leftArrow, modifiers: [])
+                .opacity(0)
+            Button("") { Task { await player.skip(by: 30) } }
+                .keyboardShortcut(.rightArrow, modifiers: [])
+                .opacity(0)
+        }
+    }
+
+    private var transportControls: some View {
+        HStack(spacing: 0) {
+            Button {
+                Task { await player.skip(by: -15) }
+            } label: {
+                Image(systemName: "gobackward.15")
+                    .font(.system(size: 34))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Skip back 15 seconds")
+            .frame(maxWidth: .infinity)
+
+            Button {
+                player.togglePlayPause()
+            } label: {
+                Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                    .font(.system(size: 76))
+                    .foregroundStyle(Color.accentColor)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
+            .frame(maxWidth: .infinity)
+
+            Button {
+                Task { await player.skip(by: 30) }
+            } label: {
+                Image(systemName: "goforward.30")
+                    .font(.system(size: 34))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Skip forward 30 seconds")
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var speedButton: some View {
+        let current = player.playbackSpeed
+        let currentIndex = speedOptions.firstIndex(of: current) ?? 2
+        let nextIndex = (currentIndex + 1) % speedOptions.count
+        let next = speedOptions[nextIndex]
+
+        return Button {
+            player.playbackSpeed = next
+        } label: {
+            Text("\(speedLabel(current))×")
+                .font(.subheadline).fontWeight(.bold)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 8)
+                .background(Color(uiColor: .secondarySystemBackground), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Playback speed: \(speedLabel(current))×. Double-tap to increase.")
+    }
+
+    private var sleepTimerButton: some View {
+        Menu {
+            ForEach([5, 15, 30, 45, 60], id: \.self) { minutes in
+                Button("\(minutes) minutes") { player.startSleepTimer(minutes: minutes) }
+            }
+            Button("End of Episode") { player.startSleepTimerAtEndOfEpisode() }
+            if player.sleepTimerRemaining != nil || player.sleepAtEndOfEpisode {
+                Button("Turn Off", role: .destructive) { player.cancelSleepTimer() }
+            }
+        } label: {
+            Label(sleepTimerLabel, systemImage: "moon.zzz")
+                .font(.subheadline).fontWeight(.bold)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 8)
+                .background(Color(uiColor: .secondarySystemBackground), in: Capsule())
+        }
+        .accessibilityLabel("Sleep timer\(sleepTimerLabel.isEmpty ? "" : ": \(sleepTimerLabel)")")
+    }
+
+    private var sleepTimerLabel: String {
+        if player.sleepAtEndOfEpisode { return "End" }
+        if let remaining = player.sleepTimerRemaining { return formatTime(remaining) }
+        return ""
+    }
+
+    private func formatTime(_ seconds: TimeInterval) -> String {
+        let s = max(0, Int(seconds))
+        let h = s / 3600
+        let m = (s % 3600) / 60
+        let sec = s % 60
+        return h > 0
+            ? String(format: "%d:%02d:%02d", h, m, sec)
+            : String(format: "%d:%02d", m, sec)
+    }
+
+    private func speedLabel(_ speed: Float) -> String {
+        speed.truncatingRemainder(dividingBy: 1) == 0
+            ? String(format: "%.0f", speed)
+            : String(format: "%.2g", speed)
+    }
+}
+
+// MARK: - Scrubber (extracted so it can read geometry)
+
+private struct ScrubberView: View {
+    @EnvironmentObject private var player: PlayerStore
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.secondary.opacity(0.25))
+                    .frame(height: 4)
+                Capsule()
+                    .fill(Color.accentColor)
+                    .frame(
+                        width: player.duration > 0
+                            ? geo.size.width * CGFloat(min(1, player.position / player.duration))
+                            : 0,
+                        height: 4
+                    )
+            }
+            .frame(height: 28)
+            .contentShape(Rectangle())
+            .onTapGesture { location in
+                guard player.duration > 0 else { return }
+                let ratio = location.x / geo.size.width
+                Task { await player.seek(to: ratio * player.duration) }
+            }
+        }
+        .frame(height: 28)
+        .accessibilityElement()
+        .accessibilityLabel("Playback position")
+        .accessibilityValue(player.duration > 0
+            ? "\(Int(player.position / player.duration * 100))%"
+            : "0%"
+        )
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: Task { await player.skip(by: 30) }
+            case .decrement: Task { await player.skip(by: -15) }
+            @unknown default: break
+            }
+        }
+    }
+}
