@@ -1,0 +1,71 @@
+import Foundation
+
+struct Resource: Identifiable, Codable, Hashable {
+    let id: String
+    let title: String
+    let kind: ResourceKind
+    let authorName: String
+    let authorId: String
+    let categories: [String]
+    let summary: String
+    let createdAt: Date
+    let updatedAt: Date
+    let commentCount: Int
+    let url: String
+    var isSaved: Bool
+}
+
+struct ResourceDetail: Identifiable, Codable {
+    let id: String
+    let title: String
+    let kind: ResourceKind
+    let authorName: String
+    let authorId: String
+    let categories: [String]
+    let summary: String
+    let body: String
+    let createdAt: Date
+    let updatedAt: Date
+    let commentCount: Int
+    let url: String
+    var comments: [ResourceComment]
+    var isSaved: Bool
+}
+
+struct ResourceComment: Identifiable, Codable {
+    let id: String
+    let authorName: String
+    let authorId: String
+    let body: String
+    let createdAt: Date
+}
+
+enum ResourceKind: String, Codable, CaseIterable, Identifiable {
+    case guide
+    case tutorial
+    case article
+    case event
+    case developer
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .guide:      return "Guide"
+        case .tutorial:   return "Tutorial"
+        case .article:    return "Article"
+        case .event:      return "Event"
+        case .developer:  return "Developer Resource"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .guide:      return "book"
+        case .tutorial:   return "graduationcap"
+        case .article:    return "newspaper"
+        case .event:      return "calendar"
+        case .developer:  return "hammer"
+        }
+    }
+}

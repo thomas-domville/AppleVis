@@ -1,0 +1,232 @@
+import Foundation
+
+/// Drupal HTML form submission — ported from src/services/drupalForm.ts.
+///
+/// Blog, bug report, and podcast submission are Drupal webforms / contact
+/// forms with no REST/JSON:API create endpoint. The only way to submit is to
+/// replicate what a browser does: GET the form page (session cookie carries
+/// auth automatically via the shared URLSession cookie store), scrape the
+/// one-time CSRF tokens out of the HTML, then POST the encoded body and
+/// detect success by whether the response redirected away from the form URL.
+///
+/// Verified live: the `/contact` form's token extraction (form_build_id,
+/// captcha_sid, captcha_token) matches this parsing exactly. Blog/bug
+/// submission require an authenticated session to even reach the real form
+/// (anonymous requests redirect to a login page) — the token-scraping and
+/// POST logic is identical, ported faithfully from the RN reference, but
+/// could not be end-to-end verified against a live authenticated session.
+enum DrupalFormClient {
+    private static let base = "https://www.applevis.com"
+
+    // Same Cloudflare-bypass headers as APIClient — the backend serves an
+    // HTML challenge page instead of the real form to any request missing
+    // these, so every request built here needs them explicitly (this client
+    // uses URLSession.shared, not APIClient's session).
+    private static let bypassHeaders: [String: String] = [
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 AppleVis/2026",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Origin": base,
+        "Referer": "\(base)/",
+        "X-App-Auth": "2ff01dc7bf35469d93c6",
+    ]
+
+    private static func applyBypassHeaders(to request: inout URLRequest) {
+        bypassHeaders.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+    }
+
+    enum FormResult {
+        case ok
+        case failure(String)
+    }
+
+    private struct FormTokens {
+        let formBuildId: String
+        let formToken: String
+        let honeypotTime: String
+    }
+
+    private static func fetchTokens(path: String) async -> FormTokens? {
+        guard let url = URL(string: "\(base)\(path)") else { return nil }
+        var request = URLRequest(url: url)
+        applyBypassHeaders(to: &request)
+        request.setValue("text/html,application/xhtml+xml", forHTTPHeaderField: "Accept")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+              let html = String(data: data, encoding: .utf8) else { return nil }
+
+        let formBuildId = firstMatch(#"name="form_build_id"\s+value="([^"]+)""#, in: html)
+        let formToken = firstMatch(#"name="form_token"\s+value="([^"]+)""#, in: html)
+        let honeypotTime = firstMatch(#"name="honeypot_time"\s+value="([^"]+)""#, in: html)
+        guard let formBuildId, !formBuildId.isEmpty else { return nil }
+        return FormTokens(formBuildId: formBuildId, formToken: formToken ?? "", honeypotTime: honeypotTime ?? "")
+    }
+
+    private static func firstMatch(_ pattern: String, in text: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+              let range = Range(match.range(at: 1), in: text) else { return nil }
+        return String(text[range])
+    }
+
+    private static func encodeFields(_ fields: [String: String]) -> Data {
+        fields.map { "\($0.key.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? $0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? $0.value)" }
+            .joined(separator: "&")
+            .data(using: .utf8) ?? Data()
+    }
+
+    /// Drupal redirects on a successful submission; a form error re-renders the same URL.
+    private static func wasRedirected(_ response: URLResponse, from path: String) -> Bool {
+        guard let url = response.url?.absoluteString else { return false }
+        return !url.hasPrefix("\(base)\(path)")
+    }
+
+    private static func postForm(path: String, body: Data, contentType: String) async -> FormResult {
+        guard let url = URL(string: "\(base)\(path)") else { return .failure("Invalid form URL.") }
+        var request = URLRequest(url: url)
+        applyBypassHeaders(to: &request)
+        request.httpMethod = "POST"
+        request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            return wasRedirected(response, from: path)
+                ? .ok
+                : .failure("The submission was not accepted. Please check your content and try again.")
+        } catch {
+            return .failure(error.localizedDescription)
+        }
+    }
+
+    // MARK: - Blog submission (/form/blog-submission)
+
+    static func submitBlog(name: String, email: String, message: String, blogDraft: String) async -> FormResult {
+        let path = "/form/blog-submission"
+        guard let tokens = await fetchTokens(path: path) else {
+            return .failure("Could not load the submission form. Check your connection and try again.")
+        }
+        let body = encodeFields([
+            "name": name, "email": email, "message": message, "blog_draft": blogDraft,
+            "form_build_id": tokens.formBuildId, "form_token": tokens.formToken,
+            "form_id": "webform_submission_blog_submission_add_form", "op": "Submit",
+        ])
+        return await postForm(path: path, body: body, contentType: "application/x-www-form-urlencoded")
+    }
+
+    // MARK: - Bug report (/form/community-bug-report-form)
+
+    static func submitBug(
+        name: String, email: String, title: String, appleFeedback: String,
+        platform: String, softwareVersion: String, canReproduce: String,
+        description: String, recognition: String
+    ) async -> FormResult {
+        let path = "/form/community-bug-report-form"
+        guard let tokens = await fetchTokens(path: path) else {
+            return .failure("Could not load the submission form. Check your connection and try again.")
+        }
+        let body = encodeFields([
+            "your_name": name, "email": email, "title": title, "apple_feedback": appleFeedback,
+            "platform": platform, "software_version": softwareVersion,
+            "can_you_reproduce_the_issue": canReproduce, "description": description,
+            "may_we_thank_and_publicly_recognize_you_for_your_efforts_in_our": recognition,
+            "form_build_id": tokens.formBuildId, "form_token": tokens.formToken,
+            "form_id": "webform_submission_community_bug_report_form_add_form", "op": "Submit",
+        ])
+        return await postForm(path: path, body: body, contentType: "application/x-www-form-urlencoded")
+    }
+
+    // MARK: - Podcast submission (/podcasts/upload) — multipart, includes an audio file
+
+    static func submitPodcast(name: String, email: String, description: String, audioFileURL: URL?) async -> FormResult {
+        let path = "/podcasts/upload"
+        guard let tokens = await fetchTokens(path: path) else {
+            return .failure("Could not load the submission form. Check your connection and try again.")
+        }
+        guard let url = URL(string: "\(base)\(path)") else { return .failure("Invalid form URL.") }
+
+        let boundary = "AppleVisBoundary-\(UUID().uuidString)"
+        var body = Data()
+        func appendField(_ name: String, _ value: String) {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".data(using: .utf8)!)
+            body.append("\(value)\r\n".data(using: .utf8)!)
+        }
+        appendField("name", name)
+        appendField("mail", email)
+        appendField("field_description[0][value]", description)
+        appendField("field_podcast_file[0][display]", "1")
+        appendField("field_podcast_file[0][fids]", "")
+        appendField("honeypot_time", tokens.honeypotTime)
+        appendField("form_build_id", tokens.formBuildId)
+        appendField("form_token", tokens.formToken)
+        appendField("form_id", "contact_message_submit_podcast_form")
+        appendField("url", "")
+        appendField("op", "Send message")
+
+        if let audioFileURL, let fileData = try? Data(contentsOf: audioFileURL) {
+            let filename = audioFileURL.lastPathComponent
+            let mimeType = mimeType(for: audioFileURL)
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"files[field_podcast_file_0]\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+            body.append(fileData)
+            body.append("\r\n".data(using: .utf8)!)
+        }
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+
+        var request = URLRequest(url: url)
+        applyBypassHeaders(to: &request)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            return wasRedirected(response, from: path)
+                ? .ok
+                : .failure("The submission was not accepted. Please check your content and try again.")
+        } catch {
+            return .failure(error.localizedDescription)
+        }
+    }
+
+    private static func mimeType(for url: URL) -> String {
+        switch url.pathExtension.lowercased() {
+        case "mp3": return "audio/mpeg"
+        case "m4a", "mp4": return "audio/mp4"
+        case "wav": return "audio/x-wav"
+        default: return "application/octet-stream"
+        }
+    }
+
+    // MARK: - Contact form (/contact) — verified live; uses a captcha token instead of form_token
+
+    static func submitContact(name: String, email: String, subject: String, message: String) async -> FormResult {
+        let path = "/contact"
+        guard let url = URL(string: "\(base)\(path)") else { return .failure("Invalid form URL.") }
+        var pageRequest = URLRequest(url: url)
+        applyBypassHeaders(to: &pageRequest)
+        pageRequest.setValue("text/html,application/xhtml+xml", forHTTPHeaderField: "Accept")
+
+        guard let (data, pageResponse) = try? await URLSession.shared.data(for: pageRequest),
+              let http = pageResponse as? HTTPURLResponse, (200...299).contains(http.statusCode),
+              let html = String(data: data, encoding: .utf8)
+        else { return .failure("Could not load the contact form. Check your connection and try again.") }
+
+        guard let formBuildId = firstMatch(#"name="form_build_id"\s+value="([^"]+)""#, in: html), !formBuildId.isEmpty else {
+            return .failure("Could not load the contact form. Check your connection and try again.")
+        }
+        let captchaSid = firstMatch(#"name="captcha_sid"\s+value="([^"]+)""#, in: html) ?? ""
+        let captchaToken = firstMatch(#"name="captcha_token"\s+value="([^"]+)""#, in: html) ?? ""
+        let captchaResponse = firstMatch(#"name="captcha_response"\s+value="([^"]+)""#, in: html) ?? "Turnstile no captcha"
+
+        let body = encodeFields([
+            "i_understand_that_applevis_does_not_accept_sponsored_posts_conte": "1",
+            "name": name, "email": email, "subject": subject, "message": message,
+            "captcha_sid": captchaSid, "captcha_token": captchaToken,
+            "captcha_response": captchaResponse, "captcha_cacheable": "1",
+            "form_build_id": formBuildId, "form_id": "webform_submission_contact_node_25142_add_form",
+            "url": "", "op": "Send message",
+        ])
+        return await postForm(path: path, body: body, contentType: "application/x-www-form-urlencoded")
+    }
+}
