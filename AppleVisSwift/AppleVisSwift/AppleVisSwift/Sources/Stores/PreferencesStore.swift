@@ -1,17 +1,13 @@
 import SwiftUI
+import Combine
 
 @MainActor
 final class PreferencesStore: ObservableObject {
 
     // MARK: - Appearance
     @AppStorage("theme") var theme: AppTheme = .system
-    var colorScheme: ColorScheme? {
-        switch theme {
-        case .light:  return .light
-        case .dark:   return .dark
-        case .system: return nil
-        }
-    }
+    var colorScheme: ColorScheme? { theme.colorScheme }
+    @AppStorage("appearance.cardDensity") var cardDensity: CardDensity = .comfortable
 
     // MARK: - Home feed filters
     @AppStorage("feed.showForums")   var showForums   = true
@@ -76,9 +72,61 @@ final class PreferencesStore: ObservableObject {
 // MARK: - Enums
 
 enum AppTheme: String, CaseIterable, Identifiable {
-    case system, light, dark
+    case system, light, dark, sepia, midnight, highContrastLight, highContrastDark
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system:            return "System"
+        case .light:              return "Light"
+        case .dark:                return "Dark"
+        case .sepia:              return "Sepia"
+        case .midnight:           return "Midnight"
+        case .highContrastLight: return "High Contrast Light"
+        case .highContrastDark:  return "High Contrast Dark"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .system:            return "Follows iOS appearance setting"
+        case .light:              return "Always uses light colours"
+        case .dark:                return "Always uses dark colours"
+        case .sepia:              return "Warm, low-glare tones for extended reading"
+        case .midnight:           return "Deep black background for low-light use"
+        case .highContrastLight: return "Maximum contrast on a light background"
+        case .highContrastDark:  return "Maximum contrast on a dark background"
+        }
+    }
+
+    /// The underlying light/dark base every theme renders on top of —
+    /// SwiftUI has no native "sepia" scheme, so themes differentiate via
+    /// this base plus `accentColor` below.
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system:            return nil
+        case .light, .sepia, .highContrastLight: return .light
+        case .dark, .midnight, .highContrastDark: return .dark
+        }
+    }
+
+    var accentColor: Color {
+        switch self {
+        case .system, .light, .dark: return .accentColor
+        case .sepia:              return Color(red: 0.55, green: 0.38, blue: 0.20)
+        case .midnight:           return Color(red: 0.30, green: 0.55, blue: 1.0)
+        case .highContrastLight: return .black
+        case .highContrastDark:  return .yellow
+        }
+    }
+}
+
+enum CardDensity: String, CaseIterable, Identifiable {
+    case comfortable, compact
     var id: String { rawValue }
     var displayName: String { rawValue.capitalized }
+    var verticalPadding: CGFloat { self == .compact ? 2 : 6 }
 }
 
 enum ForumFilter: String, CaseIterable, Identifiable {
