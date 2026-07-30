@@ -9,6 +9,7 @@ struct EpisodeDetailView: View {
     @State private var showCompose = false
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
+    @State private var artworkDescription: String?
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -30,6 +31,10 @@ struct EpisodeDetailView: View {
         .task {
             SoundPlayer.shared.play(.articleOpen)
             await load()
+        }
+        .task(id: episode?.artworkUrl) {
+            guard let artworkUrl = episode?.artworkUrl, let url = URL(string: artworkUrl) else { return }
+            artworkDescription = await ImageDescriber.describe(imageAt: url)
         }
     }
 
@@ -131,7 +136,10 @@ struct EpisodeDetailView: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(episode.title) by \(episode.showTitle)")
+        .accessibilityLabel(
+            "\(episode.title) by \(episode.showTitle)" +
+            (artworkDescription.map { ". Artwork \($0)" } ?? "")
+        )
     }
 
     @ViewBuilder
