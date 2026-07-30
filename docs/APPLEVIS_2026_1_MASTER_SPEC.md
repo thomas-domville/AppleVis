@@ -78,15 +78,12 @@ Required player features:
 
 Apple ecosystem features:
 
-- Home Screen widgets
-- Lock Screen widgets
-- StandBy widgets
 - Dynamic Island / Live Activities
-- Apple Watch app
-- Apple Watch complications
 - Siri Shortcuts / App Intents
 
-Note: Dynamic Island, Live Activities, Apple Watch, advanced App Intents, iCloud key-value store, CloudKit, Smart Speed DSP, and MPRemoteCommandCenter require native iOS work beyond a basic Expo managed app.
+Out of scope for now: Home Screen/Lock Screen/StandBy widgets, Apple Watch app and complications.
+
+Note: Dynamic Island, Live Activities, advanced App Intents, iCloud key-value store, CloudKit, Smart Speed DSP, and MPRemoteCommandCenter require native iOS work beyond a basic Expo managed app.
 
 ## Apps
 

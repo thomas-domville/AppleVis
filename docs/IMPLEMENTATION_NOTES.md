@@ -2,26 +2,26 @@
 
 This ZIP is a buildable starter scaffold, not a finished production app.
 
-Expo is useful for quickly developing the UI and core experience. The following require native iOS work or config plugins:
+This app is now a native Swift/SwiftUI project (AppleVisSwift/), not the Expo starter. The following still require native iOS work beyond the single app target:
 
-- Apple Watch app and complications
 - Dynamic Island and Live Activities via ActivityKit
 - Full Siri App Intents/App Shortcuts
 - iCloud key-value store or CloudKit
 - MPRemoteCommandCenter and Now Playing metadata beyond basic audio playback
 - Smart Speed/silence trimming DSP
 - Voice enhancement/EQ audio pipeline
-- Home Screen/Lock Screen/StandBy widgets
 
-Recommended production path:
+Out of scope for now: Apple Watch app/complications, Home Screen/Lock Screen/StandBy widgets.
 
-1. Build and test the Expo UI.
-2. Add real AppleVis Drupal API endpoints.
-3. Implement local persistence for saved/read/list position.
-4. Add account sync through AppleVis API.
-5. Add native iOS modules for Apple ecosystem features.
-6. Add watchOS target.
-7. Add WidgetKit target.
+Migration path:
+
+1. ~~Build and test the Expo UI.~~ (superseded by native Swift rewrite)
+2. Add real AppleVis Drupal API endpoints. — done
+3. Implement local persistence for saved/read/list position. — done
+4. Add account sync through AppleVis API. — done
+5. Add native iOS modules for Apple ecosystem features. — in progress: iCloud sync, push notifications, Spotlight, Siri Shortcuts, Now Playing, AirPlay done; Handoff, Focus Filter, Audio Effects, keyboard shortcuts, Vision, Share Extension, Live Activity remain
+6. ~~Add watchOS target.~~ — out of scope for now
+7. ~~Add WidgetKit target.~~ — out of scope for now
 8. Add ActivityKit Live Activity.
 9. Complete App Store privacy/accessibility compliance checklist.
 
