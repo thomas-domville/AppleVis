@@ -11,5 +11,9 @@
 	<array>
 		<string>com.applevis.autodownload</string>
 	</array>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>com.applevis.viewing</string>
+	</array>
 </dict>
 </plist>

@@ -17,6 +17,7 @@ struct BugDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .handoff(title: detail?.title, url: detail?.url)
         .task {
             SoundPlayer.shared.play(.articleOpen)
             await load()
