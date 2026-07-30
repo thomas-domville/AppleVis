@@ -15,5 +15,16 @@
 	<array>
 		<string>com.applevis.viewing</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.applevis.AppleVisSwift</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>applevis</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

@@ -21,6 +21,11 @@ struct SubmitBlogView: View {
     @State private var isSubmitting = false
     @State private var error: String?
 
+    /// Set when opened from the Share Extension with shared text.
+    init(prefillText: String? = nil) {
+        _blogDraft = State(initialValue: prefillText ?? "")
+    }
+
     private var detailsValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty &&
         !email.trimmingCharacters(in: .whitespaces).isEmpty

@@ -23,6 +23,16 @@ struct SubmitPodcastView: View {
     @State private var isSubmitting = false
     @State private var error: String?
 
+    /// Set when opened from the Share Extension with a shared podcast URL.
+    /// This form needs an actual audio file upload — a shared link can't
+    /// satisfy that — so the URL is dropped into the description as context
+    /// rather than claimed as an attachment.
+    init(prefillSharedURL: String? = nil) {
+        if let prefillSharedURL {
+            _description = State(initialValue: "Shared from: \(prefillSharedURL)\n\n")
+        }
+    }
+
     private var detailsValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty &&
         !email.trimmingCharacters(in: .whitespaces).isEmpty

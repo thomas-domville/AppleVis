@@ -65,7 +65,9 @@ struct AppleVisApp: App {
                 deepLinkRouter.handleSpotlight(identifier: identifier)
             }
             .onOpenURL { url in
-                deepLinkRouter.handleUniversalLink(url)
+                if !deepLinkRouter.handleCustomScheme(url) {
+                    deepLinkRouter.handleUniversalLink(url)
+                }
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .background {
@@ -73,6 +75,8 @@ struct AppleVisApp: App {
                     ICloudSyncManager.shared.pushSavedItems()
                     ICloudSyncManager.shared.pushQueue(player.queue)
                     ICloudSyncManager.shared.pushSettings()
+                } else if newPhase == .active {
+                    deepLinkRouter.checkPendingShareExtensionContent()
                 }
             }
             .task {

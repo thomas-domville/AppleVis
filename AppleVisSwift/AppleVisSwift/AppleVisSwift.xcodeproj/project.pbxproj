@@ -6,8 +6,39 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		DEC630EDC9D1B0626868AA5F /* AppleVisShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 349D7F728302C4405C947D9E /* AppleVisShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		85D1BF0D568A3226C5FB18F1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E92FCDBE30085E49006E2C72 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5DEB814E8E8E1F7621740F4A;
+			remoteInfo = AppleVisShareExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		E257CE720A081D57ABD577E4 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				DEC630EDC9D1B0626868AA5F /* AppleVisShareExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		E92FCDC630085E49006E2C72 /* AppleVisSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AppleVisSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		349D7F728302C4405C947D9E /* AppleVisShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AppleVisShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		9B70515002325C021087C8D7 /* ShareExtension-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "ShareExtension-Info.plist"; sourceTree = "<group>"; };
+		4D4A25F764097BE700D35F23 /* ShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,10 +47,22 @@
 			path = AppleVisSwift;
 			sourceTree = "<group>";
 		};
+		B7D19609EAB36B32278CD870 /* ShareExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ShareExtension;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		E92FCDC330085E49006E2C72 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EC8644CE2B2D86F0378AF70D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,6 +76,9 @@
 			isa = PBXGroup;
 			children = (
 				E92FCDC830085E49006E2C72 /* AppleVisSwift */,
+				B7D19609EAB36B32278CD870 /* ShareExtension */,
+				9B70515002325C021087C8D7 /* ShareExtension-Info.plist */,
+				4D4A25F764097BE700D35F23 /* ShareExtension.entitlements */,
 				E92FCDC730085E49006E2C72 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +87,7 @@
 			isa = PBXGroup;
 			children = (
 				E92FCDC630085E49006E2C72 /* AppleVisSwift.app */,
+				349D7F728302C4405C947D9E /* AppleVisShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -55,10 +102,12 @@
 				E92FCDC230085E49006E2C72 /* Sources */,
 				E92FCDC330085E49006E2C72 /* Frameworks */,
 				E92FCDC430085E49006E2C72 /* Resources */,
+				E257CE720A081D57ABD577E4 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				EF0642480C06E4DBFC4B8BCB /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				E92FCDC830085E49006E2C72 /* AppleVisSwift */,
@@ -69,6 +118,28 @@
 			productName = AppleVisSwift;
 			productReference = E92FCDC630085E49006E2C72 /* AppleVisSwift.app */;
 			productType = "com.apple.product-type.application";
+		};
+		5DEB814E8E8E1F7621740F4A /* AppleVisShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BFBFCAC965141C3E5D017852 /* Build configuration list for PBXNativeTarget "AppleVisShareExtension" */;
+			buildPhases = (
+				690829B3F726C6540F3426FC /* Sources */,
+				EC8644CE2B2D86F0378AF70D /* Frameworks */,
+				8A5BFBEF5D531811520A2F70 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B7D19609EAB36B32278CD870 /* ShareExtension */,
+			);
+			name = AppleVisShareExtension;
+			packageProductDependencies = (
+			);
+			productName = AppleVisShareExtension;
+			productReference = 349D7F728302C4405C947D9E /* AppleVisShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -87,6 +158,17 @@
 								enabled = 1;
 							};
 							"com.apple.Push" = {
+								enabled = 1;
+							};
+							"com.apple.ApplicationGroups.iOS" = {
+								enabled = 1;
+							};
+						};
+					};
+					5DEB814E8E8E1F7621740F4A = {
+						CreatedOnToolsVersion = 26.6;
+						SystemCapabilities = {
+							"com.apple.ApplicationGroups.iOS" = {
 								enabled = 1;
 							};
 						};
@@ -112,12 +194,20 @@
 			projectRoot = "";
 			targets = (
 				E92FCDC530085E49006E2C72 /* AppleVisSwift */,
+				5DEB814E8E8E1F7621740F4A /* AppleVisShareExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		E92FCDC430085E49006E2C72 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A5BFBEF5D531811520A2F70 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -134,7 +224,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		690829B3F726C6540F3426FC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		EF0642480C06E4DBFC4B8BCB /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5DEB814E8E8E1F7621740F4A /* AppleVisShareExtension */;
+			targetProxy = 85D1BF0D568A3226C5FB18F1 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		E92FCDCF30085E4A006E2C72 /* Debug */ = {
@@ -326,6 +431,58 @@
 			};
 			name = Release;
 		};
+		1B54EE61C81E744D98830F8D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 97YM8TUSX8;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "ShareExtension-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.applevis.AppleVisSwift.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		DA0B826AE47704E64611BC73 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 97YM8TUSX8;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "ShareExtension-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.applevis.AppleVisSwift.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -343,6 +500,15 @@
 			buildConfigurations = (
 				E92FCDD230085E4A006E2C72 /* Debug */,
 				E92FCDD330085E4A006E2C72 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BFBFCAC965141C3E5D017852 /* Build configuration list for PBXNativeTarget "AppleVisShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1B54EE61C81E744D98830F8D /* Debug */,
+				DA0B826AE47704E64611BC73 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

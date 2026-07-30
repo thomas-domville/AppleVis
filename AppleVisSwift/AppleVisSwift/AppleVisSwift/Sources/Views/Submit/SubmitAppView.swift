@@ -19,6 +19,13 @@ struct SubmitAppView: View {
     @State private var isSubmitting = false
     @State private var error: String?
 
+    /// Set when opened from the Share Extension with an App Store URL.
+    private let prefillAppStoreURL: String?
+
+    init(prefillAppStoreURL: String? = nil) {
+        self.prefillAppStoreURL = prefillAppStoreURL
+    }
+
     private let categories = [
         "Books", "Business", "Catalogs", "Developer Tools", "Education", "Entertainment",
         "Finance", "Food and Drink", "Games", "Graphics and Design", "Health and Fitness",
@@ -58,6 +65,21 @@ struct SubmitAppView: View {
                         .disabled(!isValid || isSubmitting)
                 }
             }
+        }
+        .task { await applyPrefillIfNeeded() }
+    }
+
+    private func applyPrefillIfNeeded() async {
+        guard let prefillAppStoreURL, selectedHit == nil else { return }
+        selectedHit = ItunesSearchHit(appStoreId: "", appName: "", developerName: "", artworkUrl: "", appStoreUrl: prefillAppStoreURL)
+        payload.appStoreUrl = prefillAppStoreURL
+        if let meta = await ItunesAPI.fetchMetadata(appStoreUrl: prefillAppStoreURL) {
+            payload.appName = meta.appName
+            payload.appVersion = meta.version
+            payload.price = meta.price
+            payload.category = meta.category
+            payload.osVersion = meta.minimumOsVersion
+            payload.appStoreDescription = meta.appStoreDescription
         }
     }
 

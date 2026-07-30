@@ -46,6 +46,18 @@ struct ContentView: View {
         .sheet(isPresented: $keyCommands.showSettings) {
             ProfileView()
         }
+        .sheet(item: $deepLinkRouter.pendingSubmit) { submit in
+            submitDestination(for: submit)
+        }
+    }
+
+    @ViewBuilder
+    private func submitDestination(for submit: PendingSubmit) -> some View {
+        switch submit {
+        case .app(let url): SubmitAppView(prefillAppStoreURL: url)
+        case .blog(let text): SubmitBlogView(prefillText: text)
+        case .podcast(let url): SubmitPodcastView(prefillSharedURL: url)
+        }
     }
 
     @ViewBuilder
