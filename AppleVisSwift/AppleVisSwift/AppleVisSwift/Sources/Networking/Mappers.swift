@@ -117,7 +117,7 @@ enum Mappers {
         let fileId = node.relationshipId("field_podcast")
         let fileNode = fileId.flatMap { id in included.first { $0.id == id } }
         let rawUri = fileNode?.attributes["uri"]?["value"]?.stringValue
-        let audioUrl = rawUri.map(fileURI) ?? ""
+        let audioUrl = rawUri?.replacingOccurrences(of: "public://", with: "\(base)/sites/default/files/") ?? ""
 
         let transcriptUrl = a["field_transcript_url"]?.stringValue ?? a["field_vtt_url"]?.stringValue
 

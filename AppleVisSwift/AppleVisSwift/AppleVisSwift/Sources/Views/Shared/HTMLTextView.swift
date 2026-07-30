@@ -23,3 +23,14 @@ struct HTMLTextView: View {
         return result
     }
 }
+
+extension String {
+    /// Strips HTML tags for contexts that need plain text (e.g. feeding
+    /// rich-text content to the on-device summarizer).
+    func strippingHTMLTags() -> String {
+        replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "&nbsp;", with: " ")
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}

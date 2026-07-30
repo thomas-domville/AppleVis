@@ -51,3 +51,24 @@ struct ForumCategory: Identifiable, Codable, Hashable {
     let tid: Int
     let topicCount: Int
 }
+
+extension ForumFilter {
+    /// Applies this filter to a page of "recent" topics. Not meaningful for
+    /// `.following`/`.saved` — those are sourced directly from
+    /// `PersistenceStore` (see `supportsRefinement`), not from "recent".
+    func apply(to topics: [ForumTopic]) -> [ForumTopic] {
+        let lastVisit = PersistenceStore.shared.forumsLastVisit
+        switch self {
+        case .recent:
+            return topics
+        case .new:
+            return topics.filter { $0.createdAt > lastVisit }
+        case .unread:
+            return topics.filter { !PersistenceStore.shared.isTopicSeen(id: $0.id) }
+        case .sinceLastVisit:
+            return topics.filter { $0.lastActivityAt > lastVisit }
+        case .following, .saved:
+            return topics
+        }
+    }
+}

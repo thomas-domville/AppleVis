@@ -3,11 +3,17 @@ import SwiftUI
 /// Ported against src/services/drupalForm.ts's `/form/community-bug-report-form`
 /// webform. Requires an authenticated session — see DrupalFormClient's header
 /// comment on verification status.
+///
+/// Four-step wizard: Your Details → Description → Bug Details → Review,
+/// matching the original step-by-step design.
 struct SubmitBugView: View {
+    private enum Step: Int { case details, description, bugInfo, review }
+
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @Environment(\.dismiss) private var dismiss
 
+    @State private var step: Step = .details
     @State private var name = ""
     @State private var email = ""
     @State private var title = ""
@@ -28,9 +34,12 @@ struct SubmitBugView: View {
         "No - please thank/recognize me anonymously",
     ]
 
-    private var isValid: Bool {
+    private var detailsValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !email.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !email.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private var descriptionValid: Bool {
         !title.trimmingCharacters(in: .whitespaces).isEmpty &&
         !description.trimmingCharacters(in: .whitespaces).isEmpty
     }
@@ -38,36 +47,11 @@ struct SubmitBugView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    Text("Report an accessibility bug for the community Bug Tracker. Apple does not see this directly — file Feedback Assistant separately if you want Apple to see it.")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                }
-                Section("Your Details") {
-                    TextField("Name", text: $name)
-                    TextField("Email", text: $email)
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                }
-                Section("Bug Details") {
-                    TextField("Title", text: $title)
-                    Picker("Platform", selection: $platform) {
-                        ForEach(platforms, id: \.self) { Text($0) }
-                    }
-                    TextField("Software Version", text: $softwareVersion)
-                    TextField("Apple Feedback ID (optional)", text: $appleFeedbackId)
-                    Picker("Can you reproduce it?", selection: $canReproduce) {
-                        ForEach(reproduceOptions, id: \.self) { Text($0) }
-                    }
-                }
-                Section("Description") {
-                    TextEditor(text: $description)
-                        .frame(minHeight: 160)
-                }
-                Section("Recognition") {
-                    Picker("Recognize your contribution?", selection: $recognition) {
-                        ForEach(recognitionOptions, id: \.self) { Text($0) }
-                    }
-                    .pickerStyle(.navigationLink)
+                switch step {
+                case .details:     detailsSection
+                case .description: descriptionSection
+                case .bugInfo:     bugInfoSection
+                case .review:      reviewSection
                 }
                 if let error {
                     Section { Text(error).foregroundStyle(.red) }
@@ -77,17 +61,111 @@ struct SubmitBugView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(step == .details ? "Cancel" : "Back") {
+                        if step == .details {
+                            SoundPlayer.shared.play(.screenClose)
+                            dismiss()
+                        } else {
+                            goBack()
+                        }
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Submit") { Task { await submit() } }
-                        .disabled(!isValid || isSubmitting)
+                    if step == .review {
+                        Button("Submit") { Task { await submit() } }
+                            .disabled(isSubmitting)
+                    } else {
+                        Button("Next") { goNext() }
+                            .disabled(step == .details ? !detailsValid : (step == .description ? !descriptionValid : false))
+                    }
                 }
             }
             .onAppear {
                 if name.isEmpty { name = auth.user?.name ?? "" }
             }
         }
+    }
+
+    private var detailsSection: some View {
+        Group {
+            Section {
+                WizardStepIndicator(step: 1, total: 4, title: "Your Details")
+                Text("Report an accessibility bug for the community Bug Tracker. Apple does not see this directly — file Feedback Assistant separately if you want Apple to see it.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            Section("Your Details") {
+                TextField("Name", text: $name)
+                TextField("Email", text: $email)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+            }
+        }
+    }
+
+    private var descriptionSection: some View {
+        Group {
+            Section { WizardStepIndicator(step: 2, total: 4, title: "Describe the Bug") }
+            Section("Bug Details") {
+                TextField("Title", text: $title)
+            }
+            Section("Description") {
+                TextEditor(text: $description)
+                    .frame(minHeight: 160)
+            }
+        }
+    }
+
+    private var bugInfoSection: some View {
+        Group {
+            Section { WizardStepIndicator(step: 3, total: 4, title: "Environment") }
+            Section("Where It Happens") {
+                Picker("Platform", selection: $platform) {
+                    ForEach(platforms, id: \.self) { Text($0) }
+                }
+                TextField("Software Version", text: $softwareVersion)
+                TextField("Apple Feedback ID (optional)", text: $appleFeedbackId)
+                Picker("Can you reproduce it?", selection: $canReproduce) {
+                    ForEach(reproduceOptions, id: \.self) { Text($0) }
+                }
+            }
+            Section("Recognition") {
+                Picker("Recognize your contribution?", selection: $recognition) {
+                    ForEach(recognitionOptions, id: \.self) { Text($0) }
+                }
+                .pickerStyle(.navigationLink)
+            }
+        }
+    }
+
+    private var reviewSection: some View {
+        Group {
+            Section { WizardStepIndicator(step: 4, total: 4, title: "Review & Submit") }
+            Section("Your Details") {
+                WizardReviewRow(label: "Name", value: name)
+                WizardReviewRow(label: "Email", value: email)
+            }
+            Section("Bug") {
+                WizardReviewRow(label: "Title", value: title)
+                WizardReviewRow(label: "Description", value: description)
+            }
+            Section("Environment") {
+                WizardReviewRow(label: "Platform", value: platform)
+                WizardReviewRow(label: "Software Version", value: softwareVersion)
+                WizardReviewRow(label: "Apple Feedback ID", value: appleFeedbackId)
+                WizardReviewRow(label: "Can Reproduce", value: canReproduce)
+                WizardReviewRow(label: "Recognition", value: recognition)
+            }
+        }
+    }
+
+    private func goNext() {
+        SoundPlayer.shared.play(.pickerTick)
+        step = Step(rawValue: step.rawValue + 1) ?? .review
+    }
+
+    private func goBack() {
+        SoundPlayer.shared.play(.pickerTick)
+        step = Step(rawValue: step.rawValue - 1) ?? .details
     }
 
     private func submit() async {

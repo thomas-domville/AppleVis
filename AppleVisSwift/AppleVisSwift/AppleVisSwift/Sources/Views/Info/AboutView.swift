@@ -26,6 +26,10 @@ struct AboutView: View {
     var body: some View {
         Form {
             Section("App Information") {
+                NavigationLink { WhatsNewView() } label: {
+                    Label("What's New", systemImage: "sparkles")
+                }
+                .accessibilityLabel("What's New in AppleVis")
                 InfoRow(label: "Version", value: appVersion)
                 InfoRow(label: "Build",   value: buildNumber)
                 InfoRow(label: "iOS",     value: iosVersion)

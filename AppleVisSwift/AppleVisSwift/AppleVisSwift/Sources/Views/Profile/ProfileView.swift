@@ -82,6 +82,11 @@ struct ProfileView: View {
             }
             .accessibilityLabel("Edit your public profile")
 
+            Link(destination: URL(string: "https://www.applevis.com/user")!) {
+                Label("Account Settings on applevis.com", systemImage: "arrow.up.right.square")
+            }
+            .accessibilityLabel("Account Settings on applevis.com, opens in browser")
+
             NavigationLink {
                 DeleteAccountView()
             } label: {
@@ -138,6 +143,13 @@ struct ProfileView: View {
     private var aboutSection: some View {
         Section("About AppleVis") {
             NavigationLink {
+                WhatsNewView()
+            } label: {
+                Label("What's New", systemImage: "sparkles")
+            }
+            .accessibilityLabel("What's New in AppleVis")
+
+            NavigationLink {
                 AboutView()
             } label: {
                 Label("About & Credits", systemImage: "info.circle")
@@ -146,7 +158,7 @@ struct ProfileView: View {
             Button {
                 showWelcomeTour = true
             } label: {
-                Label("Replay Welcome Tour", systemImage: "sparkles")
+                Label("Replay Welcome Tour", systemImage: "arrow.clockwise")
             }
             .accessibilityLabel("Replay Welcome Tour")
 

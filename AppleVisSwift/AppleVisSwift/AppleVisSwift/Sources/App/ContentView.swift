@@ -3,21 +3,25 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+    @State private var selectedTab = 0
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            TabView {
+            TabView(selection: $selectedTab) {
                 HomeView()
                     .tabItem { Label("Home", systemImage: "house") }
+                    .tag(0)
 
                 DiscoverView()
                     .tabItem { Label("Discover", systemImage: "safari") }
+                    .tag(1)
 
                 ForYouView()
                     .tabItem { Label("For You", systemImage: "person.crop.circle") }
-
-                ProfileView()
-                    .tabItem { Label("Profile", systemImage: "person") }
+                    .tag(2)
+            }
+            .onChange(of: selectedTab) { _, _ in
+                SoundPlayer.shared.play(.tabChange)
             }
 
             if player.currentEpisode != nil {

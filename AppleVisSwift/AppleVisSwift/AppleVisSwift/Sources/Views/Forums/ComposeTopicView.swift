@@ -10,6 +10,9 @@ struct ComposeTopicView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var preferences: PreferencesStore
+    @StateObject private var guidelines = GuidelinesCheckState()
+    @StateObject private var intelligence = ComposeIntelligenceState()
 
     var isValid: Bool { !title.trimmingCharacters(in: .whitespaces).isEmpty && !bodyText.trimmingCharacters(in: .whitespaces).isEmpty && selectedCategory != nil }
 
@@ -27,9 +30,36 @@ struct ComposeTopicView: View {
                         }
                     }
                 }
+                if intelligence.showTranslatePrompt {
+                    Section {
+                        TranslatePromptView(isProcessing: intelligence.isProcessing) {
+                            Task {
+                                if let result = await intelligence.translate(subject: title, body: bodyText, isTopic: true) {
+                                    title = result.subject ?? title
+                                    bodyText = result.body
+                                }
+                            }
+                        } onDismiss: {
+                            intelligence.dismissTranslatePrompt()
+                        }
+                    }
+                }
+                if let warning = guidelines.topWarning {
+                    Section {
+                        GuidelinesReminderView(warning: warning) { guidelines.dismiss() }
+                    }
+                }
                 Section("Body") {
                     TextEditor(text: $bodyText)
                         .frame(minHeight: 200)
+                        .onChange(of: bodyText) { _, newValue in
+                            guidelines.textChanged(newValue)
+                            intelligence.textChanged(
+                                newValue,
+                                translationEnabled: preferences.composeTranslationEnabled,
+                                detectionEnabled: preferences.nonEnglishDetectionEnabled
+                            )
+                        }
                 }
                 if let error {
                     Section {
@@ -41,7 +71,20 @@ struct ComposeTopicView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") { SoundPlayer.shared.play(.screenClose); dismiss() }
+                }
+                if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+                    ToolbarItem(placement: .secondaryAction) {
+                        Button("Rewrite") {
+                            Task {
+                                if let result = await intelligence.rewrite(subject: title, body: bodyText, isTopic: true) {
+                                    title = result.subject ?? title
+                                    bodyText = result.body
+                                }
+                            }
+                        }
+                        .disabled(bodyText.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Post") { Task { await submit() } }
@@ -81,6 +124,9 @@ struct ComposeReplyView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var preferences: PreferencesStore
+    @StateObject private var guidelines = GuidelinesCheckState()
+    @StateObject private var intelligence = ComposeIntelligenceState()
 
     var body: some View {
         NavigationStack {
@@ -89,8 +135,34 @@ struct ComposeReplyView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding()
+                if intelligence.showTranslatePrompt {
+                    TranslatePromptView(isProcessing: intelligence.isProcessing) {
+                        Task {
+                            if let result = await intelligence.translate(subject: nil, body: bodyText, isTopic: false) {
+                                bodyText = result.body
+                            }
+                        }
+                    } onDismiss: {
+                        intelligence.dismissTranslatePrompt()
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+                }
+                if let warning = guidelines.topWarning {
+                    GuidelinesReminderView(warning: warning) { guidelines.dismiss() }
+                        .padding(.horizontal)
+                        .padding(.bottom, 8)
+                }
                 TextEditor(text: $bodyText)
                     .padding()
+                    .onChange(of: bodyText) { _, newValue in
+                        guidelines.textChanged(newValue)
+                        intelligence.textChanged(
+                            newValue,
+                            translationEnabled: preferences.composeTranslationEnabled,
+                            detectionEnabled: preferences.nonEnglishDetectionEnabled
+                        )
+                    }
                 if let error {
                     Text(error).foregroundStyle(.red).padding()
                 }
@@ -98,7 +170,19 @@ struct ComposeReplyView: View {
             .navigationTitle("Reply")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { SoundPlayer.shared.play(.screenClose); dismiss() } }
+                if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+                    ToolbarItem(placement: .secondaryAction) {
+                        Button("Rewrite") {
+                            Task {
+                                if let result = await intelligence.rewrite(subject: nil, body: bodyText, isTopic: false) {
+                                    bodyText = result.body
+                                }
+                            }
+                        }
+                        .disabled(bodyText.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Post") { Task { await submit() } }
                         .disabled(bodyText.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
@@ -114,6 +198,7 @@ struct ComposeReplyView: View {
         do {
             let reply = try await APIClient.shared.forums.submitReply(topicId: topicId, body: bodyText, csrfToken: user.csrfToken)
             toast.success("Reply posted")
+            SoundPlayer.shared.play(.reply)
             onPosted(reply)
             dismiss()
         } catch let e as APIError { error = e.localizedDescription

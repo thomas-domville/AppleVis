@@ -1,9 +1,33 @@
 import SwiftUI
 
+/// Time-of-day greeting shown on the Home tab's greeting card.
+enum Greeting {
+    static func text(for date: Date = Date()) -> String {
+        switch Calendar.current.component(.hour, from: date) {
+        case 5..<12:  return "Good morning"
+        case 12..<17: return "Good afternoon"
+        case 17..<22: return "Good evening"
+        default:      return "Good night"
+        }
+    }
+
+    static func accentColor(for date: Date = Date()) -> Color {
+        switch Calendar.current.component(.hour, from: date) {
+        case 5..<12:  return Color(red: 0.961, green: 0.620, blue: 0.043) // amber
+        case 12..<17: return Color(red: 0.055, green: 0.647, blue: 0.914) // sky blue
+        case 17..<22: return Color(red: 0.388, green: 0.400, blue: 0.945) // indigo
+        default:      return Color(red: 0.486, green: 0.227, blue: 0.929) // purple
+        }
+    }
+}
+
 struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var player: PlayerStore
+    @EnvironmentObject private var auth: AuthStore
+    @EnvironmentObject private var networkMonitor: NetworkMonitor
+    @State private var hasAnnouncedWelcome = false
 
     var body: some View {
         NavigationStack {
@@ -21,9 +45,24 @@ struct HomeView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     filterMenu
                 }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if auth.isSignedIn {
+                        NavigationLink(destination: ProfileView()) {
+                            Image(systemName: "person.circle")
+                        }
+                    } else {
+                        NavigationLink(destination: SignInView()) {
+                            Text("Sign In")
+                        }
+                    }
+                }
             }
             .refreshable { await vm.load() }
             .overlay(alignment: .top) { ToastOverlay() }
+            .onChange(of: vm.isLoading) { _, isLoading in
+                guard !isLoading else { return }
+                announceWelcomeIfNeeded()
+            }
             .navigationDestination(for: ForumTopic.self) { topic in
                 ForumTopicDetailView(topicId: topic.id)
             }
@@ -43,10 +82,67 @@ struct HomeView: View {
         .task { await vm.load() }
     }
 
+    // MARK: - Welcome
+
+    private func announceWelcomeIfNeeded() {
+        guard !hasAnnouncedWelcome, preferences.homeStartupBehavior != .quiet else { return }
+        hasAnnouncedWelcome = true
+
+        SoundPlayer.shared.play(.welcome)
+
+        let baseText = vm.isReturningVisit
+            ? "Welcome back to AppleVis. Returning to where you left off."
+            : "Welcome to AppleVis. Home is ready."
+        let welcomeText = preferences.homeStartupBehavior == .detailed && !vm.newActivitySummary.isEmpty
+            ? "\(baseText) \(vm.newActivitySummary)."
+            : baseText
+        UIAccessibility.post(notification: .announcement, argument: welcomeText)
+    }
+
+    private var greetingCard: some View {
+        let name = auth.user?.name ?? ""
+        return Group {
+            if !name.isEmpty {
+                let today = Date().formatted(date: .complete, time: .omitted)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(Greeting.text()),")
+                        .font(.system(size: 20, weight: .light))
+                    Text(name)
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundStyle(Color.accentColor)
+                    Text(today)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                .overlay(alignment: .leading) {
+                    Rectangle()
+                        .fill(Greeting.accentColor())
+                        .frame(width: 4)
+                        .clipShape(RoundedRectangle(cornerRadius: 2))
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(Greeting.text()), \(name). Today is \(today).")
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+                .listRowSeparator(.hidden)
+            }
+        }
+    }
+
     // MARK: - Feed list
 
     private var feedList: some View {
         List {
+            greetingCard
+
+            if !networkMonitor.isConnected && !vm.items.isEmpty {
+                OfflineBanner()
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    .listRowSeparator(.hidden)
+            }
+
             if !vm.newActivitySummary.isEmpty {
                 Section {
                     Text(vm.newActivitySummary)

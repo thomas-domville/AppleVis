@@ -37,6 +37,7 @@ final class PlayerStore: ObservableObject {
         restorePositions()
         restoreLastPlayed()
         observeLifecycle()
+        observePlaybackSpeedPreference()
     }
 
     // MARK: - Playback control
@@ -110,6 +111,7 @@ final class PlayerStore: ObservableObject {
         player?.rate = playbackSpeed
         isPlaying = true
         updateNowPlayingPlaybackState()
+        SoundPlayer.shared.play(.podcastPlay)
     }
 
     func pause() {
@@ -117,6 +119,7 @@ final class PlayerStore: ObservableObject {
         isPlaying = false
         savePositionOfCurrentEpisode()
         updateNowPlayingPlaybackState()
+        SoundPlayer.shared.play(.podcastPause)
     }
 
     func togglePlayPause() {
@@ -174,7 +177,7 @@ final class PlayerStore: ObservableObject {
         sleepAtEndOfEpisode = false
         sleepTimerRemaining = TimeInterval(minutes * 60)
         sleepTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.tickSleepTimer() }
+            Task { @MainActor [weak self] in self?.tickSleepTimer() }
         }
     }
 
@@ -203,7 +206,7 @@ final class PlayerStore: ObservableObject {
     // MARK: - Now Playing / Lock Screen
 
     private func updateNowPlayingInfo(episode: PodcastEpisode) {
-        var info: [String: Any] = [
+        let info: [String: Any] = [
             MPMediaItemPropertyTitle: episode.title,
             MPMediaItemPropertyArtist: episode.showTitle,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: position,
@@ -241,16 +244,21 @@ final class PlayerStore: ObservableObject {
         center.togglePlayPauseCommand.removeTarget(nil)
         center.togglePlayPauseCommand.addTarget { [weak self] _ in self?.togglePlayPause(); return .success }
 
+        let skipBack = UserDefaults.standard.object(forKey: "podcast.skipBack") as? Double ?? 10
+        let skipForward = UserDefaults.standard.object(forKey: "podcast.skipForward") as? Double ?? 30
+
         center.skipBackwardCommand.removeTarget(nil)
-        center.skipBackwardCommand.preferredIntervals = [15]
+        center.skipBackwardCommand.preferredIntervals = [NSNumber(value: skipBack)]
         center.skipBackwardCommand.addTarget { [weak self] _ in
-            Task { await self?.skip(by: -15) }; return .success
+            let interval = UserDefaults.standard.object(forKey: "podcast.skipBack") as? Double ?? 10
+            Task { await self?.skip(by: -interval) }; return .success
         }
 
         center.skipForwardCommand.removeTarget(nil)
-        center.skipForwardCommand.preferredIntervals = [30]
+        center.skipForwardCommand.preferredIntervals = [NSNumber(value: skipForward)]
         center.skipForwardCommand.addTarget { [weak self] _ in
-            Task { await self?.skip(by: 30) }; return .success
+            let interval = UserDefaults.standard.object(forKey: "podcast.skipForward") as? Double ?? 30
+            Task { await self?.skip(by: interval) }; return .success
         }
 
         center.nextTrackCommand.removeTarget(nil)
@@ -287,9 +295,11 @@ final class PlayerStore: ObservableObject {
     private func observeTime() {
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
         timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            self?.position = time.seconds
-            if let duration = self?.player?.currentItem?.duration.seconds, duration.isFinite {
-                self?.duration = duration
+            MainActor.assumeIsolated {
+                self?.position = time.seconds
+                if let duration = self?.player?.currentItem?.duration.seconds, duration.isFinite {
+                    self?.duration = duration
+                }
             }
         }
     }
@@ -305,11 +315,15 @@ final class PlayerStore: ObservableObject {
         NotificationCenter.default.publisher(for: AVPlayerItem.didPlayToEndTimeNotification)
             .sink { [weak self] _ in
                 guard let self else { return }
+                if let episode = self.currentEpisode {
+                    DownloadManager.shared.markPlayCompleted(episode.id)
+                }
                 if self.sleepAtEndOfEpisode {
                     self.pause()
                     self.cancelSleepTimer()
                     return
                 }
+                guard UserDefaults.standard.object(forKey: "podcast.autoPlay") as? Bool ?? true else { return }
                 Task { await self.playNext() }
             }
             .store(in: &cancellables)
@@ -334,6 +348,23 @@ final class PlayerStore: ObservableObject {
         player?.volume = volume
     }
 
+    /// PreferencesStore's Settings speed picker and this store's own in-player
+    /// speed control share the "podcast.speed" UserDefaults key but are
+    /// separate in-memory @Published/@AppStorage values with no built-in link.
+    /// This keeps them in sync so a change in Settings actually affects
+    /// playback immediately (and vice versa) instead of only on next launch.
+    private func observePlaybackSpeedPreference() {
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                let stored = Float(UserDefaults.standard.object(forKey: Self.speedKey) as? Double ?? 1.0)
+                if stored != self.playbackSpeed {
+                    self.playbackSpeed = stored
+                }
+            }
+            .store(in: &cancellables)
+    }
+
     private func observeLifecycle() {
         NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)
             .sink { [weak self] _ in
@@ -355,6 +386,24 @@ final class PlayerStore: ObservableObject {
         if let data = try? JSONEncoder().encode(queue) {
             UserDefaults.standard.set(data, forKey: Self.queueKey)
         }
+        ICloudSyncManager.shared.pushQueue(queue)
+    }
+
+    /// Adopts a queue pulled from iCloud (another device added/reordered episodes).
+    func applyPulledQueue(_ pulled: [PodcastEpisode]) {
+        queue = pulled
+        saveQueue()
+    }
+
+    /// Adopts playback positions pulled from iCloud, keeping whichever is
+    /// further along for episodes present on both sides.
+    func applyPulledPositions(_ pulled: [String: TimeInterval]) {
+        for (id, time) in pulled {
+            positions[id] = max(positions[id] ?? 0, time)
+        }
+        if let data = try? JSONEncoder().encode(positions) {
+            UserDefaults.standard.set(data, forKey: Self.positionsKey)
+        }
     }
 
     private func restoreQueue() {
@@ -369,6 +418,7 @@ final class PlayerStore: ObservableObject {
         if let data = try? JSONEncoder().encode(positions) {
             UserDefaults.standard.set(data, forKey: Self.positionsKey)
         }
+        ICloudSyncManager.shared.pushPodcastPositions(positions)
     }
 
     private func restorePositions() {

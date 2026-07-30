@@ -14,6 +14,7 @@ struct ContentActionsModifier: ViewModifier {
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var tips: TipStore
     @State private var isSaved = false
     @State private var isFollowing = false
 
@@ -61,6 +62,7 @@ struct ContentActionsModifier: ViewModifier {
             PersistenceStore.shared.save(SavedItem(id: id, kind: kind, title: title, savedAt: Date(), lastActivityAt: lastActivityAt))
             isSaved = true
             toast.success("Saved")
+            SoundPlayer.shared.play(.bookmarkSaved)
         }
     }
 
@@ -80,6 +82,7 @@ struct ContentActionsModifier: ViewModifier {
                 ))
                 isFollowing = true
                 toast.success("Following")
+                if kind == .forumTopic { tips.show(.followTopicNotifications) }
             }
         } catch let e as APIError {
             toast.error(e.localizedDescription)
@@ -125,6 +128,7 @@ struct ContentDetailActions: View {
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var tips: TipStore
     @State private var isSaved = false
     @State private var isFollowing = false
 
@@ -167,6 +171,7 @@ struct ContentDetailActions: View {
             PersistenceStore.shared.save(SavedItem(id: id, kind: kind, title: title, savedAt: Date(), lastActivityAt: lastActivityAt))
             isSaved = true
             toast.success("Saved")
+            SoundPlayer.shared.play(.bookmarkSaved)
         }
     }
 
@@ -186,6 +191,7 @@ struct ContentDetailActions: View {
                 ))
                 isFollowing = true
                 toast.success("Following")
+                if kind == .forumTopic { tips.show(.followTopicNotifications) }
             }
         } catch let e as APIError {
             toast.error(e.localizedDescription)

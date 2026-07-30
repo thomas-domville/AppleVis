@@ -11,28 +11,30 @@ struct AppearanceSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("Colour Scheme") {
-                ForEach(AppTheme.allCases) { theme in
-                    Button {
-                        preferences.theme = theme
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(theme.displayName)
-                                    .foregroundStyle(.primary)
-                                Text(theme.subtitle)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if preferences.theme == theme {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(Color.accentColor)
-                                    .accessibilityHidden(true)
+            ForEach(ThemeGroup.allCases) { group in
+                Section(group.label) {
+                    ForEach(AppTheme.allCases.filter { $0.group == group }) { theme in
+                        Button {
+                            preferences.theme = theme
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(theme.displayName)
+                                        .foregroundStyle(.primary)
+                                    Text(theme.subtitle)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if preferences.theme == theme {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(Color.accentColor)
+                                        .accessibilityHidden(true)
+                                }
                             }
                         }
+                        .accessibilityAddTraits(preferences.theme == theme ? [.isSelected] : [])
                     }
-                    .accessibilityAddTraits(preferences.theme == theme ? [.isSelected] : [])
                 }
             }
 

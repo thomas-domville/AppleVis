@@ -105,6 +105,7 @@ struct StorageView: View {
 
     private func clearCache() {
         URLCache.shared.removeAllCachedResponses()
+        UserDefaults.standard.set(Date(), forKey: "storage.lastCachePurge")
         cachedMB = 0
     }
 

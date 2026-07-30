@@ -15,6 +15,9 @@ struct ForYouView: View {
                 }
                 .pickerStyle(.segmented)
                 .padding()
+                .onChange(of: selectedTab) { _, _ in
+                    SoundPlayer.shared.play(.pickerTick)
+                }
 
                 Group {
                     switch selectedTab {
@@ -62,6 +65,7 @@ enum ForYouTab: String, CaseIterable, Identifiable {
 
 struct DownloadsView: View {
     @EnvironmentObject private var player: PlayerStore
+    @EnvironmentObject private var tips: TipStore
     @ObservedObject private var downloads = DownloadManager.shared
 
     var body: some View {
@@ -103,6 +107,7 @@ struct DownloadsView: View {
                         }
                     }
                 }
+                .onAppear { tips.show(.downloadsOffline) }
             }
         }
     }
@@ -126,6 +131,7 @@ struct DownloadsView: View {
 
 struct SavedItemsView: View {
     @EnvironmentObject private var auth: AuthStore
+    @EnvironmentObject private var tips: TipStore
     @State private var items: [SavedItem] = []
     @State private var isLoading = false
     @State private var error: String?
@@ -163,8 +169,15 @@ struct SavedItemsView: View {
                         .foregroundStyle(.secondary)
                     Text(item.title)
                 }
+                .swipeActions {
+                    Button("Remove", role: .destructive) {
+                        PersistenceStore.shared.unsave(id: item.id)
+                        items.removeAll { $0.id == item.id }
+                    }
+                }
             }
         }
+        .onAppear { tips.show(.savedSwipeActions) }
     }
 
     private var filterPicker: some View {

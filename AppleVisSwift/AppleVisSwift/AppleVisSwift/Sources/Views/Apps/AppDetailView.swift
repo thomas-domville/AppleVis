@@ -22,7 +22,10 @@ struct AppDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .handoff(title: detail?.name, url: detail?.url)
-        .task { await load() }
+        .task {
+            SoundPlayer.shared.play(.articleOpen)
+            await load()
+        }
     }
 
     @ViewBuilder

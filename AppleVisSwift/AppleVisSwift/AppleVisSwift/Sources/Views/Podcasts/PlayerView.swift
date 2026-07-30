@@ -4,6 +4,7 @@ import SwiftUI
 
 struct MiniPlayerView: View {
     @EnvironmentObject private var player: PlayerStore
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var showFullPlayer = false
 
     var body: some View {
@@ -38,13 +39,13 @@ struct MiniPlayerView: View {
                 .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
 
                 Button {
-                    Task { await player.skip(by: 30) }
+                    Task { await player.skip(by: preferences.skipForwardInterval) }
                 } label: {
-                    Image(systemName: "goforward.30")
+                    Image(systemName: "goforward.\(Int(preferences.skipForwardInterval))")
                         .font(.title3)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Skip forward 30 seconds")
+                .accessibilityLabel("Skip forward \(Int(preferences.skipForwardInterval)) seconds")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -68,6 +69,7 @@ struct MiniPlayerView: View {
 
 struct FullPlayerView: View {
     @EnvironmentObject private var player: PlayerStore
+    @EnvironmentObject private var preferences: PreferencesStore
     @Environment(\.dismiss) private var dismiss
 
     private let speedOptions: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
@@ -144,7 +146,7 @@ struct FullPlayerView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Done") { dismiss() }
+                        Button("Done") { SoundPlayer.shared.play(.screenClose); dismiss() }
                     }
                 }
             }
@@ -154,10 +156,10 @@ struct FullPlayerView: View {
             Button("") { player.togglePlayPause() }
                 .keyboardShortcut(.space, modifiers: [])
                 .opacity(0)
-            Button("") { Task { await player.skip(by: -15) } }
+            Button("") { Task { await player.skip(by: -preferences.skipBackInterval) } }
                 .keyboardShortcut(.leftArrow, modifiers: [])
                 .opacity(0)
-            Button("") { Task { await player.skip(by: 30) } }
+            Button("") { Task { await player.skip(by: preferences.skipForwardInterval) } }
                 .keyboardShortcut(.rightArrow, modifiers: [])
                 .opacity(0)
         }
@@ -166,13 +168,13 @@ struct FullPlayerView: View {
     private var transportControls: some View {
         HStack(spacing: 0) {
             Button {
-                Task { await player.skip(by: -15) }
+                Task { await player.skip(by: -preferences.skipBackInterval) }
             } label: {
-                Image(systemName: "gobackward.15")
+                Image(systemName: "gobackward.\(Int(preferences.skipBackInterval))")
                     .font(.system(size: 34))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Skip back 15 seconds")
+            .accessibilityLabel("Skip back \(Int(preferences.skipBackInterval)) seconds")
             .frame(maxWidth: .infinity)
 
             Button {
@@ -187,13 +189,13 @@ struct FullPlayerView: View {
             .frame(maxWidth: .infinity)
 
             Button {
-                Task { await player.skip(by: 30) }
+                Task { await player.skip(by: preferences.skipForwardInterval) }
             } label: {
-                Image(systemName: "goforward.30")
+                Image(systemName: "goforward.\(Int(preferences.skipForwardInterval))")
                     .font(.system(size: 34))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Skip forward 30 seconds")
+            .accessibilityLabel("Skip forward \(Int(preferences.skipForwardInterval)) seconds")
             .frame(maxWidth: .infinity)
         }
     }
@@ -219,8 +221,16 @@ struct FullPlayerView: View {
 
     private var sleepTimerButton: some View {
         Menu {
-            ForEach([5, 15, 30, 45, 60], id: \.self) { minutes in
-                Button("\(minutes) minutes") { player.startSleepTimer(minutes: minutes) }
+            ForEach([15, 30, 45, 60], id: \.self) { minutes in
+                Button {
+                    player.startSleepTimer(minutes: minutes)
+                } label: {
+                    if preferences.sleepTimerMinutes == minutes {
+                        Label("\(minutes) minutes (Default)", systemImage: "checkmark")
+                    } else {
+                        Text("\(minutes) minutes")
+                    }
+                }
             }
             Button("End of Episode") { player.startSleepTimerAtEndOfEpisode() }
             if player.sleepTimerRemaining != nil || player.sleepAtEndOfEpisode {

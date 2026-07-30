@@ -44,6 +44,9 @@ struct NotificationSettingsView: View {
                     }
                 }
                 .accessibilityHint("Choose the sound played for AppleVis notifications.")
+                .onChange(of: preferences.notificationSound) { _, newValue in
+                    SoundPlayer.shared.playNotificationPreview(newValue)
+                }
 
                 if let sound = NotificationSound.allCases.first(where: { $0 == preferences.notificationSound }) {
                     Text(sound.description)
@@ -130,13 +133,9 @@ struct NotificationSettingsView: View {
 
     private func requestPermission() {
         Task {
-            do {
-                let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
-                await checkPermission()
-                _ = granted
-            } catch {
-                await checkPermission()
-            }
+            let granted = await PushNotificationManager.requestAuthorizationAndRegister()
+            await checkPermission()
+            _ = granted
         }
     }
 

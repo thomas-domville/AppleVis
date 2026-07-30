@@ -12,6 +12,7 @@ struct EpisodeDetailView: View {
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var tips: TipStore
     @ObservedObject private var downloads = DownloadManager.shared
 
     var body: some View {
@@ -26,7 +27,10 @@ struct EpisodeDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .handoff(title: episode?.title, url: episode?.url)
-        .task { await load() }
+        .task {
+            SoundPlayer.shared.play(.articleOpen)
+            await load()
+        }
     }
 
     @ViewBuilder
@@ -39,6 +43,7 @@ struct EpisodeDetailView: View {
                 // Chapters
                 if !episode.chapters.isEmpty {
                     sectionHeading("Chapters")
+                        .onAppear { tips.show(.episodeChapters) }
                     ForEach(episode.chapters) { chapter in
                         ChapterRow(chapter: chapter) {
                             Task { await player.seek(to: chapter.startTime) }
@@ -309,6 +314,7 @@ struct ComposePodcastCommentView: View {
                 episodeId: episodeId, body: commentText, csrfToken: user.csrfToken
             )
             toast.success("Comment posted")
+            SoundPlayer.shared.play(.reply)
             onPosted(comment)
             dismiss()
         } catch let e as APIError { submitError = e.localizedDescription

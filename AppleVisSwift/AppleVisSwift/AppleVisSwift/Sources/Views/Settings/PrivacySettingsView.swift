@@ -42,45 +42,24 @@ struct PrivacySettingsView: View {
             }
 
             Section("Smart Features") {
-                Toggle("Non-English Content Detection", isOn: $preferences.nonEnglishDetectionEnabled)
-                    .accessibilityHint("Detects when content is in a language other than English and offers translation.")
-                Toggle("Compose Rewrite", isOn: $preferences.composeRewriteEnabled)
-                    .accessibilityHint("Offers AI-assisted rewrites when composing forum posts or messages.")
-                Toggle("Compose Translation", isOn: $preferences.composeTranslationEnabled)
-                    .accessibilityHint("Offers translation of your draft text into other languages.")
-                Toggle("Search Translation", isOn: $preferences.searchTranslationEnabled)
-                    .accessibilityHint("Translates your search query when results in other languages are found.")
-                Toggle("AI Summaries", isOn: $preferences.aiSummariesEnabled)
-                    .accessibilityHint("Generates short summaries for long forum threads and articles.")
+                Text("Non-English detection, compose rewrite/translation, search translation, and AI summaries all run on-device via Apple Intelligence.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                NavigationLink {
+                    IntelligenceSettingsView()
+                } label: {
+                    Label("Manage Smart Features", systemImage: "cpu")
+                }
             }
 
             Section("iCloud Sync") {
-                Toggle("Sync Saved Items", isOn: $preferences.savedItemsSync)
-                    .disabled(!preferences.iCloudSync)
-                    .accessibilityHint("Sync your saved articles, episodes, and app listings across all your devices.")
-                Toggle("Sync Reading Position", isOn: $preferences.readingPositionSync)
-                    .disabled(!preferences.iCloudSync)
-                    .accessibilityHint("Resume reading from the same position on any device.")
-                Toggle("Sync Podcast Position", isOn: $preferences.podcastPositionSync)
-                    .disabled(!preferences.iCloudSync)
-                    .accessibilityHint("Resume podcast playback from the same point on any device.")
-                Toggle("Sync Queue", isOn: $preferences.queueSync)
-                    .disabled(!preferences.iCloudSync)
-                    .accessibilityHint("Keep your listening queue in sync across all your devices.")
-                Toggle("Sync Settings", isOn: $preferences.settingsSync)
-                    .disabled(!preferences.iCloudSync)
-                    .accessibilityHint("Sync your preferences, theme, and configuration across all your devices.")
-
-                if !preferences.iCloudSync {
-                    Label {
-                        Text("Enable iCloud Sync in Saved & Sync to control these options.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } icon: {
-                        Image(systemName: "info.circle")
-                            .foregroundStyle(.secondary)
-                    }
-                    .accessibilityElement(children: .combine)
+                Text("Saved items, reading position, podcast position, queue, and settings can sync across your devices via iCloud.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                NavigationLink {
+                    SavedSyncSettingsView()
+                } label: {
+                    Label("Manage iCloud Sync", systemImage: "icloud")
                 }
             }
 

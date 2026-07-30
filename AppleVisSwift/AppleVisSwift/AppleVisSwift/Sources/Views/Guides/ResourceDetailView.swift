@@ -23,7 +23,10 @@ struct ResourceDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .handoff(title: detail?.title, url: detail?.url)
-        .task { await load() }
+        .task {
+            SoundPlayer.shared.play(.articleOpen)
+            await load()
+        }
     }
 
     @ViewBuilder
@@ -173,7 +176,7 @@ struct CommentRow: View {
     @State private var showEditSheet = false
 
     private var canDelete: Bool {
-        guard let user = auth.user, let authorId, let commentId, let commentType else { return false }
+        guard let user = auth.user, let authorId, commentId != nil, commentType != nil else { return false }
         return !authorId.isEmpty && (user.isAdmin || user.uuid == authorId)
     }
 

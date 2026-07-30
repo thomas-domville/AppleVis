@@ -28,11 +28,18 @@ final class PersistenceStore {
         guard !items.contains(where: { $0.id == item.id }) else { return }
         items.insert(item, at: 0)
         persist(items, key: savedKey)
+        Task { @MainActor in ICloudSyncManager.shared.pushSavedItems() }
     }
 
     func unsave(id: String) {
         var items = savedItems()
         items.removeAll { $0.id == id }
+        persist(items, key: savedKey)
+        Task { @MainActor in ICloudSyncManager.shared.pushSavedItems() }
+    }
+
+    /// Overwrites the local saved list — used when adopting an iCloud sync.
+    func replaceSavedItems(_ items: [SavedItem]) {
         persist(items, key: savedKey)
     }
 
@@ -51,12 +58,47 @@ final class PersistenceStore {
         guard !items.contains(where: { $0.id == item.id }) else { return }
         items.insert(item, at: 0)
         persist(items, key: followedKey)
+        Task { @MainActor in ICloudSyncManager.shared.pushSavedItems() }
     }
 
     func markUnfollowed(id: String) {
         var items = followedItems()
         items.removeAll { $0.id == id }
         persist(items, key: followedKey)
+        Task { @MainActor in ICloudSyncManager.shared.pushSavedItems() }
+    }
+
+    /// Overwrites the local followed list — used when adopting an iCloud sync.
+    func replaceFollowedItems(_ items: [FollowedItem]) {
+        persist(items, key: followedKey)
+    }
+
+    // MARK: - Seen forum topics (backs the "Unread" forums filter)
+
+    private let seenTopicsKey = "applevis.forums.seenTopics"
+
+    func isTopicSeen(id: String) -> Bool {
+        seenTopicIds().contains(id)
+    }
+
+    func markTopicSeen(id: String) {
+        var ids = seenTopicIds()
+        guard ids.insert(id).inserted else { return }
+        persist(Array(ids), key: seenTopicsKey)
+    }
+
+    private func seenTopicIds() -> Set<String> {
+        Set(load(key: seenTopicsKey) ?? [])
+    }
+
+    // MARK: - Forums last-visit (backs the New / Since Last Visit forums filters)
+
+    var forumsLastVisit: Date {
+        Date(timeIntervalSince1970: defaults.double(forKey: "applevis.forums.lastVisit"))
+    }
+
+    func markForumsVisited() {
+        defaults.set(Date().timeIntervalSince1970, forKey: "applevis.forums.lastVisit")
     }
 
     // MARK: - Storage

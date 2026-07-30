@@ -42,8 +42,6 @@ final class PreferencesStore: ObservableObject {
     @AppStorage("notif.sound")          var notificationSound: NotificationSound = .mouseSqueak
 
     // MARK: - Accessibility
-    @AppStorage("a11y.reducedMotion")   var reducedMotion   = false
-    @AppStorage("a11y.largerText")      var largerText      = false
     @AppStorage("a11y.announcement")    var announcementLevel: AnnouncementLevel = .normal
     @AppStorage("a11y.helpfulTips")     var helpfulTipsEnabled = true
     @AppStorage("a11y.welcomeSummary")  var welcomeSummaryEnabled = true
@@ -71,18 +69,51 @@ final class PreferencesStore: ObservableObject {
 
 // MARK: - Enums
 
+enum ThemeGroup: String, CaseIterable, Identifiable {
+    case standard, appleVis, accessibility
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .standard:     return "Standard"
+        case .appleVis:     return "AppleVis"
+        case .accessibility: return "Accessibility"
+        }
+    }
+}
+
+/// 13 fixed themes plus System, across three groups — Standard, AppleVis, Accessibility.
 enum AppTheme: String, CaseIterable, Identifiable {
-    case system, light, dark, sepia, midnight, highContrastLight, highContrastDark
+    case system, light, dark, midnight, warm, sepia
+    case applevisClassic, mouseLight, mouseDark, orchard, goldenGate, nebula
+    case highContrastLight, highContrastDark
 
     var id: String { rawValue }
+
+    var group: ThemeGroup {
+        switch self {
+        case .system, .light, .dark, .midnight, .warm, .sepia:
+            return .standard
+        case .applevisClassic, .mouseLight, .mouseDark, .orchard, .goldenGate, .nebula:
+            return .appleVis
+        case .highContrastLight, .highContrastDark:
+            return .accessibility
+        }
+    }
 
     var displayName: String {
         switch self {
         case .system:            return "System"
         case .light:              return "Light"
         case .dark:                return "Dark"
-        case .sepia:              return "Sepia"
         case .midnight:           return "Midnight"
+        case .warm:               return "Warm"
+        case .sepia:              return "Sepia"
+        case .applevisClassic:   return "AppleVis Classic"
+        case .mouseLight:        return "Mouse — Light"
+        case .mouseDark:         return "Mouse — Dark"
+        case .orchard:            return "Orchard"
+        case .goldenGate:        return "Golden Gate"
+        case .nebula:             return "Nebula"
         case .highContrastLight: return "High Contrast Light"
         case .highContrastDark:  return "High Contrast Dark"
         }
@@ -93,29 +124,44 @@ enum AppTheme: String, CaseIterable, Identifiable {
         case .system:            return "Follows iOS appearance setting"
         case .light:              return "Always uses light colours"
         case .dark:                return "Always uses dark colours"
-        case .sepia:              return "Warm, low-glare tones for extended reading"
         case .midnight:           return "Deep black background for low-light use"
+        case .warm:               return "Soft cream and amber tones that reduce blue light"
+        case .sepia:              return "Warm, low-glare tones for extended reading"
+        case .applevisClassic:   return "The blue and white scheme from applevis.com"
+        case .mouseLight:        return "Warm, playful theme inspired by AnonyMouse"
+        case .mouseDark:         return "The Mouse theme in a warm charcoal dark edition"
+        case .orchard:            return "Fresh apple greens and deep reds"
+        case .goldenGate:        return "Warm California sunset tones"
+        case .nebula:             return "Deep indigo and soft lavender, space-inspired"
         case .highContrastLight: return "Maximum contrast on a light background"
         case .highContrastDark:  return "Maximum contrast on a dark background"
         }
     }
 
     /// The underlying light/dark base every theme renders on top of —
-    /// SwiftUI has no native "sepia" scheme, so themes differentiate via
-    /// this base plus `accentColor` below.
+    /// SwiftUI has no native "sepia"/"nebula"/etc. scheme, so themes
+    /// differentiate via this base plus `accentColor` below.
     var colorScheme: ColorScheme? {
         switch self {
-        case .system:            return nil
-        case .light, .sepia, .highContrastLight: return .light
-        case .dark, .midnight, .highContrastDark: return .dark
+        case .system: return nil
+        case .light, .warm, .sepia, .applevisClassic, .mouseLight, .orchard, .goldenGate, .highContrastLight:
+            return .light
+        case .dark, .midnight, .mouseDark, .nebula, .highContrastDark:
+            return .dark
         }
     }
 
     var accentColor: Color {
         switch self {
         case .system, .light, .dark: return .accentColor
-        case .sepia:              return Color(red: 0.55, green: 0.38, blue: 0.20)
         case .midnight:           return Color(red: 0.30, green: 0.55, blue: 1.0)
+        case .warm:               return Color(red: 0.757, green: 0.490, blue: 0.169)
+        case .sepia:              return Color(red: 0.55, green: 0.38, blue: 0.20)
+        case .applevisClassic:   return Color(red: 0.039, green: 0.373, blue: 1.0)
+        case .mouseLight, .mouseDark: return Color(red: 0.961, green: 0.651, blue: 0.137)
+        case .orchard:            return Color(red: 0.800, green: 0.200, blue: 0.200)
+        case .goldenGate:        return Color(red: 1.0, green: 0.420, blue: 0.169)
+        case .nebula:             return Color(red: 0.655, green: 0.545, blue: 0.980)
         case .highContrastLight: return .black
         case .highContrastDark:  return .yellow
         }
@@ -130,9 +176,21 @@ enum CardDensity: String, CaseIterable, Identifiable {
 }
 
 enum ForumFilter: String, CaseIterable, Identifiable {
-    case recent, appleOnly
+    case recent, new, unread, sinceLastVisit, following, saved
     var id: String { rawValue }
-    var displayName: String { self == .recent ? "All Recent" : "Apple Only" }
+    var displayName: String {
+        switch self {
+        case .recent:         return "Recent"
+        case .new:             return "New"
+        case .unread:          return "Unread"
+        case .sinceLastVisit: return "Since Last Visit"
+        case .following:       return "Following"
+        case .saved:           return "Saved"
+        }
+    }
+    /// Following/Saved come from local persistence rather than the "recent" feed,
+    /// so category/Apple-only refinement doesn't apply to them.
+    var supportsRefinement: Bool { self == .recent || self == .new || self == .unread || self == .sinceLastVisit }
 }
 
 enum AnnouncementLevel: String, CaseIterable, Identifiable {
@@ -216,6 +274,16 @@ enum NotificationSound: String, CaseIterable, Identifiable {
         case .appleCrunch:         return "A crisp apple crunch."
         case .goldenRetrieverBark: return "A friendly golden retriever bark, warm and cheerful."
         case .system:              return "Your iPhone's standard notification tone."
+        }
+    }
+    /// Value stored server-side in `field_push_sound` so a push payload can
+    /// name the right sound file — matches the RN app's NOTIFICATION_SOUND_FILE map.
+    var pushSoundFile: String {
+        switch self {
+        case .mouseSqueak:         return "Mouse Squeak.wav"
+        case .appleCrunch:         return "Apple Crunch.wav"
+        case .goldenRetrieverBark: return "Golden Retriever Bark.wav"
+        case .system:              return "default"
         }
     }
 }

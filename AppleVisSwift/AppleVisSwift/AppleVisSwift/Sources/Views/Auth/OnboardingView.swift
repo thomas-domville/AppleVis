@@ -199,31 +199,41 @@ private struct ThemeStep: View {
                     subtitle: "Pick your preferred colour scheme. You can always change this later in Settings."
                 )
 
-                VStack(spacing: 12) {
-                    ForEach(AppTheme.allCases) { theme in
-                        Button {
-                            preferences.theme = theme
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(theme.displayName)
-                                        .font(.headline)
-                                        .foregroundStyle(.primary)
-                                    Text(theme.subtitle)
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                if preferences.theme == theme {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(Color.accentColor)
-                                        .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 20) {
+                    ForEach(ThemeGroup.allCases) { group in
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(group.label)
+                                .font(.headline)
+                                .foregroundStyle(.secondary)
+
+                            VStack(spacing: 12) {
+                                ForEach(AppTheme.allCases.filter { $0.group == group }) { theme in
+                                    Button {
+                                        preferences.theme = theme
+                                    } label: {
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(theme.displayName)
+                                                    .font(.headline)
+                                                    .foregroundStyle(.primary)
+                                                Text(theme.subtitle)
+                                                    .font(.subheadline)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            Spacer()
+                                            if preferences.theme == theme {
+                                                Image(systemName: "checkmark.circle.fill")
+                                                    .foregroundStyle(Color.accentColor)
+                                                    .accessibilityHidden(true)
+                                            }
+                                        }
+                                        .padding(16)
+                                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                                    }
+                                    .accessibilityAddTraits(preferences.theme == theme ? [.isSelected] : [])
                                 }
                             }
-                            .padding(16)
-                            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
                         }
-                        .accessibilityAddTraits(preferences.theme == theme ? [.isSelected] : [])
                     }
                 }
                 .padding(.horizontal, 24)
@@ -341,6 +351,7 @@ private struct NotificationsStep: View {
                         ForEach(NotificationSound.allCases) { sound in
                             Button {
                                 preferences.notificationSound = sound
+                                SoundPlayer.shared.playNotificationPreview(sound)
                             } label: {
                                 HStack {
                                     VStack(alignment: .leading, spacing: 2) {
@@ -414,9 +425,9 @@ private struct NotificationsStep: View {
 
     private func requestPermission() {
         Task {
-            let granted = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
-            permissionGranted = granted == true
-            if permissionGranted == true { onNext() }
+            let granted = await PushNotificationManager.requestAuthorizationAndRegister()
+            permissionGranted = granted
+            if granted { onNext() }
         }
     }
 }

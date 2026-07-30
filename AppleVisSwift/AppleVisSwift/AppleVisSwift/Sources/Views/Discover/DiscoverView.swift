@@ -10,7 +10,10 @@ struct DiscoverView: View {
     @State private var showSubmitBug = false
     @State private var showSubmitPodcast = false
     @State private var showContact = false
+    @State private var showTranslateSearchPrompt = false
+    @State private var isTranslatingSearch = false
     @EnvironmentObject private var auth: AuthStore
+    @EnvironmentObject private var preferences: PreferencesStore
 
     var body: some View {
         NavigationStack {
@@ -18,10 +21,34 @@ struct DiscoverView: View {
                 if searchText.isEmpty {
                     hubGrid
                 } else {
-                    SearchResultsView(results: searchResults, isSearching: isSearching)
+                    VStack(spacing: 0) {
+                        if showTranslateSearchPrompt {
+                            TranslatePromptView(isProcessing: isTranslatingSearch) {
+                                Task { await translateAndResearch() }
+                            } onDismiss: {
+                                showTranslateSearchPrompt = false
+                            }
+                            .padding(.horizontal)
+                            .padding(.top, 8)
+                        }
+                        SearchResultsView(results: searchResults, isSearching: isSearching)
+                    }
                 }
             }
             .navigationTitle("Discover")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if auth.isSignedIn {
+                        NavigationLink(destination: ProfileView()) {
+                            Image(systemName: "person.circle")
+                        }
+                    } else {
+                        NavigationLink(destination: SignInView()) {
+                            Text("Sign In")
+                        }
+                    }
+                }
+            }
             .searchable(text: $searchText, prompt: "Search AppleVis")
             .onChange(of: searchText) { _, newValue in
                 searchTask?.cancel()
@@ -32,6 +59,9 @@ struct DiscoverView: View {
                     isSearching = true
                     searchResults = try? await APIClient.shared.search.query(newValue)
                     isSearching = false
+                    SoundPlayer.shared.play(.searchComplete)
+                    showTranslateSearchPrompt = preferences.searchTranslationEnabled && IntelligenceService.isAvailable
+                        && IntelligenceService.detectNonEnglish(newValue)
                 }
             }
             .navigationDestination(for: ForumTopic.self) { topic in
@@ -58,6 +88,18 @@ struct DiscoverView: View {
             .sheet(isPresented: $showSubmitPodcast) { SubmitPodcastView() }
             .sheet(isPresented: $showContact) { ContactView() }
         }
+    }
+
+    private func translateAndResearch() async {
+        isTranslatingSearch = true
+        defer { isTranslatingSearch = false }
+        guard let translated = await IntelligenceService.translateSearchQuery(searchText) else { return }
+        showTranslateSearchPrompt = false
+        searchText = translated
+        isSearching = true
+        searchResults = try? await APIClient.shared.search.query(translated)
+        isSearching = false
+        SoundPlayer.shared.play(.searchComplete)
     }
 
     // MARK: - Hub grid (shown when not searching)

@@ -26,6 +26,7 @@ final class AuthStore: ObservableObject {
             let authUser = try await APIClient.shared.account.signIn(username: username, password: password)
             user = authUser
             saveToKeychain(authUser)
+            Task { await PushNotificationManager.syncRegistration() }
         } catch let apiError as APIError {
             error = apiError.localizedDescription
         } catch {
@@ -36,6 +37,7 @@ final class AuthStore: ObservableObject {
 
     func signOut() async {
         guard let u = user else { return }
+        await PushNotificationManager.clearRegistration()
         try? await APIClient.shared.account.logout(csrfToken: u.csrfToken, logoutToken: u.logoutToken)
         user = nil
         deleteFromKeychain()

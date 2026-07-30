@@ -7,6 +7,7 @@ struct DownloadedEpisodeMeta: Codable {
     let showTitle: String
     let downloadedAt: Date
     var fileSizeBytes: Int64
+    var playCompletedAt: Date? = nil
 }
 
 /// Downloads podcast episodes for offline playback. Not `@MainActor` — the
@@ -39,6 +40,7 @@ final class DownloadManager: NSObject, ObservableObject {
     private override init() {
         super.init()
         loadMetadata()
+        applyAutoDeletePolicy()
     }
 
     // MARK: - Queries
@@ -90,6 +92,38 @@ final class DownloadManager: NSObject, ObservableObject {
         saveMetadata()
     }
 
+    /// Called when an episode finishes playing. Records the completion time
+    /// (used by the Auto-Delete preference) and immediately applies the policy.
+    func markPlayCompleted(_ episodeId: String) {
+        guard metadata[episodeId] != nil else { return }
+        metadata[episodeId]?.playCompletedAt = Date()
+        saveMetadata()
+        applyAutoDeletePolicy()
+    }
+
+    /// Deletes downloaded episodes whose completed-playback age exceeds the
+    /// user's Auto-Delete preference. Safe to call anytime (app launch,
+    /// after an episode finishes) — it's a no-op when the preference is Off.
+    func applyAutoDeletePolicy() {
+        let raw = UserDefaults.standard.string(forKey: "podcast.autoDelete") ?? PodcastAutoDelete.off.rawValue
+        guard let policy = PodcastAutoDelete(rawValue: raw), policy != .off else { return }
+
+        let threshold: TimeInterval
+        switch policy {
+        case .off:        return
+        case .immediate:  threshold = 0
+        case .oneDay:     threshold = 86_400
+        case .threeDays:  threshold = 86_400 * 3
+        case .sevenDays:  threshold = 86_400 * 7
+        }
+
+        let now = Date()
+        for (id, meta) in metadata {
+            guard let completedAt = meta.playCompletedAt, now.timeIntervalSince(completedAt) >= threshold else { continue }
+            delete(id)
+        }
+    }
+
     func deleteAll() {
         try? FileManager.default.removeItem(at: downloadsDirectory)
         downloadedEpisodeIds.removeAll()
@@ -134,8 +168,9 @@ extension DownloadManager: URLSessionDownloadDelegate {
 
         DispatchQueue.main.async {
             if moved {
-                self.metadata[episodeId]?.fileSizeBytes = size ?? 0
+                self.metadata[episodeId]?.fileSizeBytes = size
                 self.downloadedEpisodeIds.insert(episodeId)
+                SoundPlayer.shared.play(.downloadComplete)
             } else {
                 self.metadata[episodeId] = nil
             }

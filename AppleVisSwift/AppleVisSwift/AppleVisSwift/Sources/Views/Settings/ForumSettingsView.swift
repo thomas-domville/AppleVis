@@ -57,8 +57,12 @@ struct ForumSettingsView: View {
 
     private func filterSubtitle(_ filter: ForumFilter) -> String {
         switch filter {
-        case .recent:    return "Shows the most recently updated topics from all categories."
-        case .appleOnly: return "Shows only topics about Apple products, services, and platforms."
+        case .recent:         return "Shows the most recently updated topics from all categories."
+        case .new:             return "Shows only topics created since your last visit."
+        case .unread:          return "Shows only topics you haven't opened yet."
+        case .sinceLastVisit: return "Shows topics with new replies since your last visit."
+        case .following:       return "Shows only forum topics you're following."
+        case .saved:           return "Shows only forum topics you've saved."
         }
     }
 }

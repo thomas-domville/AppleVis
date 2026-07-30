@@ -51,7 +51,7 @@ struct SubmitAppView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") { SoundPlayer.shared.play(.screenClose); dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Submit") { Task { await submit() } }

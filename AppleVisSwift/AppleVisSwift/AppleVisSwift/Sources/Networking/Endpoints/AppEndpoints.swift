@@ -41,7 +41,7 @@ struct AppEndpoints {
         return response.data.map { Mappers.app($0, included: response.included ?? []) }
     }
 
-    func categoryListing(platform: String, categoryId: String, page: Int, limit: Int = pageSize) async throws -> (items: [AppListing], hasMore: Bool) {
+    func categoryListing(platform: String, categoryId: String, page: Int, limit: Int = 20) async throws -> (items: [AppListing], hasMore: Bool) {
         let raw: JSONValue = try await client.get(
             "apps/\(platform)/categories/\(categoryId)",
             query: ["page": "\(page + 1)", "limit": "\(limit)"]

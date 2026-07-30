@@ -31,6 +31,7 @@ final class ToastStore: ObservableObject {
 
     func show(_ message: String, kind: Toast.Kind = .success) {
         current = Toast(message: message, kind: kind)
+        SoundPlayer.shared.play(kind == .success ? .success : .error)
         Task {
             try? await Task.sleep(for: .seconds(3))
             current = nil

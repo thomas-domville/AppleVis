@@ -17,7 +17,10 @@ struct BugDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .task { await load() }
+        .task {
+            SoundPlayer.shared.play(.articleOpen)
+            await load()
+        }
     }
 
     @ViewBuilder

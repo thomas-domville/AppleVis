@@ -12,6 +12,9 @@ struct ForumTopicDetailView: View {
     @State private var hasMoreReplies = true
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var preferences: PreferencesStore
+    @State private var threadSummary: String?
+    @State private var isSummarizing = false
 
     var body: some View {
         Group {
@@ -60,7 +63,10 @@ struct ForumTopicDetailView: View {
             }
         }
         .handoff(title: detail?.title, url: detail?.url)
-        .task { await load() }
+        .task {
+            SoundPlayer.shared.play(.articleOpen)
+            await load()
+        }
     }
 
     private func topicContent(_ detail: ForumTopicDetail) -> some View {
@@ -98,6 +104,10 @@ struct ForumTopicDetailView: View {
                         .font(.headline)
                         .padding(.horizontal)
 
+                    if preferences.aiSummariesEnabled && IntelligenceService.isAvailable && detail.replies.count >= 5 {
+                        summarizeSection(detail)
+                    }
+
                     ForEach(detail.replies) { reply in
                         ReplyView(reply: reply, onDelete: {
                             self.detail?.replies.removeAll { $0.id == reply.id }
@@ -127,6 +137,41 @@ struct ForumTopicDetailView: View {
         }
     }
 
+    @ViewBuilder
+    private func summarizeSection(_ detail: ForumTopicDetail) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let threadSummary {
+                Label("AI Summary", systemImage: "sparkles")
+                    .font(.caption).fontWeight(.bold)
+                    .foregroundStyle(Color.accentColor)
+                Text(threadSummary)
+                    .font(.subheadline)
+            } else {
+                Button {
+                    Task { await summarizeThread(detail) }
+                } label: {
+                    if isSummarizing {
+                        ProgressView()
+                    } else {
+                        Label("Summarize Thread", systemImage: "sparkles")
+                    }
+                }
+                .disabled(isSummarizing)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal)
+    }
+
+    private func summarizeThread(_ detail: ForumTopicDetail) async {
+        isSummarizing = true
+        let text = ([detail.body.strippingHTMLTags()] + detail.replies.prefix(30).map { "\($0.authorName): \($0.body.strippingHTMLTags())" }).joined(separator: "\n\n")
+        threadSummary = await IntelligenceService.summarize(text)
+        isSummarizing = false
+    }
+
     private func load() async {
         isLoading = true
         error = nil
@@ -134,6 +179,7 @@ struct ForumTopicDetailView: View {
             detail = try await APIClient.shared.forums.topicDetail(id: topicId)
             isFollowing = detail.map { PersistenceStore.shared.isFollowed(id: $0.id) } ?? false
             isSaved = detail.map { PersistenceStore.shared.isSaved(id: $0.id) } ?? false
+            PersistenceStore.shared.markTopicSeen(id: topicId)
             hasMoreReplies = (detail?.replies.count ?? 0) >= 100
             if let detail {
                 SpotlightIndexer.index(ForumTopic(

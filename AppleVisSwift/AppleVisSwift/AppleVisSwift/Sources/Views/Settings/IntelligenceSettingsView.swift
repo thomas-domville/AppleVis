@@ -2,6 +2,7 @@ import SwiftUI
 
 struct IntelligenceSettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var tips: TipStore
 
     var body: some View {
         Form {
@@ -94,6 +95,7 @@ struct IntelligenceSettingsView: View {
         }
         .navigationTitle("Intelligence & Siri")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { tips.show(.settingsIntelligence) }
     }
 }
 

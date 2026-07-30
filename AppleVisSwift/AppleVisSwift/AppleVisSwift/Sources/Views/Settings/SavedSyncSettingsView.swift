@@ -3,7 +3,7 @@ import SwiftUI
 struct SavedSyncSettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var isSyncing = false
-    @State private var lastSyncDate: Date? = nil
+    @State private var lastSyncDate: Date? = UserDefaults.standard.object(forKey: "sync.lastSyncDate") as? Date
 
     var body: some View {
         Form {
@@ -116,8 +116,12 @@ struct SavedSyncSettingsView: View {
     private func triggerSync() {
         isSyncing = true
         Task {
-            try? await Task.sleep(for: .seconds(1.5))
-            lastSyncDate = Date()
+            ICloudSyncManager.shared.pushSavedItems()
+            ICloudSyncManager.shared.pushSettings()
+            ICloudSyncManager.shared.pullAll()
+            let now = Date()
+            lastSyncDate = now
+            UserDefaults.standard.set(now, forKey: "sync.lastSyncDate")
             isSyncing = false
         }
     }

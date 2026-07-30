@@ -1,17 +1,7 @@
-node_modules/
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-
 # Local tooling / handoff artifacts — never ship these in source ZIPs
 .claude/
 Temp/
 *.log
-
-# Native
-ios/
-android/
 
 # Debug
 npm-debug.*
@@ -26,5 +16,14 @@ yarn-error.*
 .env
 .env*.local
 
-# typescript
-*.tsbuildinfo
+# Xcode
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM

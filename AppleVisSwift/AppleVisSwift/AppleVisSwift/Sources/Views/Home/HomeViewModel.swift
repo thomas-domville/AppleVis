@@ -8,6 +8,7 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var error: String?
     @Published private(set) var hasMore = false
     @Published private(set) var newActivitySummary = ""
+    @Published private(set) var isReturningVisit = false
 
     private let pageSize = 20
     private var page = 0
@@ -17,9 +18,11 @@ final class HomeViewModel: ObservableObject {
     }
 
     func load() async {
+        SoundPlayer.shared.play(.loadingStart)
         isLoading = true
         error = nil
         page = 0
+        isReturningVisit = UserDefaults.standard.object(forKey: "applevis.lastVisit") != nil
 
         do {
             let fetched = try await fetchPage(page: 0)
@@ -65,9 +68,14 @@ final class HomeViewModel: ObservableObject {
         async let blogs    = showBlogs    ? try APIClient.shared.blogs.list(page: page) : []
 
         let (f, p, a, g, b) = try await (forums, podcasts, apps, guides, blogs)
+        let defaultFilterRaw = UserDefaults.standard.string(forKey: "forums.defaultFilter") ?? ForumFilter.recent.rawValue
+        let defaultFilter = ForumFilter(rawValue: defaultFilterRaw) ?? .recent
+        // Following/Saved aren't meaningful as a Home-feed filter (Home already
+        // mixes several content kinds) — treat them the same as Recent here.
+        let filteredForums = defaultFilter.supportsRefinement ? defaultFilter.apply(to: f) : f
 
         var result: [FeedItem] = []
-        result += f.map { .forumTopic($0) }
+        result += filteredForums.map { .forumTopic($0) }
         result += p.map { .podcastEpisode($0) }
         result += a.map { .appListing($0) }
         result += g.map { .resource($0) }
