@@ -11,6 +11,7 @@ struct AppleVisApp: App {
     @StateObject private var deepLinkRouter = DeepLinkRouter()
     @StateObject private var tips = TipStore()
     @StateObject private var networkMonitor = NetworkMonitor.shared
+    @StateObject private var keyCommands = KeyCommandRouter()
 
     init() {
         BackgroundDownloadTask.register()
@@ -50,6 +51,7 @@ struct AppleVisApp: App {
             .environmentObject(deepLinkRouter)
             .environmentObject(tips)
             .environmentObject(networkMonitor)
+            .environmentObject(keyCommands)
             .preferredColorScheme(preferences.colorScheme)
             .tint(preferences.theme.accentColor)
             .overlay { TipOverlay() }
@@ -81,6 +83,21 @@ struct AppleVisApp: App {
             }
             .onChange(of: preferences.notificationSound) { _, _ in
                 Task { await PushNotificationManager.syncRegistration() }
+            }
+        }
+        .commands {
+            CommandMenu("Go") {
+                Button("Home") { keyCommands.selectedTab = 0 }
+                    .keyboardShortcut("1", modifiers: .command)
+                Button("Discover") { keyCommands.selectedTab = 1 }
+                    .keyboardShortcut("2", modifiers: .command)
+                Button("For You") { keyCommands.selectedTab = 2 }
+                    .keyboardShortcut("3", modifiers: .command)
+                Divider()
+                Button("Refresh") { keyCommands.refreshRequested.send() }
+                    .keyboardShortcut("r", modifiers: .command)
+                Button("Settings") { keyCommands.showSettings = true }
+                    .keyboardShortcut(",", modifiers: .command)
             }
         }
     }

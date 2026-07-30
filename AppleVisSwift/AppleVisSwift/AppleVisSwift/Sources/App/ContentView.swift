@@ -3,11 +3,11 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
-    @State private var selectedTab = 0
+    @EnvironmentObject private var keyCommands: KeyCommandRouter
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            TabView(selection: $selectedTab) {
+            TabView(selection: $keyCommands.selectedTab) {
                 HomeView()
                     .tabItem { Label("Home", systemImage: "house") }
                     .tag(0)
@@ -20,7 +20,7 @@ struct ContentView: View {
                     .tabItem { Label("For You", systemImage: "person.crop.circle") }
                     .tag(2)
             }
-            .onChange(of: selectedTab) { _, _ in
+            .onChange(of: keyCommands.selectedTab) { _, _ in
                 SoundPlayer.shared.play(.tabChange)
             }
 
@@ -42,6 +42,9 @@ struct ContentView: View {
             set: { if $0 == nil { deepLinkRouter.pendingWebURL = nil } }
         )) { wrapped in
             SafariView(url: wrapped.url)
+        }
+        .sheet(isPresented: $keyCommands.showSettings) {
+            ProfileView()
         }
     }
 

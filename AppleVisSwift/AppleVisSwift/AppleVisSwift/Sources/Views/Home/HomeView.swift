@@ -27,6 +27,7 @@ struct HomeView: View {
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var networkMonitor: NetworkMonitor
+    @EnvironmentObject private var keyCommands: KeyCommandRouter
     @State private var hasAnnouncedWelcome = false
 
     var body: some View {
@@ -58,6 +59,7 @@ struct HomeView: View {
                 }
             }
             .refreshable { await vm.load() }
+            .onReceive(keyCommands.refreshRequested) { Task { await vm.load() } }
             .overlay(alignment: .top) { ToastOverlay() }
             .onChange(of: vm.isLoading) { _, isLoading in
                 guard !isLoading else { return }
