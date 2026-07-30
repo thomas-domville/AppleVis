@@ -38,6 +38,10 @@ final class PlayerStore: ObservableObject {
         restoreLastPlayed()
         observeLifecycle()
         observePlaybackSpeedPreference()
+        observeAudioEffectsPreferences()
+        AudioEffectsProcessor.shared.onSilenceSkip = { [weak self] seconds in
+            Task { await self?.skip(by: seconds) }
+        }
     }
 
     // MARK: - Playback control
@@ -73,10 +77,20 @@ final class PlayerStore: ObservableObject {
         errorMessage = nil
         isBuffering = true
 
-        let item = AVPlayerItem(url: url)
+        let asset = AVURLAsset(url: url)
+        let item = AVPlayerItem(asset: asset)
         // Recommended for spoken-word content — keeps pitch natural at
         // non-1.0x playback rates instead of the classic "chipmunk" effect.
         item.audioTimePitchAlgorithm = .timeDomain
+
+        // Voice Boost/Equaliser/Trim Silence run through this tap. Track
+        // loading is async even for local files, so this can't block ahead
+        // of AVPlayer construction — set audioMix as soon as it resolves;
+        // if it resolves after playback starts, AVPlayerItem picks it up
+        // on the next render pass rather than requiring a restart.
+        if let audioTrack = try? await asset.loadTracks(withMediaType: .audio).first {
+            item.audioMix = AudioEffectsProcessor.shared.makeAudioMix(for: audioTrack)
+        }
 
         let newPlayer = AVPlayer(playerItem: item)
         newPlayer.volume = volume
@@ -362,6 +376,24 @@ final class PlayerStore: ObservableObject {
                     self.playbackSpeed = stored
                 }
             }
+            .store(in: &cancellables)
+    }
+
+    /// Mirrors PodcastSettingsView's Audio Enhancement toggles/picker into
+    /// AudioEffectsProcessor, which only reads plain properties (it can't
+    /// hold an @AppStorage/EnvironmentObject reference — it runs on the
+    /// real-time audio thread, not in SwiftUI). Same sync-via-UserDefaults-
+    /// notification approach as observePlaybackSpeedPreference().
+    private func observeAudioEffectsPreferences() {
+        func sync() {
+            let defaults = UserDefaults.standard
+            AudioEffectsProcessor.shared.voiceBoostEnabled = defaults.bool(forKey: "podcast.voiceBoost")
+            AudioEffectsProcessor.shared.trimSilenceEnabled = defaults.bool(forKey: "podcast.trimSilence")
+            AudioEffectsProcessor.shared.eqPreset = (defaults.string(forKey: "podcast.eq")).flatMap(PodcastEQ.init(rawValue:)) ?? .flat
+        }
+        sync()
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .sink { _ in sync() }
             .store(in: &cancellables)
     }
 
