@@ -15,6 +15,10 @@ struct DiscoverView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
 
+    init(initialSearchQuery: String? = nil) {
+        _searchText = State(initialValue: initialSearchQuery ?? "")
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -50,19 +54,12 @@ struct DiscoverView: View {
                 }
             }
             .searchable(text: $searchText, prompt: "Search AppleVis")
-            .onChange(of: searchText) { _, newValue in
-                searchTask?.cancel()
-                guard !newValue.isEmpty else { searchResults = nil; return }
-                searchTask = Task {
-                    try? await Task.sleep(for: .milliseconds(400))
-                    guard !Task.isCancelled else { return }
-                    isSearching = true
-                    searchResults = try? await APIClient.shared.search.query(newValue)
-                    isSearching = false
-                    SoundPlayer.shared.play(.searchComplete)
-                    showTranslateSearchPrompt = preferences.searchTranslationEnabled && IntelligenceService.isAvailable
-                        && IntelligenceService.detectNonEnglish(newValue)
-                }
+            .onChange(of: searchText) { _, newValue in runSearch(newValue) }
+            .task {
+                // .onChange doesn't fire for a prefilled initial value (e.g.
+                // opened via the "Search AppleVis" Siri intent) — kick it off
+                // manually in that case.
+                if !searchText.isEmpty, searchResults == nil { runSearch(searchText) }
             }
             .navigationDestination(for: ForumTopic.self) { topic in
                 ForumTopicDetailView(topicId: topic.id)
@@ -87,6 +84,21 @@ struct DiscoverView: View {
             .sheet(isPresented: $showSubmitBug) { SubmitBugView() }
             .sheet(isPresented: $showSubmitPodcast) { SubmitPodcastView() }
             .sheet(isPresented: $showContact) { ContactView() }
+        }
+    }
+
+    private func runSearch(_ query: String) {
+        searchTask?.cancel()
+        guard !query.isEmpty else { searchResults = nil; return }
+        searchTask = Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            isSearching = true
+            searchResults = try? await APIClient.shared.search.query(query)
+            isSearching = false
+            SoundPlayer.shared.play(.searchComplete)
+            showTranslateSearchPrompt = preferences.searchTranslationEnabled && IntelligenceService.isAvailable
+                && IntelligenceService.detectNonEnglish(query)
         }
     }
 

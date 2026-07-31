@@ -12,6 +12,10 @@ struct ForumsBrowseView: View {
     @State private var hasMore = false
     @EnvironmentObject private var auth: AuthStore
 
+    init(initialFilter: ForumFilter = .recent) {
+        _filter = State(initialValue: initialFilter)
+    }
+
     /// Following/Saved come from local persistence, not the "recent" feed —
     /// they render as their own lightweight list instead of paged `topics`.
     private var localFilterItems: [(id: String, title: String, lastActivityAt: Date?)]? {

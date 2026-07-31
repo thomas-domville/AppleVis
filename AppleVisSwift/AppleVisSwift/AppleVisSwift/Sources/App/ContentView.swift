@@ -49,6 +49,9 @@ struct ContentView: View {
         .sheet(item: $deepLinkRouter.pendingSubmit) { submit in
             submitDestination(for: submit)
         }
+        .sheet(item: $deepLinkRouter.pendingSiriDestination) { destination in
+            siriDestination(for: destination)
+        }
     }
 
     @ViewBuilder
@@ -57,6 +60,15 @@ struct ContentView: View {
         case .app(let url): SubmitAppView(prefillAppStoreURL: url)
         case .blog(let text): SubmitBlogView(prefillText: text)
         case .podcast(let url): SubmitPodcastView(prefillSharedURL: url)
+        }
+    }
+
+    @ViewBuilder
+    private func siriDestination(for destination: SiriDestination) -> some View {
+        switch destination {
+        case .forums(let filter): NavigationStack { ForumsBrowseView(initialFilter: filter) }
+        case .savedItems: NavigationStack { SavedItemsView() }
+        case .search(let query): DiscoverView(initialSearchQuery: query)
         }
     }
 

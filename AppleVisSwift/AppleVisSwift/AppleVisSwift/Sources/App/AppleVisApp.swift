@@ -88,6 +88,11 @@ struct AppleVisApp: App {
             .onChange(of: preferences.notificationSound) { _, _ in
                 Task { await PushNotificationManager.syncRegistration() }
             }
+            .onChange(of: deepLinkRouter.pendingPodcastAction) { _, action in
+                guard let action else { return }
+                deepLinkRouter.pendingPodcastAction = nil
+                Task { await handlePodcastSiriAction(action) }
+            }
         }
         .commands {
             CommandMenu("Go") {
@@ -107,4 +112,17 @@ struct AppleVisApp: App {
     }
 
     @Environment(\.scenePhase) private var scenePhase
+
+    /// "Resume/Play Latest AppleVis Podcast" Siri intents. Resume reuses
+    /// PlayerStore's existing lazily-restored currentEpisode; Play Latest
+    /// fetches the newest episode fresh.
+    private func handlePodcastSiriAction(_ action: PodcastSiriAction) async {
+        switch action {
+        case .resume:
+            player.play()
+        case .playLatest:
+            guard let latest = try? await APIClient.shared.podcasts.episodes().first else { return }
+            await player.load(latest)
+        }
+    }
 }

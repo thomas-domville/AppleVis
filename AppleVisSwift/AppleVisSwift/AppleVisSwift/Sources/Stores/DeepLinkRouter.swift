@@ -12,6 +12,8 @@ final class DeepLinkRouter: ObservableObject {
     @Published var pendingContent: (kind: ContentKind, id: String)?
     @Published var pendingWebURL: URL?
     @Published var pendingSubmit: PendingSubmit?
+    @Published var pendingSiriDestination: SiriDestination?
+    @Published var pendingPodcastAction: PodcastSiriAction?
 
     func handleSpotlight(identifier: String) {
         guard let resolved = SpotlightIndexer.parse(identifier: identifier) else { return }
@@ -42,6 +44,19 @@ final class DeepLinkRouter: ObservableObject {
         case "submit-podcast":
             _ = AppShareConsumer.consumePendingPodcastURL()
             if let podURL = value("url") { pendingSubmit = .podcast(url: podURL) }
+        case "forums":
+            let filter = value("filter").flatMap(ForumFilter.init(rawValue:)) ?? .recent
+            pendingSiriDestination = .forums(filter: filter)
+        case "saved":
+            pendingSiriDestination = .savedItems
+        case "search":
+            if let query = value("q") { pendingSiriDestination = .search(query: query) }
+        case "podcasts":
+            switch value("action") {
+            case "resume": pendingPodcastAction = .resume
+            case "playLatest": pendingPodcastAction = .playLatest
+            default: break
+            }
         default:
             return false
         }
@@ -74,4 +89,26 @@ enum PendingSubmit: Identifiable {
         case .podcast(let url): return "podcast:\(url)"
         }
     }
+}
+
+/// Destinations reachable via Siri/App Intents that don't map to existing
+/// tab navigation, so they're presented as a sheet from ContentView — the
+/// same treatment Settings (Cmd+,) already gets from KeyCommandRouter.
+enum SiriDestination: Identifiable {
+    case forums(filter: ForumFilter)
+    case savedItems
+    case search(query: String)
+
+    var id: String {
+        switch self {
+        case .forums(let filter): return "forums:\(filter.rawValue)"
+        case .savedItems: return "saved"
+        case .search(let query): return "search:\(query)"
+        }
+    }
+}
+
+enum PodcastSiriAction: Equatable {
+    case resume
+    case playLatest
 }

@@ -1,35 +1,39 @@
-# AppleVis Expo React Native Starter
+# AppleVis (Native Swift)
 
-Version: 2026.1.0
+A native SwiftUI iOS app for AppleVis — an accessibility-focused community for blind and low-vision Apple device users (forums, podcasts, an app directory, and accessibility guides).
 
-This package contains a starter Expo React Native project plus updated specs, user guide, accessibility notes, generated placeholder assets, and the two notification sounds from the original AppleVis ZIP.
+This replaced an earlier Expo/React Native prototype; that codebase has been fully removed.
 
-## Start
-
-```bash
-npm install
-npx expo start
-```
-
-For native iOS background audio and deeper Apple ecosystem features, use a development build:
+## Open the project
 
 ```bash
-npx expo prebuild
-npx expo run:ios
+open AppleVisSwift/AppleVisSwift/AppleVisSwift.xcodeproj
 ```
+
+Build and run the `AppleVisSwift` scheme in Xcode. The project targets iOS 26.5+ and uses Xcode 16's file-system-synchronized groups, so new files added under `AppleVisSwift/AppleVisSwift/AppleVisSwift/Sources/` are picked up automatically — no manual project-file editing needed for ordinary source changes.
+
+Two additional targets are embedded in the app:
+
+- **AppleVisShareExtension** — handles sharing App Store URLs, podcast links, and blog drafts into AppleVis via the system share sheet.
+
+Both the main app and the Share Extension use the App Group `group.com.applevis.app`, which needs to be enabled on the App ID in your Apple Developer account for local signing to succeed.
+
+## Structure
+
+- `AppleVisSwift/AppleVisSwift/AppleVisSwift/Sources/` — the app: `App/`, `Views/`, `Stores/` (ObservableObjects), `Services/`, `Networking/` (JSON:API client against the AppleVis Drupal backend), `Models/`, `Resources/` (sounds, localized strings).
+- `AppleVisSwift/AppleVisSwift/ShareExtension/` — the Share Extension's source.
+- `docs/` — implementation notes and the original feature spec; `docs/IMPLEMENTATION_NOTES.md` tracks what's been ported/built vs. still open.
+- `assets/` — original reference assets (images, sounds, icons) from the pre-Swift era.
 
 ## Included
 
-- Five-tab navigation: Home, Forums, Podcasts, Apps, Resources
-- Settings/Profile moved out of the bottom tab bar
-- Saved hub concept
-- Forums filters: Recent, New, Unread, Since Last Visit, Following, Saved
-- Podcast player UI scaffold
-- Background audio configuration placeholder
-- VoiceOver-first grouped cards and custom action strategy
-- iPad layout notes
-- Apple Watch, widgets, Live Activities, Dynamic Island, Siri/App Intents requirements in docs
+- Three-tab navigation: Home, Discover (Forums/Podcasts/Apps/Guides/Blogs/Bug Reports hub + search), For You (Queue/Downloads/Saved/Following)
+- Podcast player with background audio, Now Playing/lock-screen controls, AirPlay, sleep timer, Voice Boost/Equaliser/Trim Silence audio processing
+- iCloud key-value sync (saved items, queue, playback positions, settings)
+- Push notifications, Spotlight indexing, Handoff, Focus Filters, Siri/App Intents, hardware keyboard shortcuts
+- On-device Apple Intelligence features (rewrite/translate/summarize, guidelines checking) via FoundationModels
+- Multi-step submission wizards (App, Blog, Podcast, Bug Report)
 
-## Important implementation notes
+## Out of scope for now
 
-Expo can scaffold the iPhone/iPad app quickly. Apple Watch, Dynamic Island/Live Activities, advanced App Intents, and some iCloud syncing pieces require native iOS code, EAS development builds, config plugins, or custom Swift modules. The docs folder includes those requirements so the native layer can be added intentionally.
+Apple Watch app, Home/Lock Screen/StandBy widgets, and Dynamic Island/Live Activities — see `docs/IMPLEMENTATION_NOTES.md` for status and rationale.
