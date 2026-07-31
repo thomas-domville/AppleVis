@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		DEC630EDC9D1B0626868AA5F /* AppleVisShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 349D7F728302C4405C947D9E /* AppleVisShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		94295F3BF5A3FCE4DBBB838C /* AppleVisLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 73C820DCF6DE8275CCBD3DBC /* AppleVisLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -17,6 +18,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 5DEB814E8E8E1F7621740F4A;
 			remoteInfo = AppleVisShareExtension;
+		};
+		189C08C8BD947EC8E89CFBF7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E92FCDBE30085E49006E2C72 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5A502F4B501FC64AF6FD8C84;
+			remoteInfo = AppleVisLiveActivity;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -28,6 +36,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				DEC630EDC9D1B0626868AA5F /* AppleVisShareExtension.appex in Embed Foundation Extensions */,
+				94295F3BF5A3FCE4DBBB838C /* AppleVisLiveActivity.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -39,6 +48,8 @@
 		349D7F728302C4405C947D9E /* AppleVisShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AppleVisShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9B70515002325C021087C8D7 /* ShareExtension-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "ShareExtension-Info.plist"; sourceTree = "<group>"; };
 		4D4A25F764097BE700D35F23 /* ShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
+		73C820DCF6DE8275CCBD3DBC /* AppleVisLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AppleVisLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		5FCCA5959CA2CF4932A88B0B /* LiveActivityExtension-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "LiveActivityExtension-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -50,6 +61,11 @@
 		B7D19609EAB36B32278CD870 /* ShareExtension */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = ShareExtension;
+			sourceTree = "<group>";
+		};
+		8088E3100FB93450FBC2C72E /* LiveActivityExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = LiveActivityExtension;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -69,6 +85,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4F5847B2C2AA8FD5C8B2ECEB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -79,6 +102,8 @@
 				B7D19609EAB36B32278CD870 /* ShareExtension */,
 				9B70515002325C021087C8D7 /* ShareExtension-Info.plist */,
 				4D4A25F764097BE700D35F23 /* ShareExtension.entitlements */,
+				8088E3100FB93450FBC2C72E /* LiveActivityExtension */,
+				5FCCA5959CA2CF4932A88B0B /* LiveActivityExtension-Info.plist */,
 				E92FCDC730085E49006E2C72 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -88,6 +113,7 @@
 			children = (
 				E92FCDC630085E49006E2C72 /* AppleVisSwift.app */,
 				349D7F728302C4405C947D9E /* AppleVisShareExtension.appex */,
+				73C820DCF6DE8275CCBD3DBC /* AppleVisLiveActivity.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -108,6 +134,7 @@
 			);
 			dependencies = (
 				EF0642480C06E4DBFC4B8BCB /* PBXTargetDependency */,
+				A1333AF7F3EF4EE92EE9B8E4 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				E92FCDC830085E49006E2C72 /* AppleVisSwift */,
@@ -139,6 +166,28 @@
 			);
 			productName = AppleVisShareExtension;
 			productReference = 349D7F728302C4405C947D9E /* AppleVisShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		5A502F4B501FC64AF6FD8C84 /* AppleVisLiveActivity */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F7B5F64A4CDCA505857B6C55 /* Build configuration list for PBXNativeTarget "AppleVisLiveActivity" */;
+			buildPhases = (
+				EC69A8429E4A3B996125C07E /* Sources */,
+				4F5847B2C2AA8FD5C8B2ECEB /* Frameworks */,
+				CBE2639AA0797B74667CDEE1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				8088E3100FB93450FBC2C72E /* LiveActivityExtension */,
+			);
+			name = AppleVisLiveActivity;
+			packageProductDependencies = (
+			);
+			productName = AppleVisLiveActivity;
+			productReference = 73C820DCF6DE8275CCBD3DBC /* AppleVisLiveActivity.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -173,6 +222,9 @@
 							};
 						};
 					};
+					5A502F4B501FC64AF6FD8C84 = {
+						CreatedOnToolsVersion = 26.6;
+					};
 				};
 			};
 			buildConfigurationList = E92FCDC130085E49006E2C72 /* Build configuration list for PBXProject "AppleVisSwift" */;
@@ -195,6 +247,7 @@
 			targets = (
 				E92FCDC530085E49006E2C72 /* AppleVisSwift */,
 				5DEB814E8E8E1F7621740F4A /* AppleVisShareExtension */,
+				5A502F4B501FC64AF6FD8C84 /* AppleVisLiveActivity */,
 			);
 		};
 /* End PBXProject section */
@@ -208,6 +261,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		8A5BFBEF5D531811520A2F70 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CBE2639AA0797B74667CDEE1 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -231,6 +291,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		EC69A8429E4A3B996125C07E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -238,6 +305,11 @@
 			isa = PBXTargetDependency;
 			target = 5DEB814E8E8E1F7621740F4A /* AppleVisShareExtension */;
 			targetProxy = 85D1BF0D568A3226C5FB18F1 /* PBXContainerItemProxy */;
+		};
+		A1333AF7F3EF4EE92EE9B8E4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5A502F4B501FC64AF6FD8C84 /* AppleVisLiveActivity */;
+			targetProxy = 189C08C8BD947EC8E89CFBF7 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -483,6 +555,56 @@
 			};
 			name = Release;
 		};
+		7F62DB0C61AB66A7CB573042 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 97YM8TUSX8;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "LiveActivityExtension-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.applevis.AppleVisSwift.AppleVisLiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		EC869844684E09E55F01123F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 97YM8TUSX8;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "LiveActivityExtension-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.applevis.AppleVisSwift.AppleVisLiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -509,6 +631,15 @@
 			buildConfigurations = (
 				1B54EE61C81E744D98830F8D /* Debug */,
 				DA0B826AE47704E64611BC73 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F7B5F64A4CDCA505857B6C55 /* Build configuration list for PBXNativeTarget "AppleVisLiveActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7F62DB0C61AB66A7CB573042 /* Debug */,
+				EC869844684E09E55F01123F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
