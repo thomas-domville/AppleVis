@@ -21,8 +21,8 @@ Migration path:
 4. Add account sync through AppleVis API. — done
 5. Add native iOS modules for Apple ecosystem features. — done: iCloud sync, push notifications, Spotlight, Siri Shortcuts, Now Playing, AirPlay, Handoff, Focus Filter, keyboard shortcuts, Audio Effects, Vision, Share Extension all ported/wired
 6. ~~Add watchOS target.~~ — out of scope for now
-7. ~~Add WidgetKit target.~~ — out of scope for now (Home/Lock Screen/StandBy widgets; the Live Activity WidgetKit extension below is separate and in scope)
-8. Add ActivityKit Live Activity. — done: AppleVisLiveActivity target added, wired into PlayerStore
+7. ~~Add WidgetKit target.~~ — out of scope for now (Home/Lock Screen/StandBy widgets)
+8. ~~Add ActivityKit Live Activity.~~ — out of scope for now. Was built and wired (AppleVisLiveActivity target), then removed again at the user's request before the first push — see git history around the "Add/Remove Live Activity" commits if revisiting.
 9. Complete App Store privacy/accessibility compliance checklist. — PrivacyInfo.xcprivacy rewritten for the native app (was Expo/RN-era) at AppleVisSwift/AppleVisSwift/AppleVisSwift/PrivacyInfo.xcprivacy; reason codes not independently verified against Apple's current published list (no network access this session) — re-check before submission. App Store Connect privacy nutrition label answers derived from that manifest: Email Address and Other User Content and Device ID, all "Linked to you", "App Functionality" only, not used for tracking. Accessibility: static pass only (no VoiceOver device/simulator test in this environment) — no icon-only buttons found missing accessibility labels; native SwiftUI .alert/.confirmationDialog already satisfy the old AccessibleAlertContext guideline (focus-to-title, per-button VoiceOver access, standard escape-to-dismiss) without a dedicated port. A real on-device VoiceOver pass is still needed before shipping.
 
 ## AppleVis Tips Pattern

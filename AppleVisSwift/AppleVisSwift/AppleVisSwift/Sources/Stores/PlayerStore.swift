@@ -108,23 +108,10 @@ final class PlayerStore: ObservableObject {
         observeBuffering()
         updateNowPlayingInfo(episode: episode)
         setupRemoteCommands()
-        LiveActivityController.shared.start(episodeId: episode.id, episodeTitle: episode.title, showTitle: episode.showTitle)
 
         newPlayer.rate = playbackSpeed
         isPlaying = true
         saveLastPlayed()
-    }
-
-    private func currentChapterTitle() -> String {
-        guard let chapters = currentEpisode?.chapters, !chapters.isEmpty else { return "" }
-        return chapters.last { $0.startTime <= position }?.title ?? ""
-    }
-
-    private func updateLiveActivity(force: Bool = false) {
-        LiveActivityController.shared.update(
-            isPlaying: isPlaying, position: position, duration: duration,
-            speed: Double(playbackSpeed), chapterTitle: currentChapterTitle(), force: force
-        )
     }
 
     func play() {
@@ -138,7 +125,6 @@ final class PlayerStore: ObservableObject {
         player?.rate = playbackSpeed
         isPlaying = true
         updateNowPlayingPlaybackState()
-        updateLiveActivity(force: true)
         SoundPlayer.shared.play(.podcastPlay)
     }
 
@@ -147,7 +133,6 @@ final class PlayerStore: ObservableObject {
         isPlaying = false
         savePositionOfCurrentEpisode()
         updateNowPlayingPlaybackState()
-        updateLiveActivity(force: true)
         SoundPlayer.shared.play(.podcastPause)
     }
 
@@ -159,7 +144,6 @@ final class PlayerStore: ObservableObject {
         await player?.seek(to: CMTime(seconds: time, preferredTimescale: 600))
         position = time
         savePositionOfCurrentEpisode()
-        updateLiveActivity(force: true)
     }
 
     func skip(by seconds: TimeInterval) async {
@@ -330,7 +314,6 @@ final class PlayerStore: ObservableObject {
                 if let duration = self?.player?.currentItem?.duration.seconds, duration.isFinite {
                     self?.duration = duration
                 }
-                self?.updateLiveActivity()
             }
         }
     }
@@ -371,7 +354,6 @@ final class PlayerStore: ObservableObject {
         UserDefaults.standard.set(Double(playbackSpeed), forKey: Self.speedKey)
         if isPlaying { player?.rate = playbackSpeed }
         updateNowPlayingPlaybackState()
-        updateLiveActivity(force: true)
     }
 
     private func didSetVolume(_ oldValue: Float) {
