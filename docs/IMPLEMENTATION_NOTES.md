@@ -19,11 +19,11 @@ Migration path:
 2. Add real AppleVis Drupal API endpoints. — done
 3. Implement local persistence for saved/read/list position. — done
 4. Add account sync through AppleVis API. — done
-5. Add native iOS modules for Apple ecosystem features. — in progress: iCloud sync, push notifications, Spotlight, Siri Shortcuts, Now Playing, AirPlay done; Handoff, Focus Filter, Audio Effects, keyboard shortcuts, Vision, Share Extension, Live Activity remain
+5. Add native iOS modules for Apple ecosystem features. — done: iCloud sync, push notifications, Spotlight, Siri Shortcuts, Now Playing, AirPlay, Handoff, Focus Filter, keyboard shortcuts, Audio Effects, Vision, Share Extension all ported/wired
 6. ~~Add watchOS target.~~ — out of scope for now
-7. ~~Add WidgetKit target.~~ — out of scope for now
-8. Add ActivityKit Live Activity.
-9. Complete App Store privacy/accessibility compliance checklist.
+7. ~~Add WidgetKit target.~~ — out of scope for now (Home/Lock Screen/StandBy widgets; the Live Activity WidgetKit extension below is separate and in scope)
+8. Add ActivityKit Live Activity. — done: AppleVisLiveActivity target added, wired into PlayerStore
+9. Complete App Store privacy/accessibility compliance checklist. — PrivacyInfo.xcprivacy rewritten for the native app (was Expo/RN-era) at AppleVisSwift/AppleVisSwift/AppleVisSwift/PrivacyInfo.xcprivacy; reason codes not independently verified against Apple's current published list (no network access this session) — re-check before submission. App Store Connect privacy nutrition label answers derived from that manifest: Email Address and Other User Content and Device ID, all "Linked to you", "App Functionality" only, not used for tracking. Accessibility: static pass only (no VoiceOver device/simulator test in this environment) — no icon-only buttons found missing accessibility labels; native SwiftUI .alert/.confirmationDialog already satisfy the old AccessibleAlertContext guideline (focus-to-title, per-button VoiceOver access, standard escape-to-dismiss) without a dedicated port. A real on-device VoiceOver pass is still needed before shipping.
 
 ## AppleVis Tips Pattern
 

@@ -4,13 +4,15 @@
   PrivacyInfo.xcprivacy — Apple Privacy Manifest (required for App Store submission)
   https://developer.apple.com/documentation/bundleresources/privacy-manifest-files
 
-  HOW TO ACTIVATE:
-  In managed Expo, add expo-build-properties to your plugins in app.json:
-    ["expo-build-properties", { "ios": { "privacyManifests": { ... } } }]
-  OR place this file at ios/<AppName>/PrivacyInfo.xcprivacy after `expo prebuild`.
+  Rewritten for the native Swift app — the previous version (assets/PrivacyInfo.xcprivacy)
+  was written for the Expo/React Native prototype and referenced dependencies
+  (AsyncStorage, expo-file-system, RN internals) that no longer exist.
 
-  This manifest covers APIs used by the app and its Expo/React Native dependencies.
-  Review and update when adding new native libraries.
+  NOT independently verified against Apple's current published reason-code list
+  in this pass (no network access) — re-check the "Required Reason APIs" codes
+  below against https://developer.apple.com/documentation/bundleresources/privacy_manifest_files/describing_use_of_required_reason_api
+  before submission; only the categories/purposes were re-derived from the
+  actual Swift code, not the specific reason letter/number codes themselves.
 -->
 <plist version="1.0">
 <dict>
@@ -18,15 +20,12 @@
   <!-- AppleVis does not collect any data for tracking purposes. -->
   <key>NSPrivacyTracking</key>
   <false/>
-
-  <!-- No tracking domains used. -->
   <key>NSPrivacyTrackingDomains</key>
   <array/>
 
-  <!-- Data collected and linked to the user's identity -->
   <key>NSPrivacyCollectedDataTypes</key>
   <array>
-    <!-- Account credentials: username / session token stored in Keychain (SecureStore) -->
+    <!-- Account credentials: session token stored in Keychain (AuthStore) -->
     <dict>
       <key>NSPrivacyCollectedDataType</key>
       <string>NSPrivacyCollectedDataTypeEmailAddress</string>
@@ -39,7 +38,7 @@
         <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
       </array>
     </dict>
-    <!-- iCloud sync: saved items, forum reads, podcast positions -->
+    <!-- iCloud key-value sync: saved items, queue, playback positions, settings (ICloudSyncManager) -->
     <dict>
       <key>NSPrivacyCollectedDataType</key>
       <string>NSPrivacyCollectedDataTypeOtherUserContent</string>
@@ -52,7 +51,7 @@
         <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
       </array>
     </dict>
-    <!-- Push notification token — sent to applevis.com server only -->
+    <!-- APNs device token — sent to applevis.com only, to enable push notifications (PushNotificationManager) -->
     <dict>
       <key>NSPrivacyCollectedDataType</key>
       <string>NSPrivacyCollectedDataTypeDeviceID</string>
@@ -71,49 +70,40 @@
   <key>NSPrivacyAccessedAPITypes</key>
   <array>
 
-    <!-- NSUserDefaults — used by AsyncStorage, expo-constants, expo-localization -->
+    <!-- NSUserDefaults — UserDefaults.standard throughout, plus the
+         group.com.applevis.app App Group suite shared by the main app and
+         the Share Extension / Live Activity extension targets. -->
     <dict>
       <key>NSPrivacyAccessedAPIType</key>
       <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
       <key>NSPrivacyAccessedAPITypeReasons</key>
       <array>
-        <!-- CA92.1: Accessed from app and app extensions that are members of the same App Group -->
+        <!-- Accessed from app and app extensions that are members of the same App Group -->
         <string>CA92.1</string>
       </array>
     </dict>
 
-    <!-- File timestamp APIs — used by expo-file-system for cache management -->
+    <!-- File timestamps — DownloadManager manages downloaded episode files
+         in the app's container; PlayerStore/AppleVisApp purge URLCache
+         based on age for the Storage → Cache Retention setting. -->
     <dict>
       <key>NSPrivacyAccessedAPIType</key>
       <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
       <key>NSPrivacyAccessedAPITypeReasons</key>
       <array>
-        <!-- C617.1: Accessed to display to the user (e.g. cache date shown in Offline Banner) -->
-        <string>C617.1</string>
-        <!-- 0A2A.1: Accessed to manage files within the app's container -->
+        <!-- Accessed to manage files/data within the app's container -->
         <string>0A2A.1</string>
       </array>
     </dict>
 
-    <!-- Disk space APIs — used by expo-file-system when writing cache files -->
+    <!-- Disk space — StorageView reports downloaded-episode/cache usage to the user. -->
     <dict>
       <key>NSPrivacyAccessedAPIType</key>
       <string>NSPrivacyAccessedAPICategoryDiskSpace</string>
       <key>NSPrivacyAccessedAPITypeReasons</key>
       <array>
-        <!-- 85F4.1: Accessed to manage files within the app's container -->
-        <string>85F4.1</string>
-      </array>
-    </dict>
-
-    <!-- System boot time — used by some React Native internals / networking -->
-    <dict>
-      <key>NSPrivacyAccessedAPIType</key>
-      <string>NSPrivacyAccessedAPICategorySystemBootTime</string>
-      <key>NSPrivacyAccessedAPITypeReasons</key>
-      <array>
-        <!-- 35F9.1: Accessed to measure time on-device for debugging / performance -->
-        <string>35F9.1</string>
+        <!-- Accessed to display disk space information to the user -->
+        <string>E174.1</string>
       </array>
     </dict>
 
