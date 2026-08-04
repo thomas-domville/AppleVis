@@ -49,7 +49,7 @@ struct MiniPlayerView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .glassEffect(in: RoundedRectangle(cornerRadius: 16))
             .padding(.horizontal, 8)
             .contentShape(Rectangle())
             .onTapGesture { showFullPlayer = true }
@@ -132,12 +132,14 @@ struct FullPlayerView: View {
                             .padding(.bottom, 28)
 
                         // Speed + Sleep Timer + AirPlay
-                        HStack(spacing: 12) {
-                            speedButton
-                            sleepTimerButton
-                            RoutePickerView()
-                                .frame(width: 32, height: 32)
-                                .accessibilityLabel("Audio output")
+                        GlassEffectContainer(spacing: 12) {
+                            HStack(spacing: 12) {
+                                speedButton
+                                sleepTimerButton
+                                RoutePickerView()
+                                    .frame(width: 32, height: 32)
+                                    .accessibilityLabel("Audio output")
+                            }
                         }
                         .padding(.bottom, 32)
                     }
@@ -213,7 +215,7 @@ struct FullPlayerView: View {
                 .font(.subheadline).fontWeight(.bold)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 8)
-                .background(Color(uiColor: .secondarySystemBackground), in: Capsule())
+                .glassEffect(in: Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Playback speed: \(speedLabel(current))×. Double-tap to increase.")
@@ -241,7 +243,7 @@ struct FullPlayerView: View {
                 .font(.subheadline).fontWeight(.bold)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 8)
-                .background(Color(uiColor: .secondarySystemBackground), in: Capsule())
+                .glassEffect(in: Capsule())
         }
         .accessibilityLabel("Sleep timer\(sleepTimerLabel.isEmpty ? "" : ": \(sleepTimerLabel)")")
     }

@@ -106,7 +106,7 @@ struct EditProfileView: View {
                 if isSaving {
                     ProgressView("Saving…")
                         .padding(20)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
                 }
             }
         }

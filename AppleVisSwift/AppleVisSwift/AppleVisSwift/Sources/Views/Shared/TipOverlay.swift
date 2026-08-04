@@ -55,15 +55,13 @@ private struct TipCard: View {
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
 
-            Button(action: onDismiss) {
-                Text("Got it")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 13))
-            }
-            .accessibilityHint("Dismisses this tip. It will not appear again.")
+            Button("Got it", action: onDismiss)
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .buttonStyle(.glassProminent)
+                .tint(Color.accentColor)
+                .accessibilityHint("Dismisses this tip. It will not appear again.")
         }
         .padding(22)
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22))
