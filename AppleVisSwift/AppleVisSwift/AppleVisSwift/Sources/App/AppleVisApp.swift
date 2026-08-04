@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreSpotlight
+import Combine
 
 @main
 struct AppleVisApp: App {

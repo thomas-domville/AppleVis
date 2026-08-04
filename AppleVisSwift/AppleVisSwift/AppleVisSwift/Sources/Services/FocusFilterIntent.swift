@@ -40,12 +40,23 @@ struct AppleVisFocusFilterIntent: SetFocusFilterIntent {
         "Choose which AppleVis notifications break through this Focus."
     )
 
+    // SetFocusFilterIntent requires every parameter to be Optional.
     @Parameter(title: "Allowed notification categories")
-    var allowedCategories: [AppleVisNotificationCategory]
+    var allowedCategories: [AppleVisNotificationCategory]?
+
+    var displayRepresentation: DisplayRepresentation {
+        let categories = allowedCategories ?? []
+        return DisplayRepresentation(
+            title: "AppleVis",
+            subtitle: categories.isEmpty
+                ? "All notifications silenced"
+                : "\(categories.count) categor\(categories.count == 1 ? "y" : "ies") allowed"
+        )
+    }
 
     func perform() async throws -> some IntentResult {
         let defaults = UserDefaults(suiteName: "group.com.applevis.app")
-        defaults?.set(allowedCategories.map(\.rawValue), forKey: "focusFilterAllowedCategories")
+        defaults?.set((allowedCategories ?? []).map(\.rawValue), forKey: "focusFilterAllowedCategories")
         return .result()
     }
 }

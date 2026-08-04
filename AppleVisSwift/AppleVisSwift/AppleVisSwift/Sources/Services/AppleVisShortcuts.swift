@@ -153,10 +153,13 @@ struct AppleVisShortcuts: AppShortcutsProvider {
         )
         AppShortcut(
             intent: SearchAppleVisIntent(),
+            // A plain String @Parameter can't be embedded in a phrase (only
+            // AppEntity/AppEnum can) — Siri still prompts for `query`
+            // conversationally after one of these static phrases.
             phrases: [
-                "Search \(.applicationName) for \(\.$query)",
-                "Find \(\.$query) on \(.applicationName)",
-                "Look up \(\.$query) on \(.applicationName)",
+                "Search \(.applicationName)",
+                "Find something on \(.applicationName)",
+                "Look something up on \(.applicationName)",
             ],
             shortTitle: "Search AppleVis",
             systemImageName: "magnifyingglass"

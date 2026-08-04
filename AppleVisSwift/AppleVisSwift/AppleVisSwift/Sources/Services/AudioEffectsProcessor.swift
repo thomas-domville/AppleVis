@@ -62,14 +62,14 @@ final class AudioEffectsProcessor {
             process: tapProcess
         )
 
-        var tap: Unmanaged<MTAudioProcessingTap>?
+        var tap: MTAudioProcessingTap?
         MTAudioProcessingTapCreate(
             kCFAllocatorDefault, &callbacks,
             kMTAudioProcessingTapCreationFlag_PreEffects, &tap
         )
 
         let params = AVMutableAudioMixInputParameters(track: audioTrack)
-        params.audioTapProcessor = tap?.takeRetainedValue()
+        params.audioTapProcessor = tap
 
         let mix = AVMutableAudioMix()
         mix.inputParameters = [params]
