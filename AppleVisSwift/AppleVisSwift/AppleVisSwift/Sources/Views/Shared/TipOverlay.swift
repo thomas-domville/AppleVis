@@ -1,8 +1,16 @@
 import SwiftUI
 
 /// The "AppleVis Tip" popover card, driven by `TipStore.activeTip`.
+///
+/// Takes `tips` as an explicit @ObservedObject rather than @EnvironmentObject:
+/// this is the one view attached via `.overlay { }` directly at the App/Scene
+/// level (AppleVisApp.swift) rather than nested as a normal ContentView
+/// descendant, and environment-object lookup through that specific path
+/// crashes at runtime ("No ObservableObject of type TipStore found") on the
+/// iOS 26 SDK this targets — passing it explicitly sidesteps the question
+/// entirely.
 struct TipOverlay: View {
-    @EnvironmentObject private var tips: TipStore
+    @ObservedObject var tips: TipStore
 
     var body: some View {
         ZStack {

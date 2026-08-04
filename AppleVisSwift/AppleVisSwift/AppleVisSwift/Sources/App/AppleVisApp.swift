@@ -55,7 +55,7 @@ struct AppleVisApp: App {
             .environmentObject(keyCommands)
             .preferredColorScheme(preferences.colorScheme)
             .tint(preferences.theme.accentColor)
-            .overlay { TipOverlay() }
+            .overlay { TipOverlay(tips: tips) }
             .accessibilityAction(.magicTap) {
                 guard player.currentEpisode != nil else { return }
                 player.togglePlayPause()
