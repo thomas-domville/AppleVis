@@ -9,6 +9,15 @@ enum HomeFeedFilter: String, CaseIterable, Identifiable {
     var label: String { self == .all ? "All" : "New" }
 }
 
+/// Where VoiceOver focus should land once Home finishes its initial load —
+/// docs/IMPLEMENTATION_NOTES.md: "VoiceOver focus should land on the
+/// summary before the first feed card." Falls back to the greeting when
+/// there's no What's New card to land on.
+enum HomeFocusTarget: Hashable {
+    case summary
+    case greeting
+}
+
 /// Time-of-day greeting shown on the Home tab's greeting card.
 enum Greeting {
     static func text(for date: Date = Date()) -> String {
@@ -39,6 +48,7 @@ struct HomeView: View {
     @EnvironmentObject private var keyCommands: KeyCommandRouter
     @State private var hasAnnouncedWelcome = false
     @State private var homeFeedFilter: HomeFeedFilter = .all
+    @AccessibilityFocusState private var focusTarget: HomeFocusTarget?
 
     /// Items actually shown below the feed picker — narrowed to just what's
     /// new since the last visit when the "New" segment is selected. Distinct
@@ -115,6 +125,21 @@ struct HomeView: View {
             ? "\(baseText) \(vm.newActivitySummary)."
             : baseText
         UIAccessibility.post(notification: .announcement, argument: welcomeText)
+
+        // Land VoiceOver focus on the summary (or greeting, if there's no
+        // new activity to summarize) instead of leaving it whereever it was
+        // before navigation/launch — a short delay because setting focus
+        // before the List has actually laid out the new content is a common
+        // way for it to silently fail.
+        let target: HomeFocusTarget? = !vm.newItems.isEmpty && !vm.isNewActivityDismissed
+            ? .summary
+            : (auth.user?.name.isEmpty == false ? .greeting : nil)
+        if let target {
+            Task {
+                try? await Task.sleep(for: .milliseconds(300))
+                focusTarget = target
+            }
+        }
     }
 
     private var greetingCard: some View {
@@ -143,6 +168,7 @@ struct HomeView: View {
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(Greeting.text()), \(name). Today is \(today).")
+                .accessibilityFocused($focusTarget, equals: .greeting)
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
                 .listRowSeparator(.hidden)
             }
@@ -191,6 +217,7 @@ struct HomeView: View {
                         },
                         onDismiss: { vm.isNewActivityDismissed = true }
                     )
+                    .accessibilityFocused($focusTarget, equals: .summary)
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     .listRowSeparator(.hidden)
                 }

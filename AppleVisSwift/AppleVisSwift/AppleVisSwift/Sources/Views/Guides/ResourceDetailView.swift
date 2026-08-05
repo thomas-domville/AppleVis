@@ -8,6 +8,7 @@ struct ResourceDetailView: View {
     @State private var showCompose = false
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
+    @AccessibilityFocusState private var isTitleFocused: Bool
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
 
@@ -43,6 +44,8 @@ struct ResourceDetailView: View {
                     }
                     Text(detail.title)
                         .font(.title2).fontWeight(.semibold)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityFocused($isTitleFocused)
                     Text("by \(detail.authorName)")
                         .font(.subheadline).foregroundStyle(.secondary)
                     if !detail.categories.isEmpty {
@@ -150,6 +153,19 @@ struct ResourceDetailView: View {
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Couldn't load guide." }
         isLoading = false
+        focusTitleAfterLoad()
+    }
+
+    /// VoiceOver lands on the back button after push navigation by default;
+    /// this moves it to the page heading instead, per
+    /// docs/IMPLEMENTATION_NOTES.md's "VoiceOver Detail Page Navigation"
+    /// guidance. Delayed slightly since setting focus before the new content
+    /// has actually laid out is a common way for it to silently fail.
+    private func focusTitleAfterLoad() {
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            isTitleFocused = true
+        }
     }
 
     private func loadMoreComments() async {

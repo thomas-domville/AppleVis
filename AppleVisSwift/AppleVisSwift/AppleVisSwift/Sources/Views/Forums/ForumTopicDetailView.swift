@@ -16,6 +16,7 @@ struct ForumTopicDetailView: View {
     @State private var threadSummary: String?
     @State private var isSummarizing = false
     @State private var showBrowser = false
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         Group {
@@ -90,6 +91,8 @@ struct ForumTopicDetailView: View {
                     Text(detail.title)
                         .font(.title2)
                         .fontWeight(.semibold)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityFocused($isTitleFocused)
                     HStack {
                         AuthorProfileButton(name: "by \(detail.authorName)", authorId: detail.authorId)
                         Spacer()
@@ -203,6 +206,18 @@ struct ForumTopicDetailView: View {
         UIAccessibility.post(notification: .announcement, argument: summary)
     }
 
+    /// VoiceOver lands on the back button after push navigation by default;
+    /// this moves it to the page heading instead, per
+    /// docs/IMPLEMENTATION_NOTES.md's "VoiceOver Detail Page Navigation"
+    /// guidance. Delayed slightly since setting focus before the new content
+    /// has actually laid out is a common way for it to silently fail.
+    private func focusTitleAfterLoad() {
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            isTitleFocused = true
+        }
+    }
+
     private func load() async {
         isLoading = true
         error = nil
@@ -223,6 +238,7 @@ struct ForumTopicDetailView: View {
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Couldn't load topic." }
         isLoading = false
+        focusTitleAfterLoad()
     }
 
     private func toggleFollow() async {

@@ -10,6 +10,7 @@ struct EpisodeDetailView: View {
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
     @State private var artworkDescription: String?
+    @AccessibilityFocusState private var isTitleFocused: Bool
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -140,6 +141,8 @@ struct EpisodeDetailView: View {
             "\(episode.title) by \(episode.showTitle)" +
             (artworkDescription.map { ". Artwork \($0)" } ?? "")
         )
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityFocused($isTitleFocused)
     }
 
     @ViewBuilder

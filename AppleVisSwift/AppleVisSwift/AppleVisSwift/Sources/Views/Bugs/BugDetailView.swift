@@ -5,6 +5,7 @@ struct BugDetailView: View {
     @State private var detail: BugReportDetail?
     @State private var isLoading = false
     @State private var error: String?
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         Group {
@@ -35,6 +36,8 @@ struct BugDetailView: View {
                 Text(detail.title)
                     .font(.title2).fontWeight(.semibold)
                     .padding(.horizontal)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($isTitleFocused)
 
                 // Metadata
                 metaGrid(detail).padding(.horizontal)
@@ -165,5 +168,18 @@ struct BugDetailView: View {
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Couldn't load bug report." }
         isLoading = false
+        focusTitleAfterLoad()
+    }
+
+    /// VoiceOver lands on the back button after push navigation by default;
+    /// this moves it to the page heading instead, per
+    /// docs/IMPLEMENTATION_NOTES.md's "VoiceOver Detail Page Navigation"
+    /// guidance. Delayed slightly since setting focus before the new content
+    /// has actually laid out is a common way for it to silently fail.
+    private func focusTitleAfterLoad() {
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            isTitleFocused = true
+        }
     }
 }

@@ -7,6 +7,7 @@ struct AppDetailView: View {
     @State private var error: String?
     @State private var showReviewCompose = false
     @State private var itunesMetadata: ItunesMetadata?
+    @AccessibilityFocusState private var isTitleFocused: Bool
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
 
@@ -121,6 +122,8 @@ struct AppDetailView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(detail.name) by \(detail.developer), \(detail.platform.displayName), \(detail.price)")
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityFocused($isTitleFocused)
     }
 
     private func appStoreInfoSection(_ meta: ItunesMetadata) -> some View {
@@ -236,6 +239,19 @@ struct AppDetailView: View {
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Couldn't load app." }
         isLoading = false
+        focusTitleAfterLoad()
+    }
+
+    /// VoiceOver lands on the back button after push navigation by default;
+    /// this moves it to the page heading instead, per
+    /// docs/IMPLEMENTATION_NOTES.md's "VoiceOver Detail Page Navigation"
+    /// guidance. Delayed slightly since setting focus before the new content
+    /// has actually laid out is a common way for it to silently fail.
+    private func focusTitleAfterLoad() {
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            isTitleFocused = true
+        }
     }
 }
 
