@@ -86,13 +86,9 @@ struct ResourceDetailView: View {
 
     @ViewBuilder
     private func commentsSection(_ detail: ResourceDetail) -> some View {
-        HStack {
-            Text("\(detail.comments.count) Comment\(detail.comments.count == 1 ? "" : "s")")
-                .font(.headline)
-            Spacer()
+        CommunityDiscussionHeading(count: detail.comments.count) {
+            announceThreadOverview(detail)
         }
-        .padding(.horizontal)
-        .accessibilityAddTraits(.isHeader)
 
         if detail.comments.isEmpty {
             Text("No comments yet.")
@@ -124,6 +120,18 @@ struct ResourceDetailView: View {
                 }
             }
         }
+    }
+
+    /// VoiceOver "Thread overview" custom action on the comments heading —
+    /// a spoken summary in place of manually reading through every comment.
+    private func announceThreadOverview(_ detail: ResourceDetail) {
+        let mostRecent = detail.comments.max { $0.createdAt < $1.createdAt }
+        var summary = "Thread has \(detail.comments.count) comment\(detail.comments.count == 1 ? "" : "s")."
+        if let mostRecent {
+            summary += " Most recent comment by \(mostRecent.authorName), \(mostRecent.createdAt.formatted(.relative(presentation: .named)))."
+        }
+        summary += " Original post by \(detail.authorName)."
+        UIAccessibility.post(notification: .announcement, argument: summary)
     }
 
     private func load() async {

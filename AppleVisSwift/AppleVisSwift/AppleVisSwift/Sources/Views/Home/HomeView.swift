@@ -43,7 +43,10 @@ struct HomeView: View {
             }
             .navigationTitle("Home")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                // Matches the original design: Customize Home in the
+                // top-left, Profile/Settings in the top-right — not both
+                // crowded onto the same side.
+                ToolbarItem(placement: .navigationBarLeading) {
                     filterMenu
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -178,8 +181,9 @@ struct HomeView: View {
                 Toggle("Apple Topics Only", isOn: $preferences.appleOnlyForums)
             }
         } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle")
-                .accessibilityLabel("Filter feed")
+            Image(systemName: "slider.horizontal.3")
+                .accessibilityLabel("Customize Home")
+                .accessibilityHint("Choose what content types appear on your Home screen")
         }
         .onChange(of: preferences.showForums)   { _, _ in Task { await vm.load() } }
         .onChange(of: preferences.showPodcasts) { _, _ in Task { await vm.load() } }

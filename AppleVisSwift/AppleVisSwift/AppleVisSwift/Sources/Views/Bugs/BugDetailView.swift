@@ -129,10 +129,9 @@ struct BugDetailView: View {
 
     @ViewBuilder
     private func commentsSection(_ detail: BugReportDetail) -> some View {
-        Text("\(detail.comments.count) Comment\(detail.comments.count == 1 ? "" : "s")")
-            .font(.headline)
-            .padding(.horizontal)
-            .accessibilityAddTraits(.isHeader)
+        CommunityDiscussionHeading(count: detail.comments.count) {
+            announceThreadOverview(detail)
+        }
 
         if detail.comments.isEmpty {
             Text("No comments yet.")
@@ -144,6 +143,19 @@ struct BugDetailView: View {
                 Divider().padding(.leading)
             }
         }
+    }
+
+    /// VoiceOver "Thread overview" custom action on the comments heading —
+    /// a spoken summary in place of manually reading through every comment.
+    /// No "Original post by" line: BugReportDetail doesn't expose a
+    /// submitter name (unlike forum topics, blog posts, and resources).
+    private func announceThreadOverview(_ detail: BugReportDetail) {
+        let mostRecent = detail.comments.max { $0.createdAt < $1.createdAt }
+        var summary = "Thread has \(detail.comments.count) comment\(detail.comments.count == 1 ? "" : "s")."
+        if let mostRecent {
+            summary += " Most recent comment by \(mostRecent.authorName), \(mostRecent.createdAt.formatted(.relative(presentation: .named)))."
+        }
+        UIAccessibility.post(notification: .announcement, argument: summary)
     }
 
     private func load() async {

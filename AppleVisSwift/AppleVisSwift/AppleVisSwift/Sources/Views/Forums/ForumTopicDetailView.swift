@@ -113,16 +113,8 @@ struct ForumTopicDetailView: View {
 
                 // Replies
                 if !detail.replies.isEmpty {
-                    let newCount = detail.replies.filter(\.isNew).count
-                    Text(
-                        "Community Discussion - \(detail.replies.count) comment\(detail.replies.count == 1 ? "" : "s")"
-                        + (newCount > 0 ? " - \(newCount) new" : "")
-                    )
-                    .font(.headline)
-                    .padding(.horizontal)
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityAction(named: Text("Thread overview")) {
-                        announceThreadOverview(detail, newCount: newCount)
+                    CommunityDiscussionHeading(count: detail.replies.count) {
+                        announceThreadOverview(detail)
                     }
 
                     if preferences.aiSummariesEnabled && IntelligenceService.isAvailable && detail.replies.count >= 5 {
@@ -195,12 +187,15 @@ struct ForumTopicDetailView: View {
 
     /// VoiceOver "Thread overview" custom action on the comments heading —
     /// a spoken summary in place of manually reading through every reply.
-    private func announceThreadOverview(_ detail: ForumTopicDetail, newCount: Int) {
+    /// No "N new" count: nothing in the app currently tracks per-item last-
+    /// visit timestamps (ForumReply.isNew is hardcoded false in Mappers.swift
+    /// and never set) — the "New Comment Tracking" feature described in
+    /// docs/IMPLEMENTATION_NOTES.md was documented but never built. Saying
+    /// "0 new" or silently always omitting it would both be misleading in
+    /// different ways, so this only speaks what's actually real right now.
+    private func announceThreadOverview(_ detail: ForumTopicDetail) {
         let mostRecent = detail.replies.max { $0.createdAt < $1.createdAt }
         var summary = "Thread has \(detail.replies.count) comment\(detail.replies.count == 1 ? "" : "s")."
-        if newCount > 0 {
-            summary += " \(newCount) new since your last visit."
-        }
         if let mostRecent {
             summary += " Most recent comment by \(mostRecent.authorName), \(mostRecent.createdAt.formatted(.relative(presentation: .named)))."
         }

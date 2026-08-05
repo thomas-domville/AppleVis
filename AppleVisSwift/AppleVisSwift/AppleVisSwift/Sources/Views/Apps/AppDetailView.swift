@@ -174,19 +174,9 @@ struct AppDetailView: View {
 
     @ViewBuilder
     private func reviewsSection(_ detail: AppDetail) -> some View {
-        HStack {
-            Text("Community Discussion")
-                .font(.headline)
-            Spacer()
-            Text("\(detail.reviews.count) comment\(detail.reviews.count == 1 ? "" : "s")")
-                .font(.caption).foregroundStyle(.secondary)
+        CommunityDiscussionHeading(count: detail.reviews.count) {
+            announceThreadOverview(detail)
         }
-        .padding(.horizontal)
-        .padding(.top, 16)
-        .padding(.bottom, 8)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
-        .accessibilityLabel("Community Discussion, \(detail.reviews.count) comments")
 
         if detail.reviews.isEmpty {
             Text("No reviews yet — be the first!")
@@ -212,6 +202,18 @@ struct AppDetailView: View {
                 }
             }
         }
+    }
+
+    /// VoiceOver "Thread overview" custom action on the reviews heading —
+    /// a spoken summary in place of manually reading through every review.
+    private func announceThreadOverview(_ detail: AppDetail) {
+        let mostRecent = detail.reviews.max { $0.createdAt < $1.createdAt }
+        var summary = "Thread has \(detail.reviews.count) comment\(detail.reviews.count == 1 ? "" : "s")."
+        if let mostRecent {
+            summary += " Most recent comment by \(mostRecent.authorName), \(mostRecent.createdAt.formatted(.relative(presentation: .named)))."
+        }
+        summary += " Submitted by \(detail.submittedBy)."
+        UIAccessibility.post(notification: .announcement, argument: summary)
     }
 
     private func load() async {
