@@ -34,6 +34,12 @@ struct ContentActionsModifier: ViewModifier {
                     Label(isSaved ? "Unsave" : "Save", systemImage: isSaved ? "bookmark.slash" : "bookmark")
                 }
                 .tint(.orange)
+                // Visible button text stays short (swipe buttons truncate),
+                // but VoiceOver gets the fuller, self-descriptive phrasing —
+                // it announces this in isolation, without the row's own
+                // label alongside it, so "Save" alone is ambiguous out of
+                // context.
+                .accessibilityLabel(isSaved ? "Unsave \(kind.displayName)" : "Save \(kind.displayName)")
             }
             .swipeActions(edge: .trailing) {
                 if let url, let shareURL = URL(string: url) {
@@ -41,6 +47,7 @@ struct ContentActionsModifier: ViewModifier {
                         Label("Share", systemImage: "square.and.arrow.up")
                     }
                     .tint(.blue)
+                    .accessibilityLabel("Share \(kind.displayName)")
                 }
                 if supportsFollow && auth.isSignedIn {
                     Button {
@@ -49,6 +56,7 @@ struct ContentActionsModifier: ViewModifier {
                         Label(isFollowing ? "Unfollow" : "Follow", systemImage: isFollowing ? "bell.slash" : "bell")
                     }
                     .tint(.indigo)
+                    .accessibilityLabel(isFollowing ? "Unfollow \(kind.displayName)" : "Follow \(kind.displayName)")
                 }
             }
             .contextMenu {
