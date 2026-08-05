@@ -229,7 +229,7 @@ struct SearchEndpoints {
 
     func query(_ text: String) async throws -> SearchResults {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return SearchResults(forums: [], apps: [], guides: [], blogs: []) }
+        guard !trimmed.isEmpty else { return SearchResults(forums: [], apps: [], guides: [], blogs: [], podcasts: [], bugs: []) }
 
         async let forumsRes = client.jsonAPIList(
             "node/forum",
@@ -243,12 +243,32 @@ struct SearchEndpoints {
             "node/guides",
             query: ["filter[title][operator]": "CONTAINS", "filter[title][value]": trimmed, "sort": "-changed", "page[limit]": "10"]
         )
+        async let blogsRes = client.jsonAPIList(
+            "node/blog2",
+            query: ["include": "uid", "filter[title][operator]": "CONTAINS", "filter[title][value]": trimmed, "sort": "-changed", "page[limit]": "10"]
+        )
+        async let podcastsRes = client.jsonAPIList(
+            "node/podcast",
+            query: ["include": "field_podcast,uid,taxonomy_vocabulary_15", "filter[title][operator]": "CONTAINS", "filter[title][value]": trimmed, "sort": "-changed", "page[limit]": "10"]
+        )
+        async let iosBugsRes = client.jsonAPIList(
+            "node/ios_bug_report",
+            query: ["filter[title][operator]": "CONTAINS", "filter[title][value]": trimmed, "sort": "-changed", "page[limit]": "10"]
+        )
+        async let macBugsRes = client.jsonAPIList(
+            "node/os_x_bug_report",
+            query: ["filter[title][operator]": "CONTAINS", "filter[title][value]": trimmed, "sort": "-changed", "page[limit]": "10"]
+        )
 
         let forums = (try? await forumsRes).map { r in r.data.map { Mappers.forum($0, included: r.included ?? []) } } ?? []
         let apps = (try? await appsRes).map { r in r.data.map { Mappers.app($0, included: r.included ?? []) } } ?? []
         let guides = (try? await guidesRes).map { r in r.data.map { Mappers.resource($0, included: r.included ?? []) } } ?? []
+        let blogs = (try? await blogsRes).map { r in r.data.map { Mappers.blog($0, included: r.included ?? []) } } ?? []
+        let podcasts = (try? await podcastsRes).map { r in r.data.map { Mappers.podcast($0, included: r.included ?? []) } } ?? []
+        let iosBugs = (try? await iosBugsRes).map { r in r.data.map { Mappers.bug($0, platform: .ios) } } ?? []
+        let macBugs = (try? await macBugsRes).map { r in r.data.map { Mappers.bug($0, platform: .macos) } } ?? []
 
-        return SearchResults(forums: forums, apps: apps, guides: guides, blogs: [])
+        return SearchResults(forums: forums, apps: apps, guides: guides, blogs: blogs, podcasts: podcasts, bugs: iosBugs + macBugs)
     }
 }
 
@@ -257,6 +277,8 @@ struct SearchResults {
     let apps: [AppListing]
     let guides: [Resource]
     let blogs: [BlogPost]
+    let podcasts: [PodcastEpisode]
+    let bugs: [BugReport]
 }
 
 // MARK: - Flags (follow any content — "save" has no server counterpart, see PersistenceStore)

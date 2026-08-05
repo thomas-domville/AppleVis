@@ -113,7 +113,7 @@ enum HelpContent {
                     title: "Frequently Asked Questions",
                     summary: "Quick answers to the questions members ask most.",
                     content: [
-                        .faq(question: "How do I search AppleVis?", answer: "Open the Discover tab and use the search field. Results are grouped into Forum Topics, Apps, and Guides."),
+                        .faq(question: "How do I search AppleVis?", answer: "Open the Discover tab and use the search field (2 characters minimum). Results are grouped into Forum Topics, Apps, Guides, Blogs, Podcasts, and Bug Reports."),
                         .faq(question: "Where are my saved items?", answer: "Open For You and choose the Saved section."),
                         .faq(question: "What is the difference between Save and Follow?", answer: "Save bookmarks an item locally so you can find it again. Follow keeps it in For You > Following and notifies you when it has new activity."),
                         .faq(question: "How do I download podcast episodes?", answer: "Open the episode and choose Download. Downloaded episodes appear in For You > Downloads for offline listening."),

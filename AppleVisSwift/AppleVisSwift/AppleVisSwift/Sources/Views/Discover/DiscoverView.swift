@@ -40,7 +40,7 @@ struct DiscoverView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if searchText.isEmpty {
+                if searchText.trimmingCharacters(in: .whitespaces).count < 2 {
                     hubGrid
                 } else {
                     VStack(spacing: 0) {
@@ -102,7 +102,9 @@ struct DiscoverView: View {
 
     private func runSearch(_ query: String) {
         searchTask?.cancel()
-        guard !query.isEmpty else { searchResults = nil; return }
+        // Matches the old RN app's minimum: below 2 characters is too broad
+        // to be a useful title-CONTAINS search and just wastes a request.
+        guard query.trimmingCharacters(in: .whitespaces).count >= 2 else { searchResults = nil; return }
         searchTask = Task {
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
@@ -121,9 +123,12 @@ struct DiscoverView: View {
     /// count changes so a slow typist isn't blipped on every debounced fetch.
     private func announceSearchResults() {
         guard let results = searchResults else { return }
-        let total = results.forums.count + results.apps.count + results.guides.count + results.blogs.count
-        let categoryCount = [!results.forums.isEmpty, !results.apps.isEmpty, !results.guides.isEmpty, !results.blogs.isEmpty]
-            .filter { $0 }.count
+        let total = results.forums.count + results.apps.count + results.guides.count
+            + results.blogs.count + results.podcasts.count + results.bugs.count
+        let categoryCount = [
+            !results.forums.isEmpty, !results.apps.isEmpty, !results.guides.isEmpty,
+            !results.blogs.isEmpty, !results.podcasts.isEmpty, !results.bugs.isEmpty,
+        ].filter { $0 }.count
         let message = total == 0
             ? "No results found."
             : "\(total) result\(total == 1 ? "" : "s") found in \(categoryCount) categor\(categoryCount == 1 ? "y" : "ies")."

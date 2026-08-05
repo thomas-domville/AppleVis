@@ -18,7 +18,8 @@ struct SearchResultsView: View {
 
     @ViewBuilder
     private func resultsList(_ results: SearchResults) -> some View {
-        let isEmpty = results.forums.isEmpty && results.apps.isEmpty && results.guides.isEmpty && results.blogs.isEmpty
+        let isEmpty = results.forums.isEmpty && results.apps.isEmpty && results.guides.isEmpty
+            && results.blogs.isEmpty && results.podcasts.isEmpty && results.bugs.isEmpty
         if isEmpty {
             EmptyStateView(title: "No Results", message: "Nothing matched your search.", systemImage: "magnifyingglass")
         } else {
@@ -48,6 +49,22 @@ struct SearchResultsView: View {
                     Section("Blogs") {
                         ForEach(results.blogs) { post in
                             BlogPostRow(post: post)
+                        }
+                    }
+                }
+                if !results.podcasts.isEmpty {
+                    Section("Podcasts") {
+                        ForEach(results.podcasts) { episode in
+                            PodcastEpisodeRow(episode: episode)
+                        }
+                    }
+                }
+                if !results.bugs.isEmpty {
+                    Section("Bug Reports") {
+                        ForEach(results.bugs) { bug in
+                            NavigationLink(value: bug) {
+                                BugReportRow(bug: bug)
+                            }
                         }
                     }
                 }
