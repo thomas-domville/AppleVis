@@ -205,6 +205,7 @@ struct ContentDetailActions: View {
     @EnvironmentObject private var tips: TipStore
     @State private var isSaved = false
     @State private var isFollowing = false
+    @State private var showBrowser = false
 
     var body: some View {
         Group {
@@ -227,6 +228,16 @@ struct ContentDetailActions: View {
             if let url, let shareURL = URL(string: url) {
                 ShareLink(item: shareURL, subject: Text(title)) {
                     Image(systemName: "square.and.arrow.up")
+                }
+
+                Button {
+                    showBrowser = true
+                } label: {
+                    Image(systemName: "safari")
+                }
+                .accessibilityLabel("Open in Browser")
+                .sheet(isPresented: $showBrowser) {
+                    SafariView(url: shareURL)
                 }
             }
         }

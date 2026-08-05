@@ -15,6 +15,7 @@ struct ForumTopicDetailView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var threadSummary: String?
     @State private var isSummarizing = false
+    @State private var showBrowser = false
 
     var body: some View {
         Group {
@@ -52,6 +53,13 @@ struct ForumTopicDetailView: View {
                     ShareLink(item: shareURL, subject: Text(detail.title)) {
                         Image(systemName: "square.and.arrow.up")
                     }
+
+                    Button {
+                        showBrowser = true
+                    } label: {
+                        Image(systemName: "safari")
+                    }
+                    .accessibilityLabel("Open in Browser")
                 }
             }
         }
@@ -60,6 +68,11 @@ struct ForumTopicDetailView: View {
                 ComposeReplyView(topicId: d.id, topicTitle: d.title) { reply in
                     self.detail?.replies.append(reply)
                 }
+            }
+        }
+        .sheet(isPresented: $showBrowser) {
+            if let detail, let shareURL = URL(string: detail.url) {
+                SafariView(url: shareURL)
             }
         }
         .handoff(title: detail?.title, url: detail?.url)
@@ -100,9 +113,17 @@ struct ForumTopicDetailView: View {
 
                 // Replies
                 if !detail.replies.isEmpty {
-                    Text("\(detail.replies.count) Repl\(detail.replies.count == 1 ? "y" : "ies")")
-                        .font(.headline)
-                        .padding(.horizontal)
+                    let newCount = detail.replies.filter(\.isNew).count
+                    Text(
+                        "Community Discussion - \(detail.replies.count) comment\(detail.replies.count == 1 ? "" : "s")"
+                        + (newCount > 0 ? " - \(newCount) new" : "")
+                    )
+                    .font(.headline)
+                    .padding(.horizontal)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityAction(named: Text("Thread overview")) {
+                        announceThreadOverview(detail, newCount: newCount)
+                    }
 
                     if preferences.aiSummariesEnabled && IntelligenceService.isAvailable && detail.replies.count >= 5 {
                         summarizeSection(detail)
@@ -170,6 +191,21 @@ struct ForumTopicDetailView: View {
         let text = ([detail.body.strippingHTMLTags()] + detail.replies.prefix(30).map { "\($0.authorName): \($0.body.strippingHTMLTags())" }).joined(separator: "\n\n")
         threadSummary = await IntelligenceService.summarize(text)
         isSummarizing = false
+    }
+
+    /// VoiceOver "Thread overview" custom action on the comments heading —
+    /// a spoken summary in place of manually reading through every reply.
+    private func announceThreadOverview(_ detail: ForumTopicDetail, newCount: Int) {
+        let mostRecent = detail.replies.max { $0.createdAt < $1.createdAt }
+        var summary = "Thread has \(detail.replies.count) comment\(detail.replies.count == 1 ? "" : "s")."
+        if newCount > 0 {
+            summary += " \(newCount) new since your last visit."
+        }
+        if let mostRecent {
+            summary += " Most recent comment by \(mostRecent.authorName), \(mostRecent.createdAt.formatted(.relative(presentation: .named)))."
+        }
+        summary += " Original post by \(detail.authorName)."
+        UIAccessibility.post(notification: .announcement, argument: summary)
     }
 
     private func load() async {
