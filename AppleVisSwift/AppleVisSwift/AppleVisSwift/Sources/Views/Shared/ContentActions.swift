@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Shared save/follow/share actions (swipe + context menu) for any content row
 /// or detail screen. Save is local-only (no server concept — see
@@ -20,13 +21,15 @@ struct ContentActionsModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            // .swipeActions buttons are what SwiftUI actually exposes to
-            // VoiceOver as custom actions (reachable by swiping up/down once
-            // an item is selected). .contextMenu items are NOT reliably
-            // exposed the same way — Follow/Share used to live only in the
-            // context menu, so VoiceOver users only ever heard "Save" repeat.
-            // Per docs/APPLEVIS_2026_1_MASTER_SPEC.md: "Use custom actions
-            // for Save, Follow, Share..." — this puts all three there.
+            // The visible swipe buttons below are hidden from the
+            // accessibility tree (.accessibilityHidden) and are NOT the
+            // source of VoiceOver's custom actions — on this SDK,
+            // .accessibilityLabel applied to a .swipeActions button doesn't
+            // replace its auto-derived custom-action name, it adds a SECOND
+            // one, so VoiceOver announced both "Save" and "Save Forum Topic"
+            // back to back for the same action. The .accessibilityAction
+            // block further down is the single, explicit source of truth
+            // instead, giving full control with no duplicates.
             .swipeActions(edge: .leading) {
                 Button {
                     toggleSave()
@@ -34,12 +37,7 @@ struct ContentActionsModifier: ViewModifier {
                     Label(isSaved ? "Unsave" : "Save", systemImage: isSaved ? "bookmark.slash" : "bookmark")
                 }
                 .tint(.orange)
-                // Visible button text stays short (swipe buttons truncate),
-                // but VoiceOver gets the fuller, self-descriptive phrasing —
-                // it announces this in isolation, without the row's own
-                // label alongside it, so "Save" alone is ambiguous out of
-                // context.
-                .accessibilityLabel(isSaved ? "Unsave \(kind.displayName)" : "Save \(kind.displayName)")
+                .accessibilityHidden(true)
             }
             .swipeActions(edge: .trailing) {
                 if let url, let shareURL = URL(string: url) {
@@ -47,7 +45,7 @@ struct ContentActionsModifier: ViewModifier {
                         Label("Share", systemImage: "square.and.arrow.up")
                     }
                     .tint(.blue)
-                    .accessibilityLabel("Share \(kind.displayName)")
+                    .accessibilityHidden(true)
                 }
                 if supportsFollow && auth.isSignedIn {
                     Button {
@@ -56,7 +54,7 @@ struct ContentActionsModifier: ViewModifier {
                         Label(isFollowing ? "Unfollow" : "Follow", systemImage: isFollowing ? "bell.slash" : "bell")
                     }
                     .tint(.indigo)
-                    .accessibilityLabel(isFollowing ? "Unfollow \(kind.displayName)" : "Follow \(kind.displayName)")
+                    .accessibilityHidden(true)
                 }
             }
             .contextMenu {
@@ -78,10 +76,38 @@ struct ContentActionsModifier: ViewModifier {
                     }
                 }
             }
+            .accessibilityAction(named: Text(isSaved ? "Unsave \(kind.displayName)" : "Save \(kind.displayName)")) {
+                toggleSave()
+            }
+            .modifier(ConditionalAccessibilityAction(
+                isActive: url.flatMap(URL.init) != nil,
+                name: "Share \(kind.displayName)"
+            ) {
+                presentShareSheet()
+            })
+            .modifier(ConditionalAccessibilityAction(
+                isActive: supportsFollow && auth.isSignedIn,
+                name: isFollowing ? "Unfollow \(kind.displayName)" : "Follow \(kind.displayName)"
+            ) {
+                Task { await toggleFollow() }
+            })
             .onAppear {
                 isSaved = PersistenceStore.shared.isSaved(id: id)
                 isFollowing = PersistenceStore.shared.isFollowed(id: id)
             }
+    }
+
+    /// ShareLink has no programmatic trigger, so the explicit VoiceOver
+    /// Share action presents the same system share sheet directly via UIKit.
+    private func presentShareSheet() {
+        guard let url, let shareURL = URL(string: url) else { return }
+        let activityVC = UIActivityViewController(activityItems: [shareURL], applicationActivities: nil)
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }?
+            .rootViewController?
+            .present(activityVC, animated: true)
     }
 
     private func toggleSave() {
@@ -119,6 +145,23 @@ struct ContentActionsModifier: ViewModifier {
             toast.error(e.localizedDescription)
         } catch {
             toast.error("Couldn't update follow status.")
+        }
+    }
+}
+
+/// Attaches an .accessibilityAction only when `isActive` — e.g. Share should
+/// not appear as a VoiceOver action at all when there's no url, and Follow
+/// shouldn't appear when signed out, rather than appearing as a no-op.
+private struct ConditionalAccessibilityAction: ViewModifier {
+    let isActive: Bool
+    let name: String
+    let action: () -> Void
+
+    func body(content: Content) -> some View {
+        if isActive {
+            content.accessibilityAction(named: Text(name), action)
+        } else {
+            content
         }
     }
 }
