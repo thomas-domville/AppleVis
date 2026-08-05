@@ -87,6 +87,23 @@ enum PushNotificationManager {
               let kind = ContentKind(rawValue: kindRaw) else { return }
         deepLinkRouter?.pendingContent = (kind: kind, id: id)
     }
+
+    /// Records a notification into on-device history (Home's Notification
+    /// summary — docs/APPLEVIS_2026_1_MASTER_SPEC.md) whenever one arrives,
+    /// whether or not it's ever tapped. `kind`/`id` come from the same
+    /// custom payload keys `handle(userInfo:)` reads.
+    static func recordHistory(content: UNNotificationContent) {
+        let kind = (content.userInfo["kind"] as? String).flatMap(ContentKind.init(rawValue:))
+        let contentId = content.userInfo["id"] as? String
+        PersistenceStore.shared.recordNotification(NotificationHistoryItem(
+            id: UUID().uuidString,
+            title: content.title,
+            body: content.body,
+            receivedAt: Date(),
+            kind: kind,
+            contentId: kind != nil ? contentId : nil
+        ))
+    }
 }
 
 /// Bridges UIKit app-delegate callbacks (APNs registration, foreground
@@ -113,13 +130,23 @@ final class AppleVisAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .sound, .badge]
+        await MainActor.run {
+            PushNotificationManager.recordHistory(content: notification.request.content)
+        }
+        return [.banner, .sound, .badge]
     }
 
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
+        // Notifications tapped while the app wasn't running/foregrounded
+        // never pass through willPresent, so this is also a recording point,
+        // not just the tap-to-open route — duplicate entries aren't a
+        // concern since willPresent only fires for foreground delivery.
+        await MainActor.run {
+            PushNotificationManager.recordHistory(content: response.notification.request.content)
+        }
         guard response.actionIdentifier != "DISMISS" else { return }
         await MainActor.run {
             PushNotificationManager.handle(userInfo: response.notification.request.content.userInfo)

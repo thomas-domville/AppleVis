@@ -9,6 +9,8 @@ final class PersistenceStore {
 
     private let savedKey = "applevis.saved.v1"
     private let followedKey = "applevis.followed.v1"
+    private let notificationHistoryKey = "applevis.notificationHistory.v1"
+    private let notificationHistoryLimit = 20
     private let defaults = UserDefaults.standard
 
     private init() {}
@@ -41,6 +43,21 @@ final class PersistenceStore {
     /// Overwrites the local saved list — used when adopting an iCloud sync.
     func replaceSavedItems(_ items: [SavedItem]) {
         persist(items, key: savedKey)
+    }
+
+    // MARK: - Notification history (on-device only — nothing server-side tracks this)
+
+    func notificationHistory() -> [NotificationHistoryItem] {
+        load(key: notificationHistoryKey) ?? []
+    }
+
+    func recordNotification(_ item: NotificationHistoryItem) {
+        var items = notificationHistory()
+        items.insert(item, at: 0)
+        if items.count > notificationHistoryLimit {
+            items.removeLast(items.count - notificationHistoryLimit)
+        }
+        persist(items, key: notificationHistoryKey)
     }
 
     // MARK: - Followed items (local cache; follow/unfollow itself is server-backed)

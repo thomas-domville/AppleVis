@@ -48,6 +48,8 @@ struct HomeView: View {
     @EnvironmentObject private var keyCommands: KeyCommandRouter
     @State private var hasAnnouncedWelcome = false
     @State private var homeFeedFilter: HomeFeedFilter = .all
+    @State private var savedItems: [SavedItem] = []
+    @State private var notificationHistory: [NotificationHistoryItem] = []
     @AccessibilityFocusState private var focusTarget: HomeFocusTarget?
 
     /// Items actually shown below the feed picker — narrowed to just what's
@@ -84,7 +86,11 @@ struct HomeView: View {
                     .accessibilityLabel("Profile and Settings")
                 }
             }
-            .refreshable { await vm.load() }
+            .refreshable {
+                await vm.load()
+                savedItems = PersistenceStore.shared.savedItems()
+                notificationHistory = PersistenceStore.shared.notificationHistory()
+            }
             .onReceive(keyCommands.refreshRequested) { Task { await vm.load() } }
             .overlay(alignment: .top) { ToastOverlay() }
             .onChange(of: vm.isLoading) { _, isLoading in
@@ -108,6 +114,10 @@ struct HomeView: View {
             }
         }
         .task { await vm.load() }
+        .onAppear {
+            savedItems = PersistenceStore.shared.savedItems()
+            notificationHistory = PersistenceStore.shared.notificationHistory()
+        }
     }
 
     // MARK: - Welcome
@@ -193,6 +203,48 @@ struct HomeView: View {
         ScrollViewReader { proxy in
             List {
                 greetingCard
+
+                if !savedItems.isEmpty {
+                    NavigationLink(destination: SavedItemsView()) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "bookmark.fill")
+                                .foregroundStyle(Color.accentColor)
+                                .accessibilityHidden(true)
+                            Text("Saved")
+                                .font(.subheadline).fontWeight(.semibold)
+                            Spacer()
+                            Text("\(savedItems.count)")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        .padding(12)
+                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                    }
+                    .accessibilityLabel("Saved, \(savedItems.count) item\(savedItems.count == 1 ? "" : "s")")
+                    .accessibilityHint("Double-tap to view your saved items.")
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    .listRowSeparator(.hidden)
+                }
+
+                if !notificationHistory.isEmpty {
+                    NavigationLink(destination: NotificationHistoryView()) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "bell.fill")
+                                .foregroundStyle(Color.accentColor)
+                                .accessibilityHidden(true)
+                            Text("Notifications")
+                                .font(.subheadline).fontWeight(.semibold)
+                            Spacer()
+                            Text("\(notificationHistory.count)")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        .padding(12)
+                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                    }
+                    .accessibilityLabel("Notifications, \(notificationHistory.count) recent")
+                    .accessibilityHint("Double-tap to view your recent notifications.")
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    .listRowSeparator(.hidden)
+                }
 
                 if !networkMonitor.isConnected && !vm.items.isEmpty {
                     OfflineBanner()
@@ -403,6 +455,51 @@ private struct UnreadTopicsStrip: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(count) unread topic\(count == 1 ? "" : "s"). Activate to jump to first unread.")
+    }
+}
+
+// MARK: - Notification history
+
+/// Home's "Notification summary" destination (docs/APPLEVIS_2026_1_MASTER_SPEC.md)
+/// — a local read-only log of the last 20 notifications received, since
+/// nothing server-side tracks this. Tapping an entry with a recognizable
+/// deep-link target routes it the same way a tapped system notification
+/// would (DeepLinkRouter.pendingContent); entries without one (e.g. plain
+/// announcements) are shown but not tappable.
+struct NotificationHistoryView: View {
+    @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+    @State private var items: [NotificationHistoryItem] = []
+
+    var body: some View {
+        Group {
+            if items.isEmpty {
+                EmptyStateView(title: "No Notifications Yet", message: "Notifications you receive will appear here.", systemImage: "bell")
+            } else {
+                List(items) { item in
+                    let isRoutable = item.kind != nil && item.contentId != nil
+                    Button {
+                        guard let kind = item.kind, let contentId = item.contentId else { return }
+                        deepLinkRouter.pendingContent = (kind: kind, id: contentId)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.title)
+                                .font(.subheadline).fontWeight(.semibold)
+                            Text(item.body)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            RelativeDateLabel(date: item.receivedAt)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!isRoutable)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("\(item.title). \(item.body).")
+                    .accessibilityHint(isRoutable ? "Double-tap to open." : "")
+                }
+            }
+        }
+        .navigationTitle("Notifications")
+        .onAppear { items = PersistenceStore.shared.notificationHistory() }
     }
 }
 

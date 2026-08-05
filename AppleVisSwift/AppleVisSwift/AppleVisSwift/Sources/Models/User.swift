@@ -38,6 +38,20 @@ struct FollowedItem: Identifiable, Codable {
     let url: String
 }
 
+/// A push notification the user received, kept locally so Home can show a
+/// "Notification summary" (docs/APPLEVIS_2026_1_MASTER_SPEC.md) — nothing
+/// server-side tracks notification history, so this is purely on-device.
+struct NotificationHistoryItem: Identifiable, Codable {
+    let id: String
+    let title: String
+    let body: String
+    let receivedAt: Date
+    /// Nil when the payload didn't carry a recognizable deep-link target —
+    /// still shown in history, just not tappable-to-open.
+    let kind: ContentKind?
+    let contentId: String?
+}
+
 // Unified content type enum used throughout the app
 enum ContentKind: String, Codable, CaseIterable {
     case forumTopic
