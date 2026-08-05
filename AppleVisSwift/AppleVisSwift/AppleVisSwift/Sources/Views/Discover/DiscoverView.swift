@@ -42,15 +42,10 @@ struct DiscoverView: View {
             .navigationTitle("Discover")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if auth.isSignedIn {
-                        NavigationLink(destination: ProfileView()) {
-                            Image(systemName: "person.circle")
-                        }
-                    } else {
-                        NavigationLink(destination: SignInView()) {
-                            Text("Sign In")
-                        }
+                    NavigationLink(destination: ProfileView()) {
+                        Image(systemName: "person.circle")
                     }
+                    .accessibilityLabel("Profile and Settings")
                 }
             }
             .searchable(text: $searchText, prompt: "Search AppleVis")

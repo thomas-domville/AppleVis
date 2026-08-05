@@ -20,6 +20,13 @@ struct ContentActionsModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            // .swipeActions buttons are what SwiftUI actually exposes to
+            // VoiceOver as custom actions (reachable by swiping up/down once
+            // an item is selected). .contextMenu items are NOT reliably
+            // exposed the same way — Follow/Share used to live only in the
+            // context menu, so VoiceOver users only ever heard "Save" repeat.
+            // Per docs/APPLEVIS_2026_1_MASTER_SPEC.md: "Use custom actions
+            // for Save, Follow, Share..." — this puts all three there.
             .swipeActions(edge: .leading) {
                 Button {
                     toggleSave()
@@ -27,6 +34,22 @@ struct ContentActionsModifier: ViewModifier {
                     Label(isSaved ? "Unsave" : "Save", systemImage: isSaved ? "bookmark.slash" : "bookmark")
                 }
                 .tint(.orange)
+            }
+            .swipeActions(edge: .trailing) {
+                if let url, let shareURL = URL(string: url) {
+                    ShareLink(item: shareURL, subject: Text(title)) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                    .tint(.blue)
+                }
+                if supportsFollow && auth.isSignedIn {
+                    Button {
+                        Task { await toggleFollow() }
+                    } label: {
+                        Label(isFollowing ? "Unfollow" : "Follow", systemImage: isFollowing ? "bell.slash" : "bell")
+                    }
+                    .tint(.indigo)
+                }
             }
             .contextMenu {
                 Button {

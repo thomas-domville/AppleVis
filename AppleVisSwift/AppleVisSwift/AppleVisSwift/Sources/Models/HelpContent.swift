@@ -147,7 +147,7 @@ enum HelpContent {
                             "Swipe right or left to move through controls and content.",
                             "Double tap to activate the focused item.",
                             "Use headings to jump between major sections.",
-                            "Use the context menu on content rows for Save, Follow, and Share.",
+                            "With VoiceOver focus on a content row, set the rotor to Actions and swipe up or down to reach Save, Follow, and Share, then double tap to activate one. (Sighted users can reach the same actions by swiping the row left or right, or with a long-press context menu.)",
                             "Use two-finger scrub to go back.",
                             "Use two-finger double tap to play or pause podcasts from anywhere.",
                         ]),

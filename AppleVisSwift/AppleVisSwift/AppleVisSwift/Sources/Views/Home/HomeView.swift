@@ -47,15 +47,10 @@ struct HomeView: View {
                     filterMenu
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if auth.isSignedIn {
-                        NavigationLink(destination: ProfileView()) {
-                            Image(systemName: "person.circle")
-                        }
-                    } else {
-                        NavigationLink(destination: SignInView()) {
-                            Text("Sign In")
-                        }
+                    NavigationLink(destination: ProfileView()) {
+                        Image(systemName: "person.circle")
                     }
+                    .accessibilityLabel("Profile and Settings")
                 }
             }
             .refreshable { await vm.load() }
