@@ -73,16 +73,29 @@ struct PodcastEpisodeRow: View {
                 Button {
                     Task { await player.load(episode) }
                 } label: {
-                    Image(systemName: player.currentEpisode?.id == episode.id && player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                    Image(systemName: isCurrentlyPlaying ? "pause.circle.fill" : "play.circle.fill")
                         .font(.title2)
                         .foregroundStyle(Color.accentColor)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(player.currentEpisode?.id == episode.id && player.isPlaying ? "Pause" : "Play \(episode.title)")
+                .accessibilityHidden(true)
             }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(episode.title), \(episode.showTitle) podcast" +
+            (episode.duration.map { ", \(Duration.seconds($0).formatted(.units(allowed: [.hours, .minutes])))" } ?? "") +
+            ", \(episode.publishedAt.formatted(.relative(presentation: .named)))"
+        )
+        .accessibilityAction(named: Text(isCurrentlyPlaying ? "Pause" : "Play")) {
+            Task { await player.load(episode) }
         }
         .contentActions(id: episode.id, kind: .podcastEpisode, title: episode.title, lastActivityAt: episode.lastActivityAt, url: episode.url)
         .cardDensityPadding()
+    }
+
+    private var isCurrentlyPlaying: Bool {
+        player.currentEpisode?.id == episode.id && player.isPlaying
     }
 }
 
@@ -121,7 +134,7 @@ struct AppListingRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(app.name) by \(app.developer), \(app.category)")
+        .accessibilityLabel("\(app.name) by \(app.developer), \(app.category), \(app.lastActivityAt.formatted(.relative(presentation: .named)))")
         .contentActions(id: app.id, kind: .appListing, title: app.name, lastActivityAt: app.lastActivityAt, url: app.url)
         .cardDensityPadding()
     }
@@ -150,6 +163,11 @@ struct ResourceRow: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(resource.title), \(resource.kind.displayName), by \(resource.authorName), " +
+            "\(resource.updatedAt.formatted(.relative(presentation: .named)))"
+        )
         .contentActions(id: resource.id, kind: .resource, title: resource.title, lastActivityAt: resource.updatedAt, url: resource.url)
         .cardDensityPadding()
     }
@@ -182,6 +200,11 @@ struct BlogPostRow: View {
                 .foregroundStyle(.secondary)
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(post.title), Blog post, by \(post.authorName), \(post.commentCount) comment\(post.commentCount == 1 ? "" : "s"), " +
+            "\(post.lastActivityAt.formatted(.relative(presentation: .named)))"
+        )
         .contentActions(id: post.id, kind: .blogPost, title: post.title, lastActivityAt: post.lastActivityAt, url: post.url)
         .cardDensityPadding()
     }

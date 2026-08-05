@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ForumTopicDetailView: View {
     let topicId: String
@@ -8,6 +9,7 @@ struct ForumTopicDetailView: View {
     @State private var isFollowing = false
     @State private var isSaved = false
     @State private var showReplyCompose = false
+    @State private var quotedReplyTarget: ForumReply?
     @State private var isLoadingMoreReplies = false
     @State private var hasMoreReplies = true
     @EnvironmentObject private var auth: AuthStore
@@ -71,6 +73,13 @@ struct ForumTopicDetailView: View {
                 }
             }
         }
+        .sheet(item: $quotedReplyTarget) { target in
+            if let d = detail {
+                ComposeReplyView(topicId: d.id, topicTitle: d.title, quotedReply: target) { reply in
+                    self.detail?.replies.append(reply)
+                }
+            }
+        }
         .sheet(isPresented: $showBrowser) {
             if let detail, let shareURL = URL(string: detail.url) {
                 SafariView(url: shareURL)
@@ -124,17 +133,27 @@ struct ForumTopicDetailView: View {
                         summarizeSection(detail)
                     }
 
-                    ForEach(detail.replies) { reply in
-                        ReplyView(reply: reply, onDelete: {
-                            self.detail?.replies.removeAll { $0.id == reply.id }
-                        }, onEdit: { newBody in
-                            guard let idx = self.detail?.replies.firstIndex(where: { $0.id == reply.id }) else { return }
-                            self.detail?.replies[idx] = ForumReply(
-                                id: reply.id, subject: reply.subject, authorName: reply.authorName,
-                                authorId: reply.authorId, body: newBody, createdAt: reply.createdAt,
-                                loveCount: reply.loveCount, isNew: reply.isNew
-                            )
-                        })
+                    ForEach(Array(detail.replies.enumerated()), id: \.element.id) { index, reply in
+                        ReplyView(
+                            reply: reply, index: index, total: detail.replies.count,
+                            topicAuthorId: detail.authorId, topicTitle: detail.title,
+                            onReplyTo: {
+                                guard auth.isSignedIn else {
+                                    toast.warning("Sign in to reply to posts.")
+                                    return
+                                }
+                                quotedReplyTarget = reply
+                            },
+                            onDelete: {
+                                self.detail?.replies.removeAll { $0.id == reply.id }
+                            }, onEdit: { newBody in
+                                guard let idx = self.detail?.replies.firstIndex(where: { $0.id == reply.id }) else { return }
+                                self.detail?.replies[idx] = ForumReply(
+                                    id: reply.id, subject: reply.subject, authorName: reply.authorName,
+                                    authorId: reply.authorId, body: newBody, createdAt: reply.createdAt,
+                                    loveCount: reply.loveCount, isNew: reply.isNew
+                                )
+                            })
                         Divider().padding(.leading)
                     }
 
@@ -297,6 +316,11 @@ struct ForumTopicDetailView: View {
 
 struct ReplyView: View {
     let reply: ForumReply
+    var index: Int = 0
+    var total: Int = 1
+    var topicAuthorId: String = ""
+    var topicTitle: String = ""
+    var onReplyTo: (() -> Void)? = nil
     var onDelete: (() -> Void)? = nil
     var onEdit: ((String) -> Void)? = nil
 
@@ -305,9 +329,31 @@ struct ReplyView: View {
     @State private var showDeleteConfirm = false
     @State private var showEditSheet = false
 
+    private var isOriginalPoster: Bool {
+        !topicAuthorId.isEmpty && topicAuthorId == reply.authorId
+    }
+
     private var canDelete: Bool {
         guard let user = auth.user else { return false }
         return user.isAdmin || (!reply.authorId.isEmpty && user.uuid == reply.authorId)
+    }
+
+    /// "Comment 2 of 8. Jane Doe, Original Poster. 3 hours ago. Subject: ..."
+    /// — mirrors the old app's per-comment header label so VoiceOver users
+    /// get the same at-a-glance context and rotor-navigable heading stops.
+    private var headerAccessibilityLabel: String {
+        var label = "Comment \(index + 1) of \(total). \(reply.authorName)"
+        if isOriginalPoster { label += ", Original Poster" }
+        label += ". \(reply.createdAt.formatted(.relative(presentation: .named)))."
+        let subject = reply.subject.trimmingCharacters(in: .whitespaces)
+        let impliedSubject = "Re: \(topicTitle)"
+        if !subject.isEmpty
+            && subject.caseInsensitiveCompare(impliedSubject) != .orderedSame
+            && subject.caseInsensitiveCompare(topicTitle) != .orderedSame {
+            label += " Subject: \(subject)."
+        }
+        if reply.isNew { label += " New." }
+        return label
     }
 
     var body: some View {
@@ -318,6 +364,22 @@ struct ReplyView: View {
                 RelativeDateLabel(date: reply.createdAt)
             }
             .font(.subheadline)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityLabel(headerAccessibilityLabel)
+            .accessibilityHint("Actions available: reply, copy, share, and more.")
+            .accessibilityAction(named: Text("Reply to this Comment")) { onReplyTo?() }
+            .accessibilityAction(named: Text("Copy Comment Text")) { copyText() }
+            .accessibilityAction(named: Text("Share Comment")) { presentShareSheet() }
+            .accessibilityAction(named: Text("Mark as Helpful")) {
+                toast.warning("Helpful votes are coming once the Drupal Flags API is confirmed.")
+            }
+            .accessibilityAction(named: Text("Report Comment")) {
+                toast.warning("Reporting is coming once the Drupal Flags API is confirmed.")
+            }
+            .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Edit Comment") { showEditSheet = true })
+            .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Delete Comment") { showDeleteConfirm = true })
+
             HTMLTextView(html: reply.body)
             if reply.loveCount > 0 {
                 Label("\(reply.loveCount)", systemImage: "heart.fill")
@@ -352,6 +414,29 @@ struct ReplyView: View {
                 toast.success("Reply updated")
             }
         }
+    }
+
+    private func copyText() {
+        UIPasteboard.general.string = reply.body.strippingHTMLTags()
+        toast.success("Comment text copied.")
+    }
+
+    /// Mirrors the old app's "Share Comment" action — shares the comment as
+    /// plain text (author, subject if meaningful, body), not a URL, since
+    /// individual replies have no shareable link of their own.
+    private func presentShareSheet() {
+        let plain = reply.body.strippingHTMLTags()
+        let subject = reply.subject.trimmingCharacters(in: .whitespaces)
+        var message = "\(reply.authorName) on AppleVis"
+        if !subject.isEmpty { message += ":\n\nSubject: \(subject)" }
+        message += "\n\n\(plain)"
+        let activityVC = UIActivityViewController(activityItems: [message], applicationActivities: nil)
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }?
+            .rootViewController?
+            .present(activityVC, animated: true)
     }
 
     private func delete() async {

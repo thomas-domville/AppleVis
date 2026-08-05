@@ -152,7 +152,9 @@ struct ContentActionsModifier: ViewModifier {
 /// Attaches an .accessibilityAction only when `isActive` — e.g. Share should
 /// not appear as a VoiceOver action at all when there's no url, and Follow
 /// shouldn't appear when signed out, rather than appearing as a no-op.
-private struct ConditionalAccessibilityAction: ViewModifier {
+/// Internal (not private) so other rows/detail screens with the same
+/// conditional-action need (e.g. ReplyView's Edit/Delete) can reuse it.
+struct ConditionalAccessibilityAction: ViewModifier {
     let isActive: Bool
     let name: String
     let action: () -> Void

@@ -116,9 +116,13 @@ struct ComposeTopicView: View {
 struct ComposeReplyView: View {
     let topicId: String
     let topicTitle: String
+    /// Set when opened via a comment's "Reply to this Comment" VoiceOver
+    /// action (ForumTopicDetailView) — prefills a quoted excerpt the same
+    /// way the old RN compose screen's replyToAuthor/replyToQuote params did.
+    var quotedReply: ForumReply? = nil
     let onPosted: (ForumReply) -> Void
 
-    @State private var bodyText = ""
+    @State private var bodyText: String
     @State private var isSubmitting = false
     @State private var error: String?
     @Environment(\.dismiss) private var dismiss
@@ -128,10 +132,24 @@ struct ComposeReplyView: View {
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
 
+    init(topicId: String, topicTitle: String, quotedReply: ForumReply? = nil, onPosted: @escaping (ForumReply) -> Void) {
+        self.topicId = topicId
+        self.topicTitle = topicTitle
+        self.quotedReply = quotedReply
+        self.onPosted = onPosted
+        if let quotedReply {
+            let plain = quotedReply.body.strippingHTMLTags()
+            let excerpt = plain.count > 150 ? String(plain.prefix(150)).trimmingCharacters(in: .whitespaces) + "…" : plain
+            _bodyText = State(initialValue: "\(quotedReply.authorName) wrote:\n> \(excerpt)\n\n")
+        } else {
+            _bodyText = State(initialValue: "")
+        }
+    }
+
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
-                Text("Re: \(topicTitle)")
+                Text(quotedReply != nil ? "Replying to \(quotedReply!.authorName) — Re: \(topicTitle)" : "Re: \(topicTitle)")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding()
