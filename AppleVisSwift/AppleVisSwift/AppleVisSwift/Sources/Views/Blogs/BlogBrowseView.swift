@@ -7,6 +7,7 @@ struct BlogBrowseView: View {
     @State private var page = 0
     @State private var hasMore = false
     @State private var searchText = ""
+    @State private var isLoadingMore = false
 
     var body: some View {
         Group {
@@ -71,17 +72,20 @@ struct BlogBrowseView: View {
         do {
             let fetched = try await APIClient.shared.blogs.list(page: page)
             posts = fetched
-            hasMore = fetched.count >= 20
+            hasMore = fetched.count >= APIPaging.pageSize
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Couldn't load posts." }
         isLoading = false
     }
 
     private func loadMore() async {
+        guard !isLoadingMore, hasMore else { return }
+        isLoadingMore = true
         page += 1
         if let more = try? await APIClient.shared.blogs.list(page: page) {
             posts += more
-            hasMore = more.count >= 20
+            hasMore = more.count >= APIPaging.pageSize
         }
+        isLoadingMore = false
     }
 }

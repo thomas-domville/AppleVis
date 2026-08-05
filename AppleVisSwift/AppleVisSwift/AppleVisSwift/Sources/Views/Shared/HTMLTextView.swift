@@ -1,5 +1,18 @@
 import SwiftUI
 
+/// Parsed-HTML cache — `NSAttributedString(html:)` is a known-slow,
+/// WebKit-backed, main-thread-only API. Without this, scrolling a long
+/// reply list out of and back into view (or re-opening the same topic)
+/// re-parses identical HTML from scratch every time a row reappears.
+/// In-memory only (cleared on relaunch) since re-parsing once per cold
+/// launch is cheap relative to the disk I/O a persistent cache would add.
+private let parsedHTMLCache = NSCache<NSString, NSAttributedStringWrapper>()
+
+private final class NSAttributedStringWrapper {
+    let value: AttributedString
+    init(_ value: AttributedString) { self.value = value }
+}
+
 // Renders Drupal HTML content as attributed text using NSAttributedString.
 struct HTMLTextView: View {
     let html: String
@@ -11,15 +24,22 @@ struct HTMLTextView: View {
     }
 
     private func parse(_ html: String) -> AttributedString {
+        let key = html as NSString
+        if let cached = parsedHTMLCache.object(forKey: key) { return cached.value }
+
         let data = Data(html.utf8)
         let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
             .documentType: NSAttributedString.DocumentType.html,
             .characterEncoding: String.Encoding.utf8.rawValue,
         ]
-        guard let ns = try? NSAttributedString(data: data, options: options, documentAttributes: nil),
-              let result = try? AttributedString(ns, including: \.uiKit) else {
-            return AttributedString(html.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression))
+        let result: AttributedString
+        if let ns = try? NSAttributedString(data: data, options: options, documentAttributes: nil),
+           let parsed = try? AttributedString(ns, including: \.uiKit) {
+            result = parsed
+        } else {
+            result = AttributedString(html.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression))
         }
+        parsedHTMLCache.setObject(NSAttributedStringWrapper(result), forKey: key, cost: html.utf8.count)
         return result
     }
 }

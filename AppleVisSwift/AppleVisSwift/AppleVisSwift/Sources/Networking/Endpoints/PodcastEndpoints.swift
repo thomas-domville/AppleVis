@@ -10,15 +10,17 @@ struct PodcastEndpoints {
     private static let pageSize = 20
 
     func episodes(page: Int = 0, sort: PodcastSort = .recent, tagTid: Int? = nil) async throws -> [PodcastEpisode] {
-        var query: [String: String] = [
-            "sort": sort.drupalSort,
-            "include": "field_podcast,uid,taxonomy_vocabulary_15",
-            "page[limit]": "\(Self.pageSize)",
-            "page[offset]": "\(page * Self.pageSize)",
-        ]
-        if let tagTid { query["filter[taxonomy_vocabulary_15.drupal_internal__tid]"] = "\(tagTid)" }
-        let response = try await client.jsonAPIList("node/podcast", query: query)
-        return response.data.map { Mappers.podcast($0, included: response.included ?? []) }
+        try await fetchWithCache(group: .podcasts, key: "podcasts:episodes:\(page):\(sort.drupalSort):\(tagTid ?? -1)") {
+            var query: [String: String] = [
+                "sort": sort.drupalSort,
+                "include": "field_podcast,uid,taxonomy_vocabulary_15",
+                "page[limit]": "\(Self.pageSize)",
+                "page[offset]": "\(page * Self.pageSize)",
+            ]
+            if let tagTid { query["filter[taxonomy_vocabulary_15.drupal_internal__tid]"] = "\(tagTid)" }
+            let response = try await client.jsonAPIList("node/podcast", query: query)
+            return response.data.map { Mappers.podcast($0, included: response.included ?? []) }
+        }
     }
 
     /// Live podcast tag vocabulary via the native REST endpoint (confirmed
@@ -33,11 +35,13 @@ struct PodcastEndpoints {
     }
 
     func episode(id: String) async throws -> PodcastEpisode {
-        let response = try await client.jsonAPISingle(
-            "node/podcast/\(id)",
-            query: ["include": "field_podcast,uid,taxonomy_vocabulary_15"]
-        )
-        return Mappers.podcast(response.data, included: response.included ?? [])
+        try await fetchWithCache(group: .podcasts, key: "podcasts:detail:\(id)") {
+            let response = try await client.jsonAPISingle(
+                "node/podcast/\(id)",
+                query: ["include": "field_podcast,uid,taxonomy_vocabulary_15"]
+            )
+            return Mappers.podcast(response.data, included: response.included ?? [])
+        }
     }
 
     /// Bundle confirmed: comment_node_podcast.

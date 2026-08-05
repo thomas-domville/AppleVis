@@ -9,6 +9,7 @@ struct PodcastBrowseView: View {
     @State private var error: String?
     @State private var page = 0
     @State private var hasMore = false
+    @State private var isLoadingMore = false
 
     var body: some View {
         Group {
@@ -66,17 +67,20 @@ struct PodcastBrowseView: View {
             let (fetched, fetchedTags) = try await (eps, tagList)
             episodes = fetched
             if !fetchedTags.isEmpty { tags = fetchedTags }
-            hasMore = fetched.count >= 20
+            hasMore = fetched.count >= APIPaging.pageSize
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Couldn't load podcasts." }
         isLoading = false
     }
 
     private func loadMore() async {
+        guard !isLoadingMore, hasMore else { return }
+        isLoadingMore = true
         page += 1
         if let more = try? await APIClient.shared.podcasts.episodes(page: page, sort: sort, tagTid: selectedTag?.tid) {
             episodes += more
-            hasMore = more.count >= 20
+            hasMore = more.count >= APIPaging.pageSize
         }
+        isLoadingMore = false
     }
 }

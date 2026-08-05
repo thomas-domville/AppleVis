@@ -34,86 +34,100 @@ struct AppEndpoints {
         if let platform, let categoryTid {
             return try await categoryListing(platform: platform.rawValue, categoryId: "\(categoryTid)", page: page).items
         }
-        let response = try await client.jsonAPIList(
-            "node/ios_app_directory",
-            query: ["include": "uid", "sort": "-changed", "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)"]
-        )
-        return response.data.map { Mappers.app($0, included: response.included ?? []) }
+        return try await fetchWithCache(group: .apps, key: "apps:list:\(page)") {
+            let response = try await client.jsonAPIList(
+                "node/ios_app_directory",
+                query: ["include": "uid", "sort": "-changed", "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)"]
+            )
+            return response.data.map { Mappers.app($0, included: response.included ?? []) }
+        }
+    }
+
+    private struct CategoryListingPage: Codable {
+        let items: [AppListing]
+        let hasMore: Bool
     }
 
     func categoryListing(platform: String, categoryId: String, page: Int, limit: Int = 20) async throws -> (items: [AppListing], hasMore: Bool) {
-        let raw: JSONValue = try await client.get(
-            "apps/\(platform)/categories/\(categoryId)",
-            query: ["page": "\(page + 1)", "limit": "\(limit)"]
-        )
-        let rawItems: [JSONValue]
-        let hasMore: Bool
-        if let arr = raw.arrayValue {
-            rawItems = arr
-            hasMore = arr.count >= limit
-        } else {
-            rawItems = raw["items"]?.arrayValue ?? []
-            hasMore = raw["hasMore"]?.boolValue ?? false
+        let result = try await fetchWithCache(group: .apps, key: "apps:category:\(platform):\(categoryId):\(page)") {
+            let raw: JSONValue = try await client.get(
+                "apps/\(platform)/categories/\(categoryId)",
+                query: ["page": "\(page + 1)", "limit": "\(limit)"]
+            )
+            let rawItems: [JSONValue]
+            let hasMore: Bool
+            if let arr = raw.arrayValue {
+                rawItems = arr
+                hasMore = arr.count >= limit
+            } else {
+                rawItems = raw["items"]?.arrayValue ?? []
+                hasMore = raw["hasMore"]?.boolValue ?? false
+            }
+            return CategoryListingPage(items: rawItems.map { mapDirectoryListing($0) }, hasMore: hasMore)
         }
-        return (rawItems.map { mapDirectoryListing($0) }, hasMore)
+        return (result.items, result.hasMore)
     }
 
     func updates(page: Int = 0) async throws -> [AppListing] {
-        let response = try await client.jsonAPIList(
-            "node/ios_app_directory",
-            query: ["include": "uid", "sort": "-changed", "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)"]
-        )
-        return response.data.map { Mappers.app($0, included: response.included ?? []) }
+        try await fetchWithCache(group: .apps, key: "apps:updates:\(page)") {
+            let response = try await client.jsonAPIList(
+                "node/ios_app_directory",
+                query: ["include": "uid", "sort": "-changed", "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)"]
+            )
+            return response.data.map { Mappers.app($0, included: response.included ?? []) }
+        }
     }
 
     /// Fetches an app listing with full body text and all reviews.
     /// Review bundle confirmed: comment_node_ios_app_directory.
     func detail(id: String) async throws -> AppDetail {
-        async let appRes = client.jsonAPISingle("node/ios_app_directory/\(id)", query: ["include": "uid"])
-        async let reviewsRes = client.jsonAPIList(
-            "comment/comment_node_ios_app_directory",
-            query: ["filter[entity_id.id]": id, "sort": "-created", "page[limit]": "50", "include": "uid"]
-        )
+        try await fetchWithCache(group: .apps, key: "apps:detail:\(id)") {
+            async let appRes = client.jsonAPISingle("node/ios_app_directory/\(id)", query: ["include": "uid"])
+            async let reviewsRes = client.jsonAPIList(
+                "comment/comment_node_ios_app_directory",
+                query: ["filter[entity_id.id]": id, "sort": "-created", "page[limit]": "50", "include": "uid"]
+            )
 
-        let appResponse = try await appRes
-        let node = appResponse.data
-        let a = node.attributes
-        let listing = Mappers.app(node, included: appResponse.included ?? [])
+            let appResponse = try await appRes
+            let node = appResponse.data
+            let a = node.attributes
+            let listing = Mappers.app(node, included: appResponse.included ?? [])
 
-        let reviews: [AppReview]
-        if let reviewsResponse = try? await reviewsRes {
-            reviews = reviewsResponse.data.map { Mappers.appReview($0, included: reviewsResponse.included ?? []) }
-        } else {
-            reviews = []
+            let reviews: [AppReview]
+            if let reviewsResponse = try? await reviewsRes {
+                reviews = reviewsResponse.data.map { Mappers.appReview($0, included: reviewsResponse.included ?? []) }
+            } else {
+                reviews = []
+            }
+
+            return AppDetail(
+                id: listing.id,
+                name: listing.name,
+                developer: listing.developer,
+                platform: listing.platform,
+                category: listing.category,
+                categoryId: listing.categoryId,
+                reviewCount: listing.reviewCount,
+                lastUpdatedAt: listing.lastUpdatedAt,
+                createdAt: listing.createdAt,
+                submittedBy: listing.submittedBy,
+                submitterUid: listing.submitterUid,
+                appStoreUrl: listing.appStoreUrl,
+                iconUrl: listing.iconUrl,
+                price: listing.price,
+                supportedDevices: listing.supportedDevices,
+                voiceOverPerformance: listing.voiceOverPerformance,
+                buttonLabelling: a["field_labelling"]?.stringValue,
+                usabilityNotes: a["field_usability"]?.stringValue,
+                body: a["body"]?.richTextValue ?? "",
+                reviewedVersion: a["field_version"]?.stringValue,
+                testedOnIOS: a["field_ios_version"]?.stringValue,
+                accessibilityComments: a["field_comments"]?.richTextValue,
+                url: listing.url,
+                reviews: reviews,
+                isSaved: false
+            )
         }
-
-        return AppDetail(
-            id: listing.id,
-            name: listing.name,
-            developer: listing.developer,
-            platform: listing.platform,
-            category: listing.category,
-            categoryId: listing.categoryId,
-            reviewCount: listing.reviewCount,
-            lastUpdatedAt: listing.lastUpdatedAt,
-            createdAt: listing.createdAt,
-            submittedBy: listing.submittedBy,
-            submitterUid: listing.submitterUid,
-            appStoreUrl: listing.appStoreUrl,
-            iconUrl: listing.iconUrl,
-            price: listing.price,
-            supportedDevices: listing.supportedDevices,
-            voiceOverPerformance: listing.voiceOverPerformance,
-            buttonLabelling: a["field_labelling"]?.stringValue,
-            usabilityNotes: a["field_usability"]?.stringValue,
-            body: a["body"]?.richTextValue ?? "",
-            reviewedVersion: a["field_version"]?.stringValue,
-            testedOnIOS: a["field_ios_version"]?.stringValue,
-            accessibilityComments: a["field_comments"]?.richTextValue,
-            url: listing.url,
-            reviews: reviews,
-            isSaved: false
-        )
     }
 
     @discardableResult

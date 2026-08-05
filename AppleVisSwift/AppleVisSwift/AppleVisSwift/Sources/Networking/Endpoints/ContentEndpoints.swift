@@ -17,49 +17,54 @@ struct ResourceEndpoints {
     private static let pageSize = 20
 
     func list(page: Int = 0, categoryTids: [Int] = []) async throws -> [Resource] {
-        var query: [String: String] = [
-            "sort": "-changed", "include": "taxonomy_vocabulary_3,uid",
-            "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)",
-        ]
-        if !categoryTids.isEmpty {
-            query["filter[category][condition][path]"] = "taxonomy_vocabulary_3.drupal_internal__tid"
-            query["filter[category][condition][operator]"] = "IN"
-            for (i, tid) in categoryTids.enumerated() { query["filter[category][condition][value][\(i)]"] = "\(tid)" }
+        let categoryKey = categoryTids.isEmpty ? "" : ":categories:\(categoryTids.sorted())"
+        return try await fetchWithCache(group: .resources, key: "resources:list:\(page)\(categoryKey)") {
+            var query: [String: String] = [
+                "sort": "-changed", "include": "taxonomy_vocabulary_3,uid",
+                "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)",
+            ]
+            if !categoryTids.isEmpty {
+                query["filter[category][condition][path]"] = "taxonomy_vocabulary_3.drupal_internal__tid"
+                query["filter[category][condition][operator]"] = "IN"
+                for (i, tid) in categoryTids.enumerated() { query["filter[category][condition][value][\(i)]"] = "\(tid)" }
+            }
+            let response = try await client.jsonAPIList("node/guides", query: query)
+            return response.data.map { Mappers.resource($0, included: response.included ?? []) }
         }
-        let response = try await client.jsonAPIList("node/guides", query: query)
-        return response.data.map { Mappers.resource($0, included: response.included ?? []) }
     }
 
     /// Fetches the guide with full body and its comments (bundle: comment_node_guides).
     func detail(id: String) async throws -> ResourceDetail {
-        async let resourceRes = client.jsonAPISingle("node/guides/\(id)", query: ["include": "uid"])
-        async let commentsRes = client.jsonAPIList(
-            "comment/comment_node_guides",
-            query: ["filter[entity_id.id]": id, "sort": "created", "page[limit]": "100", "include": "uid"]
-        )
-        let response = try await resourceRes
-        let node = response.data
-        let resource = Mappers.resource(node, included: response.included ?? [])
-        let body = node.attributes["body"]?.richTextValue ?? ""
+        try await fetchWithCache(group: .resources, key: "resources:detail:\(id)") {
+            async let resourceRes = client.jsonAPISingle("node/guides/\(id)", query: ["include": "uid"])
+            async let commentsRes = client.jsonAPIList(
+                "comment/comment_node_guides",
+                query: ["filter[entity_id.id]": id, "sort": "created", "page[limit]": "100", "include": "uid"]
+            )
+            let response = try await resourceRes
+            let node = response.data
+            let resource = Mappers.resource(node, included: response.included ?? [])
+            let body = node.attributes["body"]?.richTextValue ?? ""
 
-        let comments: [ResourceComment]
-        if let commentsResponse = try? await commentsRes {
-            comments = commentsResponse.data.map { n in
-                let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
-                return ResourceComment(id: n.id, authorName: c.authorName, authorId: c.authorId, body: c.body, createdAt: c.createdAt)
+            let comments: [ResourceComment]
+            if let commentsResponse = try? await commentsRes {
+                comments = commentsResponse.data.map { n in
+                    let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
+                    return ResourceComment(id: n.id, authorName: c.authorName, authorId: c.authorId, body: c.body, createdAt: c.createdAt)
+                }
+            } else {
+                comments = []
             }
-        } else {
-            comments = []
-        }
 
-        return ResourceDetail(
-            id: resource.id, title: resource.title, kind: resource.kind,
-            authorName: resource.authorName, authorId: resource.authorId,
-            categories: resource.categories, summary: resource.summary, body: body,
-            createdAt: resource.createdAt, updatedAt: resource.updatedAt,
-            commentCount: resource.commentCount, url: resource.url,
-            comments: comments, isSaved: false
-        )
+            return ResourceDetail(
+                id: resource.id, title: resource.title, kind: resource.kind,
+                authorName: resource.authorName, authorId: resource.authorId,
+                categories: resource.categories, summary: resource.summary, body: body,
+                createdAt: resource.createdAt, updatedAt: resource.updatedAt,
+                commentCount: resource.commentCount, url: resource.url,
+                comments: comments, isSaved: false
+            )
+        }
     }
 
     @discardableResult
@@ -103,40 +108,44 @@ struct BlogEndpoints {
     private static let contentType = "blog2"
 
     func list(page: Int = 0) async throws -> [BlogPost] {
-        let response = try await client.jsonAPIList(
-            "node/\(Self.contentType)",
-            query: ["sort": "-changed", "include": "uid", "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)"]
-        )
-        return response.data.map { Mappers.blog($0, included: response.included ?? []) }
+        try await fetchWithCache(group: .blogs, key: "blogs:list:\(page)") {
+            let response = try await client.jsonAPIList(
+                "node/\(Self.contentType)",
+                query: ["sort": "-changed", "include": "uid", "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)"]
+            )
+            return response.data.map { Mappers.blog($0, included: response.included ?? []) }
+        }
     }
 
     /// Fetches the blog post with full body and its comments (bundle: comment_node_blog2).
     func detail(id: String) async throws -> BlogPostDetail {
-        async let postRes = client.jsonAPISingle("node/\(Self.contentType)/\(id)", query: ["include": "uid"])
-        async let commentsRes = client.jsonAPIList(
-            "comment/comment_node_\(Self.contentType)",
-            query: ["filter[entity_id.id]": id, "sort": "created", "page[limit]": "100", "include": "uid"]
-        )
-        let response = try await postRes
-        let node = response.data
-        let post = Mappers.blog(node, included: response.included ?? [])
-        let body = node.attributes["body"]?.richTextValue ?? ""
+        try await fetchWithCache(group: .blogs, key: "blogs:detail:\(id)") {
+            async let postRes = client.jsonAPISingle("node/\(Self.contentType)/\(id)", query: ["include": "uid"])
+            async let commentsRes = client.jsonAPIList(
+                "comment/comment_node_\(Self.contentType)",
+                query: ["filter[entity_id.id]": id, "sort": "created", "page[limit]": "100", "include": "uid"]
+            )
+            let response = try await postRes
+            let node = response.data
+            let post = Mappers.blog(node, included: response.included ?? [])
+            let body = node.attributes["body"]?.richTextValue ?? ""
 
-        let comments: [BlogComment]
-        if let commentsResponse = try? await commentsRes {
-            comments = commentsResponse.data.map { n in
-                let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
-                return BlogComment(id: n.id, authorName: c.authorName, authorId: c.authorId, body: c.body, createdAt: c.createdAt)
+            let comments: [BlogComment]
+            if let commentsResponse = try? await commentsRes {
+                comments = commentsResponse.data.map { n in
+                    let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
+                    return BlogComment(id: n.id, authorName: c.authorName, authorId: c.authorId, body: c.body, createdAt: c.createdAt)
+                }
+            } else {
+                comments = []
             }
-        } else {
-            comments = []
-        }
 
-        return BlogPostDetail(
-            id: post.id, title: post.title, authorName: post.authorName, authorId: post.authorId,
-            publishedAt: post.publishedAt, lastActivityAt: post.lastActivityAt, body: body,
-            commentCount: post.commentCount, url: post.url, comments: comments, isSaved: false
-        )
+            return BlogPostDetail(
+                id: post.id, title: post.title, authorName: post.authorName, authorId: post.authorId,
+                publishedAt: post.publishedAt, lastActivityAt: post.lastActivityAt, body: body,
+                commentCount: post.commentCount, url: post.url, comments: comments, isSaved: false
+            )
+        }
     }
 
     @discardableResult
@@ -183,14 +192,17 @@ struct BugReportEndpoints {
 
     func list(page: Int = 0, platform: BugPlatform? = nil, status: BugStatus? = nil) async throws -> [BugReport] {
         let effectivePlatform = platform ?? .ios
-        var query: [String: String] = [
-            "sort": "-changed", "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)",
-        ]
-        // The REST filter is binary (active-only vs all); anything other than
-        // "active" maps to "all" (there is no server-side "fixed" filter).
-        if status == .active { query["filter[field_status]"] = "1" }
-        let response = try await client.jsonAPIList("node/\(nodeType(for: effectivePlatform))", query: query)
-        return response.data.map { Mappers.bug($0, platform: effectivePlatform) }
+        let key = "bugs:list:\(effectivePlatform.rawValue):\(status?.rawValue ?? "all"):\(page)"
+        return try await fetchWithCache(group: .bugs, key: key) {
+            var query: [String: String] = [
+                "sort": "-changed", "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)",
+            ]
+            // The REST filter is binary (active-only vs all); anything other than
+            // "active" maps to "all" (there is no server-side "fixed" filter).
+            if status == .active { query["filter[field_status]"] = "1" }
+            let response = try await client.jsonAPIList("node/\(nodeType(for: effectivePlatform))", query: query)
+            return response.data.map { Mappers.bug($0, platform: effectivePlatform) }
+        }
     }
 
     /// The current screen doesn't carry platform context to the detail view,
@@ -201,8 +213,10 @@ struct BugReportEndpoints {
     }
 
     func detail(platform: BugPlatform, id: String) async throws -> BugReportDetail {
-        let response = try await client.jsonAPISingle("node/\(nodeType(for: platform))/\(id)")
-        return Mappers.bugDetail(response.data, platform: platform)
+        try await fetchWithCache(group: .bugs, key: "bugs:detail:\(platform.rawValue):\(id)") {
+            let response = try await client.jsonAPISingle("node/\(nodeType(for: platform))/\(id)")
+            return Mappers.bugDetail(response.data, platform: platform)
+        }
     }
 }
 

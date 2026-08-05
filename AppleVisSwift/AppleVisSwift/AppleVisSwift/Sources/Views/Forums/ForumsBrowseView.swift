@@ -10,6 +10,7 @@ struct ForumsBrowseView: View {
     @State private var error: String?
     @State private var page = 0
     @State private var hasMore = false
+    @State private var isLoadingMore = false
     @EnvironmentObject private var auth: AuthStore
 
     init(initialFilter: ForumFilter = .recent) {
@@ -147,18 +148,26 @@ struct ForumsBrowseView: View {
             let (fetched, cats) = try await (topicsResult, categoriesResult)
             topics = filter.apply(to: fetched)
             if !cats.isEmpty { categories = cats }
-            hasMore = fetched.count >= 20
+            hasMore = fetched.count >= APIPaging.pageSize
             PersistenceStore.shared.markForumsVisited()
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Couldn't load forums." }
         isLoading = false
     }
 
+    /// `hasMore` is intentionally driven by the raw (pre-filter) page size,
+    /// not the filtered `topics` count: there's no server-side "New"/"Unread"/
+    /// "Since Last Visit" filter, so a narrow filter can show few items per
+    /// raw page yet still correctly keep paging until the underlying recent
+    /// feed itself is exhausted.
     private func loadMore() async {
+        guard !isLoadingMore, hasMore else { return }
+        isLoadingMore = true
         page += 1
         if let more = try? await APIClient.shared.forums.recent(page: page, appleOnly: appleOnly) {
             topics += filter.apply(to: more)
-            hasMore = more.count >= 20
+            hasMore = more.count >= APIPaging.pageSize
         }
+        isLoadingMore = false
     }
 }

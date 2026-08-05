@@ -15,13 +15,15 @@ struct ForumEndpoints {
     /// endpoint — matches the website's own sort order (JSON:API `-changed`
     /// sort does not, since it doesn't account for new comments on old topics).
     func recent(page: Int = 0, appleOnly: Bool = false) async throws -> [ForumTopic] {
-        var queryItems = [URLQueryItem(name: "page", value: "\(page)")]
-        if appleOnly {
-            queryItems += Self.nonAppleTids.map { URLQueryItem(name: "apple_only[]", value: "\($0)") }
+        try await fetchWithCache(group: .forums, key: "forums:list:\(appleOnly):\(page)") {
+            var queryItems = [URLQueryItem(name: "page", value: "\(page)")]
+            if appleOnly {
+                queryItems += Self.nonAppleTids.map { URLQueryItem(name: "apple_only[]", value: "\($0)") }
+            }
+            let raw: JSONValue = try await client.get("forums/recent", queryItems: queryItems)
+            let items = raw.arrayValue ?? []
+            return items.compactMap { $0.objectValue }.map(Mappers.forumFromRecent)
         }
-        let raw: JSONValue = try await client.get("forums/recent", queryItems: queryItems)
-        let items = raw.arrayValue ?? []
-        return items.compactMap { $0.objectValue }.map(Mappers.forumFromRecent)
     }
 
     func categories() async throws -> [ForumCategory] {
@@ -43,44 +45,46 @@ struct ForumEndpoints {
     }
 
     func topicDetail(id: String) async throws -> ForumTopicDetail {
-        async let topicRes = client.jsonAPISingle("node/forum/\(id)", query: ["include": "uid,taxonomy_forums"])
-        async let commentsRes = client.jsonAPIList(
-            "comment/comment_forum",
-            query: ["filter[entity_id.id]": id, "sort": "created", "page[limit]": "100", "include": "uid"]
-        )
+        try await fetchWithCache(group: .forums, key: "forums:detail:\(id)") {
+            async let topicRes = client.jsonAPISingle("node/forum/\(id)", query: ["include": "uid,taxonomy_forums"])
+            async let commentsRes = client.jsonAPIList(
+                "comment/comment_forum",
+                query: ["filter[entity_id.id]": id, "sort": "created", "page[limit]": "100", "include": "uid"]
+            )
 
-        let topicResponse = try await topicRes
-        let node = topicResponse.data
-        let included = topicResponse.included ?? []
-        let topic = Mappers.forum(node, included: included)
-        let body = node.attributes["body"]?.richTextValue ?? ""
-        let alias = node.attributes["path"]?.pathAlias
-        let url = alias.map { "https://www.applevis.com\($0)" } ?? "https://www.applevis.com/node/\(node.id)"
+            let topicResponse = try await topicRes
+            let node = topicResponse.data
+            let included = topicResponse.included ?? []
+            let topic = Mappers.forum(node, included: included)
+            let body = node.attributes["body"]?.richTextValue ?? ""
+            let alias = node.attributes["path"]?.pathAlias
+            let url = alias.map { "https://www.applevis.com\($0)" } ?? "https://www.applevis.com/node/\(node.id)"
 
-        let replies: [ForumReply]
-        if let commentsResponse = try? await commentsRes {
-            replies = commentsResponse.data.map { Mappers.forumReply($0, included: commentsResponse.included ?? []) }
-        } else {
-            replies = []
+            let replies: [ForumReply]
+            if let commentsResponse = try? await commentsRes {
+                replies = commentsResponse.data.map { Mappers.forumReply($0, included: commentsResponse.included ?? []) }
+            } else {
+                replies = []
+            }
+
+            return ForumTopicDetail(
+                id: topic.id,
+                title: topic.title,
+                authorName: topic.authorName,
+                authorId: topic.authorId,
+                createdAt: topic.createdAt,
+                lastActivityAt: topic.lastActivityAt,
+                replyCount: topic.replyCount,
+                viewCount: 0,
+                category: topic.category,
+                categoryId: topic.categoryId,
+                body: body,
+                url: url,
+                isFollowing: false,
+                isSaved: false,
+                replies: replies
+            )
         }
-
-        return ForumTopicDetail(
-            id: topic.id,
-            title: topic.title,
-            authorName: topic.authorName,
-            authorId: topic.authorId,
-            createdAt: topic.createdAt,
-            lastActivityAt: topic.lastActivityAt,
-            replyCount: topic.replyCount,
-            viewCount: 0,
-            category: topic.category,
-            categoryId: topic.categoryId,
-            body: body,
-            url: url,
-            isFollowing: false,
-            isSaved: false,
-            replies: replies
-        )
     }
 
     /// Note: mirrors the RN reference implementation, which does not attach a

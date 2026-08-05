@@ -11,6 +11,10 @@ enum APIError: LocalizedError {
     case server(statusCode: Int)
     case decoding(underlying: Error)
     case unknown(statusCode: Int)
+    /// The content group's circuit breaker is down (or the live fetch
+    /// failed) and there's no cached response to fall back to yet — see
+    /// CachedFetch.swift.
+    case offlineNoCache(group: String)
 
     var errorDescription: String? {
         switch self {
@@ -22,6 +26,7 @@ enum APIError: LocalizedError {
         case .server:        return "AppleVis is having trouble right now. Try again later."
         case .decoding(let e): return "Couldn't parse server response: \(e.localizedDescription)"
         case .unknown(let c): return "Unexpected error (HTTP \(c))."
+        case .offlineNoCache(let group): return "No saved \(group) content yet. Connect to the internet to load content for the first time."
         }
     }
 }
