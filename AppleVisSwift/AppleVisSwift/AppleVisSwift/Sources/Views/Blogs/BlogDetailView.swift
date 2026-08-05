@@ -94,9 +94,10 @@ struct BlogDetailView: View {
                 .font(.subheadline).foregroundStyle(.secondary)
                 .padding(.horizontal)
         } else {
-            ForEach(detail.comments) { comment in
+            ForEach(Array(detail.comments.enumerated()), id: \.element.id) { index, comment in
                 CommentRow(
                     authorName: comment.authorName, text: comment.body, date: comment.createdAt,
+                    index: index, total: detail.comments.count,
                     commentId: comment.id, authorId: comment.authorId, commentType: "comment_node_blog2",
                     onDelete: {
                         self.detail?.comments.removeAll { $0.id == comment.id }

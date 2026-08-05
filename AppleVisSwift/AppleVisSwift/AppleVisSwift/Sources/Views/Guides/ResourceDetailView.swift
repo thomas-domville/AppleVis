@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ResourceDetailView: View {
     let resourceId: String
@@ -98,9 +99,10 @@ struct ResourceDetailView: View {
                 .font(.subheadline).foregroundStyle(.secondary)
                 .padding(.horizontal)
         } else {
-            ForEach(detail.comments) { comment in
+            ForEach(Array(detail.comments.enumerated()), id: \.element.id) { index, comment in
                 CommentRow(
                     authorName: comment.authorName, text: comment.body, date: comment.createdAt,
+                    index: index, total: detail.comments.count,
                     commentId: comment.id, authorId: comment.authorId, commentType: "comment_node_guides",
                     onDelete: {
                         self.detail?.comments.removeAll { $0.id == comment.id }
@@ -188,6 +190,8 @@ struct CommentRow: View {
     let authorName: String
     let text: String
     let date: Date
+    var index: Int = 0
+    var total: Int = 1
     var commentId: String? = nil
     var authorId: String? = nil
     var commentType: String? = nil
@@ -204,6 +208,10 @@ struct CommentRow: View {
         return !authorId.isEmpty && (user.isAdmin || user.uuid == authorId)
     }
 
+    private var headerAccessibilityLabel: String {
+        "Comment \(index + 1) of \(total). \(authorName). \(date.formatted(.relative(presentation: .named)))."
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -212,12 +220,25 @@ struct CommentRow: View {
                 RelativeDateLabel(date: date)
             }
             .font(.subheadline)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityLabel(headerAccessibilityLabel)
+            .accessibilityHint("Actions available: copy, share, and more.")
+            .accessibilityAction(named: Text("Copy Comment Text")) { copyText() }
+            .accessibilityAction(named: Text("Share Comment")) { presentShareSheet() }
+            .accessibilityAction(named: Text("Mark as Helpful")) {
+                toast.warning("Helpful votes are coming once the Drupal Flags API is confirmed.")
+            }
+            .accessibilityAction(named: Text("Report Comment")) {
+                toast.warning("Reporting is coming once the Drupal Flags API is confirmed.")
+            }
+            .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Edit Comment") { showEditSheet = true })
+            .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Delete Comment") { showDeleteConfirm = true })
+
             HTMLTextView(html: text)
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Comment by \(authorName), \(date.formatted(.relative(presentation: .named)))")
         .contextMenu {
             if canDelete {
                 Button { showEditSheet = true } label: {
@@ -242,6 +263,22 @@ struct CommentRow: View {
                 toast.success("Comment updated")
             }
         }
+    }
+
+    private func copyText() {
+        UIPasteboard.general.string = text.strippingHTMLTags()
+        toast.success("Comment text copied.")
+    }
+
+    private func presentShareSheet() {
+        let message = "\(authorName) on AppleVis:\n\n\(text.strippingHTMLTags())"
+        let activityVC = UIActivityViewController(activityItems: [message], applicationActivities: nil)
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }?
+            .rootViewController?
+            .present(activityVC, animated: true)
     }
 
     private func delete() async {

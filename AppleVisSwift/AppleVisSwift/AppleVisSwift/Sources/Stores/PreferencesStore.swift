@@ -177,6 +177,15 @@ enum AppTheme: String, CaseIterable, Identifiable {
     }
 }
 
+/// Single source of truth for the playback-speed range docs/APPLEVIS_2026_1_MASTER_SPEC.md
+/// requires (0.5x through 3.0x) — PodcastSettingsView's picker and
+/// FullPlayerView's quick-cycle speed button used to keep their own
+/// independent, out-of-sync copies of this list (the player's capped at
+/// 2.0x and couldn't recognize a higher speed set from Settings).
+enum PodcastSpeedOptions {
+    static let all: [Double] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 3.0]
+}
+
 enum CardDensity: String, CaseIterable, Identifiable {
     case comfortable, compact
     var id: String { rawValue }

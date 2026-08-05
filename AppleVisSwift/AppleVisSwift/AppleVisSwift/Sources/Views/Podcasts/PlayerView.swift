@@ -72,7 +72,7 @@ struct FullPlayerView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @Environment(\.dismiss) private var dismiss
 
-    private let speedOptions: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
+    private let speedOptions: [Float] = PodcastSpeedOptions.all.map(Float.init)
 
     var body: some View {
         NavigationStack {
@@ -106,6 +106,11 @@ struct FullPlayerView: View {
                                 .lineLimit(3)
                             Text(episode.showTitle)
                                 .font(.subheadline).foregroundStyle(.secondary)
+                            if let chapter = player.currentChapter, let index = episode.chapters.firstIndex(where: { $0.id == chapter.id }) {
+                                Text("Chapter \(index + 1) of \(episode.chapters.count): \(chapter.title)")
+                                    .font(.caption).foregroundStyle(Color.accentColor)
+                                    .padding(.top, 2)
+                            }
                         }
                         .padding(.horizontal, 28)
                         .padding(.bottom, 28)
@@ -271,6 +276,20 @@ struct FullPlayerView: View {
     }
 }
 
+/// Shared by ScrubberView's VoiceOver value and FullPlayerView's visible time
+/// labels — the scrubber previously announced only a bare percentage since
+/// the visible time labels are `.accessibilityHidden`, giving VoiceOver
+/// users no spoken elapsed/remaining time at all.
+private func formatScrubberTime(_ seconds: TimeInterval) -> String {
+    let s = max(0, Int(seconds))
+    let h = s / 3600
+    let m = (s % 3600) / 60
+    let sec = s % 60
+    return h > 0
+        ? String(format: "%d:%02d:%02d", h, m, sec)
+        : String(format: "%d:%02d", m, sec)
+}
+
 // MARK: - Scrubber (extracted so it can read geometry)
 
 private struct ScrubberView: View {
@@ -303,7 +322,7 @@ private struct ScrubberView: View {
         .accessibilityElement()
         .accessibilityLabel("Playback position")
         .accessibilityValue(player.duration > 0
-            ? "\(Int(player.position / player.duration * 100))%"
+            ? "\(formatScrubberTime(player.position)) of \(formatScrubberTime(player.duration)), \(Int(player.position / player.duration * 100))%"
             : "0%"
         )
         .accessibilityAdjustableAction { direction in

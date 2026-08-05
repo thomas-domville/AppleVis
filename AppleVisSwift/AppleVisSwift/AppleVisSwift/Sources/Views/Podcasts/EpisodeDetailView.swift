@@ -7,6 +7,7 @@ struct EpisodeDetailView: View {
     @State private var isLoading = false
     @State private var error: String?
     @State private var showCompose = false
+    @State private var showTranscript = false
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
     @State private var artworkDescription: String?
@@ -92,6 +93,13 @@ struct EpisodeDetailView: View {
 
                 downloadButton(episode)
 
+                if let transcriptUrl = episode.transcriptUrl, !transcriptUrl.isEmpty {
+                    Button { showTranscript = true } label: {
+                        Image(systemName: "text.quote")
+                    }
+                    .accessibilityLabel("View Transcript")
+                }
+
                 if auth.isSignedIn {
                     Button { showCompose = true } label: {
                         Image(systemName: "square.and.pencil")
@@ -106,6 +114,9 @@ struct EpisodeDetailView: View {
             ComposePodcastCommentView(episodeId: episode.id, title: episode.title) { comment in
                 comments.append(comment)
             }
+        }
+        .sheet(isPresented: $showTranscript) {
+            TranscriptView(episodeId: episode.id, episodeTitle: episode.title)
         }
     }
 
@@ -186,9 +197,10 @@ struct EpisodeDetailView: View {
                 .font(.subheadline).foregroundStyle(.secondary)
                 .padding(.horizontal).padding(.vertical, 8)
         } else {
-            ForEach(comments) { comment in
+            ForEach(Array(comments.enumerated()), id: \.element.id) { index, comment in
                 CommentRow(
                     authorName: comment.authorName, text: comment.body, date: comment.createdAt,
+                    index: index, total: comments.count,
                     commentId: comment.id, authorId: comment.authorId, commentType: "comment_node_podcast",
                     onDelete: {
                         comments.removeAll { $0.id == comment.id }

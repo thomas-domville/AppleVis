@@ -3,7 +3,7 @@ import SwiftUI
 struct PodcastSettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
 
-    private let speedOptions: [Double] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 3.0]
+    private let speedOptions: [Double] = PodcastSpeedOptions.all
     private let skipBackOptions: [Double] = [5, 10, 15, 30]
     private let skipForwardOptions: [Double] = [15, 30, 45, 60]
     private let sleepTimerOptions: [(label: String, minutes: Int)] = [

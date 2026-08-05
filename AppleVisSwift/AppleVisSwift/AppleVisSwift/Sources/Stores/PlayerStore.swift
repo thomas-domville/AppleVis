@@ -11,6 +11,7 @@ final class PlayerStore: ObservableObject {
     @Published private(set) var isBuffering = false
     @Published private(set) var position: TimeInterval = 0
     @Published private(set) var duration: TimeInterval = 0
+    @Published private(set) var currentChapter: Chapter?
     @Published private(set) var errorMessage: String?
     @Published private(set) var sleepTimerRemaining: TimeInterval?
     @Published private(set) var sleepAtEndOfEpisode = false
@@ -76,6 +77,7 @@ final class PlayerStore: ObservableObject {
         removeTimeObserver()
         errorMessage = nil
         isBuffering = true
+        currentChapter = nil
 
         let asset = AVURLAsset(url: url)
         let item = AVPlayerItem(asset: asset)
@@ -319,7 +321,28 @@ final class PlayerStore: ObservableObject {
                 if let duration = self?.player?.currentItem?.duration.seconds, duration.isFinite {
                     self?.duration = duration
                 }
+                self?.updateCurrentChapter()
             }
+        }
+    }
+
+    /// Announces the chapter title and number as playback crosses into it —
+    /// docs/APPLEVIS_2026_1_MASTER_SPEC.md's VoiceOver requirements
+    /// explicitly call for this; previously chapters were only browsable
+    /// from the episode detail page, with nothing surfaced during playback.
+    private func updateCurrentChapter() {
+        guard let chapters = currentEpisode?.chapters, !chapters.isEmpty else {
+            currentChapter = nil
+            return
+        }
+        let match = chapters.first { position >= $0.startTime && position < $0.endTime }
+        guard match?.id != currentChapter?.id else { return }
+        currentChapter = match
+        if let match, let index = chapters.firstIndex(where: { $0.id == match.id }) {
+            UIAccessibility.post(
+                notification: .announcement,
+                argument: "Chapter \(index + 1) of \(chapters.count): \(match.title)."
+            )
         }
     }
 

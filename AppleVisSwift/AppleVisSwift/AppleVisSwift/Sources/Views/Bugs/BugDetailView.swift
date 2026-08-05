@@ -141,8 +141,11 @@ struct BugDetailView: View {
                 .font(.subheadline).foregroundStyle(.secondary)
                 .padding(.horizontal)
         } else {
-            ForEach(detail.comments) { comment in
-                CommentRow(authorName: comment.authorName, text: comment.body, date: comment.createdAt)
+            ForEach(Array(detail.comments.enumerated()), id: \.element.id) { index, comment in
+                CommentRow(
+                    authorName: comment.authorName, text: comment.body, date: comment.createdAt,
+                    index: index, total: detail.comments.count
+                )
                 Divider().padding(.leading)
             }
         }
