@@ -84,4 +84,25 @@ final class ContentCache {
             try? raw.write(to: self.fileURL(for: key), options: .atomic)
         }
     }
+
+    /// Total on-disk size — surfaced by StorageView alongside the system
+    /// URLCache so "Cached Content" actually reflects everything AppleVis
+    /// caches, not just images/network responses.
+    var totalSizeBytes: Int64 {
+        queue.sync {
+            let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.fileSizeKey])) ?? []
+            return files.reduce(0) { total, url in
+                total + Int64((try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
+            }
+        }
+    }
+
+    /// Deletes every cached list/detail response — backs StorageView's
+    /// "Clear Cached Content"/"Clear All Storage" actions.
+    func clearAll() {
+        queue.async {
+            guard let files = try? FileManager.default.contentsOfDirectory(at: self.directory, includingPropertiesForKeys: nil) else { return }
+            for file in files { try? FileManager.default.removeItem(at: file) }
+        }
+    }
 }

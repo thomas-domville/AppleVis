@@ -49,22 +49,6 @@ struct IntelligenceSettingsView: View {
 
             Section("Native Integration") {
                 FeatureInfoRow(
-                    icon: "waveform",
-                    title: "Siri",
-                    subtitle: "Supports Siri voice commands",
-                    detail: "You can ask Siri to open AppleVis and navigate to specific content.",
-                    isSystemFeature: true
-                )
-
-                FeatureInfoRow(
-                    icon: "app.badge",
-                    title: "Live Activities",
-                    subtitle: "Now-playing controls on Lock Screen",
-                    detail: "Control podcast playback from the Lock Screen, Dynamic Island, and Control Center.",
-                    isSystemFeature: true
-                )
-
-                FeatureInfoRow(
                     icon: "magnifyingglass",
                     title: "Spotlight",
                     subtitle: "Search saved items from Spotlight",
@@ -73,10 +57,10 @@ struct IntelligenceSettingsView: View {
                 )
 
                 FeatureInfoRow(
-                    icon: "square.grid.2x2",
-                    title: "Home Screen Widgets",
-                    subtitle: "Quick-glance widgets",
-                    detail: "Add AppleVis widgets to see recent content and your podcast queue at a glance.",
+                    icon: "lock.fill",
+                    title: "Lock Screen & Control Center",
+                    subtitle: "Playback controls while podcasts are playing",
+                    detail: "Play, pause, and skip from the Lock Screen and Control Center while a podcast episode is playing.",
                     isSystemFeature: true
                 )
             }
@@ -93,13 +77,13 @@ struct IntelligenceSettingsView: View {
                 .accessibilityElement(children: .combine)
             }
         }
-        .navigationTitle("Intelligence & Siri")
+        .navigationTitle("Intelligence")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { tips.show(.settingsIntelligence) }
     }
 }
 
-private struct FeatureInfoRow: View {
+struct FeatureInfoRow: View {
     let icon: String
     let title: String
     let subtitle: String

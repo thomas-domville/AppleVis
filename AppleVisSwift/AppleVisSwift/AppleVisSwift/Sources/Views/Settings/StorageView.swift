@@ -93,7 +93,7 @@ struct StorageView: View {
     }
 
     private func calculateUsage() async {
-        let cacheDisk = URLCache.shared.currentDiskUsage
+        let cacheDisk = URLCache.shared.currentDiskUsage + Int(ContentCache.shared.totalSizeBytes)
         cachedMB = Double(cacheDisk) / 1_000_000
         downloadedMB = Double(DownloadManager.shared.totalSizeBytes) / 1_000_000
     }
@@ -105,6 +105,7 @@ struct StorageView: View {
 
     private func clearCache() {
         URLCache.shared.removeAllCachedResponses()
+        ContentCache.shared.clearAll()
         UserDefaults.standard.set(Date(), forKey: "storage.lastCachePurge")
         cachedMB = 0
     }

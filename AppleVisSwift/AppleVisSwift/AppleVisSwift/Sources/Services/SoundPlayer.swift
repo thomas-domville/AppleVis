@@ -21,6 +21,30 @@ enum AppSound: String {
     case syncComplete    = "sync_complete"
     case tipPopup        = "tip_popup"
     case welcome
+
+    /// Non-essential UI chrome — docs/APPLEVIS_2026_1_MASTER_SPEC.md defaults
+    /// these off (tab switching, picker changes, opening screens, list
+    /// refresh), gated by PreferencesStore's `interfaceSoundsEnabled`.
+    fileprivate static let interfaceSounds: Set<AppSound> = [
+        .tabChange, .articleOpen, .screenClose, .pickerTick, .refresh,
+        .searchComplete, .tipPopup, .syncComplete, .loadingStart, .welcome,
+    ]
+
+    /// Important functional signals, not decorative preference — always play
+    /// regardless of either toggle.
+    fileprivate static let alwaysOn: Set<AppSound> = [.error, .offline]
+
+    /// Reads the same UserDefaults keys PreferencesStore's `@AppStorage`
+    /// properties use — SoundPlayer is a plain singleton with no environment
+    /// access, so it can't observe the store directly.
+    var shouldPlay: Bool {
+        if Self.alwaysOn.contains(self) { return true }
+        let defaults = UserDefaults.standard
+        if Self.interfaceSounds.contains(self) {
+            return defaults.object(forKey: "sound.interface") as? Bool ?? false
+        }
+        return defaults.object(forKey: "sound.confirmation") as? Bool ?? true
+    }
 }
 
 /// Plays short UI feedback sounds and notification-sound previews.
@@ -36,6 +60,7 @@ final class SoundPlayer {
     private init() {}
 
     func play(_ sound: AppSound) {
+        guard sound.shouldPlay else { return }
         play(filename: sound.rawValue, ext: "wav")
     }
 

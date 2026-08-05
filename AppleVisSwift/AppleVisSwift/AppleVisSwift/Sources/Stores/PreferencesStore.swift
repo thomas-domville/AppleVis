@@ -51,6 +51,15 @@ final class PreferencesStore: ObservableObject {
     // MARK: - Forums
     @AppStorage("forums.defaultFilter") var forumsDefaultFilter: ForumFilter = .recent
 
+    // MARK: - Sounds & Haptics
+    // docs/APPLEVIS_2026_1_MASTER_SPEC.md: "All app sounds must be optional.
+    // Default on: notification, save confirmation, download complete, and
+    // podcast actions. Default off: tab switching, picker changes, opening
+    // screens, and list refresh sounds." SoundPlayer.swift reads these same
+    // keys directly (it has no environment access to this store).
+    @AppStorage("sound.interface")    var interfaceSoundsEnabled = false
+    @AppStorage("sound.confirmation") var confirmationSoundsEnabled = true
+
     // MARK: - Intelligence / Smart Features
     @AppStorage("intel.nonEnglish")         var nonEnglishDetectionEnabled = true
     @AppStorage("intel.composeRewrite")     var composeRewriteEnabled = true
