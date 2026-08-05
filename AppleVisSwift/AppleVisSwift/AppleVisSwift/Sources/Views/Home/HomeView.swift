@@ -1,5 +1,14 @@
 import SwiftUI
 
+/// Narrows the feed already loaded on Home to just what's new since the
+/// last visit — distinct from "Customize Home," which controls which
+/// content types are fetched in the first place, not which of them show.
+enum HomeFeedFilter: String, CaseIterable, Identifiable {
+    case all, new
+    var id: String { rawValue }
+    var label: String { self == .all ? "All" : "New" }
+}
+
 /// Time-of-day greeting shown on the Home tab's greeting card.
 enum Greeting {
     static func text(for date: Date = Date()) -> String {
@@ -29,6 +38,15 @@ struct HomeView: View {
     @EnvironmentObject private var networkMonitor: NetworkMonitor
     @EnvironmentObject private var keyCommands: KeyCommandRouter
     @State private var hasAnnouncedWelcome = false
+    @State private var homeFeedFilter: HomeFeedFilter = .all
+
+    /// Items actually shown below the feed picker — narrowed to just what's
+    /// new since the last visit when the "New" segment is selected. Distinct
+    /// from the "Customize Home" menu, which controls which content TYPES
+    /// are fetched at all, not which of the fetched items are shown.
+    private var visibleItems: [FeedItem] {
+        homeFeedFilter == .new ? vm.newItems : vm.items
+    }
 
     var body: some View {
         NavigationStack {
@@ -131,39 +149,97 @@ struct HomeView: View {
         }
     }
 
+    /// Forum topics new since the last Home visit — approximates the old
+    /// app's per-topic "unread" tracking (ForumTopic.isUnread is hardcoded
+    /// false server-side and never set; there's no real per-topic read
+    /// tracking anywhere in the app), using the same last-visit comparison
+    /// that already works for the What's New card.
+    private var unreadForumTopics: [FeedItem] {
+        vm.newItems.filter {
+            if case .forumTopic = $0 { return true }
+            return false
+        }
+    }
+
     // MARK: - Feed list
 
     private var feedList: some View {
-        List {
-            greetingCard
+        ScrollViewReader { proxy in
+            List {
+                greetingCard
 
-            if !networkMonitor.isConnected && !vm.items.isEmpty {
-                OfflineBanner()
+                if !networkMonitor.isConnected && !vm.items.isEmpty {
+                    OfflineBanner()
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                        .listRowSeparator(.hidden)
+                }
+
+                if !vm.failedSourceNames.isEmpty && !vm.items.isEmpty {
+                    SourceErrorBanner(failedSources: vm.failedSourceNames) {
+                        Task { await vm.load() }
+                    }
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     .listRowSeparator(.hidden)
-            }
+                }
 
-            if !vm.newActivitySummary.isEmpty {
-                Section {
-                    Text(vm.newActivitySummary)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                if !vm.newItems.isEmpty && !vm.isNewActivityDismissed {
+                    WhatsNewCard(
+                        message: vm.newActivitySummary,
+                        onTap: {
+                            guard let first = vm.newItems.first else { return }
+                            withAnimation { proxy.scrollTo(first.id, anchor: .top) }
+                        },
+                        onDismiss: { vm.isNewActivityDismissed = true }
+                    )
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    .listRowSeparator(.hidden)
+                }
+
+                if let firstUnread = unreadForumTopics.first {
+                    UnreadTopicsStrip(count: unreadForumTopics.count) {
+                        withAnimation { proxy.scrollTo(firstUnread.id, anchor: .top) }
+                    }
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    .listRowSeparator(.hidden)
+                }
+
+                Picker("Home Feed", selection: $homeFeedFilter) {
+                    ForEach(HomeFeedFilter.allCases) { filter in
+                        Text(filter.label).tag(filter)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+                .listRowSeparator(.hidden)
+                .onChange(of: homeFeedFilter) { _, filter in
+                    SoundPlayer.shared.play(.pickerTick)
+                    let announcement = filter == .new
+                        ? "\(vm.newItems.count) new activity item\(vm.newItems.count == 1 ? "" : "s")."
+                        : "Showing all Home activity."
+                    UIAccessibility.post(notification: .announcement, argument: announcement)
+                }
+
+                if homeFeedFilter == .new && visibleItems.isEmpty {
+                    Text("No new activity since your last visit.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                        .listRowSeparator(.hidden)
+                }
+
+                ForEach(visibleItems) { item in
+                    FeedRow(item: item)
+                        .id(item.id)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                }
+
+                if vm.hasMore && homeFeedFilter == .all {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .listRowSeparator(.hidden)
+                        .task { await vm.loadMore() }
                 }
             }
-
-            ForEach(vm.items) { item in
-                FeedRow(item: item)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-            }
-
-            if vm.hasMore {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-                    .listRowSeparator(.hidden)
-                    .task { await vm.loadMore() }
-            }
+            .listStyle(.plain)
         }
-        .listStyle(.plain)
     }
 
     // MARK: - Filter menu
@@ -190,6 +266,116 @@ struct HomeView: View {
         .onChange(of: preferences.showApps)     { _, _ in Task { await vm.load() } }
         .onChange(of: preferences.showGuides)   { _, _ in Task { await vm.load() } }
         .onChange(of: preferences.showBlogs)    { _, _ in Task { await vm.load() } }
+    }
+}
+
+// MARK: - Source error banner
+
+/// Shown when some (not all) of Home's sources failed to load — the rest of
+/// the feed is still real, successfully-loaded data, not stale placeholder
+/// content, so this stays a small dismissable-feeling banner rather than a
+/// full-screen error.
+private struct SourceErrorBanner: View {
+    let failedSources: [String]
+    let onRetry: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+            Text("Some sources could not be loaded: \(failedSources.joined(separator: ", ")).")
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            Button("Retry Now", action: onRetry)
+                .font(.footnote).fontWeight(.semibold)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+        }
+        .padding(12)
+        .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Some sources could not be loaded: \(failedSources.joined(separator: ", ")).")
+    }
+}
+
+// MARK: - What's New card
+
+/// Dismissible, tappable "since last visit" summary — tapping scrolls to
+/// the first new item, matching the old app's welcomeSummary card. Dismissal
+/// isn't persisted across launches: it resets whenever a fresh load() finds
+/// a new batch of newer-than-last-visit items, since the set of "what's new"
+/// is itself different each time.
+private struct WhatsNewCard: View {
+    let message: String
+    let onTap: () -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Button(action: onTap) {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(Color.accentColor)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("What's New")
+                            .font(.caption).fontWeight(.bold)
+                            .foregroundStyle(Color.accentColor)
+                        Text(message)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.leading)
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("What's New. \(message)")
+            .accessibilityHint("Double-tap to jump to where you left off in the feed.")
+
+            Button("Dismiss", action: onDismiss)
+                .font(.caption).fontWeight(.semibold)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .accessibilityLabel("Dismiss welcome summary")
+        }
+        .padding(12)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(alignment: .leading) {
+            Rectangle().fill(Color.accentColor).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
+        }
+    }
+}
+
+// MARK: - Unread topics strip
+
+private struct UnreadTopicsStrip: View {
+    let count: Int
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(Color.accentColor)
+                    .frame(width: 8, height: 8)
+                    .accessibilityHidden(true)
+                Text("\(count) unread topic\(count == 1 ? "" : "s")")
+                    .font(.subheadline).fontWeight(.semibold)
+                    .foregroundStyle(Color.accentColor)
+                Spacer()
+                Text("Jump to first →")
+                    .font(.subheadline).fontWeight(.medium)
+                    .foregroundStyle(Color.accentColor)
+            }
+            .padding(12)
+            .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(count) unread topic\(count == 1 ? "" : "s"). Activate to jump to first unread.")
     }
 }
 
