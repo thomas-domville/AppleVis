@@ -2,6 +2,8 @@ import SwiftUI
 
 struct QueueView: View {
     @EnvironmentObject private var player: PlayerStore
+    @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+    @State private var showClearConfirm = false
 
     var body: some View {
         NavigationStack {
@@ -22,12 +24,15 @@ struct QueueView: View {
 
                         if !player.queue.isEmpty {
                             Section {
+                                queueSummaryHeader
                                 ForEach(Array(player.queue.enumerated()), id: \.element.id) { index, episode in
                                     QueueRow(
                                         episode: episode,
                                         position: index + 1,
+                                        total: player.queue.count,
                                         isFirst: index == 0,
                                         isLast: index == player.queue.count - 1,
+                                        onOpen: { deepLinkRouter.pendingContent = (kind: .podcastEpisode, id: episode.id) },
                                         onMoveUp: { moveUp(from: index) },
                                         onMoveDown: { moveDown(from: index) },
                                         onRemove: { player.removeFromQueue(id: episode.id) }
@@ -41,6 +46,9 @@ struct QueueView: View {
                             } footer: {
                                 Text("\(player.queue.count) episode\(player.queue.count == 1 ? "" : "s") in queue")
                             }
+
+                            Button("Clear Queue", role: .destructive) { showClearConfirm = true }
+                                .frame(maxWidth: .infinity)
                         }
                     }
                     .toolbar {
@@ -49,7 +57,33 @@ struct QueueView: View {
                 }
             }
             .navigationTitle("Queue")
+            .confirmationDialog(
+                "Clear the entire queue?", isPresented: $showClearConfirm, titleVisibility: .visible
+            ) {
+                Button("Clear Queue", role: .destructive) {
+                    player.clearQueue()
+                    UIAccessibility.post(notification: .announcement, argument: "Queue cleared.")
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes all episodes from your queue. Downloaded episodes will not be deleted.")
+            }
         }
+    }
+
+    private var queueSummaryHeader: some View {
+        Text("Up Next (\(player.queue.count))")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityAction(named: Text("Queue summary")) {
+                let totalSeconds = player.queue.reduce(0.0) { $0 + ($1.duration ?? 0) }
+                let duration = totalSeconds > 0 ? ", about \(formatDuration(totalSeconds))" : ""
+                UIAccessibility.post(
+                    notification: .announcement,
+                    argument: "\(player.queue.count) episode\(player.queue.count == 1 ? "" : "s") in queue\(duration)."
+                )
+            }
     }
 
     private func moveUp(from index: Int) {
@@ -126,8 +160,10 @@ private struct NowPlayingQueueCard: View {
 private struct QueueRow: View {
     let episode: PodcastEpisode
     let position: Int
+    let total: Int
     let isFirst: Bool
     let isLast: Bool
+    let onOpen: () -> Void
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
     let onRemove: () -> Void
@@ -141,19 +177,22 @@ private struct QueueRow: View {
                 .frame(width: 28, alignment: .trailing)
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(episode.title)
-                    .font(.subheadline)
-                    .lineLimit(2)
-                Text(episode.showTitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if let duration = episode.duration {
-                    Text(formatDuration(duration))
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+            Button(action: onOpen) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(episode.title)
+                        .font(.subheadline)
+                        .lineLimit(2)
+                    Text(episode.showTitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let duration = episode.duration {
+                        Text(formatDuration(duration))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
             }
+            .buttonStyle(.plain)
 
             Spacer()
 
@@ -164,7 +203,7 @@ private struct QueueRow: View {
                 }
                 .buttonStyle(.borderless)
                 .disabled(isFirst)
-                .accessibilityLabel("Move up")
+                .accessibilityHidden(true)
 
                 Button(action: onMoveDown) {
                     Image(systemName: "chevron.down")
@@ -172,7 +211,7 @@ private struct QueueRow: View {
                 }
                 .buttonStyle(.borderless)
                 .disabled(isLast)
-                .accessibilityLabel("Move down")
+                .accessibilityHidden(true)
 
                 Button(role: .destructive, action: onRemove) {
                     Image(systemName: "xmark")
@@ -180,12 +219,20 @@ private struct QueueRow: View {
                         .foregroundStyle(.red)
                 }
                 .buttonStyle(.borderless)
-                .accessibilityLabel("Remove from queue")
+                .accessibilityHidden(true)
             }
         }
         .padding(.vertical, 2)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Position \(position): \(episode.title), \(episode.showTitle)")
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(position) of \(total). \(episode.title), \(episode.showTitle)" +
+            (episode.duration.map { ", \(formatDuration($0))" } ?? "")
+        )
+        .accessibilityHint("Double-tap to open. Use actions to move or remove.")
+        .accessibilityAction(named: Text("Open Episode"), onOpen)
+        .modifier(ConditionalAccessibilityAction(isActive: !isFirst, name: "Move Up", action: onMoveUp))
+        .modifier(ConditionalAccessibilityAction(isActive: !isLast, name: "Move Down", action: onMoveDown))
+        .accessibilityAction(named: Text("Remove from Queue"), onRemove)
     }
 }
 

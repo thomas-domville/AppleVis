@@ -177,6 +177,11 @@ final class PlayerStore: ObservableObject {
         saveQueue()
     }
 
+    func clearQueue() {
+        queue.removeAll()
+        saveQueue()
+    }
+
     func playNext() async {
         guard !queue.isEmpty else { return }
         let next = queue.removeFirst()
