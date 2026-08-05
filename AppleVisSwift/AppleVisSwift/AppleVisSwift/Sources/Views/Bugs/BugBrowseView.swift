@@ -10,6 +10,7 @@ struct BugBrowseView: View {
     @State private var statusFilter: BugStatus? = .active
     @State private var searchText = ""
     @State private var isLoadingMore = false
+    @ObservedObject private var networkStatus = NetworkStatusStore.shared
 
     var body: some View {
         Group {
@@ -37,6 +38,10 @@ struct BugBrowseView: View {
 
     private var bugList: some View {
         List {
+            if networkStatus.degradedGroups.contains(.bugs) {
+                OfflineBanner()
+                    .listRowSeparator(.hidden)
+            }
             if !searchText.isEmpty && visible.isEmpty {
                 EmptyStateView(
                     title: "No Results",

@@ -15,6 +15,7 @@ func fetchWithCache<T: Codable>(
 ) async throws -> T {
     if await !ApiHealthMonitor.shared.isAvailable(group) {
         if let cached = ContentCache.shared.get(T.self, key: key) {
+            NetworkStatusStore.shared.markDegraded(group)
             return cached.data
         }
         throw APIError.offlineNoCache(group: group.rawValue)
@@ -28,11 +29,13 @@ func fetchWithCache<T: Codable>(
         let result = try await fetch()
         ContentCache.shared.set(result, key: key)
         await ApiHealthMonitor.shared.markUp(group)
+        NetworkStatusStore.shared.markHealthy(group)
         return result
     } catch {
         if case APIError.unauthorized = error { throw error }
         await ApiHealthMonitor.shared.markDown(group)
         if let cached = ContentCache.shared.get(T.self, key: key), cached.freshness != .expired {
+            NetworkStatusStore.shared.markDegraded(group)
             return cached.data
         }
         throw error

@@ -46,6 +46,7 @@ struct HomeView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var networkMonitor: NetworkMonitor
     @EnvironmentObject private var keyCommands: KeyCommandRouter
+    @ObservedObject private var networkStatus = NetworkStatusStore.shared
     @State private var hasAnnouncedWelcome = false
     @State private var homeFeedFilter: HomeFeedFilter = .all
     @State private var savedItems: [SavedItem] = []
@@ -190,6 +191,21 @@ struct HomeView: View {
     /// false server-side and never set; there's no real per-topic read
     /// tracking anywhere in the app), using the same last-visit comparison
     /// that already works for the What's New card.
+    /// True when at least one of Home's active sources is currently being
+    /// served from cache because its live fetch is failing (see
+    /// NetworkStatusStore/CachedFetch.swift) — shown with the same
+    /// OfflineBanner a true connectivity loss uses, since "pull to refresh
+    /// when things are working again" is the right guidance either way.
+    private var isAnySourceDegraded: Bool {
+        var groups: Set<ContentGroup> = []
+        if preferences.showForums { groups.insert(.forums) }
+        if preferences.showPodcasts { groups.insert(.podcasts) }
+        if preferences.showApps { groups.insert(.apps) }
+        if preferences.showGuides { groups.insert(.resources) }
+        if preferences.showBlogs { groups.insert(.blogs) }
+        return !groups.isDisjoint(with: networkStatus.degradedGroups)
+    }
+
     private var unreadForumTopics: [FeedItem] {
         vm.newItems.filter {
             if case .forumTopic = $0 { return true }
@@ -246,7 +262,7 @@ struct HomeView: View {
                     .listRowSeparator(.hidden)
                 }
 
-                if !networkMonitor.isConnected && !vm.items.isEmpty {
+                if (!networkMonitor.isConnected || isAnySourceDegraded) && !vm.items.isEmpty {
                     OfflineBanner()
                         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         .listRowSeparator(.hidden)

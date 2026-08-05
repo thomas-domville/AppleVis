@@ -10,6 +10,7 @@ struct PodcastBrowseView: View {
     @State private var page = 0
     @State private var hasMore = false
     @State private var isLoadingMore = false
+    @ObservedObject private var networkStatus = NetworkStatusStore.shared
 
     var body: some View {
         Group {
@@ -46,6 +47,10 @@ struct PodcastBrowseView: View {
 
     private var episodeList: some View {
         List {
+            if networkStatus.degradedGroups.contains(.podcasts) {
+                OfflineBanner()
+                    .listRowSeparator(.hidden)
+            }
             ForEach(episodes) { episode in
                 PodcastEpisodeRow(episode: episode)
             }

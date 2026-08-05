@@ -118,6 +118,7 @@ struct AppCategoryView: View {
     @State private var page = 0
     @State private var hasMore = false
     @State private var isLoadingMore = false
+    @ObservedObject private var networkStatus = NetworkStatusStore.shared
 
     var body: some View {
         Group {
@@ -133,6 +134,10 @@ struct AppCategoryView: View {
                 )
             } else {
                 List {
+                    if networkStatus.degradedGroups.contains(.apps) {
+                        OfflineBanner()
+                            .listRowSeparator(.hidden)
+                    }
                     ForEach(apps) { app in
                         AppListingRow(app: app)
                     }

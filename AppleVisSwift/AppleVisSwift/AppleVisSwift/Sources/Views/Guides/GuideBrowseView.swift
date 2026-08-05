@@ -9,6 +9,7 @@ struct GuideBrowseView: View {
     @State private var selectedFilter: GuideFilter = .all
     @State private var searchText = ""
     @State private var isLoadingMore = false
+    @ObservedObject private var networkStatus = NetworkStatusStore.shared
 
     var body: some View {
         Group {
@@ -36,6 +37,10 @@ struct GuideBrowseView: View {
 
     private var resourceList: some View {
         List {
+            if networkStatus.degradedGroups.contains(.resources) {
+                OfflineBanner()
+                    .listRowSeparator(.hidden)
+            }
             if !searchText.isEmpty && visible.isEmpty {
                 EmptyStateView(title: "No Results", message: "No guides match \"\(searchText)\".", systemImage: "magnifyingglass")
                     .listRowSeparator(.hidden)

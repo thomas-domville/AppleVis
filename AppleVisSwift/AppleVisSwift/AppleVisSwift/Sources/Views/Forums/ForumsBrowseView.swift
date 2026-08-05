@@ -12,6 +12,7 @@ struct ForumsBrowseView: View {
     @State private var hasMore = false
     @State private var isLoadingMore = false
     @EnvironmentObject private var auth: AuthStore
+    @ObservedObject private var networkStatus = NetworkStatusStore.shared
 
     init(initialFilter: ForumFilter = .recent) {
         _filter = State(initialValue: initialFilter)
@@ -92,6 +93,10 @@ struct ForumsBrowseView: View {
 
     private var topicList: some View {
         List {
+            if networkStatus.degradedGroups.contains(.forums) {
+                OfflineBanner()
+                    .listRowSeparator(.hidden)
+            }
             ForEach(topics) { topic in
                 ForumTopicRow(topic: topic)
             }

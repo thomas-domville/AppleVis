@@ -8,6 +8,7 @@ struct BlogBrowseView: View {
     @State private var hasMore = false
     @State private var searchText = ""
     @State private var isLoadingMore = false
+    @ObservedObject private var networkStatus = NetworkStatusStore.shared
 
     var body: some View {
         Group {
@@ -35,6 +36,10 @@ struct BlogBrowseView: View {
 
     private var postList: some View {
         List {
+            if networkStatus.degradedGroups.contains(.blogs) {
+                OfflineBanner()
+                    .listRowSeparator(.hidden)
+            }
             if !searchText.isEmpty && visible.isEmpty {
                 EmptyStateView(
                     title: "No Results",
