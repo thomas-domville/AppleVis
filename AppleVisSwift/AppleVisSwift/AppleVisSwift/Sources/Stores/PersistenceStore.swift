@@ -142,6 +142,16 @@ final class PersistenceStore {
         persist(visits, key: itemVisitsKey)
     }
 
+    /// New replies/comments since this item was last visited — same
+    /// calculation Home uses, exposed here so browse-list rows (Forums,
+    /// Guides, Apps, Blogs, Podcasts, Bug Reports) can show the same
+    /// per-item "N new" signal Home already has, instead of only Home
+    /// knowing about it.
+    func newReplyCount(kind: ContentKind, id: String, currentCount: Int) -> Int {
+        guard let visit = allItemVisits()[FeedItem.visitKey(kind: kind, contentId: id)] else { return 0 }
+        return max(0, currentCount - visit.commentCount)
+    }
+
     // MARK: - Storage
 
     private func persist<T: Encodable>(_ value: T, key: String) {

@@ -170,6 +170,9 @@ struct BugReportRow: View {
                 Text(bug.severity.displayName)
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
+                if newCount > 0 {
+                    NewCountBadge(count: newCount)
+                }
                 RelativeDateLabel(date: bug.changedAt)
             }
             Text(bug.title)
@@ -195,8 +198,13 @@ struct BugReportRow: View {
         .cardDensityPadding()
     }
 
+    private var newCount: Int {
+        PersistenceStore.shared.newReplyCount(kind: .bugReport, id: bug.id, currentCount: bug.commentCount)
+    }
+
     private var bugLabel: String {
-        "\(bug.title). \(bug.status.displayName). \(bug.severity.displayName) severity. " +
-        "\(bug.commentCount) comments."
+        let newLabel = newCount > 0 ? " \(newCount) new comment\(newCount == 1 ? "" : "s")." : ""
+        return "\(bug.title). \(bug.status.displayName). \(bug.severity.displayName) severity. " +
+        "\(bug.commentCount) comments.\(newLabel)"
     }
 }

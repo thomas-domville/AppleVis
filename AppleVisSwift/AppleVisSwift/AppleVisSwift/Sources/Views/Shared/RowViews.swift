@@ -1,5 +1,24 @@
 import SwiftUI
 
+/// Visual "N NEW" pill shown when a browse-list row has new replies/comments
+/// since it was last visited — same signal Home already surfaces via
+/// HomeViewModel.newReplyCount, now available to every row type via
+/// PersistenceStore.newReplyCount so it isn't Home-exclusive. Purely visual;
+/// the accompanying text lives in each row's accessibility label instead of
+/// duplicating it here.
+struct NewCountBadge: View {
+    let count: Int
+
+    var body: some View {
+        Text("\(count) NEW")
+            .font(.caption2).fontWeight(.bold)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .background(Color.accentColor, in: Capsule())
+            .accessibilityHidden(true)
+    }
+}
+
 // MARK: - Forum Topic Row
 
 struct ForumTopicRow: View {
@@ -18,6 +37,10 @@ struct ForumTopicRow: View {
         }
     }
 
+    private var newCount: Int {
+        PersistenceStore.shared.newReplyCount(kind: .forumTopic, id: topic.id, currentCount: topic.replyCount)
+    }
+
     var body: some View {
         NavigationLink(value: topic) {
             VStack(alignment: .leading, spacing: 4) {
@@ -26,6 +49,9 @@ struct ForumTopicRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
+                    if newCount > 0 {
+                        NewCountBadge(count: newCount)
+                    }
                     if topic.isSaved {
                         Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
                     }
@@ -54,7 +80,8 @@ struct ForumTopicRow: View {
     }
 
     private var topicLabel: String {
-        "\(topic.title), \(topic.category), \(topic.replyCount) replies, \(topic.lastActivityAt.formatted(.relative(presentation: .named)))\(savedFollowingLabel)"
+        let newLabel = newCount > 0 ? ". \(newCount) new repl\(newCount == 1 ? "y" : "ies")" : ""
+        return "\(topic.title), \(topic.category), \(topic.replyCount) replies, \(topic.lastActivityAt.formatted(.relative(presentation: .named)))\(savedFollowingLabel)\(newLabel)"
     }
 }
 
@@ -90,6 +117,9 @@ struct PodcastEpisodeRow: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
+                        if newCount > 0 {
+                            NewCountBadge(count: newCount)
+                        }
                         RelativeDateLabel(date: episode.publishedAt)
                     }
                 }
@@ -119,10 +149,15 @@ struct PodcastEpisodeRow: View {
         player.currentEpisode?.id == episode.id && player.isPlaying
     }
 
+    private var newCount: Int {
+        PersistenceStore.shared.newReplyCount(kind: .podcastEpisode, id: episode.id, currentCount: episode.commentCount)
+    }
+
     private var episodeLabel: String {
-        "\(episode.title), \(episode.showTitle) podcast" +
+        let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
+        return "\(episode.title), \(episode.showTitle) podcast" +
         (episode.duration.map { ", \(Duration.seconds($0).formatted(.units(allowed: [.hours, .minutes])))" } ?? "") +
-        ", \(episode.publishedAt.formatted(.relative(presentation: .named)))"
+        ", \(episode.publishedAt.formatted(.relative(presentation: .named)))\(newLabel)"
     }
 }
 
@@ -153,6 +188,9 @@ struct AppListingRow: View {
                     HStack {
                         Text(app.category)
                         Spacer()
+                        if newCount > 0 {
+                            NewCountBadge(count: newCount)
+                        }
                         RelativeDateLabel(date: app.lastActivityAt)
                     }
                     .font(.caption)
@@ -167,8 +205,13 @@ struct AppListingRow: View {
         .cardDensityPadding()
     }
 
+    private var newCount: Int {
+        PersistenceStore.shared.newReplyCount(kind: .appListing, id: app.id, currentCount: app.reviewCount)
+    }
+
     private var appLabel: String {
-        "\(app.name) by \(app.developer), \(app.category), \(app.lastActivityAt.formatted(.relative(presentation: .named)))"
+        let newLabel = newCount > 0 ? ". \(newCount) new review\(newCount == 1 ? "" : "s")" : ""
+        return "\(app.name) by \(app.developer), \(app.category), \(app.lastActivityAt.formatted(.relative(presentation: .named)))\(newLabel)"
     }
 }
 
@@ -185,6 +228,9 @@ struct ResourceRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
+                    if newCount > 0 {
+                        NewCountBadge(count: newCount)
+                    }
                     RelativeDateLabel(date: resource.updatedAt)
                 }
                 Text(resource.title)
@@ -202,9 +248,14 @@ struct ResourceRow: View {
         .cardDensityPadding()
     }
 
+    private var newCount: Int {
+        PersistenceStore.shared.newReplyCount(kind: .resource, id: resource.id, currentCount: resource.commentCount)
+    }
+
     private var resourceLabel: String {
-        "\(resource.title), \(resource.kind.displayName), by \(resource.authorName), " +
-        "\(resource.updatedAt.formatted(.relative(presentation: .named)))"
+        let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
+        return "\(resource.title), \(resource.kind.displayName), by \(resource.authorName), " +
+        "\(resource.updatedAt.formatted(.relative(presentation: .named)))\(newLabel)"
     }
 }
 
@@ -221,6 +272,9 @@ struct BlogPostRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
+                    if newCount > 0 {
+                        NewCountBadge(count: newCount)
+                    }
                     RelativeDateLabel(date: post.lastActivityAt)
                 }
                 Text(post.title)
@@ -242,8 +296,13 @@ struct BlogPostRow: View {
         .cardDensityPadding()
     }
 
+    private var newCount: Int {
+        PersistenceStore.shared.newReplyCount(kind: .blogPost, id: post.id, currentCount: post.commentCount)
+    }
+
     private var postLabel: String {
-        "\(post.title), Blog post, by \(post.authorName), \(post.commentCount) comment\(post.commentCount == 1 ? "" : "s"), " +
-        "\(post.lastActivityAt.formatted(.relative(presentation: .named)))"
+        let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
+        return "\(post.title), Blog post, by \(post.authorName), \(post.commentCount) comment\(post.commentCount == 1 ? "" : "s"), " +
+        "\(post.lastActivityAt.formatted(.relative(presentation: .named)))\(newLabel)"
     }
 }
