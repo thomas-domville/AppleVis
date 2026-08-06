@@ -4,6 +4,7 @@ struct ContentView: View {
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @EnvironmentObject private var keyCommands: KeyCommandRouter
+    @ObservedObject private var homeBadge = HomeBadgeStore.shared
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -11,6 +12,7 @@ struct ContentView: View {
                 HomeView()
                     .tabItem { Label("Home", systemImage: "house") }
                     .tag(0)
+                    .badge(homeBadge.unreadForumTopicCount)
 
                 DiscoverView()
                     .tabItem { Label("Discover", systemImage: "safari") }

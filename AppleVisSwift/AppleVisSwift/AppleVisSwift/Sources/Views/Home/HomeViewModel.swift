@@ -1,5 +1,18 @@
 import Foundation
 import Combine
+import UIKit
+
+/// Lets the Home tab's unread count reach the tab bar badge in ContentView
+/// without hoisting HomeViewModel's whole lifecycle up to the app root —
+/// same singleton-`ObservedObject` pattern already used by ToastStore/
+/// NetworkStatusStore for cross-screen state that isn't worth an explicit
+/// ownership chain.
+@MainActor
+final class HomeBadgeStore: ObservableObject {
+    static let shared = HomeBadgeStore()
+    @Published var unreadForumTopicCount = 0
+    private init() {}
+}
 
 @MainActor
 final class HomeViewModel: ObservableObject {
@@ -18,6 +31,7 @@ final class HomeViewModel: ObservableObject {
 
     private let pageSize = 20
     private var page = 0
+    private var itemVisits: [String: PersistenceStore.ItemVisit] = [:]
     private var lastVisit: Date {
         get { Date(timeIntervalSince1970: UserDefaults.standard.double(forKey: "applevis.lastVisit")) }
         set { UserDefaults.standard.set(newValue.timeIntervalSince1970, forKey: "applevis.lastVisit") }
@@ -46,6 +60,7 @@ final class HomeViewModel: ObservableObject {
             error = nil
             items = fetched.sorted { $0.lastActivityAt > $1.lastActivityAt }
             hasMore = fetched.count >= pageSize
+            itemVisits = PersistenceStore.shared.allItemVisits()
             buildNewActivitySummary()
             lastVisit = Date()
         }
@@ -60,6 +75,44 @@ final class HomeViewModel: ObservableObject {
         let merged = (items + more).sorted { $0.lastActivityAt > $1.lastActivityAt }
         items = merged
         hasMore = more.count >= pageSize
+    }
+
+    /// New replies/comments on an item the user has visited before — distinct
+    /// from an item being newer-than-lastVisit outright, since without this a
+    /// long-running thread you'd already opened once could keep getting new
+    /// replies forever without ever showing up in "New" again.
+    func newReplyCount(for item: FeedItem) -> Int {
+        guard let visit = itemVisits[item.id] else { return 0 }
+        return max(0, item.commentCount - visit.commentCount)
+    }
+
+    /// Stamps this item as read (current comment count + now), so it drops
+    /// out of "New" until it gets further activity. Matches the old app's
+    /// per-item "Mark as Read" action — previously the only way for an item
+    /// to leave the New view was for the global last-visit timestamp to
+    /// advance past it, with no way to dismiss a single item on its own.
+    func markAsRead(_ item: FeedItem) {
+        PersistenceStore.shared.stampItemVisit(id: item.id, commentCount: item.commentCount)
+        itemVisits[item.id] = PersistenceStore.ItemVisit(seenAt: Date(), commentCount: item.commentCount)
+        if case .forumTopic(let topic) = item {
+            PersistenceStore.shared.markTopicSeen(id: topic.id)
+        }
+        recomputeNewActivity()
+        UIAccessibility.post(notification: .announcement, argument: "Marked as read.")
+    }
+
+    func markAllAsRead(_ itemsToMark: [FeedItem]) {
+        guard !itemsToMark.isEmpty else { return }
+        for item in itemsToMark {
+            PersistenceStore.shared.stampItemVisit(id: item.id, commentCount: item.commentCount)
+            itemVisits[item.id] = PersistenceStore.ItemVisit(seenAt: Date(), commentCount: item.commentCount)
+            if case .forumTopic(let topic) = item {
+                PersistenceStore.shared.markTopicSeen(id: topic.id)
+            }
+        }
+        isNewActivityDismissed = true
+        recomputeNewActivity()
+        UIAccessibility.post(notification: .announcement, argument: "All new activity marked as read.")
     }
 
     // MARK: - Private
@@ -128,9 +181,27 @@ final class HomeViewModel: ObservableObject {
     }
 
     private func buildNewActivitySummary() {
-        let since = lastVisit
-        newItems = items.filter { $0.lastActivityAt > since }
         isNewActivityDismissed = false
+        recomputeNewActivity()
+    }
+
+    /// An item counts as new if it has replies/comments beyond what it had
+    /// the last time it was visited, OR it's newer than the last Home visit
+    /// and hasn't specifically been seen since (a visit with no matching
+    /// record at all — never opened — always counts once past lastVisit).
+    private func isNewActivity(_ item: FeedItem) -> Bool {
+        if newReplyCount(for: item) > 0 { return true }
+        guard item.lastActivityAt > lastVisit else { return false }
+        guard let visit = itemVisits[item.id] else { return true }
+        return visit.seenAt < item.lastActivityAt
+    }
+
+    private func recomputeNewActivity() {
+        newItems = items.filter(isNewActivity)
+        HomeBadgeStore.shared.unreadForumTopicCount = newItems.filter {
+            if case .forumTopic = $0 { return true }
+            return false
+        }.count
         guard !newItems.isEmpty else { newActivitySummary = ""; return }
         newActivitySummary = "\(newItems.count) new item\(newItems.count == 1 ? "" : "s") since your last visit"
     }

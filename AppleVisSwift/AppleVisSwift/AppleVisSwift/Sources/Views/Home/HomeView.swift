@@ -343,10 +343,35 @@ struct HomeView: View {
                         .listRowSeparator(.hidden)
                 }
 
+                if !visibleItems.isEmpty {
+                    HStack {
+                        Text(homeFeedFilter == .new ? "New Activity" : "Latest Activity")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityAction(named: Text("Feed summary")) {
+                                UIAccessibility.post(notification: .announcement, argument: feedSummary)
+                            }
+                        Spacer()
+                        if homeFeedFilter == .new {
+                            Button("Mark All Read") {
+                                vm.markAllAsRead(visibleItems)
+                            }
+                            .font(.system(size: 12, weight: .bold))
+                            .accessibilityHint("Clears all items from the New view.")
+                        }
+                    }
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 4, trailing: 16))
+                    .listRowSeparator(.hidden)
+                }
+
                 ForEach(visibleItems) { item in
-                    FeedRow(item: item)
-                        .id(item.id)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    FeedRow(item: item, newCount: vm.newReplyCount(for: item)) {
+                        vm.markAsRead(item)
+                    }
+                    .id(item.id)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 }
 
                 if vm.hasMore && homeFeedFilter == .all {
@@ -354,12 +379,31 @@ struct HomeView: View {
                         .frame(maxWidth: .infinity)
                         .listRowSeparator(.hidden)
                         .task { await vm.loadMore() }
+                } else if !vm.hasMore && homeFeedFilter == .all && !visibleItems.isEmpty {
+                    Text("You're all caught up.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .listRowSeparator(.hidden)
                 }
             }
             .listStyle(.plain)
         }
     }
 
+    /// Backs the "Feed summary" custom accessibility action on the section
+    /// heading — lets a VoiceOver user hear a breakdown by content type on
+    /// demand instead of having to swipe through every row to gauge it.
+    private var feedSummary: String {
+        guard !visibleItems.isEmpty else { return "Feed is empty." }
+        var counts: [ContentKind: Int] = [:]
+        for item in visibleItems { counts[item.kind, default: 0] += 1 }
+        let parts = [ContentKind.forumTopic, .podcastEpisode, .appListing, .resource, .blogPost].compactMap { kind -> String? in
+            guard let n = counts[kind], n > 0 else { return nil }
+            let label = kind.displayName.lowercased()
+            return "\(n) \(label)\(n == 1 ? "" : "s")"
+        }
+        return "\(visibleItems.count) item\(visibleItems.count == 1 ? "" : "s"): \(parts.joined(separator: ", "))."
+    }
 }
 
 // MARK: - Customize Home
@@ -560,6 +604,11 @@ struct NotificationHistoryView: View {
 
 struct FeedRow: View {
     let item: FeedItem
+    /// Replies/comments added since this item was last marked read — the
+    /// "Mark as Read" action only appears when there's actually something
+    /// new to dismiss, matching the old app's behavior.
+    var newCount: Int = 0
+    var onMarkRead: (() -> Void)? = nil
 
     var body: some View {
         Group {
@@ -572,5 +621,8 @@ struct FeedRow: View {
             }
         }
         .unreadIndicator(item.isUnread)
+        .modifier(ConditionalAccessibilityAction(isActive: newCount > 0 && onMarkRead != nil, name: "Mark as Read") {
+            onMarkRead?()
+        })
     }
 }

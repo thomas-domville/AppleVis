@@ -54,4 +54,17 @@ enum FeedItem: Identifiable {
         default: return false
         }
     }
+
+    /// The count backing "new replies since you last saw this item" —
+    /// replies/comments for most kinds, reviews for apps (apps have no
+    /// comment concept of their own).
+    var commentCount: Int {
+        switch self {
+        case .forumTopic(let t):     return t.replyCount
+        case .podcastEpisode(let e): return e.commentCount
+        case .appListing(let a):     return a.reviewCount
+        case .resource(let r):       return r.commentCount
+        case .blogPost(let b):       return b.commentCount
+        }
+    }
 }

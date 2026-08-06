@@ -118,6 +118,30 @@ final class PersistenceStore {
         defaults.set(Date().timeIntervalSince1970, forKey: "applevis.forums.lastVisit")
     }
 
+    // MARK: - Per-item visit tracking (backs Home's "Mark as Read" and new-reply detection)
+
+    private let itemVisitsKey = "applevis.home.itemVisits"
+
+    /// When an item was last opened, and how many comments/replies it had at
+    /// that moment — lets Home detect not just "brand new items since last
+    /// visit" but "new replies on something you'd already seen before," and
+    /// lets a single item be marked read without waiting for the global
+    /// last-visit timestamp to advance.
+    struct ItemVisit: Codable {
+        let seenAt: Date
+        let commentCount: Int
+    }
+
+    func allItemVisits() -> [String: ItemVisit] {
+        load(key: itemVisitsKey) ?? [:]
+    }
+
+    func stampItemVisit(id: String, commentCount: Int) {
+        var visits = allItemVisits()
+        visits[id] = ItemVisit(seenAt: Date(), commentCount: commentCount)
+        persist(visits, key: itemVisitsKey)
+    }
+
     // MARK: - Storage
 
     private func persist<T: Encodable>(_ value: T, key: String) {
