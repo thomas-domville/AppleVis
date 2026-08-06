@@ -10,6 +10,7 @@ struct ResourceDetailView: View {
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
     @AccessibilityFocusState private var isTitleFocused: Bool
+    @AccessibilityFocusState private var focusedCommentId: String?
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
 
@@ -33,42 +34,44 @@ struct ResourceDetailView: View {
 
     @ViewBuilder
     private func content(_ detail: ResourceDetail) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // Header
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Label(detail.kind.displayName, systemImage: detail.kind.systemImage)
-                            .font(.caption).foregroundStyle(.secondary)
-                        Spacer()
-                        RelativeDateLabel(date: detail.updatedAt)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Header
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Label(detail.kind.displayName, systemImage: detail.kind.systemImage)
+                                .font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            RelativeDateLabel(date: detail.updatedAt)
+                        }
+                        Text(detail.title)
+                            .font(.title2).fontWeight(.semibold)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityFocused($isTitleFocused)
+                        Text("by \(detail.authorName)")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                        if !detail.categories.isEmpty {
+                            Text(detail.categories.joined(separator: " · "))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
-                    Text(detail.title)
-                        .font(.title2).fontWeight(.semibold)
-                        .accessibilityAddTraits(.isHeader)
-                        .accessibilityFocused($isTitleFocused)
-                    Text("by \(detail.authorName)")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    if !detail.categories.isEmpty {
-                        Text(detail.categories.joined(separator: " · "))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.horizontal)
-
-                Divider()
-
-                HTMLTextView(html: detail.body)
                     .padding(.horizontal)
 
-                Divider()
+                    Divider()
 
-                // Comments
-                commentsSection(detail)
+                    HTMLTextView(html: detail.body)
+                        .padding(.horizontal)
 
-                Color.clear.frame(height: 40)
+                    Divider()
+
+                    // Comments
+                    commentsSection(detail, proxy: proxy)
+
+                    Color.clear.frame(height: 40)
+                }
+                .padding(.vertical)
             }
-            .padding(.vertical)
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -91,10 +94,12 @@ struct ResourceDetailView: View {
     }
 
     @ViewBuilder
-    private func commentsSection(_ detail: ResourceDetail) -> some View {
-        CommunityDiscussionHeading(count: detail.comments.count) {
-            announceThreadOverview(detail)
-        }
+    private func commentsSection(_ detail: ResourceDetail, proxy: ScrollViewProxy) -> some View {
+        CommunityDiscussionHeading(
+            count: detail.comments.count,
+            onThreadOverview: { announceThreadOverview(detail) },
+            onJumpToLast: { Task { await jumpToLastComment(proxy: proxy) } }
+        )
 
         if detail.comments.isEmpty {
             Text("No comments yet.")
@@ -112,8 +117,10 @@ struct ResourceDetailView: View {
                     onEdit: { newText in
                         guard let idx = self.detail?.comments.firstIndex(where: { $0.id == comment.id }) else { return }
                         self.detail?.comments[idx] = ResourceComment(id: comment.id, authorName: comment.authorName, authorId: comment.authorId, body: newText, createdAt: comment.createdAt)
-                    }
+                    },
+                    focusBinding: $focusedCommentId
                 )
+                .id(comment.id)
                 Divider().padding(.leading)
             }
 
@@ -121,9 +128,12 @@ struct ResourceDetailView: View {
                 if isLoadingMoreComments {
                     ProgressView().frame(maxWidth: .infinity).padding()
                 } else {
-                    Button("Load More Comments") { Task { await loadMoreComments() } }
-                        .frame(maxWidth: .infinity)
-                        .padding()
+                    let remaining = detail.commentCount - detail.comments.count
+                    Button(remaining > 0 ? "Load \(remaining) More Comments" : "Load More Comments") {
+                        Task { await loadMoreComments() }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
                 }
             }
         }
@@ -177,17 +187,35 @@ struct ResourceDetailView: View {
         }
     }
 
+    /// Loads every remaining page in one go instead of requiring a tap per
+    /// page — the server clamps each request to its own max page size, so a
+    /// guide with many comments could otherwise take several manual
+    /// "Load More" taps to fully unroll.
     private func loadMoreComments() async {
-        guard let detail else { return }
         isLoadingMoreComments = true
         do {
-            let more = try await APIClient.shared.resources.moreComments(resourceId: detail.id, offset: detail.comments.count)
-            self.detail?.comments.append(contentsOf: more)
-            hasMoreComments = !more.isEmpty && (self.detail?.comments.count ?? 0) < (self.detail?.commentCount ?? 0)
+            while let current = self.detail, current.comments.count < current.commentCount {
+                let more = try await APIClient.shared.resources.moreComments(resourceId: current.id, offset: current.comments.count)
+                guard !more.isEmpty else { break }
+                self.detail?.comments.append(contentsOf: more)
+            }
         } catch {
             toast.error("Couldn't load more comments.")
         }
+        hasMoreComments = (self.detail?.comments.count ?? 0) < (self.detail?.commentCount ?? 0)
         isLoadingMoreComments = false
+    }
+
+    /// "Jump to Last Comment" custom action on the Community Discussion
+    /// heading — loads any not-yet-fetched comments first so it always
+    /// lands on the true last one, then moves VoiceOver focus there (a
+    /// scroll alone doesn't relocate the VoiceOver cursor).
+    private func jumpToLastComment(proxy: ScrollViewProxy) async {
+        if hasMoreComments { await loadMoreComments() }
+        guard let lastId = self.detail?.comments.last?.id else { return }
+        withAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
+        try? await Task.sleep(for: .milliseconds(400))
+        focusedCommentId = lastId
     }
 }
 
@@ -204,6 +232,9 @@ struct CommentRow: View {
     var commentType: String? = nil
     var onDelete: (() -> Void)? = nil
     var onEdit: ((String) -> Void)? = nil
+    /// Set by the parent when it supports "Jump to Last Comment" — lets
+    /// that action move VoiceOver focus here, not just scroll the viewport.
+    var focusBinding: AccessibilityFocusState<String?>.Binding? = nil
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -231,6 +262,7 @@ struct CommentRow: View {
             .accessibilityAddTraits(.isHeader)
             .accessibilityLabel(headerAccessibilityLabel)
             .accessibilityHint("Actions available: copy, share, and more.")
+            .modifier(OptionalReplyFocus(binding: focusBinding, id: commentId ?? "\(authorName)-\(date.timeIntervalSince1970)"))
             .accessibilityAction(named: Text("Copy Comment Text")) { copyText() }
             .accessibilityAction(named: Text("Share Comment")) { presentShareSheet() }
             .accessibilityAction(named: Text("Mark as Helpful")) {

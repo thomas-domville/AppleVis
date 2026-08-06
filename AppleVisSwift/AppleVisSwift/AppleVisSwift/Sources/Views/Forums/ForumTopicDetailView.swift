@@ -19,6 +19,7 @@ struct ForumTopicDetailView: View {
     @State private var isSummarizing = false
     @State private var showBrowser = false
     @AccessibilityFocusState private var isTitleFocused: Bool
+    @AccessibilityFocusState private var focusedReplyId: String?
 
     var body: some View {
         Group {
@@ -67,82 +68,92 @@ struct ForumTopicDetailView: View {
     }
 
     private func topicContent(_ detail: ForumTopicDetail) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // Header
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(detail.title)
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                        .accessibilityAddTraits(.isHeader)
-                        .accessibilityFocused($isTitleFocused)
-                    HStack {
-                        AuthorProfileButton(name: "by \(detail.authorName)", authorId: detail.authorId)
-                        Spacer()
-                        RelativeDateLabel(date: detail.createdAt)
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    Label(detail.category, systemImage: "bubble.left.and.bubble.right")
-                        .font(.caption)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Header
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(detail.title)
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityFocused($isTitleFocused)
+                        HStack {
+                            AuthorProfileButton(name: "by \(detail.authorName)", authorId: detail.authorId)
+                            Spacer()
+                            RelativeDateLabel(date: detail.createdAt)
+                        }
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal)
-
-                Divider()
-
-                // Body
-                HTMLTextView(html: detail.body)
+                        Label(detail.category, systemImage: "bubble.left.and.bubble.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     .padding(.horizontal)
 
-                Divider()
+                    Divider()
 
-                // Replies
-                if !detail.replies.isEmpty {
-                    CommunityDiscussionHeading(count: detail.replies.count) {
-                        announceThreadOverview(detail)
-                    }
+                    // Body
+                    HTMLTextView(html: detail.body)
+                        .padding(.horizontal)
 
-                    if preferences.aiSummariesEnabled && IntelligenceService.isAvailable && detail.replies.count >= 5 {
-                        summarizeSection(detail)
-                    }
+                    Divider()
 
-                    ForEach(Array(detail.replies.enumerated()), id: \.element.id) { index, reply in
-                        ReplyView(
-                            reply: reply, index: index, total: detail.replies.count,
-                            topicAuthorId: detail.authorId, topicTitle: detail.title,
-                            onReplyTo: {
-                                guard auth.isSignedIn else {
-                                    toast.warning("Sign in to reply to posts.")
-                                    return
+                    // Replies
+                    if !detail.replies.isEmpty {
+                        CommunityDiscussionHeading(
+                            count: detail.replies.count,
+                            onThreadOverview: { announceThreadOverview(detail) },
+                            onJumpToLast: { Task { await jumpToLastReply(proxy: proxy) } }
+                        )
+
+                        if preferences.aiSummariesEnabled && IntelligenceService.isAvailable && detail.replies.count >= 5 {
+                            summarizeSection(detail)
+                        }
+
+                        ForEach(Array(detail.replies.enumerated()), id: \.element.id) { index, reply in
+                            ReplyView(
+                                reply: reply, index: index, total: detail.replies.count,
+                                topicAuthorId: detail.authorId, topicTitle: detail.title,
+                                onReplyTo: {
+                                    guard auth.isSignedIn else {
+                                        toast.warning("Sign in to reply to posts.")
+                                        return
+                                    }
+                                    quotedReplyTarget = reply
+                                },
+                                onDelete: {
+                                    self.detail?.replies.removeAll { $0.id == reply.id }
+                                }, onEdit: { newBody in
+                                    guard let idx = self.detail?.replies.firstIndex(where: { $0.id == reply.id }) else { return }
+                                    self.detail?.replies[idx] = ForumReply(
+                                        id: reply.id, subject: reply.subject, authorName: reply.authorName,
+                                        authorId: reply.authorId, body: newBody, createdAt: reply.createdAt,
+                                        loveCount: reply.loveCount, isNew: reply.isNew
+                                    )
+                                },
+                                focusBinding: $focusedReplyId
+                            )
+                            .id(reply.id)
+                            Divider().padding(.leading)
+                        }
+
+                        if hasMoreReplies {
+                            if isLoadingMoreReplies {
+                                ProgressView().frame(maxWidth: .infinity).padding()
+                            } else {
+                                let remaining = detail.replyCount - detail.replies.count
+                                Button(remaining > 0 ? "Load \(remaining) More Replies" : "Load More Replies") {
+                                    Task { await loadMoreReplies() }
                                 }
-                                quotedReplyTarget = reply
-                            },
-                            onDelete: {
-                                self.detail?.replies.removeAll { $0.id == reply.id }
-                            }, onEdit: { newBody in
-                                guard let idx = self.detail?.replies.firstIndex(where: { $0.id == reply.id }) else { return }
-                                self.detail?.replies[idx] = ForumReply(
-                                    id: reply.id, subject: reply.subject, authorName: reply.authorName,
-                                    authorId: reply.authorId, body: newBody, createdAt: reply.createdAt,
-                                    loveCount: reply.loveCount, isNew: reply.isNew
-                                )
-                            })
-                        Divider().padding(.leading)
-                    }
-
-                    if hasMoreReplies {
-                        if isLoadingMoreReplies {
-                            ProgressView().frame(maxWidth: .infinity).padding()
-                        } else {
-                            Button("Load More Replies") { Task { await loadMoreReplies() } }
                                 .frame(maxWidth: .infinity)
                                 .padding()
+                            }
                         }
                     }
                 }
+                .padding(.vertical)
             }
-            .padding(.vertical)
         }
     }
 
@@ -310,21 +321,41 @@ struct ForumTopicDetailView: View {
         }
     }
 
+    /// Loads every remaining page in one go instead of requiring a tap per
+    /// page — the server clamps each request to its own max page size
+    /// (see the hasMoreReplies fix above), so a thread with hundreds of
+    /// replies could otherwise take several manual "Load More" taps to
+    /// fully unroll. Reported directly as unwanted friction.
     private func loadMoreReplies() async {
-        guard let detail else { return }
         isLoadingMoreReplies = true
         do {
-            let more = try await APIClient.shared.forums.moreReplies(topicId: detail.id, offset: detail.replies.count)
-            self.detail?.replies.append(contentsOf: more)
-            // Guard against a stuck "Load More" loop: if the server ever
-            // returns nothing new despite replyCount claiming there's more
-            // (offset drift, a since-deleted comment throwing the count off,
-            // etc.), stop offering to load more rather than looping forever.
-            hasMoreReplies = !more.isEmpty && (self.detail?.replies.count ?? 0) < (self.detail?.replyCount ?? 0)
+            while let current = self.detail, current.replies.count < current.replyCount {
+                let more = try await APIClient.shared.forums.moreReplies(topicId: current.id, offset: current.replies.count)
+                guard !more.isEmpty else { break }
+                self.detail?.replies.append(contentsOf: more)
+            }
         } catch {
             toast.error("Couldn't load more replies.")
         }
+        hasMoreReplies = (self.detail?.replies.count ?? 0) < (self.detail?.replyCount ?? 0)
         isLoadingMoreReplies = false
+    }
+
+    /// "Jump to Last Comment" custom action on the Community Discussion
+    /// heading — mirrors the existing jump-to-first-new-item pattern
+    /// elsewhere in the app (e.g. Home's What's New card), requested
+    /// directly as an alternative to manually scrolling through a long
+    /// thread. Loads any not-yet-fetched replies first so it always lands
+    /// on the true last reply, not just the last of whatever's loaded so far.
+    private func jumpToLastReply(proxy: ScrollViewProxy) async {
+        if hasMoreReplies { await loadMoreReplies() }
+        guard let lastId = self.detail?.replies.last?.id else { return }
+        withAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
+        // Scrolling the viewport doesn't move VoiceOver's focus on its own —
+        // without this, the visual position changes but a VoiceOver user's
+        // swipe cursor stays exactly where it was, defeating the point.
+        try? await Task.sleep(for: .milliseconds(400))
+        focusedReplyId = lastId
     }
 
     private func toggleSave() {
@@ -391,6 +422,9 @@ struct ReplyView: View {
     var onReplyTo: (() -> Void)? = nil
     var onDelete: (() -> Void)? = nil
     var onEdit: ((String) -> Void)? = nil
+    /// Set by the parent when it supports "Jump to Last Comment" — lets
+    /// that action move VoiceOver focus here, not just scroll the viewport.
+    var focusBinding: AccessibilityFocusState<String?>.Binding? = nil
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -436,6 +470,7 @@ struct ReplyView: View {
             .accessibilityAddTraits(.isHeader)
             .accessibilityLabel(headerAccessibilityLabel)
             .accessibilityHint("Actions available: reply, copy, share, and more.")
+            .modifier(OptionalReplyFocus(binding: focusBinding, id: reply.id))
             .accessibilityAction(named: Text("Reply to this Comment")) { onReplyTo?() }
             .accessibilityAction(named: Text("Copy Comment Text")) { copyText() }
             .accessibilityAction(named: Text("Share Comment")) { presentShareSheet() }

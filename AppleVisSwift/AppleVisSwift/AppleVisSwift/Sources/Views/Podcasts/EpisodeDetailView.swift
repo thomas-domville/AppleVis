@@ -12,6 +12,7 @@ struct EpisodeDetailView: View {
     @State private var hasMoreComments = true
     @State private var artworkDescription: String?
     @AccessibilityFocusState private var isTitleFocused: Bool
+    @AccessibilityFocusState private var focusedCommentId: String?
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -42,36 +43,38 @@ struct EpisodeDetailView: View {
 
     @ViewBuilder
     private func content(_ episode: PodcastEpisode) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                // Hero
-                heroCard(episode).padding()
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Hero
+                    heroCard(episode).padding()
 
-                // Chapters
-                if !episode.chapters.isEmpty {
-                    sectionHeading("Chapters")
-                        .onAppear { tips.show(.episodeChapters) }
-                    ForEach(episode.chapters) { chapter in
-                        ChapterRow(chapter: chapter) {
-                            Task { await player.seek(to: chapter.startTime) }
+                    // Chapters
+                    if !episode.chapters.isEmpty {
+                        sectionHeading("Chapters")
+                            .onAppear { tips.show(.episodeChapters) }
+                        ForEach(episode.chapters) { chapter in
+                            ChapterRow(chapter: chapter) {
+                                Task { await player.seek(to: chapter.startTime) }
+                            }
+                            Divider().padding(.leading)
                         }
-                        Divider().padding(.leading)
                     }
+
+                    // Description
+                    if !episode.description.isEmpty {
+                        sectionHeading("Episode Notes")
+                        HTMLTextView(html: episode.description)
+                            .padding(.horizontal).padding(.bottom, 16)
+                    }
+
+                    Divider()
+
+                    // Comments
+                    commentsSection(episode: episode, proxy: proxy)
+
+                    Color.clear.frame(height: 40)
                 }
-
-                // Description
-                if !episode.description.isEmpty {
-                    sectionHeading("Episode Notes")
-                    HTMLTextView(html: episode.description)
-                        .padding(.horizontal).padding(.bottom, 16)
-                }
-
-                Divider()
-
-                // Comments
-                commentsSection
-
-                Color.clear.frame(height: 40)
             }
         }
         .toolbar {
@@ -188,10 +191,12 @@ struct EpisodeDetailView: View {
     }
 
     @ViewBuilder
-    private var commentsSection: some View {
-        CommunityDiscussionHeading(count: comments.count) {
-            announceThreadOverview()
-        }
+    private func commentsSection(episode: PodcastEpisode, proxy: ScrollViewProxy) -> some View {
+        CommunityDiscussionHeading(
+            count: comments.count,
+            onThreadOverview: { announceThreadOverview() },
+            onJumpToLast: { Task { await jumpToLastComment(proxy: proxy) } }
+        )
 
         if comments.isEmpty {
             Text("No comments yet.")
@@ -209,8 +214,10 @@ struct EpisodeDetailView: View {
                     onEdit: { newText in
                         guard let idx = comments.firstIndex(where: { $0.id == comment.id }) else { return }
                         comments[idx] = PodcastComment(id: comment.id, authorName: comment.authorName, authorId: comment.authorId, body: newText, createdAt: comment.createdAt)
-                    }
+                    },
+                    focusBinding: $focusedCommentId
                 )
+                .id(comment.id)
                 Divider().padding(.leading)
             }
 
@@ -218,9 +225,12 @@ struct EpisodeDetailView: View {
                 if isLoadingMoreComments {
                     ProgressView().frame(maxWidth: .infinity).padding()
                 } else {
-                    Button("Load More Comments") { Task { await loadMoreComments() } }
-                        .frame(maxWidth: .infinity)
-                        .padding()
+                    let remaining = episode.commentCount - comments.count
+                    Button(remaining > 0 ? "Load \(remaining) More Comments" : "Load More Comments") {
+                        Task { await loadMoreComments() }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
                 }
             }
         }
@@ -260,16 +270,34 @@ struct EpisodeDetailView: View {
         isLoading = false
     }
 
+    /// Loads every remaining page in one go instead of requiring a tap per
+    /// page — the server clamps each request to its own max page size, so
+    /// an episode with many comments could otherwise take several manual
+    /// "Load More" taps to fully unroll.
     private func loadMoreComments() async {
         isLoadingMoreComments = true
         do {
-            let more = try await APIClient.shared.podcasts.moreComments(episodeId: episodeId, offset: comments.count)
-            comments.append(contentsOf: more)
-            hasMoreComments = !more.isEmpty && comments.count < (episode?.commentCount ?? 0)
+            while comments.count < (episode?.commentCount ?? 0) {
+                let more = try await APIClient.shared.podcasts.moreComments(episodeId: episodeId, offset: comments.count)
+                guard !more.isEmpty else { break }
+                comments.append(contentsOf: more)
+            }
         } catch {
             toast.error("Couldn't load more comments.")
         }
+        hasMoreComments = comments.count < (episode?.commentCount ?? 0)
         isLoadingMoreComments = false
+    }
+
+    /// "Jump to Last Comment" custom action on the Community Discussion
+    /// heading — loads any not-yet-fetched comments first so it always
+    /// lands on the true last one, then moves VoiceOver focus there.
+    private func jumpToLastComment(proxy: ScrollViewProxy) async {
+        if hasMoreComments { await loadMoreComments() }
+        guard let lastId = comments.last?.id else { return }
+        withAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
+        try? await Task.sleep(for: .milliseconds(400))
+        focusedCommentId = lastId
     }
 }
 
