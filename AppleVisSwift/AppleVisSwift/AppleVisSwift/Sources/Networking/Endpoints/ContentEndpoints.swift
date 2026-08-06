@@ -288,15 +288,34 @@ struct SearchEndpoints {
             query: ["filter[title][operator]": "CONTAINS", "filter[title][value]": trimmed, "sort": "-changed", "page[limit]": "10"]
         )
 
-        let forums = (try? await forumsRes).map { r in r.data.map { Mappers.forum($0, included: r.included ?? []) } } ?? []
-        let apps = (try? await appsRes).map { r in r.data.map { Mappers.app($0, included: r.included ?? []) } } ?? []
-        let guides = (try? await guidesRes).map { r in r.data.map { Mappers.resource($0, included: r.included ?? []) } } ?? []
-        let blogs = (try? await blogsRes).map { r in r.data.map { Mappers.blog($0, included: r.included ?? []) } } ?? []
-        let podcasts = (try? await podcastsRes).map { r in r.data.map { Mappers.podcast($0, included: r.included ?? []) } } ?? []
-        let iosBugs = (try? await iosBugsRes).map { r in r.data.map { Mappers.bug($0, platform: .ios) } } ?? []
-        let macBugs = (try? await macBugsRes).map { r in r.data.map { Mappers.bug($0, platform: .macos) } } ?? []
+        var failed: [String] = []
 
-        return SearchResults(forums: forums, apps: apps, guides: guides, blogs: blogs, podcasts: podcasts, bugs: iosBugs + macBugs)
+        let forumsResult = try? await forumsRes
+        if forumsResult == nil { failed.append("Forums") }
+        let appsResult = try? await appsRes
+        if appsResult == nil { failed.append("Apps") }
+        let guidesResult = try? await guidesRes
+        if guidesResult == nil { failed.append("Guides") }
+        let blogsResult = try? await blogsRes
+        if blogsResult == nil { failed.append("Blogs") }
+        let podcastsResult = try? await podcastsRes
+        if podcastsResult == nil { failed.append("Podcasts") }
+        let iosBugsResult = try? await iosBugsRes
+        let macBugsResult = try? await macBugsRes
+        if iosBugsResult == nil && macBugsResult == nil { failed.append("Bug Reports") }
+
+        let forums = forumsResult.map { r in r.data.map { Mappers.forum($0, included: r.included ?? []) } } ?? []
+        let apps = appsResult.map { r in r.data.map { Mappers.app($0, included: r.included ?? []) } } ?? []
+        let guides = guidesResult.map { r in r.data.map { Mappers.resource($0, included: r.included ?? []) } } ?? []
+        let blogs = blogsResult.map { r in r.data.map { Mappers.blog($0, included: r.included ?? []) } } ?? []
+        let podcasts = podcastsResult.map { r in r.data.map { Mappers.podcast($0, included: r.included ?? []) } } ?? []
+        let iosBugs = iosBugsResult.map { r in r.data.map { Mappers.bug($0, platform: .ios) } } ?? []
+        let macBugs = macBugsResult.map { r in r.data.map { Mappers.bug($0, platform: .macos) } } ?? []
+
+        return SearchResults(
+            forums: forums, apps: apps, guides: guides, blogs: blogs, podcasts: podcasts, bugs: iosBugs + macBugs,
+            failedCategories: failed
+        )
     }
 }
 
@@ -307,6 +326,12 @@ struct SearchResults {
     let blogs: [BlogPost]
     let podcasts: [PodcastEpisode]
     let bugs: [BugReport]
+    /// Display names of categories whose request failed — lets the UI tell
+    /// "search failed for some sources" apart from "genuinely zero
+    /// matches," which previously looked identical: every per-category
+    /// fetch already swallowed its own errors into an empty array with no
+    /// signal anywhere that anything had gone wrong.
+    var failedCategories: [String] = []
 }
 
 // MARK: - Flags (follow any content — "save" has no server counterpart, see PersistenceStore)

@@ -38,6 +38,10 @@ struct EmptyStateView: View {
     let title: String
     let message: String
     var systemImage: String = "tray"
+    var primaryActionLabel: String? = nil
+    var primaryAction: (() -> Void)? = nil
+    var secondaryActionLabel: String? = nil
+    var secondaryAction: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 12) {
@@ -50,6 +54,15 @@ struct EmptyStateView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+            if let primaryActionLabel, let primaryAction {
+                Button(primaryActionLabel, action: primaryAction)
+                    .buttonStyle(.borderedProminent)
+                    .padding(.top, 4)
+            }
+            if let secondaryActionLabel, let secondaryAction {
+                Button(secondaryActionLabel, action: secondaryAction)
+                    .buttonStyle(.bordered)
+            }
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)

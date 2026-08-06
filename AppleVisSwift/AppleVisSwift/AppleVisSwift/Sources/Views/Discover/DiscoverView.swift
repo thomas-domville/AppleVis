@@ -54,7 +54,11 @@ struct DiscoverView: View {
                             .padding(.horizontal)
                             .padding(.top, 8)
                         }
-                        SearchResultsView(results: searchResults, isSearching: isSearching)
+                        SearchResultsView(
+                            results: searchResults, isSearching: isSearching,
+                            onRetry: { runSearch(searchText) },
+                            onClearSearch: { searchText = "" }
+                        )
                     }
                 }
             }
@@ -130,9 +134,12 @@ struct DiscoverView: View {
             !results.forums.isEmpty, !results.apps.isEmpty, !results.guides.isEmpty,
             !results.blogs.isEmpty, !results.podcasts.isEmpty, !results.bugs.isEmpty,
         ].filter { $0 }.count
-        let message = total == 0
+        var message = total == 0
             ? "No results found."
             : "\(total) result\(total == 1 ? "" : "s") found in \(categoryCount) categor\(categoryCount == 1 ? "y" : "ies")."
+        if !results.failedCategories.isEmpty {
+            message += " Some results may be missing: \(results.failedCategories.joined(separator: ", "))."
+        }
         UIAccessibility.post(notification: .announcement, argument: message)
 
         if lastAnnouncedResultCount != total {
