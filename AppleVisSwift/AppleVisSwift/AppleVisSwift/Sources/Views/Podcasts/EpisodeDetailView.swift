@@ -193,7 +193,7 @@ struct EpisodeDetailView: View {
     @ViewBuilder
     private func commentsSection(episode: PodcastEpisode, proxy: ScrollViewProxy) -> some View {
         CommunityDiscussionHeading(
-            count: comments.count,
+            count: episode.commentCount,
             onThreadOverview: { announceThreadOverview() },
             onJumpToLast: { Task { await jumpToLastComment(proxy: proxy) } }
         )
@@ -264,6 +264,13 @@ struct EpisodeDetailView: View {
             // Comparing against the episode's own known commentCount is
             // correct regardless of the server's actual page size.
             hasMoreComments = fetchedComments.count < fetchedEp.commentCount
+            // Fetch every remaining page automatically instead of waiting for
+            // a "Load More" tap — the heading already shows the true total
+            // (commentCount), so leaving the rest behind a manual tap just
+            // contradicted what the count said was there.
+            if hasMoreComments {
+                Task { await loadMoreComments() }
+            }
             SpotlightIndexer.index(fetchedEp)
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Couldn't load episode." }

@@ -96,7 +96,7 @@ struct ResourceDetailView: View {
     @ViewBuilder
     private func commentsSection(_ detail: ResourceDetail, proxy: ScrollViewProxy) -> some View {
         CommunityDiscussionHeading(
-            count: detail.comments.count,
+            count: detail.commentCount,
             onThreadOverview: { announceThreadOverview(detail) },
             onJumpToLast: { Task { await jumpToLastComment(proxy: proxy) } }
         )
@@ -161,6 +161,13 @@ struct ResourceDetailView: View {
             // Comparing against the guide's own known commentCount is
             // correct regardless of the server's actual page size.
             hasMoreComments = (detail?.comments.count ?? 0) < (detail?.commentCount ?? 0)
+            // Fetch every remaining page automatically instead of waiting for
+            // a "Load More" tap — the heading already shows the true total
+            // (commentCount), so leaving the rest behind a manual tap just
+            // contradicted what the count said was there.
+            if hasMoreComments {
+                Task { await loadMoreComments() }
+            }
             if let detail {
                 SpotlightIndexer.index(Resource(
                     id: detail.id, title: detail.title, kind: detail.kind, authorName: detail.authorName,

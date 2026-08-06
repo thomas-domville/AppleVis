@@ -102,7 +102,7 @@ struct ForumTopicDetailView: View {
                     // Replies
                     if !detail.replies.isEmpty {
                         CommunityDiscussionHeading(
-                            count: detail.replies.count,
+                            count: detail.replyCount,
                             onThreadOverview: { announceThreadOverview(detail) },
                             onJumpToLast: { Task { await jumpToLastReply(proxy: proxy) } }
                         )
@@ -283,6 +283,13 @@ struct ForumTopicDetailView: View {
             // the row's "N replies" label) is correct regardless of
             // whatever page size the server actually enforces.
             hasMoreReplies = (detail?.replies.count ?? 0) < (detail?.replyCount ?? 0)
+            // Fetch every remaining page automatically instead of waiting for
+            // a "Load More" tap — requested directly: the heading already
+            // shows the true total (replyCount), so leaving the rest behind
+            // a manual tap just contradicted what the count said was there.
+            if hasMoreReplies {
+                Task { await loadMoreReplies() }
+            }
             if let detail {
                 SpotlightIndexer.index(ForumTopic(
                     id: detail.id, title: detail.title, authorName: detail.authorName, authorId: detail.authorId,
