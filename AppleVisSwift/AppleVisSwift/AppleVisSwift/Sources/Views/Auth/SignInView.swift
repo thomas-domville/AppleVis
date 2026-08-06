@@ -8,6 +8,7 @@ struct SignInView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+    @AccessibilityFocusState private var isErrorFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -52,6 +53,8 @@ struct SignInView: View {
                                 .textFieldStyle(.roundedBorder)
                                 .textContentType(.password)
                                 .onSubmit { Task { await signIn() } }
+                                .accessibilityLabel("Password")
+                                .accessibilityHint("Enter your AppleVis account password.")
                         }
 
                         if let err = signInError {
@@ -64,6 +67,7 @@ struct SignInView: View {
                             .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
                             .accessibilityElement(children: .combine)
                             .accessibilityLabel(err)
+                            .accessibilityFocused($isErrorFocused)
                         }
 
                         Button {
@@ -119,6 +123,7 @@ struct SignInView: View {
             dismiss()
         } else {
             signInError = auth.error ?? "Sign in failed. Please try again."
+            isErrorFocused = true
         }
     }
 }

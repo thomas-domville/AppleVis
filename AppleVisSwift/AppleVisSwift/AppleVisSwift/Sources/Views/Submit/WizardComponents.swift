@@ -26,7 +26,9 @@ struct WizardStepIndicator: View {
     }
 }
 
-private struct OptionalAccessibilityFocus: ViewModifier {
+/// Not private so other screens with the same "focus this heading after a
+/// transition" need (e.g. OnboardingView's step headers) can reuse it.
+struct OptionalAccessibilityFocus: ViewModifier {
     let isFocused: AccessibilityFocusState<Bool>.Binding?
 
     func body(content: Content) -> some View {

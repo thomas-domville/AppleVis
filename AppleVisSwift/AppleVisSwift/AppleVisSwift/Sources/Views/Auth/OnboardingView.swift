@@ -7,16 +7,23 @@ struct OnboardingView: View {
 
     @State private var step = 0
     private let totalSteps = 6
+    /// Every step's header binds to this so VoiceOver focus moves there after
+    /// Next/Skip — previously each step was a distinct pushed screen in the
+    /// old RN app, which got an automatic focus/announcement from React
+    /// Navigation's screen transition for free; collapsing all 6 steps into
+    /// one ZStack + switch here lost that for free, and nothing was added to
+    /// compensate, so every step change was completely silent for VoiceOver.
+    @AccessibilityFocusState private var isStepHeaderFocused: Bool
 
     var body: some View {
         ZStack {
             switch step {
-            case 0: WelcomeStep(onNext: nextStep)
-            case 1: SignInStep(onNext: nextStep, onSkip: nextStep)
-            case 2: ThemeStep(onNext: nextStep)
-            case 3: AnnouncementStep(onNext: nextStep)
-            case 4: NotificationsStep(onNext: nextStep)
-            case 5: ReadyStep(onFinish: finish)
+            case 0: WelcomeStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
+            case 1: SignInStep(onNext: nextStep, onSkip: nextStep, headerFocus: $isStepHeaderFocused)
+            case 2: ThemeStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
+            case 3: AnnouncementStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
+            case 4: NotificationsStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
+            case 5: ReadyStep(onFinish: finish, headerFocus: $isStepHeaderFocused)
             default: EmptyView()
             }
         }
@@ -25,6 +32,10 @@ struct OnboardingView: View {
 
     private func nextStep() {
         withAnimation { step = min(step + 1, totalSteps - 1) }
+        Task {
+            try? await Task.sleep(for: .milliseconds(350))
+            isStepHeaderFocused = true
+        }
     }
 
     private func finish() {
@@ -36,6 +47,7 @@ struct OnboardingView: View {
 
 private struct WelcomeStep: View {
     let onNext: () -> Void
+    let headerFocus: AccessibilityFocusState<Bool>.Binding
 
     private let features: [(icon: String, title: String, desc: String)] = [
         ("voiceover",       "Built for VoiceOver",         "Every screen crafted for screen-reader access from the ground up."),
@@ -59,6 +71,7 @@ private struct WelcomeStep: View {
                         .fontWeight(.bold)
                         .multilineTextAlignment(.center)
                         .accessibilityAddTraits(.isHeader)
+                        .modifier(OptionalAccessibilityFocus(isFocused: headerFocus))
 
                     Text("The community for blind and low-vision Apple users.")
                         .font(.title3)
@@ -110,9 +123,11 @@ private struct SignInStep: View {
     @EnvironmentObject private var auth: AuthStore
     let onNext: () -> Void
     let onSkip: () -> Void
+    let headerFocus: AccessibilityFocusState<Bool>.Binding
 
     @State private var username = ""
     @State private var password = ""
+    @AccessibilityFocusState private var isErrorFocused: Bool
 
     var body: some View {
         ScrollView {
@@ -120,7 +135,8 @@ private struct SignInStep: View {
                 OnboardingHeader(
                     icon: "person.crop.circle",
                     title: "Sign In",
-                    subtitle: "Sign in to post in forums, track saved items, and sync across devices. You can skip this and sign in later."
+                    subtitle: "Sign in to post in forums, track saved items, and sync across devices. You can skip this and sign in later.",
+                    headerFocus: headerFocus
                 )
 
                 VStack(spacing: 16) {
@@ -145,6 +161,7 @@ private struct SignInStep: View {
                             .font(.caption)
                             .foregroundStyle(.red)
                             .accessibilityLabel("Error: \(error)")
+                            .accessibilityFocused($isErrorFocused)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -179,7 +196,11 @@ private struct SignInStep: View {
     private func signIn() {
         Task {
             await auth.signIn(username: username, password: password)
-            if auth.isSignedIn { onNext() }
+            if auth.isSignedIn {
+                onNext()
+            } else {
+                isErrorFocused = true
+            }
         }
     }
 }
@@ -189,6 +210,7 @@ private struct SignInStep: View {
 private struct ThemeStep: View {
     @EnvironmentObject private var preferences: PreferencesStore
     let onNext: () -> Void
+    let headerFocus: AccessibilityFocusState<Bool>.Binding
 
     var body: some View {
         ScrollView {
@@ -196,7 +218,8 @@ private struct ThemeStep: View {
                 OnboardingHeader(
                     icon: "paintbrush",
                     title: "Choose a Theme",
-                    subtitle: "Pick your preferred colour scheme. You can always change this later in Settings."
+                    subtitle: "Pick your preferred colour scheme. You can always change this later in Settings.",
+                    headerFocus: headerFocus
                 )
 
                 VStack(alignment: .leading, spacing: 20) {
@@ -259,6 +282,7 @@ private struct ThemeStep: View {
 private struct AnnouncementStep: View {
     @EnvironmentObject private var preferences: PreferencesStore
     let onNext: () -> Void
+    let headerFocus: AccessibilityFocusState<Bool>.Binding
 
     var body: some View {
         ScrollView {
@@ -266,7 +290,8 @@ private struct AnnouncementStep: View {
                 OnboardingHeader(
                     icon: "speaker.wave.3",
                     title: "VoiceOver Detail Level",
-                    subtitle: "How much information should VoiceOver announce for each content item? You can change this in Accessibility Settings."
+                    subtitle: "How much information should VoiceOver announce for each content item? You can change this in Accessibility Settings.",
+                    headerFocus: headerFocus
                 )
 
                 VStack(spacing: 12) {
@@ -321,6 +346,7 @@ private struct NotificationsStep: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var auth: AuthStore
     let onNext: () -> Void
+    let headerFocus: AccessibilityFocusState<Bool>.Binding
 
     @State private var permissionGranted: Bool? = nil
 
@@ -330,7 +356,8 @@ private struct NotificationsStep: View {
                 OnboardingHeader(
                     icon: "bell.badge",
                     title: "Notifications",
-                    subtitle: "Choose which alerts you'd like to receive. You can update these anytime in Settings."
+                    subtitle: "Choose which alerts you'd like to receive. You can update these anytime in Settings.",
+                    headerFocus: headerFocus
                 )
 
                 VStack(spacing: 0) {
@@ -454,6 +481,7 @@ private struct ReadyStep: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var auth: AuthStore
     let onFinish: () -> Void
+    let headerFocus: AccessibilityFocusState<Bool>.Binding
 
     private var summaryItems: [(icon: String, text: String)] {
         var items: [(String, String)] = []
@@ -469,7 +497,8 @@ private struct ReadyStep: View {
                 OnboardingHeader(
                     icon: "checkmark.circle.fill",
                     title: "You're All Set",
-                    subtitle: "AppleVis is ready for you. Here's a summary of your setup:"
+                    subtitle: "AppleVis is ready for you. Here's a summary of your setup:",
+                    headerFocus: headerFocus
                 )
 
                 VStack(spacing: 12) {
@@ -507,6 +536,13 @@ private struct ReadyStep: View {
             }
             .padding(.top, 48)
         }
+        .onAppear {
+            let summary = summaryItems.map(\.text).joined(separator: ". ")
+            Task {
+                try? await Task.sleep(for: .milliseconds(600))
+                UIAccessibility.post(notification: .announcement, argument: "Setup complete. \(summary).")
+            }
+        }
     }
 }
 
@@ -516,6 +552,7 @@ private struct OnboardingHeader: View {
     let icon: String
     let title: String
     let subtitle: String
+    var headerFocus: AccessibilityFocusState<Bool>.Binding? = nil
 
     var body: some View {
         VStack(spacing: 12) {
@@ -535,5 +572,6 @@ private struct OnboardingHeader: View {
         }
         .padding(.horizontal, 24)
         .accessibilityElement(children: .combine)
+        .modifier(OptionalAccessibilityFocus(isFocused: headerFocus))
     }
 }
