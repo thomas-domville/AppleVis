@@ -160,12 +160,16 @@ struct ForumTopicDetailView: View {
                     Task { await summarizeThread(detail) }
                 } label: {
                     if isSummarizing {
-                        ProgressView()
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("Summarizing…")
+                        }
                     } else {
                         Label("Summarize Thread", systemImage: "sparkles")
                     }
                 }
                 .disabled(isSummarizing)
+                .accessibilityLabel(isSummarizing ? "Summarizing thread, please wait" : "Summarize Thread")
             }
         }
         .padding(12)
@@ -176,6 +180,10 @@ struct ForumTopicDetailView: View {
 
     private func summarizeThread(_ detail: ForumTopicDetail) async {
         isSummarizing = true
+        // The button dims/disables while loading, but a disabled control on
+        // its own gives a VoiceOver user no confirmation the tap actually
+        // registered versus just failing to respond — announce explicitly.
+        UIAccessibility.post(notification: .announcement, argument: "Summarizing thread. This may take a moment.")
         if let summary = await IntelligenceService.summarize(summaryInput(for: detail)) {
             threadSummary = summary
         } else {
@@ -194,13 +202,18 @@ struct ForumTopicDetailView: View {
     /// exceed the on-device FoundationModels context window, which throws a
     /// generation error IntelligenceService swallows. That silently broke
     /// "Summarize Thread" on exactly the threads a summary is most useful
-    /// for (this was reported directly: "a topic that has lots of comments").
+    /// for (this was reported directly, twice: once in general, then
+    /// specifically reproduced on a 30-reply thread that still failed under
+    /// the first, more generous cap — the exact on-device context limit
+    /// isn't documented, so this trades some summary detail for headroom
+    /// rather than trying to find the precise ceiling by trial and error).
     private func summaryInput(for detail: ForumTopicDetail) -> String {
-        let maxTotalCharacters = 6000
-        let maxPerReply = 400
+        let maxTotalCharacters = 3000
+        let maxPerReply = 220
+        let maxReplies = 20
         var parts = [String(detail.body.strippingHTMLTags().prefix(maxPerReply * 2))]
         var remaining = maxTotalCharacters - parts[0].count
-        for reply in detail.replies.prefix(30) {
+        for reply in detail.replies.prefix(maxReplies) {
             guard remaining > 0 else { break }
             let body = reply.body.strippingHTMLTags().prefix(maxPerReply)
             let part = "\(reply.authorName): \(body)"

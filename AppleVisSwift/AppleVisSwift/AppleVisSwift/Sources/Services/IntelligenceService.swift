@@ -129,6 +129,15 @@ enum IntelligenceService {
             let response = try await session.respond(to: prompt)
             return response.content
         } catch {
+            // Every caller here just returns nil on failure — this is the
+            // one place that can see *why*, so log it rather than
+            // discarding the reason entirely (context-window overflow,
+            // guardrail rejection, and rate limiting all look identical to
+            // callers otherwise, which made repeated reports of "it just
+            // does nothing" hard to diagnose without a device console).
+            #if DEBUG
+            print("IntelligenceService generation failed: \(error)")
+            #endif
             return nil
         }
     }
