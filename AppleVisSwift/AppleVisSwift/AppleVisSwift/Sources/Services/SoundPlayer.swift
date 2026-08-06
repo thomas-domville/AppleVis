@@ -36,24 +36,14 @@ enum AppSound: String {
 
     /// Reads through PreferencesStore's own property — the exact same one
     /// SwiftUI's Settings Toggle reads and writes — instead of an
-    /// independent `UserDefaults.standard` lookup. The two were observed to
-    /// disagree live on-device (Settings showed "Interface Sounds" on; a
-    /// raw UserDefaults read of "sound.interface" still came back nil even
-    /// immediately after explicitly toggling it off and back on), so this
-    /// removes any chance of that drift by going through the single
-    /// AppStorage-backed property both places actually use.
+    /// independent `UserDefaults.standard` lookup, so the two can never
+    /// disagree with each other.
     @MainActor
     var shouldPlay: Bool {
         if Self.alwaysOn.contains(self) { return true }
-        #if DEBUG
-        print("SoundPlayer: PreferencesStore.current is \(PreferencesStore.current == nil ? "nil" : "set (\(ObjectIdentifier(PreferencesStore.current!)))")")
-        #endif
         guard let preferences = PreferencesStore.current else {
             return !Self.interfaceSounds.contains(self)
         }
-        #if DEBUG
-        print("SoundPlayer: live interfaceSoundsEnabled=\(preferences.interfaceSoundsEnabled), confirmationSoundsEnabled=\(preferences.confirmationSoundsEnabled)")
-        #endif
         return Self.interfaceSounds.contains(self)
             ? preferences.interfaceSoundsEnabled
             : preferences.confirmationSoundsEnabled
@@ -72,12 +62,7 @@ final class SoundPlayer {
     private init() {}
 
     func play(_ sound: AppSound) {
-        guard sound.shouldPlay else {
-            #if DEBUG
-            print("SoundPlayer: skipping '\(sound.rawValue)' — shouldPlay is false")
-            #endif
-            return
-        }
+        guard sound.shouldPlay else { return }
         play(filename: sound.rawValue, ext: "wav")
     }
 
@@ -100,31 +85,17 @@ final class SoundPlayer {
         let key = filename
         if let cached = players[key] {
             cached.currentTime = 0
-            let started = cached.play()
-            #if DEBUG
-            print("SoundPlayer: replaying '\(filename)', started=\(started), volume=\(cached.volume), session category=\(AVAudioSession.sharedInstance().category.rawValue), sessionActive=\(AVAudioSession.sharedInstance().isOtherAudioPlaying)")
-            #endif
+            cached.play()
             return
         }
 
         guard let url = Bundle.main.url(forResource: filename, withExtension: ext) else {
-            #if DEBUG
-            print("SoundPlayer: '\(filename).\(ext)' not found in bundle")
-            #endif
             return
         }
-        guard let player = try? AVAudioPlayer(contentsOf: url) else {
-            #if DEBUG
-            print("SoundPlayer: failed to create AVAudioPlayer for '\(filename)'")
-            #endif
-            return
-        }
+        guard let player = try? AVAudioPlayer(contentsOf: url) else { return }
         player.prepareToPlay()
         players[key] = player
-        let started = player.play()
-        #if DEBUG
-        print("SoundPlayer: playing '\(filename)' for the first time, started=\(started), category=\(AVAudioSession.sharedInstance().category.rawValue)")
-        #endif
+        player.play()
     }
 
     /// Reasserts `.ambient`/`.mixWithOthers` whenever the shared session
@@ -134,26 +105,11 @@ final class SoundPlayer {
     /// once that happens, a one-time "already configured" guard here left
     /// every UI sound effect permanently, silently broken for the rest of
     /// the app session (AVAudioPlayer.play() just no-ops under the wrong
-    /// category, with no error anywhere) — this was reported directly as
-    /// tab-change/refresh sounds going silent, and is also the most likely
-    /// cause of a separate report that a tab's VoiceOver "selected"
-    /// announcement was getting cut off: an audio session/category change
-    /// while VoiceOver speech is in flight can interrupt it, and skipping
-    /// the reassert when the category is already correct (the common case)
-    /// avoids doing that on every single sound.
+    /// category, with no error anywhere).
     private func configureSession() {
         let session = AVAudioSession.sharedInstance()
         guard session.category != .ambient || !session.categoryOptions.contains(.mixWithOthers) else { return }
-        #if DEBUG
-        print("SoundPlayer: reconfiguring session, was category=\(session.category.rawValue) options=\(session.categoryOptions.rawValue)")
-        #endif
-        do {
-            try session.setCategory(.ambient, options: [.mixWithOthers])
-            try session.setActive(true)
-        } catch {
-            #if DEBUG
-            print("SoundPlayer: failed to reconfigure session: \(error)")
-            #endif
-        }
+        try? session.setCategory(.ambient, options: [.mixWithOthers])
+        try? session.setActive(true)
     }
 }
