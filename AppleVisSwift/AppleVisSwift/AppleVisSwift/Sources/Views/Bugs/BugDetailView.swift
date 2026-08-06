@@ -7,9 +7,18 @@ struct BugDetailView: View {
     @State private var error: String?
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
+    @State private var bugSummary: String?
+    @State private var isSummarizingBug = false
+    @State private var discussionSummary: String?
+    @State private var isSummarizingDiscussion = false
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedCommentId: String?
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var preferences: PreferencesStore
+
+    /// Matches the old app's exact "Report to Apple" / "Apple Feedback ID"
+    /// destination.
+    private static let feedbackAssistantURL = URL(string: "https://feedbackassistant.apple.com/")!
 
     var body: some View {
         Group {
@@ -47,6 +56,10 @@ struct BugDetailView: View {
                     // Metadata
                     metaGrid(detail).padding(.horizontal)
 
+                    if let feedbackId = detail.feedbackId, !feedbackId.isEmpty {
+                        feedbackIdRow(feedbackId).padding(.horizontal)
+                    }
+
                     Divider()
 
                     // Description
@@ -67,6 +80,10 @@ struct BugDetailView: View {
 
                     Divider()
 
+                    if preferences.aiSummariesEnabled && IntelligenceService.isAvailable {
+                        aiSummarySection(detail)
+                    }
+
                     // Comments
                     commentsSection(detail, proxy: proxy)
 
@@ -75,9 +92,149 @@ struct BugDetailView: View {
                 .padding(.vertical)
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Link(destination: Self.feedbackAssistantURL) {
+                    Image(systemName: "flag")
+                }
+                .accessibilityLabel("Report to Apple")
+                .accessibilityHint("Opens Feedback Assistant to file this with Apple directly.")
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             ContentDetailActions(id: detail.id, kind: .bugReport, title: detail.title, lastActivityAt: detail.changedAt, url: detail.url)
         }
+    }
+
+    /// Matches the old app's tappable "Apple Feedback ID" row — the field
+    /// was already fetched (`field_apple_feedback_`) but never displayed or
+    /// used anywhere.
+    private func feedbackIdRow(_ feedbackId: String) -> some View {
+        Link(destination: Self.feedbackAssistantURL) {
+            HStack {
+                Image(systemName: "exclamationmark.bubble").foregroundStyle(Color.accentColor)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Apple Feedback ID").font(.caption).foregroundStyle(.secondary)
+                    Text(feedbackId).font(.subheadline).fontWeight(.medium)
+                }
+                Spacer()
+                Image(systemName: "arrow.up.right.square").foregroundStyle(.secondary)
+            }
+            .padding(10)
+            .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Apple Feedback ID: \(feedbackId).")
+        .accessibilityHint("Double-tap to open Feedback Assistant.")
+    }
+
+    /// Two independent AI actions, matching Forums/Apps/Guides/Blogs —
+    /// previously BugDetailView had no Apple Intelligence integration at
+    /// all, the last content-detail screen without it.
+    @ViewBuilder
+    private func aiSummarySection(_ detail: BugReportDetail) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            bugSummaryRow(detail)
+            if detail.comments.count >= 5 {
+                Divider()
+                discussionSummaryRow(detail)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal)
+    }
+
+    @ViewBuilder
+    private func bugSummaryRow(_ detail: BugReportDetail) -> some View {
+        if let bugSummary {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Bug Report Summary", systemImage: "sparkles")
+                    .font(.caption).fontWeight(.bold).foregroundStyle(Color.accentColor)
+                Text(bugSummary).font(.subheadline)
+            }
+        } else {
+            Button {
+                Task { await summarizeBug(detail) }
+            } label: {
+                if isSummarizingBug {
+                    HStack(spacing: 8) { ProgressView(); Text("Summarizing…") }
+                } else {
+                    Label("Summarize Bug Report", systemImage: "sparkles")
+                }
+            }
+            .disabled(isSummarizingBug)
+            .accessibilityLabel(isSummarizingBug ? "Summarizing bug report, please wait" : "Summarize Bug Report")
+        }
+    }
+
+    @ViewBuilder
+    private func discussionSummaryRow(_ detail: BugReportDetail) -> some View {
+        if let discussionSummary {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Discussion Summary", systemImage: "sparkles")
+                    .font(.caption).fontWeight(.bold).foregroundStyle(Color.accentColor)
+                Text(discussionSummary).font(.subheadline)
+            }
+        } else {
+            Button {
+                Task { await summarizeDiscussion(detail) }
+            } label: {
+                if isSummarizingDiscussion {
+                    HStack(spacing: 8) { ProgressView(); Text("Summarizing…") }
+                } else {
+                    Label("Summarize Discussion", systemImage: "sparkles")
+                }
+            }
+            .disabled(isSummarizingDiscussion)
+            .accessibilityLabel(isSummarizingDiscussion ? "Summarizing discussion, please wait" : "Summarize Discussion")
+        }
+    }
+
+    private func summarizeBug(_ detail: BugReportDetail) async {
+        isSummarizingBug = true
+        UIAccessibility.post(notification: .announcement, argument: "Summarizing bug report. This may take a moment.")
+        var parts = ["Bug report: \(detail.title)", detail.body.strippingHTMLTags().prefix(1500).description]
+        if let steps = detail.stepsToReproduce, !steps.isEmpty {
+            parts.append("Steps to reproduce: \(steps.strippingHTMLTags().prefix(800))")
+        }
+        if let workaround = detail.workaround, !workaround.isEmpty {
+            parts.append("Workaround: \(workaround.strippingHTMLTags().prefix(500))")
+        }
+        let input = parts.joined(separator: "\n\n")
+        if let summary = await IntelligenceService.summarize(input) {
+            bugSummary = summary
+        } else {
+            toast.error("Couldn't generate a summary for this bug report. Try again.")
+            UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a summary for this bug report.")
+        }
+        isSummarizingBug = false
+    }
+
+    private func summarizeDiscussion(_ detail: BugReportDetail) async {
+        isSummarizingDiscussion = true
+        UIAccessibility.post(notification: .announcement, argument: "Summarizing discussion. This may take a moment.")
+        let maxTotalCharacters = 3000
+        let maxPerComment = 220
+        var parts: [String] = []
+        var remaining = maxTotalCharacters
+        for comment in detail.comments.prefix(20) {
+            guard remaining > 0 else { break }
+            let body = comment.body.strippingHTMLTags().prefix(maxPerComment)
+            let part = "\(comment.authorName): \(body)"
+            parts.append(String(part.prefix(remaining)))
+            remaining -= part.count
+        }
+        let input = "Bug report: \(detail.title)\n\n\(parts.joined(separator: "\n\n"))"
+        if let summary = await IntelligenceService.summarize(input) {
+            discussionSummary = summary
+        } else {
+            toast.error("Couldn't generate a discussion summary. Try again.")
+            UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a discussion summary.")
+        }
+        isSummarizingDiscussion = false
     }
 
     private func statusBanner(_ detail: BugReportDetail) -> some View {
