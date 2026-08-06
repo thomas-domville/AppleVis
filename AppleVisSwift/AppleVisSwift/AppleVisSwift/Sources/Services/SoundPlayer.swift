@@ -45,9 +45,15 @@ enum AppSound: String {
     @MainActor
     var shouldPlay: Bool {
         if Self.alwaysOn.contains(self) { return true }
+        #if DEBUG
+        print("SoundPlayer: PreferencesStore.current is \(PreferencesStore.current == nil ? "nil" : "set (\(ObjectIdentifier(PreferencesStore.current!)))")")
+        #endif
         guard let preferences = PreferencesStore.current else {
             return !Self.interfaceSounds.contains(self)
         }
+        #if DEBUG
+        print("SoundPlayer: live interfaceSoundsEnabled=\(preferences.interfaceSoundsEnabled), confirmationSoundsEnabled=\(preferences.confirmationSoundsEnabled)")
+        #endif
         return Self.interfaceSounds.contains(self)
             ? preferences.interfaceSoundsEnabled
             : preferences.confirmationSoundsEnabled

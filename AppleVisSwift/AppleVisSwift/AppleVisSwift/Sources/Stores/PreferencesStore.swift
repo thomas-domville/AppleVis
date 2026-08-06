@@ -15,6 +15,9 @@ final class PreferencesStore: ObservableObject {
 
     init() {
         PreferencesStore.current = self
+        #if DEBUG
+        print("PreferencesStore: init, set current=\(ObjectIdentifier(self)), interfaceSoundsEnabled=\(interfaceSoundsEnabled)")
+        #endif
     }
 
     // MARK: - Appearance
