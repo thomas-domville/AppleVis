@@ -220,23 +220,23 @@ struct ContentDetailActions: View {
                 DetailActionButton(
                     systemImage: isFollowing ? "bell.fill" : "bell",
                     visualLabel: isFollowing ? "Unfollow" : "Follow",
-                    accessibilityLabel: isFollowing ? "Unfollow" : "Follow"
+                    accessibilityLabel: isFollowing ? "Unfollow \(kind.displayName)" : "Follow \(kind.displayName)"
                 ) { Task { await toggleFollow() } }
             }
 
             DetailActionButton(
                 systemImage: isSaved ? "bookmark.fill" : "bookmark",
                 visualLabel: isSaved ? "Unsave" : "Save",
-                accessibilityLabel: isSaved ? "Unsave" : "Save"
+                accessibilityLabel: isSaved ? "Unsave \(kind.displayName)" : "Save \(kind.displayName)"
             ) { toggleSave() }
 
             if let url, let shareURL = URL(string: url) {
                 ShareLink(item: shareURL, subject: Text(title)) {
                     DetailActionButtonLabel(systemImage: "square.and.arrow.up", visualLabel: "Share")
                 }
-                .accessibilityLabel("Share")
+                .accessibilityLabel("Share \(kind.displayName)")
 
-                DetailActionButton(systemImage: "safari", visualLabel: "Browser", accessibilityLabel: "Open in Browser") {
+                DetailActionButton(systemImage: "safari", visualLabel: "Browser", accessibilityLabel: "Open \(kind.displayName) in Browser") {
                     showBrowser = true
                 }
                 .sheet(isPresented: $showBrowser) {

@@ -394,16 +394,16 @@ struct ForumTopicDetailView: View {
             DetailActionButton(
                 systemImage: isSaved ? "bookmark.fill" : "bookmark",
                 visualLabel: isSaved ? "Unsave" : "Save",
-                accessibilityLabel: isSaved ? "Unsave" : "Save"
+                accessibilityLabel: isSaved ? "Unsave topic" : "Save topic"
             ) { toggleSave() }
 
             if let shareURL = URL(string: detail.url) {
                 ShareLink(item: shareURL, subject: Text(detail.title)) {
                     DetailActionButtonLabel(systemImage: "square.and.arrow.up", visualLabel: "Share")
                 }
-                .accessibilityLabel("Share")
+                .accessibilityLabel("Share topic")
 
-                DetailActionButton(systemImage: "safari", visualLabel: "Browser", accessibilityLabel: "Open in Browser") {
+                DetailActionButton(systemImage: "safari", visualLabel: "Browser", accessibilityLabel: "Open topic in browser") {
                     showBrowser = true
                 }
             }
