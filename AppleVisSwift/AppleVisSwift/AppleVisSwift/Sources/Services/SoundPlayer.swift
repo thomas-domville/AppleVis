@@ -34,21 +34,23 @@ enum AppSound: String {
     /// regardless of either toggle.
     fileprivate static let alwaysOn: Set<AppSound> = [.error, .offline]
 
-    /// Reads the same UserDefaults keys PreferencesStore's `@AppStorage`
-    /// properties use — SoundPlayer is a plain singleton with no environment
-    /// access, so it can't observe the store directly.
+    /// Reads through PreferencesStore's own property — the exact same one
+    /// SwiftUI's Settings Toggle reads and writes — instead of an
+    /// independent `UserDefaults.standard` lookup. The two were observed to
+    /// disagree live on-device (Settings showed "Interface Sounds" on; a
+    /// raw UserDefaults read of "sound.interface" still came back nil even
+    /// immediately after explicitly toggling it off and back on), so this
+    /// removes any chance of that drift by going through the single
+    /// AppStorage-backed property both places actually use.
+    @MainActor
     var shouldPlay: Bool {
         if Self.alwaysOn.contains(self) { return true }
-        let defaults = UserDefaults.standard
-        if Self.interfaceSounds.contains(self) {
-            #if DEBUG
-            let raw = defaults.object(forKey: "sound.interface")
-            let rawType = raw.map { String(describing: Swift.type(of: $0)) } ?? "nil"
-            print("SoundPlayer: sound.interface raw=\(String(describing: raw)) type=\(rawType) bool(forKey:)=\(defaults.bool(forKey: "sound.interface"))")
-            #endif
-            return defaults.object(forKey: "sound.interface") as? Bool ?? false
+        guard let preferences = PreferencesStore.current else {
+            return !Self.interfaceSounds.contains(self)
         }
-        return defaults.object(forKey: "sound.confirmation") as? Bool ?? true
+        return Self.interfaceSounds.contains(self)
+            ? preferences.interfaceSoundsEnabled
+            : preferences.confirmationSoundsEnabled
     }
 }
 

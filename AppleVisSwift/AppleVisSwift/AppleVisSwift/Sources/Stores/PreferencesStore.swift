@@ -3,6 +3,19 @@ import Combine
 
 @MainActor
 final class PreferencesStore: ObservableObject {
+    /// Lets SoundPlayer (a plain singleton with no environment access) read
+    /// the exact same in-memory property SwiftUI's Toggle reads/writes,
+    /// instead of doing its own independent `UserDefaults.standard` lookup.
+    /// The two were observed to disagree on-device (Settings showed
+    /// "Interface Sounds" on; a raw UserDefaults read of the same key
+    /// still came back nil) — going through the single AppStorage-backed
+    /// property both places read/write removes any chance of that drift,
+    /// regardless of the underlying cause.
+    static weak var current: PreferencesStore?
+
+    init() {
+        PreferencesStore.current = self
+    }
 
     // MARK: - Appearance
     @AppStorage("theme") var theme: AppTheme = .system
