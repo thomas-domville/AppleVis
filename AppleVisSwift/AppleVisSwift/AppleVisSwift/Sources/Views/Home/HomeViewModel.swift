@@ -32,9 +32,34 @@ final class HomeViewModel: ObservableObject {
     private let pageSize = 20
     private var page = 0
     private var itemVisits: [String: PersistenceStore.ItemVisit] = [:]
-    private var lastVisit: Date {
-        get { Date(timeIntervalSince1970: UserDefaults.standard.double(forKey: "applevis.lastVisit")) }
-        set { UserDefaults.standard.set(newValue.timeIntervalSince1970, forKey: "applevis.lastVisit") }
+
+    /// Snapshotted once per "session" (cold launch, or returning from the
+    /// background) rather than re-read on every load() — otherwise a plain
+    /// pull-to-refresh would silently forget still-unread items. load()
+    /// used to advance this to `Date()` on every single call, so if 6 items
+    /// arrived, then the user refreshed again before reading them, those 6
+    /// would immediately stop counting as new (their lastActivityAt was now
+    /// older than the freshly-bumped "last visit") even though the user
+    /// never actually saw them. Holding this fixed for the whole session
+    /// and only advancing it at real session boundaries fixes that.
+    private var lastVisit = Date(timeIntervalSince1970: UserDefaults.standard.double(forKey: "applevis.lastVisit"))
+    private var hasStampedCurrentSession = false
+
+    /// Starts a new "new since last visit" session — call when the app
+    /// returns to the foreground after being backgrounded. Deliberately not
+    /// called on pull-to-refresh/loadMore, which should keep comparing
+    /// against the same boundary as the rest of the session.
+    func refreshSessionBoundary() {
+        lastVisit = Date(timeIntervalSince1970: UserDefaults.standard.double(forKey: "applevis.lastVisit"))
+        hasStampedCurrentSession = false
+    }
+
+    /// Stamps "now" as the last-visit point for the *next* session, read
+    /// back by refreshSessionBoundary()/init next time around. Doesn't
+    /// touch this session's own `lastVisit`, so in-flight comparisons don't
+    /// shift underneath a still-open Home screen.
+    func stampVisitForNextSession() {
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "applevis.lastVisit")
     }
 
     func load() async {
@@ -62,7 +87,10 @@ final class HomeViewModel: ObservableObject {
             hasMore = fetched.count >= pageSize
             itemVisits = PersistenceStore.shared.allItemVisits()
             buildNewActivitySummary()
-            lastVisit = Date()
+            if !hasStampedCurrentSession {
+                stampVisitForNextSession()
+                hasStampedCurrentSession = true
+            }
         }
 
         isLoading = false
@@ -203,6 +231,35 @@ final class HomeViewModel: ObservableObject {
             return false
         }.count
         guard !newItems.isEmpty else { newActivitySummary = ""; return }
-        newActivitySummary = "\(newItems.count) new item\(newItems.count == 1 ? "" : "s") since your last visit"
+        newActivitySummary = Self.buildSummaryText(for: newItems, itemVisits: itemVisits)
+    }
+
+    /// Breaks "N new items" down by what actually changed — e.g. "2 new
+    /// forum topics, 1 new podcast episode, 3 items with new replies" —
+    /// instead of a bare count that doesn't say what kind of activity it
+    /// was or whether it's new content vs. new replies on something already
+    /// seen.
+    private static func buildSummaryText(for newItems: [FeedItem], itemVisits: [String: PersistenceStore.ItemVisit]) -> String {
+        var brandNewByKind: [ContentKind: Int] = [:]
+        var updatedCount = 0
+        for item in newItems {
+            if itemVisits[item.id] != nil {
+                updatedCount += 1
+            } else {
+                brandNewByKind[item.kind, default: 0] += 1
+            }
+        }
+        var parts: [String] = []
+        for kind in [ContentKind.forumTopic, .podcastEpisode, .appListing, .resource, .blogPost] {
+            guard let n = brandNewByKind[kind], n > 0 else { continue }
+            parts.append("\(n) new \(kind.displayName.lowercased())\(n == 1 ? "" : "s")")
+        }
+        if updatedCount > 0 {
+            parts.append("\(updatedCount) item\(updatedCount == 1 ? "" : "s") with new replies")
+        }
+        guard !parts.isEmpty else {
+            return "\(newItems.count) new item\(newItems.count == 1 ? "" : "s") since your last visit"
+        }
+        return parts.joined(separator: ", ") + " since your last visit"
     }
 }

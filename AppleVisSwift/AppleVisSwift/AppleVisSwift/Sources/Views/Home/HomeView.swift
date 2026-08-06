@@ -53,6 +53,7 @@ struct HomeView: View {
     @State private var savedItems: [SavedItem] = []
     @State private var notificationHistory: [NotificationHistoryItem] = []
     @AccessibilityFocusState private var focusTarget: HomeFocusTarget?
+    @Environment(\.scenePhase) private var scenePhase
 
     /// Items actually shown below the feed picker — narrowed to just what's
     /// new since the last visit when the "New" segment is selected. Distinct
@@ -60,6 +61,12 @@ struct HomeView: View {
     /// are fetched at all, not which of the fetched items are shown.
     private var visibleItems: [FeedItem] {
         homeFeedFilter == .new ? vm.newItems : vm.items
+    }
+
+    /// O(1) lookup used by feedList to mark rows new — built once per body
+    /// evaluation rather than having every row call `vm.newItems.contains`.
+    private var newItemIds: Set<String> {
+        Set(vm.newItems.map(\.id))
     }
 
     var body: some View {
@@ -129,6 +136,18 @@ struct HomeView: View {
         .onAppear {
             savedItems = PersistenceStore.shared.savedItems()
             notificationHistory = PersistenceStore.shared.notificationHistory()
+        }
+        .onChange(of: scenePhase) { old, new in
+            if new == .background {
+                // Marks "now" as the boundary for the *next* session —
+                // doesn't affect what's already on screen this session, so
+                // items the user hasn't gotten to yet don't vanish from
+                // "New" just because the app briefly backgrounded.
+                vm.stampVisitForNextSession()
+            } else if new == .active && old == .background {
+                vm.refreshSessionBoundary()
+                Task { await vm.load() }
+            }
         }
     }
 
@@ -368,7 +387,7 @@ struct HomeView: View {
                 }
 
                 ForEach(visibleItems) { item in
-                    FeedRow(item: item, newCount: vm.newReplyCount(for: item)) {
+                    FeedRow(item: item, newCount: vm.newReplyCount(for: item), isNew: newItemIds.contains(item.id)) {
                         vm.markAsRead(item)
                     }
                     .id(item.id)
@@ -609,6 +628,13 @@ struct FeedRow: View {
     /// "Mark as Read" action only appears when there's actually something
     /// new to dismiss, matching the old app's behavior.
     var newCount: Int = 0
+    /// Whether Home considers this item new since the last visit at all —
+    /// distinct from `newCount`, which only counts *additional* replies on
+    /// something already seen before. An item that's never been opened has
+    /// no comment-count baseline to diff against, so newCount is 0 for it
+    /// even though it's clearly new; this flag covers that case so brand-
+    /// new items still get a visible "NEW" marker on their card.
+    var isNew: Bool = false
     var onMarkRead: (() -> Void)? = nil
 
     var body: some View {
@@ -622,6 +648,21 @@ struct FeedRow: View {
             }
         }
         .unreadIndicator(item.isUnread)
+        .overlay(alignment: .topTrailing) {
+            // Only shown when the row itself has no reply-count badge of
+            // its own to show (newCount == 0) — otherwise a revisited item
+            // with fresh replies would show two "new" badges at once.
+            if isNew && newCount == 0 {
+                Text("NEW")
+                    .font(.caption2).fontWeight(.bold)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(Color.accentColor, in: Capsule())
+                    .accessibilityHidden(true)
+                    .padding(6)
+            }
+        }
+        .accessibilityValue(isNew && newCount == 0 ? "New." : "")
         .modifier(ConditionalAccessibilityAction(isActive: newCount > 0 && onMarkRead != nil, name: "Mark as Read") {
             onMarkRead?()
         })
