@@ -55,7 +55,7 @@ struct AppDetailView: View {
 
                     if !detail.body.isEmpty {
                         sectionHeading("About")
-                        HTMLTextView(html: detail.body)
+                        SegmentedHTMLView(html: detail.body)
                             .padding(.horizontal)
                             .padding(.bottom, 16)
                     }
@@ -74,7 +74,7 @@ struct AppDetailView: View {
                     }
                     if let acc = detail.accessibilityComments, !acc.isEmpty {
                         sectionHeading("Accessibility Comments")
-                        HTMLTextView(html: acc)
+                        SegmentedHTMLView(html: acc)
                             .padding(.horizontal).padding(.bottom, 8)
                     }
 
@@ -557,7 +557,7 @@ struct AppReviewRow: View {
                 .accessibilityHidden(true)
             }
 
-            HTMLTextView(html: review.body)
+            SegmentedHTMLView(html: review.body)
         }
         .padding()
         .contextMenu {

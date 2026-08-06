@@ -60,7 +60,7 @@ struct BlogDetailView: View {
 
                     Divider()
 
-                    HTMLTextView(html: detail.body)
+                    SegmentedHTMLView(html: detail.body)
                         .padding(.horizontal)
 
                     Divider()

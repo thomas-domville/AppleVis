@@ -96,7 +96,7 @@ struct ForumTopicDetailView: View {
                     Divider()
 
                     // Body
-                    HTMLTextView(html: detail.body)
+                    SegmentedHTMLView(html: detail.body)
                         .padding(.horizontal)
 
                     Divider()
@@ -546,7 +546,7 @@ struct ReplyView: View {
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Edit Comment") { showEditSheet = true })
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Delete Comment") { showDeleteConfirm = true })
 
-            HTMLTextView(html: reply.body)
+            SegmentedHTMLView(html: reply.body)
             if reply.loveCount > 0 {
                 Label("\(reply.loveCount)", systemImage: "heart.fill")
                     .font(.caption)

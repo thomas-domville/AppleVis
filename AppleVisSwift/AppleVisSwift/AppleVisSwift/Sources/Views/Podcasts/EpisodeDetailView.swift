@@ -68,7 +68,7 @@ struct EpisodeDetailView: View {
                     // Description
                     if !episode.description.isEmpty {
                         sectionHeading("Episode Notes")
-                        HTMLTextView(html: episode.description)
+                        SegmentedHTMLView(html: episode.description)
                             .padding(.horizontal).padding(.bottom, 16)
                     }
 

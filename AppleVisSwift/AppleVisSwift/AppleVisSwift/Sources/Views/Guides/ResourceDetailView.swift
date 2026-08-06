@@ -65,8 +65,20 @@ struct ResourceDetailView: View {
 
                     Divider()
 
-                    HTMLTextView(html: detail.body)
-                        .padding(.horizontal)
+                    // Long guides get a jump-to-heading table of contents
+                    // and collapse behind "Show Full Guide" past 6 segments
+                    // — matches the old app, which only showed either
+                    // control when there was actually enough content to
+                    // need it, rather than making every guide scroll past
+                    // controls that don't do anything.
+                    SegmentedHTMLView(
+                        html: detail.body,
+                        collapsedSegmentLimit: 6,
+                        expandLabel: "Show Full Guide",
+                        showTableOfContents: true
+                    )
+                    .environment(\.contentScrollProxy, proxy)
+                    .padding(.horizontal)
 
                     Divider()
 
@@ -414,7 +426,7 @@ struct CommentRow: View {
                 Text(displaySubject).font(.subheadline).fontWeight(.medium)
             }
 
-            HTMLTextView(html: text)
+            SegmentedHTMLView(html: text)
         }
         .padding(.horizontal)
         .padding(.vertical, 8)

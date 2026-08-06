@@ -65,17 +65,17 @@ struct BugDetailView: View {
                     // Description
                     if !detail.body.isEmpty {
                         sectionHeading("Description")
-                        HTMLTextView(html: detail.body).padding(.horizontal)
+                        SegmentedHTMLView(html: detail.body).padding(.horizontal)
                     }
 
                     if let steps = detail.stepsToReproduce, !steps.isEmpty {
                         sectionHeading("Steps to Reproduce")
-                        HTMLTextView(html: steps).padding(.horizontal)
+                        SegmentedHTMLView(html: steps).padding(.horizontal)
                     }
 
                     if let workaround = detail.workaround, !workaround.isEmpty {
                         sectionHeading("Workaround")
-                        HTMLTextView(html: workaround).padding(.horizontal)
+                        SegmentedHTMLView(html: workaround).padding(.horizontal)
                     }
 
                     Divider()
