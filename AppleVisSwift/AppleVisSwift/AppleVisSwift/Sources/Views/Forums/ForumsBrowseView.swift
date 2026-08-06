@@ -154,7 +154,7 @@ struct ForumsBrowseView: View {
             ForumFilterSheetView(filter: $filter, appleTopicsFilter: $appleTopicsFilter, selectedCategory: $selectedCategory, categories: categories)
         }
         .task { await load(reset: true) }
-        .refreshable { await load(reset: true) }
+        .refreshable { await load(reset: true); SoundPlayer.shared.play(.refresh) }
     }
 
     private var topicList: some View {

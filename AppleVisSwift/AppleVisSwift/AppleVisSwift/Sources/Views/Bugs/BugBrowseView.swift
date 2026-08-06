@@ -27,7 +27,7 @@ struct BugBrowseView: View {
             ToolbarItem(placement: .navigationBarTrailing) { filterMenu }
         }
         .task { await load(reset: true) }
-        .refreshable { await load(reset: true) }
+        .refreshable { await load(reset: true); SoundPlayer.shared.play(.refresh) }
         .searchable(text: $searchText, prompt: "Search bug reports")
     }
 

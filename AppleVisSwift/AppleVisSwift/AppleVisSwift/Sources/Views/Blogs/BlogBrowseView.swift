@@ -22,7 +22,7 @@ struct BlogBrowseView: View {
         }
         .navigationTitle("AppleVis Blog")
         .task { await load(reset: true) }
-        .refreshable { await load(reset: true) }
+        .refreshable { await load(reset: true); SoundPlayer.shared.play(.refresh) }
         .searchable(text: $searchText, prompt: "Search posts")
     }
 

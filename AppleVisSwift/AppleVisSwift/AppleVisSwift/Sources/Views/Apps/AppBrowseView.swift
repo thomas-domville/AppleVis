@@ -25,7 +25,7 @@ struct AppBrowseView: View {
             ToolbarItem(placement: .navigationBarTrailing) { platformMenu }
         }
         .task { await load() }
-        .refreshable { await load() }
+        .refreshable { await load(); SoundPlayer.shared.play(.refresh) }
         .onChange(of: platform) { _, _ in Task { await load() } }
         .navigationDestination(for: AppCategoryDestination.self) { dest in
             AppCategoryView(destination: dest)
@@ -152,7 +152,7 @@ struct AppCategoryView: View {
         }
         .navigationTitle(destination.category.name)
         .task { await load(reset: true) }
-        .refreshable { await load(reset: true) }
+        .refreshable { await load(reset: true); SoundPlayer.shared.play(.refresh) }
     }
 
     private func load(reset: Bool) async {

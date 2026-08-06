@@ -59,7 +59,12 @@ final class SoundPlayer {
     private init() {}
 
     func play(_ sound: AppSound) {
-        guard sound.shouldPlay else { return }
+        guard sound.shouldPlay else {
+            #if DEBUG
+            print("SoundPlayer: skipping '\(sound.rawValue)' — shouldPlay is false")
+            #endif
+            return
+        }
         play(filename: sound.rawValue, ext: "wav")
     }
 
@@ -82,17 +87,31 @@ final class SoundPlayer {
         let key = filename
         if let cached = players[key] {
             cached.currentTime = 0
-            cached.play()
+            let started = cached.play()
+            #if DEBUG
+            print("SoundPlayer: replaying '\(filename)', started=\(started), volume=\(cached.volume), session category=\(AVAudioSession.sharedInstance().category.rawValue), sessionActive=\(AVAudioSession.sharedInstance().isOtherAudioPlaying)")
+            #endif
             return
         }
 
         guard let url = Bundle.main.url(forResource: filename, withExtension: ext) else {
+            #if DEBUG
+            print("SoundPlayer: '\(filename).\(ext)' not found in bundle")
+            #endif
             return
         }
-        guard let player = try? AVAudioPlayer(contentsOf: url) else { return }
+        guard let player = try? AVAudioPlayer(contentsOf: url) else {
+            #if DEBUG
+            print("SoundPlayer: failed to create AVAudioPlayer for '\(filename)'")
+            #endif
+            return
+        }
         player.prepareToPlay()
         players[key] = player
-        player.play()
+        let started = player.play()
+        #if DEBUG
+        print("SoundPlayer: playing '\(filename)' for the first time, started=\(started), category=\(AVAudioSession.sharedInstance().category.rawValue)")
+        #endif
     }
 
     /// Reasserts `.ambient`/`.mixWithOthers` whenever the shared session
@@ -112,7 +131,16 @@ final class SoundPlayer {
     private func configureSession() {
         let session = AVAudioSession.sharedInstance()
         guard session.category != .ambient || !session.categoryOptions.contains(.mixWithOthers) else { return }
-        try? session.setCategory(.ambient, options: [.mixWithOthers])
-        try? session.setActive(true)
+        #if DEBUG
+        print("SoundPlayer: reconfiguring session, was category=\(session.category.rawValue) options=\(session.categoryOptions.rawValue)")
+        #endif
+        do {
+            try session.setCategory(.ambient, options: [.mixWithOthers])
+            try session.setActive(true)
+        } catch {
+            #if DEBUG
+            print("SoundPlayer: failed to reconfigure session: \(error)")
+            #endif
+        }
     }
 }

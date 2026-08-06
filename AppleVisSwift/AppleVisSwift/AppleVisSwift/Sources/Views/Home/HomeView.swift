@@ -98,6 +98,7 @@ struct HomeView: View {
                 await vm.load()
                 savedItems = PersistenceStore.shared.savedItems()
                 notificationHistory = PersistenceStore.shared.notificationHistory()
+                SoundPlayer.shared.play(.refresh)
             }
             .onReceive(keyCommands.refreshRequested) { Task { await vm.load() } }
             .overlay(alignment: .top) { ToastOverlay() }

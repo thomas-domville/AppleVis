@@ -42,7 +42,7 @@ struct PodcastBrowseView: View {
             }
         }
         .task { await load(reset: true) }
-        .refreshable { await load(reset: true) }
+        .refreshable { await load(reset: true); SoundPlayer.shared.play(.refresh) }
     }
 
     private var episodeList: some View {
