@@ -229,6 +229,10 @@ struct AppDetailView: View {
                 itunesMetadata = await ItunesAPI.fetchMetadata(appStoreUrl: storeUrl)
             }
             if let detail {
+                PersistenceStore.shared.stampItemVisit(
+                    id: FeedItem.visitKey(kind: .appListing, contentId: detail.id),
+                    commentCount: detail.reviewCount
+                )
                 SpotlightIndexer.index(AppListing(
                     id: detail.id, name: detail.name, developer: detail.developer, platform: detail.platform,
                     category: detail.category, categoryId: detail.categoryId, reviewCount: detail.reviewCount,

@@ -166,6 +166,10 @@ struct BlogDetailView: View {
                 Task { await loadMoreComments() }
             }
             if let detail {
+                PersistenceStore.shared.stampItemVisit(
+                    id: FeedItem.visitKey(kind: .blogPost, contentId: detail.id),
+                    commentCount: detail.commentCount
+                )
                 SpotlightIndexer.index(BlogPost(
                     id: detail.id, title: detail.title, authorName: detail.authorName, authorId: detail.authorId,
                     publishedAt: detail.publishedAt, lastActivityAt: detail.lastActivityAt,

@@ -268,6 +268,10 @@ struct EpisodeDetailView: View {
             // Comparing against the episode's own known commentCount is
             // correct regardless of the server's actual page size.
             hasMoreComments = fetchedComments.count < fetchedEp.commentCount
+            PersistenceStore.shared.stampItemVisit(
+                id: FeedItem.visitKey(kind: .podcastEpisode, contentId: fetchedEp.id),
+                commentCount: fetchedEp.commentCount
+            )
             // Fetch every remaining page automatically instead of waiting for
             // a "Load More" tap — the heading already shows the true total
             // (commentCount), so leaving the rest behind a manual tap just

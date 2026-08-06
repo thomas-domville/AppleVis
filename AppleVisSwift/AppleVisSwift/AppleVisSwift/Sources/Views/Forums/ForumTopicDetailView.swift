@@ -17,6 +17,8 @@ struct ForumTopicDetailView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var threadSummary: String?
     @State private var isSummarizing = false
+    @State private var postSummary: String?
+    @State private var isSummarizingPost = false
     @State private var showBrowser = false
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedReplyId: String?
@@ -107,7 +109,7 @@ struct ForumTopicDetailView: View {
                             onJumpToLast: { Task { await jumpToLastReply(proxy: proxy) } }
                         )
 
-                        if preferences.aiSummariesEnabled && IntelligenceService.isAvailable && detail.replies.count >= 5 {
+                        if preferences.aiSummariesEnabled && IntelligenceService.isAvailable {
                             summarizeSection(detail)
                         }
 
@@ -157,30 +159,18 @@ struct ForumTopicDetailView: View {
         }
     }
 
+    /// Split into two independent actions (matching the old app): "Summarize
+    /// Post" covers just the original post so a user can get its gist
+    /// before deciding to read replies at all, while "Summarize Discussion"
+    /// covers only the replies. Previously this was a single "Summarize
+    /// Thread" action that always included both together.
     @ViewBuilder
     private func summarizeSection(_ detail: ForumTopicDetail) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let threadSummary {
-                Label("AI Summary", systemImage: "sparkles")
-                    .font(.caption).fontWeight(.bold)
-                    .foregroundStyle(Color.accentColor)
-                Text(threadSummary)
-                    .font(.subheadline)
-            } else {
-                Button {
-                    Task { await summarizeThread(detail) }
-                } label: {
-                    if isSummarizing {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                            Text("Summarizing…")
-                        }
-                    } else {
-                        Label("Summarize Thread", systemImage: "sparkles")
-                    }
-                }
-                .disabled(isSummarizing)
-                .accessibilityLabel(isSummarizing ? "Summarizing thread, please wait" : "Summarize Thread")
+        VStack(alignment: .leading, spacing: 12) {
+            summarizePostRow(detail)
+            if detail.replies.count >= 5 {
+                Divider()
+                summarizeDiscussionRow(detail)
             }
         }
         .padding(12)
@@ -189,12 +179,73 @@ struct ForumTopicDetailView: View {
         .padding(.horizontal)
     }
 
+    @ViewBuilder
+    private func summarizePostRow(_ detail: ForumTopicDetail) -> some View {
+        if let postSummary {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Post Summary", systemImage: "sparkles")
+                    .font(.caption).fontWeight(.bold)
+                    .foregroundStyle(Color.accentColor)
+                Text(postSummary).font(.subheadline)
+            }
+        } else {
+            Button {
+                Task { await summarizePost(detail) }
+            } label: {
+                if isSummarizingPost {
+                    HStack(spacing: 8) { ProgressView(); Text("Summarizing…") }
+                } else {
+                    Label("Summarize Post", systemImage: "sparkles")
+                }
+            }
+            .disabled(isSummarizingPost)
+            .accessibilityLabel(isSummarizingPost ? "Summarizing post, please wait" : "Summarize Post")
+        }
+    }
+
+    @ViewBuilder
+    private func summarizeDiscussionRow(_ detail: ForumTopicDetail) -> some View {
+        if let threadSummary {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Discussion Summary", systemImage: "sparkles")
+                    .font(.caption).fontWeight(.bold)
+                    .foregroundStyle(Color.accentColor)
+                Text(threadSummary).font(.subheadline)
+            }
+        } else {
+            Button {
+                Task { await summarizeThread(detail) }
+            } label: {
+                if isSummarizing {
+                    HStack(spacing: 8) { ProgressView(); Text("Summarizing…") }
+                } else {
+                    Label("Summarize Discussion", systemImage: "sparkles")
+                }
+            }
+            .disabled(isSummarizing)
+            .accessibilityLabel(isSummarizing ? "Summarizing discussion, please wait" : "Summarize Discussion")
+        }
+    }
+
+    private func summarizePost(_ detail: ForumTopicDetail) async {
+        isSummarizingPost = true
+        UIAccessibility.post(notification: .announcement, argument: "Summarizing post. This may take a moment.")
+        let input = "Forum topic: \(detail.title)\n\n\(detail.body.strippingHTMLTags().prefix(3000))"
+        if let summary = await IntelligenceService.summarize(input) {
+            postSummary = summary
+        } else {
+            toast.error("Couldn't generate a summary for this post. Try again.")
+            UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a summary for this post.")
+        }
+        isSummarizingPost = false
+    }
+
     private func summarizeThread(_ detail: ForumTopicDetail) async {
         isSummarizing = true
         // The button dims/disables while loading, but a disabled control on
         // its own gives a VoiceOver user no confirmation the tap actually
         // registered versus just failing to respond — announce explicitly.
-        UIAccessibility.post(notification: .announcement, argument: "Summarizing thread. This may take a moment.")
+        UIAccessibility.post(notification: .announcement, argument: "Summarizing discussion. This may take a moment.")
         if let summary = await IntelligenceService.summarize(summaryInput(for: detail)) {
             threadSummary = summary
         } else {
@@ -202,28 +253,28 @@ struct ForumTopicDetailView: View {
             // failure, so without this the button just reverted to its
             // original state with zero feedback — indistinguishable from
             // the tap not registering at all.
-            toast.error("Couldn't generate a summary for this thread. Try again.")
-            UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a summary for this thread.")
+            toast.error("Couldn't generate a summary for this discussion. Try again.")
+            UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a summary for this discussion.")
         }
         isSummarizing = false
     }
 
-    /// Caps total input length before sending to the on-device model — a
-    /// long, heavily-discussed thread's full, untruncated reply bodies can
-    /// exceed the on-device FoundationModels context window, which throws a
-    /// generation error IntelligenceService swallows. That silently broke
-    /// "Summarize Thread" on exactly the threads a summary is most useful
-    /// for (this was reported directly, twice: once in general, then
-    /// specifically reproduced on a 30-reply thread that still failed under
-    /// the first, more generous cap — the exact on-device context limit
-    /// isn't documented, so this trades some summary detail for headroom
-    /// rather than trying to find the precise ceiling by trial and error).
+    /// Replies only, not the post body — matches the old app's separate
+    /// "Summarise Discussion" action. Caps total input length before
+    /// sending to the on-device model: a long, heavily-discussed thread's
+    /// full, untruncated reply bodies can exceed the on-device
+    /// FoundationModels context window, which throws a generation error
+    /// IntelligenceService swallows. That silently broke this feature on
+    /// exactly the threads a summary is most useful for (reported directly,
+    /// twice — the exact on-device context limit isn't documented, so this
+    /// trades some summary detail for headroom rather than trying to find
+    /// the precise ceiling by trial and error).
     private func summaryInput(for detail: ForumTopicDetail) -> String {
         let maxTotalCharacters = 3000
         let maxPerReply = 220
         let maxReplies = 20
-        var parts = [String(detail.body.strippingHTMLTags().prefix(maxPerReply * 2))]
-        var remaining = maxTotalCharacters - parts[0].count
+        var parts: [String] = []
+        var remaining = maxTotalCharacters
         for reply in detail.replies.prefix(maxReplies) {
             guard remaining > 0 else { break }
             let body = reply.body.strippingHTMLTags().prefix(maxPerReply)
@@ -272,6 +323,15 @@ struct ForumTopicDetailView: View {
             isFollowing = detail.map { PersistenceStore.shared.isFollowed(id: $0.id) } ?? false
             isSaved = detail.map { PersistenceStore.shared.isSaved(id: $0.id) } ?? false
             PersistenceStore.shared.markTopicSeen(id: topicId)
+            // Opening the topic itself should clear its "new" state on Home,
+            // not just Home's own explicit "Mark as Read" action — otherwise
+            // a topic you've actually read stays flagged as new indefinitely.
+            if let detail {
+                PersistenceStore.shared.stampItemVisit(
+                    id: FeedItem.visitKey(kind: .forumTopic, contentId: detail.id),
+                    commentCount: detail.replyCount
+                )
+            }
             // Was `>= 100` — the page size *requested*, not what the server
             // actually returns. Drupal JSON:API deployments commonly clamp
             // a requested page[limit] down to a lower site-configured max
@@ -454,15 +514,38 @@ struct ReplyView: View {
         var label = "Comment \(index + 1) of \(total). \(reply.authorName)"
         if isOriginalPoster { label += ", Original Poster" }
         label += ". \(reply.createdAt.formatted(.relative(presentation: .named)))."
-        let subject = reply.subject.trimmingCharacters(in: .whitespaces)
-        let impliedSubject = "Re: \(topicTitle)"
-        if !subject.isEmpty
-            && subject.caseInsensitiveCompare(impliedSubject) != .orderedSame
-            && subject.caseInsensitiveCompare(topicTitle) != .orderedSame {
+        if let subject = Self.displaySubject(reply.subject, parentTitle: topicTitle) {
             label += " Subject: \(subject)."
         }
         if reply.isNew { label += " New." }
         return label
+    }
+
+    /// Suppresses generic default subjects ("Comment", "Reply", "Review",
+    /// "Re", "Add new comment") and subjects that just duplicate the parent
+    /// topic title — mirrors the old app's commentSubject.ts. Drupal
+    /// defaults a reply's subject to one of these unless the poster changes
+    /// it, so without this nearly every reply read "Subject: Comment." aloud
+    /// for no reason (the previous version only caught the exact "Re: Title"
+    /// and title-duplicate cases, not these generic defaults).
+    private static func displaySubject(_ subject: String, parentTitle: String) -> String? {
+        func normalize(_ value: String) -> String {
+            var s = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                .lowercased()
+            if s.hasPrefix("re:") {
+                s = String(s.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+            }
+            return s
+        }
+        let genericSubjects: Set<String> = ["comment", "reply", "review", "re", "add new comment"]
+        let clean = subject.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        guard !clean.isEmpty else { return nil }
+        let normalized = normalize(clean)
+        guard !normalized.isEmpty, !genericSubjects.contains(normalized) else { return nil }
+        guard normalize(parentTitle) != normalized else { return nil }
+        return clean
     }
 
     var body: some View {

@@ -10,11 +10,26 @@ enum FeedItem: Identifiable {
 
     var id: String {
         switch self {
-        case .forumTopic(let t):     return "forum-\(t.id)"
-        case .podcastEpisode(let e): return "podcast-\(e.id)"
-        case .appListing(let a):     return "app-\(a.id)"
-        case .resource(let r):       return "resource-\(r.id)"
-        case .blogPost(let b):       return "blog-\(b.id)"
+        case .forumTopic(let t):     return FeedItem.visitKey(kind: .forumTopic, contentId: t.id)
+        case .podcastEpisode(let e): return FeedItem.visitKey(kind: .podcastEpisode, contentId: e.id)
+        case .appListing(let a):     return FeedItem.visitKey(kind: .appListing, contentId: a.id)
+        case .resource(let r):       return FeedItem.visitKey(kind: .resource, contentId: r.id)
+        case .blogPost(let b):       return FeedItem.visitKey(kind: .blogPost, contentId: b.id)
+        }
+    }
+
+    /// The key used both here and by `PersistenceStore.stampItemVisit` —
+    /// detail screens stamp a visit under this same key when opened, so
+    /// Home's "new since last visit" tracking clears naturally on read
+    /// instead of only ever clearing via Home's own "Mark as Read" action.
+    static func visitKey(kind: ContentKind, contentId: String) -> String {
+        switch kind {
+        case .forumTopic:     return "forum-\(contentId)"
+        case .podcastEpisode: return "podcast-\(contentId)"
+        case .appListing:     return "app-\(contentId)"
+        case .resource:       return "resource-\(contentId)"
+        case .blogPost:       return "blog-\(contentId)"
+        case .bugReport:      return "bug-\(contentId)"
         }
     }
 

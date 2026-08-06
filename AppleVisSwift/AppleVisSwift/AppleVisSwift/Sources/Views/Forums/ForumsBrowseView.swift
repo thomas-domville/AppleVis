@@ -11,6 +11,8 @@ struct ForumsBrowseView: View {
     @State private var page = 0
     @State private var hasMore = false
     @State private var isLoadingMore = false
+    @State private var showFilterSheet = false
+    @State private var searchText = ""
     @EnvironmentObject private var auth: AuthStore
     @ObservedObject private var networkStatus = NetworkStatusStore.shared
 
@@ -35,9 +37,20 @@ struct ForumsBrowseView: View {
         }
     }
 
+    private func matchesSearch(title: String, author: String = "") -> Bool {
+        guard !searchText.isEmpty else { return true }
+        return title.localizedCaseInsensitiveContains(searchText)
+            || (!author.isEmpty && author.localizedCaseInsensitiveContains(searchText))
+    }
+
+    private var filteredTopics: [ForumTopic] {
+        topics.filter { matchesSearch(title: $0.title, author: $0.authorName) }
+    }
+
     var body: some View {
         Group {
             if let localItems = localFilterItems {
+                let filteredLocalItems = localItems.filter { matchesSearch(title: $0.title) }
                 if localItems.isEmpty {
                     EmptyStateView(
                         title: filter == .following ? "Not Following Any Topics" : "No Saved Topics",
@@ -47,7 +60,7 @@ struct ForumsBrowseView: View {
                         systemImage: filter == .following ? "bell" : "bookmark"
                     )
                 } else {
-                    List(localItems, id: \.id) { item in
+                    List(filteredLocalItems, id: \.id) { item in
                         NavigationLink(value: ForumTopic(
                             id: item.id, title: item.title, authorName: "", authorId: "",
                             createdAt: item.lastActivityAt ?? .distantPast, lastActivityAt: item.lastActivityAt ?? .distantPast,
@@ -77,6 +90,7 @@ struct ForumsBrowseView: View {
             }
         }
         .navigationTitle("Forums")
+        .searchable(text: $searchText, prompt: "Search topics")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack {
@@ -85,9 +99,17 @@ struct ForumsBrowseView: View {
                             Image(systemName: "square.and.pencil")
                         }
                     }
-                    filterMenu
+                    Button {
+                        showFilterSheet = true
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                    }
+                    .accessibilityLabel("Filter: \(filter.displayName)")
                 }
             }
+        }
+        .sheet(isPresented: $showFilterSheet, onDismiss: { Task { await load(reset: true) } }) {
+            ForumFilterSheetView(filter: $filter, appleOnly: $appleOnly, selectedCategory: $selectedCategory, categories: categories)
         }
         .task { await load(reset: true) }
         .refreshable { await load(reset: true) }
@@ -99,7 +121,7 @@ struct ForumsBrowseView: View {
                 OfflineBanner()
                     .listRowSeparator(.hidden)
             }
-            ForEach(topics) { topic in
+            ForEach(filteredTopics) { topic in
                 ForumTopicRow(topic: topic)
             }
             if hasMore {
@@ -108,41 +130,6 @@ struct ForumsBrowseView: View {
             }
         }
         .listStyle(.plain)
-    }
-
-    private var filterMenu: some View {
-        Menu {
-            Section("Show") {
-                ForEach(ForumFilter.allCases) { option in
-                    Button {
-                        filter = option
-                        SoundPlayer.shared.play(.pickerTick)
-                        if localFilterItems == nil { Task { await load(reset: true) } }
-                    } label: {
-                        if filter == option {
-                            Label(option.displayName, systemImage: "checkmark")
-                        } else {
-                            Text(option.displayName)
-                        }
-                    }
-                }
-            }
-            if filter.supportsRefinement {
-                Toggle("Apple Topics Only", isOn: $appleOnly)
-                    .onChange(of: appleOnly) { _, _ in Task { await load(reset: true) } }
-                if !categories.isEmpty {
-                    Section("Category") {
-                        Button("All") { selectedCategory = nil; Task { await load(reset: true) } }
-                        ForEach(categories) { cat in
-                            Button(cat.name) { selectedCategory = cat; Task { await load(reset: true) } }
-                        }
-                    }
-                }
-            }
-        } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle")
-        }
-        .accessibilityLabel("Filter: \(filter.displayName)")
     }
 
     private func load(reset: Bool) async {
@@ -176,5 +163,85 @@ struct ForumsBrowseView: View {
             hasMore = more.count >= APIPaging.pageSize
         }
         isLoadingMore = false
+    }
+}
+
+/// A real screen instead of a Menu containing a Toggle — same VoiceOver
+/// quirk fixed elsewhere in the app (CustomizeHomeView): double-tapping a
+/// Toggle inside a Menu dismisses the whole menu on this SDK, so a
+/// VoiceOver user could never reach the category list below "Apple Topics
+/// Only" without reopening the menu each time.
+private struct ForumFilterSheetView: View {
+    @Binding var filter: ForumFilter
+    @Binding var appleOnly: Bool
+    @Binding var selectedCategory: ForumCategory?
+    let categories: [ForumCategory]
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Show") {
+                    ForEach(ForumFilter.allCases) { option in
+                        Button {
+                            filter = option
+                            SoundPlayer.shared.play(.pickerTick)
+                        } label: {
+                            HStack {
+                                Text(option.displayName).foregroundStyle(.primary)
+                                Spacer()
+                                if filter == option {
+                                    Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
+                                }
+                            }
+                        }
+                        .accessibilityAddTraits(filter == option ? [.isSelected] : [])
+                    }
+                }
+                if filter.supportsRefinement {
+                    Section("Forums") {
+                        Toggle("Apple Topics Only", isOn: $appleOnly)
+                            .accessibilityHint("Hides non-Apple forum categories from results.")
+                    }
+                    if !categories.isEmpty {
+                        Section("Category") {
+                            Button {
+                                selectedCategory = nil
+                            } label: {
+                                HStack {
+                                    Text("All").foregroundStyle(.primary)
+                                    Spacer()
+                                    if selectedCategory == nil {
+                                        Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
+                                    }
+                                }
+                            }
+                            .accessibilityAddTraits(selectedCategory == nil ? [.isSelected] : [])
+                            ForEach(categories) { cat in
+                                Button {
+                                    selectedCategory = cat
+                                } label: {
+                                    HStack {
+                                        Text(cat.name).foregroundStyle(.primary)
+                                        Spacer()
+                                        if selectedCategory?.id == cat.id {
+                                            Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
+                                        }
+                                    }
+                                }
+                                .accessibilityAddTraits(selectedCategory?.id == cat.id ? [.isSelected] : [])
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Filter Forums")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
     }
 }
