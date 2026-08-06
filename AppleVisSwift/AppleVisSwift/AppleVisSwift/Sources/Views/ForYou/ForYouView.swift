@@ -67,6 +67,7 @@ struct DownloadsView: View {
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var tips: TipStore
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+    @EnvironmentObject private var toast: ToastStore
     @ObservedObject private var downloads = DownloadManager.shared
     @State private var showRemoveAllConfirm = false
 
@@ -121,6 +122,10 @@ struct DownloadsView: View {
                     Text("This deletes downloaded episodes from this device. Queue and Saved items are not affected.")
                 }
             }
+        }
+        .onChange(of: downloads.lastFailure) { _, failure in
+            guard let failure else { return }
+            toast.error("Couldn't download \"\(failure.episodeTitle)\". Try again.")
         }
     }
 

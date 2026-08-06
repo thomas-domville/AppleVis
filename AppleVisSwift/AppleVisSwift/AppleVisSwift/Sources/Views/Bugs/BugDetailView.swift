@@ -5,7 +5,11 @@ struct BugDetailView: View {
     @State private var detail: BugReportDetail?
     @State private var isLoading = false
     @State private var error: String?
+    @State private var isLoadingMoreComments = false
+    @State private var hasMoreComments = true
     @AccessibilityFocusState private var isTitleFocused: Bool
+    @AccessibilityFocusState private var focusedCommentId: String?
+    @EnvironmentObject private var toast: ToastStore
 
     var body: some View {
         Group {
@@ -27,47 +31,52 @@ struct BugDetailView: View {
 
     @ViewBuilder
     private func content(_ detail: BugReportDetail) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // Status banner
-                statusBanner(detail).padding(.horizontal)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Status banner
+                    statusBanner(detail).padding(.horizontal)
 
-                // Title
-                Text(detail.title)
-                    .font(.title2).fontWeight(.semibold)
-                    .padding(.horizontal)
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityFocused($isTitleFocused)
+                    // Title
+                    Text(detail.title)
+                        .font(.title2).fontWeight(.semibold)
+                        .padding(.horizontal)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityFocused($isTitleFocused)
 
-                // Metadata
-                metaGrid(detail).padding(.horizontal)
+                    // Metadata
+                    metaGrid(detail).padding(.horizontal)
 
-                Divider()
+                    Divider()
 
-                // Description
-                if !detail.body.isEmpty {
-                    sectionHeading("Description")
-                    HTMLTextView(html: detail.body).padding(.horizontal)
+                    // Description
+                    if !detail.body.isEmpty {
+                        sectionHeading("Description")
+                        HTMLTextView(html: detail.body).padding(.horizontal)
+                    }
+
+                    if let steps = detail.stepsToReproduce, !steps.isEmpty {
+                        sectionHeading("Steps to Reproduce")
+                        HTMLTextView(html: steps).padding(.horizontal)
+                    }
+
+                    if let workaround = detail.workaround, !workaround.isEmpty {
+                        sectionHeading("Workaround")
+                        HTMLTextView(html: workaround).padding(.horizontal)
+                    }
+
+                    Divider()
+
+                    // Comments
+                    commentsSection(detail, proxy: proxy)
+
+                    Color.clear.frame(height: 40)
                 }
-
-                if let steps = detail.stepsToReproduce, !steps.isEmpty {
-                    sectionHeading("Steps to Reproduce")
-                    HTMLTextView(html: steps).padding(.horizontal)
-                }
-
-                if let workaround = detail.workaround, !workaround.isEmpty {
-                    sectionHeading("Workaround")
-                    HTMLTextView(html: workaround).padding(.horizontal)
-                }
-
-                Divider()
-
-                // Comments
-                commentsSection(detail)
-
-                Color.clear.frame(height: 40)
+                .padding(.vertical)
             }
-            .padding(.vertical)
+        }
+        .safeAreaInset(edge: .bottom) {
+            ContentDetailActions(id: detail.id, kind: .bugReport, title: detail.title, lastActivityAt: detail.changedAt, url: detail.url)
         }
     }
 
@@ -131,10 +140,12 @@ struct BugDetailView: View {
     }
 
     @ViewBuilder
-    private func commentsSection(_ detail: BugReportDetail) -> some View {
-        CommunityDiscussionHeading(count: detail.comments.count) {
-            announceThreadOverview(detail)
-        }
+    private func commentsSection(_ detail: BugReportDetail, proxy: ScrollViewProxy) -> some View {
+        CommunityDiscussionHeading(
+            count: detail.commentCount,
+            onThreadOverview: { announceThreadOverview(detail) },
+            onJumpToLast: { Task { await jumpToLastComment(proxy: proxy) } }
+        )
 
         if detail.comments.isEmpty {
             Text("No comments yet.")
@@ -144,9 +155,25 @@ struct BugDetailView: View {
             ForEach(Array(detail.comments.enumerated()), id: \.element.id) { index, comment in
                 CommentRow(
                     authorName: comment.authorName, text: comment.body, date: comment.createdAt,
-                    index: index, total: detail.comments.count
+                    index: index, total: detail.comments.count,
+                    commentId: comment.id,
+                    focusBinding: $focusedCommentId
                 )
+                .id(comment.id)
                 Divider().padding(.leading)
+            }
+
+            if hasMoreComments {
+                if isLoadingMoreComments {
+                    ProgressView().frame(maxWidth: .infinity).padding()
+                } else {
+                    let remaining = detail.commentCount - detail.comments.count
+                    Button(remaining > 0 ? "Load \(remaining) More Comments" : "Load More Comments") {
+                        Task { await loadMoreComments() }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                }
             }
         }
     }
@@ -168,6 +195,23 @@ struct BugDetailView: View {
         isLoading = true; error = nil
         do {
             detail = try await APIClient.shared.bugReports.detail(id: bugId)
+            hasMoreComments = (detail?.comments.count ?? 0) < (detail?.commentCount ?? 0)
+            // Fetch every remaining page automatically instead of waiting for
+            // a "Load More" tap — matches Forum/Blog/Guide/Podcast, which had
+            // the same fix for the same reason: the heading shows the true
+            // total, so leaving the rest behind a manual tap read as broken.
+            if hasMoreComments {
+                Task { await loadMoreComments() }
+            }
+            if let detail {
+                SpotlightIndexer.index(BugReport(
+                    id: detail.id, title: detail.title, platform: detail.platform, status: detail.status,
+                    severity: detail.severity, firstSeen: detail.firstSeen, fixedIn: detail.fixedIn,
+                    feedbackId: detail.feedbackId, commentCount: detail.commentCount,
+                    createdAt: detail.createdAt, changedAt: detail.changedAt,
+                    summary: String(detail.body.prefix(200)), url: detail.url
+                ))
+            }
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Couldn't load bug report." }
         isLoading = false
@@ -184,5 +228,35 @@ struct BugDetailView: View {
             try? await Task.sleep(for: .milliseconds(300))
             isTitleFocused = true
         }
+    }
+
+    /// Loads every remaining page in one go instead of requiring a tap per
+    /// page — same fix already applied to Forum/Blog/Guide/Podcast comments.
+    private func loadMoreComments() async {
+        isLoadingMoreComments = true
+        do {
+            while let current = self.detail, current.comments.count < current.commentCount {
+                let more = try await APIClient.shared.bugReports.moreComments(
+                    platform: current.platform, bugId: current.id, offset: current.comments.count
+                )
+                guard !more.isEmpty else { break }
+                self.detail?.comments.append(contentsOf: more)
+            }
+        } catch {
+            toast.error("Couldn't load more comments.")
+        }
+        hasMoreComments = (self.detail?.comments.count ?? 0) < (self.detail?.commentCount ?? 0)
+        isLoadingMoreComments = false
+    }
+
+    /// "Jump to Last Comment" link on the Community Discussion heading —
+    /// loads any not-yet-fetched comments first so it always lands on the
+    /// true last one, then moves VoiceOver focus there.
+    private func jumpToLastComment(proxy: ScrollViewProxy) async {
+        if hasMoreComments { await loadMoreComments() }
+        guard let lastId = self.detail?.comments.last?.id else { return }
+        withAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
+        try? await Task.sleep(for: .milliseconds(400))
+        focusedCommentId = lastId
     }
 }

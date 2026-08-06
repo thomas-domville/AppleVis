@@ -86,8 +86,8 @@ enum Mappers {
             categoryId: "",
             url: urlPath,
             isUnread: false,
-            isFollowing: false,
-            isSaved: false
+            isFollowing: PersistenceStore.shared.isFollowed(id: uuid),
+            isSaved: PersistenceStore.shared.isSaved(id: uuid)
         )
     }
 

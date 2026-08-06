@@ -15,12 +15,22 @@ struct DownloadedEpisodeMeta: Codable {
 /// `@Published` mutations are explicitly hopped to the main thread instead of
 /// isolating the whole type (avoids cross-actor friction with the delegate
 /// protocol, whose methods can't themselves be actor-isolated).
+/// A download that ended in failure — screens observing `DownloadManager`
+/// can react to this to tell the user, instead of the progress indicator
+/// just silently reverting with no explanation (reported directly: this was
+/// indistinguishable from the download never having been requested at all).
+struct DownloadFailure: Equatable {
+    let episodeId: String
+    let episodeTitle: String
+}
+
 final class DownloadManager: NSObject, ObservableObject {
     static let shared = DownloadManager()
 
     @Published private(set) var downloadedEpisodeIds: Set<String> = []
     @Published private(set) var progress: [String: Double] = [:]
     @Published private(set) var activeDownloads: Set<String> = []
+    @Published private(set) var lastFailure: DownloadFailure? = nil
 
     private var metadata: [String: DownloadedEpisodeMeta] = [:]
     private var tasks: [String: URLSessionDownloadTask] = [:]
@@ -166,6 +176,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
         let moved = (try? FileManager.default.moveItem(at: location, to: destination)) != nil
         let size = moved ? ((try? FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? Int64) ?? 0) : 0
 
+        let title = metadata[episodeId]?.title ?? "Episode"
         DispatchQueue.main.async {
             if moved {
                 self.metadata[episodeId]?.fileSizeBytes = size
@@ -173,6 +184,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
                 SoundPlayer.shared.play(.downloadComplete)
             } else {
                 self.metadata[episodeId] = nil
+                self.lastFailure = DownloadFailure(episodeId: episodeId, episodeTitle: title)
             }
             self.activeDownloads.remove(episodeId)
             self.progress[episodeId] = nil
@@ -192,12 +204,14 @@ extension DownloadManager: URLSessionDownloadDelegate {
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         guard error != nil, let episodeId = task.taskDescription else { return }
+        let title = metadata[episodeId]?.title ?? "Episode"
         DispatchQueue.main.async {
             self.activeDownloads.remove(episodeId)
             self.progress[episodeId] = nil
             self.metadata[episodeId] = nil
             self.tasks[episodeId] = nil
             self.saveMetadata()
+            self.lastFailure = DownloadFailure(episodeId: episodeId, episodeTitle: title)
         }
     }
 }

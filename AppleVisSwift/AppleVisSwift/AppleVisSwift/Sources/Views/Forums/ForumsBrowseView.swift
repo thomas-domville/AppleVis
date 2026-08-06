@@ -52,7 +52,9 @@ struct ForumsBrowseView: View {
                             id: item.id, title: item.title, authorName: "", authorId: "",
                             createdAt: item.lastActivityAt ?? .distantPast, lastActivityAt: item.lastActivityAt ?? .distantPast,
                             replyCount: 0, category: "", categoryId: "", url: "",
-                            isUnread: false, isFollowing: filter == .following, isSaved: filter == .saved
+                            isUnread: false,
+                            isFollowing: PersistenceStore.shared.isFollowed(id: item.id),
+                            isSaved: PersistenceStore.shared.isSaved(id: item.id)
                         )) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(item.title)

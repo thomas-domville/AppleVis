@@ -20,6 +20,12 @@ enum PushNotificationManager {
     /// user's UUID/CSRF token whenever both become available.
     static weak var authStore: AuthStore?
 
+    /// Set once at launch so a registration failure can actually tell the
+    /// user, instead of only a debug log — previously if APNs registration
+    /// failed, a signed-in user would silently never get push notifications
+    /// with zero indication why.
+    static weak var toastStore: ToastStore?
+
     private static var cachedDeviceToken: String?
 
     static func registerCategories() {
@@ -58,6 +64,7 @@ enum PushNotificationManager {
         #if DEBUG
         print("Push registration failed: \(error)")
         #endif
+        toastStore?.warning("Couldn't register for push notifications. You may not receive alerts for replies or followed topics.")
     }
 
     /// Uploads the current device token + chosen notification sound for the

@@ -214,9 +214,37 @@ struct BugReportEndpoints {
 
     func detail(platform: BugPlatform, id: String) async throws -> BugReportDetail {
         try await fetchWithCache(group: .bugs, key: "bugs:detail:\(platform.rawValue):\(id)") {
-            let response = try await client.jsonAPISingle("node/\(nodeType(for: platform))/\(id)")
-            return Mappers.bugDetail(response.data, platform: platform)
+            async let nodeRes = client.jsonAPISingle("node/\(nodeType(for: platform))/\(id)")
+            async let commentsRes = client.jsonAPIList(
+                "comment/\(commentBundle(for: platform))",
+                query: ["filter[entity_id.id]": id, "sort": "created", "page[limit]": "100", "include": "uid"]
+            )
+            let response = try await nodeRes
+            var detail = Mappers.bugDetail(response.data, platform: platform)
+            if let commentsResponse = try? await commentsRes {
+                detail.comments = commentsResponse.data.map { n in
+                    let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
+                    return BugComment(id: n.id, authorName: c.authorName, body: c.body, createdAt: c.createdAt)
+                }
+            }
+            return detail
         }
+    }
+
+    /// Fetches the next page of comments beyond the initial 100 (used by "Load more comments").
+    func moreComments(platform: BugPlatform, bugId: String, offset: Int) async throws -> [BugComment] {
+        let response = try await client.jsonAPIList(
+            "comment/\(commentBundle(for: platform))",
+            query: ["filter[entity_id.id]": bugId, "sort": "created", "page[limit]": "100", "page[offset]": "\(offset)", "include": "uid"]
+        )
+        return response.data.map { n in
+            let c = Mappers.genericComment(n, included: response.included ?? [])
+            return BugComment(id: n.id, authorName: c.authorName, body: c.body, createdAt: c.createdAt)
+        }
+    }
+
+    private func commentBundle(for platform: BugPlatform) -> String {
+        platform == .ios ? "comment_node_ios_bug_report" : "comment_node_os_x_bug_report"
     }
 }
 

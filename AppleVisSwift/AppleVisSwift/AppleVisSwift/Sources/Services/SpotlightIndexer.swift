@@ -49,4 +49,8 @@ enum SpotlightIndexer {
     static func index(_ post: BlogPost) {
         index(kind: .blogPost, id: post.id, title: post.title, contentDescription: post.summary, url: post.url)
     }
+
+    static func index(_ bug: BugReport) {
+        index(kind: .bugReport, id: bug.id, title: bug.title, contentDescription: "\(bug.platform.displayName) · \(bug.status.displayName) · \(bug.summary)", url: bug.url)
+    }
 }

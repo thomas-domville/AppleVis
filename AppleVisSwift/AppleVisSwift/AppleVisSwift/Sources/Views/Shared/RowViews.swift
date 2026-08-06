@@ -5,6 +5,19 @@ import SwiftUI
 struct ForumTopicRow: View {
     let topic: ForumTopic
 
+    /// Was previously computed but never surfaced anywhere — a VoiceOver
+    /// user browsing a list had no way to tell they'd already saved or
+    /// followed a topic short of checking the swipe/rotor action's current
+    /// wording. Spoken here, and shown visually via the icons below.
+    private var savedFollowingLabel: String {
+        switch (topic.isSaved, topic.isFollowing) {
+        case (true, true): return ". Saved, following."
+        case (true, false): return ". Saved."
+        case (false, true): return ". Following."
+        case (false, false): return ""
+        }
+    }
+
     var body: some View {
         NavigationLink(value: topic) {
             VStack(alignment: .leading, spacing: 4) {
@@ -13,6 +26,12 @@ struct ForumTopicRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
+                    if topic.isSaved {
+                        Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
+                    }
+                    if topic.isFollowing {
+                        Image(systemName: "bell.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
+                    }
                     RelativeDateLabel(date: topic.lastActivityAt)
                 }
                 Text(topic.title)
@@ -28,7 +47,7 @@ struct ForumTopicRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(topic.title), \(topic.category), \(topic.replyCount) replies, \(topic.lastActivityAt.formatted(.relative(presentation: .named)))")
+        .accessibilityLabel("\(topic.title), \(topic.category), \(topic.replyCount) replies, \(topic.lastActivityAt.formatted(.relative(presentation: .named)))\(savedFollowingLabel)")
         .contentActions(id: topic.id, kind: .forumTopic, title: topic.title, lastActivityAt: topic.lastActivityAt, url: topic.url)
         .cardDensityPadding()
     }

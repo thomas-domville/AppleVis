@@ -85,6 +85,7 @@ struct AppleVisApp: App {
                 ICloudSyncManager.shared.pullAll()
                 PushNotificationManager.deepLinkRouter = deepLinkRouter
                 PushNotificationManager.authStore = auth
+                PushNotificationManager.toastStore = toast
             }
             .onChange(of: preferences.notificationSound) { _, _ in
                 Task { await PushNotificationManager.syncRegistration() }

@@ -39,6 +39,10 @@ struct EpisodeDetailView: View {
             guard let artworkUrl = episode?.artworkUrl, let url = URL(string: artworkUrl) else { return }
             artworkDescription = await ImageDescriber.describe(imageAt: url)
         }
+        .onChange(of: downloads.lastFailure) { _, failure in
+            guard let failure, failure.episodeId == episode?.id else { return }
+            toast.error("Couldn't download \"\(failure.episodeTitle)\". Try again.")
+        }
     }
 
     @ViewBuilder
