@@ -261,7 +261,17 @@ struct ForumTopicDetailView: View {
             isFollowing = detail.map { PersistenceStore.shared.isFollowed(id: $0.id) } ?? false
             isSaved = detail.map { PersistenceStore.shared.isSaved(id: $0.id) } ?? false
             PersistenceStore.shared.markTopicSeen(id: topicId)
-            hasMoreReplies = (detail?.replies.count ?? 0) >= 100
+            // Was `>= 100` — the page size *requested*, not what the server
+            // actually returns. Drupal JSON:API deployments commonly clamp
+            // a requested page[limit] down to a lower site-configured max
+            // (e.g. 50) regardless of what's asked for, so a topic with
+            // hundreds of replies could get back only 50 on the first page —
+            // `50 >= 100` is false, permanently hiding "Load More Replies"
+            // even though most of the thread was never fetched. Comparing
+            // against the topic's own known replyCount (already used for
+            // the row's "N replies" label) is correct regardless of
+            // whatever page size the server actually enforces.
+            hasMoreReplies = (detail?.replies.count ?? 0) < (detail?.replyCount ?? 0)
             if let detail {
                 SpotlightIndexer.index(ForumTopic(
                     id: detail.id, title: detail.title, authorName: detail.authorName, authorId: detail.authorId,
@@ -306,7 +316,11 @@ struct ForumTopicDetailView: View {
         do {
             let more = try await APIClient.shared.forums.moreReplies(topicId: detail.id, offset: detail.replies.count)
             self.detail?.replies.append(contentsOf: more)
-            hasMoreReplies = more.count >= 100
+            // Guard against a stuck "Load More" loop: if the server ever
+            // returns nothing new despite replyCount claiming there's more
+            // (offset drift, a since-deleted comment throwing the count off,
+            // etc.), stop offering to load more rather than looping forever.
+            hasMoreReplies = !more.isEmpty && (self.detail?.replies.count ?? 0) < (self.detail?.replyCount ?? 0)
         } catch {
             toast.error("Couldn't load more replies.")
         }

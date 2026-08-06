@@ -140,7 +140,14 @@ struct BlogDetailView: View {
         isLoading = true; error = nil
         do {
             detail = try await APIClient.shared.blogs.detail(id: postId)
-            hasMoreComments = (detail?.comments.count ?? 0) >= 100
+            // Was `>= 100` (the page size requested, not what the server
+            // actually returns — Drupal JSON:API commonly clamps a
+            // requested page[limit] down to a lower site-configured max,
+            // e.g. 50, so a post with hundreds of comments could get back
+            // only 50 on the first page and this would never fire).
+            // Comparing against the post's own known commentCount is
+            // correct regardless of the server's actual page size.
+            hasMoreComments = (detail?.comments.count ?? 0) < (detail?.commentCount ?? 0)
             if let detail {
                 SpotlightIndexer.index(BlogPost(
                     id: detail.id, title: detail.title, authorName: detail.authorName, authorId: detail.authorId,
@@ -172,7 +179,7 @@ struct BlogDetailView: View {
         do {
             let more = try await APIClient.shared.blogs.moreComments(blogId: detail.id, offset: detail.comments.count)
             self.detail?.comments.append(contentsOf: more)
-            hasMoreComments = more.count >= 100
+            hasMoreComments = !more.isEmpty && (self.detail?.comments.count ?? 0) < (self.detail?.commentCount ?? 0)
         } catch {
             toast.error("Couldn't load more comments.")
         }

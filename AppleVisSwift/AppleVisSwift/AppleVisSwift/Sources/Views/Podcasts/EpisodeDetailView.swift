@@ -248,7 +248,12 @@ struct EpisodeDetailView: View {
             let (fetchedEp, fetchedComments) = try await (ep, cms)
             episode = fetchedEp
             comments = fetchedComments
-            hasMoreComments = fetchedComments.count >= 100
+            // Was `>= 100` (the page size requested, not what the server
+            // actually returns — Drupal JSON:API commonly clamps a
+            // requested page[limit] down to a lower site-configured max).
+            // Comparing against the episode's own known commentCount is
+            // correct regardless of the server's actual page size.
+            hasMoreComments = fetchedComments.count < fetchedEp.commentCount
             SpotlightIndexer.index(fetchedEp)
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Couldn't load episode." }
@@ -260,7 +265,7 @@ struct EpisodeDetailView: View {
         do {
             let more = try await APIClient.shared.podcasts.moreComments(episodeId: episodeId, offset: comments.count)
             comments.append(contentsOf: more)
-            hasMoreComments = more.count >= 100
+            hasMoreComments = !more.isEmpty && comments.count < (episode?.commentCount ?? 0)
         } catch {
             toast.error("Couldn't load more comments.")
         }
