@@ -158,7 +158,13 @@ final class PlayerStore: ObservableObject {
         duration = 0
         currentChapter = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        // Deliberately does NOT deactivate the shared AVAudioSession: doing
+        // so broke every UI sound effect app-wide (SoundPlayer configures
+        // its session once and never re-activates it, so once this
+        // deactivated it, .ambient playback silently stopped working for
+        // the rest of the app session with no error). Clearing playback
+        // state and Now Playing info is enough to fully "stop" from the
+        // user's perspective without that side effect.
     }
 
     func seek(to time: TimeInterval) async {
