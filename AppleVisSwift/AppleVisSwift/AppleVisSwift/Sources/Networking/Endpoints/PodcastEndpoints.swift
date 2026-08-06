@@ -52,7 +52,7 @@ struct PodcastEndpoints {
         )
         return response.data.map { node in
             let c = Mappers.genericComment(node, included: response.included ?? [])
-            return PodcastComment(id: node.id, authorName: c.authorName, authorId: c.authorId, body: c.body, createdAt: c.createdAt)
+            return PodcastComment(id: node.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
         }
     }
 
@@ -63,7 +63,7 @@ struct PodcastEndpoints {
         )
         return response.data.map { node in
             let c = Mappers.genericComment(node, included: response.included ?? [])
-            return PodcastComment(id: node.id, authorName: c.authorName, authorId: c.authorId, body: c.body, createdAt: c.createdAt)
+            return PodcastComment(id: node.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
         }
     }
 
@@ -83,7 +83,7 @@ struct PodcastEndpoints {
             headers: ["X-CSRF-Token": csrfToken]
         )
         let c = Mappers.genericComment(response.data, included: response.included ?? [])
-        return PodcastComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, body: c.body, createdAt: c.createdAt)
+        return PodcastComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
     }
 
     func transcript(id: String) async throws -> String {

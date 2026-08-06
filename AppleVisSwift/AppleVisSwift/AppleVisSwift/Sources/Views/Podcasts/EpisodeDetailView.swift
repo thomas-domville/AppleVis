@@ -211,13 +211,14 @@ struct EpisodeDetailView: View {
                 CommentRow(
                     authorName: comment.authorName, text: comment.body, date: comment.createdAt,
                     index: index, total: comments.count,
+                    subject: comment.subject, parentTitle: episode.title,
                     commentId: comment.id, authorId: comment.authorId, commentType: "comment_node_podcast",
                     onDelete: {
                         comments.removeAll { $0.id == comment.id }
                     },
                     onEdit: { newText in
                         guard let idx = comments.firstIndex(where: { $0.id == comment.id }) else { return }
-                        comments[idx] = PodcastComment(id: comment.id, authorName: comment.authorName, authorId: comment.authorId, body: newText, createdAt: comment.createdAt)
+                        comments[idx] = PodcastComment(id: comment.id, authorName: comment.authorName, authorId: comment.authorId, subject: comment.subject, body: newText, createdAt: comment.createdAt)
                     },
                     focusBinding: $focusedCommentId
                 )

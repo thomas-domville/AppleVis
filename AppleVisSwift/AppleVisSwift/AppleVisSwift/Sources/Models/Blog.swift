@@ -31,6 +31,7 @@ struct BlogComment: Identifiable, Codable {
     let id: String
     let authorName: String
     let authorId: String
+    let subject: String
     let body: String
     let createdAt: Date
 }

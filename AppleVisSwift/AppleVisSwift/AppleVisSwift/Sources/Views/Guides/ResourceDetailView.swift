@@ -9,10 +9,15 @@ struct ResourceDetailView: View {
     @State private var showCompose = false
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
+    @State private var guideSummary: String?
+    @State private var isSummarizingGuide = false
+    @State private var discussionSummary: String?
+    @State private var isSummarizingDiscussion = false
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedCommentId: String?
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var preferences: PreferencesStore
 
     var body: some View {
         Group {
@@ -65,6 +70,10 @@ struct ResourceDetailView: View {
 
                     Divider()
 
+                    if preferences.aiSummariesEnabled && IntelligenceService.isAvailable {
+                        aiSummarySection(detail)
+                    }
+
                     // Comments
                     commentsSection(detail, proxy: proxy)
 
@@ -110,13 +119,14 @@ struct ResourceDetailView: View {
                 CommentRow(
                     authorName: comment.authorName, text: comment.body, date: comment.createdAt,
                     index: index, total: detail.comments.count,
+                    subject: comment.subject, parentTitle: detail.title,
                     commentId: comment.id, authorId: comment.authorId, commentType: "comment_node_guides",
                     onDelete: {
                         self.detail?.comments.removeAll { $0.id == comment.id }
                     },
                     onEdit: { newText in
                         guard let idx = self.detail?.comments.firstIndex(where: { $0.id == comment.id }) else { return }
-                        self.detail?.comments[idx] = ResourceComment(id: comment.id, authorName: comment.authorName, authorId: comment.authorId, body: newText, createdAt: comment.createdAt)
+                        self.detail?.comments[idx] = ResourceComment(id: comment.id, authorName: comment.authorName, authorId: comment.authorId, subject: comment.subject, body: newText, createdAt: comment.createdAt)
                     },
                     focusBinding: $focusedCommentId
                 )
@@ -137,6 +147,108 @@ struct ResourceDetailView: View {
                 }
             }
         }
+    }
+
+    /// Two independent AI actions, matching Forums/Apps: one summarizes just
+    /// the guide's own text, the other summarizes the comment discussion —
+    /// previously ResourceDetailView had no Apple Intelligence integration
+    /// at all despite it being used elsewhere in the app.
+    @ViewBuilder
+    private func aiSummarySection(_ detail: ResourceDetail) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            guideSummaryRow(detail)
+            if detail.comments.count >= 5 {
+                Divider()
+                discussionSummaryRow(detail)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal)
+    }
+
+    @ViewBuilder
+    private func guideSummaryRow(_ detail: ResourceDetail) -> some View {
+        if let guideSummary {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Guide Summary", systemImage: "sparkles")
+                    .font(.caption).fontWeight(.bold).foregroundStyle(Color.accentColor)
+                Text(guideSummary).font(.subheadline)
+            }
+        } else {
+            Button {
+                Task { await summarizeGuide(detail) }
+            } label: {
+                if isSummarizingGuide {
+                    HStack(spacing: 8) { ProgressView(); Text("Summarizing…") }
+                } else {
+                    Label("Summarize Guide", systemImage: "sparkles")
+                }
+            }
+            .disabled(isSummarizingGuide)
+            .accessibilityLabel(isSummarizingGuide ? "Summarizing guide, please wait" : "Summarize Guide")
+        }
+    }
+
+    @ViewBuilder
+    private func discussionSummaryRow(_ detail: ResourceDetail) -> some View {
+        if let discussionSummary {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Discussion Summary", systemImage: "sparkles")
+                    .font(.caption).fontWeight(.bold).foregroundStyle(Color.accentColor)
+                Text(discussionSummary).font(.subheadline)
+            }
+        } else {
+            Button {
+                Task { await summarizeDiscussion(detail) }
+            } label: {
+                if isSummarizingDiscussion {
+                    HStack(spacing: 8) { ProgressView(); Text("Summarizing…") }
+                } else {
+                    Label("Summarize Discussion", systemImage: "sparkles")
+                }
+            }
+            .disabled(isSummarizingDiscussion)
+            .accessibilityLabel(isSummarizingDiscussion ? "Summarizing discussion, please wait" : "Summarize Discussion")
+        }
+    }
+
+    private func summarizeGuide(_ detail: ResourceDetail) async {
+        isSummarizingGuide = true
+        UIAccessibility.post(notification: .announcement, argument: "Summarizing guide. This may take a moment.")
+        let input = "Guide: \(detail.title)\n\n\(detail.body.strippingHTMLTags().prefix(3000))"
+        if let summary = await IntelligenceService.summarize(input) {
+            guideSummary = summary
+        } else {
+            toast.error("Couldn't generate a summary for this guide. Try again.")
+            UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a summary for this guide.")
+        }
+        isSummarizingGuide = false
+    }
+
+    private func summarizeDiscussion(_ detail: ResourceDetail) async {
+        isSummarizingDiscussion = true
+        UIAccessibility.post(notification: .announcement, argument: "Summarizing discussion. This may take a moment.")
+        let maxTotalCharacters = 3000
+        let maxPerComment = 220
+        var parts: [String] = []
+        var remaining = maxTotalCharacters
+        for comment in detail.comments.prefix(20) {
+            guard remaining > 0 else { break }
+            let body = comment.body.strippingHTMLTags().prefix(maxPerComment)
+            let part = "\(comment.authorName): \(body)"
+            parts.append(String(part.prefix(remaining)))
+            remaining -= part.count
+        }
+        let input = "Guide: \(detail.title)\n\n\(parts.joined(separator: "\n\n"))"
+        if let summary = await IntelligenceService.summarize(input) {
+            discussionSummary = summary
+        } else {
+            toast.error("Couldn't generate a discussion summary. Try again.")
+            UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a discussion summary.")
+        }
+        isSummarizingDiscussion = false
     }
 
     /// VoiceOver "Thread overview" custom action on the comments heading —
@@ -238,6 +350,8 @@ struct CommentRow: View {
     let date: Date
     var index: Int = 0
     var total: Int = 1
+    var subject: String = ""
+    var parentTitle: String = ""
     var commentId: String? = nil
     var authorId: String? = nil
     var commentType: String? = nil
@@ -257,8 +371,19 @@ struct CommentRow: View {
         return !authorId.isEmpty && (user.isAdmin || user.uuid == authorId)
     }
 
+    /// Was fetched from the API and then thrown away entirely — the shared
+    /// comment mapper never read the `subject` field, so a commenter's
+    /// actual subject line never reached the UI for guides, blogs, or
+    /// podcast comments. Suppresses generic defaults ("Comment", "Reply",
+    /// etc.) the same way ForumReply already does.
+    private var displaySubject: String? {
+        CommentSubject.display(subject, parentTitle: parentTitle)
+    }
+
     private var headerAccessibilityLabel: String {
-        "Comment \(index + 1) of \(total). \(authorName). \(date.formatted(.relative(presentation: .named)))."
+        var label = "Comment \(index + 1) of \(total). \(authorName). \(date.formatted(.relative(presentation: .named)))."
+        if let displaySubject { label += " Subject: \(displaySubject)." }
+        return label
     }
 
     var body: some View {
@@ -284,6 +409,10 @@ struct CommentRow: View {
             }
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Edit Comment") { showEditSheet = true })
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Delete Comment") { showDeleteConfirm = true })
+
+            if let displaySubject {
+                Text(displaySubject).font(.subheadline).fontWeight(.medium)
+            }
 
             HTMLTextView(html: text)
         }

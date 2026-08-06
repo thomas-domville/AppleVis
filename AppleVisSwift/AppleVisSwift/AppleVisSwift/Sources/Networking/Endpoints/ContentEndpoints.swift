@@ -50,7 +50,7 @@ struct ResourceEndpoints {
             if let commentsResponse = try? await commentsRes {
                 comments = commentsResponse.data.map { n in
                     let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
-                    return ResourceComment(id: n.id, authorName: c.authorName, authorId: c.authorId, body: c.body, createdAt: c.createdAt)
+                    return ResourceComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
                 }
             } else {
                 comments = []
@@ -83,7 +83,7 @@ struct ResourceEndpoints {
             headers: ["X-CSRF-Token": csrfToken]
         )
         let c = Mappers.genericComment(response.data, included: response.included ?? [])
-        return ResourceComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, body: c.body, createdAt: c.createdAt)
+        return ResourceComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
     }
 
     /// Fetches the next page of comments beyond the initial 100 (used by "Load more comments").
@@ -94,7 +94,7 @@ struct ResourceEndpoints {
         )
         return response.data.map { n in
             let c = Mappers.genericComment(n, included: response.included ?? [])
-            return ResourceComment(id: n.id, authorName: c.authorName, authorId: c.authorId, body: c.body, createdAt: c.createdAt)
+            return ResourceComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
         }
     }
 }
@@ -134,7 +134,7 @@ struct BlogEndpoints {
             if let commentsResponse = try? await commentsRes {
                 comments = commentsResponse.data.map { n in
                     let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
-                    return BlogComment(id: n.id, authorName: c.authorName, authorId: c.authorId, body: c.body, createdAt: c.createdAt)
+                    return BlogComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
                 }
             } else {
                 comments = []
@@ -164,7 +164,7 @@ struct BlogEndpoints {
             headers: ["X-CSRF-Token": csrfToken]
         )
         let c = Mappers.genericComment(response.data, included: response.included ?? [])
-        return BlogComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, body: c.body, createdAt: c.createdAt)
+        return BlogComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
     }
 
     func moreComments(blogId: String, offset: Int) async throws -> [BlogComment] {
@@ -174,7 +174,7 @@ struct BlogEndpoints {
         )
         return response.data.map { n in
             let c = Mappers.genericComment(n, included: response.included ?? [])
-            return BlogComment(id: n.id, authorName: c.authorName, authorId: c.authorId, body: c.body, createdAt: c.createdAt)
+            return BlogComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
         }
     }
 }

@@ -299,14 +299,14 @@ enum Mappers {
 
     // MARK: - Generic comments (resource / blog / podcast)
 
-    static func genericComment(_ node: JsonApiNode, included: [JsonApiNode] = []) -> (authorName: String, authorId: String, body: String, createdAt: Date) {
+    static func genericComment(_ node: JsonApiNode, included: [JsonApiNode] = []) -> (authorName: String, authorId: String, subject: String, body: String, createdAt: Date) {
         let a = node.attributes
         let uidId = node.relationshipId("uid")
         let userNode = uidId.flatMap { id in included.first { $0.id == id } }
         let authorName = userNode?.attributes["display_name"]?.stringValue
             ?? userNode?.attributes["name"]?.stringValue
             ?? a["name"]?.stringValue ?? ""
-        return (authorName, uidId ?? "", a["comment_body"]?.richTextValue ?? "", node.createdDate)
+        return (authorName, uidId ?? "", a["subject"]?.stringValue ?? "", a["comment_body"]?.richTextValue ?? "", node.createdDate)
     }
 
     // MARK: - Resources / Guides

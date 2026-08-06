@@ -514,38 +514,11 @@ struct ReplyView: View {
         var label = "Comment \(index + 1) of \(total). \(reply.authorName)"
         if isOriginalPoster { label += ", Original Poster" }
         label += ". \(reply.createdAt.formatted(.relative(presentation: .named)))."
-        if let subject = Self.displaySubject(reply.subject, parentTitle: topicTitle) {
+        if let subject = CommentSubject.display(reply.subject, parentTitle: topicTitle) {
             label += " Subject: \(subject)."
         }
         if reply.isNew { label += " New." }
         return label
-    }
-
-    /// Suppresses generic default subjects ("Comment", "Reply", "Review",
-    /// "Re", "Add new comment") and subjects that just duplicate the parent
-    /// topic title — mirrors the old app's commentSubject.ts. Drupal
-    /// defaults a reply's subject to one of these unless the poster changes
-    /// it, so without this nearly every reply read "Subject: Comment." aloud
-    /// for no reason (the previous version only caught the exact "Re: Title"
-    /// and title-duplicate cases, not these generic defaults).
-    private static func displaySubject(_ subject: String, parentTitle: String) -> String? {
-        func normalize(_ value: String) -> String {
-            var s = value.trimmingCharacters(in: .whitespacesAndNewlines)
-                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-                .lowercased()
-            if s.hasPrefix("re:") {
-                s = String(s.dropFirst(3)).trimmingCharacters(in: .whitespaces)
-            }
-            return s
-        }
-        let genericSubjects: Set<String> = ["comment", "reply", "review", "re", "add new comment"]
-        let clean = subject.trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-        guard !clean.isEmpty else { return nil }
-        let normalized = normalize(clean)
-        guard !normalized.isEmpty, !genericSubjects.contains(normalized) else { return nil }
-        guard normalize(parentTitle) != normalized else { return nil }
-        return clean
     }
 
     var body: some View {

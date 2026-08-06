@@ -105,13 +105,14 @@ struct BlogDetailView: View {
                 CommentRow(
                     authorName: comment.authorName, text: comment.body, date: comment.createdAt,
                     index: index, total: detail.comments.count,
+                    subject: comment.subject, parentTitle: detail.title,
                     commentId: comment.id, authorId: comment.authorId, commentType: "comment_node_blog2",
                     onDelete: {
                         self.detail?.comments.removeAll { $0.id == comment.id }
                     },
                     onEdit: { newText in
                         guard let idx = self.detail?.comments.firstIndex(where: { $0.id == comment.id }) else { return }
-                        self.detail?.comments[idx] = BlogComment(id: comment.id, authorName: comment.authorName, authorId: comment.authorId, body: newText, createdAt: comment.createdAt)
+                        self.detail?.comments[idx] = BlogComment(id: comment.id, authorName: comment.authorName, authorId: comment.authorId, subject: comment.subject, body: newText, createdAt: comment.createdAt)
                     },
                     focusBinding: $focusedCommentId
                 )

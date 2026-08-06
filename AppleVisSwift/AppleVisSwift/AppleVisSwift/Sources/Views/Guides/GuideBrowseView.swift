@@ -115,7 +115,10 @@ struct GuideBrowseView: View {
 // MARK: - Filter options
 
 enum GuideFilter: String, CaseIterable, Identifiable {
-    case all, apps, iOS, iPadOS, macOS, voiceOver, braille, accessories, gaming, misc
+    // iPhone/iPad/Programming were missing entirely — the old app has 3
+    // more category filters than this, so guides tagged only under those
+    // categories had no dedicated filter to find them by.
+    case all, apps, iOS, iPadOS, iPhone, iPad, macOS, voiceOver, braille, accessories, gaming, programming, misc
 
     var id: String { rawValue }
 
@@ -125,11 +128,14 @@ enum GuideFilter: String, CaseIterable, Identifiable {
         case .apps:        return "Apps"
         case .iOS:         return "iOS"
         case .iPadOS:      return "iPadOS"
+        case .iPhone:      return "iPhone"
+        case .iPad:        return "iPad"
         case .macOS:       return "macOS"
         case .voiceOver:   return "VoiceOver"
         case .braille:     return "Braille"
         case .accessories: return "Accessories"
         case .gaming:      return "Gaming"
+        case .programming: return "Programming"
         case .misc:        return "Miscellaneous"
         }
     }
@@ -140,11 +146,14 @@ enum GuideFilter: String, CaseIterable, Identifiable {
         case .apps:        return [27, 28, 115]
         case .iOS:         return [26]
         case .iPadOS:      return [244]
+        case .iPhone:      return [93]
+        case .iPad:        return [92]
         case .macOS:       return [114]
         case .voiceOver:   return [101]
         case .braille:     return [88]
         case .accessories: return [97]
         case .gaming:      return [90]
+        case .programming: return [194, 195]
         case .misc:        return [31]
         }
     }

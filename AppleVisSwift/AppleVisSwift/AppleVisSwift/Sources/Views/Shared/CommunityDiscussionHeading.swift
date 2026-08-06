@@ -71,3 +71,31 @@ struct OptionalReplyFocus: ViewModifier {
         }
     }
 }
+
+/// Suppresses generic default comment subjects ("Comment", "Reply",
+/// "Review", "Re", "Add new comment") and subjects that just duplicate the
+/// parent title — Drupal defaults a comment's subject to one of these
+/// unless the poster changes it. Shared by ForumReply (ForumTopicDetailView)
+/// and the generic CommentRow (Blog/Guide/Podcast comments) so reading a
+/// comment aloud doesn't announce "Subject: Comment." for no reason.
+enum CommentSubject {
+    static func display(_ subject: String, parentTitle: String) -> String? {
+        func normalize(_ value: String) -> String {
+            var s = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                .lowercased()
+            if s.hasPrefix("re:") {
+                s = String(s.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+            }
+            return s
+        }
+        let genericSubjects: Set<String> = ["comment", "reply", "review", "re", "add new comment"]
+        let clean = subject.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        guard !clean.isEmpty else { return nil }
+        let normalized = normalize(clean)
+        guard !normalized.isEmpty, !genericSubjects.contains(normalized) else { return nil }
+        guard normalize(parentTitle) != normalized else { return nil }
+        return clean
+    }
+}

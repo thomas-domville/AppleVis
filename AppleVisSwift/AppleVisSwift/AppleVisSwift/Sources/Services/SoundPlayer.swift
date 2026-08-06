@@ -55,7 +55,6 @@ final class SoundPlayer {
     static let shared = SoundPlayer()
 
     private var players: [String: AVAudioPlayer] = [:]
-    private var sessionConfigured = false
 
     private init() {}
 
@@ -78,7 +77,7 @@ final class SoundPlayer {
     }
 
     private func play(filename: String, ext: String) {
-        configureSessionIfNeeded()
+        configureSession()
 
         let key = filename
         if let cached = players[key] {
@@ -96,10 +95,24 @@ final class SoundPlayer {
         player.play()
     }
 
-    private func configureSessionIfNeeded() {
-        guard !sessionConfigured else { return }
-        sessionConfigured = true
-        try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
-        try? AVAudioSession.sharedInstance().setActive(true)
+    /// Reasserts `.ambient`/`.mixWithOthers` whenever the shared session
+    /// isn't already in that state, instead of only ever configuring it
+    /// once. Podcast playback (PlayerStore) switches the shared
+    /// AVAudioSession to `.playback` category while an episode is loaded;
+    /// once that happens, a one-time "already configured" guard here left
+    /// every UI sound effect permanently, silently broken for the rest of
+    /// the app session (AVAudioPlayer.play() just no-ops under the wrong
+    /// category, with no error anywhere) — this was reported directly as
+    /// tab-change/refresh sounds going silent, and is also the most likely
+    /// cause of a separate report that a tab's VoiceOver "selected"
+    /// announcement was getting cut off: an audio session/category change
+    /// while VoiceOver speech is in flight can interrupt it, and skipping
+    /// the reassert when the category is already correct (the common case)
+    /// avoids doing that on every single sound.
+    private func configureSession() {
+        let session = AVAudioSession.sharedInstance()
+        guard session.category != .ambient || !session.categoryOptions.contains(.mixWithOthers) else { return }
+        try? session.setCategory(.ambient, options: [.mixWithOthers])
+        try? session.setActive(true)
     }
 }
