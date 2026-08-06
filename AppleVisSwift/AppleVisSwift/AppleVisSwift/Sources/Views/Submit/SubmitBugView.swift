@@ -11,7 +11,11 @@ struct SubmitBugView: View {
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var preferences: PreferencesStore
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var guidelines = GuidelinesCheckState()
+    @StateObject private var intelligence = ComposeIntelligenceState()
+    @AccessibilityFocusState private var isStepFocused: Bool
 
     @State private var step: Step = .details
     @State private var name = ""
@@ -70,6 +74,19 @@ struct SubmitBugView: View {
                         }
                     }
                 }
+                if step == .description && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+                    ToolbarItem(placement: .secondaryAction) {
+                        Button("Rewrite") {
+                            Task {
+                                if let result = await intelligence.rewrite(subject: title, body: description, isTopic: true) {
+                                    title = result.subject ?? title
+                                    description = result.body
+                                }
+                            }
+                        }
+                        .disabled(description.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     if step == .review {
                         Button("Submit") { Task { await submit() } }
@@ -89,7 +106,7 @@ struct SubmitBugView: View {
     private var detailsSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 1, total: 4, title: "Your Details")
+                WizardStepIndicator(step: 1, total: 4, title: "Your Details", isFocused: $isStepFocused)
                 Text("Report an accessibility bug for the community Bug Tracker. Apple does not see this directly — file Feedback Assistant separately if you want Apple to see it.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -98,32 +115,61 @@ struct SubmitBugView: View {
                 TextField("Email", text: $email)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
+                    .accessibilityHint("We'll follow up at this address if we need more detail.")
             }
         }
     }
 
     private var descriptionSection: some View {
         Group {
-            Section { WizardStepIndicator(step: 2, total: 4, title: "Describe the Bug") }
+            Section { WizardStepIndicator(step: 2, total: 4, title: "Describe the Bug", isFocused: $isStepFocused) }
+            if intelligence.showTranslatePrompt {
+                Section {
+                    TranslatePromptView(isProcessing: intelligence.isProcessing) {
+                        Task {
+                            if let result = await intelligence.translate(subject: title, body: description, isTopic: true) {
+                                title = result.subject ?? title
+                                description = result.body
+                            }
+                        }
+                    } onDismiss: {
+                        intelligence.dismissTranslatePrompt()
+                    }
+                }
+            }
+            if let warning = guidelines.topWarning {
+                Section {
+                    GuidelinesReminderView(warning: warning) { guidelines.dismiss() }
+                }
+            }
             Section("Bug Details") {
                 TextField("Title", text: $title)
             }
             Section("Description") {
                 TextEditor(text: $description)
                     .frame(minHeight: 160)
+                    .onChange(of: description) { _, newValue in
+                        guidelines.textChanged(newValue)
+                        intelligence.textChanged(
+                            newValue,
+                            translationEnabled: preferences.composeTranslationEnabled,
+                            detectionEnabled: preferences.nonEnglishDetectionEnabled
+                        )
+                    }
             }
         }
     }
 
     private var bugInfoSection: some View {
         Group {
-            Section { WizardStepIndicator(step: 3, total: 4, title: "Environment") }
+            Section { WizardStepIndicator(step: 3, total: 4, title: "Environment", isFocused: $isStepFocused) }
             Section("Where It Happens") {
                 Picker("Platform", selection: $platform) {
                     ForEach(platforms, id: \.self) { Text($0) }
                 }
                 TextField("Software Version", text: $softwareVersion)
                 TextField("Apple Feedback ID (optional)", text: $appleFeedbackId)
+                    .accessibilityHint("The FB number from Apple's Feedback Assistant, if you also filed this there.")
                 Picker("Can you reproduce it?", selection: $canReproduce) {
                     ForEach(reproduceOptions, id: \.self) { Text($0) }
                 }
@@ -133,13 +179,14 @@ struct SubmitBugView: View {
                     ForEach(recognitionOptions, id: \.self) { Text($0) }
                 }
                 .pickerStyle(.navigationLink)
+                .accessibilityHint("Controls how you're credited if this report leads to a fix.")
             }
         }
     }
 
     private var reviewSection: some View {
         Group {
-            Section { WizardStepIndicator(step: 4, total: 4, title: "Review & Submit") }
+            Section { WizardStepIndicator(step: 4, total: 4, title: "Review & Submit", isFocused: $isStepFocused) }
             Section("Your Details") {
                 WizardReviewRow(label: "Name", value: name)
                 WizardReviewRow(label: "Email", value: email)
@@ -161,11 +208,20 @@ struct SubmitBugView: View {
     private func goNext() {
         SoundPlayer.shared.play(.pickerTick)
         step = Step(rawValue: step.rawValue + 1) ?? .review
+        focusStepAfterTransition()
     }
 
     private func goBack() {
         SoundPlayer.shared.play(.pickerTick)
         step = Step(rawValue: step.rawValue - 1) ?? .details
+        focusStepAfterTransition()
+    }
+
+    private func focusStepAfterTransition() {
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            isStepFocused = true
+        }
     }
 
     private func submit() async {

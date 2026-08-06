@@ -1,10 +1,15 @@
 import SwiftUI
 
-/// "Step X of N" indicator shown at the top of each multi-step submission wizard.
+/// "Step X of N" indicator shown at the top of each multi-step submission
+/// wizard. Optionally bound to an `@AccessibilityFocusState` so the wizard
+/// can move VoiceOver focus here after Next/Back — previously goNext()/
+/// goBack() only played a sound, leaving focus wherever it was on the
+/// previous step with nothing announcing the step actually changed.
 struct WizardStepIndicator: View {
     let step: Int
     let total: Int
     let title: String
+    var isFocused: AccessibilityFocusState<Bool>.Binding? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -16,6 +21,20 @@ struct WizardStepIndicator: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Step \(step) of \(total): \(title)")
+        .accessibilityAddTraits(.isHeader)
+        .modifier(OptionalAccessibilityFocus(isFocused: isFocused))
+    }
+}
+
+private struct OptionalAccessibilityFocus: ViewModifier {
+    let isFocused: AccessibilityFocusState<Bool>.Binding?
+
+    func body(content: Content) -> some View {
+        if let isFocused {
+            content.accessibilityFocused(isFocused)
+        } else {
+            content
+        }
     }
 }
 

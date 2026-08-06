@@ -11,7 +11,11 @@ struct SubmitBlogView: View {
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var preferences: PreferencesStore
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var guidelines = GuidelinesCheckState()
+    @StateObject private var intelligence = ComposeIntelligenceState()
+    @AccessibilityFocusState private var isStepFocused: Bool
 
     @State private var step: Step = .details
     @State private var name = ""
@@ -60,6 +64,18 @@ struct SubmitBlogView: View {
                         }
                     }
                 }
+                if step == .content && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+                    ToolbarItem(placement: .secondaryAction) {
+                        Button("Rewrite") {
+                            Task {
+                                if let result = await intelligence.rewrite(subject: nil, body: blogDraft, isTopic: false) {
+                                    blogDraft = result.body
+                                }
+                            }
+                        }
+                        .disabled(blogDraft.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     if step == .review {
                         Button("Submit") { Task { await submit() } }
@@ -79,7 +95,7 @@ struct SubmitBlogView: View {
     private var detailsSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 1, total: 3, title: "Your Details")
+                WizardStepIndicator(step: 1, total: 3, title: "Your Details", isFocused: $isStepFocused)
                 Text("Submit a blog post draft for the AppleVis editorial team to review. This does not publish immediately — an editor will follow up.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -88,27 +104,55 @@ struct SubmitBlogView: View {
                 TextField("Email", text: $email)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
+                    .accessibilityHint("The editorial team will follow up at this address.")
             }
         }
     }
 
     private var contentSection: some View {
         Group {
-            Section { WizardStepIndicator(step: 2, total: 3, title: "Your Content") }
+            Section { WizardStepIndicator(step: 2, total: 3, title: "Your Content", isFocused: $isStepFocused) }
+            if intelligence.showTranslatePrompt {
+                Section {
+                    TranslatePromptView(isProcessing: intelligence.isProcessing) {
+                        Task {
+                            if let result = await intelligence.translate(subject: nil, body: blogDraft, isTopic: false) {
+                                blogDraft = result.body
+                            }
+                        }
+                    } onDismiss: {
+                        intelligence.dismissTranslatePrompt()
+                    }
+                }
+            }
+            if let warning = guidelines.topWarning {
+                Section {
+                    GuidelinesReminderView(warning: warning) { guidelines.dismiss() }
+                }
+            }
             Section("Cover Note") {
                 TextEditor(text: $coverNote)
                     .frame(minHeight: 80)
+                    .accessibilityHint("A private note to the editorial team, not published.")
             }
             Section("Blog Post Draft") {
                 TextEditor(text: $blogDraft)
                     .frame(minHeight: 200)
+                    .onChange(of: blogDraft) { _, newValue in
+                        guidelines.textChanged(newValue)
+                        intelligence.textChanged(
+                            newValue,
+                            translationEnabled: preferences.composeTranslationEnabled,
+                            detectionEnabled: preferences.nonEnglishDetectionEnabled
+                        )
+                    }
             }
         }
     }
 
     private var reviewSection: some View {
         Group {
-            Section { WizardStepIndicator(step: 3, total: 3, title: "Review & Submit") }
+            Section { WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused) }
             Section("Your Details") {
                 WizardReviewRow(label: "Name", value: name)
                 WizardReviewRow(label: "Email", value: email)
@@ -123,11 +167,20 @@ struct SubmitBlogView: View {
     private func goNext() {
         SoundPlayer.shared.play(.pickerTick)
         step = Step(rawValue: step.rawValue + 1) ?? .review
+        focusStepAfterTransition()
     }
 
     private func goBack() {
         SoundPlayer.shared.play(.pickerTick)
         step = Step(rawValue: step.rawValue - 1) ?? .details
+        focusStepAfterTransition()
+    }
+
+    private func focusStepAfterTransition() {
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            isStepFocused = true
+        }
     }
 
     private func submit() async {

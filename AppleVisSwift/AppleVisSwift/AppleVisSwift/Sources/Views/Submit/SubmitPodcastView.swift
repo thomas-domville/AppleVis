@@ -12,7 +12,11 @@ struct SubmitPodcastView: View {
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var preferences: PreferencesStore
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var guidelines = GuidelinesCheckState()
+    @StateObject private var intelligence = ComposeIntelligenceState()
+    @AccessibilityFocusState private var isStepFocused: Bool
 
     @State private var step: Step = .details
     @State private var name = ""
@@ -67,6 +71,18 @@ struct SubmitPodcastView: View {
                         }
                     }
                 }
+                if step == .audio && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+                    ToolbarItem(placement: .secondaryAction) {
+                        Button("Rewrite") {
+                            Task {
+                                if let result = await intelligence.rewrite(subject: nil, body: description, isTopic: false) {
+                                    description = result.body
+                                }
+                            }
+                        }
+                        .disabled(description.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     if step == .review {
                         Button("Submit") { Task { await submit() } }
@@ -89,7 +105,7 @@ struct SubmitPodcastView: View {
     private var detailsSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 1, total: 3, title: "Your Details")
+                WizardStepIndicator(step: 1, total: 3, title: "Your Details", isFocused: $isStepFocused)
                 Text("Submit an episode for the AppleVis podcast feed. An editor will review it before it's published.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -98,16 +114,43 @@ struct SubmitPodcastView: View {
                 TextField("Email", text: $email)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
+                    .accessibilityHint("The editorial team will follow up at this address.")
             }
         }
     }
 
     private var audioSection: some View {
         Group {
-            Section { WizardStepIndicator(step: 2, total: 3, title: "Episode & Audio") }
+            Section { WizardStepIndicator(step: 2, total: 3, title: "Episode & Audio", isFocused: $isStepFocused) }
+            if intelligence.showTranslatePrompt {
+                Section {
+                    TranslatePromptView(isProcessing: intelligence.isProcessing) {
+                        Task {
+                            if let result = await intelligence.translate(subject: nil, body: description, isTopic: false) {
+                                description = result.body
+                            }
+                        }
+                    } onDismiss: {
+                        intelligence.dismissTranslatePrompt()
+                    }
+                }
+            }
+            if let warning = guidelines.topWarning {
+                Section {
+                    GuidelinesReminderView(warning: warning) { guidelines.dismiss() }
+                }
+            }
             Section("Episode Description") {
                 TextEditor(text: $description)
                     .frame(minHeight: 120)
+                    .onChange(of: description) { _, newValue in
+                        guidelines.textChanged(newValue)
+                        intelligence.textChanged(
+                            newValue,
+                            translationEnabled: preferences.composeTranslationEnabled,
+                            detectionEnabled: preferences.nonEnglishDetectionEnabled
+                        )
+                    }
             }
             Section("Audio File") {
                 Button {
@@ -115,13 +158,14 @@ struct SubmitPodcastView: View {
                 } label: {
                     Label(audioFileURL?.lastPathComponent ?? "Choose Audio File", systemImage: "waveform")
                 }
+                .accessibilityHint("Opens the Files app to pick an audio file for this episode.")
             }
         }
     }
 
     private var reviewSection: some View {
         Group {
-            Section { WizardStepIndicator(step: 3, total: 3, title: "Review & Submit") }
+            Section { WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused) }
             Section("Your Details") {
                 WizardReviewRow(label: "Name", value: name)
                 WizardReviewRow(label: "Email", value: email)
@@ -136,11 +180,20 @@ struct SubmitPodcastView: View {
     private func goNext() {
         SoundPlayer.shared.play(.pickerTick)
         step = Step(rawValue: step.rawValue + 1) ?? .review
+        focusStepAfterTransition()
     }
 
     private func goBack() {
         SoundPlayer.shared.play(.pickerTick)
         step = Step(rawValue: step.rawValue - 1) ?? .details
+        focusStepAfterTransition()
+    }
+
+    private func focusStepAfterTransition() {
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            isStepFocused = true
+        }
     }
 
     private func submit() async {

@@ -8,7 +8,10 @@ import SwiftUI
 struct SubmitAppView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var preferences: PreferencesStore
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var guidelines = GuidelinesCheckState()
+    @StateObject private var intelligence = ComposeIntelligenceState()
 
     @State private var searchQuery = ""
     @State private var searchResults: [ItunesSearchHit] = []
@@ -59,6 +62,18 @@ struct SubmitAppView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { SoundPlayer.shared.play(.screenClose); dismiss() }
+                }
+                if selectedHit != nil && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+                    ToolbarItem(placement: .secondaryAction) {
+                        Button("Rewrite") {
+                            Task {
+                                if let result = await intelligence.rewrite(subject: nil, body: payload.accessibilityComments, isTopic: false) {
+                                    payload.accessibilityComments = result.body
+                                }
+                            }
+                        }
+                        .disabled(payload.accessibilityComments.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Submit") { Task { await submit() } }
@@ -134,23 +149,54 @@ struct SubmitAppView: View {
                     Text("Choose…").tag("")
                     ForEach(performanceOptions, id: \.self) { Text($0).tag($0) }
                 }
+                .accessibilityHint("How well VoiceOver works overall in this app.")
                 Picker("Button Labelling", selection: $payload.buttonLabelling) {
                     Text("Choose…").tag("")
                     ForEach(performanceOptions, id: \.self) { Text($0).tag($0) }
                 }
+                .accessibilityHint("Whether buttons and controls have clear, accurate VoiceOver labels.")
                 Picker("Usability", selection: $payload.usabilityNotes) {
                     Text("Choose…").tag("")
                     ForEach(performanceOptions, id: \.self) { Text($0).tag($0) }
+                }
+                .accessibilityHint("How easy the app is to use as a blind or low-vision user overall.")
+            }
+
+            if intelligence.showTranslatePrompt {
+                Section {
+                    TranslatePromptView(isProcessing: intelligence.isProcessing) {
+                        Task {
+                            if let result = await intelligence.translate(subject: nil, body: payload.accessibilityComments, isTopic: false) {
+                                payload.accessibilityComments = result.body
+                            }
+                        }
+                    } onDismiss: {
+                        intelligence.dismissTranslatePrompt()
+                    }
+                }
+            }
+            if let warning = guidelines.topWarning {
+                Section {
+                    GuidelinesReminderView(warning: warning) { guidelines.dismiss() }
                 }
             }
 
             Section("Accessibility Comments") {
                 TextEditor(text: $payload.accessibilityComments)
                     .frame(minHeight: 120)
+                    .onChange(of: payload.accessibilityComments) { _, newValue in
+                        guidelines.textChanged(newValue)
+                        intelligence.textChanged(
+                            newValue,
+                            translationEnabled: preferences.composeTranslationEnabled,
+                            detectionEnabled: preferences.nonEnglishDetectionEnabled
+                        )
+                    }
             }
 
             Section("Short Summary") {
                 TextField("One-line summary for the directory listing", text: $payload.shortSummary)
+                    .accessibilityHint("Shown in the app directory list view, not the full review.")
             }
 
             Section("Additional Comments (optional)") {
