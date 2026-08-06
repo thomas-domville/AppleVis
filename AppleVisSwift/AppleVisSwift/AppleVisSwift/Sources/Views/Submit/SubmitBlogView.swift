@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Ported against src/services/drupalForm.ts's `/form/blog-submission` webform.
 /// Requires an authenticated session to reach the real form — could not be
@@ -24,6 +25,7 @@ struct SubmitBlogView: View {
     @State private var blogDraft = ""
     @State private var isSubmitting = false
     @State private var error: String?
+    @State private var showFileImporter = false
 
     /// Set when opened from the Share Extension with shared text.
     init(prefillText: String? = nil) {
@@ -150,8 +152,56 @@ struct SubmitBlogView: View {
                             detectionEnabled: preferences.nonEnglishDetectionEnabled
                         )
                     }
+                HStack {
+                    Button {
+                        showFileImporter = true
+                    } label: {
+                        Label("Import File", systemImage: "doc.text")
+                    }
+                    .accessibilityHint("Replaces the draft with the contents of a text file.")
+
+                    Spacer()
+
+                    Button {
+                        pasteFromClipboard()
+                    } label: {
+                        Label("Paste", systemImage: "doc.on.clipboard")
+                    }
+                    .accessibilityHint("Replaces the draft with the contents of the clipboard.")
+                }
+                .buttonStyle(.borderless)
             }
         }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.plainText, .text, .rtf], onCompletion: handleFileImport)
+    }
+
+    /// Matches the old app's Write/Import/Paste content step, minus the
+    /// mode-switching UI — Import and Paste both just fill the same draft
+    /// editor, which keeps the Write mode always visible instead of hiding
+    /// it behind a segmented picker.
+    private func handleFileImport(_ result: Result<URL, Error>) {
+        switch result {
+        case .success(let url):
+            let didAccess = url.startAccessingSecurityScopedResource()
+            defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+                toast.error("Couldn't read that file.")
+                return
+            }
+            blogDraft = text
+            UIAccessibility.post(notification: .announcement, argument: "Imported \(text.count) characters.")
+        case .failure:
+            toast.error("Couldn't import that file.")
+        }
+    }
+
+    private func pasteFromClipboard() {
+        guard let text = UIPasteboard.general.string, !text.isEmpty else {
+            UIAccessibility.post(notification: .announcement, argument: "Clipboard is empty.")
+            return
+        }
+        blogDraft = text
+        UIAccessibility.post(notification: .announcement, argument: "Pasted \(text.count) characters.")
     }
 
     private var reviewSection: some View {
