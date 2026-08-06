@@ -8,10 +8,15 @@ struct BlogDetailView: View {
     @State private var showCompose = false
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
+    @State private var postSummary: String?
+    @State private var isSummarizingPost = false
+    @State private var discussionSummary: String?
+    @State private var isSummarizingDiscussion = false
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedCommentId: String?
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var preferences: PreferencesStore
 
     var body: some View {
         Group {
@@ -59,6 +64,10 @@ struct BlogDetailView: View {
                         .padding(.horizontal)
 
                     Divider()
+
+                    if preferences.aiSummariesEnabled && IntelligenceService.isAvailable {
+                        aiSummarySection(detail)
+                    }
 
                     // Comments
                     commentsSection(detail, proxy: proxy)
@@ -133,6 +142,108 @@ struct BlogDetailView: View {
                 }
             }
         }
+    }
+
+    /// Two independent AI actions, matching Forums/Apps/Guides: one
+    /// summarizes just the post's own text, the other summarizes the
+    /// comment discussion — previously BlogDetailView had no Apple
+    /// Intelligence integration at all despite it being used elsewhere.
+    @ViewBuilder
+    private func aiSummarySection(_ detail: BlogPostDetail) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            postSummaryRow(detail)
+            if detail.comments.count >= 5 {
+                Divider()
+                discussionSummaryRow(detail)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal)
+    }
+
+    @ViewBuilder
+    private func postSummaryRow(_ detail: BlogPostDetail) -> some View {
+        if let postSummary {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Post Summary", systemImage: "sparkles")
+                    .font(.caption).fontWeight(.bold).foregroundStyle(Color.accentColor)
+                Text(postSummary).font(.subheadline)
+            }
+        } else {
+            Button {
+                Task { await summarizePost(detail) }
+            } label: {
+                if isSummarizingPost {
+                    HStack(spacing: 8) { ProgressView(); Text("Summarizing…") }
+                } else {
+                    Label("Summarize Post", systemImage: "sparkles")
+                }
+            }
+            .disabled(isSummarizingPost)
+            .accessibilityLabel(isSummarizingPost ? "Summarizing post, please wait" : "Summarize Post")
+        }
+    }
+
+    @ViewBuilder
+    private func discussionSummaryRow(_ detail: BlogPostDetail) -> some View {
+        if let discussionSummary {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Discussion Summary", systemImage: "sparkles")
+                    .font(.caption).fontWeight(.bold).foregroundStyle(Color.accentColor)
+                Text(discussionSummary).font(.subheadline)
+            }
+        } else {
+            Button {
+                Task { await summarizeDiscussion(detail) }
+            } label: {
+                if isSummarizingDiscussion {
+                    HStack(spacing: 8) { ProgressView(); Text("Summarizing…") }
+                } else {
+                    Label("Summarize Discussion", systemImage: "sparkles")
+                }
+            }
+            .disabled(isSummarizingDiscussion)
+            .accessibilityLabel(isSummarizingDiscussion ? "Summarizing discussion, please wait" : "Summarize Discussion")
+        }
+    }
+
+    private func summarizePost(_ detail: BlogPostDetail) async {
+        isSummarizingPost = true
+        UIAccessibility.post(notification: .announcement, argument: "Summarizing post. This may take a moment.")
+        let input = "Blog post: \(detail.title)\n\n\(detail.body.strippingHTMLTags().prefix(3000))"
+        if let summary = await IntelligenceService.summarize(input) {
+            postSummary = summary
+        } else {
+            toast.error("Couldn't generate a summary for this post. Try again.")
+            UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a summary for this post.")
+        }
+        isSummarizingPost = false
+    }
+
+    private func summarizeDiscussion(_ detail: BlogPostDetail) async {
+        isSummarizingDiscussion = true
+        UIAccessibility.post(notification: .announcement, argument: "Summarizing discussion. This may take a moment.")
+        let maxTotalCharacters = 3000
+        let maxPerComment = 220
+        var parts: [String] = []
+        var remaining = maxTotalCharacters
+        for comment in detail.comments.prefix(20) {
+            guard remaining > 0 else { break }
+            let body = comment.body.strippingHTMLTags().prefix(maxPerComment)
+            let part = "\(comment.authorName): \(body)"
+            parts.append(String(part.prefix(remaining)))
+            remaining -= part.count
+        }
+        let input = "Blog post: \(detail.title)\n\n\(parts.joined(separator: "\n\n"))"
+        if let summary = await IntelligenceService.summarize(input) {
+            discussionSummary = summary
+        } else {
+            toast.error("Couldn't generate a discussion summary. Try again.")
+            UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a discussion summary.")
+        }
+        isSummarizingDiscussion = false
     }
 
     /// VoiceOver "Thread overview" custom action on the comments heading —
