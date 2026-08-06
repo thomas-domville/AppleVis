@@ -46,6 +46,16 @@ struct MiniPlayerView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Skip forward \(Int(preferences.skipForwardInterval)) seconds")
+
+                Button {
+                    player.stop()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Stop and dismiss player")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -223,7 +233,21 @@ struct FullPlayerView: View {
                 .glassEffect(in: Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Playback speed: \(speedLabel(current))×. Double-tap to increase.")
+        .accessibilityLabel("Playback speed: \(speedLabel(current))×")
+        .accessibilityHint("Double-tap to increase. Swipe up or down to adjust.")
+        // Was double-tap-to-increase only, wrapping 3.0x back to 0.5x — a
+        // VoiceOver user who overshot their target speed had to tap through
+        // the entire list again (up to 9 taps) instead of swiping down once.
+        .accessibilityAdjustableAction { direction in
+            let idx = speedOptions.firstIndex(of: player.playbackSpeed) ?? 2
+            switch direction {
+            case .increment:
+                player.playbackSpeed = speedOptions[(idx + 1) % speedOptions.count]
+            case .decrement:
+                player.playbackSpeed = speedOptions[(idx - 1 + speedOptions.count) % speedOptions.count]
+            @unknown default: break
+            }
+        }
     }
 
     private var sleepTimerButton: some View {
@@ -294,6 +318,7 @@ private func formatScrubberTime(_ seconds: TimeInterval) -> String {
 
 private struct ScrubberView: View {
     @EnvironmentObject private var player: PlayerStore
+    @EnvironmentObject private var preferences: PreferencesStore
 
     var body: some View {
         GeometryReader { geo in
@@ -326,9 +351,14 @@ private struct ScrubberView: View {
             : "0%"
         )
         .accessibilityAdjustableAction { direction in
+            // Was hardcoded to 30s/15s regardless of the user's configured
+            // skip intervals — every other skip control on this screen
+            // (transport buttons, mini-player) already reads these
+            // preferences, so swiping the scrubber behaved inconsistently
+            // with double-tapping the actual skip buttons.
             switch direction {
-            case .increment: Task { await player.skip(by: 30) }
-            case .decrement: Task { await player.skip(by: -15) }
+            case .increment: Task { await player.skip(by: preferences.skipForwardInterval) }
+            case .decrement: Task { await player.skip(by: -preferences.skipBackInterval) }
             @unknown default: break
             }
         }

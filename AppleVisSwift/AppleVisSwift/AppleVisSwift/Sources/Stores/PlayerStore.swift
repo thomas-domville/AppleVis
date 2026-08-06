@@ -142,6 +142,25 @@ final class PlayerStore: ObservableObject {
         isPlaying ? pause() : play()
     }
 
+    /// Fully stops playback and dismisses the mini player — distinct from
+    /// `pause()`, which keeps the episode loaded so it can resume. The old
+    /// app's mini player has an explicit "Stop and dismiss" action; without
+    /// this there was no way to clear the mini player short of loading a
+    /// different episode, so it stayed pinned to the bottom of every tab
+    /// indefinitely once anything had ever played.
+    func stop() {
+        pause()
+        removeTimeObserver()
+        player?.replaceCurrentItem(with: nil)
+        player = nil
+        currentEpisode = nil
+        position = 0
+        duration = 0
+        currentChapter = nil
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
     func seek(to time: TimeInterval) async {
         await player?.seek(to: CMTime(seconds: time, preferredTimescale: 600))
         position = time
