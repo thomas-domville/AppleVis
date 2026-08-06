@@ -78,8 +78,10 @@ struct ResourceDetailView: View {
                     }
                     .accessibilityLabel("Add comment")
                 }
-                ContentDetailActions(id: detail.id, kind: .resource, title: detail.title, lastActivityAt: detail.updatedAt, url: detail.url)
             }
+        }
+        .safeAreaInset(edge: .bottom) {
+            ContentDetailActions(id: detail.id, kind: .resource, title: detail.title, lastActivityAt: detail.updatedAt, url: detail.url)
         }
         .sheet(isPresented: $showCompose) {
             ComposeResourceCommentView(resourceId: detail.id, title: detail.title) { comment in

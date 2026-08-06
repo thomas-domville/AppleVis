@@ -48,6 +48,7 @@ struct HomeView: View {
     @EnvironmentObject private var keyCommands: KeyCommandRouter
     @ObservedObject private var networkStatus = NetworkStatusStore.shared
     @State private var hasAnnouncedWelcome = false
+    @State private var showCustomizeHome = false
     @State private var homeFeedFilter: HomeFeedFilter = .all
     @State private var savedItems: [SavedItem] = []
     @State private var notificationHistory: [NotificationHistoryItem] = []
@@ -78,7 +79,13 @@ struct HomeView: View {
                 // top-left, Profile/Settings in the top-right — not both
                 // crowded onto the same side.
                 ToolbarItem(placement: .navigationBarLeading) {
-                    filterMenu
+                    Button {
+                        showCustomizeHome = true
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                    }
+                    .accessibilityLabel("Customize Home")
+                    .accessibilityHint("Choose what content types appear on your Home screen")
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink(destination: ProfileView()) {
@@ -94,6 +101,9 @@ struct HomeView: View {
             }
             .onReceive(keyCommands.refreshRequested) { Task { await vm.load() } }
             .overlay(alignment: .top) { ToastOverlay() }
+            .sheet(isPresented: $showCustomizeHome, onDismiss: { Task { await vm.load() } }) {
+                CustomizeHomeView()
+            }
             .onChange(of: vm.isLoading) { _, isLoading in
                 guard !isLoading else { return }
                 announceWelcomeIfNeeded()
@@ -337,30 +347,44 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Filter menu
+}
 
-    private var filterMenu: some View {
-        Menu {
-            Section("Content Types") {
-                Toggle("Forums", isOn: $preferences.showForums)
-                Toggle("Podcasts", isOn: $preferences.showPodcasts)
-                Toggle("Apps", isOn: $preferences.showApps)
-                Toggle("Guides", isOn: $preferences.showGuides)
-                Toggle("Blogs", isOn: $preferences.showBlogs)
+// MARK: - Customize Home
+
+/// A real screen instead of a Menu with Toggle rows — Menu+Toggle has a
+/// known VoiceOver quirk on this SDK where double-tapping a Toggle inside a
+/// Menu dismisses the whole menu (a sighted tap keeps it open), so a
+/// VoiceOver user could never toggle more than one content type per visit
+/// without reopening it each time. This also fixes the "reloads once per
+/// toggle" issue: Home now only reloads once, when this sheet is dismissed,
+/// via HomeView's `.sheet(isPresented:onDismiss:)`.
+struct CustomizeHomeView: View {
+    @EnvironmentObject private var preferences: PreferencesStore
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Content Types") {
+                    Toggle("Forums", isOn: $preferences.showForums)
+                    Toggle("Podcasts", isOn: $preferences.showPodcasts)
+                    Toggle("Apps", isOn: $preferences.showApps)
+                    Toggle("Guides", isOn: $preferences.showGuides)
+                    Toggle("Blogs", isOn: $preferences.showBlogs)
+                }
+                Section("Forums") {
+                    Toggle("Apple Topics Only", isOn: $preferences.appleOnlyForums)
+                        .accessibilityHint("Hides non-Apple forum categories from Home.")
+                }
             }
-            Section("Forums") {
-                Toggle("Apple Topics Only", isOn: $preferences.appleOnlyForums)
+            .navigationTitle("Customize Home")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
             }
-        } label: {
-            Image(systemName: "slider.horizontal.3")
-                .accessibilityLabel("Customize Home")
-                .accessibilityHint("Choose what content types appear on your Home screen")
         }
-        .onChange(of: preferences.showForums)   { _, _ in Task { await vm.load() } }
-        .onChange(of: preferences.showPodcasts) { _, _ in Task { await vm.load() } }
-        .onChange(of: preferences.showApps)     { _, _ in Task { await vm.load() } }
-        .onChange(of: preferences.showGuides)   { _, _ in Task { await vm.load() } }
-        .onChange(of: preferences.showBlogs)    { _, _ in Task { await vm.load() } }
     }
 }
 

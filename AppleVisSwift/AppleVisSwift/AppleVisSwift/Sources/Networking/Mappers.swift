@@ -49,7 +49,15 @@ enum Mappers {
     }
 
     /// Maps a flat item from GET /api/v1/forums/recent (native REST, not JSON:API).
-    static func forumFromRecent(_ item: [String: JSONValue]) -> ForumTopic {
+    /// Returns nil when the payload has no real uuid — a previous version
+    /// fell back to `UUID().uuidString`, fabricating a random id that looks
+    /// like a normal row but can never resolve server-side. Tapping it called
+    /// `topicDetail(id:)` with that fake id and Drupal's JSON:API route
+    /// rejected the malformed/nonexistent UUID with a 400 ("Unexpected error
+    /// (HTTP 400)"), intermittently and only for topics missing this field —
+    /// better to silently drop the row than show one guaranteed to error.
+    static func forumFromRecent(_ item: [String: JSONValue]) -> ForumTopic? {
+        guard let uuid = item["uuid"]?.stringValue, !uuid.isEmpty else { return nil }
         let lastTs = item["last_comment_timestamp"]?.doubleValue ?? 0
         let changed = item["changed"]?.doubleValue ?? 0
         let lastActivity: Date = lastTs > 0
@@ -59,7 +67,7 @@ enum Mappers {
         let replyCount = item["comment_count"]?.intValue ?? 0
         let urlPath = item["url"]?.stringValue ?? ""
         return ForumTopic(
-            id: item["uuid"]?.stringValue ?? UUID().uuidString,
+            id: uuid,
             title: item["title"]?.stringValue ?? "",
             authorName: "",
             authorId: "",

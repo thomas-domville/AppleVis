@@ -31,39 +31,13 @@ struct ForumTopicDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
-                if auth.isSignedIn {
-                    Button {
-                        Task { await toggleFollow() }
-                    } label: {
-                        Image(systemName: isFollowing ? "bell.fill" : "bell")
-                    }
-                    .accessibilityLabel(isFollowing ? "Unfollow topic" : "Follow topic")
-
-                    Button { showReplyCompose = true } label: {
-                        Image(systemName: "square.and.pencil")
-                    }
-                    .accessibilityLabel("Reply to topic")
-                }
-
-                Button { toggleSave() } label: {
-                    Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
-                }
-                .accessibilityLabel(isSaved ? "Unsave" : "Save")
-
-                if let detail, let shareURL = URL(string: detail.url) {
-                    ShareLink(item: shareURL, subject: Text(detail.title)) {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-
-                    Button {
-                        showBrowser = true
-                    } label: {
-                        Image(systemName: "safari")
-                    }
-                    .accessibilityLabel("Open in Browser")
-                }
+        .safeAreaInset(edge: .bottom) {
+            // Matches the old app's fixed bottom toolbar (Follow, Save,
+            // Share, Open in Safari, Add New Comment — confirmed via
+            // git show 655e6ca^:app/topic/[id].tsx) — these 5 actions used
+            // to be crammed into top-right nav bar icons instead.
+            if let detail {
+                bottomActionBar(detail)
             }
         }
         .sheet(isPresented: $showReplyCompose) {
@@ -311,6 +285,44 @@ struct ForumTopicDetailView: View {
             isSaved = true
             toast.success("Saved")
         }
+    }
+
+    private func bottomActionBar(_ detail: ForumTopicDetail) -> some View {
+        HStack(spacing: 0) {
+            if auth.isSignedIn {
+                DetailActionButton(
+                    systemImage: isFollowing ? "bell.fill" : "bell",
+                    visualLabel: isFollowing ? "Unfollow" : "Follow",
+                    accessibilityLabel: isFollowing ? "Unfollow topic" : "Follow topic"
+                ) { Task { await toggleFollow() } }
+            }
+
+            DetailActionButton(
+                systemImage: isSaved ? "bookmark.fill" : "bookmark",
+                visualLabel: isSaved ? "Unsave" : "Save",
+                accessibilityLabel: isSaved ? "Unsave" : "Save"
+            ) { toggleSave() }
+
+            if let shareURL = URL(string: detail.url) {
+                ShareLink(item: shareURL, subject: Text(detail.title)) {
+                    DetailActionButtonLabel(systemImage: "square.and.arrow.up", visualLabel: "Share")
+                }
+                .accessibilityLabel("Share")
+
+                DetailActionButton(systemImage: "safari", visualLabel: "Browser", accessibilityLabel: "Open in Browser") {
+                    showBrowser = true
+                }
+            }
+
+            if auth.isSignedIn {
+                DetailActionButton(systemImage: "square.and.pencil", visualLabel: "Reply", accessibilityLabel: "Reply to topic") {
+                    showReplyCompose = true
+                }
+            }
+        }
+        .padding(.vertical, 8)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider() }
     }
 }
 

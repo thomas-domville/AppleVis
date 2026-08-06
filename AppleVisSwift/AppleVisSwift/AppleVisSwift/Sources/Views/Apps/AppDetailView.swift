@@ -84,8 +84,10 @@ struct AppDetailView: View {
                     }
                     .accessibilityLabel("Write review")
                 }
-                ContentDetailActions(id: detail.id, kind: .appListing, title: detail.name, lastActivityAt: detail.lastUpdatedAt, url: detail.url)
             }
+        }
+        .safeAreaInset(edge: .bottom) {
+            ContentDetailActions(id: detail.id, kind: .appListing, title: detail.name, lastActivityAt: detail.lastUpdatedAt, url: detail.url)
         }
         .sheet(isPresented: $showReviewCompose) {
             ComposeAppReviewView(appId: detail.id, appName: detail.name) { review in

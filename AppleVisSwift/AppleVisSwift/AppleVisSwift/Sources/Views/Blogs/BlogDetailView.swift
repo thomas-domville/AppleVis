@@ -73,8 +73,10 @@ struct BlogDetailView: View {
                     }
                     .accessibilityLabel("Add comment")
                 }
-                ContentDetailActions(id: detail.id, kind: .blogPost, title: detail.title, lastActivityAt: detail.lastActivityAt, url: detail.url)
             }
+        }
+        .safeAreaInset(edge: .bottom) {
+            ContentDetailActions(id: detail.id, kind: .blogPost, title: detail.title, lastActivityAt: detail.lastActivityAt, url: detail.url)
         }
         .sheet(isPresented: $showCompose) {
             ComposeBlogCommentView(blogId: detail.id, title: detail.title) { comment in

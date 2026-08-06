@@ -192,8 +192,13 @@ extension View {
     }
 }
 
-/// Toolbar-style variant for detail screens (save/follow as toolbar buttons + a
-/// native `ShareLink`), rather than swipe/context-menu.
+/// Fixed bottom action bar for detail screens (Follow/Save/Share/Open in
+/// Browser) — matches the old RN app's bottom `ToolbarButton` row (icon +
+/// label, evenly spaced; `git show 655e6ca^:app/app-detail/[id].tsx`
+/// confirms every content-detail screen used this pattern, not just forum
+/// topics). Used to live crammed into the top navigation bar as icon-only
+/// buttons; moved back to the bottom via `.safeAreaInset(edge: .bottom)` at
+/// each call site, matching where users actually remember reaching for them.
 struct ContentDetailActions: View {
     let id: String
     let kind: ContentKind
@@ -210,39 +215,38 @@ struct ContentDetailActions: View {
     @State private var showBrowser = false
 
     var body: some View {
-        Group {
+        HStack(spacing: 0) {
             if supportsFollow && auth.isSignedIn {
-                Button {
-                    Task { await toggleFollow() }
-                } label: {
-                    Image(systemName: isFollowing ? "bell.fill" : "bell")
-                }
-                .accessibilityLabel(isFollowing ? "Unfollow" : "Follow")
+                DetailActionButton(
+                    systemImage: isFollowing ? "bell.fill" : "bell",
+                    visualLabel: isFollowing ? "Unfollow" : "Follow",
+                    accessibilityLabel: isFollowing ? "Unfollow" : "Follow"
+                ) { Task { await toggleFollow() } }
             }
 
-            Button {
-                toggleSave()
-            } label: {
-                Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
-            }
-            .accessibilityLabel(isSaved ? "Unsave" : "Save")
+            DetailActionButton(
+                systemImage: isSaved ? "bookmark.fill" : "bookmark",
+                visualLabel: isSaved ? "Unsave" : "Save",
+                accessibilityLabel: isSaved ? "Unsave" : "Save"
+            ) { toggleSave() }
 
             if let url, let shareURL = URL(string: url) {
                 ShareLink(item: shareURL, subject: Text(title)) {
-                    Image(systemName: "square.and.arrow.up")
+                    DetailActionButtonLabel(systemImage: "square.and.arrow.up", visualLabel: "Share")
                 }
+                .accessibilityLabel("Share")
 
-                Button {
+                DetailActionButton(systemImage: "safari", visualLabel: "Browser", accessibilityLabel: "Open in Browser") {
                     showBrowser = true
-                } label: {
-                    Image(systemName: "safari")
                 }
-                .accessibilityLabel("Open in Browser")
                 .sheet(isPresented: $showBrowser) {
                     SafariView(url: shareURL)
                 }
             }
         }
+        .padding(.vertical, 8)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider() }
         .onAppear {
             isSaved = PersistenceStore.shared.isSaved(id: id)
             isFollowing = PersistenceStore.shared.isFollowed(id: id)
@@ -285,5 +289,40 @@ struct ContentDetailActions: View {
         } catch {
             toast.error("Couldn't update follow status.")
         }
+    }
+}
+
+/// One icon+label button in a bottom detail action bar. Not private — reused
+/// directly by ForumTopicDetailView's own bottom bar (which has a 5th
+/// content-specific action, Reply, that ContentDetailActions doesn't cover)
+/// so both bars look and behave identically.
+struct DetailActionButton: View {
+    let systemImage: String
+    let visualLabel: String
+    let accessibilityLabel: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            DetailActionButtonLabel(systemImage: systemImage, visualLabel: visualLabel)
+        }
+        .accessibilityLabel(accessibilityLabel)
+    }
+}
+
+struct DetailActionButtonLabel: View {
+    let systemImage: String
+    let visualLabel: String
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Image(systemName: systemImage)
+                .font(.system(size: 20))
+            Text(visualLabel)
+                .font(.caption2)
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        .accessibilityHidden(true)
     }
 }

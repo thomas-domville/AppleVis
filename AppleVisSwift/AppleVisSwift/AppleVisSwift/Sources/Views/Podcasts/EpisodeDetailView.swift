@@ -106,9 +106,10 @@ struct EpisodeDetailView: View {
                     }
                     .accessibilityLabel("Add comment")
                 }
-
-                ContentDetailActions(id: episode.id, kind: .podcastEpisode, title: episode.title, lastActivityAt: episode.lastActivityAt, url: episode.url)
             }
+        }
+        .safeAreaInset(edge: .bottom) {
+            ContentDetailActions(id: episode.id, kind: .podcastEpisode, title: episode.title, lastActivityAt: episode.lastActivityAt, url: episode.url)
         }
         .sheet(isPresented: $showCompose) {
             ComposePodcastCommentView(episodeId: episode.id, title: episode.title) { comment in
