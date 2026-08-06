@@ -189,11 +189,14 @@ struct BugReportRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "\(bug.title). \(bug.status.displayName). \(bug.severity.displayName) severity. " +
-            "\(bug.commentCount) comments."
-        )
+        .accessibilityLabel(bugLabel)
+        .readAloudAction(bugLabel)
         .contentActions(id: bug.id, kind: .bugReport, title: bug.title, lastActivityAt: bug.changedAt, url: bug.url)
         .cardDensityPadding()
+    }
+
+    private var bugLabel: String {
+        "\(bug.title). \(bug.status.displayName). \(bug.severity.displayName) severity. " +
+        "\(bug.commentCount) comments."
     }
 }

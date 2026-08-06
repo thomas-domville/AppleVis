@@ -47,9 +47,14 @@ struct ForumTopicRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(topic.title), \(topic.category), \(topic.replyCount) replies, \(topic.lastActivityAt.formatted(.relative(presentation: .named)))\(savedFollowingLabel)")
+        .accessibilityLabel(topicLabel)
+        .readAloudAction(topicLabel)
         .contentActions(id: topic.id, kind: .forumTopic, title: topic.title, lastActivityAt: topic.lastActivityAt, url: topic.url)
         .cardDensityPadding()
+    }
+
+    private var topicLabel: String {
+        "\(topic.title), \(topic.category), \(topic.replyCount) replies, \(topic.lastActivityAt.formatted(.relative(presentation: .named)))\(savedFollowingLabel)"
     }
 }
 
@@ -101,11 +106,8 @@ struct PodcastEpisodeRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "\(episode.title), \(episode.showTitle) podcast" +
-            (episode.duration.map { ", \(Duration.seconds($0).formatted(.units(allowed: [.hours, .minutes])))" } ?? "") +
-            ", \(episode.publishedAt.formatted(.relative(presentation: .named)))"
-        )
+        .accessibilityLabel(episodeLabel)
+        .readAloudAction(episodeLabel)
         .accessibilityAction(named: Text(isCurrentlyPlaying ? "Pause" : "Play")) {
             Task { await player.load(episode) }
         }
@@ -115,6 +117,12 @@ struct PodcastEpisodeRow: View {
 
     private var isCurrentlyPlaying: Bool {
         player.currentEpisode?.id == episode.id && player.isPlaying
+    }
+
+    private var episodeLabel: String {
+        "\(episode.title), \(episode.showTitle) podcast" +
+        (episode.duration.map { ", \(Duration.seconds($0).formatted(.units(allowed: [.hours, .minutes])))" } ?? "") +
+        ", \(episode.publishedAt.formatted(.relative(presentation: .named)))"
     }
 }
 
@@ -153,9 +161,14 @@ struct AppListingRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(app.name) by \(app.developer), \(app.category), \(app.lastActivityAt.formatted(.relative(presentation: .named)))")
+        .accessibilityLabel(appLabel)
+        .readAloudAction(appLabel)
         .contentActions(id: app.id, kind: .appListing, title: app.name, lastActivityAt: app.lastActivityAt, url: app.url)
         .cardDensityPadding()
+    }
+
+    private var appLabel: String {
+        "\(app.name) by \(app.developer), \(app.category), \(app.lastActivityAt.formatted(.relative(presentation: .named)))"
     }
 }
 
@@ -183,12 +196,15 @@ struct ResourceRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "\(resource.title), \(resource.kind.displayName), by \(resource.authorName), " +
-            "\(resource.updatedAt.formatted(.relative(presentation: .named)))"
-        )
+        .accessibilityLabel(resourceLabel)
+        .readAloudAction(resourceLabel)
         .contentActions(id: resource.id, kind: .resource, title: resource.title, lastActivityAt: resource.updatedAt, url: resource.url)
         .cardDensityPadding()
+    }
+
+    private var resourceLabel: String {
+        "\(resource.title), \(resource.kind.displayName), by \(resource.authorName), " +
+        "\(resource.updatedAt.formatted(.relative(presentation: .named)))"
     }
 }
 
@@ -220,11 +236,14 @@ struct BlogPostRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "\(post.title), Blog post, by \(post.authorName), \(post.commentCount) comment\(post.commentCount == 1 ? "" : "s"), " +
-            "\(post.lastActivityAt.formatted(.relative(presentation: .named)))"
-        )
+        .accessibilityLabel(postLabel)
+        .readAloudAction(postLabel)
         .contentActions(id: post.id, kind: .blogPost, title: post.title, lastActivityAt: post.lastActivityAt, url: post.url)
         .cardDensityPadding()
+    }
+
+    private var postLabel: String {
+        "\(post.title), Blog post, by \(post.authorName), \(post.commentCount) comment\(post.commentCount == 1 ? "" : "s"), " +
+        "\(post.lastActivityAt.formatted(.relative(presentation: .named)))"
     }
 }
