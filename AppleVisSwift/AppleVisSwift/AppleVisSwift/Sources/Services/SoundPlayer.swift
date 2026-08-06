@@ -41,6 +41,11 @@ enum AppSound: String {
         if Self.alwaysOn.contains(self) { return true }
         let defaults = UserDefaults.standard
         if Self.interfaceSounds.contains(self) {
+            #if DEBUG
+            let raw = defaults.object(forKey: "sound.interface")
+            let rawType = raw.map { String(describing: Swift.type(of: $0)) } ?? "nil"
+            print("SoundPlayer: sound.interface raw=\(String(describing: raw)) type=\(rawType) bool(forKey:)=\(defaults.bool(forKey: "sound.interface"))")
+            #endif
             return defaults.object(forKey: "sound.interface") as? Bool ?? false
         }
         return defaults.object(forKey: "sound.confirmation") as? Bool ?? true
