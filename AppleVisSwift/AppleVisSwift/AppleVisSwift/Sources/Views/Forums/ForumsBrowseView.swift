@@ -1,10 +1,27 @@
 import SwiftUI
 
+/// Splits the old binary "Apple Topics Only" toggle into three states,
+/// matching the old app's current (non-deprecated) forums-browse screen —
+/// which added a dedicated "Non-Apple Related" browsing mode alongside
+/// "All Topics" and "Apple Related", rather than only being able to hide
+/// non-Apple topics without ever isolating them.
+enum AppleTopicsFilter: String, CaseIterable, Identifiable {
+    case all, appleOnly, nonAppleOnly
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .all:         return "All Topics"
+        case .appleOnly:    return "Apple Related"
+        case .nonAppleOnly: return "Non-Apple Related"
+        }
+    }
+}
+
 struct ForumsBrowseView: View {
     @State private var topics: [ForumTopic] = []
     @State private var categories: [ForumCategory] = []
     @State private var selectedCategory: ForumCategory? = nil
-    @State private var appleOnly = false
+    @State private var appleTopicsFilter: AppleTopicsFilter = .all
     @State private var filter: ForumFilter = .recent
     @State private var isLoading = false
     @State private var error: String?
@@ -45,6 +62,31 @@ struct ForumsBrowseView: View {
 
     private var filteredTopics: [ForumTopic] {
         topics.filter { matchesSearch(title: $0.title, author: $0.authorName) }
+    }
+
+    private static let nonAppleCategoryNames: Set<String> = [
+        "windows", "android", "smart home tech and gadgets", "assistive technology",
+    ]
+
+    private static func isNonAppleCategory(_ category: String) -> Bool {
+        let c = category.lowercased()
+        return nonAppleCategoryNames.contains(c) || c.contains("non-apple") || c.contains("non apple")
+    }
+
+    /// Category selection has no `categoryId` to match against — the recent-
+    /// topics feed's mapper leaves `categoryId` empty (only the full node
+    /// mapper populates it), so this matches on the category display name
+    /// instead, the same string both `categories()` and the recent feed
+    /// already surface.
+    private func applyRefinements(to fetched: [ForumTopic]) -> [ForumTopic] {
+        var result = filter.apply(to: fetched)
+        if appleTopicsFilter == .nonAppleOnly {
+            result = result.filter { ForumsBrowseView.isNonAppleCategory($0.category) }
+        }
+        if let selectedCategory {
+            result = result.filter { $0.category.caseInsensitiveCompare(selectedCategory.name) == .orderedSame }
+        }
+        return result
     }
 
     var body: some View {
@@ -109,7 +151,7 @@ struct ForumsBrowseView: View {
             }
         }
         .sheet(isPresented: $showFilterSheet, onDismiss: { Task { await load(reset: true) } }) {
-            ForumFilterSheetView(filter: $filter, appleOnly: $appleOnly, selectedCategory: $selectedCategory, categories: categories)
+            ForumFilterSheetView(filter: $filter, appleTopicsFilter: $appleTopicsFilter, selectedCategory: $selectedCategory, categories: categories)
         }
         .task { await load(reset: true) }
         .refreshable { await load(reset: true) }
@@ -137,10 +179,10 @@ struct ForumsBrowseView: View {
         isLoading = true
         error = nil
         do {
-            async let topicsResult = APIClient.shared.forums.recent(page: page, appleOnly: appleOnly)
+            async let topicsResult = APIClient.shared.forums.recent(page: page, appleOnly: appleTopicsFilter == .appleOnly)
             async let categoriesResult = categories.isEmpty ? APIClient.shared.forums.categories() : []
             let (fetched, cats) = try await (topicsResult, categoriesResult)
-            topics = filter.apply(to: fetched)
+            topics = applyRefinements(to: fetched)
             if !cats.isEmpty { categories = cats }
             hasMore = fetched.count >= APIPaging.pageSize
             PersistenceStore.shared.markForumsVisited()
@@ -158,8 +200,8 @@ struct ForumsBrowseView: View {
         guard !isLoadingMore, hasMore else { return }
         isLoadingMore = true
         page += 1
-        if let more = try? await APIClient.shared.forums.recent(page: page, appleOnly: appleOnly) {
-            topics += filter.apply(to: more)
+        if let more = try? await APIClient.shared.forums.recent(page: page, appleOnly: appleTopicsFilter == .appleOnly) {
+            topics += applyRefinements(to: more)
             hasMore = more.count >= APIPaging.pageSize
         }
         isLoadingMore = false
@@ -173,7 +215,7 @@ struct ForumsBrowseView: View {
 /// Only" without reopening the menu each time.
 private struct ForumFilterSheetView: View {
     @Binding var filter: ForumFilter
-    @Binding var appleOnly: Bool
+    @Binding var appleTopicsFilter: AppleTopicsFilter
     @Binding var selectedCategory: ForumCategory?
     let categories: [ForumCategory]
     @Environment(\.dismiss) private var dismiss
@@ -199,9 +241,22 @@ private struct ForumFilterSheetView: View {
                     }
                 }
                 if filter.supportsRefinement {
-                    Section("Forums") {
-                        Toggle("Apple Topics Only", isOn: $appleOnly)
-                            .accessibilityHint("Hides non-Apple forum categories from results.")
+                    Section("Apple Relevance") {
+                        ForEach(AppleTopicsFilter.allCases) { option in
+                            Button {
+                                appleTopicsFilter = option
+                                SoundPlayer.shared.play(.pickerTick)
+                            } label: {
+                                HStack {
+                                    Text(option.displayName).foregroundStyle(.primary)
+                                    Spacer()
+                                    if appleTopicsFilter == option {
+                                        Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
+                                    }
+                                }
+                            }
+                            .accessibilityAddTraits(appleTopicsFilter == option ? [.isSelected] : [])
+                        }
                     }
                     if !categories.isEmpty {
                         Section("Category") {
