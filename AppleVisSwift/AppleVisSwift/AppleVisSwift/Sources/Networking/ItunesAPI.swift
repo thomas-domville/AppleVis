@@ -5,6 +5,7 @@ import Foundation
 /// rating, size, screenshots. Ported from src/services/itunesApi.ts.
 struct ItunesMetadata {
     let appStoreId: String
+    let artistId: Int?
     let appName: String
     let developerName: String
     let category: String
@@ -20,6 +21,14 @@ struct ItunesMetadata {
     let ageRating: String
     let screenshotUrls: [String]
     let appStoreDescription: String
+}
+
+struct ItunesDeveloperApp: Identifiable {
+    var id: String { appStoreId }
+    let appStoreId: String
+    let appName: String
+    let artworkUrl: String
+    let appStoreUrl: String
 }
 
 struct ItunesSearchHit: Identifiable {
@@ -96,6 +105,7 @@ enum ItunesAPI {
 
         return ItunesMetadata(
             appStoreId: id,
+            artistId: r["artistId"] as? Int,
             appName: str("trackName"),
             developerName: str("artistName"),
             category: str("primaryGenreName"),
@@ -112,6 +122,33 @@ enum ItunesAPI {
             screenshotUrls: (r["screenshotUrls"] as? [String]) ?? [],
             appStoreDescription: str("description")
         )
+    }
+
+    /// Other apps by the same developer — the old app fetches and shows
+    /// this on the app detail page (`fetchDeveloperApps`); Swift never had
+    /// an equivalent at all.
+    static func fetchDeveloperApps(artistId: Int, excluding appStoreId: String) async -> [ItunesDeveloperApp] {
+        guard let url = URL(string: "https://itunes.apple.com/lookup?id=\(artistId)&entity=software&limit=25") else { return [] }
+        var request = URLRequest(url: url)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = json["results"] as? [[String: Any]]
+        else { return [] }
+
+        return results.compactMap { r -> ItunesDeveloperApp? in
+            guard r["wrapperType"] as? String == "software",
+                  let trackId = r["trackId"] as? Int, "\(trackId)" != appStoreId,
+                  let name = r["trackName"] as? String
+            else { return nil }
+            return ItunesDeveloperApp(
+                appStoreId: "\(trackId)",
+                appName: name,
+                artworkUrl: (r["artworkUrl100"] as? String) ?? (r["artworkUrl60"] as? String) ?? "",
+                appStoreUrl: (r["trackViewUrl"] as? String) ?? ""
+            )
+        }
     }
 
     private static func extractAppStoreId(_ url: String) -> String? {

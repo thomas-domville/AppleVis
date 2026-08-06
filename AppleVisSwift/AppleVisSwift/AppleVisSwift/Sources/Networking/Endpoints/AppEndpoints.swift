@@ -68,16 +68,6 @@ struct AppEndpoints {
         return (result.items, result.hasMore)
     }
 
-    func updates(page: Int = 0) async throws -> [AppListing] {
-        try await fetchWithCache(group: .apps, key: "apps:updates:\(page)") {
-            let response = try await client.jsonAPIList(
-                "node/ios_app_directory",
-                query: ["include": "uid", "sort": "-changed", "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)"]
-            )
-            return response.data.map { Mappers.app($0, included: response.included ?? []) }
-        }
-    }
-
     /// Fetches an app listing with full body text and all reviews.
     /// Review bundle confirmed: comment_node_ios_app_directory.
     func detail(id: String) async throws -> AppDetail {
@@ -85,7 +75,7 @@ struct AppEndpoints {
             async let appRes = client.jsonAPISingle("node/ios_app_directory/\(id)", query: ["include": "uid"])
             async let reviewsRes = client.jsonAPIList(
                 "comment/comment_node_ios_app_directory",
-                query: ["filter[entity_id.id]": id, "sort": "-created", "page[limit]": "50", "include": "uid"]
+                query: ["filter[entity_id.id]": id, "sort": "-created", "page[limit]": "100", "include": "uid"]
             )
 
             let appResponse = try await appRes
@@ -128,6 +118,18 @@ struct AppEndpoints {
                 isSaved: false
             )
         }
+    }
+
+    /// Fetches the next page of reviews beyond the initial 100 (used by
+    /// "Load more reviews") — previously reviews had no pagination at all,
+    /// the same bug class already fixed for Forums/Blogs/Guides/Podcasts:
+    /// an app with more than 100 reviews permanently hid the rest.
+    func moreReviews(appId: String, offset: Int) async throws -> [AppReview] {
+        let response = try await client.jsonAPIList(
+            "comment/comment_node_ios_app_directory",
+            query: ["filter[entity_id.id]": appId, "sort": "-created", "page[limit]": "100", "page[offset]": "\(offset)", "include": "uid"]
+        )
+        return response.data.map { Mappers.appReview($0, included: response.included ?? []) }
     }
 
     @discardableResult

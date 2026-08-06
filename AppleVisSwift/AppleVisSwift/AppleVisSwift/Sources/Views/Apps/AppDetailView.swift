@@ -7,9 +7,18 @@ struct AppDetailView: View {
     @State private var error: String?
     @State private var showReviewCompose = false
     @State private var itunesMetadata: ItunesMetadata?
+    @State private var developerApps: [ItunesDeveloperApp] = []
+    @State private var isLoadingMoreReviews = false
+    @State private var hasMoreReviews = true
+    @State private var accessibilitySummary: String?
+    @State private var isSummarizingAccessibility = false
+    @State private var reviewsSummary: String?
+    @State private var isSummarizingReviews = false
     @AccessibilityFocusState private var isTitleFocused: Bool
+    @AccessibilityFocusState private var focusedReviewId: String?
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var preferences: PreferencesStore
 
     var body: some View {
         Group {
@@ -31,43 +40,52 @@ struct AppDetailView: View {
 
     @ViewBuilder
     private func appContent(_ detail: AppDetail) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                heroCard(detail).padding()
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    heroCard(detail).padding()
 
-                if let meta = itunesMetadata {
-                    appStoreInfoSection(meta)
-                }
+                    if let meta = itunesMetadata {
+                        appStoreInfoSection(meta)
+                    }
 
-                if !detail.body.isEmpty {
-                    sectionHeading("About")
-                    HTMLTextView(html: detail.body)
-                        .padding(.horizontal)
-                        .padding(.bottom, 16)
-                }
+                    if !developerApps.isEmpty {
+                        developerAppsSection(detail)
+                    }
 
-                if let vo = detail.voiceOverPerformance, !vo.isEmpty {
-                    sectionHeading("VoiceOver Performance")
-                    Text(vo).padding(.horizontal).padding(.bottom, 8)
-                }
-                if let bl = detail.buttonLabelling, !bl.isEmpty {
-                    sectionHeading("Button Labelling")
-                    Text(bl).padding(.horizontal).padding(.bottom, 8)
-                }
-                if let usability = detail.usabilityNotes, !usability.isEmpty {
-                    sectionHeading("Usability Notes")
-                    HTMLTextView(html: usability)
-                        .padding(.horizontal).padding(.bottom, 8)
-                }
-                if let acc = detail.accessibilityComments, !acc.isEmpty {
-                    sectionHeading("Accessibility Comments")
-                    HTMLTextView(html: acc)
-                        .padding(.horizontal).padding(.bottom, 8)
-                }
+                    if !detail.body.isEmpty {
+                        sectionHeading("About")
+                        HTMLTextView(html: detail.body)
+                            .padding(.horizontal)
+                            .padding(.bottom, 16)
+                    }
 
-                reviewsSection(detail)
+                    if let vo = detail.voiceOverPerformance, !vo.isEmpty {
+                        RatingGaugeView(label: "VoiceOver Performance", ratingText: vo, category: .voiceOver)
+                            .padding(.horizontal).padding(.bottom, 12)
+                    }
+                    if let bl = detail.buttonLabelling, !bl.isEmpty {
+                        RatingGaugeView(label: "Button Labelling", ratingText: bl, category: .buttonLabeling)
+                            .padding(.horizontal).padding(.bottom, 12)
+                    }
+                    if let usability = detail.usabilityNotes, !usability.isEmpty {
+                        RatingGaugeView(label: "Usability", ratingText: usability, category: .usability)
+                            .padding(.horizontal).padding(.bottom, 12)
+                    }
+                    if let acc = detail.accessibilityComments, !acc.isEmpty {
+                        sectionHeading("Accessibility Comments")
+                        HTMLTextView(html: acc)
+                            .padding(.horizontal).padding(.bottom, 8)
+                    }
 
-                Color.clear.frame(height: 40)
+                    if preferences.aiSummariesEnabled && IntelligenceService.isAvailable {
+                        aiSummarySection(detail)
+                    }
+
+                    reviewsSection(detail, proxy: proxy)
+
+                    Color.clear.frame(height: 40)
+                }
             }
         }
         .toolbar {
@@ -153,8 +171,173 @@ struct AppDetailView: View {
                     .font(.subheadline).foregroundStyle(.secondary)
                     .padding(.horizontal)
             }
+
+            if !meta.screenshotUrls.isEmpty {
+                Text("Screenshots")
+                    .font(.subheadline).fontWeight(.semibold)
+                    .padding(.horizontal).padding(.top, 8)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(Array(meta.screenshotUrls.enumerated()), id: \.offset) { index, url in
+                            AsyncImage(url: URL(string: url)) { image in
+                                image.resizable().scaledToFit()
+                            } placeholder: {
+                                RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.15))
+                            }
+                            .frame(height: 220)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .accessibilityLabel("Screenshot \(index + 1) of \(meta.screenshotUrls.count)")
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
         }
         .padding(.bottom, 8)
+    }
+
+    @ViewBuilder
+    private func developerAppsSection(_ detail: AppDetail) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionHeading("More by \(detail.developer)")
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(developerApps) { app in
+                        if let url = URL(string: app.appStoreUrl) {
+                            Link(destination: url) {
+                                VStack(spacing: 6) {
+                                    AsyncImage(url: URL(string: app.artworkUrl)) { image in
+                                        image.resizable().scaledToFill()
+                                    } placeholder: {
+                                        RoundedRectangle(cornerRadius: 12).fill(Color.secondary.opacity(0.2))
+                                    }
+                                    .frame(width: 64, height: 64)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    Text(app.appName)
+                                        .font(.caption2)
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.center)
+                                        .frame(width: 72)
+                                }
+                            }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("\(app.appName). Double-tap to open in the App Store.")
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+        .padding(.bottom, 8)
+    }
+
+    /// Two independent AI actions, matching the old app: one digests the
+    /// accessibility fields (VoiceOver Performance/Button Labelling/
+    /// Usability/Accessibility Comments) into a plain-language blurb, the
+    /// other digests the community reviews — previously AppDetailView had
+    /// no Apple Intelligence integration at all despite it being built into
+    /// Forums, Discover, and every compose screen elsewhere in the app.
+    @ViewBuilder
+    private func aiSummarySection(_ detail: AppDetail) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            accessibilitySummaryRow(detail)
+            if !detail.reviews.isEmpty {
+                Divider()
+                reviewsSummaryRow(detail)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal)
+    }
+
+    @ViewBuilder
+    private func accessibilitySummaryRow(_ detail: AppDetail) -> some View {
+        if let accessibilitySummary {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Accessibility Summary", systemImage: "sparkles")
+                    .font(.caption).fontWeight(.bold).foregroundStyle(Color.accentColor)
+                Text(accessibilitySummary).font(.subheadline)
+            }
+        } else {
+            Button {
+                Task { await summarizeAccessibility(detail) }
+            } label: {
+                if isSummarizingAccessibility {
+                    HStack(spacing: 8) { ProgressView(); Text("Summarizing…") }
+                } else {
+                    Label("Summarize Accessibility Notes", systemImage: "sparkles")
+                }
+            }
+            .disabled(isSummarizingAccessibility)
+            .accessibilityLabel(isSummarizingAccessibility ? "Summarizing accessibility notes, please wait" : "Summarize Accessibility Notes")
+        }
+    }
+
+    @ViewBuilder
+    private func reviewsSummaryRow(_ detail: AppDetail) -> some View {
+        if let reviewsSummary {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Community Discussion Summary", systemImage: "sparkles")
+                    .font(.caption).fontWeight(.bold).foregroundStyle(Color.accentColor)
+                Text(reviewsSummary).font(.subheadline)
+            }
+        } else {
+            Button {
+                Task { await summarizeReviews(detail) }
+            } label: {
+                if isSummarizingReviews {
+                    HStack(spacing: 8) { ProgressView(); Text("Summarizing…") }
+                } else {
+                    Label("Summarize Community Discussion", systemImage: "sparkles")
+                }
+            }
+            .disabled(isSummarizingReviews)
+            .accessibilityLabel(isSummarizingReviews ? "Summarizing community discussion, please wait" : "Summarize Community Discussion")
+        }
+    }
+
+    private func summarizeAccessibility(_ detail: AppDetail) async {
+        isSummarizingAccessibility = true
+        UIAccessibility.post(notification: .announcement, argument: "Summarizing accessibility notes. This may take a moment.")
+        var parts: [String] = []
+        if let vo = detail.voiceOverPerformance, !vo.isEmpty { parts.append("VoiceOver Performance: \(vo)") }
+        if let bl = detail.buttonLabelling, !bl.isEmpty { parts.append("Button Labelling: \(bl)") }
+        if let usability = detail.usabilityNotes, !usability.isEmpty { parts.append("Usability: \(usability)") }
+        if let acc = detail.accessibilityComments, !acc.isEmpty { parts.append(acc.strippingHTMLTags().prefix(2000).description) }
+        let input = "App: \(detail.name)\n\n\(parts.joined(separator: "\n"))"
+        if let summary = await IntelligenceService.summarize(input) {
+            accessibilitySummary = summary
+        } else {
+            toast.error("Couldn't generate an accessibility summary. Try again.")
+            UIAccessibility.post(notification: .announcement, argument: "Couldn't generate an accessibility summary.")
+        }
+        isSummarizingAccessibility = false
+    }
+
+    private func summarizeReviews(_ detail: AppDetail) async {
+        isSummarizingReviews = true
+        UIAccessibility.post(notification: .announcement, argument: "Summarizing community discussion. This may take a moment.")
+        let maxTotalCharacters = 3000
+        let maxPerReview = 220
+        var parts: [String] = []
+        var remaining = maxTotalCharacters
+        for review in detail.reviews.prefix(20) {
+            guard remaining > 0 else { break }
+            let body = review.body.strippingHTMLTags().prefix(maxPerReview)
+            let part = "\(review.authorName): \(body)"
+            parts.append(String(part.prefix(remaining)))
+            remaining -= part.count
+        }
+        let input = "App: \(detail.name)\n\n\(parts.joined(separator: "\n\n"))"
+        if let summary = await IntelligenceService.summarize(input) {
+            reviewsSummary = summary
+        } else {
+            toast.error("Couldn't generate a discussion summary. Try again.")
+            UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a discussion summary.")
+        }
+        isSummarizingReviews = false
     }
 
     private func infoRow(_ label: String, _ value: String) -> some View {
@@ -178,10 +361,12 @@ struct AppDetailView: View {
     }
 
     @ViewBuilder
-    private func reviewsSection(_ detail: AppDetail) -> some View {
-        CommunityDiscussionHeading(count: detail.reviews.count) {
-            announceThreadOverview(detail)
-        }
+    private func reviewsSection(_ detail: AppDetail, proxy: ScrollViewProxy) -> some View {
+        CommunityDiscussionHeading(
+            count: detail.reviewCount,
+            onThreadOverview: { announceThreadOverview(detail) },
+            onJumpToLast: { Task { await jumpToLastReview(proxy: proxy) } }
+        )
 
         if detail.reviews.isEmpty {
             Text("No reviews yet — be the first!")
@@ -200,10 +385,25 @@ struct AppDetailView: View {
                             id: review.id, subject: review.subject, authorName: review.authorName,
                             authorId: review.authorId, rating: review.rating, body: newText, createdAt: review.createdAt
                         )
-                    }
+                    },
+                    focusBinding: $focusedReviewId
                 )
+                .id(review.id)
                 if index < detail.reviews.count - 1 {
                     Divider().padding(.leading)
+                }
+            }
+
+            if hasMoreReviews {
+                if isLoadingMoreReviews {
+                    ProgressView().frame(maxWidth: .infinity).padding()
+                } else {
+                    let remaining = detail.reviewCount - detail.reviews.count
+                    Button(remaining > 0 ? "Load \(remaining) More Reviews" : "Load More Reviews") {
+                        Task { await loadMoreReviews() }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
                 }
             }
         }
@@ -225,8 +425,15 @@ struct AppDetailView: View {
         isLoading = true; error = nil
         do {
             detail = try await APIClient.shared.apps.detail(id: appId)
+            hasMoreReviews = (detail?.reviews.count ?? 0) < (detail?.reviewCount ?? 0)
+            if hasMoreReviews {
+                Task { await loadMoreReviews() }
+            }
             if let storeUrl = detail?.appStoreUrl, !storeUrl.isEmpty {
                 itunesMetadata = await ItunesAPI.fetchMetadata(appStoreUrl: storeUrl)
+                if let artistId = itunesMetadata?.artistId, let appStoreId = itunesMetadata?.appStoreId {
+                    developerApps = await ItunesAPI.fetchDeveloperApps(artistId: artistId, excluding: appStoreId)
+                }
             }
             if let detail {
                 PersistenceStore.shared.stampItemVisit(
@@ -246,6 +453,36 @@ struct AppDetailView: View {
         } catch { self.error = "Couldn't load app." }
         isLoading = false
         focusTitleAfterLoad()
+    }
+
+    /// Loads every remaining page in one go instead of requiring a tap per
+    /// page — same fix already applied to Forum/Blog/Guide/Podcast comments.
+    /// Reviews previously had no pagination at all (not even manual "Load
+    /// More"): an app with more than 100 reviews permanently hid the rest.
+    private func loadMoreReviews() async {
+        isLoadingMoreReviews = true
+        do {
+            while let current = self.detail, current.reviews.count < current.reviewCount {
+                let more = try await APIClient.shared.apps.moreReviews(appId: current.id, offset: current.reviews.count)
+                guard !more.isEmpty else { break }
+                self.detail?.reviews.append(contentsOf: more)
+            }
+        } catch {
+            toast.error("Couldn't load more reviews.")
+        }
+        hasMoreReviews = (self.detail?.reviews.count ?? 0) < (self.detail?.reviewCount ?? 0)
+        isLoadingMoreReviews = false
+    }
+
+    /// "Jump to Last Comment" link on the Community Discussion heading —
+    /// loads any not-yet-fetched reviews first so it always lands on the
+    /// true last one, then moves VoiceOver focus there.
+    private func jumpToLastReview(proxy: ScrollViewProxy) async {
+        if hasMoreReviews { await loadMoreReviews() }
+        guard let lastId = self.detail?.reviews.last?.id else { return }
+        withAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
+        try? await Task.sleep(for: .milliseconds(400))
+        focusedReviewId = lastId
     }
 
     /// VoiceOver lands on the back button after push navigation by default;
@@ -269,6 +506,9 @@ struct AppReviewRow: View {
     let total: Int
     var onDelete: (() -> Void)? = nil
     var onEdit: ((String) -> Void)? = nil
+    /// Set by the parent when it supports "Jump to Last Comment" — lets
+    /// that action move VoiceOver focus here, not just scroll the viewport.
+    var focusBinding: AccessibilityFocusState<String?>.Binding? = nil
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -282,12 +522,26 @@ struct AppReviewRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            // A separate header/body split, not one combined element covering
+            // the whole card — matches every other comment type in the app
+            // (docs/IMPLEMENTATION_NOTES.md: render an actionable header, then
+            // a separate readable body, so VoiceOver output stays short and
+            // Braille navigation stays predictable). This previously put the
+            // full review body inside the same accessibility label as the
+            // header, unlike ForumReply/CommentRow.
             HStack {
                 Text(review.authorName).fontWeight(.medium)
                 Spacer()
                 RelativeDateLabel(date: review.createdAt)
             }
             .font(.subheadline)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(
+                "Comment \(index) of \(total) by \(review.authorName). " +
+                (review.rating.map { "\($0) out of 5 stars. " } ?? "") +
+                (review.subject.isEmpty ? "" : "\(review.subject).")
+            )
+            .modifier(OptionalReplyFocus(binding: focusBinding, id: review.id))
 
             if !review.subject.isEmpty {
                 Text(review.subject).font(.subheadline).fontWeight(.medium)
@@ -306,12 +560,6 @@ struct AppReviewRow: View {
             HTMLTextView(html: review.body)
         }
         .padding()
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "Comment \(index) of \(total) by \(review.authorName). " +
-            (review.rating.map { "\($0) out of 5 stars. " } ?? "") +
-            (review.subject.isEmpty ? "" : "\(review.subject).")
-        )
         .contextMenu {
             if canDelete {
                 Button { showEditSheet = true } label: {
@@ -348,6 +596,107 @@ struct AppReviewRow: View {
             toast.success("Review deleted")
         } catch {
             toast.error("Couldn't delete review.")
+        }
+    }
+}
+
+// MARK: - Accessibility rating gauge
+
+/// AppleVis's VoiceOver Performance/Button Labelling/Usability fields are a
+/// fixed four-word vocabulary (Excellent/Good/Fair/Poor), not free text —
+/// confirmed by the old app's own accessibility-label construction, which
+/// runs each of these three fields through the same rating lookup. Swift
+/// previously rendered them as plain text (or, for Usability, as if it were
+/// an HTML free-text field), losing both the quick-scan visual gauge and
+/// the friendlier plain-language description sighted/low-vision users get
+/// from the old app.
+enum AppRatingLevel {
+    case excellent, good, fair, poor
+
+    init?(text: String) {
+        switch text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "excellent": self = .excellent
+        case "good": self = .good
+        case "fair": self = .fair
+        case "poor": self = .poor
+        default: return nil
+        }
+    }
+
+    var value: Double {
+        switch self {
+        case .excellent: return 1.0
+        case .good: return 0.75
+        case .fair: return 0.5
+        case .poor: return 0.25
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .excellent: return Color(red: 0.133, green: 0.773, blue: 0.369)
+        case .good: return Color(red: 0.518, green: 0.800, blue: 0.086)
+        case .fair: return Color(red: 0.961, green: 0.620, blue: 0.043)
+        case .poor: return Color(red: 0.937, green: 0.267, blue: 0.267)
+        }
+    }
+
+    enum Category { case voiceOver, buttonLabeling, usability }
+
+    func description(for category: Category) -> String {
+        switch (self, category) {
+        case (.excellent, .voiceOver):      return "Works flawlessly with VoiceOver. No workarounds needed."
+        case (.excellent, .buttonLabeling): return "All interactive elements are clearly and accurately labeled."
+        case (.excellent, .usability):      return "Smooth, intuitive experience for screen reader users."
+        case (.good, .voiceOver):           return "Works well with VoiceOver. Minor issues or inconsistencies."
+        case (.good, .buttonLabeling):      return "Most elements are labeled. Occasional unlabeled buttons."
+        case (.good, .usability):           return "Generally usable with minor friction points."
+        case (.fair, .voiceOver):           return "Partially accessible. Some features may require workarounds."
+        case (.fair, .buttonLabeling):      return "Many interactive elements have poor or missing labels."
+        case (.fair, .usability):           return "Usable but requires significant effort or workarounds."
+        case (.poor, .voiceOver):           return "Significant accessibility barriers. Most features are difficult or impossible to use with VoiceOver."
+        case (.poor, .buttonLabeling):      return "Most interactive elements are unlabeled or incorrectly labeled."
+        case (.poor, .usability):           return "Very difficult or unusable for screen reader users."
+        }
+    }
+}
+
+struct RatingGaugeView: View {
+    let label: String
+    let ratingText: String
+    let category: AppRatingLevel.Category
+
+    var body: some View {
+        if let level = AppRatingLevel(text: ratingText) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(label.uppercased())
+                        .font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
+                    Spacer()
+                    Text(ratingText)
+                        .font(.caption).fontWeight(.heavy).foregroundStyle(level.color)
+                        .padding(.horizontal, 8).padding(.vertical, 2)
+                        .background(level.color.opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
+                }
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.secondary.opacity(0.2)).frame(height: 8)
+                        Capsule().fill(level.color).frame(width: geo.size.width * level.value, height: 8)
+                    }
+                }
+                .frame(height: 8)
+                Text(level.description(for: category))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(label): \(ratingText). \(level.description(for: category))")
+        } else {
+            // Unexpected value outside the known vocabulary — show as plain
+            // text rather than silently dropping it.
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label.uppercased()).font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
+                Text(ratingText).font(.subheadline)
+            }
         }
     }
 }
