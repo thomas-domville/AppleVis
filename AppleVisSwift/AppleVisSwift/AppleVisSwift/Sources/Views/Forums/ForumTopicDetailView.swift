@@ -176,9 +176,38 @@ struct ForumTopicDetailView: View {
 
     private func summarizeThread(_ detail: ForumTopicDetail) async {
         isSummarizing = true
-        let text = ([detail.body.strippingHTMLTags()] + detail.replies.prefix(30).map { "\($0.authorName): \($0.body.strippingHTMLTags())" }).joined(separator: "\n\n")
-        threadSummary = await IntelligenceService.summarize(text)
+        if let summary = await IntelligenceService.summarize(summaryInput(for: detail)) {
+            threadSummary = summary
+        } else {
+            // IntelligenceService silently returns nil on any generation
+            // failure, so without this the button just reverted to its
+            // original state with zero feedback — indistinguishable from
+            // the tap not registering at all.
+            toast.error("Couldn't generate a summary for this thread. Try again.")
+            UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a summary for this thread.")
+        }
         isSummarizing = false
+    }
+
+    /// Caps total input length before sending to the on-device model — a
+    /// long, heavily-discussed thread's full, untruncated reply bodies can
+    /// exceed the on-device FoundationModels context window, which throws a
+    /// generation error IntelligenceService swallows. That silently broke
+    /// "Summarize Thread" on exactly the threads a summary is most useful
+    /// for (this was reported directly: "a topic that has lots of comments").
+    private func summaryInput(for detail: ForumTopicDetail) -> String {
+        let maxTotalCharacters = 6000
+        let maxPerReply = 400
+        var parts = [String(detail.body.strippingHTMLTags().prefix(maxPerReply * 2))]
+        var remaining = maxTotalCharacters - parts[0].count
+        for reply in detail.replies.prefix(30) {
+            guard remaining > 0 else { break }
+            let body = reply.body.strippingHTMLTags().prefix(maxPerReply)
+            let part = "\(reply.authorName): \(body)"
+            parts.append(String(part.prefix(remaining)))
+            remaining -= part.count
+        }
+        return parts.joined(separator: "\n\n")
     }
 
     /// VoiceOver "Thread overview" custom action on the comments heading —
