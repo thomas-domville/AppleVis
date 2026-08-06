@@ -81,6 +81,8 @@ struct SubmitBugView: View {
                                 if let result = await intelligence.rewrite(subject: title, body: description, isTopic: true) {
                                     title = result.subject ?? title
                                     description = result.body
+                                } else {
+                                    toast.error("Couldn't rewrite this. Try again.")
                                 }
                             }
                         }
@@ -130,6 +132,8 @@ struct SubmitBugView: View {
                             if let result = await intelligence.translate(subject: title, body: description, isTopic: true) {
                                 title = result.subject ?? title
                                 description = result.body
+                            } else {
+                                toast.error("Couldn't translate this. Try again.")
                             }
                         }
                     } onDismiss: {

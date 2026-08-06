@@ -77,6 +77,8 @@ struct SubmitPodcastView: View {
                             Task {
                                 if let result = await intelligence.rewrite(subject: nil, body: description, isTopic: false) {
                                     description = result.body
+                                } else {
+                                    toast.error("Couldn't rewrite this. Try again.")
                                 }
                             }
                         }
@@ -128,6 +130,8 @@ struct SubmitPodcastView: View {
                         Task {
                             if let result = await intelligence.translate(subject: nil, body: description, isTopic: false) {
                                 description = result.body
+                            } else {
+                                toast.error("Couldn't translate this. Try again.")
                             }
                         }
                     } onDismiss: {

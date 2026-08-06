@@ -15,6 +15,7 @@ struct DiscoverView: View {
     @State private var lastAnnouncedResultCount: Int?
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var toast: ToastStore
     @Environment(\.openURL) private var openURL
 
     private static let bmeAppStoreURL = URL(string: "https://apps.apple.com/us/app/be-my-eyes/id905177575")!
@@ -143,7 +144,10 @@ struct DiscoverView: View {
     private func translateAndResearch() async {
         isTranslatingSearch = true
         defer { isTranslatingSearch = false }
-        guard let translated = await IntelligenceService.translateSearchQuery(searchText) else { return }
+        guard let translated = await IntelligenceService.translateSearchQuery(searchText) else {
+            toast.error("Couldn't translate this search. Try again.")
+            return
+        }
         showTranslateSearchPrompt = false
         searchText = translated
         isSearching = true

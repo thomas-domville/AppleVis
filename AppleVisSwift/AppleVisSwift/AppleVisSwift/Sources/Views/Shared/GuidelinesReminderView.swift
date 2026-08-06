@@ -83,7 +83,17 @@ final class GuidelinesCheckState: ObservableObject {
         checkTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(1500))
             guard !Task.isCancelled, let self else { return }
-            let visible = GuidelinesChecker.check(text).filter { !self.dismissedIds.contains($0.id) }
+            var visible = GuidelinesChecker.check(text).filter { !self.dismissedIds.contains($0.id) }
+            // AI-assisted second pass — existed but was never called
+            // anywhere. Only runs when the rule-based check found nothing,
+            // matching its own doc comment ("only flags obvious violations
+            // the rules missed"), so a rule hit isn't delayed by an extra
+            // on-device model round-trip.
+            if visible.isEmpty && IntelligenceService.isAvailable {
+                let aiWarnings = await IntelligenceService.checkAgainstGuidelinesAI(text)
+                guard !Task.isCancelled else { return }
+                visible = aiWarnings.filter { !self.dismissedIds.contains($0.id) }
+            }
             self.topWarning = visible.first
             if let top = visible.first, top.id != self.lastAnnouncedId {
                 self.lastAnnouncedId = top.id

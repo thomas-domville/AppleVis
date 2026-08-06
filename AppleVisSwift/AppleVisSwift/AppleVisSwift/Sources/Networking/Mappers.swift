@@ -56,8 +56,16 @@ enum Mappers {
     /// rejected the malformed/nonexistent UUID with a 400 ("Unexpected error
     /// (HTTP 400)"), intermittently and only for topics missing this field —
     /// better to silently drop the row than show one guaranteed to error.
+    ///
+    /// Validates actual UUID *format* (`UUID(uuidString:)`), not just
+    /// non-emptiness — a first pass only checked for an empty string, but a
+    /// real-world repro (a topic whose category also came back blank,
+    /// implying its `url` field was empty/missing too — likely a generally
+    /// sparse record) kept 400ing afterward, meaning the field can come back
+    /// non-empty but still not a real UUID (e.g. the literal string "null").
     static func forumFromRecent(_ item: [String: JSONValue]) -> ForumTopic? {
-        guard let uuid = item["uuid"]?.stringValue, !uuid.isEmpty else { return nil }
+        guard let uuidString = item["uuid"]?.stringValue, UUID(uuidString: uuidString) != nil else { return nil }
+        let uuid = uuidString
         let lastTs = item["last_comment_timestamp"]?.doubleValue ?? 0
         let changed = item["changed"]?.doubleValue ?? 0
         let lastActivity: Date = lastTs > 0

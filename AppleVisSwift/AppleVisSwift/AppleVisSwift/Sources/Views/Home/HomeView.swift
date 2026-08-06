@@ -142,10 +142,23 @@ struct HomeView: View {
         let baseText = vm.isReturningVisit
             ? "Welcome back to AppleVis. Returning to where you left off."
             : "Welcome to AppleVis. Home is ready."
-        let welcomeText = preferences.homeStartupBehavior == .detailed && !vm.newActivitySummary.isEmpty
-            ? "\(baseText) \(vm.newActivitySummary)."
-            : baseText
-        UIAccessibility.post(notification: .announcement, argument: welcomeText)
+
+        if preferences.homeStartupBehavior == .detailed && !vm.newActivitySummary.isEmpty {
+            // IntelligenceService.generateDigest existed but was never
+            // called anywhere — "Detailed" mode just concatenated the raw
+            // newActivitySummary string instead of the friendlier
+            // AI-generated digest it was built for. Falls back to the raw
+            // summary (the previous behavior) if AI is unavailable or fails,
+            // so this can't regress into silence the way other Intelligence
+            // call sites did.
+            let rawSummary = vm.newActivitySummary
+            Task {
+                let digest = await IntelligenceService.generateDigest(rawSummary)
+                UIAccessibility.post(notification: .announcement, argument: "\(baseText) \(digest ?? rawSummary).")
+            }
+        } else {
+            UIAccessibility.post(notification: .announcement, argument: baseText)
+        }
 
         // Land VoiceOver focus on the summary (or greeting, if there's no
         // new activity to summarize) instead of leaving it whereever it was

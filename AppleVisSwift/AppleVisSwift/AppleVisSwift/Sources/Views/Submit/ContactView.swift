@@ -66,6 +66,8 @@ struct ContactView: View {
                                 if let result = await intelligence.rewrite(subject: subject, body: message, isTopic: false) {
                                     subject = result.subject ?? subject
                                     message = result.body
+                                } else {
+                                    toast.error("Couldn't rewrite this. Try again.")
                                 }
                             }
                         }
@@ -115,6 +117,8 @@ struct ContactView: View {
                             if let result = await intelligence.translate(subject: subject, body: message, isTopic: false) {
                                 subject = result.subject ?? subject
                                 message = result.body
+                            } else {
+                                toast.error("Couldn't translate this. Try again.")
                             }
                         }
                     } onDismiss: {

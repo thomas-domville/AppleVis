@@ -69,6 +69,8 @@ struct SubmitAppView: View {
                             Task {
                                 if let result = await intelligence.rewrite(subject: nil, body: payload.accessibilityComments, isTopic: false) {
                                     payload.accessibilityComments = result.body
+                                } else {
+                                    toast.error("Couldn't rewrite this. Try again.")
                                 }
                             }
                         }
@@ -168,6 +170,8 @@ struct SubmitAppView: View {
                         Task {
                             if let result = await intelligence.translate(subject: nil, body: payload.accessibilityComments, isTopic: false) {
                                 payload.accessibilityComments = result.body
+                            } else {
+                                toast.error("Couldn't translate this. Try again.")
                             }
                         }
                     } onDismiss: {

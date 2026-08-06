@@ -37,6 +37,8 @@ struct ComposeTopicView: View {
                                 if let result = await intelligence.translate(subject: title, body: bodyText, isTopic: true) {
                                     title = result.subject ?? title
                                     bodyText = result.body
+                                } else {
+                                    toast.error("Couldn't translate this. Try again.")
                                 }
                             }
                         } onDismiss: {
@@ -80,6 +82,8 @@ struct ComposeTopicView: View {
                                 if let result = await intelligence.rewrite(subject: title, body: bodyText, isTopic: true) {
                                     title = result.subject ?? title
                                     bodyText = result.body
+                                } else {
+                                    toast.error("Couldn't rewrite this. Try again.")
                                 }
                             }
                         }
@@ -158,6 +162,8 @@ struct ComposeReplyView: View {
                         Task {
                             if let result = await intelligence.translate(subject: nil, body: bodyText, isTopic: false) {
                                 bodyText = result.body
+                            } else {
+                                toast.error("Couldn't translate this. Try again.")
                             }
                         }
                     } onDismiss: {
@@ -195,6 +201,8 @@ struct ComposeReplyView: View {
                             Task {
                                 if let result = await intelligence.rewrite(subject: nil, body: bodyText, isTopic: false) {
                                     bodyText = result.body
+                                } else {
+                                    toast.error("Couldn't rewrite this. Try again.")
                                 }
                             }
                         }

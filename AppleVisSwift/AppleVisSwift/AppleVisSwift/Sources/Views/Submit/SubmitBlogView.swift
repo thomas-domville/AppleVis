@@ -70,6 +70,8 @@ struct SubmitBlogView: View {
                             Task {
                                 if let result = await intelligence.rewrite(subject: nil, body: blogDraft, isTopic: false) {
                                     blogDraft = result.body
+                                } else {
+                                    toast.error("Couldn't rewrite this. Try again.")
                                 }
                             }
                         }
@@ -118,6 +120,8 @@ struct SubmitBlogView: View {
                         Task {
                             if let result = await intelligence.translate(subject: nil, body: blogDraft, isTopic: false) {
                                 blogDraft = result.body
+                            } else {
+                                toast.error("Couldn't translate this. Try again.")
                             }
                         }
                     } onDismiss: {
