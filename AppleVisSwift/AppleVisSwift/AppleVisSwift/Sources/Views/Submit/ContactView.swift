@@ -86,6 +86,11 @@ struct ContactView: View {
     @StateObject private var intelligence = ComposeIntelligenceState()
     @AccessibilityFocusState private var isStepFocused: Bool
 
+    /// Lets callers outside RN's own flow (About's "Report a Bug"/"Send
+    /// Feedback", which RN just opened in Safari) preselect a type — the
+    /// picker still shows so the user can change their mind.
+    var initialType: ContactType? = nil
+
     @State private var step: Step = .type
     @State private var contactType: ContactType?
     @State private var name = ""
@@ -202,6 +207,7 @@ struct ContactView: View {
             }
             .onAppear {
                 if name.isEmpty { name = auth.user?.name ?? "" }
+                if contactType == nil { contactType = initialType }
             }
         }
     }

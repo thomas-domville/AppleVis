@@ -4,6 +4,8 @@ struct AboutView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var networkMonitor: NetworkMonitor
     @State private var copiedSupportInfo = false
+    @State private var contactType: ContactView.ContactType?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
@@ -17,30 +19,56 @@ struct AboutView: View {
     private var deviceModel: String {
         UIDevice.current.model
     }
+    private var deviceMachineModel: String {
+        var info = utsname()
+        uname(&info)
+        return withUnsafePointer(to: &info.machine) {
+            $0.withMemoryRebound(to: CChar.self, capacity: 1) { String(cString: $0) }
+        }
+    }
+    private var screenSize: String {
+        let bounds = UIScreen.main.bounds
+        return "\(Int(bounds.width)) x \(Int(bounds.height)) pts"
+    }
+    private var dynamicTypeScale: String {
+        let scale = UIFont.preferredFont(forTextStyle: .body).pointSize / 17.0
+        let suffix = dynamicTypeSize.isAccessibilitySize ? " (Accessibility size)" : ""
+        return String(format: "%.2fx%@", scale, suffix)
+    }
 
     /// Matches RN's fuller diagnostic report (app version/build, iOS
     /// version/device, every accessibility setting, theme, locale, network
     /// state) — Swift's previously only included version/build/iOS/device,
     /// missing everything that actually helps diagnose an accessibility
     /// bug report.
+    /// Matches RN's `buildSupportInfo()` structure exactly (labeled header,
+    /// dashed rule, blank-line-separated sections, trailing instruction) —
+    /// not just the same facts in a denser one-line format.
     private var supportInfo: String {
-        let accessibility = [
-            "VoiceOver: \(UIAccessibility.isVoiceOverRunning ? "On" : "Off")",
-            "Switch Control: \(UIAccessibility.isSwitchControlRunning ? "On" : "Off")",
-            "Reduced Motion: \(UIAccessibility.isReduceMotionEnabled ? "On" : "Off")",
-            "Bold Text: \(UIAccessibility.isBoldTextEnabled ? "On" : "Off")",
-            "Reduce Transparency: \(UIAccessibility.isReduceTransparencyEnabled ? "On" : "Off")",
-            "Increased Contrast: \(UIAccessibility.isDarkerSystemColorsEnabled ? "On" : "Off")",
-            "Grayscale: \(UIAccessibility.isGrayscaleEnabled ? "On" : "Off")",
-            "Invert Colors: \(UIAccessibility.isInvertColorsEnabled ? "On" : "Off")",
-        ].joined(separator: ", ")
-        return """
-        AppleVis \(appVersion) (\(buildNumber))
-        iOS \(iosVersion) · \(deviceModel)
-        Theme: \(preferences.theme.displayName)
-        Locale: \(Locale.current.identifier)
-        Network: \(networkMonitor.isConnected ? "Connected" : "Not Connected")
-        Accessibility: \(accessibility)
+        """
+        AppleVis App Support Information
+        --------------------------------
+        App Version:       \(appVersion) (Build \(buildNumber))
+        iOS Version:       \(iosVersion)
+        Device:            \(deviceModel) (\(deviceMachineModel))
+        Device Type:       \(UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone")
+        Screen:            \(screenSize)
+        Theme:             \(preferences.theme.displayName)
+        Locale:            \(Locale.current.identifier)
+        Network:           \(networkMonitor.isConnected ? "Connected" : "Not Connected")
+
+        Accessibility Settings
+        VoiceOver:         \(UIAccessibility.isVoiceOverRunning ? "On" : "Off")
+        Switch Control:    \(UIAccessibility.isSwitchControlRunning ? "On" : "Off")
+        Reduce Motion:     \(UIAccessibility.isReduceMotionEnabled ? "On" : "Off")
+        Bold Text:         \(UIAccessibility.isBoldTextEnabled ? "On" : "Off")
+        Reduce Transparency: \(UIAccessibility.isReduceTransparencyEnabled ? "On" : "Off")
+        Increased Contrast: \(UIAccessibility.isDarkerSystemColorsEnabled ? "On" : "Off")
+        Grayscale:         \(UIAccessibility.isGrayscaleEnabled ? "On" : "Off")
+        Invert Colors:     \(UIAccessibility.isInvertColorsEnabled ? "On" : "Off")
+        Dynamic Type Scale: \(dynamicTypeScale)
+
+        Please include this information when reporting a bug.
         """
     }
 
@@ -55,6 +83,9 @@ struct AboutView: View {
                 InfoRow(label: "Build",   value: buildNumber)
                 InfoRow(label: "iOS",     value: iosVersion)
                 InfoRow(label: "Device",  value: deviceModel)
+                InfoRow(label: "Model",   value: deviceMachineModel)
+                InfoRow(label: "Type",    value: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone")
+                InfoRow(label: "Screen",  value: screenSize)
             }
 
             Section("Accessibility Status") {
@@ -66,6 +97,7 @@ struct AboutView: View {
                 AccessibilityStatusRow(label: "Increased Contrast",  isActive: UIAccessibility.isDarkerSystemColorsEnabled)
                 AccessibilityStatusRow(label: "Grayscale",           isActive: UIAccessibility.isGrayscaleEnabled)
                 AccessibilityStatusRow(label: "Invert Colors",       isActive: UIAccessibility.isInvertColorsEnabled)
+                InfoRow(label: "Dynamic Type Scale", value: dynamicTypeScale)
             }
 
             Section("Support") {
@@ -88,11 +120,24 @@ struct AboutView: View {
                 }
             }
 
-            Section("Find Us") {
-                Link(destination: URL(string: "https://twitter.com/applevis")!) {
-                    Label("@AppleVis on X / Twitter", systemImage: "link")
+            Section("Connect With Us") {
+                Link(destination: URL(string: "https://x.com/AppleVis")!) {
+                    Label("Follow AppleVis on X", systemImage: "at")
                 }
-                .accessibilityLabel("X Twitter, @AppleVis")
+                .accessibilityLabel("Follow AppleVis on X")
+                .accessibilityHint("Opens in Safari.")
+
+                Link(destination: URL(string: "https://www.facebook.com/AppleVis")!) {
+                    Label("Follow AppleVis on Facebook", systemImage: "f.circle")
+                }
+                .accessibilityLabel("Follow AppleVis on Facebook")
+                .accessibilityHint("Opens in Safari.")
+
+                Link(destination: URL(string: "https://mastodon.online/@AppleVis")!) {
+                    Label("Follow AppleVis on Mastodon", systemImage: "network")
+                }
+                .accessibilityLabel("Follow AppleVis on Mastodon")
+                .accessibilityHint("Opens in Safari.")
 
                 Link(destination: URL(string: "https://www.applevis.com")!) {
                     Label("applevis.com", systemImage: "globe")
@@ -100,7 +145,7 @@ struct AboutView: View {
                 .accessibilityLabel("applevis.com website")
             }
 
-            Section("Legal") {
+            Section("Legal & Credits") {
                 NavigationLink { CreditsView() } label: {
                     Label("Credits", systemImage: "person.2")
                 }
@@ -113,10 +158,35 @@ struct AboutView: View {
                 Link(destination: URL(string: "https://www.applevis.com/terms")!) {
                     Label("Terms of Use", systemImage: "doc.plaintext")
                 }
+                Button {
+                    contactType = .bug
+                } label: {
+                    Label("Report a Bug", systemImage: "ladybug")
+                }
+                .accessibilityHint("Opens the in-app contact form.")
+                Button {
+                    contactType = .feedback
+                } label: {
+                    Label("Send Feedback", systemImage: "ellipsis.bubble")
+                }
+                .accessibilityHint("Opens the in-app contact form.")
             }
+
+            Section {
+                Text("© 2026 AppleVis\napplevis.com")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
+                    .accessibilityLabel("Copyright 2026 AppleVis. All rights reserved.")
+            }
+            .listRowBackground(Color.clear)
         }
         .navigationTitle("About AppleVis")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $contactType) { type in
+            ContactView(initialType: type)
+        }
     }
 }
 

@@ -1,72 +1,115 @@
 import SwiftUI
 
+/// Ported verbatim from RN's `app/credits.tsx` — the previous version of this
+/// screen had entirely fabricated content (generic "AppleVis Community" /
+/// "AppleVis Podcast Team" placeholders and a fictional tech-stack list)
+/// instead of the real named credits RN actually shipped.
 struct CreditsView: View {
-    private let contributors = [
-        Contributor(name: "AppleVis Community", role: "Content, Reviews, and Forum Discussions"),
-        Contributor(name: "AppleVis Editorial Team", role: "Guides, Tutorials, and News Articles"),
-        Contributor(name: "AppleVis Podcast Team", role: "Podcast Production and Hosting"),
+    private struct CreditSection: Identifiable {
+        let id = UUID()
+        let title: String
+        let icon: String
+        let body: String
+        var people: [(label: String, name: String)] = []
+        var featured: Bool = false
+    }
+
+    private let sections: [CreditSection] = [
+        CreditSection(
+            title: "App Creation",
+            icon: "hammer",
+            body: "The AppleVis app was shaped by people who cared deeply about making the community easier, faster, and more enjoyable to use.",
+            people: [
+                ("Design and Coding", "Thomas Domville"),
+                ("Wording and Quality", "Michael Hansen"),
+            ]
+        ),
+        CreditSection(
+            title: "Beta Testers",
+            icon: "flask",
+            body: "Thank you to every beta tester who shared feedback, suggested improvements, and found bugs before release. Your careful testing made this app better for everyone."
+        ),
+        CreditSection(
+            title: "The AppleVis Community",
+            icon: "person.2",
+            body: "Thank you to the AppleVis community for making the site what it is. Without the people who ask questions, share knowledge, review apps, post comments, and support one another, AppleVis would not be the same. This app is for you."
+        ),
+        CreditSection(
+            title: "AppleVis Editorial Team",
+            icon: "newspaper",
+            body: "Thank you to the AppleVis Editorial Team, past and present, for the care, judgment, hard work, and steady commitment required to keep AppleVis maintained, updated, and moving forward."
+        ),
+        CreditSection(
+            title: "David Goodwin",
+            icon: "star",
+            body: "Most of all, thank you to AppleVis founder David Goodwin. This app would not have come to life without the community he created for all of us to enjoy. His dedication, hard work, and commitment to AppleVis made everything that followed possible.",
+            featured: true
+        ),
+        CreditSection(
+            title: "Be My Eyes",
+            icon: "heart",
+            body: "Thank you to Be My Eyes for supporting AppleVis and helping keep the lights on, so people can continue to learn, participate, and contribute."
+        ),
     ]
 
     var body: some View {
         Form {
             Section {
-                Text("AppleVis is built by and for the blindness and low-vision community. This app would not exist without the countless contributions from our members.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                VStack(spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .font(.title2)
+                        .foregroundStyle(.white)
+                        .frame(width: 52, height: 52)
+                        .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14))
+                        .accessibilityHidden(true)
+                    Text("AppleVis Credits")
+                        .font(.title2.bold())
+                        .multilineTextAlignment(.center)
+                        .accessibilityAddTraits(.isHeader)
+                    Text("AppleVis exists because of the people who build, write, test, maintain, support, and participate in this community.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
             }
 
-            Section("Contributors") {
-                ForEach(contributors) { contributor in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(contributor.name)
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                        Text(contributor.role)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+            ForEach(sections) { section in
+                Section {
+                    Label(section.title, systemImage: section.icon)
+                        .font(.headline)
+                        .foregroundStyle(section.featured ? Color.accentColor : .primary)
+                        .accessibilityAddTraits(.isHeader)
+
+                    ForEach(section.people, id: \.label) { person in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(person.label)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Text(person.name)
+                                .font(.body.bold())
+                        }
+                        .padding(.vertical, 2)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("\(person.label): \(person.name)")
                     }
-                    .padding(.vertical, 2)
-                    .accessibilityElement(children: .combine)
+
+                    Text(section.body)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
             }
 
-            Section("Built With") {
-                BuiltWithRow(tech: "SwiftUI", description: "Apple's declarative UI framework for native iOS development.")
-                BuiltWithRow(tech: "AVFoundation", description: "Podcast playback, chapter support, and Now Playing integration.")
-                BuiltWithRow(tech: "CloudKit / iCloud", description: "Sync across devices, protecting your data end-to-end.")
-                BuiltWithRow(tech: "URLSession", description: "Networking and API communication with applevis.com.")
-            }
-
-            Section("Special Thanks") {
-                Text("To every member of the AppleVis community who shares their knowledge to help others navigate the Apple ecosystem. Your dedication makes a real difference.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            Section {
+                Text("To everyone who has helped AppleVis become what it is: thank you.")
+                    .font(.body.bold())
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
             }
         }
         .navigationTitle("Credits")
         .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-private struct Contributor: Identifiable {
-    let id = UUID()
-    let name: String
-    let role: String
-}
-
-private struct BuiltWithRow: View {
-    let tech: String
-    let description: String
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(tech)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-            Text(description)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 2)
-        .accessibilityElement(children: .combine)
     }
 }
