@@ -4,8 +4,12 @@ import SwiftUI
 struct OfflineBanner: View {
     @State private var hasAnnounced = false
 
+    // Deliberately avoids the word "saved" — this is about locally cached
+    // content shown while offline/degraded, unrelated to the user-facing
+    // "Saved" (bookmarks) feature, and the overlap was confusing enough
+    // that a VoiceOver user asked whether this banner was a bug.
     private var label: String {
-        "Showing saved content. Pull down to refresh when online."
+        "You're offline. Showing previously loaded content — pull down to refresh once you're back online."
     }
 
     var body: some View {

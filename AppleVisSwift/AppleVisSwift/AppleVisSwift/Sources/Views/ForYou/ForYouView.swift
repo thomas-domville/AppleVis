@@ -8,6 +8,22 @@ struct ForYouView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                // Orientation text and section-accent strip are sighted/
+                // low-vision affordances, not decoration — RN hid both from
+                // VoiceOver (accessibilityElementsHidden, foryou.tsx
+                // ~1169-1185) precisely because it already had another way
+                // to convey the same info to screen-reader users (the
+                // picker's own label/selection announcement), while
+                // low-vision users who don't run VoiceOver still benefit
+                // from a plain-language explainer and an at-a-glance color
+                // cue for which section is active.
+                Text("Your personal AppleVis hub. Continue listening, manage downloads, revisit saved items, and keep up with content you follow.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
+                    .padding(.top, 12)
+                    .accessibilityHidden(true)
+
                 Picker("Section", selection: $selectedTab) {
                     ForEach(ForYouTab.allCases) { tab in
                         Text(tab.displayName).tag(tab)
@@ -18,6 +34,15 @@ struct ForYouView: View {
                 .onChange(of: selectedTab) { _, _ in
                     SoundPlayer.shared.play(.pickerTick)
                 }
+
+                Rectangle()
+                    .fill(selectedTab.accentColor)
+                    .frame(height: 3)
+                    .clipShape(RoundedRectangle(cornerRadius: 2))
+                    .padding(.horizontal)
+                    .padding(.top, -8)
+                    .padding(.bottom, 8)
+                    .accessibilityHidden(true)
 
                 Group {
                     switch selectedTab {
@@ -57,6 +82,16 @@ enum ForYouTab: String, CaseIterable, Identifiable {
         case .downloads: return "Downloads"
         case .saved:     return "Saved"
         case .following: return "Following"
+        }
+    }
+
+    /// Matches RN's `SECTION_ACCENT` palette (foryou.tsx).
+    var accentColor: Color {
+        switch self {
+        case .queue:     return Color(red: 0.976, green: 0.451, blue: 0.086) // orange
+        case .downloads: return Color(red: 0.063, green: 0.725, blue: 0.506) // green
+        case .saved:     return Color(red: 0.388, green: 0.400, blue: 0.945) // indigo
+        case .following: return Color(red: 0.545, green: 0.361, blue: 0.965) // purple
         }
     }
 }
