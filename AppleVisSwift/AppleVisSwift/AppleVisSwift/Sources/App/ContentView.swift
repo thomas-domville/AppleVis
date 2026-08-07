@@ -69,7 +69,7 @@ struct ContentView: View {
     private func siriDestination(for destination: SiriDestination) -> some View {
         switch destination {
         case .forums(let filter): NavigationStack { ForumsBrowseView(initialFilter: filter) }
-        case .savedItems: NavigationStack { SavedItemsView() }
+        case .savedItems(let filter): NavigationStack { SavedItemsView(initialFilter: filter) }
         case .search(let query): DiscoverView(initialSearchQuery: query)
         }
     }

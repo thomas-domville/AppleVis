@@ -48,7 +48,7 @@ final class DeepLinkRouter: ObservableObject {
             let filter = value("filter").flatMap(ForumFilter.init(rawValue:)) ?? .recent
             pendingSiriDestination = .forums(filter: filter)
         case "saved":
-            pendingSiriDestination = .savedItems
+            pendingSiriDestination = .savedItems(filter: nil)
         case "search":
             if let query = value("q") { pendingSiriDestination = .search(query: query) }
         case "podcasts":
@@ -96,13 +96,17 @@ enum PendingSubmit: Identifiable {
 /// same treatment Settings (Cmd+,) already gets from KeyCommandRouter.
 enum SiriDestination: Identifiable {
     case forums(filter: ForumFilter)
-    case savedItems
+    /// `filter` pre-selects a kind within Saved — used by Profile's saved-
+    /// count rows to jump straight into e.g. just-saved-forum-topics
+    /// (matches RN's `?section=saved&savedType=forumTopic` deep link,
+    /// foryou.tsx ~1093-1105) instead of always landing on "All".
+    case savedItems(filter: ContentKind?)
     case search(query: String)
 
     var id: String {
         switch self {
         case .forums(let filter): return "forums:\(filter.rawValue)"
-        case .savedItems: return "saved"
+        case .savedItems(let filter): return "saved:\(filter?.rawValue ?? "all")"
         case .search(let query): return "search:\(query)"
         }
     }

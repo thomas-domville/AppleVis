@@ -1,6 +1,21 @@
 import SwiftUI
 import UIKit
 
+/// Per-kind accent color used to color-code Saved/Following rows — matches
+/// the old RN app's `KIND_ACCENT_SAVED` palette (foryou.tsx).
+extension ContentKind {
+    var accentColor: Color {
+        switch self {
+        case .forumTopic:     return Color(red: 0.388, green: 0.400, blue: 0.945) // indigo
+        case .podcastEpisode: return Color(red: 0.976, green: 0.451, blue: 0.086) // orange
+        case .appListing:     return Color(red: 0.231, green: 0.510, blue: 0.965) // blue
+        case .resource:       return Color(red: 0.063, green: 0.725, blue: 0.506) // green
+        case .blogPost:       return Color(red: 0.545, green: 0.361, blue: 0.965) // purple
+        case .bugReport:      return Color(red: 0.976, green: 0.451, blue: 0.086) // orange
+        }
+    }
+}
+
 /// Shared save/follow/share actions (swipe + context menu) for any content row
 /// or detail screen. Save is local-only (no server concept — see
 /// `PersistenceStore`); follow is server-backed via the generic JSON:API
@@ -12,6 +27,12 @@ struct ContentActionsModifier: ViewModifier {
     let lastActivityAt: Date?
     let url: String?
     var supportsFollow: Bool = true
+    /// Fired after a save/follow toggle actually happens — lets a screen
+    /// that owns its own "list of saved/followed items" (Saved, Following)
+    /// prune the item locally instead of showing a stale row that still
+    /// claims to be saved/followed after the user just toggled it off.
+    var onSaveToggle: ((Bool) -> Void)? = nil
+    var onFollowToggle: ((Bool) -> Void)? = nil
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -121,6 +142,7 @@ struct ContentActionsModifier: ViewModifier {
             toast.success("Saved")
             SoundPlayer.shared.play(.bookmarkSaved)
         }
+        onSaveToggle?(isSaved)
     }
 
     private func toggleFollow() async {
@@ -131,6 +153,7 @@ struct ContentActionsModifier: ViewModifier {
                 PersistenceStore.shared.markUnfollowed(id: id)
                 isFollowing = false
                 toast.success("Unfollowed")
+                onFollowToggle?(false)
             } else {
                 try await APIClient.shared.flags.follow(nodeUuid: id, nodeType: kind.nodeType, token: user.csrfToken)
                 PersistenceStore.shared.markFollowed(FollowedItem(
@@ -140,6 +163,7 @@ struct ContentActionsModifier: ViewModifier {
                 isFollowing = true
                 toast.success("Following")
                 if kind == .forumTopic { tips.show(.followTopicNotifications) }
+                onFollowToggle?(true)
             }
         } catch let e as APIError {
             toast.error(e.localizedDescription)
@@ -184,10 +208,12 @@ extension View {
     /// Adds save/follow/share swipe actions + context menu to a row or detail screen.
     func contentActions(
         id: String, kind: ContentKind, title: String,
-        lastActivityAt: Date? = nil, url: String? = nil, supportsFollow: Bool = true
+        lastActivityAt: Date? = nil, url: String? = nil, supportsFollow: Bool = true,
+        onSaveToggle: ((Bool) -> Void)? = nil, onFollowToggle: ((Bool) -> Void)? = nil
     ) -> some View {
         modifier(ContentActionsModifier(
-            id: id, kind: kind, title: title, lastActivityAt: lastActivityAt, url: url, supportsFollow: supportsFollow
+            id: id, kind: kind, title: title, lastActivityAt: lastActivityAt, url: url, supportsFollow: supportsFollow,
+            onSaveToggle: onSaveToggle, onFollowToggle: onFollowToggle
         ))
     }
 }

@@ -121,6 +121,11 @@ struct DownloadsView: View {
                 } message: {
                     Text("This deletes downloaded episodes from this device. Queue and Saved items are not affected.")
                 }
+                .refreshable {
+                    downloads.applyAutoDeletePolicy()
+                    SoundPlayer.shared.play(.refresh)
+                    UIAccessibility.post(notification: .announcement, argument: "Downloads refreshed.")
+                }
             }
         }
         .onChange(of: downloads.lastFailure) { _, failure in
@@ -143,25 +148,58 @@ struct DownloadsView: View {
             }
     }
 
-    /// Tapping opens the episode's detail page (matches every other row type
-    /// in this tab) — previously this only started playback, with no way to
-    /// see the episode's description, chapters, or comments from Downloads.
+    /// Tapping the title opens the episode's detail page (matches every
+    /// other row type in this tab). Play/Queue are also visible icon
+    /// buttons now, not just VoiceOver custom actions — RN showed them as
+    /// on-screen pill buttons (foryou.tsx ~499-528), so a sighted user could
+    /// use them without opening the episode first, which the Swift version
+    /// previously couldn't do.
     private func downloadRow(_ meta: DownloadedEpisodeMeta) -> some View {
         let isQueued = player.queue.contains { $0.id == meta.id }
         let isCurrentlyPlaying = player.currentEpisode?.id == meta.id && player.isPlaying
 
-        return Button {
-            deepLinkRouter.pendingContent = (kind: .podcastEpisode, id: meta.id)
-        } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(meta.title).foregroundStyle(.primary)
-                Text(formattedSize(meta.fileSizeBytes))
-                    .font(.caption).foregroundStyle(.secondary)
+        return HStack(spacing: 12) {
+            Button {
+                deepLinkRouter.pendingContent = (kind: .podcastEpisode, id: meta.id)
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(meta.title).foregroundStyle(.primary)
+                    Text(formattedSize(meta.fileSizeBytes))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
+            .buttonStyle(.plain)
+
+            Spacer(minLength: 0)
+
+            Button {
+                Task { await playDownloaded(meta) }
+            } label: {
+                Image(systemName: isCurrentlyPlaying ? "pause.circle.fill" : "play.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(Color.accentColor)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHidden(true)
+
+            Button {
+                if isQueued {
+                    player.removeFromQueue(id: meta.id)
+                } else {
+                    player.enqueue(episode(for: meta))
+                }
+            } label: {
+                Image(systemName: isQueued ? "text.badge.minus" : "text.badge.plus")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHidden(true)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(meta.title). Downloaded. \(formattedSize(meta.fileSizeBytes)).")
         .accessibilityHint("Double-tap to open episode details.")
+        .readAloudAction(meta.title)
         .accessibilityAction(named: Text(isCurrentlyPlaying ? "Pause" : "Play")) {
             Task { await playDownloaded(meta) }
         }
@@ -202,14 +240,29 @@ struct DownloadsView: View {
 // MARK: - Saved Items
 
 struct SavedItemsView: View {
-    @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var tips: TipStore
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+    @EnvironmentObject private var toast: ToastStore
     @State private var items: [SavedItem] = []
+    /// Full episode metadata for saved podcasts, fetched on load — Saved
+    /// only persists id/kind/title locally (see `SavedItem`), which isn't
+    /// enough to show artwork/duration/Play/Queue the way RN's SavedSection
+    /// did (foryou.tsx ~707-825), so podcast rows get enriched once this
+    /// resolves and fall back to the plain row until then.
+    @State private var enrichedEpisodes: [String: PodcastEpisode] = [:]
     @State private var isLoading = false
     @State private var error: String?
-    @State private var filter: ContentKind? = nil
+    @State private var filter: ContentKind?
     @State private var showUnsaveAllConfirm = false
+    @AccessibilityFocusState private var summaryFocused: Bool
+
+    /// Saved has no server concept and needs no sign-in (see
+    /// ContentActionsModifier) — this used to gate the whole screen behind
+    /// `auth.isSignedIn` even though Save itself works while signed out,
+    /// so a signed-out user could save items they could then never see.
+    init(initialFilter: ContentKind? = nil) {
+        _filter = State(initialValue: initialFilter)
+    }
 
     var filtered: [SavedItem] {
         guard let f = filter else { return items }
@@ -218,9 +271,7 @@ struct SavedItemsView: View {
 
     var body: some View {
         Group {
-            if !auth.isSignedIn {
-                EmptyStateView(title: "Sign In Required", message: "Sign in to view your saved items.", systemImage: "bookmark")
-            } else if isLoading {
+            if isLoading {
                 LoadingView()
             } else if let error {
                 ErrorView(message: error) { await load() }
@@ -237,38 +288,9 @@ struct SavedItemsView: View {
         List {
             filterPicker
             summaryHeader
+                .accessibilityFocused($summaryFocused)
             ForEach(filtered) { item in
-                Button {
-                    deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Label(item.kind.displayName, systemImage: item.kind.systemImage)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(item.title)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .accessibilityHidden(true)
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(
-                    "\(item.title). \(item.kind.displayName). Saved \(item.savedAt.formatted(.relative(presentation: .named)))."
-                )
-                .accessibilityHint("Double-tap to open.")
-                .accessibilityAction(named: Text("Open \(item.kind.displayName)")) {
-                    deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
-                }
-                .accessibilityAction(named: Text("Unsave")) { unsave(item) }
-                .swipeActions {
-                    Button("Remove", role: .destructive) { unsave(item) }
-                        .accessibilityHidden(true)
-                }
+                rowView(for: item)
             }
             if !filtered.isEmpty {
                 Button("Unsave All", role: .destructive) { showUnsaveAllConfirm = true }
@@ -276,6 +298,7 @@ struct SavedItemsView: View {
             }
         }
         .onAppear { tips.show(.savedSwipeActions) }
+        .refreshable { await load(); SoundPlayer.shared.play(.refresh) }
         .confirmationDialog(
             "Unsave all \(filtered.count) item\(filtered.count == 1 ? "" : "s")?",
             isPresented: $showUnsaveAllConfirm, titleVisibility: .visible
@@ -285,6 +308,58 @@ struct SavedItemsView: View {
         } message: {
             Text("This removes them from Saved. It does not delete the original content.")
         }
+    }
+
+    @ViewBuilder
+    private func rowView(for item: SavedItem) -> some View {
+        if item.kind == .podcastEpisode, let episode = enrichedEpisodes[item.id] {
+            SavedPodcastEpisodeCard(episode: episode, savedItem: item) {
+                removeFromList(item)
+            }
+        } else {
+            genericRow(item)
+        }
+    }
+
+    private func genericRow(_ item: SavedItem) -> some View {
+        Button {
+            deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(item.kind.displayName, systemImage: item.kind.systemImage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(item.title)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .leading) {
+            Rectangle().fill(item.kind.accentColor).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
+        }
+        .padding(.leading, 6)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(item.title). \(item.kind.displayName). Saved \(item.savedAt.formatted(.relative(presentation: .named)))."
+        )
+        .accessibilityHint("Double-tap to open.")
+        .readAloudAction(item.title)
+        .accessibilityAction(named: Text("Open \(item.kind.displayName)")) {
+            deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
+        }
+        .contentActions(
+            id: item.id, kind: item.kind, title: item.title, lastActivityAt: item.lastActivityAt,
+            onSaveToggle: { isSaved in
+                guard !isSaved else { return }
+                removeFromList(item)
+            }
+        )
     }
 
     private var summaryHeader: some View {
@@ -330,21 +405,144 @@ struct SavedItemsView: View {
         .listRowSeparator(.hidden)
     }
 
-    private func unsave(_ item: SavedItem) {
-        PersistenceStore.shared.unsave(id: item.id)
+    /// Called after a row's own `.contentActions` swipe/context/VoiceOver
+    /// unsave already persisted the change — this just prunes it from the
+    /// list still on screen and moves focus back to the summary, matching
+    /// RN's post-unsave focus handling (foryou.tsx ~611-618).
+    private func removeFromList(_ item: SavedItem) {
         items.removeAll { $0.id == item.id }
+        enrichedEpisodes.removeValue(forKey: item.id)
+        focusSummaryAfterDelay()
     }
 
     private func unsaveAll() {
         let toRemove = Set(filtered.map(\.id))
         for id in toRemove { PersistenceStore.shared.unsave(id: id) }
         items.removeAll { toRemove.contains($0.id) }
+        toast.success("Removed \(toRemove.count) item\(toRemove.count == 1 ? "" : "s") from Saved")
         UIAccessibility.post(notification: .announcement, argument: "Removed saved items.")
+        focusSummaryAfterDelay()
+    }
+
+    /// A short delay before moving VoiceOver focus, same pattern Home uses —
+    /// setting focus before the List has re-laid-out after a row disappears
+    /// is a common way for it to silently fail.
+    private func focusSummaryAfterDelay() {
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            summaryFocused = true
+        }
     }
 
     private func load() async {
-        guard auth.isSignedIn else { return }
         items = PersistenceStore.shared.savedItems()
+        await enrichPodcastEpisodes()
+    }
+
+    private func enrichPodcastEpisodes() async {
+        let podcastIds = items.filter { $0.kind == .podcastEpisode }.map(\.id)
+        guard !podcastIds.isEmpty else { return }
+        await withTaskGroup(of: (String, PodcastEpisode?).self) { group in
+            for id in podcastIds where enrichedEpisodes[id] == nil {
+                group.addTask { (id, try? await APIClient.shared.podcasts.episode(id: id)) }
+            }
+            for await (id, episode) in group {
+                if let episode { enrichedEpisodes[id] = episode }
+            }
+        }
+    }
+}
+
+/// Richer saved-podcast card with artwork, duration, and visible Play/Queue
+/// buttons — matches RN's SavedSection treatment for saved episodes
+/// (foryou.tsx ~707-825), which every other saved kind doesn't have enough
+/// local metadata to support.
+private struct SavedPodcastEpisodeCard: View {
+    let episode: PodcastEpisode
+    let savedItem: SavedItem
+    let onUnsave: () -> Void
+
+    @EnvironmentObject private var player: PlayerStore
+    @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+
+    private var isCurrentlyPlaying: Bool {
+        player.currentEpisode?.id == episode.id && player.isPlaying
+    }
+    private var isQueued: Bool {
+        player.queue.contains { $0.id == episode.id }
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button {
+                deepLinkRouter.pendingContent = (kind: .podcastEpisode, id: episode.id)
+            } label: {
+                HStack(spacing: 12) {
+                    AsyncImage(url: episode.artworkUrl.flatMap(URL.init)) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: {
+                        Image(systemName: "mic.fill").foregroundStyle(.secondary)
+                    }
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(episode.showTitle).font(.caption).foregroundStyle(.secondary)
+                        Text(episode.title).font(.body).lineLimit(2)
+                        if let duration = episode.duration {
+                            Text(Duration.seconds(duration).formatted(.units(allowed: [.hours, .minutes])))
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            Spacer(minLength: 0)
+
+            Button {
+                Task { await player.load(episode) }
+            } label: {
+                Image(systemName: isCurrentlyPlaying ? "pause.circle.fill" : "play.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(Color.accentColor)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHidden(true)
+
+            Button {
+                if isQueued { player.removeFromQueue(id: episode.id) } else { player.enqueue(episode) }
+            } label: {
+                Image(systemName: isQueued ? "text.badge.minus" : "text.badge.plus")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHidden(true)
+        }
+        .overlay(alignment: .leading) {
+            Rectangle().fill(ContentKind.podcastEpisode.accentColor).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
+        }
+        .padding(.leading, 6)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(episode.title), \(episode.showTitle) podcast, saved \(savedItem.savedAt.formatted(.relative(presentation: .named)))."
+        )
+        .readAloudAction(episode.title)
+        .accessibilityAction(named: Text(isCurrentlyPlaying ? "Pause" : "Play")) {
+            Task { await player.load(episode) }
+        }
+        .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to Queue")) {
+            if isQueued { player.removeFromQueue(id: episode.id) } else { player.enqueue(episode) }
+        }
+        .contentActions(
+            id: episode.id, kind: .podcastEpisode, title: episode.title,
+            lastActivityAt: episode.lastActivityAt, url: episode.url,
+            onSaveToggle: { isSaved in
+                guard !isSaved else { return }
+                onUnsave()
+            }
+        )
     }
 }
 
@@ -356,6 +554,7 @@ struct FollowingView: View {
     @State private var items: [FollowedItem] = []
     @State private var isLoading = false
     @State private var error: String?
+    @AccessibilityFocusState private var summaryFocused: Bool
 
     var body: some View {
         Group {
@@ -370,47 +569,61 @@ struct FollowingView: View {
             } else {
                 List {
                     summaryHeader
+                        .accessibilityFocused($summaryFocused)
                     ForEach(items) { item in
-                        Button {
-                            deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Label(item.kind.displayName, systemImage: item.kind.systemImage)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Text(item.title)
-                                    if let activity = item.lastActivityAt {
-                                        RelativeDateLabel(date: activity)
-                                    }
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                                    .accessibilityHidden(true)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel(
-                            "\(item.title). \(item.kind.displayName). Following." +
-                            (item.lastActivityAt.map { ", last activity \($0.formatted(.relative(presentation: .named)))." } ?? "")
-                        )
-                        .accessibilityHint("Double-tap to open.")
-                        .accessibilityAction(named: Text("Open \(item.kind.displayName)")) {
-                            deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
-                        }
-                        .accessibilityAction(named: Text("Unfollow")) { unfollow(item) }
-                        .swipeActions {
-                            Button("Unfollow", role: .destructive) { unfollow(item) }
-                                .accessibilityHidden(true)
-                        }
+                        row(for: item)
                     }
                 }
+                .refreshable { await load(); SoundPlayer.shared.play(.refresh) }
             }
         }
         .task { await load() }
+    }
+
+    private func row(for item: FollowedItem) -> some View {
+        Button {
+            deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(item.kind.displayName, systemImage: item.kind.systemImage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(item.title)
+                    if let activity = item.lastActivityAt {
+                        RelativeDateLabel(date: activity)
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .leading) {
+            Rectangle().fill(item.kind.accentColor).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
+        }
+        .padding(.leading, 6)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(item.title). \(item.kind.displayName). Following." +
+            (item.lastActivityAt.map { ", last activity \($0.formatted(.relative(presentation: .named)))." } ?? "")
+        )
+        .accessibilityHint("Double-tap to open.")
+        .readAloudAction(item.title)
+        .accessibilityAction(named: Text("Open \(item.kind.displayName)")) {
+            deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
+        }
+        .contentActions(
+            id: item.id, kind: item.kind, title: item.title, lastActivityAt: item.lastActivityAt, url: item.url,
+            onFollowToggle: { isFollowing in
+                guard !isFollowing else { return }
+                items.removeAll { $0.id == item.id }
+                focusSummaryAfterDelay()
+            }
+        )
     }
 
     private var summaryHeader: some View {
@@ -426,11 +639,11 @@ struct FollowingView: View {
             }
     }
 
-    private func unfollow(_ item: FollowedItem) {
-        items.removeAll { $0.id == item.id }
-        PersistenceStore.shared.markUnfollowed(id: item.id)
-        guard let user = auth.user else { return }
-        Task { try? await APIClient.shared.flags.unfollow(nodeUuid: item.id, token: user.csrfToken) }
+    private func focusSummaryAfterDelay() {
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            summaryFocused = true
+        }
     }
 
     private func load() async {
