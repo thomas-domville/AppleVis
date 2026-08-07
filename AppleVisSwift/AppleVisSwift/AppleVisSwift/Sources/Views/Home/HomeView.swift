@@ -233,10 +233,17 @@ struct HomeView: View {
         return !groups.isDisjoint(with: networkStatus.degradedGroups)
     }
 
+    /// Deliberately brand-new topics only (no prior visit record) — the
+    /// same population the What's New card's "N new forum topics" counts.
+    /// This used to count every forum topic in `newItems`, including ones
+    /// that had merely picked up new replies since a prior visit, so this
+    /// strip's number could legitimately disagree with the very similar-
+    /// sounding figure right above it. Matching definitions means the two
+    /// numbers can never contradict each other.
     private var unreadForumTopics: [FeedItem] {
         vm.newItems.filter {
-            if case .forumTopic = $0 { return true }
-            return false
+            guard case .forumTopic = $0 else { return false }
+            return vm.newReplyCount(for: $0) == 0
         }
     }
 
@@ -513,8 +520,13 @@ private struct WhatsNewCard: View {
     }
 }
 
-// MARK: - Unread topics strip
+// MARK: - New topics strip
 
+/// Deliberately says "new forum topics," not "unread" — Home uses "new"
+/// everywhere else (NewCountBadge, the New feed filter, the What's New
+/// card right above this), and having the one "unread"-labeled element on
+/// the whole screen sit directly under a "new" one read as a second,
+/// possibly-different count rather than a shortcut into the same figure.
 private struct UnreadTopicsStrip: View {
     let count: Int
     let onTap: () -> Void
@@ -526,7 +538,7 @@ private struct UnreadTopicsStrip: View {
                     .fill(Color.accentColor)
                     .frame(width: 8, height: 8)
                     .accessibilityHidden(true)
-                Text("\(count) unread topic\(count == 1 ? "" : "s")")
+                Text("\(count) new forum topic\(count == 1 ? "" : "s")")
                     .font(.subheadline).fontWeight(.semibold)
                     .foregroundStyle(Color.accentColor)
                 Spacer()
@@ -538,7 +550,7 @@ private struct UnreadTopicsStrip: View {
             .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(count) unread topic\(count == 1 ? "" : "s"). Activate to jump to first unread.")
+        .accessibilityLabel("\(count) new forum topic\(count == 1 ? "" : "s"). Activate to jump to the first one.")
     }
 }
 
