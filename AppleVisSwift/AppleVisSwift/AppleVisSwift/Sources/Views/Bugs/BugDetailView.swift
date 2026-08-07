@@ -301,9 +301,12 @@ struct BugDetailView: View {
 
     private func metaRow(label: String, value: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
+            // A fixed width here clipped the label at large accessibility
+            // text sizes; minWidth keeps columns aligned at normal sizes
+            // without capping how wide the label is allowed to grow.
             Text(label + ":")
                 .font(.caption).fontWeight(.semibold).foregroundStyle(.secondary)
-                .frame(width: 80, alignment: .leading)
+                .frame(minWidth: 80, alignment: .leading)
             Text(value)
                 .font(.caption)
         }
@@ -455,7 +458,7 @@ struct BugDetailView: View {
     private func jumpToLastComment(proxy: ScrollViewProxy) async {
         if hasMoreComments { await loadMoreComments() }
         guard let lastId = self.detail?.comments.last?.id else { return }
-        withAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
+        withReduceMotionAwareAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
         try? await Task.sleep(for: .milliseconds(400))
         focusedCommentId = lastId
     }

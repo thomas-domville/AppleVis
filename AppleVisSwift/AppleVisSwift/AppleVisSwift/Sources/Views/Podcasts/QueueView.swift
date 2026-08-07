@@ -174,7 +174,7 @@ private struct QueueRow: View {
                 .font(.headline)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
-                .frame(width: 28, alignment: .trailing)
+                .frame(minWidth: 28, alignment: .trailing)
                 .accessibilityHidden(true)
 
             Button(action: onOpen) {

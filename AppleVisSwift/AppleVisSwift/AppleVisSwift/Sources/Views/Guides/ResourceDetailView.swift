@@ -362,7 +362,7 @@ struct ResourceDetailView: View {
     private func jumpToLastComment(proxy: ScrollViewProxy) async {
         if hasMoreComments { await loadMoreComments() }
         guard let lastId = self.detail?.comments.last?.id else { return }
-        withAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
+        withReduceMotionAwareAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
         try? await Task.sleep(for: .milliseconds(400))
         focusedCommentId = lastId
     }
@@ -421,6 +421,7 @@ struct CommentRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
+                AuthorAvatarView(name: authorName, diameter: 28)
                 Text(authorName).fontWeight(.medium)
                 Spacer()
                 RelativeDateLabel(date: date)

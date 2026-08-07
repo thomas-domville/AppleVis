@@ -1,4 +1,13 @@
 import SwiftUI
+import UIKit
+
+/// Every `withAnimation { proxy.scrollTo(...) }` call site in the app ran
+/// unconditionally, ignoring Reduce Motion entirely — passing `nil` to
+/// `withAnimation` still applies the change, just instantly instead of
+/// animated, which is exactly what Reduce Motion asks for.
+func withReduceMotionAwareAnimation<Result>(_ body: () throws -> Result) rethrows -> Result {
+    try withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .default, body)
+}
 
 /// Shared comments/reviews-section heading used across all content-detail
 /// screens (forum topics, apps, podcast episodes, blog posts, resources).

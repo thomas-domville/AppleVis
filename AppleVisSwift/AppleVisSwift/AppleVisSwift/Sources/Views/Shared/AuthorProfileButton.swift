@@ -1,5 +1,51 @@
 import SwiftUI
 
+/// Deterministic per-author color, hashed from their name — matches RN's
+/// `hashAuthorColor` exactly (same 8-color palette and hash function) so
+/// the same author gets the same color here as they did there. Purely a
+/// sighted/low-vision visual cue — RN marked the whole avatar+name row
+/// `accessibilityElementsHidden`, since VoiceOver already gets the name
+/// from the row's own accessibility label.
+enum AuthorAvatarColor {
+    private static let palette: [Color] = [
+        Color(red: 0x3b / 255, green: 0x82 / 255, blue: 0xf6 / 255),
+        Color(red: 0x8b / 255, green: 0x5c / 255, blue: 0xf6 / 255),
+        Color(red: 0x10 / 255, green: 0xb9 / 255, blue: 0x81 / 255),
+        Color(red: 0xf5 / 255, green: 0x9e / 255, blue: 0x0b / 255),
+        Color(red: 0xef / 255, green: 0x44 / 255, blue: 0x44 / 255),
+        Color(red: 0xec / 255, green: 0x48 / 255, blue: 0x99 / 255),
+        Color(red: 0x06 / 255, green: 0xb6 / 255, blue: 0xd4 / 255),
+        Color(red: 0x84 / 255, green: 0xcc / 255, blue: 0x16 / 255),
+    ]
+
+    static func color(for name: String) -> Color {
+        var h: UInt32 = 0
+        for scalar in name.unicodeScalars {
+            h = (h &* 31 &+ scalar.value) & 0xffff
+        }
+        return palette[Int(h) % palette.count]
+    }
+}
+
+/// Circular colored initial — every comment/reply/review row in RN had one
+/// of these; Swift had none anywhere, just plain author name text.
+struct AuthorAvatarView: View {
+    let name: String
+    var diameter: CGFloat = 34
+
+    var body: some View {
+        Circle()
+            .fill(AuthorAvatarColor.color(for: name))
+            .frame(width: diameter, height: diameter)
+            .overlay {
+                Text(String(name.trimmingCharacters(in: .whitespaces).first ?? "?").uppercased())
+                    .font(.system(size: diameter * 0.44, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+            .accessibilityHidden(true)
+    }
+}
+
 /// Tappable author name that presents a public profile sheet. Shows plain
 /// text (non-interactive) when `authorId` is empty, since there's nothing to
 /// look up.
@@ -7,17 +53,18 @@ struct AuthorProfileButton: View {
     let name: String
     let authorId: String
     var font: Font = .subheadline
+    var showAvatar: Bool = false
 
     @State private var showProfile = false
 
     var body: some View {
         if authorId.isEmpty {
-            Text(name).font(font)
+            label
         } else {
             Button {
                 showProfile = true
             } label: {
-                Text(name).font(font)
+                label
             }
             .buttonStyle(.plain)
             .accessibilityLabel(name)
@@ -25,6 +72,18 @@ struct AuthorProfileButton: View {
             .sheet(isPresented: $showProfile) {
                 AuthorProfileSheet(authorId: authorId, fallbackName: name)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var label: some View {
+        if showAvatar {
+            HStack(spacing: 8) {
+                AuthorAvatarView(name: name, diameter: 28)
+                Text(name).font(font)
+            }
+        } else {
+            Text(name).font(font)
         }
     }
 }

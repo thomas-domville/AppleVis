@@ -51,7 +51,7 @@ struct GuidedExperienceView: View {
                                     .transition(.opacity)
                             }
                             Button(showExplainMore ? "Show Less" : "Explain More") {
-                                withAnimation { showExplainMore.toggle() }
+                                withReduceMotionAwareAnimation { showExplainMore.toggle() }
                             }
                             .font(.subheadline)
                         }

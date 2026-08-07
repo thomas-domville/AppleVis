@@ -31,7 +31,7 @@ struct OnboardingView: View {
     }
 
     private func nextStep() {
-        withAnimation { step = min(step + 1, totalSteps - 1) }
+        withReduceMotionAwareAnimation { step = min(step + 1, totalSteps - 1) }
         Task {
             try? await Task.sleep(for: .milliseconds(350))
             isStepHeaderFocused = true

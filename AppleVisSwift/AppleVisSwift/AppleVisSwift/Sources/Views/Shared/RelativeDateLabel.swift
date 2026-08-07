@@ -22,6 +22,9 @@ struct ActivityCountLabel: View {
 }
 
 extension View {
+    /// Purely decorative — every place this is used also states "new"/
+    /// "unread" in words elsewhere (the row's own accessibility label), so
+    /// this dot would otherwise reach VoiceOver as an unlabeled element.
     func unreadIndicator(_ isUnread: Bool) -> some View {
         overlay(alignment: .topLeading) {
             if isUnread {
@@ -29,6 +32,7 @@ extension View {
                     .fill(Color.accentColor)
                     .frame(width: 8, height: 8)
                     .offset(x: -4, y: -4)
+                    .accessibilityHidden(true)
             }
         }
     }

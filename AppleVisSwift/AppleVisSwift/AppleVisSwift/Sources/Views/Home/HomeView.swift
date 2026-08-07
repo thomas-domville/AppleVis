@@ -294,7 +294,7 @@ struct HomeView: View {
                         message: vm.newActivitySummary,
                         onTap: {
                             guard let first = vm.newItems.first else { return }
-                            withAnimation { proxy.scrollTo(first.id, anchor: .top) }
+                            withReduceMotionAwareAnimation { proxy.scrollTo(first.id, anchor: .top) }
                         },
                         onDismiss: { vm.isNewActivityDismissed = true }
                     )
@@ -305,7 +305,7 @@ struct HomeView: View {
 
                 if let firstUnread = unreadForumTopics.first {
                     UnreadTopicsStrip(count: unreadForumTopics.count) {
-                        withAnimation { proxy.scrollTo(firstUnread.id, anchor: .top) }
+                        withReduceMotionAwareAnimation { proxy.scrollTo(firstUnread.id, anchor: .top) }
                     }
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     .listRowSeparator(.hidden)

@@ -126,21 +126,33 @@ struct SegmentedHTMLView: View {
                 .font(level <= 2 ? .title3.weight(.semibold) : .headline)
                 .accessibilityAddTraits(.isHeader)
         case .quote:
+            // Matches RN's quote styling (amber border + tinted background,
+            // topic/[id].tsx) — Swift's was a plain gray border with no
+            // background tint, much less visually distinct from prose.
             HTMLTextView(html: segment.html)
                 .padding(.leading, 12)
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(red: 0xf5 / 255, green: 0x9e / 255, blue: 0x0b / 255).opacity(0.08), in: RoundedRectangle(cornerRadius: 4))
                 .overlay(alignment: .leading) {
-                    Rectangle().fill(Color.secondary.opacity(0.4)).frame(width: 3)
+                    Rectangle().fill(Color(red: 0xf5 / 255, green: 0x9e / 255, blue: 0x0b / 255)).frame(width: 3)
                 }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Quoted: \(segment.plainText)")
         case .code:
-            HTMLTextView(html: segment.html)
-                .font(.system(.footnote, design: .monospaced))
-                .padding(8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 6))
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Code: \(segment.plainText)")
+            VStack(alignment: .leading, spacing: 4) {
+                Text("CODE")
+                    .font(.caption2).fontWeight(.bold)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                HTMLTextView(html: segment.html)
+                    .font(.system(.footnote, design: .monospaced))
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 6))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Code: \(segment.plainText)")
         case .prose:
             HTMLTextView(html: segment.html)
         }
@@ -185,7 +197,7 @@ private struct ScrollLinkButton: View {
 
     var body: some View {
         Button {
-            withAnimation { proxy?.scrollTo(targetId, anchor: .top) }
+            withReduceMotionAwareAnimation { proxy?.scrollTo(targetId, anchor: .top) }
         } label: {
             HStack {
                 Text(title).foregroundStyle(Color.accentColor)

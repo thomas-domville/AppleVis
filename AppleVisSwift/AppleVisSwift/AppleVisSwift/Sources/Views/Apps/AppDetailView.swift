@@ -552,7 +552,7 @@ struct AppDetailView: View {
     private func jumpToLastReview(proxy: ScrollViewProxy) async {
         if hasMoreReviews { await loadMoreReviews() }
         guard let lastId = self.detail?.reviews.last?.id else { return }
-        withAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
+        withReduceMotionAwareAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
         try? await Task.sleep(for: .milliseconds(400))
         focusedReviewId = lastId
     }
@@ -603,6 +603,7 @@ struct AppReviewRow: View {
             // full review body inside the same accessibility label as the
             // header, unlike ForumReply/CommentRow.
             HStack {
+                AuthorAvatarView(name: review.authorName, diameter: 28)
                 Text(review.authorName).fontWeight(.medium)
                 Spacer()
                 RelativeDateLabel(date: review.createdAt)

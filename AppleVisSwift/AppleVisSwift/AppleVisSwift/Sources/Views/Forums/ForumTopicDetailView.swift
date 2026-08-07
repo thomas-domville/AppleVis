@@ -417,7 +417,7 @@ struct ForumTopicDetailView: View {
     private func jumpToLastReply(proxy: ScrollViewProxy) async {
         if hasMoreReplies { await loadMoreReplies() }
         guard let lastId = self.detail?.replies.last?.id else { return }
-        withAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
+        withReduceMotionAwareAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
         // Scrolling the viewport doesn't move VoiceOver's focus on its own —
         // without this, the visual position changes but a VoiceOver user's
         // swipe cursor stays exactly where it was, defeating the point.
@@ -524,7 +524,7 @@ struct ReplyView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                AuthorProfileButton(name: reply.authorName, authorId: reply.authorId, font: .subheadline.weight(.medium))
+                AuthorProfileButton(name: reply.authorName, authorId: reply.authorId, font: .subheadline.weight(.medium), showAvatar: true)
                 Spacer()
                 RelativeDateLabel(date: reply.createdAt)
             }
