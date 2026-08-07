@@ -10,9 +10,27 @@ struct WizardStepIndicator: View {
     let total: Int
     let title: String
     var isFocused: AccessibilityFocusState<Bool>.Binding? = nil
+    /// RN's `WizardLayout` shows an animated top progress *stripe* colored
+    /// per-wizard-type in addition to the step dots — this text-only
+    /// indicator had no visual progress cue at all, which is meaningfully
+    /// less informative for low-vision users who don't run VoiceOver.
+    var accentColor: Color? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
+            if total > 0 {
+                GeometryReader { geo in
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.2))
+                        .overlay(alignment: .leading) {
+                            Capsule()
+                                .fill(accentColor ?? Color.accentColor)
+                                .frame(width: geo.size.width * CGFloat(step) / CGFloat(total))
+                        }
+                }
+                .frame(height: 4)
+                .accessibilityHidden(true)
+            }
             Text("Step \(step) of \(total)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -55,6 +73,53 @@ struct OptionalStepAnnouncement: ViewModifier {
             content.accessibilityLabel("\(title). Step \(stepInfo.current) of \(stepInfo.total). \(subtitle)")
         } else {
             content
+        }
+    }
+}
+
+/// Post-submit confirmation screen shown by a wizard after a successful send,
+/// matching RN's shared `ThankYouScreen` (`app/submit-blog/review.tsx`) —
+/// previously wizards just toasted and dismissed immediately, giving VoiceOver
+/// users no confirmation focus point and sighted users no visual payoff.
+struct ThankYouView: View {
+    let icon: String
+    let heading: String
+    let message: String
+    let doneLabel: String
+    let onDone: () -> Void
+    @AccessibilityFocusState private var isHeadingFocused: Bool
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Spacer()
+            Image(systemName: icon)
+                .font(.system(size: 44))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 88, height: 88)
+                .background(Color.accentColor.opacity(0.15), in: Circle())
+                .accessibilityHidden(true)
+
+            Text(heading)
+                .font(.title.bold())
+                .multilineTextAlignment(.center)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityFocused($isHeadingFocused)
+
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            Button(doneLabel, action: onDone)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+
+            Spacer()
+        }
+        .padding(32)
+        .task {
+            try? await Task.sleep(for: .milliseconds(350))
+            isHeadingFocused = true
         }
     }
 }
