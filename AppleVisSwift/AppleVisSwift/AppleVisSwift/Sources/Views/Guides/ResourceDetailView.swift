@@ -450,6 +450,25 @@ struct CommentRow: View {
         .padding(.horizontal)
         .padding(.vertical, 8)
         .contextMenu {
+            // Mirrors the accessibility actions above exactly — those used
+            // to be VoiceOver-only, which meant a sighted or low-vision
+            // user doing an ordinary long-press saw none of them.
+            if onReplyTo != nil {
+                Button { onReplyTo?() } label: {
+                    Label("Reply to this Comment", systemImage: "arrowshape.turn.up.left")
+                }
+            }
+            Button { copyText() } label: {
+                Label("Copy Comment Text", systemImage: "doc.on.doc")
+            }
+            Button { presentShareSheet() } label: {
+                Label("Share Comment", systemImage: "square.and.arrow.up")
+            }
+            if supportsReport {
+                Button { toast.warning("Reporting is coming once the Drupal Flags API is confirmed.") } label: {
+                    Label("Report Comment", systemImage: "flag")
+                }
+            }
             if canDelete {
                 Button { showEditSheet = true } label: {
                     Label("Edit Comment", systemImage: "pencil")

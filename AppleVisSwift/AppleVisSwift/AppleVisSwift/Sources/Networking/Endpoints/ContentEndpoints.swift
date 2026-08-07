@@ -224,7 +224,7 @@ struct BugReportEndpoints {
             if let commentsResponse = try? await commentsRes {
                 detail.comments = commentsResponse.data.map { n in
                     let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
-                    return BugComment(id: n.id, authorName: c.authorName, body: c.body, createdAt: c.createdAt)
+                    return BugComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
                 }
             }
             return detail
@@ -239,8 +239,31 @@ struct BugReportEndpoints {
         )
         return response.data.map { n in
             let c = Mappers.genericComment(n, included: response.included ?? [])
-            return BugComment(id: n.id, authorName: c.authorName, body: c.body, createdAt: c.createdAt)
+            return BugComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
         }
+    }
+
+    /// Submits a new bug report comment — previously bug comments were
+    /// read-only (fetched and displayed, but with no way to post one),
+    /// unlike every other content type's comment thread.
+    @discardableResult
+    func submitComment(platform: BugPlatform, bugId: String, body: String, csrfToken: String) async throws -> BugComment {
+        let bundle = commentBundle(for: platform)
+        let response = try await client.jsonAPICreate(
+            "comment/\(bundle)",
+            type: "comment--\(bundle)",
+            attributes: [
+                "subject": AnyEncodable("Comment"),
+                "comment_body": AnyEncodable(RichTextValue(value: body, format: "basic_html")),
+            ],
+            relationships: [
+                "entity_id": JsonApiRelationshipRef(type: "node--\(nodeType(for: platform))", id: bugId),
+                "comment_type": JsonApiRelationshipRef(type: "comment_type--comment_type", id: bundle),
+            ],
+            headers: ["X-CSRF-Token": csrfToken]
+        )
+        let c = Mappers.genericComment(response.data, included: response.included ?? [])
+        return BugComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
     }
 
     private func commentBundle(for platform: BugPlatform) -> String {

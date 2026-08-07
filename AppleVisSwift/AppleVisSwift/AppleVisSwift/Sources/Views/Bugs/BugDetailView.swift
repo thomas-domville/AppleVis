@@ -7,12 +7,15 @@ struct BugDetailView: View {
     @State private var error: String?
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
+    @State private var showCompose = false
+    @State private var quotedComment: BugComment?
     @State private var bugSummary: String?
     @State private var isSummarizingBug = false
     @State private var discussionSummary: String?
     @State private var isSummarizingDiscussion = false
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedCommentId: String?
+    @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
 
@@ -93,7 +96,13 @@ struct BugDetailView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                if auth.isSignedIn {
+                    Button { showCompose = true } label: {
+                        Image(systemName: "square.and.pencil")
+                    }
+                    .accessibilityLabel("Add comment")
+                }
                 Link(destination: Self.feedbackAssistantURL) {
                     Image(systemName: "flag")
                 }
@@ -103,6 +112,16 @@ struct BugDetailView: View {
         }
         .safeAreaInset(edge: .bottom) {
             ContentDetailActions(id: detail.id, kind: .bugReport, title: detail.title, lastActivityAt: detail.changedAt, url: detail.url)
+        }
+        .sheet(isPresented: $showCompose) {
+            ComposeBugCommentView(platform: detail.platform, bugId: detail.id, title: detail.title) { comment in
+                self.detail?.comments.append(comment)
+            }
+        }
+        .sheet(item: $quotedComment) { target in
+            ComposeBugCommentView(platform: detail.platform, bugId: detail.id, title: detail.title, quotedComment: target) { comment in
+                self.detail?.comments.append(comment)
+            }
         }
     }
 
@@ -290,6 +309,12 @@ struct BugDetailView: View {
         }
     }
 
+    /// Matches BugReportEndpoints' private `commentBundle(for:)` — Edit/
+    /// Delete need this comment-type string to hit the right Drupal bundle.
+    private func bugCommentType(_ platform: BugPlatform) -> String {
+        platform == .ios ? "comment_node_ios_bug_report" : "comment_node_os_x_bug_report"
+    }
+
     private func sectionHeading(_ text: String) -> some View {
         Text(text).font(.headline)
             .padding(.horizontal)
@@ -313,7 +338,25 @@ struct BugDetailView: View {
                 CommentRow(
                     authorName: comment.authorName, text: comment.body, date: comment.createdAt,
                     index: index, total: detail.comments.count,
-                    commentId: comment.id,
+                    subject: comment.subject, parentTitle: detail.title,
+                    commentId: comment.id, authorId: comment.authorId, commentType: bugCommentType(detail.platform),
+                    onDelete: {
+                        self.detail?.comments.removeAll { $0.id == comment.id }
+                    },
+                    onEdit: { newText in
+                        guard let idx = self.detail?.comments.firstIndex(where: { $0.id == comment.id }) else { return }
+                        self.detail?.comments[idx] = BugComment(
+                            id: comment.id, authorName: comment.authorName, authorId: comment.authorId,
+                            subject: comment.subject, body: newText, createdAt: comment.createdAt
+                        )
+                    },
+                    onReplyTo: {
+                        guard auth.isSignedIn else {
+                            toast.warning("Sign in to reply to comments.")
+                            return
+                        }
+                        quotedComment = comment
+                    },
                     focusBinding: $focusedCommentId
                 )
                 .id(comment.id)
@@ -415,5 +458,75 @@ struct BugDetailView: View {
         withAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
         try? await Task.sleep(for: .milliseconds(400))
         focusedCommentId = lastId
+    }
+}
+
+// MARK: - Compose bug comment
+
+/// Bug report comments were read-only until now — no submitComment endpoint
+/// existed at all, unlike every other content type. Matches the same
+/// Compose*CommentView pattern used by Guides/Blogs/Podcasts.
+struct ComposeBugCommentView: View {
+    let platform: BugPlatform
+    let bugId: String
+    let title: String
+    var quotedComment: BugComment? = nil
+    let onPosted: (BugComment) -> Void
+
+    @State private var commentText: String
+    @State private var isSubmitting = false
+    @State private var submitError: String?
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var auth: AuthStore
+    @EnvironmentObject private var toast: ToastStore
+
+    init(platform: BugPlatform, bugId: String, title: String, quotedComment: BugComment? = nil, onPosted: @escaping (BugComment) -> Void) {
+        self.platform = platform
+        self.bugId = bugId
+        self.title = title
+        self.quotedComment = quotedComment
+        self.onPosted = onPosted
+        if let quotedComment {
+            _commentText = State(initialValue: QuotedReply.prefix(authorName: quotedComment.authorName, body: quotedComment.body))
+        } else {
+            _commentText = State(initialValue: "")
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(quotedComment != nil ? "Replying to \(quotedComment!.authorName) — Re: \(title)" : "Re: \(title)")
+                    .font(.subheadline).foregroundStyle(.secondary).padding()
+                TextEditor(text: $commentText).padding()
+                if let err = submitError {
+                    Text(err).foregroundStyle(.red).padding()
+                }
+            }
+            .navigationTitle("Add Comment")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Post") { Task { await submit() } }
+                        .disabled(commentText.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
+                }
+            }
+        }
+    }
+
+    private func submit() async {
+        guard let user = auth.user else { return }
+        isSubmitting = true; submitError = nil
+        do {
+            let comment = try await APIClient.shared.bugReports.submitComment(
+                platform: platform, bugId: bugId, body: commentText, csrfToken: user.csrfToken
+            )
+            toast.success("Comment posted")
+            onPosted(comment)
+            dismiss()
+        } catch let e as APIError { submitError = e.localizedDescription
+        } catch { submitError = "Failed to post comment." }
+        isSubmitting = false
     }
 }
