@@ -33,12 +33,32 @@ struct ContentActionsModifier: ViewModifier {
     /// claims to be saved/followed after the user just toggled it off.
     var onSaveToggle: ((Bool) -> Void)? = nil
     var onFollowToggle: ((Bool) -> Void)? = nil
+    /// Current total comment/reply/review count — lets this modifier offer
+    /// "Mark as Read" itself (RN's browse-list FeedCard had this on every
+    /// row with new activity, not just Home's feed row). Omit to hide the
+    /// action entirely.
+    var currentCommentCount: Int? = nil
+    /// Real "Add New Comment" handler for the content types RN wired one
+    /// to directly from the list (Forums, Podcasts — opens a reply/comment
+    /// composer without navigating in first). Every other kind gets RN's
+    /// exact original stub behavior automatically when this is left nil.
+    var onAddComment: (() -> Void)? = nil
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var tips: TipStore
     @State private var isSaved = false
     @State private var isFollowing = false
+    @State private var showBrowser = false
+
+    private var newCount: Int {
+        guard let currentCommentCount else { return 0 }
+        return PersistenceStore.shared.newReplyCount(kind: kind, id: id, currentCount: currentCommentCount)
+    }
+
+    private var addCommentLabel: String {
+        kind == .appListing ? "Write a Review" : "Add New Comment"
+    }
 
     func body(content: Content) -> some View {
         content
@@ -79,6 +99,14 @@ struct ContentActionsModifier: ViewModifier {
                 }
             }
             .contextMenu {
+                if newCount > 0 {
+                    Button { markAsRead() } label: {
+                        Label("Mark as Read", systemImage: "checkmark.circle")
+                    }
+                }
+                Button { addComment() } label: {
+                    Label(addCommentLabel, systemImage: "bubble.left")
+                }
                 Button {
                     toggleSave()
                 } label: {
@@ -91,6 +119,11 @@ struct ContentActionsModifier: ViewModifier {
                         Label(isFollowing ? "Unfollow" : "Follow", systemImage: isFollowing ? "bell.slash" : "bell")
                     }
                 }
+                if url.flatMap(URL.init) != nil {
+                    Button { showBrowser = true } label: {
+                        Label("Open in Browser", systemImage: "safari")
+                    }
+                }
                 if let url, let shareURL = URL(string: url) {
                     ShareLink(item: shareURL, subject: Text(title)) {
                         Label("Share", systemImage: "square.and.arrow.up")
@@ -100,6 +133,16 @@ struct ContentActionsModifier: ViewModifier {
             .accessibilityAction(named: Text(isSaved ? "Unsave \(kind.displayName)" : "Save \(kind.displayName)")) {
                 toggleSave()
             }
+            .modifier(ConditionalAccessibilityAction(isActive: newCount > 0, name: "Mark as Read") {
+                markAsRead()
+            })
+            .accessibilityAction(named: Text(addCommentLabel)) { addComment() }
+            .modifier(ConditionalAccessibilityAction(
+                isActive: url.flatMap(URL.init) != nil,
+                name: "Open \(kind.displayName) in Browser"
+            ) {
+                showBrowser = true
+            })
             .modifier(ConditionalAccessibilityAction(
                 isActive: url.flatMap(URL.init) != nil,
                 name: "Share \(kind.displayName)"
@@ -112,10 +155,37 @@ struct ContentActionsModifier: ViewModifier {
             ) {
                 Task { await toggleFollow() }
             })
+            .sheet(isPresented: $showBrowser) {
+                if let url, let shareURL = URL(string: url) {
+                    SafariView(url: shareURL)
+                }
+            }
             .onAppear {
                 isSaved = PersistenceStore.shared.isSaved(id: id)
                 isFollowing = PersistenceStore.shared.isFollowed(id: id)
             }
+    }
+
+    /// Matches RN's exact stub for content types with no real "reply from
+    /// the list" flow (Guides/Blogs/Bug Reports): "Open the item to add a
+    /// new comment." Forums/Podcasts pass a real `onAddComment` handler
+    /// that opens a composer directly instead.
+    private func addComment() {
+        guard auth.isSignedIn else {
+            toast.warning("Sign in to add a new comment.")
+            return
+        }
+        guard let onAddComment else {
+            toast.warning("Open the item to add a new comment.")
+            return
+        }
+        onAddComment()
+    }
+
+    private func markAsRead() {
+        guard let currentCommentCount else { return }
+        PersistenceStore.shared.stampItemVisit(id: FeedItem.visitKey(kind: kind, contentId: id), commentCount: currentCommentCount)
+        UIAccessibility.post(notification: .announcement, argument: "Marked as read.")
     }
 
     /// ShareLink has no programmatic trigger, so the explicit VoiceOver
@@ -209,11 +279,13 @@ extension View {
     func contentActions(
         id: String, kind: ContentKind, title: String,
         lastActivityAt: Date? = nil, url: String? = nil, supportsFollow: Bool = true,
-        onSaveToggle: ((Bool) -> Void)? = nil, onFollowToggle: ((Bool) -> Void)? = nil
+        onSaveToggle: ((Bool) -> Void)? = nil, onFollowToggle: ((Bool) -> Void)? = nil,
+        currentCommentCount: Int? = nil, onAddComment: (() -> Void)? = nil
     ) -> some View {
         modifier(ContentActionsModifier(
             id: id, kind: kind, title: title, lastActivityAt: lastActivityAt, url: url, supportsFollow: supportsFollow,
-            onSaveToggle: onSaveToggle, onFollowToggle: onFollowToggle
+            onSaveToggle: onSaveToggle, onFollowToggle: onFollowToggle,
+            currentCommentCount: currentCommentCount, onAddComment: onAddComment
         ))
     }
 }

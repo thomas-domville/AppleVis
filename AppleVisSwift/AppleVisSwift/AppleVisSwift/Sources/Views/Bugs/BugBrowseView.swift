@@ -194,7 +194,10 @@ struct BugReportRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(bugLabel)
         .readAloudAction(bugLabel)
-        .contentActions(id: bug.id, kind: .bugReport, title: bug.title, lastActivityAt: bug.changedAt, url: bug.url)
+        .contentActions(
+            id: bug.id, kind: .bugReport, title: bug.title, lastActivityAt: bug.changedAt, url: bug.url,
+            currentCommentCount: bug.commentCount
+        )
         .cardDensityPadding()
     }
 

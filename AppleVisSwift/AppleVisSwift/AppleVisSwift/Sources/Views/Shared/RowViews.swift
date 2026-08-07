@@ -23,6 +23,7 @@ struct NewCountBadge: View {
 
 struct ForumTopicRow: View {
     let topic: ForumTopic
+    @State private var showComposeReply = false
 
     /// Was previously computed but never surfaced anywhere — a VoiceOver
     /// user browsing a list had no way to tell they'd already saved or
@@ -75,8 +76,15 @@ struct ForumTopicRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(topicLabel)
         .readAloudAction(topicLabel)
-        .contentActions(id: topic.id, kind: .forumTopic, title: topic.title, lastActivityAt: topic.lastActivityAt, url: topic.url)
+        .contentActions(
+            id: topic.id, kind: .forumTopic, title: topic.title, lastActivityAt: topic.lastActivityAt, url: topic.url,
+            currentCommentCount: topic.replyCount,
+            onAddComment: { showComposeReply = true }
+        )
         .cardDensityPadding()
+        .sheet(isPresented: $showComposeReply) {
+            ComposeReplyView(topicId: topic.id, topicTitle: topic.title) { _ in }
+        }
     }
 
     private var topicLabel: String {
@@ -90,6 +98,7 @@ struct ForumTopicRow: View {
 struct PodcastEpisodeRow: View {
     let episode: PodcastEpisode
     @EnvironmentObject private var player: PlayerStore
+    @State private var showComposeComment = false
 
     var body: some View {
         NavigationLink(value: episode) {
@@ -141,8 +150,15 @@ struct PodcastEpisodeRow: View {
         .accessibilityAction(named: Text(isCurrentlyPlaying ? "Pause" : "Play")) {
             Task { await player.load(episode) }
         }
-        .contentActions(id: episode.id, kind: .podcastEpisode, title: episode.title, lastActivityAt: episode.lastActivityAt, url: episode.url)
+        .contentActions(
+            id: episode.id, kind: .podcastEpisode, title: episode.title, lastActivityAt: episode.lastActivityAt, url: episode.url,
+            currentCommentCount: episode.commentCount,
+            onAddComment: { showComposeComment = true }
+        )
         .cardDensityPadding()
+        .sheet(isPresented: $showComposeComment) {
+            ComposePodcastCommentView(episodeId: episode.id, title: episode.title) { _ in }
+        }
     }
 
     private var isCurrentlyPlaying: Bool {
@@ -201,7 +217,10 @@ struct AppListingRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(appLabel)
         .readAloudAction(appLabel)
-        .contentActions(id: app.id, kind: .appListing, title: app.name, lastActivityAt: app.lastActivityAt, url: app.url)
+        .contentActions(
+            id: app.id, kind: .appListing, title: app.name, lastActivityAt: app.lastActivityAt, url: app.url,
+            currentCommentCount: app.reviewCount
+        )
         .cardDensityPadding()
     }
 
@@ -244,7 +263,10 @@ struct ResourceRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(resourceLabel)
         .readAloudAction(resourceLabel)
-        .contentActions(id: resource.id, kind: .resource, title: resource.title, lastActivityAt: resource.updatedAt, url: resource.url)
+        .contentActions(
+            id: resource.id, kind: .resource, title: resource.title, lastActivityAt: resource.updatedAt, url: resource.url,
+            currentCommentCount: resource.commentCount
+        )
         .cardDensityPadding()
     }
 
@@ -292,7 +314,10 @@ struct BlogPostRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(postLabel)
         .readAloudAction(postLabel)
-        .contentActions(id: post.id, kind: .blogPost, title: post.title, lastActivityAt: post.lastActivityAt, url: post.url)
+        .contentActions(
+            id: post.id, kind: .blogPost, title: post.title, lastActivityAt: post.lastActivityAt, url: post.url,
+            currentCommentCount: post.commentCount
+        )
         .cardDensityPadding()
     }
 
