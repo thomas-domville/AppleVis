@@ -221,7 +221,8 @@ struct AppDetailView: View {
                                 }
                             }
                             .accessibilityElement(children: .combine)
-                            .accessibilityLabel("\(app.appName). Double-tap to open in the App Store.")
+                            .accessibilityLabel(app.appName)
+                            .accessibilityHint("Double-tap to open in the App Store.")
                         }
                     }
                 }

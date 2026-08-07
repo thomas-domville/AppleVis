@@ -172,7 +172,8 @@ struct EpisodeDetailView: View {
             } label: {
                 Image(systemName: "arrow.down.circle.fill")
             }
-            .accessibilityLabel("Downloaded. Double-tap to remove download.")
+            .accessibilityLabel("Downloaded")
+            .accessibilityHint("Double-tap to remove download.")
         } else if downloads.activeDownloads.contains(episode.id) {
             ProgressView(value: downloads.progress[episode.id] ?? 0)
                 .progressViewStyle(.circular)
@@ -338,7 +339,8 @@ struct ChapterRow: View {
             .padding(.vertical, 8)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(chapter.title), starts at \(formatTime(chapter.startTime)). Double-tap to seek.")
+        .accessibilityLabel("\(chapter.title), starts at \(formatTime(chapter.startTime))")
+        .accessibilityHint("Double-tap to seek.")
     }
 
     private func formatTime(_ seconds: TimeInterval) -> String {

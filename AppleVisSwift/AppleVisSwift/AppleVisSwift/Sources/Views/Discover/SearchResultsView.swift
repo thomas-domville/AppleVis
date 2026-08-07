@@ -44,7 +44,9 @@ struct SearchResultsView: View {
                 if !results.failedCategories.isEmpty {
                     Section {
                         HStack(spacing: 10) {
-                            Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundStyle(.orange)
+                                .accessibilityHidden(true)
                             Text("Some results may be missing: \(results.failedCategories.joined(separator: ", ")).")
                                 .font(.footnote)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -52,6 +54,9 @@ struct SearchResultsView: View {
                             Button("Retry", action: onRetry)
                                 .font(.footnote).fontWeight(.semibold)
                         }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Some results may be missing: \(results.failedCategories.joined(separator: ", ")).")
+                        .accessibilityAction(named: Text("Retry"), onRetry)
                     }
                     .listRowSeparator(.hidden)
                 }

@@ -469,6 +469,10 @@ private struct SourceErrorBanner: View {
         .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Some sources could not be loaded: \(failedSources.joined(separator: ", ")).")
+        // .combine merges the nested "Retry Now" Button into this single
+        // element, which can leave it unreachable as its own VoiceOver
+        // stop — an explicit action guarantees it's still triggerable.
+        .accessibilityAction(named: Text("Retry Now"), onRetry)
     }
 }
 

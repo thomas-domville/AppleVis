@@ -20,7 +20,8 @@ struct AuthorProfileButton: View {
                 Text(name).font(font)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(name). Double-tap to view profile.")
+            .accessibilityLabel(name)
+            .accessibilityHint("Double-tap to view profile.")
             .sheet(isPresented: $showProfile) {
                 AuthorProfileSheet(authorId: authorId, fallbackName: name)
             }

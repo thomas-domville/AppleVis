@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import UIKit
 
 @MainActor
 final class ToastStore: ObservableObject {
@@ -32,6 +33,11 @@ final class ToastStore: ObservableObject {
     func show(_ message: String, kind: Toast.Kind = .success) {
         current = Toast(message: message, kind: kind)
         SoundPlayer.shared.play(kind == .success ? .success : .error)
+        // The toast itself renders on screen with its own distinct text,
+        // but the sound alone doesn't tell a VoiceOver user *which*
+        // toast fired ("Saved" vs. "Removed from Saved" vs. "Couldn't
+        // update follow status" all just played the same chime otherwise).
+        UIAccessibility.post(notification: .announcement, argument: message)
         Task {
             try? await Task.sleep(for: .seconds(3))
             current = nil
