@@ -23,6 +23,7 @@ struct NewCountBadge: View {
 
 struct ForumTopicRow: View {
     let topic: ForumTopic
+    var onDelete: (() -> Void)? = nil
     @State private var showComposeReply = false
 
     /// Was previously computed but never surfaced anywhere — a VoiceOver
@@ -79,7 +80,8 @@ struct ForumTopicRow: View {
         .contentActions(
             id: topic.id, kind: .forumTopic, title: topic.title, lastActivityAt: topic.lastActivityAt, url: topic.url,
             currentCommentCount: topic.replyCount,
-            onAddComment: { showComposeReply = true }
+            onAddComment: { showComposeReply = true },
+            authorId: topic.authorId, onContentDeleted: onDelete
         )
         .cardDensityPadding()
         .sheet(isPresented: $showComposeReply) {
@@ -97,6 +99,7 @@ struct ForumTopicRow: View {
 
 struct PodcastEpisodeRow: View {
     let episode: PodcastEpisode
+    var onDelete: (() -> Void)? = nil
     @EnvironmentObject private var player: PlayerStore
     @State private var showComposeComment = false
 
@@ -153,7 +156,8 @@ struct PodcastEpisodeRow: View {
         .contentActions(
             id: episode.id, kind: .podcastEpisode, title: episode.title, lastActivityAt: episode.lastActivityAt, url: episode.url,
             currentCommentCount: episode.commentCount,
-            onAddComment: { showComposeComment = true }
+            onAddComment: { showComposeComment = true },
+            onContentDeleted: onDelete
         )
         .cardDensityPadding()
         .sheet(isPresented: $showComposeComment) {
@@ -181,6 +185,7 @@ struct PodcastEpisodeRow: View {
 
 struct AppListingRow: View {
     let app: AppListing
+    var onDelete: (() -> Void)? = nil
 
     var body: some View {
         NavigationLink(value: app) {
@@ -219,7 +224,7 @@ struct AppListingRow: View {
         .readAloudAction(appLabel)
         .contentActions(
             id: app.id, kind: .appListing, title: app.name, lastActivityAt: app.lastActivityAt, url: app.url,
-            currentCommentCount: app.reviewCount
+            currentCommentCount: app.reviewCount, onContentDeleted: onDelete
         )
         .cardDensityPadding()
     }
@@ -238,6 +243,7 @@ struct AppListingRow: View {
 
 struct ResourceRow: View {
     let resource: Resource
+    var onDelete: (() -> Void)? = nil
 
     var body: some View {
         NavigationLink(value: resource) {
@@ -265,7 +271,7 @@ struct ResourceRow: View {
         .readAloudAction(resourceLabel)
         .contentActions(
             id: resource.id, kind: .resource, title: resource.title, lastActivityAt: resource.updatedAt, url: resource.url,
-            currentCommentCount: resource.commentCount
+            currentCommentCount: resource.commentCount, onContentDeleted: onDelete
         )
         .cardDensityPadding()
     }
@@ -285,6 +291,7 @@ struct ResourceRow: View {
 
 struct BlogPostRow: View {
     let post: BlogPost
+    var onDelete: (() -> Void)? = nil
 
     var body: some View {
         NavigationLink(value: post) {
@@ -316,7 +323,7 @@ struct BlogPostRow: View {
         .readAloudAction(postLabel)
         .contentActions(
             id: post.id, kind: .blogPost, title: post.title, lastActivityAt: post.lastActivityAt, url: post.url,
-            currentCommentCount: post.commentCount
+            currentCommentCount: post.commentCount, onContentDeleted: onDelete
         )
         .cardDensityPadding()
     }

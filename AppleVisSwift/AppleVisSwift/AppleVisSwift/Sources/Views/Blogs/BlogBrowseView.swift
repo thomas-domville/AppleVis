@@ -50,7 +50,7 @@ struct BlogBrowseView: View {
             }
 
             ForEach(visible) { post in
-                BlogPostRow(post: post)
+                BlogPostRow(post: post, onDelete: { posts.removeAll { $0.id == post.id } })
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
             }
 

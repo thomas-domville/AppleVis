@@ -53,7 +53,7 @@ struct PodcastBrowseView: View {
                     .listRowSeparator(.hidden)
             }
             ForEach(episodes) { episode in
-                PodcastEpisodeRow(episode: episode)
+                PodcastEpisodeRow(episode: episode, onDelete: { episodes.removeAll { $0.id == episode.id } })
             }
             if hasMore {
                 ProgressView().frame(maxWidth: .infinity)

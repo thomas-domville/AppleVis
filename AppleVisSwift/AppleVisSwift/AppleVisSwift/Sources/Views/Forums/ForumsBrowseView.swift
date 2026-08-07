@@ -164,7 +164,7 @@ struct ForumsBrowseView: View {
                     .listRowSeparator(.hidden)
             }
             ForEach(filteredTopics) { topic in
-                ForumTopicRow(topic: topic)
+                ForumTopicRow(topic: topic, onDelete: { topics.removeAll { $0.id == topic.id } })
             }
             if hasMore {
                 ProgressView().frame(maxWidth: .infinity)

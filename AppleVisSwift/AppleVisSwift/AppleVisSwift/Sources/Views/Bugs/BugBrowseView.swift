@@ -53,7 +53,7 @@ struct BugBrowseView: View {
 
             ForEach(visible) { bug in
                 NavigationLink(value: bug) {
-                    BugReportRow(bug: bug)
+                    BugReportRow(bug: bug, onDelete: { bugs.removeAll { $0.id == bug.id } })
                 }
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
             }
@@ -153,6 +153,7 @@ struct BugBrowseView: View {
 
 struct BugReportRow: View {
     let bug: BugReport
+    var onDelete: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -196,7 +197,7 @@ struct BugReportRow: View {
         .readAloudAction(bugLabel)
         .contentActions(
             id: bug.id, kind: .bugReport, title: bug.title, lastActivityAt: bug.changedAt, url: bug.url,
-            currentCommentCount: bug.commentCount
+            currentCommentCount: bug.commentCount, onContentDeleted: onDelete
         )
         .cardDensityPadding()
     }

@@ -139,7 +139,7 @@ struct AppCategoryView: View {
                             .listRowSeparator(.hidden)
                     }
                     ForEach(apps) { app in
-                        AppListingRow(app: app)
+                        AppListingRow(app: app, onDelete: { apps.removeAll { $0.id == app.id } })
                     }
                     if hasMore {
                         ProgressView().frame(maxWidth: .infinity)

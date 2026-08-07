@@ -47,7 +47,7 @@ struct GuideBrowseView: View {
             }
 
             ForEach(visible) { resource in
-                ResourceRow(resource: resource)
+                ResourceRow(resource: resource, onDelete: { resources.removeAll { $0.id == resource.id } })
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
             }
 

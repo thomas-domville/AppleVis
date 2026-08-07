@@ -222,11 +222,16 @@ final class HomeViewModel: ObservableObject {
 
     /// Breaks "N new items" down by what actually changed — e.g. "2 new
     /// forum topics, 1 new podcast episode, 5 new comments" — instead of a
-    /// bare count that doesn't say what kind of activity it was. The
-    /// comment figure is a sum of actual new replies/reviews across
-    /// already-seen items (not a count of how many items got them), since
-    /// "3 items with new replies" doesn't tell you if that's 3 replies or
-    /// 30 — the user specifically asked for a real number here.
+    /// bare count that doesn't say what kind of activity it was.
+    ///
+    /// The comment figure counts: the reply delta for items you'd already
+    /// visited before (only the new part, since you've seen the rest), plus
+    /// the FULL comment count for brand-new items (since you've never seen
+    /// any of it). Without that second half, a user who mostly just
+    /// refreshes Home without opening individual items would never see a
+    /// "new comments" figure at all — every item would be brand-new (no
+    /// prior visit to diff against), so the count stayed permanently 0
+    /// even when those brand-new topics already had real replies attached.
     private static func buildSummaryText(for newItems: [FeedItem], itemVisits: [String: PersistenceStore.ItemVisit]) -> String {
         var brandNewByKind: [ContentKind: Int] = [:]
         var newCommentTotal = 0
@@ -235,6 +240,7 @@ final class HomeViewModel: ObservableObject {
                 newCommentTotal += max(0, item.commentCount - visit.commentCount)
             } else {
                 brandNewByKind[item.kind, default: 0] += 1
+                newCommentTotal += item.commentCount
             }
         }
         var parts: [String] = []

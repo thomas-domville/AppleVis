@@ -43,6 +43,13 @@ struct ContentActionsModifier: ViewModifier {
     /// composer without navigating in first). Every other kind gets RN's
     /// exact original stub behavior automatically when this is left nil.
     var onAddComment: (() -> Void)? = nil
+    /// Only meaningful for `.forumTopic` — RN gave forum topic owners their
+    /// own "Edit Topic"/"Delete Topic" actions, separate from (and in
+    /// addition to, if the user happens to be both) admin moderation.
+    var authorId: String? = nil
+    /// Fired after an admin/owner delete succeeds — lets the parent list
+    /// prune the row, matching the onDelete pattern comment rows already use.
+    var onContentDeleted: (() -> Void)? = nil
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -50,6 +57,9 @@ struct ContentActionsModifier: ViewModifier {
     @State private var isSaved = false
     @State private var isFollowing = false
     @State private var showBrowser = false
+    @State private var editingNode: EditableNode?
+    @State private var showUnpublishConfirm = false
+    @State private var showDeleteConfirm = false
 
     private var newCount: Int {
         guard let currentCommentCount else { return 0 }
@@ -58,6 +68,13 @@ struct ContentActionsModifier: ViewModifier {
 
     private var addCommentLabel: String {
         kind == .appListing ? "Write a Review" : "Add New Comment"
+    }
+
+    private var isAdmin: Bool { auth.user?.isAdmin ?? false }
+
+    private var isOwnTopic: Bool {
+        guard kind == .forumTopic, let authorId, let user = auth.user else { return false }
+        return !authorId.isEmpty && user.uuid == authorId
     }
 
     func body(content: Content) -> some View {
@@ -129,10 +146,34 @@ struct ContentActionsModifier: ViewModifier {
                         Label("Share", systemImage: "square.and.arrow.up")
                     }
                 }
+                if isOwnTopic {
+                    Button { startEdit() } label: {
+                        Label("Edit Topic", systemImage: "pencil")
+                    }
+                    Button(role: .destructive) { showDeleteConfirm = true } label: {
+                        Label("Delete Topic", systemImage: "trash")
+                    }
+                }
+                if isAdmin {
+                    Button { startEdit() } label: {
+                        Label("Edit \(kind.displayName)", systemImage: "pencil")
+                    }
+                    Button { showUnpublishConfirm = true } label: {
+                        Label("Unpublish \(kind.displayName)", systemImage: "eye.slash")
+                    }
+                    Button(role: .destructive) { showDeleteConfirm = true } label: {
+                        Label("Delete \(kind.displayName)", systemImage: "trash")
+                    }
+                }
             }
             .accessibilityAction(named: Text(isSaved ? "Unsave \(kind.displayName)" : "Save \(kind.displayName)")) {
                 toggleSave()
             }
+            .modifier(ConditionalAccessibilityAction(isActive: isOwnTopic, name: "Edit Topic") { startEdit() })
+            .modifier(ConditionalAccessibilityAction(isActive: isOwnTopic, name: "Delete Topic") { showDeleteConfirm = true })
+            .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Edit \(kind.displayName)") { startEdit() })
+            .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Unpublish \(kind.displayName)") { showUnpublishConfirm = true })
+            .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Delete \(kind.displayName)") { showDeleteConfirm = true })
             .modifier(ConditionalAccessibilityAction(isActive: newCount > 0, name: "Mark as Read") {
                 markAsRead()
             })
@@ -160,10 +201,107 @@ struct ContentActionsModifier: ViewModifier {
                     SafariView(url: shareURL)
                 }
             }
+            .sheet(item: $editingNode) { node in
+                EditNodeSheet(initialTitle: node.title, initialBody: node.body) { newTitle, newBody in
+                    try await saveEdit(nodeTypeSuffix: node.nodeTypeSuffix, title: newTitle, body: newBody)
+                }
+            }
+            .confirmationDialog(
+                "Unpublish this \(kind.displayName.lowercased())?",
+                isPresented: $showUnpublishConfirm, titleVisibility: .visible
+            ) {
+                Button("Unpublish", role: .destructive) { Task { await unpublish() } }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This hides it from public view.")
+            }
+            .confirmationDialog(
+                isOwnTopic ? "Delete this topic?" : "Delete this \(kind.displayName.lowercased())?",
+                isPresented: $showDeleteConfirm, titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) { Task { await deleteContent() } }
+                Button("Cancel", role: .cancel) {}
+            }
             .onAppear {
                 isSaved = PersistenceStore.shared.isSaved(id: id)
                 isFollowing = PersistenceStore.shared.isFollowed(id: id)
             }
+    }
+
+    /// A `.forumTopic`, `.podcastEpisode`, etc. is always a Drupal node
+    /// under the hood — `nodeType` is only ever wrong for Bug Reports,
+    /// whose actual bundle depends on the platform (iOS vs macOS), which
+    /// isn't known from the row alone.
+    private func resolvedNodeTypeSuffix() async -> String {
+        let generic = String(kind.nodeType.dropFirst("node--".count))
+        guard kind == .bugReport else { return generic }
+        guard let d = try? await APIClient.shared.bugReports.detail(id: id) else { return generic }
+        return d.platform == .ios ? "ios_bug_report" : "os_x_bug_report"
+    }
+
+    /// Fetches the full title+body before editing — list rows only carry
+    /// summary data, and editNode needs the complete current body to avoid
+    /// clobbering it.
+    private func startEdit() {
+        Task {
+            guard let content = await fetchEditableContent() else {
+                toast.error("Couldn't load \(kind.displayName.lowercased()) to edit.")
+                return
+            }
+            editingNode = content
+        }
+    }
+
+    private func fetchEditableContent() async -> EditableNode? {
+        switch kind {
+        case .forumTopic:
+            guard let d = try? await APIClient.shared.forums.topicDetail(id: id) else { return nil }
+            return EditableNode(title: d.title, body: d.body, nodeTypeSuffix: "forum")
+        case .podcastEpisode:
+            guard let d = try? await APIClient.shared.podcasts.episode(id: id) else { return nil }
+            return EditableNode(title: d.title, body: d.description, nodeTypeSuffix: "podcast")
+        case .appListing:
+            guard let d = try? await APIClient.shared.apps.detail(id: id) else { return nil }
+            return EditableNode(title: d.name, body: d.body, nodeTypeSuffix: "ios_app_directory")
+        case .resource:
+            guard let d = try? await APIClient.shared.resources.detail(id: id) else { return nil }
+            return EditableNode(title: d.title, body: d.body, nodeTypeSuffix: "guides")
+        case .blogPost:
+            guard let d = try? await APIClient.shared.blogs.detail(id: id) else { return nil }
+            return EditableNode(title: d.title, body: d.body, nodeTypeSuffix: "blog2")
+        case .bugReport:
+            guard let d = try? await APIClient.shared.bugReports.detail(id: id) else { return nil }
+            return EditableNode(title: d.title, body: d.body, nodeTypeSuffix: d.platform == .ios ? "ios_bug_report" : "os_x_bug_report")
+        }
+    }
+
+    private func saveEdit(nodeTypeSuffix: String, title: String, body: String) async throws {
+        guard let user = auth.user else { return }
+        try await APIClient.shared.content.editNode(nodeId: id, nodeType: nodeTypeSuffix, title: title, body: body, csrfToken: user.csrfToken)
+        toast.success("\(kind.displayName) updated")
+    }
+
+    private func unpublish() async {
+        guard let user = auth.user else { return }
+        let suffix = await resolvedNodeTypeSuffix()
+        do {
+            try await APIClient.shared.content.unpublishNode(nodeId: id, nodeType: suffix, csrfToken: user.csrfToken)
+            toast.success("\(kind.displayName) unpublished")
+        } catch {
+            toast.error("Couldn't unpublish.")
+        }
+    }
+
+    private func deleteContent() async {
+        guard let user = auth.user else { return }
+        let suffix = await resolvedNodeTypeSuffix()
+        do {
+            try await APIClient.shared.content.deleteNode(nodeId: id, nodeType: suffix, csrfToken: user.csrfToken)
+            toast.success("\(kind.displayName) deleted")
+            onContentDeleted?()
+        } catch {
+            toast.error("Couldn't delete.")
+        }
     }
 
     /// Matches RN's exact stub for content types with no real "reply from
@@ -243,6 +381,70 @@ struct ContentActionsModifier: ViewModifier {
     }
 }
 
+private struct EditableNode: Identifiable {
+    let id = UUID()
+    let title: String
+    let body: String
+    let nodeTypeSuffix: String
+}
+
+/// Generic title+body editor for admin/owner "Edit" actions — reused across
+/// every content kind (Forums/Podcasts/Apps/Guides/Blogs/Bug Reports) rather
+/// than building 6 nearly-identical edit screens.
+private struct EditNodeSheet: View {
+    let onSave: (String, String) async throws -> Void
+
+    @State private var title: String
+    @State private var bodyText: String
+    @State private var isSubmitting = false
+    @State private var error: String?
+    @Environment(\.dismiss) private var dismiss
+
+    init(initialTitle: String, initialBody: String, onSave: @escaping (String, String) async throws -> Void) {
+        self.onSave = onSave
+        _title = State(initialValue: initialTitle)
+        _bodyText = State(initialValue: initialBody)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Title") {
+                    TextField("Title", text: $title)
+                }
+                Section("Body") {
+                    TextEditor(text: $bodyText).frame(minHeight: 200)
+                }
+                if let error {
+                    Text(error).foregroundStyle(.red)
+                }
+            }
+            .navigationTitle("Edit")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { Task { await submit() } }
+                        .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
+                }
+            }
+        }
+    }
+
+    private func submit() async {
+        isSubmitting = true; error = nil
+        do {
+            try await onSave(title, bodyText)
+            dismiss()
+        } catch let e as APIError {
+            error = e.localizedDescription
+        } catch {
+            self.error = "Couldn't save changes."
+        }
+        isSubmitting = false
+    }
+}
+
 /// Attaches an .accessibilityAction only when `isActive` — e.g. Share should
 /// not appear as a VoiceOver action at all when there's no url, and Follow
 /// shouldn't appear when signed out, rather than appearing as a no-op.
@@ -280,12 +482,14 @@ extension View {
         id: String, kind: ContentKind, title: String,
         lastActivityAt: Date? = nil, url: String? = nil, supportsFollow: Bool = true,
         onSaveToggle: ((Bool) -> Void)? = nil, onFollowToggle: ((Bool) -> Void)? = nil,
-        currentCommentCount: Int? = nil, onAddComment: (() -> Void)? = nil
+        currentCommentCount: Int? = nil, onAddComment: (() -> Void)? = nil,
+        authorId: String? = nil, onContentDeleted: (() -> Void)? = nil
     ) -> some View {
         modifier(ContentActionsModifier(
             id: id, kind: kind, title: title, lastActivityAt: lastActivityAt, url: url, supportsFollow: supportsFollow,
             onSaveToggle: onSaveToggle, onFollowToggle: onFollowToggle,
-            currentCommentCount: currentCommentCount, onAddComment: onAddComment
+            currentCommentCount: currentCommentCount, onAddComment: onAddComment,
+            authorId: authorId, onContentDeleted: onContentDeleted
         ))
     }
 }
