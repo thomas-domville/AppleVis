@@ -3,6 +3,7 @@ import SwiftUI
 struct ProfileView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @State private var showSignIn = false
     @State private var showSignOutConfirm = false
     @State private var showEditProfile = false
@@ -42,7 +43,10 @@ struct ProfileView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("You'll need to sign in again to post or access saved items.")
+            // RN's wording is precise that this is local-only, so it isn't
+            // confused with the (much more serious) Delete Account option
+            // right above it in the same section.
+            Text("Removes your account session from this device only. You'll need to sign in again to post or access saved items.")
         }
     }
 
@@ -68,10 +72,28 @@ struct ProfileView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
+
+                Spacer()
+
+                // Purely a visual state indicator — the accessible text is
+                // already covered by this card's combined accessibility
+                // label below.
+                Text("Signed In")
+                    .font(.caption2).fontWeight(.bold)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(Color.green, in: Capsule())
+                    .accessibilityHidden(true)
             }
             .padding(.vertical, 4)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Signed in as \(user.name)\(user.isAdmin ? ", Administrator" : "")")
+        }
+
+        Section("Saved Items") {
+            savedCountRow(kind: .forumTopic, icon: "bubble.left.and.bubble.right")
+            savedCountRow(kind: .appListing, icon: "square.grid.2x2")
+            savedCountRow(kind: .resource, icon: "book")
         }
 
         Section("Account") {
@@ -81,6 +103,13 @@ struct ProfileView: View {
                 Label("Edit Profile", systemImage: "person.crop.circle.badge.pencil")
             }
             .accessibilityLabel("Edit your public profile")
+
+            if let username = auth.user?.name {
+                Link(destination: URL(string: "https://www.applevis.com/users/\(username)")!) {
+                    Label("View Full Profile on applevis.com", systemImage: "arrow.up.right.square")
+                }
+                .accessibilityLabel("View your full public profile on applevis.com, opens in browser")
+            }
 
             Link(destination: URL(string: "https://www.applevis.com/user")!) {
                 Label("Account Settings on applevis.com", systemImage: "arrow.up.right.square")
@@ -103,6 +132,27 @@ struct ProfileView: View {
             }
             .accessibilityLabel("Sign out of your AppleVis account")
         }
+    }
+
+    /// RN's own Profile screen showed per-kind saved counts as tappable
+    /// rows that deep-link into For You's Saved tab pre-filtered by kind —
+    /// Swift's Profile had no Saved Items section at all (this is exactly
+    /// what the `SiriDestination.savedItems(filter:)` plumbing added
+    /// earlier this session was anticipating, previously unused anywhere).
+    /// RN only showed these 3 kinds, not all 6.
+    private func savedCountRow(kind: ContentKind, icon: String) -> some View {
+        let count = PersistenceStore.shared.savedItems().filter { $0.kind == kind }.count
+        return Button {
+            deepLinkRouter.pendingSiriDestination = .savedItems(filter: kind)
+        } label: {
+            HStack {
+                Label("Saved \(kind.displayName)s", systemImage: icon)
+                Spacer()
+                Text("\(count)").foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityLabel("Saved \(kind.displayName.lowercased())s, \(count)")
+        .accessibilityHint("Double-tap to view.")
     }
 
     // MARK: - Signed-out content

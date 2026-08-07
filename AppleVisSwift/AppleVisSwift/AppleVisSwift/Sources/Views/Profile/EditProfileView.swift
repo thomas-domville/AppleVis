@@ -12,7 +12,10 @@ struct EditProfileView: View {
     @State private var interests = ""
     @State private var homepage = ""
     @State private var twitter = ""
+    @State private var facebook = ""
+    @State private var mastodon = ""
 
+    @State private var isLoading = true
     @State private var isSaving = false
     @State private var errorMessage: String?
 
@@ -81,6 +84,22 @@ struct EditProfileView: View {
                             .autocorrectionDisabled()
                     }
                     .accessibilityElement(children: .combine)
+
+                    LabeledContent("Facebook") {
+                        TextField("Optional", text: $facebook)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    }
+                    .accessibilityElement(children: .combine)
+
+                    LabeledContent("Mastodon") {
+                        TextField("@you@instance", text: $mastodon)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    }
+                    .accessibilityElement(children: .combine)
                 }
 
                 if let error = errorMessage {
@@ -101,15 +120,39 @@ struct EditProfileView: View {
                         .disabled(isSaving)
                 }
             }
-            .disabled(isSaving)
+            .disabled(isSaving || isLoading)
             .overlay {
                 if isSaving {
                     ProgressView("Saving…")
                         .padding(20)
                         .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+                } else if isLoading {
+                    ProgressView("Loading…")
                 }
             }
         }
+        .task { await loadCurrentProfile() }
+    }
+
+    /// Previously never called at all — every field always started blank,
+    /// even for a user who already had a bio/location/etc. set, forcing a
+    /// full retype for any small edit.
+    private func loadCurrentProfile() async {
+        guard let user = auth.user else { isLoading = false; return }
+        do {
+            let fields = try await APIClient.shared.account.fetchProfileFields(uuid: user.uuid, csrfToken: user.csrfToken)
+            realName = fields.realName ?? ""
+            bio = fields.bio ?? ""
+            location = fields.location ?? ""
+            interests = fields.interests ?? ""
+            homepage = fields.homepage ?? ""
+            twitter = fields.twitter ?? ""
+            facebook = fields.facebook ?? ""
+            mastodon = fields.mastodon ?? ""
+        } catch {
+            errorMessage = "Couldn't load your current profile. You can still make changes below."
+        }
+        isLoading = false
     }
 
     private func saveProfile() {
@@ -122,7 +165,9 @@ struct EditProfileView: View {
             location: location.isEmpty ? nil : location,
             interests: interests.isEmpty ? nil : interests,
             homepage: homepage.isEmpty ? nil : homepage,
-            twitter: twitter.isEmpty ? nil : twitter
+            twitter: twitter.isEmpty ? nil : twitter,
+            facebook: facebook.isEmpty ? nil : facebook,
+            mastodon: mastodon.isEmpty ? nil : mastodon
         )
         Task {
             do {

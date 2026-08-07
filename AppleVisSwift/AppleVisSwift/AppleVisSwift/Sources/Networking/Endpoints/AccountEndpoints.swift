@@ -83,7 +83,35 @@ struct AccountEndpoints {
         if let v = fields.interests { attributes["field_profile_interests"] = AnyEncodable(v) }
         if let v = fields.homepage { attributes["field_profile_homepage"] = AnyEncodable(v) }
         if let v = fields.twitter { attributes["field_profile_twitter"] = AnyEncodable(v) }
+        if let v = fields.facebook { attributes["field_profile_facebook"] = AnyEncodable(v) }
+        if let v = fields.mastodon { attributes["field_profile_mastodon"] = AnyEncodable(v) }
         try await client.jsonAPIUpdate("user/user/\(uuid)", type: "user--user", id: uuid, attributes: attributes, headers: ["X-CSRF-Token": csrfToken])
+    }
+
+    /// Fetches the signed-in user's own editable profile fields — Edit
+    /// Profile previously never loaded existing values at all, so every
+    /// field always started blank even if the user already had a bio,
+    /// location, etc. set, forcing a full retype for any small edit. Reads
+    /// the exact same attribute keys `updateProfile` writes, so what you see
+    /// here is guaranteed to round-trip correctly.
+    func fetchProfileFields(uuid: String, csrfToken: String) async throws -> ProfileUpdateFields {
+        let response = try await client.jsonAPISingle("user/user/\(uuid)", headers: ["X-CSRF-Token": csrfToken])
+        let a = response.data.attributes
+        func text(_ key: String) -> String {
+            guard let value = a[key] else { return "" }
+            if let s = value.stringValue { return s }
+            return value["value"]?.stringValue ?? ""
+        }
+        return ProfileUpdateFields(
+            realName: text("field_profile_realname"),
+            bio: text("field_profile_bio"),
+            location: text("field_profile_location"),
+            interests: text("field_profile_interests"),
+            homepage: text("field_profile_homepage"),
+            twitter: text("field_profile_twitter"),
+            facebook: text("field_profile_facebook"),
+            mastodon: text("field_profile_mastodon")
+        )
     }
 }
 
@@ -94,6 +122,8 @@ struct ProfileUpdateFields {
     var interests: String?
     var homepage: String?
     var twitter: String?
+    var facebook: String?
+    var mastodon: String?
 }
 
 private struct EmptyEncodable: Encodable {}

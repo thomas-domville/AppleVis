@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct AboutView: View {
+    @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var networkMonitor: NetworkMonitor
     @State private var copiedSupportInfo = false
 
     private var appVersion: String {
@@ -16,10 +18,29 @@ struct AboutView: View {
         UIDevice.current.model
     }
 
+    /// Matches RN's fuller diagnostic report (app version/build, iOS
+    /// version/device, every accessibility setting, theme, locale, network
+    /// state) — Swift's previously only included version/build/iOS/device,
+    /// missing everything that actually helps diagnose an accessibility
+    /// bug report.
     private var supportInfo: String {
-        """
+        let accessibility = [
+            "VoiceOver: \(UIAccessibility.isVoiceOverRunning ? "On" : "Off")",
+            "Switch Control: \(UIAccessibility.isSwitchControlRunning ? "On" : "Off")",
+            "Reduced Motion: \(UIAccessibility.isReduceMotionEnabled ? "On" : "Off")",
+            "Bold Text: \(UIAccessibility.isBoldTextEnabled ? "On" : "Off")",
+            "Reduce Transparency: \(UIAccessibility.isReduceTransparencyEnabled ? "On" : "Off")",
+            "Increased Contrast: \(UIAccessibility.isDarkerSystemColorsEnabled ? "On" : "Off")",
+            "Grayscale: \(UIAccessibility.isGrayscaleEnabled ? "On" : "Off")",
+            "Invert Colors: \(UIAccessibility.isInvertColorsEnabled ? "On" : "Off")",
+        ].joined(separator: ", ")
+        return """
         AppleVis \(appVersion) (\(buildNumber))
         iOS \(iosVersion) · \(deviceModel)
+        Theme: \(preferences.theme.displayName)
+        Locale: \(Locale.current.identifier)
+        Network: \(networkMonitor.isConnected ? "Connected" : "Not Connected")
+        Accessibility: \(accessibility)
         """
     }
 
@@ -61,7 +82,10 @@ struct AboutView: View {
                         systemImage: copiedSupportInfo ? "checkmark" : "doc.on.clipboard"
                     )
                 }
-                .accessibilityHint("Copies version, build, iOS, and device details to the clipboard so you can paste them into a support request.")
+                .accessibilityHint("Copies version, build, iOS, device, theme, and accessibility settings to the clipboard so you can paste them into a support request.")
+                .accessibilityAction(named: Text("Read Support Summary")) {
+                    UIAccessibility.post(notification: .announcement, argument: supportInfo.replacingOccurrences(of: "\n", with: ". "))
+                }
             }
 
             Section("Find Us") {
