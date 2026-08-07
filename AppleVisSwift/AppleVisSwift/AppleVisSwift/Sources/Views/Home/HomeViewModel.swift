@@ -33,35 +33,6 @@ final class HomeViewModel: ObservableObject {
     private var page = 0
     private var itemVisits: [String: PersistenceStore.ItemVisit] = [:]
 
-    /// Snapshotted once per "session" (cold launch, or returning from the
-    /// background) rather than re-read on every load() — otherwise a plain
-    /// pull-to-refresh would silently forget still-unread items. load()
-    /// used to advance this to `Date()` on every single call, so if 6 items
-    /// arrived, then the user refreshed again before reading them, those 6
-    /// would immediately stop counting as new (their lastActivityAt was now
-    /// older than the freshly-bumped "last visit") even though the user
-    /// never actually saw them. Holding this fixed for the whole session
-    /// and only advancing it at real session boundaries fixes that.
-    private var lastVisit = Date(timeIntervalSince1970: UserDefaults.standard.double(forKey: "applevis.lastVisit"))
-    private var hasStampedCurrentSession = false
-
-    /// Starts a new "new since last visit" session — call when the app
-    /// returns to the foreground after being backgrounded. Deliberately not
-    /// called on pull-to-refresh/loadMore, which should keep comparing
-    /// against the same boundary as the rest of the session.
-    func refreshSessionBoundary() {
-        lastVisit = Date(timeIntervalSince1970: UserDefaults.standard.double(forKey: "applevis.lastVisit"))
-        hasStampedCurrentSession = false
-    }
-
-    /// Stamps "now" as the last-visit point for the *next* session, read
-    /// back by refreshSessionBoundary()/init next time around. Doesn't
-    /// touch this session's own `lastVisit`, so in-flight comparisons don't
-    /// shift underneath a still-open Home screen.
-    func stampVisitForNextSession() {
-        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "applevis.lastVisit")
-    }
-
     func load() async {
         SoundPlayer.shared.play(.loadingStart)
         isLoading = true
@@ -69,6 +40,20 @@ final class HomeViewModel: ObservableObject {
         if hadNoItems { error = nil }
         page = 0
         isReturningVisit = UserDefaults.standard.object(forKey: "applevis.lastVisit") != nil
+        // Stamped exactly once, ever, purely to distinguish "first launch
+        // of this install" (don't flood a brand-new user with everything
+        // in the feed marked "new") from every launch after that. Earlier
+        // attempts tried to use this as a moving "last visit" boundary that
+        // advanced on every load(), then on every background/foreground
+        // cycle — both silently dropped still-unread items out of "New"
+        // the moment the boundary moved past them (a screen simply locking
+        // counts as backgrounding). isNewActivity() below no longer
+        // compares against a timestamp at all — an item stays "new" for as
+        // long as it's genuinely unvisited, full stop, which is what
+        // "shows all 11 until they're read" actually requires.
+        if !isReturningVisit {
+            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "applevis.lastVisit")
+        }
 
         let (fetched, failed) = await fetchPage(page: 0)
         failedSourceNames = failed
@@ -87,10 +72,6 @@ final class HomeViewModel: ObservableObject {
             hasMore = fetched.count >= pageSize
             itemVisits = PersistenceStore.shared.allItemVisits()
             buildNewActivitySummary()
-            if !hasStampedCurrentSession {
-                stampVisitForNextSession()
-                hasStampedCurrentSession = true
-            }
         }
 
         isLoading = false
@@ -213,13 +194,18 @@ final class HomeViewModel: ObservableObject {
         recomputeNewActivity()
     }
 
-    /// An item counts as new if it has replies/comments beyond what it had
-    /// the last time it was visited, OR it's newer than the last Home visit
-    /// and hasn't specifically been seen since (a visit with no matching
-    /// record at all — never opened — always counts once past lastVisit).
+    /// An item counts as new if it's never been individually visited, or it
+    /// has replies/comments (or any activity) beyond what it had the last
+    /// time it *was* visited — purely per-item, no global "last visit"
+    /// timestamp involved. It stays "new" across any number of refreshes,
+    /// backgrounds, or relaunches until the user actually opens it or hits
+    /// "Mark All Read" — that's the only thing that should make an unread
+    /// item stop being new. Suppressed entirely on a device's very first
+    /// launch (isReturningVisit false) so a fresh install isn't flooded
+    /// with everything in the feed marked new.
     private func isNewActivity(_ item: FeedItem) -> Bool {
+        guard isReturningVisit else { return false }
         if newReplyCount(for: item) > 0 { return true }
-        guard item.lastActivityAt > lastVisit else { return false }
         guard let visit = itemVisits[item.id] else { return true }
         return visit.seenAt < item.lastActivityAt
     }

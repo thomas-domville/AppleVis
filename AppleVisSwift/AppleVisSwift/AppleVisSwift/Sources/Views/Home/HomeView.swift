@@ -52,7 +52,6 @@ struct HomeView: View {
     @State private var homeFeedFilter: HomeFeedFilter = .all
     @State private var notificationHistory: [NotificationHistoryItem] = []
     @AccessibilityFocusState private var focusTarget: HomeFocusTarget?
-    @Environment(\.scenePhase) private var scenePhase
 
     /// Items actually shown below the feed picker — narrowed to just what's
     /// new since the last visit when the "New" segment is selected. Distinct
@@ -133,18 +132,6 @@ struct HomeView: View {
         .task { await vm.load() }
         .onAppear {
             notificationHistory = PersistenceStore.shared.notificationHistory()
-        }
-        .onChange(of: scenePhase) { old, new in
-            if new == .background {
-                // Marks "now" as the boundary for the *next* session —
-                // doesn't affect what's already on screen this session, so
-                // items the user hasn't gotten to yet don't vanish from
-                // "New" just because the app briefly backgrounded.
-                vm.stampVisitForNextSession()
-            } else if new == .active && old == .background {
-                vm.refreshSessionBoundary()
-                Task { await vm.load() }
-            }
         }
     }
 
