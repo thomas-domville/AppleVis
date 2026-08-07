@@ -50,7 +50,6 @@ struct HomeView: View {
     @State private var hasAnnouncedWelcome = false
     @State private var showCustomizeHome = false
     @State private var homeFeedFilter: HomeFeedFilter = .all
-    @State private var savedItems: [SavedItem] = []
     @State private var notificationHistory: [NotificationHistoryItem] = []
     @AccessibilityFocusState private var focusTarget: HomeFocusTarget?
     @Environment(\.scenePhase) private var scenePhase
@@ -103,7 +102,6 @@ struct HomeView: View {
             }
             .refreshable {
                 await vm.load()
-                savedItems = PersistenceStore.shared.savedItems()
                 notificationHistory = PersistenceStore.shared.notificationHistory()
                 SoundPlayer.shared.play(.refresh)
             }
@@ -134,7 +132,6 @@ struct HomeView: View {
         }
         .task { await vm.load() }
         .onAppear {
-            savedItems = PersistenceStore.shared.savedItems()
             notificationHistory = PersistenceStore.shared.notificationHistory()
         }
         .onChange(of: scenePhase) { old, new in
@@ -262,27 +259,6 @@ struct HomeView: View {
         ScrollViewReader { proxy in
             List {
                 greetingCard
-
-                if !savedItems.isEmpty {
-                    NavigationLink(destination: SavedItemsView()) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "bookmark.fill")
-                                .foregroundStyle(Color.accentColor)
-                                .accessibilityHidden(true)
-                            Text("Saved")
-                                .font(.subheadline).fontWeight(.semibold)
-                            Spacer()
-                            Text("\(savedItems.count)")
-                                .font(.subheadline).foregroundStyle(.secondary)
-                        }
-                        .padding(12)
-                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
-                    }
-                    .accessibilityLabel("Saved, \(savedItems.count) item\(savedItems.count == 1 ? "" : "s")")
-                    .accessibilityHint("Double-tap to view your saved items.")
-                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                    .listRowSeparator(.hidden)
-                }
 
                 if !notificationHistory.isEmpty {
                     NavigationLink(destination: NotificationHistoryView()) {
