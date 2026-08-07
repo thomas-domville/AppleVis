@@ -16,6 +16,8 @@ struct AppDetailView: View {
     @State private var isSummarizingAccessibility = false
     @State private var reviewsSummary: String?
     @State private var isSummarizingReviews = false
+    @State private var accessibilityConsensus: String?
+    @State private var isSummarizingConsensus = false
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedReviewId: String?
     @EnvironmentObject private var auth: AuthStore
@@ -251,6 +253,8 @@ struct AppDetailView: View {
             accessibilitySummaryRow(detail)
             if !detail.reviews.isEmpty {
                 Divider()
+                accessibilityConsensusRow(detail)
+                Divider()
                 reviewsSummaryRow(detail)
             }
         }
@@ -280,6 +284,35 @@ struct AppDetailView: View {
             }
             .disabled(isSummarizingAccessibility)
             .accessibilityLabel(isSummarizingAccessibility ? "Summarizing accessibility notes, please wait" : "Summarize Accessibility Notes")
+        }
+    }
+
+    /// RN's "Accessibility Consensus" — instant overview of how well an app
+    /// actually works with VoiceOver across all its reviews, without
+    /// reading every one. Distinct from "Community Discussion Summary"
+    /// (a general recap of what reviewers said), this is framed
+    /// specifically around accessibility verdict/consensus.
+    @ViewBuilder
+    private func accessibilityConsensusRow(_ detail: AppDetail) -> some View {
+        if let accessibilityConsensus {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Accessibility Consensus", systemImage: "sparkles")
+                    .font(.caption).fontWeight(.bold).foregroundStyle(Color.accentColor)
+                Text(accessibilityConsensus).font(.subheadline)
+            }
+        } else {
+            Button {
+                Task { await summarizeAccessibilityConsensus(detail) }
+            } label: {
+                if isSummarizingConsensus {
+                    HStack(spacing: 8) { ProgressView(); Text("Summarizing…") }
+                } else {
+                    Label("Accessibility Consensus", systemImage: "sparkles")
+                }
+            }
+            .disabled(isSummarizingConsensus)
+            .accessibilityLabel(isSummarizingConsensus ? "Summarizing accessibility consensus, please wait" : "Accessibility Consensus")
+            .accessibilityHint("Aggregates reviews into one sentence about how well this app works with VoiceOver.")
         }
     }
 
@@ -322,6 +355,30 @@ struct AppDetailView: View {
             UIAccessibility.post(notification: .announcement, argument: "Couldn't generate an accessibility summary.")
         }
         isSummarizingAccessibility = false
+    }
+
+    private func summarizeAccessibilityConsensus(_ detail: AppDetail) async {
+        isSummarizingConsensus = true
+        UIAccessibility.post(notification: .announcement, argument: "Summarizing accessibility consensus. This may take a moment.")
+        let maxTotalCharacters = 3000
+        let maxPerReview = 220
+        var parts: [String] = []
+        var remaining = maxTotalCharacters
+        for review in detail.reviews.prefix(20) {
+            guard remaining > 0 else { break }
+            let body = review.body.strippingHTMLTags().prefix(maxPerReview)
+            let part = "\(review.authorName): \(body)"
+            parts.append(String(part.prefix(remaining)))
+            remaining -= part.count
+        }
+        let input = "App: \(detail.name)\n\n\(parts.joined(separator: "\n\n"))"
+        if let consensus = await IntelligenceService.accessibilityConsensus(input) {
+            accessibilityConsensus = consensus
+        } else {
+            toast.error("Couldn't generate an accessibility consensus. Try again.")
+            UIAccessibility.post(notification: .announcement, argument: "Couldn't generate an accessibility consensus.")
+        }
+        isSummarizingConsensus = false
     }
 
     private func summarizeReviews(_ detail: AppDetail) async {

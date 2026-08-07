@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreSpotlight
 import Combine
+import UserNotifications
 
 @main
 struct AppleVisApp: App {
@@ -78,6 +79,10 @@ struct AppleVisApp: App {
                     ICloudSyncManager.shared.pushSettings()
                 } else if newPhase == .active {
                     deepLinkRouter.checkPendingShareExtensionContent()
+                    // Matches standard iOS badge behavior (and RN's own
+                    // notifBadge description: "tap the app and the badge
+                    // clears") — opening the app clears it.
+                    UNUserNotificationCenter.current().setBadgeCount(0)
                 }
             }
             .task {

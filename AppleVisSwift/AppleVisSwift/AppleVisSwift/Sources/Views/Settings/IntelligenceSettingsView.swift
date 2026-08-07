@@ -27,6 +27,14 @@ struct IntelligenceSettingsView: View {
 
                 Toggle("AI Summaries", isOn: $preferences.aiSummariesEnabled)
                     .accessibilityHint("Generates concise summaries for long forum threads and articles so you can quickly decide whether to read more.")
+
+                FeatureInfoRow(
+                    icon: "checkmark.bubble",
+                    title: "Accessibility Consensus",
+                    subtitle: "On an app's page, under reviews",
+                    detail: "Aggregates an app's reviews into one sentence about how well it works with VoiceOver — an instant overview instead of reading every review yourself.",
+                    isSystemFeature: false
+                )
             }
 
             Section("Live System Features") {

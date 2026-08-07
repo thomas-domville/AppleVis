@@ -152,6 +152,19 @@ final class PersistenceStore {
         return max(0, currentCount - visit.commentCount)
     }
 
+    /// Backs Settings > Privacy > "Clear All Local Data" — previously that
+    /// action only cleared the URL cache, doing nothing to any of this,
+    /// despite its own confirmation dialog explicitly promising it would.
+    func clearAllLocalData() {
+        defaults.removeObject(forKey: savedKey)
+        defaults.removeObject(forKey: followedKey)
+        defaults.removeObject(forKey: notificationHistoryKey)
+        defaults.removeObject(forKey: seenTopicsKey)
+        defaults.removeObject(forKey: itemVisitsKey)
+        defaults.removeObject(forKey: "applevis.forums.lastVisit")
+        defaults.removeObject(forKey: "applevis.lastVisit")
+    }
+
     // MARK: - Storage
 
     private func persist<T: Encodable>(_ value: T, key: String) {

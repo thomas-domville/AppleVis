@@ -53,6 +53,9 @@ struct NotificationSettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+
+                Toggle("Badge Count", isOn: $preferences.badgeCountEnabled)
+                    .accessibilityHint("Shows a number on the AppleVis icon for unread notifications. Opening the app clears it.")
             } header: {
                 Text("Sound")
             }
@@ -77,7 +80,7 @@ struct NotificationSettingsView: View {
                 Toggle("New Forum Topics", isOn: $preferences.notifyNewTopics)
                     .accessibilityHint("Get notified when new forum discussions are posted.")
                 Toggle("New App Listings", isOn: $preferences.notifyAppUpdates)
-                    .accessibilityHint("Get notified when new accessible apps are added to the AppleVis App Directory.")
+                    .accessibilityHint("Get notified when existing apps are updated or new accessible apps are added to the AppleVis App Directory.")
                 Toggle("New Podcast Episodes", isOn: $preferences.notifyNewEpisodes)
                     .accessibilityHint("Get notified when new podcast episodes are published.")
                 Toggle("New Resources", isOn: $preferences.notifyNewResources)

@@ -53,6 +53,9 @@ final class PreferencesStore: ObservableObject {
     @AppStorage("notif.newResources")   var notifyNewResources   = false
     @AppStorage("notif.announcements")  var notifyAnnouncements  = true
     @AppStorage("notif.sound")          var notificationSound: NotificationSound = .mouseSqueak
+    /// RN's `notifBadge` ("Shows a number on the AppleVis icon... tap the
+    /// app and the badge clears") had no Swift equivalent at all.
+    @AppStorage("notif.badgeCount")     var badgeCountEnabled    = true
 
     // MARK: - Accessibility
     @AppStorage("a11y.announcement")    var announcementLevel: AnnouncementLevel = .normal

@@ -140,7 +140,11 @@ final class AppleVisAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
         await MainActor.run {
             PushNotificationManager.recordHistory(content: notification.request.content)
         }
-        return [.banner, .sound, .badge]
+        var options: UNNotificationPresentationOptions = [.banner, .sound]
+        if await MainActor.run(body: { PreferencesStore.current?.badgeCountEnabled ?? true }) {
+            options.insert(.badge)
+        }
+        return options
     }
 
     func userNotificationCenter(

@@ -15,6 +15,16 @@ struct PrivacySettingsView: View {
 
             Section("Privacy at a Glance") {
                 InfoCard(
+                    icon: "person.text.rectangle",
+                    title: "What We Collect",
+                    text: "AppleVis collects your email address and username for your account, and a device push token for notifications."
+                )
+                InfoCard(
+                    icon: "key.icloud",
+                    title: "Your Session Is Encrypted",
+                    text: "Your sign-in session is stored in the iOS Keychain, not in plain app storage."
+                )
+                InfoCard(
                     icon: "nosign",
                     title: "No Ad Tracking",
                     text: "We do not use third-party advertising networks or sell your data to advertisers."
@@ -96,7 +106,7 @@ struct PrivacySettingsView: View {
                     Button("Clear", role: .destructive) { clearLocalData() }
                     Button("Cancel", role: .cancel) {}
                 } message: {
-                    Text("This removes all cached content, downloaded episodes, and local settings. Your account and cloud data are not affected.")
+                    Text("This removes cached content, downloaded episodes, saved items, and locally tracked read/seen status. Your account, cloud data, and app preferences are not affected.")
                 }
             }
         }
@@ -109,9 +119,14 @@ struct PrivacySettingsView: View {
         }
     }
 
+    /// Previously only cleared URLCache — everything else the confirmation
+    /// dialog promised (downloaded episodes, saved items, locally tracked
+    /// read/seen state) silently did nothing.
     private func clearLocalData() {
-        // Clear URLCache
         URLCache.shared.removeAllCachedResponses()
+        ContentCache.shared.clearAll()
+        DownloadManager.shared.deleteAll()
+        PersistenceStore.shared.clearAllLocalData()
         clearDataComplete = true
     }
 }

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// A single row's identity, kept as data (rather than inline NavigationLinks)
 /// so the search field below can filter by label/subtitle without a parallel
@@ -53,6 +54,13 @@ struct SettingsView: View {
                               destination: AnyView(IntelligenceSettingsView())),
                 SettingsEntry(icon: "waveform", label: "Siri & Shortcuts", subtitle: "Voice commands and Shortcuts app actions", color: .indigo,
                               destination: AnyView(SiriShortcutsSettingsView())),
+            ]),
+            // Kept out of "Data & Privacy" — RN gave this its own visually
+            // distinct framing at the bottom of the list specifically
+            // because it holds destructive actions (delete downloads,
+            // clear cache), not because it's a content-vs-privacy
+            // distinction like the rest of that section.
+            SettingsSection(title: "Storage & Cache", entries: [
                 SettingsEntry(icon: "internaldrive", label: "Storage & Cache", subtitle: "Manage downloads and cached content", color: Color(.systemGray),
                               destination: AnyView(StorageView())),
             ]),
@@ -74,23 +82,51 @@ struct SettingsView: View {
         }
     }
 
+    /// RN's header had its own "Read Settings Summary" VoiceOver action
+    /// announcing this exact breakdown — Swift's version was plain text
+    /// with no equivalent.
+    private func announceSettingsSummary() {
+        let sectionCount = sections.count
+        let entryCount = sections.reduce(0) { $0 + $1.entries.count }
+        UIAccessibility.post(
+            notification: .announcement,
+            argument: "\(sectionCount) sections and \(entryCount) settings areas."
+        )
+    }
+
     var body: some View {
         NavigationStack {
             List {
                 if searchText.isEmpty {
                     Section {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Settings Center")
-                                .font(.headline)
-                            Text("Tune AppleVis for VoiceOver, Braille, low vision, podcasts, notifications, and sync.")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            Text("Account and sign-in tools live in Profile.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        HStack(alignment: .top, spacing: 12) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.accentColor)
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: "gearshape")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundStyle(.white)
+                            }
+                            .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Settings Center")
+                                    .font(.headline)
+                                Text("Tune AppleVis for VoiceOver, Braille, low vision, podcasts, notifications, and sync.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                Text("Account and sign-in tools live in Profile.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                         .padding(.vertical, 4)
+                        .overlay(alignment: .leading) {
+                            Rectangle().fill(Color.accentColor).frame(width: 3).clipShape(RoundedRectangle(cornerRadius: 1.5))
+                        }
+                        .padding(.leading, 4)
                         .accessibilityElement(children: .combine)
+                        .accessibilityAction(named: Text("Read Settings Summary")) { announceSettingsSummary() }
                     }
                 }
 

@@ -86,6 +86,21 @@ enum IntelligenceService {
         return await cleanedResponse("Summarise the following in 2-3 sentences:\n\n\(text)")
     }
 
+    /// RN's "Accessibility Consensus" (settingsData.ts) — aggregates app
+    /// reviews into one verdict sentence about how well the app actually
+    /// works with VoiceOver, e.g. "Most reviewers say this app works well
+    /// with VoiceOver, though some note issues with the settings screen,"
+    /// instead of a generic discussion summary.
+    static func accessibilityConsensus(_ reviewText: String) async -> String? {
+        guard isAvailable else { return nil }
+        return await cleanedResponse(
+            "Here are reviews of an iOS app from blind and low-vision users. " +
+            "In 1-2 sentences, summarize the consensus on how well this app works " +
+            "with VoiceOver and other accessibility features — call out any " +
+            "specific problem areas reviewers agree on:\n\n\(reviewText)"
+        )
+    }
+
     static func generateDigest(_ activitySummary: String) async -> String? {
         guard isAvailable else { return nil }
         return await cleanedResponse(
