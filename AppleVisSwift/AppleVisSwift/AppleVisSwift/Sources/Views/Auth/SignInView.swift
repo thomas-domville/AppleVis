@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct SignInView: View {
     @State private var username = ""
@@ -58,15 +59,23 @@ struct SignInView: View {
                         }
 
                         if let err = signInError {
-                            HStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundStyle(.red)
-                                Text(err).font(.subheadline).foregroundStyle(.red)
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundStyle(.red)
+                                    Text(err).font(.subheadline).foregroundStyle(.red)
+                                }
+                                HStack(spacing: 4) {
+                                    Text("Forgot your password?")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                    Link("Reset it on the website", destination: URL(string: "https://www.applevis.com/user/password")!)
+                                        .font(.caption).fontWeight(.semibold)
+                                }
                             }
                             .padding(12)
                             .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
                             .accessibilityElement(children: .combine)
-                            .accessibilityLabel(err)
+                            .accessibilityLabel("\(err). If you have forgotten your password, you can reset it on the AppleVis website.")
                             .accessibilityFocused($isErrorFocused)
                         }
 
@@ -113,7 +122,21 @@ struct SignInView: View {
 
     private func signIn() async {
         let name = username.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty, !password.isEmpty else { return }
+        // The Sign In button is already disabled for empty fields, but
+        // the password field's `.onSubmit` (hitting Return) bypassed that
+        // and silently did nothing — give explicit feedback instead.
+        guard !name.isEmpty else {
+            signInError = "Please enter your AppleVis username or email address."
+            UIAccessibility.post(notification: .announcement, argument: signInError!)
+            isErrorFocused = true
+            return
+        }
+        guard !password.isEmpty else {
+            signInError = "Please enter your AppleVis password."
+            UIAccessibility.post(notification: .announcement, argument: signInError!)
+            isErrorFocused = true
+            return
+        }
         isSigningIn = true
         signInError = nil
         await auth.signIn(username: name, password: password)

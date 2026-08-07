@@ -1,11 +1,13 @@
 import SwiftUI
 import UserNotifications
+import UIKit
 
 struct OnboardingView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
 
     @State private var step = 0
+    @State private var showCancelConfirm = false
     private let totalSteps = 6
     /// Every step's header binds to this so VoiceOver focus moves there after
     /// Next/Skip — previously each step was a distinct pushed screen in the
@@ -16,22 +18,76 @@ struct OnboardingView: View {
     @AccessibilityFocusState private var isStepHeaderFocused: Bool
 
     var body: some View {
-        ZStack {
-            switch step {
-            case 0: WelcomeStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
-            case 1: SignInStep(onNext: nextStep, onSkip: nextStep, headerFocus: $isStepHeaderFocused)
-            case 2: ThemeStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
-            case 3: AnnouncementStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
-            case 4: NotificationsStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
-            case 5: ReadyStep(onFinish: finish, headerFocus: $isStepHeaderFocused)
-            default: EmptyView()
+        VStack(spacing: 0) {
+            chrome
+            Group {
+                switch step {
+                case 0: WelcomeStep(onNext: nextStep, headerFocus: $isStepHeaderFocused, stepInfo: (1, totalSteps))
+                case 1: SignInStep(onNext: nextStep, onSkip: nextStep, headerFocus: $isStepHeaderFocused, stepInfo: (2, totalSteps))
+                case 2: ThemeStep(onNext: nextStep, headerFocus: $isStepHeaderFocused, stepInfo: (3, totalSteps))
+                case 3: AnnouncementStep(onNext: nextStep, headerFocus: $isStepHeaderFocused, stepInfo: (4, totalSteps))
+                case 4: NotificationsStep(onNext: nextStep, headerFocus: $isStepHeaderFocused, stepInfo: (5, totalSteps))
+                case 5: ReadyStep(onFinish: finish, headerFocus: $isStepHeaderFocused, stepInfo: (6, totalSteps))
+                default: EmptyView()
+                }
             }
         }
         .animation(.easeInOut(duration: 0.3), value: step)
+        .confirmationDialog(
+            "Skip the rest of setup?",
+            isPresented: $showCancelConfirm, titleVisibility: .visible
+        ) {
+            Button("Skip Setup", role: .destructive) { finish() }
+            Button("Continue Setup", role: .cancel) {}
+        } message: {
+            Text("You can change these settings anytime later in Settings.")
+        }
+    }
+
+    /// Persistent Back/Cancel/progress row shown above every step — RN's
+    /// shared WizardLayout gave every onboarding screen a Back button (once
+    /// past the first step), a Cancel button, and a step-progress indicator
+    /// (both visual dots and a "Step X of Y" VoiceOver announcement). None
+    /// of this existed here: there was no way back once you'd advanced, no
+    /// way to bail out of setup early, and no sense of progress at all.
+    private var chrome: some View {
+        VStack(spacing: 8) {
+            HStack {
+                if step > 0 {
+                    Button(action: previousStep) {
+                        Label("Back", systemImage: "chevron.left")
+                    }
+                    .accessibilityHint("Returns to the previous step.")
+                }
+                Spacer()
+                Button("Cancel") { showCancelConfirm = true }
+                    .accessibilityHint("Cancels and closes this form.")
+            }
+
+            HStack(spacing: 6) {
+                ForEach(0..<totalSteps, id: \.self) { i in
+                    Capsule()
+                        .fill(i == step ? Color.accentColor : Color.secondary.opacity(0.3))
+                        .frame(width: i == step ? 20 : 6, height: 6)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Step \(step + 1) of \(totalSteps)")
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
     }
 
     private func nextStep() {
         withReduceMotionAwareAnimation { step = min(step + 1, totalSteps - 1) }
+        Task {
+            try? await Task.sleep(for: .milliseconds(350))
+            isStepHeaderFocused = true
+        }
+    }
+
+    private func previousStep() {
+        withReduceMotionAwareAnimation { step = max(step - 1, 0) }
         Task {
             try? await Task.sleep(for: .milliseconds(350))
             isStepHeaderFocused = true
@@ -48,12 +104,17 @@ struct OnboardingView: View {
 private struct WelcomeStep: View {
     let onNext: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
+    var stepInfo: (current: Int, total: Int)? = nil
 
     private let features: [(icon: String, title: String, desc: String)] = [
         ("voiceover",       "Built for VoiceOver",         "Every screen crafted for screen-reader access from the ground up."),
         ("person.3",        "Community-Driven",             "Tips, reviews, and guides contributed by blind and low-vision users."),
         ("newspaper",       "All the Content You Need",     "Forums, app reviews, podcasts, tutorials, and news in one place."),
-        ("paintbrush",      "Accessible Themes",            "High-contrast and low-vision-friendly themes built in."),
+        // RN's welcome copy is concrete about how many themes and which
+        // ones — Swift's was generic ("High-contrast and low-vision-
+        // friendly themes built in") despite having the exact same 14
+        // themes available (PreferencesStore's AppTheme enum).
+        ("paintbrush",      "Accessible Themes",            "14 themes including High Contrast, Mouse, and Midnight — choose yours in the next few steps."),
         ("bell.badge",      "Smart Notifications",          "Stay informed about the content that matters to you."),
     ]
 
@@ -71,6 +132,7 @@ private struct WelcomeStep: View {
                         .fontWeight(.bold)
                         .multilineTextAlignment(.center)
                         .accessibilityAddTraits(.isHeader)
+                        .accessibilityLabel(stepInfo.map { "Welcome to AppleVis. Step \($0.current) of \($0.total)." } ?? "Welcome to AppleVis")
                         .modifier(OptionalAccessibilityFocus(isFocused: headerFocus))
 
                     Text("The community for blind and low-vision Apple users.")
@@ -124,10 +186,13 @@ private struct SignInStep: View {
     let onNext: () -> Void
     let onSkip: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
+    var stepInfo: (current: Int, total: Int)? = nil
 
     @State private var username = ""
     @State private var password = ""
+    @State private var validationMessage: String?
     @AccessibilityFocusState private var isErrorFocused: Bool
+    @AccessibilityFocusState private var isUsernameFocused: Bool
 
     var body: some View {
         ScrollView {
@@ -136,7 +201,7 @@ private struct SignInStep: View {
                     icon: "person.crop.circle",
                     title: "Sign In",
                     subtitle: "Sign in to post in forums, track saved items, and sync across devices. You can skip this and sign in later.",
-                    headerFocus: headerFocus
+                    stepInfo: stepInfo
                 )
 
                 VStack(spacing: 16) {
@@ -147,6 +212,7 @@ private struct SignInStep: View {
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .accessibilityLabel("Username field")
+                            .accessibilityFocused($isUsernameFocused)
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
@@ -154,14 +220,35 @@ private struct SignInStep: View {
                         SecureField("Password", text: $password)
                             .textFieldStyle(.roundedBorder)
                             .accessibilityLabel("Password field")
+                            .onSubmit { signIn() }
                     }
 
-                    if let error = auth.error {
-                        Text(error)
+                    if let validationMessage {
+                        Text(validationMessage)
                             .font(.caption)
                             .foregroundStyle(.red)
-                            .accessibilityLabel("Error: \(error)")
                             .accessibilityFocused($isErrorFocused)
+                    } else if let error = auth.error {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                            Text("If you have forgotten your password, you can reset it on the AppleVis website.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Link("Reset Password", destination: URL(string: "https://www.applevis.com/user/password")!)
+                                .font(.caption).fontWeight(.semibold)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Error: \(error). If you have forgotten your password, you can reset it on the AppleVis website.")
+                        .accessibilityFocused($isErrorFocused)
+                    }
+
+                    HStack(spacing: 4) {
+                        Text("Don't have an account?")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Link("Sign up for free", destination: URL(string: "https://www.applevis.com/user/register")!)
+                            .font(.caption).fontWeight(.semibold)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -180,7 +267,7 @@ private struct SignInStep: View {
                         .padding(.vertical, 14)
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(username.isEmpty || password.isEmpty || auth.isLoading)
+                    .disabled(auth.isLoading)
 
                     Button("Skip for Now", action: onSkip)
                         .buttonStyle(.borderless)
@@ -191,11 +278,41 @@ private struct SignInStep: View {
             }
             .padding(.top, 48)
         }
+        .onAppear {
+            // A returning user still signed in from a previous session
+            // shouldn't have to manually tap through a sign-in screen they
+            // don't need — matches RN's mount-time isSignedIn check.
+            if auth.isSignedIn {
+                onNext()
+                return
+            }
+            // RN focuses the username field directly on this step instead
+            // of the generic header every other step gets, since this is
+            // the one step that's actually a form.
+            Task {
+                try? await Task.sleep(for: .milliseconds(500))
+                isUsernameFocused = true
+            }
+        }
     }
 
     private func signIn() {
+        let name = username.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else {
+            validationMessage = "Please enter your AppleVis username or email address."
+            UIAccessibility.post(notification: .announcement, argument: validationMessage!)
+            isErrorFocused = true
+            return
+        }
+        guard !password.isEmpty else {
+            validationMessage = "Please enter your AppleVis password."
+            UIAccessibility.post(notification: .announcement, argument: validationMessage!)
+            isErrorFocused = true
+            return
+        }
+        validationMessage = nil
         Task {
-            await auth.signIn(username: username, password: password)
+            await auth.signIn(username: name, password: password)
             if auth.isSignedIn {
                 onNext()
             } else {
@@ -211,6 +328,7 @@ private struct ThemeStep: View {
     @EnvironmentObject private var preferences: PreferencesStore
     let onNext: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
+    var stepInfo: (current: Int, total: Int)? = nil
 
     var body: some View {
         ScrollView {
@@ -219,7 +337,8 @@ private struct ThemeStep: View {
                     icon: "paintbrush",
                     title: "Choose a Theme",
                     subtitle: "Pick your preferred colour scheme. You can always change this later in Settings.",
-                    headerFocus: headerFocus
+                    headerFocus: headerFocus,
+                    stepInfo: stepInfo
                 )
 
                 VStack(alignment: .leading, spacing: 20) {
@@ -283,6 +402,7 @@ private struct AnnouncementStep: View {
     @EnvironmentObject private var preferences: PreferencesStore
     let onNext: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
+    var stepInfo: (current: Int, total: Int)? = nil
 
     var body: some View {
         ScrollView {
@@ -291,7 +411,8 @@ private struct AnnouncementStep: View {
                     icon: "speaker.wave.3",
                     title: "VoiceOver Detail Level",
                     subtitle: "How much information should VoiceOver announce for each content item? You can change this in Accessibility Settings.",
-                    headerFocus: headerFocus
+                    headerFocus: headerFocus,
+                    stepInfo: stepInfo
                 )
 
                 VStack(spacing: 12) {
@@ -347,6 +468,7 @@ private struct NotificationsStep: View {
     @EnvironmentObject private var auth: AuthStore
     let onNext: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
+    var stepInfo: (current: Int, total: Int)? = nil
 
     @State private var permissionGranted: Bool? = nil
 
@@ -357,7 +479,8 @@ private struct NotificationsStep: View {
                     icon: "bell.badge",
                     title: "Notifications",
                     subtitle: "Choose which alerts you'd like to receive. You can update these anytime in Settings.",
-                    headerFocus: headerFocus
+                    headerFocus: headerFocus,
+                    stepInfo: stepInfo
                 )
 
                 VStack(spacing: 0) {
@@ -482,6 +605,7 @@ private struct ReadyStep: View {
     @EnvironmentObject private var auth: AuthStore
     let onFinish: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
+    var stepInfo: (current: Int, total: Int)? = nil
 
     private var summaryItems: [(icon: String, text: String)] {
         var items: [(String, String)] = []
@@ -498,7 +622,8 @@ private struct ReadyStep: View {
                     icon: "checkmark.circle.fill",
                     title: "You're All Set",
                     subtitle: "AppleVis is ready for you. Here's a summary of your setup:",
-                    headerFocus: headerFocus
+                    headerFocus: headerFocus,
+                    stepInfo: stepInfo
                 )
 
                 VStack(spacing: 12) {
@@ -553,6 +678,11 @@ private struct OnboardingHeader: View {
     let title: String
     let subtitle: String
     var headerFocus: AccessibilityFocusState<Bool>.Binding? = nil
+    /// (current, total) — appended to the spoken header so a VoiceOver user
+    /// gets a sense of progress through the flow, matching RN's
+    /// `"${title}. Step ${step} of ${totalSteps}."` pattern. Previously
+    /// only the bare title was spoken.
+    var stepInfo: (current: Int, total: Int)? = nil
 
     var body: some View {
         VStack(spacing: 12) {
@@ -572,6 +702,7 @@ private struct OnboardingHeader: View {
         }
         .padding(.horizontal, 24)
         .accessibilityElement(children: .combine)
+        .modifier(OptionalStepAnnouncement(title: title, subtitle: subtitle, stepInfo: stepInfo))
         .modifier(OptionalAccessibilityFocus(isFocused: headerFocus))
     }
 }
