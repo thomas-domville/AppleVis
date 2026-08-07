@@ -534,6 +534,7 @@ struct ReplyView: View {
             .accessibilityLabel(headerAccessibilityLabel)
             .accessibilityHint("Actions available: reply, copy, share, and more.")
             .modifier(OptionalReplyFocus(binding: focusBinding, id: reply.id))
+            .readAloudAction(reply.body.strippingHTMLTags())
             .accessibilityAction(named: Text("Reply to this Comment")) { onReplyTo?() }
             .accessibilityAction(named: Text("Copy Comment Text")) { copyText() }
             .accessibilityAction(named: Text("Share Comment")) { presentShareSheet() }

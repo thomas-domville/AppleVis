@@ -349,6 +349,7 @@ struct HomeView: View {
                                 vm.markAllAsRead(visibleItems)
                             }
                             .font(.system(size: 12, weight: .bold))
+                            .accessibilityLabel("Mark all new activity as read")
                             .accessibilityHint("Clears all items from the New view.")
                         }
                     }
@@ -370,7 +371,7 @@ struct HomeView: View {
                         .listRowSeparator(.hidden)
                         .task { await vm.loadMore() }
                 } else if !vm.hasMore && homeFeedFilter == .all && !visibleItems.isEmpty {
-                    Text("You're all caught up.")
+                    Text("You've reached the end.")
                         .font(.footnote).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
                         .listRowSeparator(.hidden)

@@ -99,3 +99,15 @@ enum CommentSubject {
         return clean
     }
 }
+
+/// Shared "quote and reply" text builder — every content type's reply flow
+/// (Forums' ComposeReplyView originally, now also Guides/Blogs/Podcasts/Apps)
+/// prefixes the compose box with the same quoted-excerpt format, so replying
+/// to a comment reads the same everywhere.
+enum QuotedReply {
+    static func prefix(authorName: String, body: String) -> String {
+        let plain = body.strippingHTMLTags()
+        let excerpt = plain.count > 150 ? String(plain.prefix(150)).trimmingCharacters(in: .whitespaces) + "…" : plain
+        return "\(authorName) wrote:\n> \(excerpt)\n\n"
+    }
+}

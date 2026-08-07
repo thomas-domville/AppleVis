@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct AppDetailView: View {
     let appId: String
@@ -6,6 +7,7 @@ struct AppDetailView: View {
     @State private var isLoading = false
     @State private var error: String?
     @State private var showReviewCompose = false
+    @State private var quotedReview: AppReview?
     @State private var itunesMetadata: ItunesMetadata?
     @State private var developerApps: [ItunesDeveloperApp] = []
     @State private var isLoadingMoreReviews = false
@@ -109,6 +111,11 @@ struct AppDetailView: View {
         }
         .sheet(isPresented: $showReviewCompose) {
             ComposeAppReviewView(appId: detail.id, appName: detail.name) { review in
+                self.detail?.reviews.append(review)
+            }
+        }
+        .sheet(item: $quotedReview) { target in
+            ComposeAppReviewView(appId: detail.id, appName: detail.name, quotedReview: target) { review in
                 self.detail?.reviews.append(review)
             }
         }
@@ -387,6 +394,13 @@ struct AppDetailView: View {
                             authorId: review.authorId, rating: review.rating, body: newText, createdAt: review.createdAt
                         )
                     },
+                    onReplyTo: {
+                        guard auth.isSignedIn else {
+                            toast.warning("Sign in to reply to reviews.")
+                            return
+                        }
+                        quotedReview = review
+                    },
                     focusBinding: $focusedReviewId
                 )
                 .id(review.id)
@@ -507,6 +521,7 @@ struct AppReviewRow: View {
     let total: Int
     var onDelete: (() -> Void)? = nil
     var onEdit: ((String) -> Void)? = nil
+    var onReplyTo: (() -> Void)? = nil
     /// Set by the parent when it supports "Jump to Last Comment" — lets
     /// that action move VoiceOver focus here, not just scroll the viewport.
     var focusBinding: AccessibilityFocusState<String?>.Binding? = nil
@@ -543,6 +558,18 @@ struct AppReviewRow: View {
                 (review.subject.isEmpty ? "" : "\(review.subject).")
             )
             .modifier(OptionalReplyFocus(binding: focusBinding, id: review.id))
+            .readAloudAction(review.body.strippingHTMLTags())
+            .modifier(ConditionalAccessibilityAction(isActive: onReplyTo != nil, name: "Reply to this Comment") { onReplyTo?() })
+            .accessibilityAction(named: Text("Copy Comment Text")) { copyText() }
+            .accessibilityAction(named: Text("Share Comment")) { presentShareSheet() }
+            .accessibilityAction(named: Text("Mark as Helpful")) {
+                toast.warning("Helpful votes are coming once the Drupal Flags API is confirmed.")
+            }
+            .accessibilityAction(named: Text("Report Comment")) {
+                toast.warning("Reporting is coming once the Drupal Flags API is confirmed.")
+            }
+            .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Edit Review") { showEditSheet = true })
+            .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Delete Review") { showDeleteConfirm = true })
 
             if !review.subject.isEmpty {
                 Text(review.subject).font(.subheadline).fontWeight(.medium)
@@ -598,6 +625,26 @@ struct AppReviewRow: View {
         } catch {
             toast.error("Couldn't delete review.")
         }
+    }
+
+    private func copyText() {
+        UIPasteboard.general.string = review.body.strippingHTMLTags()
+        toast.success("Comment text copied.")
+    }
+
+    private func presentShareSheet() {
+        let plain = review.body.strippingHTMLTags()
+        let subject = review.subject.trimmingCharacters(in: .whitespaces)
+        var message = "\(review.authorName) on AppleVis"
+        if !subject.isEmpty { message += ":\n\nSubject: \(subject)" }
+        message += "\n\n\(plain)"
+        let activityVC = UIActivityViewController(activityItems: [message], applicationActivities: nil)
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }?
+            .rootViewController?
+            .present(activityVC, animated: true)
     }
 }
 
@@ -707,15 +754,28 @@ struct RatingGaugeView: View {
 struct ComposeAppReviewView: View {
     let appId: String
     let appName: String
+    var quotedReview: AppReview? = nil
     let onPosted: (AppReview) -> Void
 
     @State private var subject = ""
-    @State private var reviewText = ""
+    @State private var reviewText: String
     @State private var isSubmitting = false
     @State private var submitError: String?
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+
+    init(appId: String, appName: String, quotedReview: AppReview? = nil, onPosted: @escaping (AppReview) -> Void) {
+        self.appId = appId
+        self.appName = appName
+        self.quotedReview = quotedReview
+        self.onPosted = onPosted
+        if let quotedReview {
+            _reviewText = State(initialValue: QuotedReply.prefix(authorName: quotedReview.authorName, body: quotedReview.body))
+        } else {
+            _reviewText = State(initialValue: "")
+        }
+    }
 
     // AppleVis's review comment bundle has no rating field on the backend —
     // only a subject and body — so there's no star-rating input here; adding
@@ -723,7 +783,7 @@ struct ComposeAppReviewView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
-                Text("Reviewing: \(appName)")
+                Text(quotedReview != nil ? "Replying to \(quotedReview!.authorName) — Reviewing: \(appName)" : "Reviewing: \(appName)")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .padding(.horizontal).padding(.top)
                 TextField("Subject (optional)", text: $subject)

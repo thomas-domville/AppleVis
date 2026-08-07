@@ -7,6 +7,7 @@ struct EpisodeDetailView: View {
     @State private var isLoading = false
     @State private var error: String?
     @State private var showCompose = false
+    @State private var quotedComment: PodcastComment?
     @State private var showTranscript = false
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
@@ -123,6 +124,11 @@ struct EpisodeDetailView: View {
                 comments.append(comment)
             }
         }
+        .sheet(item: $quotedComment) { target in
+            ComposePodcastCommentView(episodeId: episode.id, title: episode.title, quotedComment: target) { comment in
+                comments.append(comment)
+            }
+        }
         .sheet(isPresented: $showTranscript) {
             TranscriptView(episodeId: episode.id, episodeTitle: episode.title)
         }
@@ -220,6 +226,13 @@ struct EpisodeDetailView: View {
                     onEdit: { newText in
                         guard let idx = comments.firstIndex(where: { $0.id == comment.id }) else { return }
                         comments[idx] = PodcastComment(id: comment.id, authorName: comment.authorName, authorId: comment.authorId, subject: comment.subject, body: newText, createdAt: comment.createdAt)
+                    },
+                    onReplyTo: {
+                        guard auth.isSignedIn else {
+                            toast.warning("Sign in to reply to comments.")
+                            return
+                        }
+                        quotedComment = comment
                     },
                     focusBinding: $focusedCommentId
                 )
@@ -359,19 +372,32 @@ struct ChapterRow: View {
 struct ComposePodcastCommentView: View {
     let episodeId: String
     let title: String
+    var quotedComment: PodcastComment? = nil
     let onPosted: (PodcastComment) -> Void
 
-    @State private var commentText = ""
+    @State private var commentText: String
     @State private var isSubmitting = false
     @State private var submitError: String?
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
 
+    init(episodeId: String, title: String, quotedComment: PodcastComment? = nil, onPosted: @escaping (PodcastComment) -> Void) {
+        self.episodeId = episodeId
+        self.title = title
+        self.quotedComment = quotedComment
+        self.onPosted = onPosted
+        if let quotedComment {
+            _commentText = State(initialValue: QuotedReply.prefix(authorName: quotedComment.authorName, body: quotedComment.body))
+        } else {
+            _commentText = State(initialValue: "")
+        }
+    }
+
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
-                Text("Re: \(title)")
+                Text(quotedComment != nil ? "Replying to \(quotedComment!.authorName) — Re: \(title)" : "Re: \(title)")
                     .font(.subheadline).foregroundStyle(.secondary).padding()
                 TextEditor(text: $commentText).padding()
                 if let err = submitError {

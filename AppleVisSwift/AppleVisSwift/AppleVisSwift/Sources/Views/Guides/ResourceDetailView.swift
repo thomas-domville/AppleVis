@@ -7,6 +7,7 @@ struct ResourceDetailView: View {
     @State private var isLoading = false
     @State private var error: String?
     @State private var showCompose = false
+    @State private var quotedComment: ResourceComment?
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
     @State private var guideSummary: String?
@@ -112,6 +113,11 @@ struct ResourceDetailView: View {
                 self.detail?.comments.append(comment)
             }
         }
+        .sheet(item: $quotedComment) { target in
+            ComposeResourceCommentView(resourceId: detail.id, title: detail.title, quotedComment: target) { comment in
+                self.detail?.comments.append(comment)
+            }
+        }
     }
 
     @ViewBuilder
@@ -133,12 +139,20 @@ struct ResourceDetailView: View {
                     index: index, total: detail.comments.count,
                     subject: comment.subject, parentTitle: detail.title,
                     commentId: comment.id, authorId: comment.authorId, commentType: "comment_node_guides",
+                    supportsReport: false,
                     onDelete: {
                         self.detail?.comments.removeAll { $0.id == comment.id }
                     },
                     onEdit: { newText in
                         guard let idx = self.detail?.comments.firstIndex(where: { $0.id == comment.id }) else { return }
                         self.detail?.comments[idx] = ResourceComment(id: comment.id, authorName: comment.authorName, authorId: comment.authorId, subject: comment.subject, body: newText, createdAt: comment.createdAt)
+                    },
+                    onReplyTo: {
+                        guard auth.isSignedIn else {
+                            toast.warning("Sign in to reply to comments.")
+                            return
+                        }
+                        quotedComment = comment
                     },
                     focusBinding: $focusedCommentId
                 )
@@ -367,8 +381,14 @@ struct CommentRow: View {
     var commentId: String? = nil
     var authorId: String? = nil
     var commentType: String? = nil
+    /// RN never had a "Report" action on Guide/Blog comments — only on
+    /// Podcast episode comments (`app/episode/[id].tsx`). Bug Report
+    /// comments have no RN precedent at all; kept enabled there by default
+    /// since it's already-shipped functionality, not a regression.
+    var supportsReport: Bool = true
     var onDelete: (() -> Void)? = nil
     var onEdit: ((String) -> Void)? = nil
+    var onReplyTo: (() -> Void)? = nil
     /// Set by the parent when it supports "Jump to Last Comment" — lets
     /// that action move VoiceOver focus here, not just scroll the viewport.
     var focusBinding: AccessibilityFocusState<String?>.Binding? = nil
@@ -411,14 +431,13 @@ struct CommentRow: View {
             .accessibilityLabel(headerAccessibilityLabel)
             .accessibilityHint("Actions available: copy, share, and more.")
             .modifier(OptionalReplyFocus(binding: focusBinding, id: commentId ?? "\(authorName)-\(date.timeIntervalSince1970)"))
+            .readAloudAction(text.strippingHTMLTags())
+            .modifier(ConditionalAccessibilityAction(isActive: onReplyTo != nil, name: "Reply to this Comment") { onReplyTo?() })
             .accessibilityAction(named: Text("Copy Comment Text")) { copyText() }
             .accessibilityAction(named: Text("Share Comment")) { presentShareSheet() }
-            .accessibilityAction(named: Text("Mark as Helpful")) {
-                toast.warning("Helpful votes are coming once the Drupal Flags API is confirmed.")
-            }
-            .accessibilityAction(named: Text("Report Comment")) {
+            .modifier(ConditionalAccessibilityAction(isActive: supportsReport, name: "Report Comment") {
                 toast.warning("Reporting is coming once the Drupal Flags API is confirmed.")
-            }
+            })
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Edit Comment") { showEditSheet = true })
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Delete Comment") { showDeleteConfirm = true })
 
@@ -489,19 +508,35 @@ struct CommentRow: View {
 struct ComposeResourceCommentView: View {
     let resourceId: String
     let title: String
+    /// Set when opened via a comment's "Reply to this Comment" VoiceOver
+    /// action — prefills a quoted excerpt the same way Forums' reply flow
+    /// does (see QuotedReply).
+    var quotedComment: ResourceComment? = nil
     let onPosted: (ResourceComment) -> Void
 
-    @State private var commentText = ""
+    @State private var commentText: String
     @State private var isSubmitting = false
     @State private var submitError: String?
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
 
+    init(resourceId: String, title: String, quotedComment: ResourceComment? = nil, onPosted: @escaping (ResourceComment) -> Void) {
+        self.resourceId = resourceId
+        self.title = title
+        self.quotedComment = quotedComment
+        self.onPosted = onPosted
+        if let quotedComment {
+            _commentText = State(initialValue: QuotedReply.prefix(authorName: quotedComment.authorName, body: quotedComment.body))
+        } else {
+            _commentText = State(initialValue: "")
+        }
+    }
+
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
-                Text("Re: \(title)")
+                Text(quotedComment != nil ? "Replying to \(quotedComment!.authorName) — Re: \(title)" : "Re: \(title)")
                     .font(.subheadline).foregroundStyle(.secondary).padding()
                 TextEditor(text: $commentText).padding()
                 if let err = submitError {
