@@ -221,16 +221,18 @@ final class HomeViewModel: ObservableObject {
     }
 
     /// Breaks "N new items" down by what actually changed — e.g. "2 new
-    /// forum topics, 1 new podcast episode, 3 items with new replies" —
-    /// instead of a bare count that doesn't say what kind of activity it
-    /// was or whether it's new content vs. new replies on something already
-    /// seen.
+    /// forum topics, 1 new podcast episode, 5 new comments" — instead of a
+    /// bare count that doesn't say what kind of activity it was. The
+    /// comment figure is a sum of actual new replies/reviews across
+    /// already-seen items (not a count of how many items got them), since
+    /// "3 items with new replies" doesn't tell you if that's 3 replies or
+    /// 30 — the user specifically asked for a real number here.
     private static func buildSummaryText(for newItems: [FeedItem], itemVisits: [String: PersistenceStore.ItemVisit]) -> String {
         var brandNewByKind: [ContentKind: Int] = [:]
-        var updatedCount = 0
+        var newCommentTotal = 0
         for item in newItems {
-            if itemVisits[item.id] != nil {
-                updatedCount += 1
+            if let visit = itemVisits[item.id] {
+                newCommentTotal += max(0, item.commentCount - visit.commentCount)
             } else {
                 brandNewByKind[item.kind, default: 0] += 1
             }
@@ -240,8 +242,8 @@ final class HomeViewModel: ObservableObject {
             guard let n = brandNewByKind[kind], n > 0 else { continue }
             parts.append("\(n) new \(kind.displayName.lowercased())\(n == 1 ? "" : "s")")
         }
-        if updatedCount > 0 {
-            parts.append("\(updatedCount) item\(updatedCount == 1 ? "" : "s") with new replies")
+        if newCommentTotal > 0 {
+            parts.append("\(newCommentTotal) new comment\(newCommentTotal == 1 ? "" : "s")")
         }
         guard !parts.isEmpty else {
             return "\(newItems.count) new item\(newItems.count == 1 ? "" : "s") since your last visit"
