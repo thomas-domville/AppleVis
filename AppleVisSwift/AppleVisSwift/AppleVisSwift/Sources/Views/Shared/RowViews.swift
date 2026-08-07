@@ -6,6 +6,41 @@ import SwiftUI
 /// PersistenceStore.newReplyCount so it isn't Home-exclusive. Purely visual;
 /// the accompanying text lives in each row's accessibility label instead of
 /// duplicating it here.
+/// Matches RN's `NowPlayingIndicator` — a small animated 3-bar waveform
+/// shown next to whichever episode is currently playing, so a low-vision
+/// user scanning a list can spot it at a glance instead of relying on the
+/// play/pause icon's state alone. Respects Reduce Motion (stays static).
+struct NowPlayingWaveform: View {
+    var color: Color = .accentColor
+    @State private var scales: [CGFloat] = [0.3, 0.6, 0.45]
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 2) {
+            ForEach(0..<3, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(color)
+                    .frame(width: 3, height: 14)
+                    .scaleEffect(y: scales[i], anchor: .bottom)
+            }
+        }
+        .frame(height: 14)
+        .accessibilityHidden(true)
+        .onAppear { animate() }
+    }
+
+    private func animate() {
+        guard !UIAccessibility.isReduceMotionEnabled else { return }
+        for i in 0..<3 {
+            let duration = 0.35 + Double(i) * 0.08
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.12) {
+                withAnimation(.easeInOut(duration: duration).repeatForever(autoreverses: true)) {
+                    scales[i] = 1.0
+                }
+            }
+        }
+    }
+}
+
 struct NewCountBadge: View {
     let count: Int
 
@@ -123,6 +158,9 @@ struct PodcastEpisodeRow: View {
                         .font(.body)
                         .lineLimit(2)
                     HStack {
+                        if isCurrentlyPlaying {
+                            NowPlayingWaveform()
+                        }
                         if let duration = episode.duration {
                             Text(Duration.seconds(duration).formatted(.units(allowed: [.hours, .minutes])))
                                 .font(.caption)

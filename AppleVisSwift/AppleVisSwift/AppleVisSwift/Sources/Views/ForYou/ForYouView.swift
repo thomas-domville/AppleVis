@@ -55,16 +55,17 @@ struct ForYouView: View {
             }
             .navigationTitle("For You")
             .toolbar {
+                // RN's shared header button is always "Profile and
+                // Settings" regardless of sign-in state (src/components/
+                // Screen.tsx) — ProfileView itself already shows a sign-in
+                // prompt when signed out, matching Home's own toolbar
+                // button, which never had this swap-to-"Sign In" behavior
+                // in the first place. This was a For You-only deviation.
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if auth.isSignedIn {
-                        NavigationLink(destination: ProfileView()) {
-                            Image(systemName: "person.circle")
-                        }
-                    } else {
-                        NavigationLink(destination: SignInView()) {
-                            Text("Sign In")
-                        }
+                    NavigationLink(destination: ProfileView()) {
+                        Image(systemName: "person.circle")
                     }
+                    .accessibilityLabel("Profile and Settings")
                 }
             }
         }

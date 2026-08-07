@@ -30,17 +30,27 @@ struct CommunityDiscussionHeading: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Community Discussion")
-                    .font(.headline)
-                Spacer()
-                Text("\(count) comment\(count == 1 ? "" : "s")")
-                    .font(.caption).foregroundStyle(.secondary)
+            // Matches RN's SectionDivider (flanking lines around a
+            // centered uppercase label) — Swift's version was plain
+            // left-aligned text with no divider treatment at all.
+            HStack(spacing: 10) {
+                Rectangle().fill(Color(uiColor: .separator)).frame(height: 1)
+                Text("COMMUNITY DISCUSSION")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+                Rectangle().fill(Color(uiColor: .separator)).frame(height: 1)
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
             .accessibilityLabel("Community Discussion, \(count) comment\(count == 1 ? "" : "s")")
             .accessibilityAction(named: Text("Thread overview"), onThreadOverview)
+
+            if count > 0 {
+                Text("\(count) comment\(count == 1 ? "" : "s")")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
 
             if let onJumpToLast, count > 1 {
                 Button(action: onJumpToLast) {
