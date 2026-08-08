@@ -63,7 +63,7 @@ struct PrivacySettingsView: View {
             }
 
             Section("iCloud Sync") {
-                Text("Saved items, reading position, podcast position, queue, and settings can sync across your devices via iCloud.")
+                Text("Saved items, followed content, podcast position, queue, and settings can sync across your devices via iCloud. Each of these can be turned on or off individually in Settings > Saved and Sync.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 NavigationLink {

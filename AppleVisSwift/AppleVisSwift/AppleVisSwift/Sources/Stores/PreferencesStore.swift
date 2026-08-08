@@ -86,7 +86,7 @@ final class PreferencesStore: ObservableObject {
     // MARK: - iCloud Sync
     @AppStorage("sync.iCloud")          var iCloudSync = true
     @AppStorage("sync.savedItems")      var savedItemsSync = true
-    @AppStorage("sync.readingPosition") var readingPositionSync = true
+    @AppStorage("sync.followedItems")   var followedItemsSync = true
     @AppStorage("sync.podcastPosition") var podcastPositionSync = true
     @AppStorage("sync.queue")           var queueSync = true
     @AppStorage("sync.settings")        var settingsSync = true

@@ -44,6 +44,7 @@ final class AuthStore: ObservableObject {
         guard let u = user else { return }
         await PushNotificationManager.clearRegistration()
         try? await APIClient.shared.account.logout(csrfToken: u.csrfToken, logoutToken: u.logoutToken)
+        SpotlightIndexer.deindexAll()
         user = nil
         deleteFromKeychain()
     }

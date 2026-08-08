@@ -22,7 +22,7 @@ struct OpenAppleVisIntent: AppIntent {
 
 struct OpenAppleVisForumsIntent: AppIntent {
     static var title: LocalizedStringResource = "Open AppleVis Forums"
-    static var description = IntentDescription("Opens the AppleVis Forums.")
+    static var description = IntentDescription("Opens the AppleVis Forums tab.")
     static var openAppWhenRun: Bool = true
 
     @MainActor
@@ -60,7 +60,7 @@ struct ResumeAppleVisPodcastIntent: AppIntent {
 
 struct PlayLatestPodcastIntent: AppIntent {
     static var title: LocalizedStringResource = "Play Latest AppleVis Podcast"
-    static var description = IntentDescription("Plays the latest AppleVis podcast episode.")
+    static var description = IntentDescription("Opens the Podcasts tab and plays the latest episode.")
     static var openAppWhenRun: Bool = true
 
     @MainActor
@@ -153,9 +153,13 @@ struct AppleVisShortcuts: AppShortcutsProvider {
         )
         AppShortcut(
             intent: SearchAppleVisIntent(),
-            // A plain String @Parameter can't be embedded in a phrase (only
-            // AppEntity/AppEnum can) — Siri still prompts for `query`
-            // conversationally after one of these static phrases.
+            // Confirmed via the AppIntents metadata compiler itself
+            // ("'AppEntity' and 'AppEnum' are the only allowed types for
+            // 'query'") — a plain String @Parameter genuinely can't be
+            // embedded in a phrase on this SDK, so RN's equivalent phrases
+            // (which did embed their query parameter) aren't reproducible
+            // here. Siri still prompts for `query` conversationally after
+            // one of these static phrases.
             phrases: [
                 "Search \(.applicationName)",
                 "Find something on \(.applicationName)",

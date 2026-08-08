@@ -297,6 +297,7 @@ struct ContentActionsModifier: ViewModifier {
         let suffix = await resolvedNodeTypeSuffix()
         do {
             try await APIClient.shared.content.deleteNode(nodeId: id, nodeType: suffix, csrfToken: user.csrfToken)
+            SpotlightIndexer.deindex(kind: kind, id: id)
             toast.success("\(kind.displayName) deleted")
             onContentDeleted?()
         } catch {

@@ -7,9 +7,6 @@ import Foundation
 /// target in Xcode's Signing & Capabilities tab. Without it, `NSUbiquitousKeyValueStore`
 /// calls are harmless no-ops — nothing crashes, it just won't sync.
 ///
-/// Note: `readingPositionSync` has no corresponding local feature to sync —
-/// this app has no "reading position" concept for articles/guides — so it's
-/// intentionally left unwired here rather than faked.
 @MainActor
 final class ICloudSyncManager {
     static let shared = ICloudSyncManager()
@@ -43,9 +40,12 @@ final class ICloudSyncManager {
     // MARK: - Push (call after a local write)
 
     func pushSavedItems() {
-        guard isSyncEnabled("sync.savedItems") else { return }
-        setJSON(PersistenceStore.shared.savedItems(), key: "icloud.saved")
-        setJSON(PersistenceStore.shared.followedItems(), key: "icloud.followed")
+        if isSyncEnabled("sync.savedItems") {
+            setJSON(PersistenceStore.shared.savedItems(), key: "icloud.saved")
+        }
+        if isSyncEnabled("sync.followedItems") {
+            setJSON(PersistenceStore.shared.followedItems(), key: "icloud.followed")
+        }
         store.synchronize()
     }
 
@@ -87,11 +87,10 @@ final class ICloudSyncManager {
     }
 
     private func pullSavedItems() {
-        guard isSyncEnabled("sync.savedItems") else { return }
-        if let saved: [SavedItem] = getJSON(key: "icloud.saved") {
+        if isSyncEnabled("sync.savedItems"), let saved: [SavedItem] = getJSON(key: "icloud.saved") {
             PersistenceStore.shared.replaceSavedItems(saved)
         }
-        if let followed: [FollowedItem] = getJSON(key: "icloud.followed") {
+        if isSyncEnabled("sync.followedItems"), let followed: [FollowedItem] = getJSON(key: "icloud.followed") {
             PersistenceStore.shared.replaceFollowedItems(followed)
         }
     }

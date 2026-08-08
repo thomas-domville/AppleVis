@@ -978,7 +978,7 @@ enum HelpContent {
                     summary: "What syncs through iCloud, and how account and local data are handled.",
                     content: [
                         .bullets([
-                            "Saved and Sync controls what goes through iCloud: saved items, following, reading position, podcast position, queue, and preferences.",
+                            "Saved and Sync controls what goes through iCloud: saved items, following, podcast position, queue, and preferences.",
                             "Privacy explains account data, Keychain, iCloud, smart features, and local data — and what never leaves the device.",
                             "Clear Local Data signs out and removes AppleVis data stored on this device without deleting your applevis.com account.",
                         ]),
@@ -1146,7 +1146,7 @@ enum HelpContent {
                         .heading("AirPlay and Route Picker"),
                         .body("The route picker in the podcast player lets you send audio to AirPlay speakers, HomePod, or Bluetooth devices, the same way any other audio app does."),
                         .heading("iCloud Sync"),
-                        .body("Saved items, following, reading position, podcast position, queue, and preferences can sync through your private iCloud account. Each of these can be turned on or off individually in Settings > Saved and Sync."),
+                        .body("Saved items, following, podcast position, queue, and preferences can sync through your private iCloud account. Each of these can be turned on or off individually in Settings > Saved and Sync."),
                     ],
                     contentType: .guide,
                     relatedLinks: [

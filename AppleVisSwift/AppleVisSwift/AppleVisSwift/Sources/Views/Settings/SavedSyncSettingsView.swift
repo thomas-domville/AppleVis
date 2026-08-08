@@ -8,7 +8,7 @@ struct SavedSyncSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Text("Keep your saved content, reading positions, podcast queue, and settings in sync across all your Apple devices using iCloud.")
+                Text("Keep your saved content, followed topics, podcast queue, and settings in sync across all your Apple devices using iCloud.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -56,10 +56,10 @@ struct SavedSyncSettingsView: View {
                     )
 
                     SyncToggleRow(
-                        isOn: $preferences.readingPositionSync,
-                        icon: "text.book.closed",
-                        label: "Reading Position",
-                        detail: "Resume reading from the same point on any device."
+                        isOn: $preferences.followedItemsSync,
+                        icon: "bell",
+                        label: "Following",
+                        detail: "Topics and content you follow stay the same on all devices."
                     )
 
                     SyncToggleRow(

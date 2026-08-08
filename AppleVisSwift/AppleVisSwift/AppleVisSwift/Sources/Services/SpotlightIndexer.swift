@@ -30,6 +30,21 @@ enum SpotlightIndexer {
         CSSearchableIndex.default().indexSearchableItems([item])
     }
 
+    /// Removes a single item from the Spotlight index — e.g. after it's
+    /// deleted. RN's native Spotlight module (never actually called from any
+    /// RN screen) designed for this via `deleteSearchableItems`; Swift's
+    /// port only ever indexed, with no way to remove anything.
+    static func deindex(kind: ContentKind, id: String) {
+        CSSearchableIndex.default().deleteSearchableItems(withIdentifiers: [identifier(kind: kind, id: id)])
+    }
+
+    /// Clears every AppleVis item from system Spotlight — called on sign-out
+    /// so a shared device doesn't keep surfacing another user's browsing
+    /// history in search after they've signed out.
+    static func deindexAll() {
+        CSSearchableIndex.default().deleteSearchableItems(withDomainIdentifiers: ContentKind.allCases.map(\.rawValue))
+    }
+
     static func index(_ topic: ForumTopic) {
         index(kind: .forumTopic, id: topic.id, title: topic.title, contentDescription: "\(topic.category) · \(topic.replyCount) replies", url: topic.url)
     }
