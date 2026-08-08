@@ -86,6 +86,12 @@ struct AppleVisApp: App {
                     // notifBadge description: "tap the app and the badge
                     // clears") — opening the app clears it.
                     UNUserNotificationCenter.current().setBadgeCount(0)
+                    // Previously only pulled once at cold launch (`.task`
+                    // runs once per view identity) — switching between two
+                    // signed-in devices within the same session meant the
+                    // other device's saved items/queue/settings changes
+                    // never appeared until a full quit and relaunch.
+                    ICloudSyncManager.shared.pullAll()
                 }
             }
             .task {
@@ -94,6 +100,8 @@ struct AppleVisApp: App {
                 PushNotificationManager.deepLinkRouter = deepLinkRouter
                 PushNotificationManager.authStore = auth
                 PushNotificationManager.toastStore = toast
+                APIClient.authStore = auth
+                APIClient.toastStore = toast
             }
             .onChange(of: preferences.notificationSound) { _, _ in
                 Task { await PushNotificationManager.syncRegistration() }

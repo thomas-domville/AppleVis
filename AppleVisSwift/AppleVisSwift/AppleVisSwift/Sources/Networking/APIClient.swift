@@ -36,6 +36,13 @@ enum APIError: LocalizedError {
 final class APIClient {
     static let shared = APIClient()
 
+    /// Set once at launch (see AppleVisApp.swift) so a 401 anywhere can
+    /// trigger a local sign-out instead of surfacing a confusing generic
+    /// error on whatever unrelated action happened to hit the expired
+    /// session first.
+    @MainActor static weak var authStore: AuthStore?
+    @MainActor static weak var toastStore: ToastStore?
+
     private let session: URLSession
     private let baseURL = URL(string: "https://www.applevis.com")!
     private let jsonAPIBase = URL(string: "https://www.applevis.com/jsonapi")!
@@ -251,7 +258,13 @@ final class APIClient {
         guard let http = response as? HTTPURLResponse else { return }
         switch http.statusCode {
         case 200...299: return
-        case 401: throw APIError.unauthorized
+        case 401:
+            Task { @MainActor in
+                guard Self.authStore?.isSignedIn == true else { return }
+                Self.authStore?.handleSessionExpired()
+                Self.toastStore?.error(String(localized: "Your session expired. Please sign in again."))
+            }
+            throw APIError.unauthorized
         case 403: throw APIError.forbidden
         case 429: throw APIError.rateLimited
         case 500...599: throw APIError.server(statusCode: http.statusCode)

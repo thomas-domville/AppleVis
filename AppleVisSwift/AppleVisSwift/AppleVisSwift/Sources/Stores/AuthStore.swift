@@ -49,6 +49,22 @@ final class AuthStore: ObservableObject {
         deleteFromKeychain()
     }
 
+    /// Called when any request comes back 401 — the server has already
+    /// invalidated this session (expired token, revoked on another device,
+    /// etc.), so calling the logout endpoint with those same now-invalid
+    /// credentials would be pointless. Clears local state only. Previously
+    /// a 401 anywhere in the app just surfaced as "Incorrect username or
+    /// password" on whatever unrelated action triggered it (e.g. posting a
+    /// reply), which is a confusing message for an expired session and left
+    /// the stale, no-longer-valid session sitting in the Keychain.
+    func handleSessionExpired() {
+        guard user != nil else { return }
+        SpotlightIndexer.deindexAll()
+        user = nil
+        deleteFromKeychain()
+        Task { await PushNotificationManager.clearRegistration() }
+    }
+
     func completeOnboarding() {
         isOnboarded = true
         justCompletedOnboarding = true
