@@ -469,7 +469,7 @@ struct AppDetailView: View {
 
             if hasMoreReviews {
                 if isLoadingMoreReviews {
-                    ProgressView().frame(maxWidth: .infinity).padding()
+                    ProgressView().frame(maxWidth: .infinity).accessibilityLabel(String(localized: "Loading more…")).padding()
                 } else {
                     let remaining = detail.reviewCount - detail.reviews.count
                     Button(remaining > 0 ? "Load \(remaining) More Reviews" : "Load More Reviews") {
@@ -708,7 +708,7 @@ struct AppReviewRow: View {
 
     private func copyText() {
         UIPasteboard.general.string = review.body.strippingHTMLTags()
-        toast.success(String(localized: "Comment text copied."))
+        toast.success(String(localized: "Copied to clipboard."))
     }
 
     private func presentShareSheet() {

@@ -144,7 +144,7 @@ struct ForumTopicDetailView: View {
 
                         if hasMoreReplies {
                             if isLoadingMoreReplies {
-                                ProgressView().frame(maxWidth: .infinity).padding()
+                                ProgressView().frame(maxWidth: .infinity).accessibilityLabel(String(localized: "Loading more…")).padding()
                             } else {
                                 let remaining = detail.replyCount - detail.replies.count
                                 Button(remaining > 0 ? "Load \(remaining) More Replies" : "Load More Replies") {
@@ -450,14 +450,14 @@ struct ForumTopicDetailView: View {
                 DetailActionButton(
                     systemImage: isFollowing ? "bell.fill" : "bell",
                     visualLabel: isFollowing ? "Unfollow" : "Follow",
-                    accessibilityLabel: isFollowing ? "Unfollow topic" : "Follow topic"
+                    accessibilityLabel: isFollowing ? "Unfollow Topic" : "Follow Topic"
                 ) { Task { await toggleFollow() } }
             }
 
             DetailActionButton(
                 systemImage: isSaved ? "bookmark.fill" : "bookmark",
                 visualLabel: isSaved ? "Unsave" : "Save",
-                accessibilityLabel: isSaved ? "Unsave topic" : "Save topic"
+                accessibilityLabel: isSaved ? "Unsave Topic" : "Save Topic"
             ) { toggleSave() }
 
             if let shareURL = URL(string: detail.url) {
@@ -608,7 +608,7 @@ struct ReplyView: View {
 
     private func copyText() {
         UIPasteboard.general.string = reply.body.strippingHTMLTags()
-        toast.success(String(localized: "Comment text copied."))
+        toast.success(String(localized: "Copied to clipboard."))
     }
 
     /// Mirrors the old app's "Share Comment" action — shares the comment as

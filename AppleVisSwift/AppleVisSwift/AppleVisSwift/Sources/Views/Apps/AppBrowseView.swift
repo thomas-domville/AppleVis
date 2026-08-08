@@ -126,13 +126,13 @@ struct AppCategoryView: View {
     var body: some View {
         Group {
             if isLoading && apps.isEmpty {
-                LoadingView()
+                LoadingView(message: "Loading apps…")
             } else if let error, apps.isEmpty {
                 ErrorView(message: error) { await load(reset: true) }
             } else if apps.isEmpty {
                 EmptyStateView(
-                    title: "No Apps",
-                    message: "No apps found in this category.",
+                    title: "No apps yet",
+                    message: "Pull to refresh apps",
                     systemImage: "square.grid.2x2"
                 )
             } else {
@@ -145,7 +145,7 @@ struct AppCategoryView: View {
                         AppListingRow(app: app, onDelete: { apps.removeAll { $0.id == app.id } })
                     }
                     if hasMore {
-                        ProgressView().frame(maxWidth: .infinity)
+                        ProgressView().frame(maxWidth: .infinity).accessibilityLabel(String(localized: "Loading more…"))
                             .listRowSeparator(.hidden)
                             .task { await loadMore() }
                     }
@@ -171,7 +171,7 @@ struct AppCategoryView: View {
             apps = fetched
             hasMore = fetched.count >= APIPaging.pageSize
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Couldn't load apps." }
+        } catch { self.error = "Could not load apps" }
         isLoading = false
     }
 

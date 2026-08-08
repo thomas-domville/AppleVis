@@ -66,6 +66,14 @@ struct ForumsBrowseView: View {
         topics.filter { matchesSearch(title: $0.title, author: $0.authorName) }
     }
 
+    private var forumsEmptyMessage: String {
+        switch filter {
+        case .unread:          return "You are all caught up."
+        case .sinceLastVisit: return "No new activity since your last visit."
+        default:                return "Pull to refresh forums"
+        }
+    }
+
     private static let nonAppleCategoryNames: Set<String> = [
         "windows", "android", "smart home tech and gadgets", "assistive technology",
     ]
@@ -99,8 +107,8 @@ struct ForumsBrowseView: View {
                     EmptyStateView(
                         title: filter == .following ? "Not Following Any Topics" : "No Saved Topics",
                         message: filter == .following
-                            ? "Follow forum topics to get notified of new replies."
-                            : "Tap the bookmark icon on any topic to save it.",
+                            ? "You are not following any topics yet."
+                            : "You have not saved any topics yet.",
                         systemImage: filter == .following ? "bell" : "bookmark"
                     )
                 } else {
@@ -127,9 +135,11 @@ struct ForumsBrowseView: View {
                     .themedList(preferences.colors)
                 }
             } else if isLoading && topics.isEmpty {
-                LoadingView()
+                LoadingView(message: "Loading \(filter.displayName)…")
             } else if let error, topics.isEmpty {
                 ErrorView(message: error) { await load(reset: true) }
+            } else if filteredTopics.isEmpty {
+                EmptyStateView(title: "No topics", message: forumsEmptyMessage, systemImage: "bubble.left.and.bubble.right")
             } else {
                 topicList
             }
@@ -184,7 +194,7 @@ struct ForumsBrowseView: View {
                     .accessibilityFocused($focusedTopicId, equals: topic.id)
             }
             if hasMore {
-                ProgressView().frame(maxWidth: .infinity)
+                ProgressView().frame(maxWidth: .infinity).accessibilityLabel(String(localized: "Loading more…"))
                     .task { await loadMore() }
             }
         }
@@ -215,7 +225,7 @@ struct ForumsBrowseView: View {
             hasMore = fetched.count >= APIPaging.pageSize
             PersistenceStore.shared.markForumsVisited()
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Couldn't load forums." }
+        } catch { self.error = "Could not load topics" }
         isLoading = false
     }
 
@@ -259,7 +269,14 @@ private struct ForumFilterSheetView: View {
                             SoundPlayer.shared.play(.pickerTick)
                         } label: {
                             HStack {
-                                Text(option.displayName).foregroundStyle(.primary)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(option.displayName).foregroundStyle(.primary)
+                                    if let description = option.filterDescription {
+                                        Text(description)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
                                 Spacer()
                                 if filter == option {
                                     Image(systemName: "checkmark").foregroundStyle(Color.accentColor)

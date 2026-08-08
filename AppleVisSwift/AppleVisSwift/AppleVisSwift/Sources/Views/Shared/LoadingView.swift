@@ -1,10 +1,12 @@
 import SwiftUI
 
 struct LoadingView: View {
+    var message: String = "Loading…"
+
     var body: some View {
         VStack(spacing: 12) {
             ProgressView()
-            Text("Loading…")
+            Text(message)
                 .foregroundStyle(.secondary)
                 .font(.subheadline)
         }
@@ -25,7 +27,7 @@ struct ErrorView: View {
             Text(message)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
-            Button("Try Again") {
+            Button("Retry") {
                 Task { await retry() }
             }
             .buttonStyle(.bordered)

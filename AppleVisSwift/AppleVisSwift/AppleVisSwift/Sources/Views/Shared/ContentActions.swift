@@ -611,7 +611,7 @@ struct DetailActionButton: View {
         Button(action: action) {
             DetailActionButtonLabel(systemImage: systemImage, visualLabel: visualLabel)
         }
-        .accessibilityLabel(accessibilityLabel)
+        .accessibilityLabel(String(localized: String.LocalizationValue(accessibilityLabel)))
     }
 }
 
@@ -623,7 +623,7 @@ struct DetailActionButtonLabel: View {
         VStack(spacing: 4) {
             Image(systemName: systemImage)
                 .font(.system(size: 20))
-            Text(visualLabel)
+            Text(String(localized: String.LocalizationValue(visualLabel)))
                 .font(.caption2)
         }
         .frame(maxWidth: .infinity)

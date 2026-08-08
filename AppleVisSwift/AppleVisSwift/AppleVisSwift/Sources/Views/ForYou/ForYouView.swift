@@ -241,7 +241,7 @@ struct DownloadsView: View {
         .accessibilityAction(named: Text(isCurrentlyPlaying ? "Pause" : "Play")) {
             Task { await playDownloaded(meta) }
         }
-        .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to Queue")) {
+        .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to queue")) {
             if isQueued {
                 player.removeFromQueue(id: meta.id)
             } else {
@@ -572,7 +572,7 @@ private struct SavedPodcastEpisodeCard: View {
         .accessibilityAction(named: Text(isCurrentlyPlaying ? "Pause" : "Play")) {
             Task { await player.load(episode) }
         }
-        .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to Queue")) {
+        .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to queue")) {
             if isQueued { player.removeFromQueue(id: episode.id) } else { player.enqueue(episode) }
         }
         .contentActions(

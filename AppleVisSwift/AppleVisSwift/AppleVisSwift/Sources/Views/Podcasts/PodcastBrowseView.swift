@@ -16,9 +16,11 @@ struct PodcastBrowseView: View {
     var body: some View {
         Group {
             if isLoading && episodes.isEmpty {
-                LoadingView()
+                LoadingView(message: "Loading episodes…")
             } else if let error, episodes.isEmpty {
                 ErrorView(message: error) { await load(reset: true) }
+            } else if episodes.isEmpty {
+                EmptyStateView(title: "No episodes yet", message: "Pull to refresh podcast episodes", systemImage: "mic")
             } else {
                 episodeList
             }
@@ -57,7 +59,7 @@ struct PodcastBrowseView: View {
                 PodcastEpisodeRow(episode: episode, onDelete: { episodes.removeAll { $0.id == episode.id } })
             }
             if hasMore {
-                ProgressView().frame(maxWidth: .infinity)
+                ProgressView().frame(maxWidth: .infinity).accessibilityLabel(String(localized: "Loading more…"))
                     .task { await loadMore() }
             }
         }
@@ -77,7 +79,7 @@ struct PodcastBrowseView: View {
             if !fetchedTags.isEmpty { tags = fetchedTags }
             hasMore = fetched.count >= APIPaging.pageSize
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Couldn't load podcasts." }
+        } catch { self.error = "Could not load episodes" }
         isLoading = false
     }
 

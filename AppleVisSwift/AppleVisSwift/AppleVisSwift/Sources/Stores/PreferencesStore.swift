@@ -266,6 +266,16 @@ enum ForumFilter: String, CaseIterable, Identifiable {
     /// Following/Saved come from local persistence rather than the "recent" feed,
     /// so category/Apple-only refinement doesn't apply to them.
     var supportsRefinement: Bool { self == .recent || self == .new || self == .unread || self == .sinceLastVisit }
+
+    var filterDescription: String? {
+        switch self {
+        case .recent, .new:   return nil
+        case .sinceLastVisit: return "Topics that changed since you last opened AppleVis."
+        case .unread:          return "Topics you have not opened yet on this device."
+        case .following:       return "Topics you are following. Saved locally and synced via iCloud."
+        case .saved:           return "Topics you saved for later. Synced via iCloud."
+        }
+    }
 }
 
 enum AnnouncementLevel: String, CaseIterable, Identifiable {

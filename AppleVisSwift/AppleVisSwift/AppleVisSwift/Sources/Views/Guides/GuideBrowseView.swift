@@ -15,9 +15,11 @@ struct GuideBrowseView: View {
     var body: some View {
         Group {
             if isLoading && resources.isEmpty {
-                LoadingView()
+                LoadingView(message: "Loading resources…")
             } else if let error, resources.isEmpty {
                 ErrorView(message: error) { await load(reset: true) }
+            } else if resources.isEmpty {
+                EmptyStateView(title: "No resources yet", message: "Pull to refresh resources", systemImage: "book")
             } else {
                 resourceList
             }
@@ -53,7 +55,7 @@ struct GuideBrowseView: View {
             }
 
             if hasMore && searchText.isEmpty {
-                ProgressView().frame(maxWidth: .infinity)
+                ProgressView().frame(maxWidth: .infinity).accessibilityLabel(String(localized: "Loading more…"))
                     .listRowSeparator(.hidden)
                     .task { await loadMore() }
             }
@@ -98,7 +100,7 @@ struct GuideBrowseView: View {
             resources = fetched
             hasMore = fetched.count >= APIPaging.pageSize
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Couldn't load guides." }
+        } catch { self.error = "Could not load resources" }
         isLoading = false
     }
 

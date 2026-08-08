@@ -244,7 +244,7 @@ struct EpisodeDetailView: View {
 
             if hasMoreComments {
                 if isLoadingMoreComments {
-                    ProgressView().frame(maxWidth: .infinity).padding()
+                    ProgressView().frame(maxWidth: .infinity).accessibilityLabel(String(localized: "Loading more…")).padding()
                 } else {
                     let remaining = episode.commentCount - comments.count
                     Button(remaining > 0 ? "Load \(remaining) More Comments" : "Load More Comments") {

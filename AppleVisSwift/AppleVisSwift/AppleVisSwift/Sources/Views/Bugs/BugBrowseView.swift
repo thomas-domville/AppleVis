@@ -60,7 +60,7 @@ struct BugBrowseView: View {
             }
 
             if hasMore && searchText.isEmpty {
-                ProgressView().frame(maxWidth: .infinity)
+                ProgressView().frame(maxWidth: .infinity).accessibilityLabel(String(localized: "Loading more…"))
                     .listRowSeparator(.hidden)
                     .task { await loadMore() }
             }
