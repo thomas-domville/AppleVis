@@ -52,7 +52,7 @@ struct EditProfileView: View {
                             .foregroundStyle(.secondary)
                         TextEditor(text: $bio)
                             .frame(minHeight: 80)
-                            .accessibilityLabel("Bio text editor")
+                            .accessibilityLabel(String(localized: "Bio text editor"))
                     }
 
                     LabeledContent("Location") {
@@ -178,7 +178,7 @@ struct EditProfileView: View {
                     csrfToken: user.csrfToken,
                     fields: fields
                 )
-                toast.success("Profile saved.")
+                toast.success(String(localized: "Profile saved."))
                 dismiss()
             } catch let error as APIError {
                 errorMessage = error.localizedDescription

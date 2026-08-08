@@ -117,7 +117,7 @@ struct BugBrowseView: View {
             }
         } label: {
             Image(systemName: "line.3.horizontal.decrease.circle")
-                .accessibilityLabel("Filter bug reports")
+                .accessibilityLabel(String(localized: "Filter bug reports"))
         }
     }
 

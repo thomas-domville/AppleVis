@@ -36,7 +36,7 @@ struct MiniPlayerView: View {
                         .font(.title3)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
+                .accessibilityLabel(player.isPlaying ? String(localized: "Pause") : String(localized: "Play"))
 
                 Button {
                     Task { await player.skip(by: preferences.skipForwardInterval) }
@@ -55,7 +55,7 @@ struct MiniPlayerView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Stop and dismiss player")
+                .accessibilityLabel(String(localized: "Stop and dismiss player"))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -155,7 +155,7 @@ struct FullPlayerView: View {
                                     .frame(width: 22, height: 22)
                                     .padding(11)
                                     .contentShape(Rectangle())
-                                    .accessibilityLabel("Audio output")
+                                    .accessibilityLabel(String(localized: "Audio output"))
                             }
                         }
                         .padding(.bottom, 32)
@@ -205,7 +205,7 @@ struct FullPlayerView: View {
                     .foregroundStyle(Color.accentColor)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
+            .accessibilityLabel(player.isPlaying ? String(localized: "Pause") : String(localized: "Play"))
             .frame(maxWidth: .infinity)
 
             Button {
@@ -237,7 +237,7 @@ struct FullPlayerView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Playback speed: \(speedLabel(current))×")
-        .accessibilityHint("Double-tap to increase. Swipe up or down to adjust.")
+        .accessibilityHint(String(localized: "Double-tap to increase. Swipe up or down to adjust."))
         // Was double-tap-to-increase only, wrapping 3.0x back to 0.5x — a
         // VoiceOver user who overshot their target speed had to tap through
         // the entire list again (up to 9 taps) instead of swiping down once.
@@ -348,7 +348,7 @@ private struct ScrubberView: View {
         }
         .frame(height: 28)
         .accessibilityElement()
-        .accessibilityLabel("Playback position")
+        .accessibilityLabel(String(localized: "Playback position"))
         .accessibilityValue(player.duration > 0
             ? "\(formatScrubberTime(player.position)) of \(formatScrubberTime(player.duration)), \(Int(player.position / player.duration * 100))%"
             : "0%"

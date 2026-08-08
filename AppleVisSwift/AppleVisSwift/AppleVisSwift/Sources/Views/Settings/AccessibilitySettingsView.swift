@@ -13,20 +13,20 @@ struct AccessibilitySettingsView: View {
 
             Section("AppleVis Controls") {
                 Toggle("AppleVis Tips", isOn: $preferences.helpfulTipsEnabled)
-                    .accessibilityHint("Shows short contextual tips and friendly reminders where they can save time.")
+                    .accessibilityHint(String(localized: "Shows short contextual tips and friendly reminders where they can save time."))
 
                 Toggle("Welcome Summary", isOn: $preferences.welcomeSummaryEnabled)
-                    .accessibilityHint("Shows a brief Home update with new AppleVis activity since your last visit.")
+                    .accessibilityHint(String(localized: "Shows a brief Home update with new AppleVis activity since your last visit."))
 
                 Toggle("Auto-Focus Search Field", isOn: $preferences.searchAutoFocusEnabled)
-                    .accessibilityHint("Automatically focuses and raises the keyboard when you open Search.")
+                    .accessibilityHint(String(localized: "Automatically focuses and raises the keyboard when you open Search."))
 
                 Picker("Home Startup Behavior", selection: $preferences.homeStartupBehavior) {
                     ForEach(HomeStartupBehavior.allCases) { behavior in
                         Text(behavior.displayName).tag(behavior)
                     }
                 }
-                .accessibilityHint("Controls how much spoken announcement Home produces when you open or return to it.")
+                .accessibilityHint(String(localized: "Controls how much spoken announcement Home produces when you open or return to it."))
             }
 
             Section("VoiceOver Detail Level") {

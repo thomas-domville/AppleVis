@@ -44,7 +44,7 @@ struct GuidelinesReminderView: View {
                         .padding(.vertical, 9)
                         .background(config.button, in: RoundedRectangle(cornerRadius: 8))
                 }
-                .accessibilityHint("Dismisses this reminder.")
+                .accessibilityHint(String(localized: "Dismisses this reminder."))
 
                 Link(destination: Self.guidelinesURL) {
                     Text("View Guidelines")
@@ -54,7 +54,7 @@ struct GuidelinesReminderView: View {
                         .padding(.vertical, 9)
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(config.border, lineWidth: 1.5))
                 }
-                .accessibilityHint("Opens the AppleVis guidelines page in Safari.")
+                .accessibilityHint(String(localized: "Opens the AppleVis guidelines page in Safari."))
             }
         }
         .padding(14)

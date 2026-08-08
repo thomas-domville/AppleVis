@@ -102,13 +102,13 @@ struct BugDetailView: View {
                     Button { showCompose = true } label: {
                         Image(systemName: "square.and.pencil")
                     }
-                    .accessibilityLabel("Add comment")
+                    .accessibilityLabel(String(localized: "Add comment"))
                 }
                 Link(destination: Self.feedbackAssistantURL) {
                     Image(systemName: "flag")
                 }
-                .accessibilityLabel("Report to Apple")
-                .accessibilityHint("Opens Feedback Assistant to file this with Apple directly.")
+                .accessibilityLabel(String(localized: "Report to Apple"))
+                .accessibilityHint(String(localized: "Opens Feedback Assistant to file this with Apple directly."))
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -146,7 +146,7 @@ struct BugDetailView: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Apple Feedback ID: \(feedbackId).")
-        .accessibilityHint("Double-tap to open Feedback Assistant.")
+        .accessibilityHint(String(localized: "Double-tap to open Feedback Assistant."))
     }
 
     /// Two independent AI actions, matching Forums/Apps/Guides/Blogs —
@@ -186,7 +186,7 @@ struct BugDetailView: View {
                 }
             }
             .disabled(isSummarizingBug)
-            .accessibilityLabel(isSummarizingBug ? "Summarizing bug report, please wait" : "Summarize Bug Report")
+            .accessibilityLabel(String(localized: isSummarizingBug ? "Summarizing bug report, please wait" : "Summarize Bug Report"))
         }
     }
 
@@ -209,7 +209,7 @@ struct BugDetailView: View {
                 }
             }
             .disabled(isSummarizingDiscussion)
-            .accessibilityLabel(isSummarizingDiscussion ? "Summarizing discussion, please wait" : "Summarize Discussion")
+            .accessibilityLabel(String(localized: isSummarizingDiscussion ? "Summarizing discussion, please wait" : "Summarize Discussion"))
         }
     }
 
@@ -227,7 +227,7 @@ struct BugDetailView: View {
         if let summary = await IntelligenceService.summarize(input) {
             bugSummary = summary
         } else {
-            toast.error("Couldn't generate a summary for this bug report. Try again.")
+            toast.error(String(localized: "Couldn't generate a summary for this bug report. Try again."))
             UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a summary for this bug report.")
         }
         isSummarizingBug = false
@@ -251,7 +251,7 @@ struct BugDetailView: View {
         if let summary = await IntelligenceService.summarize(input) {
             discussionSummary = summary
         } else {
-            toast.error("Couldn't generate a discussion summary. Try again.")
+            toast.error(String(localized: "Couldn't generate a discussion summary. Try again."))
             UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a discussion summary.")
         }
         isSummarizingDiscussion = false
@@ -353,7 +353,7 @@ struct BugDetailView: View {
                     },
                     onReplyTo: {
                         guard auth.isSignedIn else {
-                            toast.warning("Sign in to reply to comments.")
+                            toast.warning(String(localized: "Sign in to reply to comments."))
                             return
                         }
                         quotedComment = comment
@@ -444,7 +444,7 @@ struct BugDetailView: View {
                 self.detail?.comments.append(contentsOf: more)
             }
         } catch {
-            toast.error("Couldn't load more comments.")
+            toast.error(String(localized: "Couldn't load more comments."))
         }
         hasMoreComments = (self.detail?.comments.count ?? 0) < (self.detail?.commentCount ?? 0)
         isLoadingMoreComments = false
@@ -523,7 +523,7 @@ struct ComposeBugCommentView: View {
             let comment = try await APIClient.shared.bugReports.submitComment(
                 platform: platform, bugId: bugId, body: commentText, csrfToken: user.csrfToken
             )
-            toast.success("Comment posted")
+            toast.success(String(localized: "Comment posted"))
             onPosted(comment)
             dismiss()
         } catch let e as APIError { submitError = e.localizedDescription

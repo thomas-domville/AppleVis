@@ -41,7 +41,7 @@ struct DeleteAccountView: View {
             Section {
                 Toggle("I understand this is permanent and cannot be reversed.", isOn: $confirmed)
                     .tint(.red)
-                    .accessibilityHint("You must confirm before the delete button becomes active.")
+                    .accessibilityHint(String(localized: "You must confirm before the delete button becomes active."))
             }
 
             if let error = errorMessage {
@@ -67,8 +67,8 @@ struct DeleteAccountView: View {
                     }
                 }
                 .disabled(!confirmed || isDeleting)
-                .accessibilityLabel("Delete My Account Permanently")
-                .accessibilityHint(confirmed ? "Deletes your account immediately and irreversibly." : "Confirm deletion above to activate this button.")
+                .accessibilityLabel(String(localized: "Delete My Account Permanently"))
+                .accessibilityHint(confirmed ? String(localized: "Deletes your account immediately and irreversibly.") : String(localized: "Confirm deletion above to activate this button."))
             }
         }
         .themedList(preferences.colors)

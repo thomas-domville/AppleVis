@@ -38,17 +38,17 @@ struct ForumSettingsView: View {
 
             Section("Home Feed Content") {
                 Toggle("Forum Topics", isOn: $preferences.showForums)
-                    .accessibilityHint("Include forum topics in the Home feed.")
+                    .accessibilityHint(String(localized: "Include forum topics in the Home feed."))
                 Toggle("Podcast Episodes", isOn: $preferences.showPodcasts)
-                    .accessibilityHint("Include podcast episodes in the Home feed.")
+                    .accessibilityHint(String(localized: "Include podcast episodes in the Home feed."))
                 Toggle("App Listings", isOn: $preferences.showApps)
-                    .accessibilityHint("Include app directory entries in the Home feed.")
+                    .accessibilityHint(String(localized: "Include app directory entries in the Home feed."))
                 Toggle("Guides & Tutorials", isOn: $preferences.showGuides)
-                    .accessibilityHint("Include how-to guides and tutorials in the Home feed.")
+                    .accessibilityHint(String(localized: "Include how-to guides and tutorials in the Home feed."))
                 Toggle("Blog Posts", isOn: $preferences.showBlogs)
-                    .accessibilityHint("Include blog posts and opinion pieces in the Home feed.")
+                    .accessibilityHint(String(localized: "Include blog posts and opinion pieces in the Home feed."))
                 Toggle("Apple Topics Only", isOn: $preferences.appleOnlyForums)
-                    .accessibilityHint("Limits the Home feed to topics directly related to Apple products and platforms.")
+                    .accessibilityHint(String(localized: "Limits the Home feed to topics directly related to Apple products and platforms."))
             }
         }
         .themedList(preferences.colors)

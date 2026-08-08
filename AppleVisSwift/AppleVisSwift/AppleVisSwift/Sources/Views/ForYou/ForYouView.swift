@@ -65,7 +65,7 @@ struct ForYouView: View {
                     NavigationLink(destination: ProfileView()) {
                         Image(systemName: "person.circle")
                     }
-                    .accessibilityLabel("Profile and Settings")
+                    .accessibilityLabel(String(localized: "Profile and Settings"))
                 }
             }
         }
@@ -236,7 +236,7 @@ struct DownloadsView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(meta.title). Downloaded. \(formattedSize(meta.fileSizeBytes)).")
-        .accessibilityHint("Double-tap to open episode details.")
+        .accessibilityHint(String(localized: "Double-tap to open episode details."))
         .readAloudAction(meta.title)
         .accessibilityAction(named: Text(isCurrentlyPlaying ? "Pause" : "Play")) {
             Task { await playDownloaded(meta) }
@@ -388,7 +388,7 @@ struct SavedItemsView: View {
         .accessibilityLabel(
             "\(item.title). \(item.kind.displayName). Saved \(item.savedAt.formatted(.relative(presentation: .named)))."
         )
-        .accessibilityHint("Double-tap to open.")
+        .accessibilityHint(String(localized: "Double-tap to open."))
         .readAloudAction(item.title)
         .accessibilityAction(named: Text("Open \(item.kind.displayName)")) {
             deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
@@ -653,7 +653,7 @@ struct FollowingView: View {
             "\(item.title). \(item.kind.displayName). Following." +
             (item.lastActivityAt.map { ", last activity \($0.formatted(.relative(presentation: .named)))." } ?? "")
         )
-        .accessibilityHint("Double-tap to open.")
+        .accessibilityHint(String(localized: "Double-tap to open."))
         .readAloudAction(item.title)
         .accessibilityAction(named: Text("Open \(item.kind.displayName)")) {
             deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)

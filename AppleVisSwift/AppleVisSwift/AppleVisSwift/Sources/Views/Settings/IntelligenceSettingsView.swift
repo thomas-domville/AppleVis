@@ -14,19 +14,19 @@ struct IntelligenceSettingsView: View {
 
             Section("Apple Intelligence Features") {
                 Toggle("Non-English Content Detection", isOn: $preferences.nonEnglishDetectionEnabled)
-                    .accessibilityHint("Detects when you're viewing content in a language other than English and offers to translate it.")
+                    .accessibilityHint(String(localized: "Detects when you're viewing content in a language other than English and offers to translate it."))
 
                 Toggle("Compose Rewrite", isOn: $preferences.composeRewriteEnabled)
-                    .accessibilityHint("When writing a forum post or message, AI can suggest rewrites to improve clarity or tone.")
+                    .accessibilityHint(String(localized: "When writing a forum post or message, AI can suggest rewrites to improve clarity or tone."))
 
                 Toggle("Compose Translation", isOn: $preferences.composeTranslationEnabled)
-                    .accessibilityHint("Translates your draft text so you can communicate in other languages.")
+                    .accessibilityHint(String(localized: "Translates your draft text so you can communicate in other languages."))
 
                 Toggle("Search Translation", isOn: $preferences.searchTranslationEnabled)
-                    .accessibilityHint("When you search for terms in non-English, AI translates your query to find relevant results.")
+                    .accessibilityHint(String(localized: "When you search for terms in non-English, AI translates your query to find relevant results."))
 
                 Toggle("AI Summaries", isOn: $preferences.aiSummariesEnabled)
-                    .accessibilityHint("Generates concise summaries for long forum threads and articles so you can quickly decide whether to read more.")
+                    .accessibilityHint(String(localized: "Generates concise summaries for long forum threads and articles so you can quickly decide whether to read more."))
 
                 FeatureInfoRow(
                     icon: "checkmark.bubble",

@@ -30,7 +30,7 @@ struct StorageView: View {
                         Text(opt.label).tag(opt.months)
                     }
                 }
-                .accessibilityHint("Cached articles and metadata older than this will be automatically removed.")
+                .accessibilityHint(String(localized: "Cached articles and metadata older than this will be automatically removed."))
 
                 Text("Cached content lets you re-open articles without waiting for a network request. Older content is cleared automatically based on this setting.")
                     .font(.caption)

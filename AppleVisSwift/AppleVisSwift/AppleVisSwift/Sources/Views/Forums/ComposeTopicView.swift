@@ -38,7 +38,7 @@ struct ComposeTopicView: View {
                                     title = result.subject ?? title
                                     bodyText = result.body
                                 } else {
-                                    toast.error("Couldn't translate this. Try again.")
+                                    toast.error(String(localized: "Couldn't translate this. Try again."))
                                 }
                             }
                         } onDismiss: {
@@ -84,7 +84,7 @@ struct ComposeTopicView: View {
                                     title = result.subject ?? title
                                     bodyText = result.body
                                 } else {
-                                    toast.error("Couldn't rewrite this. Try again.")
+                                    toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                 }
                             }
                         }
@@ -110,7 +110,7 @@ struct ComposeTopicView: View {
         error = nil
         do {
             _ = try await APIClient.shared.forums.submitTopic(title: title, body: bodyText, categoryTid: cat.tid, csrfToken: user.csrfToken)
-            toast.success("Topic posted")
+            toast.success(String(localized: "Topic posted"))
             dismiss()
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Failed to post topic." }
@@ -164,7 +164,7 @@ struct ComposeReplyView: View {
                             if let result = await intelligence.translate(subject: nil, body: bodyText, isTopic: false) {
                                 bodyText = result.body
                             } else {
-                                toast.error("Couldn't translate this. Try again.")
+                                toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
                         }
                     } onDismiss: {
@@ -203,7 +203,7 @@ struct ComposeReplyView: View {
                                 if let result = await intelligence.rewrite(subject: nil, body: bodyText, isTopic: false) {
                                     bodyText = result.body
                                 } else {
-                                    toast.error("Couldn't rewrite this. Try again.")
+                                    toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                 }
                             }
                         }
@@ -224,7 +224,7 @@ struct ComposeReplyView: View {
         error = nil
         do {
             let reply = try await APIClient.shared.forums.submitReply(topicId: topicId, body: bodyText, csrfToken: user.csrfToken)
-            toast.success("Reply posted")
+            toast.success(String(localized: "Reply posted"))
             SoundPlayer.shared.play(.reply)
             onPosted(reply)
             dismiss()

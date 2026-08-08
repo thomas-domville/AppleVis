@@ -87,7 +87,7 @@ struct SubmitBugView: View {
                                         title = result.subject ?? title
                                         description = result.body
                                     } else {
-                                        toast.error("Couldn't rewrite this. Try again.")
+                                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                     }
                                 }
                             }
@@ -146,7 +146,7 @@ struct SubmitBugView: View {
                                 title = result.subject ?? title
                                 description = result.body
                             } else {
-                                toast.error("Couldn't translate this. Try again.")
+                                toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
                         }
                     } onDismiss: {
@@ -186,7 +186,7 @@ struct SubmitBugView: View {
                 }
                 TextField("Software Version", text: $softwareVersion)
                 TextField("Apple Feedback ID (optional)", text: $appleFeedbackId)
-                    .accessibilityHint("The FB number from Apple's Feedback Assistant, if you also filed this there.")
+                    .accessibilityHint(String(localized: "The FB number from Apple's Feedback Assistant, if you also filed this there."))
                 Picker("Can you reproduce it?", selection: $canReproduce) {
                     ForEach(reproduceOptions, id: \.self) { Text($0) }
                 }
@@ -196,7 +196,7 @@ struct SubmitBugView: View {
                     ForEach(recognitionOptions, id: \.self) { Text($0) }
                 }
                 .pickerStyle(.navigationLink)
-                .accessibilityHint("Controls how you're credited if this report leads to a fix.")
+                .accessibilityHint(String(localized: "Controls how you're credited if this report leads to a fix."))
             }
         }
     }
@@ -250,7 +250,7 @@ struct SubmitBugView: View {
         )
         switch result {
         case .ok:
-            toast.success("Bug report submitted")
+            toast.success(String(localized: "Bug report submitted"))
             dismiss()
         case .failure(let message):
             error = message

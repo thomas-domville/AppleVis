@@ -29,7 +29,7 @@ struct GuidedExperienceResumeBanner: View {
                         .padding(.leading, 10).padding(.vertical, 4)
                     }
                     .accessibilityLabel("Resume Tour: \(paused.experienceTitle)")
-                    .accessibilityHint("Returns to the guided tour where you left off.")
+                    .accessibilityHint(String(localized: "Returns to the guided tour where you left off."))
 
                     Button {
                         pauseStore.clearPaused()
@@ -38,7 +38,7 @@ struct GuidedExperienceResumeBanner: View {
                             .font(.caption)
                             .padding(8)
                     }
-                    .accessibilityLabel("Dismiss Resume Tour")
+                    .accessibilityLabel(String(localized: "Dismiss Resume Tour"))
                 }
                 .foregroundStyle(.white)
                 .background(Color.accentColor, in: Capsule())

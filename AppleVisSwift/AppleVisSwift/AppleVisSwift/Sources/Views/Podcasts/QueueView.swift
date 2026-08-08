@@ -230,7 +230,7 @@ private struct QueueRow: View {
             "\(position) of \(total). \(episode.title), \(episode.showTitle)" +
             (episode.duration.map { ", \(formatDuration($0))" } ?? "")
         )
-        .accessibilityHint("Double-tap to open. Use actions to move or remove.")
+        .accessibilityHint(String(localized: "Double-tap to open. Use actions to move or remove."))
         .accessibilityAction(named: Text("Open Episode"), onOpen)
         .modifier(ConditionalAccessibilityAction(isActive: !isFirst, name: "Move Up", action: onMoveUp))
         .modifier(ConditionalAccessibilityAction(isActive: !isLast, name: "Move Down", action: onMoveDown))

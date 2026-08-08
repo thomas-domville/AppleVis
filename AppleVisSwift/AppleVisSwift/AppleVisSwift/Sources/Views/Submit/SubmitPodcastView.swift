@@ -83,7 +83,7 @@ struct SubmitPodcastView: View {
                                     if let result = await intelligence.rewrite(subject: nil, body: description, isTopic: false) {
                                         description = result.body
                                     } else {
-                                        toast.error("Couldn't rewrite this. Try again.")
+                                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                     }
                                 }
                             }
@@ -144,7 +144,7 @@ struct SubmitPodcastView: View {
                             if let result = await intelligence.translate(subject: nil, body: description, isTopic: false) {
                                 description = result.body
                             } else {
-                                toast.error("Couldn't translate this. Try again.")
+                                toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
                         }
                     } onDismiss: {
@@ -175,7 +175,7 @@ struct SubmitPodcastView: View {
                 } label: {
                     Label(audioFileURL?.lastPathComponent ?? "Choose Audio File", systemImage: "waveform")
                 }
-                .accessibilityHint("Opens the Files app to pick an audio file for this episode.")
+                .accessibilityHint(String(localized: "Opens the Files app to pick an audio file for this episode."))
             }
         }
     }
@@ -218,7 +218,7 @@ struct SubmitPodcastView: View {
         let result = await DrupalFormClient.submitPodcast(name: user.name, email: "", description: description, audioFileURL: audioFileURL)
         switch result {
         case .ok:
-            toast.success("Podcast submitted for review")
+            toast.success(String(localized: "Podcast submitted for review"))
             dismiss()
         case .failure(let message):
             error = message

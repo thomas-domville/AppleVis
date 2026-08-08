@@ -166,7 +166,7 @@ struct ContactView: View {
                                 goBack()
                             }
                         }
-                        .accessibilityHint(step == .type ? "Cancels and closes this form." : "Returns to the previous step.")
+                        .accessibilityHint(step == .type ? String(localized: "Cancels and closes this form.") : String(localized: "Returns to the previous step."))
                     }
                     if step == .message && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
                         ToolbarItem(placement: .secondaryAction) {
@@ -175,7 +175,7 @@ struct ContactView: View {
                                     if let result = await intelligence.rewrite(subject: effectiveType.subject, body: message, isTopic: false) {
                                         message = result.body
                                     } else {
-                                        toast.error("Couldn't rewrite this. Try again.")
+                                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                     }
                                 }
                             }
@@ -234,7 +234,7 @@ struct ContactView: View {
             Section {
                 Label("To report an Apple accessibility bug, use Discover → Contribute → Submit a Bug Report.", systemImage: "info.circle")
                     .font(.footnote)
-                    .accessibilityLabel("Note: This form contacts the AppleVis team about the app itself. To report an accessibility bug in Apple software, use Discover, then Contribute, then Submit a Bug Report.")
+                    .accessibilityLabel(String(localized: "Note: This form contacts the AppleVis team about the app itself. To report an accessibility bug in Apple software, use Discover, then Contribute, then Submit a Bug Report."))
             }
             Section {
                 ForEach(ContactType.allCases) { type in
@@ -284,11 +284,11 @@ struct ContactView: View {
             }
             Section("Your Details") {
                 TextField("Full Name or Username", text: $name)
-                    .accessibilityHint("Required. Used to address our reply.")
+                    .accessibilityHint(String(localized: "Required. Used to address our reply."))
                 TextField("Email", text: $email)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
-                    .accessibilityHint("Required. Used to send you a reply.")
+                    .accessibilityHint(String(localized: "Required. Used to send you a reply."))
             }
             Section {
                 Text("We only use your email to reply to this message and will not add you to any mailing list.")
@@ -314,8 +314,8 @@ struct ContactView: View {
                     Spacer()
                     Button("Change") { step = .type }
                         .font(.caption)
-                        .accessibilityLabel("Change contact type")
-                        .accessibilityHint("Goes back to step 1 to change your selection.")
+                        .accessibilityLabel(String(localized: "Change contact type"))
+                        .accessibilityHint(String(localized: "Goes back to step 1 to change your selection."))
                 }
             }
             if intelligence.showTranslatePrompt {
@@ -325,7 +325,7 @@ struct ContactView: View {
                             if let result = await intelligence.translate(subject: effectiveType.subject, body: message, isTopic: false) {
                                 message = result.body
                             } else {
-                                toast.error("Couldn't translate this. Try again.")
+                                toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
                         }
                     } onDismiss: {
@@ -350,7 +350,7 @@ struct ContactView: View {
                 }
                 TextEditor(text: $message)
                     .frame(minHeight: 160)
-                    .accessibilityLabel("Message")
+                    .accessibilityLabel(String(localized: "Message"))
                     .accessibilityHint("Required. Minimum 20 characters. \(effectiveType.messagePlaceholder)")
                     .onChange(of: message) { _, newValue in
                         handleMessageChange(newValue)
@@ -371,7 +371,7 @@ struct ContactView: View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                    .accessibilityHint("Automatically appends your app version and iOS version to help diagnose the issue.")
+                    .accessibilityHint(String(localized: "Automatically appends your app version and iOS version to help diagnose the issue."))
                 }
                 Section {
                     Label("Tips for a helpful bug report", systemImage: "lightbulb")
@@ -382,7 +382,7 @@ struct ContactView: View {
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Tips for a helpful bug report: describe the exact steps to reproduce the issue, what you expected to happen, and what actually happened. Turn on Include app and device info above to automatically attach your version details.")
+                .accessibilityLabel(String(localized: "Tips for a helpful bug report: describe the exact steps to reproduce the issue, what you expected to happen, and what actually happened. Turn on Include app and device info above to automatically attach your version details."))
             }
         }
     }
@@ -419,8 +419,8 @@ struct ContactView: View {
                     } label: {
                         Image(systemName: "pencil")
                     }
-                    .accessibilityLabel("Edit message")
-                    .accessibilityHint("Goes back to edit your message.")
+                    .accessibilityLabel(String(localized: "Edit message"))
+                    .accessibilityHint(String(localized: "Goes back to edit your message."))
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Contact type: \(effectiveType.label)")
@@ -447,8 +447,8 @@ struct ContactView: View {
                     TextField("Email", text: $email)
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
-                        .accessibilityLabel("Email address")
-                        .accessibilityHint("Required. We will use this address to reply to you.")
+                        .accessibilityLabel(String(localized: "Email address"))
+                        .accessibilityHint(String(localized: "Required. We will use this address to reply to you."))
                 } else {
                     WizardReviewRow(label: "Name", value: name.isEmpty ? "No name entered" : name)
                     WizardReviewRow(label: "Email", value: email.isEmpty ? "No email entered" : email)
@@ -471,7 +471,7 @@ struct ContactView: View {
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .ignore)
                 .accessibilityAddTraits(.isButton)
-                .accessibilityLabel("Declaration: I understand that AppleVis does not accept sponsored posts or content, advertising, SEO, or any other type of paid proposals.")
+                .accessibilityLabel(String(localized: "Declaration: I understand that AppleVis does not accept sponsored posts or content, advertising, SEO, or any other type of paid proposals."))
                 .accessibilityValue(declarationAgreed ? "Checked" : "Unchecked")
             }
         }

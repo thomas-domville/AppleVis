@@ -86,7 +86,7 @@ struct GuideBrowseView: View {
             }
         } label: {
             Image(systemName: "line.3.horizontal.decrease.circle")
-                .accessibilityLabel("Filter guides")
+                .accessibilityLabel(String(localized: "Filter guides"))
         }
     }
 

@@ -102,7 +102,7 @@ struct HelpArticleDetailView: View {
                     relatedLinkLabel(link)
                 }
                 .accessibilityLabel(link.label)
-                .accessibilityHint("Opens this help article.")
+                .accessibilityHint(String(localized: "Opens this help article."))
             }
         case .guidedExperienceWelcome:
             Button {
@@ -111,7 +111,7 @@ struct HelpArticleDetailView: View {
                 relatedLinkLabel(link)
             }
             .accessibilityLabel(link.label)
-            .accessibilityHint("Opens the guided welcome tour.")
+            .accessibilityHint(String(localized: "Opens the guided welcome tour."))
         case .whatsNew:
             NavigationLink {
                 WhatsNewView()
@@ -119,7 +119,7 @@ struct HelpArticleDetailView: View {
                 relatedLinkLabel(link)
             }
             .accessibilityLabel(link.label)
-            .accessibilityHint("Opens What's New.")
+            .accessibilityHint(String(localized: "Opens What's New."))
         case .savedSyncSettings:
             NavigationLink {
                 SavedSyncSettingsView()
@@ -127,7 +127,7 @@ struct HelpArticleDetailView: View {
                 relatedLinkLabel(link)
             }
             .accessibilityLabel(link.label)
-            .accessibilityHint("Opens Saved and Sync settings.")
+            .accessibilityHint(String(localized: "Opens Saved and Sync settings."))
         }
     }
 

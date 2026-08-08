@@ -59,7 +59,7 @@ private struct TipCard: View {
                     .foregroundStyle(Self.brandColor)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("AppleVis Tip")
+            .accessibilityLabel(String(localized: "AppleVis Tip"))
 
             Text(tip.content.title)
                 .font(.title3)
@@ -78,7 +78,7 @@ private struct TipCard: View {
                 .padding(.vertical, 6)
                 .buttonStyle(.glassProminent)
                 .tint(Self.brandColor)
-                .accessibilityHint("Dismisses this tip. It will not appear again.")
+                .accessibilityHint(String(localized: "Dismisses this tip. It will not appear again."))
         }
         .padding(22)
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22))

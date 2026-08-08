@@ -121,7 +121,7 @@ struct ForumTopicDetailView: View {
                                 topicAuthorId: detail.authorId, topicTitle: detail.title,
                                 onReplyTo: {
                                     guard auth.isSignedIn else {
-                                        toast.warning("Sign in to reply to posts.")
+                                        toast.warning(String(localized: "Sign in to reply to posts."))
                                         return
                                     }
                                     quotedReplyTarget = reply
@@ -202,7 +202,7 @@ struct ForumTopicDetailView: View {
                 }
             }
             .disabled(isSummarizingPost)
-            .accessibilityLabel(isSummarizingPost ? "Summarizing post, please wait" : "Summarize Post")
+            .accessibilityLabel(String(localized: isSummarizingPost ? "Summarizing post, please wait" : "Summarize Post"))
         }
     }
 
@@ -226,7 +226,7 @@ struct ForumTopicDetailView: View {
                 }
             }
             .disabled(isSummarizing)
-            .accessibilityLabel(isSummarizing ? "Summarizing discussion, please wait" : "Summarize Discussion")
+            .accessibilityLabel(String(localized: isSummarizing ? "Summarizing discussion, please wait" : "Summarize Discussion"))
         }
     }
 
@@ -237,7 +237,7 @@ struct ForumTopicDetailView: View {
         if let summary = await IntelligenceService.summarize(input) {
             postSummary = summary
         } else {
-            toast.error("Couldn't generate a summary for this post. Try again.")
+            toast.error(String(localized: "Couldn't generate a summary for this post. Try again."))
             UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a summary for this post.")
         }
         isSummarizingPost = false
@@ -256,7 +256,7 @@ struct ForumTopicDetailView: View {
             // failure, so without this the button just reverted to its
             // original state with zero feedback — indistinguishable from
             // the tap not registering at all.
-            toast.error("Couldn't generate a summary for this discussion. Try again.")
+            toast.error(String(localized: "Couldn't generate a summary for this discussion. Try again."))
             UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a summary for this discussion.")
         }
         isSummarizing = false
@@ -374,7 +374,7 @@ struct ForumTopicDetailView: View {
                 try await APIClient.shared.forums.unfollow(nodeUuid: d.id, token: user.csrfToken)
                 isFollowing = false
                 PersistenceStore.shared.markUnfollowed(id: d.id)
-                toast.success("Unfollowed topic")
+                toast.success(String(localized: "Unfollowed topic"))
             } else {
                 try await APIClient.shared.forums.follow(nodeUuid: d.id, token: user.csrfToken)
                 isFollowing = true
@@ -382,12 +382,12 @@ struct ForumTopicDetailView: View {
                     id: d.id, kind: .forumTopic, nodeType: "node--forum",
                     title: d.title, followedAt: Date(), lastActivityAt: d.lastActivityAt, url: d.url
                 ))
-                toast.success("Following topic")
+                toast.success(String(localized: "Following topic"))
             }
         } catch let e as APIError {
             toast.error(e.localizedDescription)
         } catch {
-            toast.error(isFollowing ? "Failed to unfollow topic." : "Failed to follow topic.")
+            toast.error(String(localized: isFollowing ? "Failed to unfollow topic." : "Failed to follow topic."))
         }
     }
 
@@ -405,7 +405,7 @@ struct ForumTopicDetailView: View {
                 self.detail?.replies.append(contentsOf: more)
             }
         } catch {
-            toast.error("Couldn't load more replies.")
+            toast.error(String(localized: "Couldn't load more replies."))
         }
         hasMoreReplies = (self.detail?.replies.count ?? 0) < (self.detail?.replyCount ?? 0)
         isLoadingMoreReplies = false
@@ -433,14 +433,14 @@ struct ForumTopicDetailView: View {
         if isSaved {
             PersistenceStore.shared.unsave(id: detail.id)
             isSaved = false
-            toast.success("Removed from Saved")
+            toast.success(String(localized: "Removed from Saved"))
         } else {
             PersistenceStore.shared.save(SavedItem(
                 id: detail.id, kind: .forumTopic, title: detail.title,
                 savedAt: Date(), lastActivityAt: detail.lastActivityAt
             ))
             isSaved = true
-            toast.success("Saved")
+            toast.success(String(localized: "Saved"))
         }
     }
 
@@ -464,7 +464,7 @@ struct ForumTopicDetailView: View {
                 ShareLink(item: shareURL, subject: Text(detail.title)) {
                     DetailActionButtonLabel(systemImage: "square.and.arrow.up", visualLabel: "Share")
                 }
-                .accessibilityLabel("Share topic")
+                .accessibilityLabel(String(localized: "Share topic"))
 
                 DetailActionButton(systemImage: "safari", visualLabel: "Browser", accessibilityLabel: "Open topic in browser") {
                     showBrowser = true
@@ -535,17 +535,17 @@ struct ReplyView: View {
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
             .accessibilityLabel(headerAccessibilityLabel)
-            .accessibilityHint("Actions available: reply, copy, share, and more.")
+            .accessibilityHint(String(localized: "Actions available: reply, copy, share, and more."))
             .modifier(OptionalReplyFocus(binding: focusBinding, id: reply.id))
             .readAloudAction(reply.body.strippingHTMLTags())
             .accessibilityAction(named: Text("Reply to this Comment")) { onReplyTo?() }
             .accessibilityAction(named: Text("Copy Comment Text")) { copyText() }
             .accessibilityAction(named: Text("Share Comment")) { presentShareSheet() }
             .accessibilityAction(named: Text("Mark as Helpful")) {
-                toast.warning("Helpful votes are coming once the Drupal Flags API is confirmed.")
+                toast.warning(String(localized: "Helpful votes are coming once the Drupal Flags API is confirmed."))
             }
             .accessibilityAction(named: Text("Report Comment")) {
-                toast.warning("Reporting is coming once the Drupal Flags API is confirmed.")
+                toast.warning(String(localized: "Reporting is coming once the Drupal Flags API is confirmed."))
             }
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Edit Comment") { showEditSheet = true })
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Delete Comment") { showDeleteConfirm = true })
@@ -575,10 +575,10 @@ struct ReplyView: View {
             Button { presentShareSheet() } label: {
                 Label("Share Comment", systemImage: "square.and.arrow.up")
             }
-            Button { toast.warning("Helpful votes are coming once the Drupal Flags API is confirmed.") } label: {
+            Button { toast.warning(String(localized: "Helpful votes are coming once the Drupal Flags API is confirmed.")) } label: {
                 Label("Mark as Helpful", systemImage: "hand.thumbsup")
             }
-            Button { toast.warning("Reporting is coming once the Drupal Flags API is confirmed.") } label: {
+            Button { toast.warning(String(localized: "Reporting is coming once the Drupal Flags API is confirmed.")) } label: {
                 Label("Report Comment", systemImage: "flag")
             }
             if canDelete {
@@ -601,14 +601,14 @@ struct ReplyView: View {
                     commentType: "comment_forum", commentId: reply.id, newBody: newText, format: "basic_html", csrfToken: user.csrfToken
                 )
                 onEdit?(newText)
-                toast.success("Reply updated")
+                toast.success(String(localized: "Reply updated"))
             }
         }
     }
 
     private func copyText() {
         UIPasteboard.general.string = reply.body.strippingHTMLTags()
-        toast.success("Comment text copied.")
+        toast.success(String(localized: "Comment text copied."))
     }
 
     /// Mirrors the old app's "Share Comment" action — shares the comment as
@@ -634,9 +634,9 @@ struct ReplyView: View {
         do {
             try await APIClient.shared.content.deleteComment(commentType: "comment_forum", commentId: reply.id, csrfToken: user.csrfToken)
             onDelete?()
-            toast.success("Reply deleted")
+            toast.success(String(localized: "Reply deleted"))
         } catch {
-            toast.error("Couldn't delete reply.")
+            toast.error(String(localized: "Couldn't delete reply."))
         }
     }
 }

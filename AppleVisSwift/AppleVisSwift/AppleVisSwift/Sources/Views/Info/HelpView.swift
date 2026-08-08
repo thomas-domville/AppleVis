@@ -46,8 +46,8 @@ struct HelpView: View {
             Section {
                 TextField("Search help...", text: $query)
                     .autocorrectionDisabled()
-                    .accessibilityLabel("Search help")
-                    .accessibilityHint("Filters help articles by title and summary.")
+                    .accessibilityLabel(String(localized: "Search help"))
+                    .accessibilityHint(String(localized: "Filters help articles by title and summary."))
             }
 
             if filteredSections.isEmpty {
@@ -95,7 +95,7 @@ struct HelpView: View {
                     }
                     .padding(.vertical, 2)
                 }
-                .accessibilityLabel("Contact AppleVis")
+                .accessibilityLabel(String(localized: "Contact AppleVis"))
             }
         }
         .themedList(preferences.colors)

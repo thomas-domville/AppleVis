@@ -205,7 +205,7 @@ private struct ScrollLinkButton: View {
                 Image(systemName: "arrow.down.right")
             }
         }
-        .accessibilityHint("Jumps to this section.")
+        .accessibilityHint(String(localized: "Jumps to this section."))
     }
 }
 

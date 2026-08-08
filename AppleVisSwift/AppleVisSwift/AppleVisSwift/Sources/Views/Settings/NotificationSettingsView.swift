@@ -43,7 +43,7 @@ struct NotificationSettingsView: View {
                         Text(sound.displayName).tag(sound)
                     }
                 }
-                .accessibilityHint("Choose the sound played for AppleVis notifications.")
+                .accessibilityHint(String(localized: "Choose the sound played for AppleVis notifications."))
                 .onChange(of: preferences.notificationSound) { _, newValue in
                     SoundPlayer.shared.playNotificationPreview(newValue)
                 }
@@ -55,7 +55,7 @@ struct NotificationSettingsView: View {
                 }
 
                 Toggle("Badge Count", isOn: $preferences.badgeCountEnabled)
-                    .accessibilityHint("Shows a number on the AppleVis icon for unread notifications. Opening the app clears it.")
+                    .accessibilityHint(String(localized: "Shows a number on the AppleVis icon for unread notifications. Opening the app clears it."))
             } header: {
                 Text("Sound")
             }
@@ -64,11 +64,11 @@ struct NotificationSettingsView: View {
             if auth.isSignedIn {
                 Section {
                     Toggle("Forum Replies", isOn: $preferences.notifyForumReplies)
-                        .accessibilityHint("Get notified when someone replies to your forum topics.")
+                        .accessibilityHint(String(localized: "Get notified when someone replies to your forum topics."))
                     Toggle("Mentions", isOn: $preferences.notifyMentions)
-                        .accessibilityHint("Get notified when someone mentions you in a post or comment.")
+                        .accessibilityHint(String(localized: "Get notified when someone mentions you in a post or comment."))
                     Toggle("Followed Topics", isOn: $preferences.notifyFollowedTopics)
-                        .accessibilityHint("Get notified about activity in topics you follow.")
+                        .accessibilityHint(String(localized: "Get notified about activity in topics you follow."))
                 } header: {
                     Text("My Activity")
                 } footer: {
@@ -78,15 +78,15 @@ struct NotificationSettingsView: View {
 
             Section("Community") {
                 Toggle("New Forum Topics", isOn: $preferences.notifyNewTopics)
-                    .accessibilityHint("Get notified when new forum discussions are posted.")
+                    .accessibilityHint(String(localized: "Get notified when new forum discussions are posted."))
                 Toggle("New App Listings", isOn: $preferences.notifyAppUpdates)
-                    .accessibilityHint("Get notified when existing apps are updated or new accessible apps are added to the AppleVis App Directory.")
+                    .accessibilityHint(String(localized: "Get notified when existing apps are updated or new accessible apps are added to the AppleVis App Directory."))
                 Toggle("New Podcast Episodes", isOn: $preferences.notifyNewEpisodes)
-                    .accessibilityHint("Get notified when new podcast episodes are published.")
+                    .accessibilityHint(String(localized: "Get notified when new podcast episodes are published."))
                 Toggle("New Resources", isOn: $preferences.notifyNewResources)
-                    .accessibilityHint("Get notified when new guides, tutorials, and tips are published.")
+                    .accessibilityHint(String(localized: "Get notified when new guides, tutorials, and tips are published."))
                 Toggle("Announcements", isOn: $preferences.notifyAnnouncements)
-                    .accessibilityHint("Get notified about important AppleVis announcements.")
+                    .accessibilityHint(String(localized: "Get notified about important AppleVis announcements."))
             }
 
             if !auth.isSignedIn {

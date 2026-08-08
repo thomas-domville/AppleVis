@@ -102,7 +102,7 @@ struct ResourceDetailView: View {
                     Button { showCompose = true } label: {
                         Image(systemName: "square.and.pencil")
                     }
-                    .accessibilityLabel("Add comment")
+                    .accessibilityLabel(String(localized: "Add comment"))
                 }
             }
         }
@@ -150,7 +150,7 @@ struct ResourceDetailView: View {
                     },
                     onReplyTo: {
                         guard auth.isSignedIn else {
-                            toast.warning("Sign in to reply to comments.")
+                            toast.warning(String(localized: "Sign in to reply to comments."))
                             return
                         }
                         quotedComment = comment
@@ -214,7 +214,7 @@ struct ResourceDetailView: View {
                 }
             }
             .disabled(isSummarizingGuide)
-            .accessibilityLabel(isSummarizingGuide ? "Summarizing guide, please wait" : "Summarize Guide")
+            .accessibilityLabel(isSummarizingGuide ? String(localized: "Summarizing guide, please wait") : String(localized: "Summarize Guide"))
         }
     }
 
@@ -237,7 +237,7 @@ struct ResourceDetailView: View {
                 }
             }
             .disabled(isSummarizingDiscussion)
-            .accessibilityLabel(isSummarizingDiscussion ? "Summarizing discussion, please wait" : "Summarize Discussion")
+            .accessibilityLabel(isSummarizingDiscussion ? String(localized: "Summarizing discussion, please wait") : String(localized: "Summarize Discussion"))
         }
     }
 
@@ -248,7 +248,7 @@ struct ResourceDetailView: View {
         if let summary = await IntelligenceService.summarize(input) {
             guideSummary = summary
         } else {
-            toast.error("Couldn't generate a summary for this guide. Try again.")
+            toast.error(String(localized: "Couldn't generate a summary for this guide. Try again."))
             UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a summary for this guide.")
         }
         isSummarizingGuide = false
@@ -272,7 +272,7 @@ struct ResourceDetailView: View {
         if let summary = await IntelligenceService.summarize(input) {
             discussionSummary = summary
         } else {
-            toast.error("Couldn't generate a discussion summary. Try again.")
+            toast.error(String(localized: "Couldn't generate a discussion summary. Try again."))
             UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a discussion summary.")
         }
         isSummarizingDiscussion = false
@@ -350,7 +350,7 @@ struct ResourceDetailView: View {
                 self.detail?.comments.append(contentsOf: more)
             }
         } catch {
-            toast.error("Couldn't load more comments.")
+            toast.error(String(localized: "Couldn't load more comments."))
         }
         hasMoreComments = (self.detail?.comments.count ?? 0) < (self.detail?.commentCount ?? 0)
         isLoadingMoreComments = false
@@ -431,14 +431,14 @@ struct CommentRow: View {
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
             .accessibilityLabel(headerAccessibilityLabel)
-            .accessibilityHint("Actions available: copy, share, and more.")
+            .accessibilityHint(String(localized: "Actions available: copy, share, and more."))
             .modifier(OptionalReplyFocus(binding: focusBinding, id: commentId ?? "\(authorName)-\(date.timeIntervalSince1970)"))
             .readAloudAction(text.strippingHTMLTags())
             .modifier(ConditionalAccessibilityAction(isActive: onReplyTo != nil, name: "Reply to this Comment") { onReplyTo?() })
             .accessibilityAction(named: Text("Copy Comment Text")) { copyText() }
             .accessibilityAction(named: Text("Share Comment")) { presentShareSheet() }
             .modifier(ConditionalAccessibilityAction(isActive: supportsReport, name: "Report Comment") {
-                toast.warning("Reporting is coming once the Drupal Flags API is confirmed.")
+                toast.warning(String(localized: "Reporting is coming once the Drupal Flags API is confirmed."))
             })
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Edit Comment") { showEditSheet = true })
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Delete Comment") { showDeleteConfirm = true })
@@ -467,7 +467,7 @@ struct CommentRow: View {
                 Label("Share Comment", systemImage: "square.and.arrow.up")
             }
             if supportsReport {
-                Button { toast.warning("Reporting is coming once the Drupal Flags API is confirmed.") } label: {
+                Button { toast.warning(String(localized: "Reporting is coming once the Drupal Flags API is confirmed.")) } label: {
                     Label("Report Comment", systemImage: "flag")
                 }
             }
@@ -491,14 +491,14 @@ struct CommentRow: View {
                     commentType: commentType, commentId: commentId, newBody: newText, format: "basic_html", csrfToken: user.csrfToken
                 )
                 onEdit?(newText)
-                toast.success("Comment updated")
+                toast.success(String(localized: "Comment updated"))
             }
         }
     }
 
     private func copyText() {
         UIPasteboard.general.string = text.strippingHTMLTags()
-        toast.success("Comment text copied.")
+        toast.success(String(localized: "Comment text copied."))
     }
 
     private func presentShareSheet() {
@@ -517,9 +517,9 @@ struct CommentRow: View {
         do {
             try await APIClient.shared.content.deleteComment(commentType: commentType, commentId: commentId, csrfToken: user.csrfToken)
             onDelete?()
-            toast.success("Comment deleted")
+            toast.success(String(localized: "Comment deleted"))
         } catch {
-            toast.error("Couldn't delete comment.")
+            toast.error(String(localized: "Couldn't delete comment."))
         }
     }
 }
@@ -583,7 +583,7 @@ struct ComposeResourceCommentView: View {
             let comment = try await APIClient.shared.resources.submitComment(
                 resourceId: resourceId, body: commentText, csrfToken: user.csrfToken
             )
-            toast.success("Comment posted")
+            toast.success(String(localized: "Comment posted"))
             onPosted(comment)
             dismiss()
         } catch let e as APIError { submitError = e.localizedDescription

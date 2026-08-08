@@ -89,14 +89,14 @@ struct HomeView: View {
                     } label: {
                         Image(systemName: "slider.horizontal.3")
                     }
-                    .accessibilityLabel("Customize Home")
-                    .accessibilityHint("Choose what content types appear on your Home screen")
+                    .accessibilityLabel(String(localized: "Customize Home"))
+                    .accessibilityHint(String(localized: "Choose what content types appear on your Home screen"))
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink(destination: ProfileView()) {
                         Image(systemName: "person.circle")
                     }
-                    .accessibilityLabel("Profile and Settings")
+                    .accessibilityLabel(String(localized: "Profile and Settings"))
                 }
             }
             .refreshable {
@@ -270,7 +270,7 @@ struct HomeView: View {
                         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
                     }
                     .accessibilityLabel("Notifications, \(notificationHistory.count) recent")
-                    .accessibilityHint("Double-tap to view your recent notifications.")
+                    .accessibilityHint(String(localized: "Double-tap to view your recent notifications."))
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     .listRowSeparator(.hidden)
                 }
@@ -349,8 +349,8 @@ struct HomeView: View {
                                 vm.markAllAsRead(visibleItems)
                             }
                             .font(.system(size: 12, weight: .bold))
-                            .accessibilityLabel("Mark all new activity as read")
-                            .accessibilityHint("Clears all items from the New view.")
+                            .accessibilityLabel(String(localized: "Mark all new activity as read"))
+                            .accessibilityHint(String(localized: "Clears all items from the New view."))
                         }
                     }
                     .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 4, trailing: 16))
@@ -423,7 +423,7 @@ struct CustomizeHomeView: View {
                 }
                 Section("Forums") {
                     Toggle("Apple Topics Only", isOn: $preferences.appleOnlyForums)
-                        .accessibilityHint("Hides non-Apple forum categories from Home.")
+                        .accessibilityHint(String(localized: "Hides non-Apple forum categories from Home."))
                 }
             }
             .navigationTitle("Customize Home")
@@ -506,13 +506,13 @@ private struct WhatsNewCard: View {
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("What's New. \(message)")
-            .accessibilityHint("Double-tap to jump to where you left off in the feed.")
+            .accessibilityHint(String(localized: "Double-tap to jump to where you left off in the feed."))
 
             Button("Dismiss", action: onDismiss)
                 .font(.caption).fontWeight(.semibold)
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .accessibilityLabel("Dismiss welcome summary")
+                .accessibilityLabel(String(localized: "Dismiss welcome summary"))
         }
         .padding(12)
         .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))

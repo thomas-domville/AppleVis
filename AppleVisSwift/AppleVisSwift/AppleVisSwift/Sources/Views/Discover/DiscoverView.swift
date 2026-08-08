@@ -68,7 +68,7 @@ struct DiscoverView: View {
                     NavigationLink(destination: ProfileView()) {
                         Image(systemName: "person.circle")
                     }
-                    .accessibilityLabel("Profile and Settings")
+                    .accessibilityLabel(String(localized: "Profile and Settings"))
                 }
             }
             .searchable(text: $searchText, prompt: "Search AppleVis")
@@ -152,7 +152,7 @@ struct DiscoverView: View {
         isTranslatingSearch = true
         defer { isTranslatingSearch = false }
         guard let translated = await IntelligenceService.translateSearchQuery(searchText) else {
-            toast.error("Couldn't translate this search. Try again.")
+            toast.error(String(localized: "Couldn't translate this search. Try again."))
             return
         }
         showTranslateSearchPrompt = false
@@ -274,7 +274,7 @@ struct DiscoverView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title). \(subtitle).")
-        .accessibilityHint("Opens the Be My Eyes app.")
+        .accessibilityHint(String(localized: "Opens the Be My Eyes app."))
     }
 
     /// Tries the Be My Eyes deep link directly rather than pre-checking with
@@ -345,7 +345,7 @@ struct DiscoverView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("\(link.description). Opens in your browser.")
-                    .accessibilityHint("Double-tap to open in your browser.")
+                    .accessibilityHint(String(localized: "Double-tap to open in your browser."))
                 }
             }
             .padding(.horizontal)

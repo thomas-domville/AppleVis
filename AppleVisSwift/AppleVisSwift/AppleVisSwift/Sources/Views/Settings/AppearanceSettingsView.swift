@@ -45,7 +45,7 @@ struct AppearanceSettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .accessibilityHint("Compact reduces spacing between items in lists.")
+                .accessibilityHint(String(localized: "Compact reduces spacing between items in lists."))
             }
 
             Section {

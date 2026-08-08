@@ -12,10 +12,10 @@ struct SoundsHapticsSettingsView: View {
         Form {
             Section("Sounds") {
                 Toggle("Confirmation Sounds", isOn: $preferences.confirmationSoundsEnabled)
-                    .accessibilityHint("Plays a sound for notifications, saving, downloads finishing, and podcast play and pause.")
+                    .accessibilityHint(String(localized: "Plays a sound for notifications, saving, downloads finishing, and podcast play and pause."))
 
                 Toggle("Interface Sounds", isOn: $preferences.interfaceSoundsEnabled)
-                    .accessibilityHint("Plays a sound for tab switching, picker changes, opening screens, and list refreshes.")
+                    .accessibilityHint(String(localized: "Plays a sound for tab switching, picker changes, opening screens, and list refreshes."))
             }
 
             Section {

@@ -58,11 +58,11 @@ struct OnboardingView: View {
                     Button(action: previousStep) {
                         Label("Back", systemImage: "chevron.left")
                     }
-                    .accessibilityHint("Returns to the previous step.")
+                    .accessibilityHint(String(localized: "Returns to the previous step."))
                 }
                 Spacer()
                 Button("Cancel") { showCancelConfirm = true }
-                    .accessibilityHint("Cancels and closes this form.")
+                    .accessibilityHint(String(localized: "Cancels and closes this form."))
             }
 
             HStack(spacing: 6) {
@@ -174,7 +174,7 @@ private struct WelcomeStep: View {
                 .buttonStyle(.borderedProminent)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 32)
-                .accessibilityHint("Advances to the next setup step.")
+                .accessibilityHint(String(localized: "Advances to the next setup step."))
             }
         }
     }
@@ -212,7 +212,7 @@ private struct SignInStep: View {
                             .textFieldStyle(.roundedBorder)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
-                            .accessibilityLabel("Username field")
+                            .accessibilityLabel(String(localized: "Username field"))
                             .accessibilityFocused($isUsernameFocused)
                     }
 
@@ -220,7 +220,7 @@ private struct SignInStep: View {
                         Text("Password").font(.caption).foregroundStyle(.secondary)
                         SecureField("Password", text: $password)
                             .textFieldStyle(.roundedBorder)
-                            .accessibilityLabel("Password field")
+                            .accessibilityLabel(String(localized: "Password field"))
                             .onSubmit { signIn() }
                     }
 
@@ -658,7 +658,7 @@ private struct ReadyStep: View {
                 .buttonStyle(.borderedProminent)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 32)
-                .accessibilityHint("Completes setup and opens the main app.")
+                .accessibilityHint(String(localized: "Completes setup and opens the main app."))
             }
             .padding(.top, 48)
         }

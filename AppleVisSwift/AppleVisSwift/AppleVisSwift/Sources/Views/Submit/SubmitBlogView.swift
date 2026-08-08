@@ -95,7 +95,7 @@ struct SubmitBlogView: View {
                                     if let result = await intelligence.rewrite(subject: nil, body: blogDraft, isTopic: false) {
                                         blogDraft = result.body
                                     } else {
-                                        toast.error("Couldn't rewrite this. Try again.")
+                                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                     }
                                 }
                             }
@@ -166,7 +166,7 @@ struct SubmitBlogView: View {
                             if let result = await intelligence.translate(subject: nil, body: blogDraft, isTopic: false) {
                                 blogDraft = result.body
                             } else {
-                                toast.error("Couldn't translate this. Try again.")
+                                toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
                         }
                     } onDismiss: {
@@ -182,7 +182,7 @@ struct SubmitBlogView: View {
             Section("Note to Editors") {
                 TextEditor(text: $coverNote)
                     .frame(minHeight: 80)
-                    .accessibilityHint("A private note to the editorial team, not published.")
+                    .accessibilityHint(String(localized: "A private note to the editorial team, not published."))
             }
             Section("Blog Post Draft") {
                 TextEditor(text: $blogDraft)
@@ -201,7 +201,7 @@ struct SubmitBlogView: View {
                     } label: {
                         Label("Import File", systemImage: "doc.text")
                     }
-                    .accessibilityHint("Replaces the draft with the contents of a text file.")
+                    .accessibilityHint(String(localized: "Replaces the draft with the contents of a text file."))
 
                     Spacer()
 
@@ -210,7 +210,7 @@ struct SubmitBlogView: View {
                     } label: {
                         Label("Paste", systemImage: "doc.on.clipboard")
                     }
-                    .accessibilityHint("Replaces the draft with the contents of the clipboard.")
+                    .accessibilityHint(String(localized: "Replaces the draft with the contents of the clipboard."))
                 }
                 .buttonStyle(.borderless)
             }
@@ -228,13 +228,13 @@ struct SubmitBlogView: View {
             let didAccess = url.startAccessingSecurityScopedResource()
             defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
             guard let text = try? String(contentsOf: url, encoding: .utf8) else {
-                toast.error("Couldn't read that file.")
+                toast.error(String(localized: "Couldn't read that file."))
                 return
             }
             blogDraft = text
             UIAccessibility.post(notification: .announcement, argument: "Imported \(text.count) characters.")
         case .failure:
-            toast.error("Couldn't import that file.")
+            toast.error(String(localized: "Couldn't import that file."))
         }
     }
 
@@ -293,7 +293,7 @@ struct SubmitBlogView: View {
         let result = await DrupalFormClient.submitBlog(name: user.name, email: "", message: message, blogDraft: blogDraft)
         switch result {
         case .ok:
-            toast.success("Blog post submitted for review")
+            toast.success(String(localized: "Blog post submitted for review"))
             dismiss()
         case .failure(let message):
             error = message

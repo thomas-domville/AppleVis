@@ -288,7 +288,7 @@ struct ContentActionsModifier: ViewModifier {
             try await APIClient.shared.content.unpublishNode(nodeId: id, nodeType: suffix, csrfToken: user.csrfToken)
             toast.success("\(kind.displayName) unpublished")
         } catch {
-            toast.error("Couldn't unpublish.")
+            toast.error(String(localized: "Couldn't unpublish."))
         }
     }
 
@@ -301,7 +301,7 @@ struct ContentActionsModifier: ViewModifier {
             toast.success("\(kind.displayName) deleted")
             onContentDeleted?()
         } catch {
-            toast.error("Couldn't delete.")
+            toast.error(String(localized: "Couldn't delete."))
         }
     }
 
@@ -311,11 +311,11 @@ struct ContentActionsModifier: ViewModifier {
     /// that opens a composer directly instead.
     private func addComment() {
         guard auth.isSignedIn else {
-            toast.warning("Sign in to add a new comment.")
+            toast.warning(String(localized: "Sign in to add a new comment."))
             return
         }
         guard let onAddComment else {
-            toast.warning("Open the item to add a new comment.")
+            toast.warning(String(localized: "Open the item to add a new comment."))
             return
         }
         onAddComment()
@@ -344,11 +344,11 @@ struct ContentActionsModifier: ViewModifier {
         if isSaved {
             PersistenceStore.shared.unsave(id: id)
             isSaved = false
-            toast.success("Removed from Saved")
+            toast.success(String(localized: "Removed from Saved"))
         } else {
             PersistenceStore.shared.save(SavedItem(id: id, kind: kind, title: title, savedAt: Date(), lastActivityAt: lastActivityAt))
             isSaved = true
-            toast.success("Saved")
+            toast.success(String(localized: "Saved"))
             SoundPlayer.shared.play(.bookmarkSaved)
         }
         onSaveToggle?(isSaved)
@@ -361,7 +361,7 @@ struct ContentActionsModifier: ViewModifier {
                 try await APIClient.shared.flags.unfollow(nodeUuid: id, token: user.csrfToken)
                 PersistenceStore.shared.markUnfollowed(id: id)
                 isFollowing = false
-                toast.success("Unfollowed")
+                toast.success(String(localized: "Unfollowed"))
                 onFollowToggle?(false)
             } else {
                 try await APIClient.shared.flags.follow(nodeUuid: id, nodeType: kind.nodeType, token: user.csrfToken)
@@ -370,14 +370,14 @@ struct ContentActionsModifier: ViewModifier {
                     followedAt: Date(), lastActivityAt: lastActivityAt, url: url ?? ""
                 ))
                 isFollowing = true
-                toast.success("Following")
+                toast.success(String(localized: "Following"))
                 if kind == .forumTopic { tips.show(.followTopicNotifications) }
                 onFollowToggle?(true)
             }
         } catch let e as APIError {
             toast.error(e.localizedDescription)
         } catch {
-            toast.error("Couldn't update follow status.")
+            toast.error(String(localized: "Couldn't update follow status."))
         }
     }
 }
@@ -562,11 +562,11 @@ struct ContentDetailActions: View {
         if isSaved {
             PersistenceStore.shared.unsave(id: id)
             isSaved = false
-            toast.success("Removed from Saved")
+            toast.success(String(localized: "Removed from Saved"))
         } else {
             PersistenceStore.shared.save(SavedItem(id: id, kind: kind, title: title, savedAt: Date(), lastActivityAt: lastActivityAt))
             isSaved = true
-            toast.success("Saved")
+            toast.success(String(localized: "Saved"))
             SoundPlayer.shared.play(.bookmarkSaved)
         }
     }
@@ -578,7 +578,7 @@ struct ContentDetailActions: View {
                 try await APIClient.shared.flags.unfollow(nodeUuid: id, token: user.csrfToken)
                 PersistenceStore.shared.markUnfollowed(id: id)
                 isFollowing = false
-                toast.success("Unfollowed")
+                toast.success(String(localized: "Unfollowed"))
             } else {
                 try await APIClient.shared.flags.follow(nodeUuid: id, nodeType: kind.nodeType, token: user.csrfToken)
                 PersistenceStore.shared.markFollowed(FollowedItem(
@@ -586,13 +586,13 @@ struct ContentDetailActions: View {
                     followedAt: Date(), lastActivityAt: lastActivityAt, url: url ?? ""
                 ))
                 isFollowing = true
-                toast.success("Following")
+                toast.success(String(localized: "Following"))
                 if kind == .forumTopic { tips.show(.followTopicNotifications) }
             }
         } catch let e as APIError {
             toast.error(e.localizedDescription)
         } catch {
-            toast.error("Couldn't update follow status.")
+            toast.error(String(localized: "Couldn't update follow status."))
         }
     }
 }

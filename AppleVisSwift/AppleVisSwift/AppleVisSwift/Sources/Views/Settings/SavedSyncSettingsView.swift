@@ -15,7 +15,7 @@ struct SavedSyncSettingsView: View {
 
             Section("iCloud Sync") {
                 Toggle("Enable iCloud Sync", isOn: $preferences.iCloudSync)
-                    .accessibilityHint("Master switch for all AppleVis iCloud sync features.")
+                    .accessibilityHint(String(localized: "Master switch for all AppleVis iCloud sync features."))
 
                 if preferences.iCloudSync {
                     HStack {

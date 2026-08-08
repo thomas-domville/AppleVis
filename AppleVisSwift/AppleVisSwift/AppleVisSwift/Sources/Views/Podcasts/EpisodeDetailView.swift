@@ -107,14 +107,14 @@ struct EpisodeDetailView: View {
                     Button { showTranscript = true } label: {
                         Image(systemName: "text.quote")
                     }
-                    .accessibilityLabel("View Transcript")
+                    .accessibilityLabel(String(localized: "View Transcript"))
                 }
 
                 if auth.isSignedIn {
                     Button { showCompose = true } label: {
                         Image(systemName: "square.and.pencil")
                     }
-                    .accessibilityLabel("Add comment")
+                    .accessibilityLabel(String(localized: "Add comment"))
                 }
             }
         }
@@ -180,8 +180,8 @@ struct EpisodeDetailView: View {
             } label: {
                 Image(systemName: "arrow.down.circle.fill")
             }
-            .accessibilityLabel("Downloaded")
-            .accessibilityHint("Double-tap to remove download.")
+            .accessibilityLabel(String(localized: "Downloaded"))
+            .accessibilityHint(String(localized: "Double-tap to remove download."))
         } else if downloads.activeDownloads.contains(episode.id) {
             ProgressView(value: downloads.progress[episode.id] ?? 0)
                 .progressViewStyle(.circular)
@@ -192,7 +192,7 @@ struct EpisodeDetailView: View {
             } label: {
                 Image(systemName: "arrow.down.circle")
             }
-            .accessibilityLabel("Download for offline playback")
+            .accessibilityLabel(String(localized: "Download for offline playback"))
         }
     }
 
@@ -231,7 +231,7 @@ struct EpisodeDetailView: View {
                     },
                     onReplyTo: {
                         guard auth.isSignedIn else {
-                            toast.warning("Sign in to reply to comments.")
+                            toast.warning(String(localized: "Sign in to reply to comments."))
                             return
                         }
                         quotedComment = comment
@@ -315,7 +315,7 @@ struct EpisodeDetailView: View {
                 comments.append(contentsOf: more)
             }
         } catch {
-            toast.error("Couldn't load more comments.")
+            toast.error(String(localized: "Couldn't load more comments."))
         }
         hasMoreComments = comments.count < (episode?.commentCount ?? 0)
         isLoadingMoreComments = false
@@ -355,7 +355,7 @@ struct ChapterRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(chapter.title), starts at \(formatTime(chapter.startTime))")
-        .accessibilityHint("Double-tap to seek.")
+        .accessibilityHint(String(localized: "Double-tap to seek."))
     }
 
     private func formatTime(_ seconds: TimeInterval) -> String {
@@ -425,7 +425,7 @@ struct ComposePodcastCommentView: View {
             let comment = try await APIClient.shared.podcasts.submitComment(
                 episodeId: episodeId, body: commentText, csrfToken: user.csrfToken
             )
-            toast.success("Comment posted")
+            toast.success(String(localized: "Comment posted"))
             SoundPlayer.shared.play(.reply)
             onPosted(comment)
             dismiss()

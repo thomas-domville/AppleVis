@@ -45,8 +45,8 @@ struct SignInView: View {
                                 .textContentType(.username)
                                 .autocapitalization(.none)
                                 .autocorrectionDisabled()
-                                .accessibilityLabel("Username or email address")
-                                .accessibilityHint("Enter your AppleVis username or email. Both are accepted.")
+                                .accessibilityLabel(String(localized: "Username or email address"))
+                                .accessibilityHint(String(localized: "Enter your AppleVis username or email. Both are accepted."))
                         }
 
                         VStack(alignment: .leading, spacing: 6) {
@@ -55,8 +55,8 @@ struct SignInView: View {
                                 .textFieldStyle(.roundedBorder)
                                 .textContentType(.password)
                                 .onSubmit { Task { await signIn() } }
-                                .accessibilityLabel("Password")
-                                .accessibilityHint("Enter your AppleVis account password.")
+                                .accessibilityLabel(String(localized: "Password"))
+                                .accessibilityHint(String(localized: "Enter your AppleVis account password."))
                         }
 
                         if let err = signInError {
@@ -95,7 +95,7 @@ struct SignInView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(isSigningIn || username.trimmingCharacters(in: .whitespaces).isEmpty || password.isEmpty)
-                        .accessibilityLabel(isSigningIn ? "Signing in, please wait" : "Sign in")
+                        .accessibilityLabel(String(localized: isSigningIn ? "Signing in, please wait" : "Sign in"))
                     }
                 }
                 .padding()

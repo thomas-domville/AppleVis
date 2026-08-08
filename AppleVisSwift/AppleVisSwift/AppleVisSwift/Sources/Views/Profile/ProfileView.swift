@@ -104,19 +104,19 @@ struct ProfileView: View {
             } label: {
                 Label("Edit Profile", systemImage: "person.crop.circle.badge.pencil")
             }
-            .accessibilityLabel("Edit your public profile")
+            .accessibilityLabel(String(localized: "Edit your public profile"))
 
             if let username = auth.user?.name {
                 Link(destination: URL(string: "https://www.applevis.com/users/\(username)")!) {
                     Label("View Full Profile on applevis.com", systemImage: "arrow.up.right.square")
                 }
-                .accessibilityLabel("View your full public profile on applevis.com, opens in browser")
+                .accessibilityLabel(String(localized: "View your full public profile on applevis.com, opens in browser"))
             }
 
             Link(destination: URL(string: "https://www.applevis.com/user")!) {
                 Label("Account Settings on applevis.com", systemImage: "arrow.up.right.square")
             }
-            .accessibilityLabel("Account Settings on applevis.com, opens in browser")
+            .accessibilityLabel(String(localized: "Account Settings on applevis.com, opens in browser"))
 
             NavigationLink {
                 DeleteAccountView()
@@ -124,7 +124,7 @@ struct ProfileView: View {
                 Label("Delete Account", systemImage: "person.crop.circle.badge.minus")
                     .foregroundStyle(.red)
             }
-            .accessibilityLabel("Permanently delete your AppleVis account")
+            .accessibilityLabel(String(localized: "Permanently delete your AppleVis account"))
 
             Button(role: .destructive) {
                 showSignOutConfirm = true
@@ -132,7 +132,7 @@ struct ProfileView: View {
                 Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
                     .foregroundStyle(.red)
             }
-            .accessibilityLabel("Sign out of your AppleVis account")
+            .accessibilityLabel(String(localized: "Sign out of your AppleVis account"))
         }
     }
 
@@ -154,7 +154,7 @@ struct ProfileView: View {
             }
         }
         .accessibilityLabel("Saved \(kind.displayName.lowercased())s, \(count)")
-        .accessibilityHint("Double-tap to view.")
+        .accessibilityHint(String(localized: "Double-tap to view."))
     }
 
     // MARK: - Signed-out content
@@ -171,7 +171,7 @@ struct ProfileView: View {
                     showSignIn = true
                 }
                 .buttonStyle(.borderedProminent)
-                .accessibilityLabel("Sign in to your AppleVis account")
+                .accessibilityLabel(String(localized: "Sign in to your AppleVis account"))
             }
             .padding(.vertical, 8)
         }
@@ -186,7 +186,7 @@ struct ProfileView: View {
             } label: {
                 Label("Settings", systemImage: "gearshape")
             }
-            .accessibilityLabel("Open Settings")
+            .accessibilityLabel(String(localized: "Open Settings"))
         }
     }
 
@@ -199,7 +199,7 @@ struct ProfileView: View {
             } label: {
                 Label("What's New", systemImage: "sparkles")
             }
-            .accessibilityLabel("What's New in AppleVis")
+            .accessibilityLabel(String(localized: "What's New in AppleVis"))
 
             NavigationLink {
                 AboutView()
@@ -218,25 +218,25 @@ struct ProfileView: View {
             } label: {
                 Label("Replay Welcome Tour", systemImage: "arrow.clockwise")
             }
-            .accessibilityLabel("Replay Welcome Tour")
-            .accessibilityHint("Replays the short guided tour of Home, Discover, For You, Search, Profile, and Settings.")
+            .accessibilityLabel(String(localized: "Replay Welcome Tour"))
+            .accessibilityHint(String(localized: "Replays the short guided tour of Home, Discover, For You, Search, Profile, and Settings."))
 
             Link(destination: URL(string: "https://www.applevis.com/privacy")!) {
                 Label("Privacy Policy", systemImage: "shield.checkmark")
             }
-            .accessibilityLabel("Privacy Policy, opens in browser")
+            .accessibilityLabel(String(localized: "Privacy Policy, opens in browser"))
 
             Link(destination: URL(string: "https://www.applevis.com/terms")!) {
                 Label("Terms of Use", systemImage: "doc.text")
             }
-            .accessibilityLabel("Terms of Use, opens in browser")
+            .accessibilityLabel(String(localized: "Terms of Use, opens in browser"))
 
             Button {
                 showContact = true
             } label: {
                 Label("Contact AppleVis", systemImage: "envelope")
             }
-            .accessibilityLabel("Contact AppleVis")
+            .accessibilityLabel(String(localized: "Contact AppleVis"))
 
             HStack {
                 Text("Version")
@@ -254,6 +254,6 @@ struct ProfileView: View {
 
     private func signOut() async {
         await auth.signOut()
-        toast.success("Signed out.")
+        toast.success(String(localized: "Signed out."))
     }
 }

@@ -83,8 +83,8 @@ struct CommunityDiscussionHeading: View {
                     .foregroundStyle(Color.accentColor)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Jump to Last Comment")
-                .accessibilityHint("Loads any remaining comments and moves to the last one.")
+                .accessibilityLabel(String(localized: "Jump to Last Comment"))
+                .accessibilityHint(String(localized: "Loads any remaining comments and moves to the last one."))
             }
         }
         .padding(.horizontal)

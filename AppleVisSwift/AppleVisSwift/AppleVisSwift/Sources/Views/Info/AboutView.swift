@@ -81,7 +81,7 @@ struct AboutView: View {
                 NavigationLink { WhatsNewView() } label: {
                     Label("What's New", systemImage: "sparkles")
                 }
-                .accessibilityLabel("What's New in AppleVis")
+                .accessibilityLabel(String(localized: "What's New in AppleVis"))
                 InfoRow(label: "Version", value: appVersion)
                 InfoRow(label: "Build",   value: buildNumber)
                 InfoRow(label: "iOS",     value: iosVersion)
@@ -117,7 +117,7 @@ struct AboutView: View {
                         systemImage: copiedSupportInfo ? "checkmark" : "doc.on.clipboard"
                     )
                 }
-                .accessibilityHint("Copies version, build, iOS, device, theme, and accessibility settings to the clipboard so you can paste them into a support request.")
+                .accessibilityHint(String(localized: "Copies version, build, iOS, device, theme, and accessibility settings to the clipboard so you can paste them into a support request."))
                 .accessibilityAction(named: Text("Read Support Summary")) {
                     UIAccessibility.post(notification: .announcement, argument: supportInfo.replacingOccurrences(of: "\n", with: ". "))
                 }
@@ -127,25 +127,25 @@ struct AboutView: View {
                 Link(destination: URL(string: "https://x.com/AppleVis")!) {
                     Label("Follow AppleVis on X", systemImage: "at")
                 }
-                .accessibilityLabel("Follow AppleVis on X")
-                .accessibilityHint("Opens in Safari.")
+                .accessibilityLabel(String(localized: "Follow AppleVis on X"))
+                .accessibilityHint(String(localized: "Opens in Safari."))
 
                 Link(destination: URL(string: "https://www.facebook.com/AppleVis")!) {
                     Label("Follow AppleVis on Facebook", systemImage: "f.circle")
                 }
-                .accessibilityLabel("Follow AppleVis on Facebook")
-                .accessibilityHint("Opens in Safari.")
+                .accessibilityLabel(String(localized: "Follow AppleVis on Facebook"))
+                .accessibilityHint(String(localized: "Opens in Safari."))
 
                 Link(destination: URL(string: "https://mastodon.online/@AppleVis")!) {
                     Label("Follow AppleVis on Mastodon", systemImage: "network")
                 }
-                .accessibilityLabel("Follow AppleVis on Mastodon")
-                .accessibilityHint("Opens in Safari.")
+                .accessibilityLabel(String(localized: "Follow AppleVis on Mastodon"))
+                .accessibilityHint(String(localized: "Opens in Safari."))
 
                 Link(destination: URL(string: "https://www.applevis.com")!) {
                     Label("applevis.com", systemImage: "globe")
                 }
-                .accessibilityLabel("applevis.com website")
+                .accessibilityLabel(String(localized: "applevis.com website"))
             }
 
             Section("Legal & Credits") {
@@ -166,13 +166,13 @@ struct AboutView: View {
                 } label: {
                     Label("Report a Bug", systemImage: "ladybug")
                 }
-                .accessibilityHint("Opens the in-app contact form.")
+                .accessibilityHint(String(localized: "Opens the in-app contact form."))
                 Button {
                     contactType = .feedback
                 } label: {
                     Label("Send Feedback", systemImage: "ellipsis.bubble")
                 }
-                .accessibilityHint("Opens the in-app contact form.")
+                .accessibilityHint(String(localized: "Opens the in-app contact form."))
             }
 
             Section {
@@ -181,7 +181,7 @@ struct AboutView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                     .multilineTextAlignment(.center)
-                    .accessibilityLabel("Copyright 2026 AppleVis. All rights reserved.")
+                    .accessibilityLabel(String(localized: "Copyright 2026 AppleVis. All rights reserved."))
             }
             .listRowBackground(Color.clear)
         }

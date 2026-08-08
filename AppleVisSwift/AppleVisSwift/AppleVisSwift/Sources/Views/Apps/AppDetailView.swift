@@ -99,13 +99,13 @@ struct AppDetailView: View {
                     Link(destination: storeURL) {
                         Image(systemName: "arrow.up.right.square")
                     }
-                    .accessibilityLabel("Open in App Store")
+                    .accessibilityLabel(String(localized: "Open in App Store"))
                 }
                 if auth.isSignedIn {
                     Button { showReviewCompose = true } label: {
                         Image(systemName: "square.and.pencil")
                     }
-                    .accessibilityLabel("Write review")
+                    .accessibilityLabel(String(localized: "Write review"))
                 }
             }
         }
@@ -232,7 +232,7 @@ struct AppDetailView: View {
                             }
                             .accessibilityElement(children: .combine)
                             .accessibilityLabel(app.appName)
-                            .accessibilityHint("Double-tap to open in the App Store.")
+                            .accessibilityHint(String(localized: "Double-tap to open in the App Store."))
                         }
                     }
                 }
@@ -284,7 +284,7 @@ struct AppDetailView: View {
                 }
             }
             .disabled(isSummarizingAccessibility)
-            .accessibilityLabel(isSummarizingAccessibility ? "Summarizing accessibility notes, please wait" : "Summarize Accessibility Notes")
+            .accessibilityLabel(String(localized: isSummarizingAccessibility ? "Summarizing accessibility notes, please wait" : "Summarize Accessibility Notes"))
         }
     }
 
@@ -312,8 +312,8 @@ struct AppDetailView: View {
                 }
             }
             .disabled(isSummarizingConsensus)
-            .accessibilityLabel(isSummarizingConsensus ? "Summarizing accessibility consensus, please wait" : "Accessibility Consensus")
-            .accessibilityHint("Aggregates reviews into one sentence about how well this app works with VoiceOver.")
+            .accessibilityLabel(String(localized: isSummarizingConsensus ? "Summarizing accessibility consensus, please wait" : "Accessibility Consensus"))
+            .accessibilityHint(String(localized: "Aggregates reviews into one sentence about how well this app works with VoiceOver."))
         }
     }
 
@@ -336,7 +336,7 @@ struct AppDetailView: View {
                 }
             }
             .disabled(isSummarizingReviews)
-            .accessibilityLabel(isSummarizingReviews ? "Summarizing community discussion, please wait" : "Summarize Community Discussion")
+            .accessibilityLabel(String(localized: isSummarizingReviews ? "Summarizing community discussion, please wait" : "Summarize Community Discussion"))
         }
     }
 
@@ -352,7 +352,7 @@ struct AppDetailView: View {
         if let summary = await IntelligenceService.summarize(input) {
             accessibilitySummary = summary
         } else {
-            toast.error("Couldn't generate an accessibility summary. Try again.")
+            toast.error(String(localized: "Couldn't generate an accessibility summary. Try again."))
             UIAccessibility.post(notification: .announcement, argument: "Couldn't generate an accessibility summary.")
         }
         isSummarizingAccessibility = false
@@ -376,7 +376,7 @@ struct AppDetailView: View {
         if let consensus = await IntelligenceService.accessibilityConsensus(input) {
             accessibilityConsensus = consensus
         } else {
-            toast.error("Couldn't generate an accessibility consensus. Try again.")
+            toast.error(String(localized: "Couldn't generate an accessibility consensus. Try again."))
             UIAccessibility.post(notification: .announcement, argument: "Couldn't generate an accessibility consensus.")
         }
         isSummarizingConsensus = false
@@ -400,7 +400,7 @@ struct AppDetailView: View {
         if let summary = await IntelligenceService.summarize(input) {
             reviewsSummary = summary
         } else {
-            toast.error("Couldn't generate a discussion summary. Try again.")
+            toast.error(String(localized: "Couldn't generate a discussion summary. Try again."))
             UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a discussion summary.")
         }
         isSummarizingReviews = false
@@ -454,7 +454,7 @@ struct AppDetailView: View {
                     },
                     onReplyTo: {
                         guard auth.isSignedIn else {
-                            toast.warning("Sign in to reply to reviews.")
+                            toast.warning(String(localized: "Sign in to reply to reviews."))
                             return
                         }
                         quotedReview = review
@@ -541,7 +541,7 @@ struct AppDetailView: View {
                 self.detail?.reviews.append(contentsOf: more)
             }
         } catch {
-            toast.error("Couldn't load more reviews.")
+            toast.error(String(localized: "Couldn't load more reviews."))
         }
         hasMoreReviews = (self.detail?.reviews.count ?? 0) < (self.detail?.reviewCount ?? 0)
         isLoadingMoreReviews = false
@@ -622,10 +622,10 @@ struct AppReviewRow: View {
             .accessibilityAction(named: Text("Copy Comment Text")) { copyText() }
             .accessibilityAction(named: Text("Share Comment")) { presentShareSheet() }
             .accessibilityAction(named: Text("Mark as Helpful")) {
-                toast.warning("Helpful votes are coming once the Drupal Flags API is confirmed.")
+                toast.warning(String(localized: "Helpful votes are coming once the Drupal Flags API is confirmed."))
             }
             .accessibilityAction(named: Text("Report Comment")) {
-                toast.warning("Reporting is coming once the Drupal Flags API is confirmed.")
+                toast.warning(String(localized: "Reporting is coming once the Drupal Flags API is confirmed."))
             }
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Edit Review") { showEditSheet = true })
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Delete Review") { showDeleteConfirm = true })
@@ -662,10 +662,10 @@ struct AppReviewRow: View {
             Button { presentShareSheet() } label: {
                 Label("Share Comment", systemImage: "square.and.arrow.up")
             }
-            Button { toast.warning("Helpful votes are coming once the Drupal Flags API is confirmed.") } label: {
+            Button { toast.warning(String(localized: "Helpful votes are coming once the Drupal Flags API is confirmed.")) } label: {
                 Label("Mark as Helpful", systemImage: "hand.thumbsup")
             }
-            Button { toast.warning("Reporting is coming once the Drupal Flags API is confirmed.") } label: {
+            Button { toast.warning(String(localized: "Reporting is coming once the Drupal Flags API is confirmed.")) } label: {
                 Label("Report Comment", systemImage: "flag")
             }
             if canDelete {
@@ -688,7 +688,7 @@ struct AppReviewRow: View {
                     commentType: "comment_node_ios_app_directory", commentId: review.id, newBody: newText, format: "basic_html", csrfToken: user.csrfToken
                 )
                 onEdit?(newText)
-                toast.success("Review updated")
+                toast.success(String(localized: "Review updated"))
             }
         }
     }
@@ -700,15 +700,15 @@ struct AppReviewRow: View {
                 commentType: "comment_node_ios_app_directory", commentId: review.id, csrfToken: user.csrfToken
             )
             onDelete?()
-            toast.success("Review deleted")
+            toast.success(String(localized: "Review deleted"))
         } catch {
-            toast.error("Couldn't delete review.")
+            toast.error(String(localized: "Couldn't delete review."))
         }
     }
 
     private func copyText() {
         UIPasteboard.general.string = review.body.strippingHTMLTags()
-        toast.success("Comment text copied.")
+        toast.success(String(localized: "Comment text copied."))
     }
 
     private func presentShareSheet() {
@@ -895,7 +895,7 @@ struct ComposeAppReviewView: View {
             let review = try await APIClient.shared.apps.submitReview(
                 appId: appId, subject: subject, body: reviewText, csrfToken: user.csrfToken
             )
-            toast.success("Review posted")
+            toast.success(String(localized: "Review posted"))
             onPosted(review)
             dismiss()
         } catch let e as APIError { submitError = e.localizedDescription

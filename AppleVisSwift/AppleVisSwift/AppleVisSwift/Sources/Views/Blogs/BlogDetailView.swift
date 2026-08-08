@@ -85,7 +85,7 @@ struct BlogDetailView: View {
                     Button { showCompose = true } label: {
                         Image(systemName: "square.and.pencil")
                     }
-                    .accessibilityLabel("Add comment")
+                    .accessibilityLabel(String(localized: "Add comment"))
                 }
             }
         }
@@ -133,7 +133,7 @@ struct BlogDetailView: View {
                     },
                     onReplyTo: {
                         guard auth.isSignedIn else {
-                            toast.warning("Sign in to reply to comments.")
+                            toast.warning(String(localized: "Sign in to reply to comments."))
                             return
                         }
                         quotedComment = comment
@@ -197,7 +197,7 @@ struct BlogDetailView: View {
                 }
             }
             .disabled(isSummarizingPost)
-            .accessibilityLabel(isSummarizingPost ? "Summarizing post, please wait" : "Summarize Post")
+            .accessibilityLabel(String(localized: isSummarizingPost ? "Summarizing post, please wait" : "Summarize Post"))
         }
     }
 
@@ -220,7 +220,7 @@ struct BlogDetailView: View {
                 }
             }
             .disabled(isSummarizingDiscussion)
-            .accessibilityLabel(isSummarizingDiscussion ? "Summarizing discussion, please wait" : "Summarize Discussion")
+            .accessibilityLabel(String(localized: isSummarizingDiscussion ? "Summarizing discussion, please wait" : "Summarize Discussion"))
         }
     }
 
@@ -231,7 +231,7 @@ struct BlogDetailView: View {
         if let summary = await IntelligenceService.summarize(input) {
             postSummary = summary
         } else {
-            toast.error("Couldn't generate a summary for this post. Try again.")
+            toast.error(String(localized: "Couldn't generate a summary for this post. Try again."))
             UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a summary for this post.")
         }
         isSummarizingPost = false
@@ -255,7 +255,7 @@ struct BlogDetailView: View {
         if let summary = await IntelligenceService.summarize(input) {
             discussionSummary = summary
         } else {
-            toast.error("Couldn't generate a discussion summary. Try again.")
+            toast.error(String(localized: "Couldn't generate a discussion summary. Try again."))
             UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a discussion summary.")
         }
         isSummarizingDiscussion = false
@@ -334,7 +334,7 @@ struct BlogDetailView: View {
                 self.detail?.comments.append(contentsOf: more)
             }
         } catch {
-            toast.error("Couldn't load more comments.")
+            toast.error(String(localized: "Couldn't load more comments."))
         }
         hasMoreComments = (self.detail?.comments.count ?? 0) < (self.detail?.commentCount ?? 0)
         isLoadingMoreComments = false
@@ -408,7 +408,7 @@ struct ComposeBlogCommentView: View {
             let comment = try await APIClient.shared.blogs.submitComment(
                 blogId: blogId, body: commentText, csrfToken: user.csrfToken
             )
-            toast.success("Comment posted")
+            toast.success(String(localized: "Comment posted"))
             onPosted(comment)
             dismiss()
         } catch let e as APIError { submitError = e.localizedDescription

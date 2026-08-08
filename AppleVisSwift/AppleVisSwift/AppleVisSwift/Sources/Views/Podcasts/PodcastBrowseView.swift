@@ -40,7 +40,7 @@ struct PodcastBrowseView: View {
                         }
                     }
                 } label: { Image(systemName: "line.3.horizontal.decrease.circle") }
-                    .accessibilityLabel("Filter podcasts")
+                    .accessibilityLabel(String(localized: "Filter podcasts"))
             }
         }
         .task { await load(reset: true) }

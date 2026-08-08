@@ -119,7 +119,7 @@ struct SubmitAppView: View {
                                     if let result = await intelligence.rewrite(subject: nil, body: payload.accessibilityComments, isTopic: false) {
                                         payload.accessibilityComments = result.body
                                     } else {
-                                        toast.error("Couldn't rewrite this. Try again.")
+                                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                     }
                                 }
                             }
@@ -197,7 +197,7 @@ struct SubmitAppView: View {
                     Label("Read submission guidelines", systemImage: "arrow.up.forward.square")
                 }
                 .font(.subheadline).fontWeight(.semibold)
-                .accessibilityHint("Opens in Safari.")
+                .accessibilityHint(String(localized: "Opens in Safari."))
 
                 if !canContinueBeforeYouBegin {
                     Text("Confirm both checkboxes to continue")
@@ -341,17 +341,17 @@ struct SubmitAppView: View {
                     Text("Choose…").tag("")
                     ForEach(voiceOverOptions, id: \.self) { Text($0).tag($0) }
                 }
-                .accessibilityHint("How well VoiceOver works overall in this app.")
+                .accessibilityHint(String(localized: "How well VoiceOver works overall in this app."))
                 Picker("Button Labelling", selection: $payload.buttonLabelling) {
                     Text("Choose…").tag("")
                     ForEach(buttonLabellingOptions, id: \.self) { Text($0).tag($0) }
                 }
-                .accessibilityHint("Whether buttons and controls have clear, accurate VoiceOver labels.")
+                .accessibilityHint(String(localized: "Whether buttons and controls have clear, accurate VoiceOver labels."))
                 Picker("Usability", selection: $payload.usabilityNotes) {
                     Text("Choose…").tag("")
                     ForEach(usabilityOptions, id: \.self) { Text($0).tag($0) }
                 }
-                .accessibilityHint("How easy the app is to use as a blind or low-vision user overall.")
+                .accessibilityHint(String(localized: "How easy the app is to use as a blind or low-vision user overall."))
             }
 
             if intelligence.showTranslatePrompt {
@@ -361,7 +361,7 @@ struct SubmitAppView: View {
                             if let result = await intelligence.translate(subject: nil, body: payload.accessibilityComments, isTopic: false) {
                                 payload.accessibilityComments = result.body
                             } else {
-                                toast.error("Couldn't translate this. Try again.")
+                                toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
                         }
                     } onDismiss: {
@@ -390,7 +390,7 @@ struct SubmitAppView: View {
 
             Section("Short Summary") {
                 TextField("One-line summary for the directory listing", text: $payload.shortSummary)
-                    .accessibilityHint("Shown in the app directory list view, not the full review.")
+                    .accessibilityHint(String(localized: "Shown in the app directory list view, not the full review."))
             }
 
             Section("Additional Comments (optional)") {
@@ -436,7 +436,7 @@ struct SubmitAppView: View {
         isSubmitting = true; error = nil
         do {
             _ = try await APIClient.shared.apps.submitApp(payload: payload, csrfToken: user.csrfToken)
-            toast.success("App submitted for review")
+            toast.success(String(localized: "App submitted for review"))
             dismiss()
         } catch let e as APIError {
             error = e.localizedDescription

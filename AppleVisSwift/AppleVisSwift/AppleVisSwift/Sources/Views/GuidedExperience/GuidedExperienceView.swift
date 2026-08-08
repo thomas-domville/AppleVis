@@ -138,7 +138,7 @@ struct GuidedExperienceView: View {
             Button("Skip Tour") { skip() }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-                .accessibilityHint("Exits the tour. You can replay it any time from Profile.")
+                .accessibilityHint(String(localized: "Exits the tour. You can replay it any time from Profile."))
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 24)
