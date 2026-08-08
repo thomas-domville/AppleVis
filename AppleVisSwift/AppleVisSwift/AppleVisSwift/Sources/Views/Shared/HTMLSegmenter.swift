@@ -30,7 +30,23 @@ struct HTMLSegment: Identifiable {
 /// regex scan rather than a full HTML parser — good enough for the
 /// well-formed HTML Drupal's rich-text editor actually produces.
 enum HTMLSegmenter {
+    /// `SegmentedHTMLView.body` previously called `segment(_:)` fresh on
+    /// every SwiftUI re-render (it was a computed property, re-invoked
+    /// whenever anything in the view re-evaluated, not just when `html`
+    /// itself changed) — a full regex scan over potentially thousands of
+    /// characters repeated for no reason on every unrelated state change.
+    /// Views only ever call this from the main thread, so a plain
+    /// dictionary cache (no lock) is safe.
+    private static var cache: [String: [HTMLSegment]] = [:]
+
     static func segment(_ html: String) -> [HTMLSegment] {
+        if let cached = cache[html] { return cached }
+        let result = computeSegments(html)
+        cache[html] = result
+        return result
+    }
+
+    private static func computeSegments(_ html: String) -> [HTMLSegment] {
         guard let regex = try? NSRegularExpression(
             pattern: #"(?is)<(h[1-6]|blockquote|pre)\b[^>]*>.*?</\1>"#
         ) else {
