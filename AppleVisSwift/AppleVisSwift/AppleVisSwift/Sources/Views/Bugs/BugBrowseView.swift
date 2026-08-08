@@ -214,7 +214,12 @@ struct BugReportRow: View {
 
     private var bugLabel: String {
         let newLabel = newCount > 0 ? " \(newCount) new comment\(newCount == 1 ? "" : "s")." : ""
-        return "\(bug.title). \(bug.status.displayName). \(bug.severity.displayName) severity. " +
-        "\(bug.commentCount) comments.\(newLabel)"
+        return detailLevelLabel(
+            title: bug.title,
+            contentType: "\(bug.status.displayName), \(bug.severity.displayName) severity",
+            authorAndCount: "\(bug.commentCount) comment\(bug.commentCount == 1 ? "" : "s")",
+            date: bug.changedAt.formatted(.relative(presentation: .named)),
+            alwaysAppend: newLabel
+        )
     }
 }

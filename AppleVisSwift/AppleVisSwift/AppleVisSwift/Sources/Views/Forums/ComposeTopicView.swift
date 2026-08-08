@@ -1,6 +1,10 @@
 import SwiftUI
 
 struct ComposeTopicView: View {
+    /// Previously discarded — ForumsBrowseView had no way to show the new
+    /// topic or move VoiceOver focus to it without a manual pull-to-refresh.
+    var onPosted: (ForumTopic) -> Void = { _ in }
+
     @State private var title = ""
     @State private var bodyText = ""
     @State private var selectedCategory: ForumCategory?
@@ -109,8 +113,9 @@ struct ComposeTopicView: View {
         isSubmitting = true
         error = nil
         do {
-            _ = try await APIClient.shared.forums.submitTopic(title: title, body: bodyText, categoryTid: cat.tid, csrfToken: user.csrfToken)
+            let posted = try await APIClient.shared.forums.submitTopic(title: title, body: bodyText, categoryTid: cat.tid, csrfToken: user.csrfToken)
             toast.success(String(localized: "Topic posted"))
+            onPosted(posted)
             dismiss()
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Failed to post topic." }

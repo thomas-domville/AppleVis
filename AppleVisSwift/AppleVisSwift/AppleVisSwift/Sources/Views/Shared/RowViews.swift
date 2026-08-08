@@ -41,6 +41,34 @@ struct NowPlayingWaveform: View {
     }
 }
 
+/// Builds a row's accessibility label respecting Settings > Accessibility >
+/// VoiceOver Detail Level — previously every row hardcoded the "All"-tier
+/// content (title, type, author, count, date) regardless of this setting;
+/// Simple/Normal never actually read anywhere, so picking them did nothing.
+/// `contentType` is always included (title + type is RN's Simple tier);
+/// `authorAndCount` is added at Normal and above; `date` only at All.
+/// `alwaysAppend` (new-count/saved/following suffixes — Swift-only
+/// additions with no RN equivalent tier) is unconditional at every level,
+/// since "this has new activity" is exactly the kind of thing a
+/// fast-scanning Simple-mode user still wants to hear.
+func detailLevelLabel(
+    title: String,
+    contentType: String,
+    authorAndCount: String,
+    date: String,
+    alwaysAppend: String
+) -> String {
+    let level = PreferencesStore.current?.announcementLevel ?? .normal
+    var parts = "\(title), \(contentType)"
+    if level != .simple, !authorAndCount.isEmpty {
+        parts += ", \(authorAndCount)"
+    }
+    if level == .all {
+        parts += ", \(date)"
+    }
+    return parts + alwaysAppend
+}
+
 struct NewCountBadge: View {
     let count: Int
 
@@ -130,7 +158,13 @@ struct ForumTopicRow: View {
 
     private var topicLabel: String {
         let newLabel = newCount > 0 ? ". \(newCount) new repl\(newCount == 1 ? "y" : "ies")" : ""
-        return "\(topic.title), \(topic.category), \(topic.replyCount) replies, \(topic.lastActivityAt.formatted(.relative(presentation: .named)))\(savedFollowingLabel)\(newLabel)"
+        return detailLevelLabel(
+            title: topic.title,
+            contentType: topic.category,
+            authorAndCount: "by \(topic.authorName), \(topic.replyCount) repl\(topic.replyCount == 1 ? "y" : "ies")",
+            date: topic.lastActivityAt.formatted(.relative(presentation: .named)),
+            alwaysAppend: "\(savedFollowingLabel)\(newLabel)"
+        )
     }
 }
 
@@ -217,9 +251,16 @@ struct PodcastEpisodeRow: View {
 
     private var episodeLabel: String {
         let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
-        return "\(episode.title), \(episode.showTitle) podcast" +
-        (episode.duration.map { ", \(Duration.seconds($0).formatted(.units(allowed: [.hours, .minutes])))" } ?? "") +
-        ", \(episode.publishedAt.formatted(.relative(presentation: .named)))\(newLabel)"
+        let durationText = episode.duration.map { Duration.seconds($0).formatted(.units(allowed: [.hours, .minutes])) } ?? ""
+        let countText = episode.commentCount > 0 ? "\(episode.commentCount) comment\(episode.commentCount == 1 ? "" : "s")" : ""
+        let authorAndCount = [durationText, countText].filter { !$0.isEmpty }.joined(separator: ", ")
+        return detailLevelLabel(
+            title: episode.title,
+            contentType: "\(episode.showTitle) podcast",
+            authorAndCount: authorAndCount,
+            date: episode.publishedAt.formatted(.relative(presentation: .named)),
+            alwaysAppend: newLabel
+        )
     }
 }
 
@@ -281,7 +322,13 @@ struct AppListingRow: View {
 
     private var appLabel: String {
         let newLabel = newCount > 0 ? ". \(newCount) new review\(newCount == 1 ? "" : "s")" : ""
-        return "\(app.name) by \(app.developer), \(app.category), \(app.lastActivityAt.formatted(.relative(presentation: .named)))\(newLabel)"
+        return detailLevelLabel(
+            title: app.name,
+            contentType: app.category,
+            authorAndCount: "by \(app.developer), \(app.reviewCount) review\(app.reviewCount == 1 ? "" : "s")",
+            date: app.lastActivityAt.formatted(.relative(presentation: .named)),
+            alwaysAppend: newLabel
+        )
     }
 }
 
@@ -332,8 +379,13 @@ struct ResourceRow: View {
 
     private var resourceLabel: String {
         let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
-        return "\(resource.title), \(resource.kind.displayName), by \(resource.authorName), " +
-        "\(resource.updatedAt.formatted(.relative(presentation: .named)))\(newLabel)"
+        return detailLevelLabel(
+            title: resource.title,
+            contentType: resource.kind.displayName,
+            authorAndCount: "by \(resource.authorName), \(resource.commentCount) comment\(resource.commentCount == 1 ? "" : "s")",
+            date: resource.updatedAt.formatted(.relative(presentation: .named)),
+            alwaysAppend: newLabel
+        )
     }
 }
 
@@ -388,7 +440,12 @@ struct BlogPostRow: View {
 
     private var postLabel: String {
         let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
-        return "\(post.title), Blog post, by \(post.authorName), \(post.commentCount) comment\(post.commentCount == 1 ? "" : "s"), " +
-        "\(post.lastActivityAt.formatted(.relative(presentation: .named)))\(newLabel)"
+        return detailLevelLabel(
+            title: post.title,
+            contentType: "Blog post",
+            authorAndCount: "by \(post.authorName), \(post.commentCount) comment\(post.commentCount == 1 ? "" : "s")",
+            date: post.lastActivityAt.formatted(.relative(presentation: .named)),
+            alwaysAppend: newLabel
+        )
     }
 }

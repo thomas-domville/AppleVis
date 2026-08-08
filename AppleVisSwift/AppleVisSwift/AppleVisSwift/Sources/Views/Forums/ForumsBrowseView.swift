@@ -30,6 +30,7 @@ struct ForumsBrowseView: View {
     @State private var isLoadingMore = false
     @State private var showFilterSheet = false
     @State private var searchText = ""
+    @AccessibilityFocusState private var focusedTopicId: String?
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
     @ObservedObject private var networkStatus = NetworkStatusStore.shared
@@ -139,7 +140,10 @@ struct ForumsBrowseView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack {
                     if auth.isSignedIn {
-                        NavigationLink(destination: ComposeTopicView()) {
+                        NavigationLink(destination: ComposeTopicView(onPosted: { topic in
+                            topics.insert(topic, at: 0)
+                            focusOnTopic(topic.id)
+                        })) {
                             Image(systemName: "square.and.pencil")
                         }
                     }
@@ -152,7 +156,17 @@ struct ForumsBrowseView: View {
                 }
             }
         }
-        .sheet(isPresented: $showFilterSheet, onDismiss: { Task { await load(reset: true) } }) {
+        .sheet(isPresented: $showFilterSheet, onDismiss: {
+            Task {
+                await load(reset: true)
+                // Previously the reloaded list (a completely different
+                // result set after a filter change) left VoiceOver focus
+                // wherever the OS defaulted it — typically back near the
+                // toolbar filter button — instead of on the new content.
+                UIAccessibility.post(notification: .announcement, argument: String(localized: "Showing \(filter.displayName)."))
+                if let first = filteredTopics.first { focusOnTopic(first.id) }
+            }
+        }) {
             ForumFilterSheetView(filter: $filter, appleTopicsFilter: $appleTopicsFilter, selectedCategory: $selectedCategory, categories: categories)
         }
         .task { await load(reset: true) }
@@ -167,6 +181,7 @@ struct ForumsBrowseView: View {
             }
             ForEach(filteredTopics) { topic in
                 ForumTopicRow(topic: topic, onDelete: { topics.removeAll { $0.id == topic.id } })
+                    .accessibilityFocused($focusedTopicId, equals: topic.id)
             }
             if hasMore {
                 ProgressView().frame(maxWidth: .infinity)
@@ -175,6 +190,16 @@ struct ForumsBrowseView: View {
         }
         .listStyle(.plain)
         .themedList(preferences.colors)
+    }
+
+    /// Delayed since setting focus before the target row has laid out is a
+    /// common way for it to silently fail (same pattern used for wizard
+    /// step transitions elsewhere in the app).
+    private func focusOnTopic(_ id: String) {
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            focusedTopicId = id
+        }
     }
 
     private func load(reset: Bool) async {
