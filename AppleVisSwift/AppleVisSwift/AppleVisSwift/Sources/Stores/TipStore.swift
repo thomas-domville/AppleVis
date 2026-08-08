@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import UIKit
 
 struct TipContent {
     let title: String
@@ -89,9 +90,32 @@ final class TipStore: ObservableObject {
     private var seenThisSession: Set<TipKey> = []
     private static let keyPrefix = "applevis.tip."
 
+    /// RN's every call site delayed presentation 800-1500ms after the
+    /// triggering screen appeared, so the tip never collided with that
+    /// screen's own entrance animation or VoiceOver announcement. Swift
+    /// fired immediately; a single representative delay here (rather than
+    /// re-tuning every call site) captures the same intent.
+    private static let presentationDelay: Duration = .milliseconds(1000)
+
+    /// Seen-tip flags are also written to iCloud key-value storage (RN's
+    /// icloudStorage.ts) so "don't show this again" carries across a user's
+    /// devices, not just this install — falls back to UserDefaults alone
+    /// when iCloud isn't available.
+    private static func isSeen(_ key: TipKey) -> Bool {
+        let fullKey = keyPrefix + key.rawValue
+        return NSUbiquitousKeyValueStore.default.bool(forKey: fullKey) || UserDefaults.standard.bool(forKey: fullKey)
+    }
+
+    private static func markSeen(_ key: TipKey) {
+        let fullKey = keyPrefix + key.rawValue
+        UserDefaults.standard.set(true, forKey: fullKey)
+        NSUbiquitousKeyValueStore.default.set(true, forKey: fullKey)
+        NSUbiquitousKeyValueStore.default.synchronize()
+    }
+
     func show(_ key: TipKey) {
         guard !seenThisSession.contains(key), let content = Tips.content[key] else { return }
-        guard !UserDefaults.standard.bool(forKey: Self.keyPrefix + key.rawValue) else {
+        guard !Self.isSeen(key) else {
             seenThisSession.insert(key)
             return
         }
@@ -101,13 +125,18 @@ final class TipStore: ObservableObject {
         }
 
         seenThisSession.insert(key)
-        SoundPlayer.shared.play(.tipPopup)
-        activeTip = ActiveTip(key: key, content: content)
+        Task {
+            try? await Task.sleep(for: Self.presentationDelay)
+            guard !Task.isCancelled else { return }
+            SoundPlayer.shared.play(.tipPopup)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            activeTip = ActiveTip(key: key, content: content)
+        }
     }
 
     func dismissActiveTip() {
         guard let activeTip else { return }
-        UserDefaults.standard.set(true, forKey: Self.keyPrefix + activeTip.key.rawValue)
+        Self.markSeen(activeTip.key)
         self.activeTip = nil
     }
 }

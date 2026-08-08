@@ -4,7 +4,10 @@ struct ContentView: View {
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @EnvironmentObject private var keyCommands: KeyCommandRouter
+    @EnvironmentObject private var auth: AuthStore
     @ObservedObject private var homeBadge = HomeBadgeStore.shared
+    @State private var showTourPrompt = false
+    @State private var showWelcomeTourFromPrompt = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -53,6 +56,31 @@ struct ContentView: View {
         }
         .sheet(item: $deepLinkRouter.pendingSiriDestination) { destination in
             siriDestination(for: destination)
+        }
+        .sheet(isPresented: $showWelcomeTourFromPrompt) {
+            GuidedExperienceView(experience: GuidedExperienceRegistry.welcome)
+        }
+        .alert("Take a quick tour of AppleVis?", isPresented: $showTourPrompt) {
+            Button("Start Tour") { showWelcomeTourFromPrompt = true }
+            Button("Maybe Later", role: .cancel) {}
+            Button("No Thanks") { GuidedExperienceStore.disableAutoPrompt() }
+        } message: {
+            Text("See a short, skippable walkthrough of Home, Discover, For You, Search, Profile, and Settings.")
+        }
+        .onAppear { offerWelcomeTourIfNeeded() }
+    }
+
+    /// Matches RN's post-setup "Take a quick tour?" alert (app/onboarding/
+    /// ready.tsx) — offered once, right after onboarding finishes, unless the
+    /// user already completed/skipped the tour or opted out via "No Thanks."
+    private func offerWelcomeTourIfNeeded() {
+        guard auth.justCompletedOnboarding else { return }
+        auth.justCompletedOnboarding = false
+        let progress = GuidedExperienceStore.getProgress(GuidedExperienceRegistry.welcome.id)
+        guard GuidedExperienceStore.autoPromptEnabled, !progress.completed, !progress.skipped else { return }
+        Task {
+            try? await Task.sleep(for: .seconds(2.5))
+            showTourPrompt = true
         }
     }
 

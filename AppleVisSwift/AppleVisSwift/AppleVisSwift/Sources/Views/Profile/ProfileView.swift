@@ -206,11 +206,18 @@ struct ProfileView: View {
             }
 
             Button {
+                // Force a true restart — without this, if the tour is
+                // currently `dismissed` (paused mid-tour via Explore This
+                // Screen) rather than `completed`, GuidedExperienceView's
+                // own resume logic would jump back into the middle of it
+                // instead of actually replaying from step 1.
+                GuidedExperienceStore.restart(GuidedExperienceRegistry.welcome.id)
                 showWelcomeTour = true
             } label: {
                 Label("Replay Welcome Tour", systemImage: "arrow.clockwise")
             }
             .accessibilityLabel("Replay Welcome Tour")
+            .accessibilityHint("Replays the short guided tour of Home, Discover, For You, Search, Profile, and Settings.")
 
             Link(destination: URL(string: "https://www.applevis.com/privacy")!) {
                 Label("Privacy Policy", systemImage: "shield.checkmark")

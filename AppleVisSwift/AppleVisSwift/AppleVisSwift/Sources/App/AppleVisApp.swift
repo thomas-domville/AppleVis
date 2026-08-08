@@ -14,6 +14,7 @@ struct AppleVisApp: App {
     @StateObject private var tips = TipStore()
     @StateObject private var networkMonitor = NetworkMonitor.shared
     @StateObject private var keyCommands = KeyCommandRouter()
+    @StateObject private var guidedExperiencePause = GuidedExperiencePauseStore()
 
     init() {
         BackgroundDownloadTask.register()
@@ -54,9 +55,11 @@ struct AppleVisApp: App {
             .environmentObject(tips)
             .environmentObject(networkMonitor)
             .environmentObject(keyCommands)
+            .environmentObject(guidedExperiencePause)
             .preferredColorScheme(preferences.colorScheme)
             .tint(preferences.theme.accentColor)
             .overlay { TipOverlay(tips: tips) }
+            .overlay { GuidedExperienceResumeBanner() }
             .accessibilityAction(.magicTap) {
                 guard player.currentEpisode != nil else { return }
                 player.togglePlayPause()

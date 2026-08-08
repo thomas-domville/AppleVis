@@ -8,6 +8,11 @@ final class AuthStore: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var error: String?
     @Published var isOnboarded: Bool
+    /// One-shot signal so ContentView can offer the welcome-tour auto-prompt
+    /// right after setup finishes — RN did this from onboarding's own "Next"
+    /// handler, but Swift's transition to ContentView is state-driven, not
+    /// an imperative navigation call, so the signal has to live here instead.
+    @Published var justCompletedOnboarding = false
 
     var isSignedIn: Bool { user != nil }
 
@@ -45,6 +50,7 @@ final class AuthStore: ObservableObject {
 
     func completeOnboarding() {
         isOnboarded = true
+        justCompletedOnboarding = true
         UserDefaults.standard.set(true, forKey: onboardedKey)
     }
 

@@ -8,9 +8,13 @@ struct GuidedExperienceView: View {
     var onFinish: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var keyCommands: KeyCommandRouter
+    @EnvironmentObject private var pauseStore: GuidedExperiencePauseStore
     @State private var stepIndex = 0
     @State private var showExplainMore = false
     @State private var showHelpArticle: HelpArticle?
+    @AccessibilityFocusState private var isHeadingFocused: Bool
+    @State private var entranceVisible = false
 
     private var step: GuidedExperienceStep { experience.steps[stepIndex] }
     private var isFirstStep: Bool { stepIndex == 0 }
@@ -19,98 +23,123 @@ struct GuidedExperienceView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
-                    Text("Step \(stepIndex + 1) of \(experience.steps.count)")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .padding(.top, 8)
-
-                    Image(systemName: step.icon)
-                        .font(.system(size: 56))
-                        .foregroundStyle(Color.accentColor)
-                        .accessibilityHidden(true)
-
-                    VStack(spacing: 10) {
-                        Text(step.title)
-                            .font(.title2).fontWeight(.bold)
-                            .multilineTextAlignment(.center)
-                        Text(step.shortText)
-                            .font(.body)
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 24)
-
-                    if let explainMore = step.explainMoreText {
-                        VStack(spacing: 8) {
-                            if showExplainMore {
-                                Text(explainMore)
-                                    .font(.subheadline)
-                                    .multilineTextAlignment(.center)
-                                    .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 24)
-                                    .transition(.opacity)
-                            }
-                            Button(showExplainMore ? "Show Less" : "Explain More") {
-                                withReduceMotionAwareAnimation { showExplainMore.toggle() }
-                            }
-                            .font(.subheadline)
+                VStack(alignment: .leading, spacing: 0) {
+                    if !isFirstStep {
+                        Button {
+                            goToStep(stepIndex - 1)
+                        } label: {
+                            Label("Back", systemImage: "chevron.backward")
                         }
+                        .padding(.bottom, 4)
                     }
 
-                    if !step.secondaryActions.isEmpty {
-                        VStack(spacing: 8) {
-                            ForEach(step.secondaryActions) { action in
-                                Button(action.label) { perform(action) }
-                                    .buttonStyle(.bordered)
+                    VStack(spacing: 24) {
+                        progressDots
+
+                        Image(systemName: step.icon)
+                            .font(.system(size: 34))
+                            .foregroundStyle(Color.accentColor)
+                            .frame(width: 72, height: 72)
+                            .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 20))
+                            .accessibilityHidden(true)
+
+                        VStack(spacing: 10) {
+                            Text(step.title)
+                                .font(.title2).fontWeight(.bold)
+                                .multilineTextAlignment(.center)
+                                .accessibilityAddTraits(.isHeader)
+                                .accessibilityLabel("\(step.title). Step \(stepIndex + 1) of \(experience.steps.count).")
+                                .accessibilityFocused($isHeadingFocused)
+                            Text(step.shortText)
+                                .font(.body)
+                                .multilineTextAlignment(.center)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 24)
+
+                        if let explainMore = step.explainMoreText {
+                            VStack(spacing: 8) {
+                                if showExplainMore {
+                                    Text(explainMore)
+                                        .font(.subheadline)
+                                        .multilineTextAlignment(.center)
+                                        .foregroundStyle(.secondary)
+                                        .padding(.horizontal, 24)
+                                        .transition(.opacity)
+                                }
+                                Button(showExplainMore ? "Show Less" : "Explain More") {
+                                    withReduceMotionAwareAnimation { showExplainMore.toggle() }
+                                }
+                                .font(.subheadline)
                             }
                         }
-                    }
 
-                    if isLastStep {
-                        completionActions
-                    }
+                        if isLastStep {
+                            completionActions
+                        } else {
+                            stepActions
+                        }
 
-                    Color.clear.frame(height: 20)
+                        Color.clear.frame(height: 20)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .opacity(entranceVisible ? 1 : 0)
+                    .offset(y: entranceVisible ? 0 : 10)
                 }
                 .padding()
             }
             .navigationTitle(experience.title)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Skip") {
-                        GuidedExperienceStore.markSkipped(experience.id)
-                        dismiss()
-                    }
-                }
-            }
-            .safeAreaInset(edge: .bottom) {
-                if !isLastStep {
-                    navigationControls
-                        .padding()
-                        .background(.bar)
-                }
-            }
         }
         .onAppear {
             let progress = GuidedExperienceStore.getProgress(experience.id)
             if progress.dismissed {
                 stepIndex = min(progress.lastStepIndex, experience.steps.count - 1)
             }
+            playEntranceAnimation()
+            focusHeadingAfterTransition()
         }
         .sheet(item: $showHelpArticle) { article in
             NavigationStack { HelpArticleDetailView(article: article) }
         }
     }
 
-    private var navigationControls: some View {
-        HStack {
-            Button("Back") { goToStep(stepIndex - 1) }
-                .disabled(isFirstStep)
-            Spacer()
-            Button("Next") { goToStep(stepIndex + 1) }
-                .buttonStyle(.borderedProminent)
+    // MARK: - Progress
+
+    private var progressDots: some View {
+        HStack(spacing: 8) {
+            ForEach(0..<experience.steps.count, id: \.self) { i in
+                Capsule()
+                    .fill(i == stepIndex ? Color.accentColor : Color.secondary.opacity(0.3))
+                    .frame(width: i == stepIndex ? 22 : 8, height: 8)
+            }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Step \(stepIndex + 1) of \(experience.steps.count)")
+    }
+
+    // MARK: - Per-step actions (secondary + primary + skip)
+
+    private var stepActions: some View {
+        VStack(spacing: 10) {
+            ForEach(step.secondaryActions) { action in
+                Button(action.label) { perform(action) }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity)
+            }
+
+            Button("Continue") { goToStep(stepIndex + 1) }
+                .buttonStyle(.borderedProminent)
+                .frame(maxWidth: .infinity)
+                .controlSize(.large)
+
+            Button("Skip Tour") { skip() }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .accessibilityHint("Exits the tour. You can replay it any time from Profile.")
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 24)
     }
 
     private var completionActions: some View {
@@ -131,20 +160,64 @@ struct GuidedExperienceView: View {
         .padding(.top, 8)
     }
 
+    // MARK: - Navigation
+
     private func goToStep(_ index: Int) {
         let clamped = max(0, min(experience.steps.count - 1, index))
+        SoundPlayer.shared.play(.pickerTick)
         stepIndex = clamped
         showExplainMore = false
         GuidedExperienceStore.markStep(experience.id, clamped)
+        playEntranceAnimation()
+        focusHeadingAfterTransition()
+    }
+
+    /// Fade + slight upward translate on step change, matching RN's
+    /// entrance animation — skipped entirely (final state applied instantly)
+    /// under Reduce Motion.
+    private func playEntranceAnimation() {
+        guard !UIAccessibility.isReduceMotionEnabled else {
+            entranceVisible = true
+            return
+        }
+        entranceVisible = false
+        withAnimation(.easeOut(duration: 0.3)) {
+            entranceVisible = true
+        }
+    }
+
+    private func focusHeadingAfterTransition() {
+        Task {
+            try? await Task.sleep(for: .milliseconds(350))
+            isHeadingFocused = true
+        }
+    }
+
+    private func skip() {
+        GuidedExperienceStore.markSkipped(experience.id)
+        pauseStore.clearPaused()
+        UIAccessibility.post(notification: .announcement, argument: "\(experience.title) skipped.")
+        dismiss()
     }
 
     private func perform(_ action: GuidedExperienceSecondaryAction) {
         switch action.kind {
-        case .exploreScreen:
+        case .exploreScreen(let target):
             GuidedExperienceStore.markDismissedForNow(experience.id, stepIndex)
+            pauseStore.pauseForExplore(experienceId: experience.id, experienceTitle: experience.title, stepIndex: stepIndex)
             dismiss()
+            navigate(to: target)
         case .learnMore(let helpArticleId):
             showHelpArticle = HelpContent.find(helpArticleId)
+        }
+    }
+
+    private func navigate(to target: GuidedExperienceScreenTarget) {
+        switch target {
+        case .home: keyCommands.selectedTab = 0
+        case .discover: keyCommands.selectedTab = 1
+        case .forYou: keyCommands.selectedTab = 2
+        case .profile, .settings: keyCommands.showSettings = true
         }
     }
 
@@ -152,16 +225,21 @@ struct GuidedExperienceView: View {
         switch action.kind {
         case .finish:
             GuidedExperienceStore.markCompleted(experience.id)
+            pauseStore.clearPaused()
             dismiss()
             onFinish?()
         case .openHelp:
             GuidedExperienceStore.markCompleted(experience.id)
+            pauseStore.clearPaused()
             dismiss()
             onFinish?()
         case .replay:
             GuidedExperienceStore.restart(experience.id)
+            UIAccessibility.post(notification: .announcement, argument: "\(experience.title) restarted.")
             stepIndex = 0
             showExplainMore = false
+            playEntranceAnimation()
+            focusHeadingAfterTransition()
         }
     }
 }

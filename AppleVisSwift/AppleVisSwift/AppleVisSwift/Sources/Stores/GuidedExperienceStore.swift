@@ -3,6 +3,19 @@ import Foundation
 /// Ported from src/services/guidedExperienceStore.ts.
 enum GuidedExperienceStore {
     private static let keyPrefix = "applevis.guidedExperience."
+    private static let autoPromptKey = "applevis.welcomeTourAutoPrompt"
+
+    /// Whether the post-onboarding "Take a quick tour?" prompt should still
+    /// offer to start the welcome tour automatically — separate from whether
+    /// the tour itself has been completed/skipped. Ported from RN's
+    /// src/services/tour.ts; defaults true until the user explicitly opts out.
+    static var autoPromptEnabled: Bool {
+        UserDefaults.standard.object(forKey: autoPromptKey) as? Bool ?? true
+    }
+
+    static func disableAutoPrompt() {
+        UserDefaults.standard.set(false, forKey: autoPromptKey)
+    }
 
     static func getProgress(_ experienceId: String) -> GuidedExperienceProgress {
         guard let data = UserDefaults.standard.data(forKey: keyPrefix + experienceId),

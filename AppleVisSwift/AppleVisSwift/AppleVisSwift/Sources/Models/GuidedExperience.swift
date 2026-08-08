@@ -2,8 +2,15 @@ import Foundation
 
 // Ported from src/guidedExperience/types.ts + src/data/guidedExperiences.ts.
 
+/// Concrete stand-in for RN's generic route strings — Swift has no generic
+/// router, and every `route:` the RN data actually used maps 1:1 onto one of
+/// these (verified against src/data/guidedExperiences.ts).
+enum GuidedExperienceScreenTarget {
+    case home, discover, forYou, profile, settings
+}
+
 enum GuidedExperienceSecondaryActionKind {
-    case exploreScreen
+    case exploreScreen(GuidedExperienceScreenTarget)
     case learnMore(helpArticleId: String)
 }
 
@@ -65,36 +72,39 @@ enum GuidedExperienceRegistry {
                 id: "welcome-home", title: "Home", icon: "house",
                 shortText: "Home helps you catch up on the latest AppleVis activity.",
                 explainMoreText: "It brings together new topics, podcast activity, app entries, guides, and other updates so you know where to begin.",
-                secondaryActions: [GuidedExperienceSecondaryAction(label: "Explore This Screen", kind: .exploreScreen)]
+                secondaryActions: [GuidedExperienceSecondaryAction(label: "Explore This Screen", kind: .exploreScreen(.home))]
             ),
             GuidedExperienceStep(
                 id: "welcome-discover", title: "Discover", icon: "safari",
                 shortText: "Discover is your gateway to the wider AppleVis community.",
-                explainMoreText: "Browse the App Directory, community areas, learning resources, the Bug Tracker, and ways to contribute.",
-                secondaryActions: [GuidedExperienceSecondaryAction(label: "Explore This Screen", kind: .exploreScreen)]
+                explainMoreText: "Browse the App Directory, community areas, learning resources, the Bug Tracker, Be My Eyes tools, contribution options, and ways to connect.",
+                secondaryActions: [GuidedExperienceSecondaryAction(label: "Explore This Screen", kind: .exploreScreen(.discover))]
             ),
             GuidedExperienceStep(
                 id: "welcome-foryou", title: "For You", icon: "person.crop.circle",
                 shortText: "For You is your personal AppleVis hub.",
                 explainMoreText: "Return to your queue, downloads, saved items, and followed content whenever you want to continue where you left off.",
-                secondaryActions: [GuidedExperienceSecondaryAction(label: "Explore This Screen", kind: .exploreScreen)]
+                secondaryActions: [GuidedExperienceSecondaryAction(label: "Explore This Screen", kind: .exploreScreen(.forYou))]
             ),
             GuidedExperienceStep(
                 id: "welcome-search", title: "Search", icon: "magnifyingglass",
-                shortText: "Search (inside Discover) helps you find discussions, apps, guides, and podcast episodes across AppleVis.",
+                shortText: "Search helps you find discussions, apps, guides, podcast episodes, and help across AppleVis.",
                 explainMoreText: "Results are grouped so you can quickly choose the kind of content you want.",
-                secondaryActions: [GuidedExperienceSecondaryAction(label: "Explore This Screen", kind: .exploreScreen)]
+                secondaryActions: [GuidedExperienceSecondaryAction(label: "Explore This Screen", kind: .exploreScreen(.discover))]
             ),
             GuidedExperienceStep(
                 id: "welcome-profile", title: "Profile", icon: "person",
-                shortText: "Profile is where you sign in, view account tools, check support information, and access app information.",
-                secondaryActions: [GuidedExperienceSecondaryAction(label: "Explore This Screen", kind: .exploreScreen)]
+                shortText: "Profile is where you sign in, view account tools, check support information, see saved item summaries, and access app information.",
+                secondaryActions: [GuidedExperienceSecondaryAction(label: "Explore This Screen", kind: .exploreScreen(.profile))]
             ),
             GuidedExperienceStep(
                 id: "welcome-settings-help", title: "Settings and Help", icon: "gearshape",
                 shortText: "Settings lets you customize appearance, accessibility, notifications, podcasts, privacy, storage, and more.",
                 explainMoreText: "Help is always available when you want a guide, troubleshooting step, or refresher.",
-                secondaryActions: [GuidedExperienceSecondaryAction(label: "Learn More", kind: .learnMore(helpArticleId: "start-tabs"))]
+                secondaryActions: [
+                    GuidedExperienceSecondaryAction(label: "Explore This Screen", kind: .exploreScreen(.settings)),
+                    GuidedExperienceSecondaryAction(label: "Learn More", kind: .learnMore(helpArticleId: "start-tabs")),
+                ]
             ),
             GuidedExperienceStep(
                 id: "welcome-ready", title: "You're Ready", icon: "checkmark.circle",

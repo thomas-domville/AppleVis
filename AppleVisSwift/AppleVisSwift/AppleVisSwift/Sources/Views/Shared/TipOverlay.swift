@@ -32,23 +32,31 @@ struct TipOverlay: View {
 private struct TipCard: View {
     let tip: TipStore.ActiveTip
     let onDismiss: () -> Void
+    @AccessibilityFocusState private var isTitleFocused: Bool
+
+    /// RN hardcoded the "AppleVis Tip" badge/button to this exact blue
+    /// regardless of the active theme, so the tip keeps a consistent,
+    /// recognizable brand identity even under themes with a very different
+    /// accent (e.g. red, yellow, orange) — tying it to `Color.accentColor`
+    /// made its look shift with every theme.
+    private static let brandColor = Color(red: 0.039, green: 0.518, blue: 1.0)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
                 ZStack {
                     Circle()
-                        .fill(Color.accentColor.opacity(0.12))
+                        .fill(Self.brandColor.opacity(0.12))
                         .frame(width: 32, height: 32)
                     Image(systemName: tip.content.icon)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(Self.brandColor)
                         .font(.system(size: 15, weight: .semibold))
                 }
                 Text("AppleVis Tip")
                     .font(.caption)
                     .fontWeight(.bold)
                     .textCase(.uppercase)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Self.brandColor)
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("AppleVis Tip")
@@ -57,6 +65,7 @@ private struct TipCard: View {
                 .font(.title3)
                 .fontWeight(.bold)
                 .accessibilityLabel("AppleVis Tip. \(tip.content.title). \(tip.content.message)")
+                .accessibilityFocused($isTitleFocused)
 
             Text(tip.content.message)
                 .font(.subheadline)
@@ -68,7 +77,7 @@ private struct TipCard: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
                 .buttonStyle(.glassProminent)
-                .tint(Color.accentColor)
+                .tint(Self.brandColor)
                 .accessibilityHint("Dismisses this tip. It will not appear again.")
         }
         .padding(22)
@@ -76,5 +85,10 @@ private struct TipCard: View {
         .shadow(radius: 24, y: 8)
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)
+        .accessibilityAction(.escape, onDismiss)
+        .task {
+            try? await Task.sleep(for: .milliseconds(350))
+            isTitleFocused = true
+        }
     }
 }
