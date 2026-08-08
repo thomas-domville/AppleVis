@@ -38,7 +38,7 @@ struct WhatsNewView: View {
                 .tracking(0.8)
                 .accessibilityHidden(true)
 
-            Text("A new Apple Watch app, sharing into AppleVis from other apps, picking up where you left off on another device, iPad keyboard shortcuts, and a big pass making sure everything actually works as expected.")
+            Text("Sharing into AppleVis from other apps, picking up where you left off on another device, iPad keyboard shortcuts, and a big pass making sure everything actually works as expected.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -176,12 +176,6 @@ struct ChangeItem: Identifiable {
     static let currentVersion = "2026.0.7"
 
     static let current: [ChangeItem] = [
-        ChangeItem(
-            systemImage: "applewatch",
-            tag: .new,
-            title: "AppleVis on Apple Watch",
-            description: "A brand-new Apple Watch app lets you see what episode is playing, play or pause, and skip forward or back right from your wrist — no need to take out your phone. It also shows how many forum replies are waiting for you."
-        ),
         ChangeItem(
             systemImage: "square.and.arrow.up",
             tag: .new,

@@ -283,7 +283,7 @@ enum HelpContent {
                             "Use Downloads when you want offline listening.",
                             "Use Settings > Podcasts to adjust speed, skip intervals, sleep timer, voice boost, trim silence, and auto-play.",
                         ]),
-                        .note("When a podcast is playing, Live Activities and Dynamic Island show the episode title, progress, playback state, and chapter name on supported iPhone models."),
+                        .note("When a podcast is playing, the Dynamic Island and Lock Screen show the episode title, progress, and playback state on supported iPhone models."),
                     ]
                 ),
                 HelpArticle(
@@ -895,7 +895,7 @@ enum HelpContent {
                             "Download episodes for offline listening.",
                             "Navigate chapters using the chapter strip when the episode includes chapter markers.",
                             "Lock Screen shows the episode title, artwork, progress bar, and playback controls.",
-                            "Dynamic Island and Live Activities show the episode title and chapter on supported iPhone models while you use other apps.",
+                            "Dynamic Island shows the episode title and playback state on supported iPhone models while you use other apps.",
                             "AirPods: double tap to play or pause. On episodes with a queue, use the next-track gesture on AirPods or the next button on the Lock Screen to skip to the next queued episode. The previous-track gesture restarts the current episode from the beginning.",
                             "Control Center shows a Now Playing card with artwork, title, and controls.",
                         ]),
@@ -1022,7 +1022,7 @@ enum HelpContent {
             id: "smart",
             title: "Smart Features and iOS Integrations",
             icon: "sparkles",
-            description: "Apple Intelligence, translation, Siri phrases, widgets, Spotlight, Share Extension, Focus Filters, and Dynamic Island.",
+            description: "Apple Intelligence, translation, Siri phrases, Spotlight, Share Extension, Focus Filters, and Dynamic Island.",
             articles: [
                 HelpArticle(
                     id: "smart-reading-writing",
@@ -1042,7 +1042,7 @@ enum HelpContent {
                 ),
                 HelpArticle(
                     id: "smart-siri-widgets",
-                    title: "Siri, Widgets, Control Center, and Spotlight",
+                    title: "Siri and Spotlight",
                     summary: "Use AppleVis from system features outside the app.",
                     content: [
                         .heading("Siri phrases"),
@@ -1054,18 +1054,6 @@ enum HelpContent {
                             "\"Play the latest AppleVis podcast\" — opens Podcasts and starts the newest episode.",
                             "\"Search AppleVis for [your query]\" — opens search with your words pre-filled.",
                             "\"Open my AppleVis saved items\" — opens the Saved section in For You.",
-                        ]),
-                        .heading("Widgets"),
-                        .body("AppleVis widgets can be added to your Home Screen, Today View, Lock Screen, or StandBy display."),
-                        .bullets([
-                            "Continue Listening — shows the title, show, and progress of the current podcast episode with a play or pause button. Available in small, medium, accessory rectangular, accessory circular, and accessory inline sizes.",
-                            "Unread Forums — shows your unread topic count with a direct tap to the Unread filter. Available in small, accessory circular, and accessory inline sizes.",
-                        ]),
-                        .heading("Control Center (iOS 18 and later)"),
-                        .bullets([
-                            "AppleVis Podcast toggle — play or pause the current AppleVis podcast episode from Control Center without unlocking your phone.",
-                            "AppleVis Forums button — open unread forum topics directly from Control Center.",
-                            "Add these from iOS Settings > Control Center.",
                         ]),
                         .heading("Spotlight"),
                         .body("Spotlight can find AppleVis topics, apps, podcasts, and resources from iOS Search. Items you open are indexed so they appear in future Spotlight results."),
@@ -1131,15 +1119,12 @@ enum HelpContent {
                 ),
                 HelpArticle(
                     id: "smart-system-integrations",
-                    title: "Handoff, Apple Watch, Background Refresh, and AirPlay",
+                    title: "Handoff, Background Refresh, and AirPlay",
                     summary: "What each system integration does and how to turn it off if you prefer not to use it.",
                     content: [
                         .heading("Handoff"),
                         .body("AppleVis advertises the screen you are viewing (Home, Discover, a podcast episode, and similar) so you can pick up on a nearby Mac or iPad using the Handoff icon in the Dock or App Switcher. Only a screen name and, where relevant, a public content link are shared — no account details, tokens, or private data leave the device."),
                         .tip("To turn Handoff off entirely for all apps, use iOS Settings > General > AirPlay & Handoff > Handoff."),
-                        .heading("Apple Watch"),
-                        .body("When a companion watch app is installed, it mirrors Now Playing controls for AppleVis podcasts — play, pause, and skip — from your wrist."),
-                        .note("Remove the AppleVis Watch app from the Watch app on iPhone if you do not want this mirroring."),
                         .heading("Background Refresh"),
                         .body("AppleVis periodically refreshes downloaded episode metadata and checks for followed-topic activity while in the background, so content is current the next time you open the app."),
                         .tip("Turn this off in iOS Settings > General > Background App Refresh > AppleVis. Podcast playback itself keeps working in the background either way — only the periodic content refresh is affected."),
