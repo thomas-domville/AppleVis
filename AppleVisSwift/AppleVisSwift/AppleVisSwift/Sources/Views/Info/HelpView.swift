@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct HelpView: View {
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var showContact = false
     @State private var query = ""
 
@@ -97,6 +98,7 @@ struct HelpView: View {
                 .accessibilityLabel("Contact AppleVis")
             }
         }
+        .themedList(preferences.colors)
         .navigationTitle("Help")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(for: HelpArticle.self) { article in

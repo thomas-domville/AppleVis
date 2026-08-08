@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct WhatsNewView: View {
+    @EnvironmentObject private var preferences: PreferencesStore
+
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
@@ -22,6 +24,7 @@ struct WhatsNewView: View {
                 Color.clear.frame(height: 40)
             }
         }
+        .background(preferences.colors.background)
         .navigationTitle("What's New")
         .navigationBarTitleDisplayMode(.inline)
     }

@@ -158,6 +158,7 @@ struct ForumTopicDetailView: View {
                 }
                 .padding(.vertical)
             }
+            .background(preferences.colors.background)
         }
     }
 

@@ -18,6 +18,7 @@ struct EpisodeDetailView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var tips: TipStore
+    @EnvironmentObject private var preferences: PreferencesStore
     @ObservedObject private var downloads = DownloadManager.shared
 
     var body: some View {
@@ -81,6 +82,7 @@ struct EpisodeDetailView: View {
                     Color.clear.frame(height: 40)
                 }
             }
+            .background(preferences.colors.background)
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {

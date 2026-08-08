@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - App Directory browser (platform → categories → apps)
 
 struct AppBrowseView: View {
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var platform: AppPlatform = .ios
     @State private var categories: [AppCategory] = []
     @State private var isLoading = false
@@ -74,6 +75,7 @@ struct AppBrowseView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .themedList(preferences.colors)
     }
 
     private var groupedCategories: [(letter: String, categories: [AppCategory])] {
@@ -112,6 +114,7 @@ struct AppCategoryDestination: Hashable {
 
 struct AppCategoryView: View {
     let destination: AppCategoryDestination
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var apps: [AppListing] = []
     @State private var isLoading = false
     @State private var error: String?
@@ -148,6 +151,7 @@ struct AppCategoryView: View {
                     }
                 }
                 .listStyle(.plain)
+                .themedList(preferences.colors)
             }
         }
         .navigationTitle(destination.category.name)

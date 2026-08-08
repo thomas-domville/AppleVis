@@ -24,6 +24,7 @@ struct SoundsHapticsSettingsView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .themedList(preferences.colors)
         .navigationTitle("Sounds & Haptics")
         .navigationBarTitleDisplayMode(.inline)
     }

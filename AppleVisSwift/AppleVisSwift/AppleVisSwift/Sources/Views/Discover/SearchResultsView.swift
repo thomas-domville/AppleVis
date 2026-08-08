@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SearchResultsView: View {
+    @EnvironmentObject private var preferences: PreferencesStore
     let results: SearchResults?
     let isSearching: Bool
     let onRetry: () -> Void
@@ -105,6 +106,7 @@ struct SearchResultsView: View {
                     }
                 }
             }
+            .themedList(preferences.colors)
         }
     }
 }

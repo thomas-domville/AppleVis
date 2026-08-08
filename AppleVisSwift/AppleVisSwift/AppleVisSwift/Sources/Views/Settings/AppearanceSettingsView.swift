@@ -61,6 +61,7 @@ struct AppearanceSettingsView: View {
                 .accessibilityElement(children: .combine)
             }
         }
+        .themedList(preferences.colors)
         .navigationTitle("Appearance")
         .navigationBarTitleDisplayMode(.inline)
     }

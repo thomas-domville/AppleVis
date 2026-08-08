@@ -109,6 +109,7 @@ struct SavedSyncSettingsView: View {
                 }
             }
         }
+        .themedList(preferences.colors)
         .navigationTitle("Saved & Sync")
         .navigationBarTitleDisplayMode(.inline)
     }

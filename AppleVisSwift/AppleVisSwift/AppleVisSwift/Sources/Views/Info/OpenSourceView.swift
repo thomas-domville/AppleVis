@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct OpenSourceView: View {
+    @EnvironmentObject private var preferences: PreferencesStore
+
     // This app has no third-party Swift Package Manager dependencies — every
     // import (Foundation, SwiftUI, AVFoundation, MediaPlayer, Combine,
     // Security, UserNotifications) is a first-party Apple framework, so
@@ -56,6 +58,7 @@ struct OpenSourceView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .themedList(preferences.colors)
         .navigationTitle("Open Source Licences")
         .navigationBarTitleDisplayMode(.inline)
     }

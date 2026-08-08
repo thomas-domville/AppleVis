@@ -103,6 +103,7 @@ struct NotificationSettingsView: View {
                 .accessibilityElement(children: .combine)
             }
         }
+        .themedList(preferences.colors)
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
         .task { await checkPermission() }

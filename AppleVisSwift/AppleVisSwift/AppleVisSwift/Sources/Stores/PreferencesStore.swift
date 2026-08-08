@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import UIKit
 
 @MainActor
 final class PreferencesStore: ObservableObject {
@@ -20,6 +21,7 @@ final class PreferencesStore: ObservableObject {
     // MARK: - Appearance
     @AppStorage("theme") var theme: AppTheme = .system
     var colorScheme: ColorScheme? { theme.colorScheme }
+    var colors: ThemeColors { theme.colors }
     @AppStorage("appearance.cardDensity") var cardDensity: CardDensity = .comfortable
 
     // MARK: - Home feed filters
@@ -106,9 +108,13 @@ enum ThemeGroup: String, CaseIterable, Identifiable {
     }
 }
 
-/// 13 fixed themes plus System, across three groups — Standard, AppleVis, Accessibility.
+/// 15 fixed theme IDs across three groups — Standard, AppleVis, Accessibility.
+/// (RN's own header comments/settings copy claimed "13" or "14 themes" at
+/// various points — both were stale; `src/theme/themes.ts`'s actual registry
+/// is 15, including `oppositeToSystem`, which this port had dropped
+/// entirely.)
 enum AppTheme: String, CaseIterable, Identifiable {
-    case system, light, dark, midnight, warm, sepia
+    case system, oppositeToSystem, light, dark, midnight, warm, sepia
     case applevisClassic, mouseLight, mouseDark, orchard, goldenGate, nebula
     case highContrastLight, highContrastDark
 
@@ -116,7 +122,7 @@ enum AppTheme: String, CaseIterable, Identifiable {
 
     var group: ThemeGroup {
         switch self {
-        case .system, .light, .dark, .midnight, .warm, .sepia:
+        case .system, .oppositeToSystem, .light, .dark, .midnight, .warm, .sepia:
             return .standard
         case .applevisClassic, .mouseLight, .mouseDark, .orchard, .goldenGate, .nebula:
             return .appleVis
@@ -128,6 +134,7 @@ enum AppTheme: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .system:            return "System"
+        case .oppositeToSystem: return "System (Inverted)"
         case .light:              return "Light"
         case .dark:                return "Dark"
         case .midnight:           return "Midnight"
@@ -147,6 +154,7 @@ enum AppTheme: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .system:            return "Follows iOS appearance setting"
+        case .oppositeToSystem: return "Always the opposite of your iOS appearance"
         case .light:              return "Always uses light colours"
         case .dark:                return "Always uses dark colours"
         case .midnight:           return "Deep black background for low-light use"
@@ -169,6 +177,12 @@ enum AppTheme: String, CaseIterable, Identifiable {
     var colorScheme: ColorScheme? {
         switch self {
         case .system: return nil
+        case .oppositeToSystem:
+            // Reads the live system trait rather than a fixed value, so this
+            // stays correct if iOS's appearance changes while the app is
+            // running — the same live-tracking RN's ThemeContext did for
+            // this specific theme.
+            return UITraitCollection.current.userInterfaceStyle == .dark ? .light : .dark
         case .light, .warm, .sepia, .applevisClassic, .mouseLight, .orchard, .goldenGate, .highContrastLight:
             return .light
         case .dark, .midnight, .mouseDark, .nebula, .highContrastDark:
@@ -176,9 +190,34 @@ enum AppTheme: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Full palette for this theme, ported verbatim from RN's
+    /// `src/theme/themes.ts`. `.system`/`.oppositeToSystem` resolve
+    /// dynamically off the live system trait, matching RN's own
+    /// runtime-resolved placeholders for those two entries.
+    var colors: ThemeColors {
+        let systemIsDark = UITraitCollection.current.userInterfaceStyle == .dark
+        switch self {
+        case .system:            return systemIsDark ? .dark : .light
+        case .oppositeToSystem: return systemIsDark ? .light : .dark
+        case .light:              return .light
+        case .dark:                return .dark
+        case .midnight:           return .midnight
+        case .warm:               return .warm
+        case .sepia:              return .sepia
+        case .applevisClassic:   return .applevisClassic
+        case .mouseLight:        return .mouseLight
+        case .mouseDark:         return .mouseDark
+        case .orchard:            return .orchard
+        case .goldenGate:        return .goldenGate
+        case .nebula:             return .nebula
+        case .highContrastLight: return .highContrastLight
+        case .highContrastDark:  return .highContrastDark
+        }
+    }
+
     var accentColor: Color {
         switch self {
-        case .system, .light, .dark: return .accentColor
+        case .system, .oppositeToSystem, .light, .dark: return .accentColor
         case .midnight:           return Color(red: 0.30, green: 0.55, blue: 1.0)
         case .warm:               return Color(red: 0.757, green: 0.490, blue: 0.169)
         case .sepia:              return Color(red: 0.55, green: 0.38, blue: 0.20)

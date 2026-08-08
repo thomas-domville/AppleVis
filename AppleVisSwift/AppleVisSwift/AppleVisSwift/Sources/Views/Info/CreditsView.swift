@@ -5,6 +5,8 @@ import SwiftUI
 /// "AppleVis Podcast Team" placeholders and a fictional tech-stack list)
 /// instead of the real named credits RN actually shipped.
 struct CreditsView: View {
+    @EnvironmentObject private var preferences: PreferencesStore
+
     private struct CreditSection: Identifiable {
         let id = UUID()
         let title: String
@@ -109,6 +111,7 @@ struct CreditsView: View {
                     .padding(.vertical, 6)
             }
         }
+        .themedList(preferences.colors)
         .navigationTitle("Credits")
         .navigationBarTitleDisplayMode(.inline)
     }

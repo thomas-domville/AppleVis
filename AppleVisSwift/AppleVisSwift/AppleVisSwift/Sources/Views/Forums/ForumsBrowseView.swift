@@ -31,6 +31,7 @@ struct ForumsBrowseView: View {
     @State private var showFilterSheet = false
     @State private var searchText = ""
     @EnvironmentObject private var auth: AuthStore
+    @EnvironmentObject private var preferences: PreferencesStore
     @ObservedObject private var networkStatus = NetworkStatusStore.shared
 
     init(initialFilter: ForumFilter = .recent) {
@@ -122,6 +123,7 @@ struct ForumsBrowseView: View {
                         }
                     }
                     .listStyle(.plain)
+                    .themedList(preferences.colors)
                 }
             } else if isLoading && topics.isEmpty {
                 LoadingView()
@@ -172,6 +174,7 @@ struct ForumsBrowseView: View {
             }
         }
         .listStyle(.plain)
+        .themedList(preferences.colors)
     }
 
     private func load(reset: Bool) async {
@@ -219,6 +222,7 @@ private struct ForumFilterSheetView: View {
     @Binding var selectedCategory: ForumCategory?
     let categories: [ForumCategory]
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var preferences: PreferencesStore
 
     var body: some View {
         NavigationStack {
@@ -290,6 +294,7 @@ private struct ForumFilterSheetView: View {
                     }
                 }
             }
+            .themedList(preferences.colors)
             .navigationTitle("Filter Forums")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -93,6 +93,7 @@ private struct AuthorProfileSheet: View {
     let fallbackName: String
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var profile: UserEndpoints.PublicProfile?
     @State private var isLoading = false
     @State private var error: String?
@@ -146,6 +147,7 @@ private struct AuthorProfileSheet: View {
                 }
             }
         }
+        .themedList(preferences.colors)
     }
 
     private func load() async {

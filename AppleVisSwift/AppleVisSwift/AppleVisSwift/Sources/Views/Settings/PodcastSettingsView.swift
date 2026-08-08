@@ -86,6 +86,7 @@ struct PodcastSettingsView: View {
                 .accessibilityHint("Automatically removes played episodes to free up storage.")
             }
         }
+        .themedList(preferences.colors)
         .navigationTitle("Podcasts")
         .navigationBarTitleDisplayMode(.inline)
     }

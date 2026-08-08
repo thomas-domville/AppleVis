@@ -10,6 +10,7 @@ struct GuidedExperienceView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var keyCommands: KeyCommandRouter
     @EnvironmentObject private var pauseStore: GuidedExperiencePauseStore
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var stepIndex = 0
     @State private var showExplainMore = false
     @State private var showHelpArticle: HelpArticle?
@@ -88,6 +89,7 @@ struct GuidedExperienceView: View {
                 }
                 .padding()
             }
+            .background(preferences.colors.background)
             .navigationTitle(experience.title)
             .navigationBarTitleDisplayMode(.inline)
         }

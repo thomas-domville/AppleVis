@@ -69,6 +69,7 @@ struct ComposeTopicView: View {
                     }
                 }
             }
+            .themedList(preferences.colors)
             .navigationTitle("New Topic")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

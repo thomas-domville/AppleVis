@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct BugBrowseView: View {
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var bugs: [BugReport] = []
     @State private var isLoading = false
     @State private var error: String?
@@ -73,6 +74,7 @@ struct BugBrowseView: View {
             }
         }
         .listStyle(.plain)
+        .themedList(preferences.colors)
     }
 
     private var filterMenu: some View {

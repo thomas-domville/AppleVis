@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct PodcastBrowseView: View {
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var episodes: [PodcastEpisode] = []
     @State private var tags: [PodcastTag] = []
     @State private var selectedTag: PodcastTag? = nil
@@ -61,6 +62,7 @@ struct PodcastBrowseView: View {
             }
         }
         .listStyle(.plain)
+        .themedList(preferences.colors)
     }
 
     private func load(reset: Bool) async {

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct StorageView: View {
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var downloadedMB: Double = 0
     @State private var cachedMB: Double = 0
     @State private var showClearDownloads = false
@@ -87,6 +88,7 @@ struct StorageView: View {
                 }
             }
         }
+        .themedList(preferences.colors)
         .navigationTitle("Storage & Cache")
         .navigationBarTitleDisplayMode(.inline)
         .task { await calculateUsage() }

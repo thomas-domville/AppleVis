@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct GuideBrowseView: View {
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var resources: [Resource] = []
     @State private var isLoading = false
     @State private var error: String?
@@ -66,6 +67,7 @@ struct GuideBrowseView: View {
             }
         }
         .listStyle(.plain)
+        .themedList(preferences.colors)
     }
 
     private var filterMenu: some View {

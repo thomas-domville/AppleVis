@@ -110,6 +110,7 @@ struct PrivacySettingsView: View {
                 }
             }
         }
+        .themedList(preferences.colors)
         .navigationTitle("Privacy")
         .navigationBarTitleDisplayMode(.inline)
         .alert("Local Data Cleared", isPresented: $clearDataComplete) {

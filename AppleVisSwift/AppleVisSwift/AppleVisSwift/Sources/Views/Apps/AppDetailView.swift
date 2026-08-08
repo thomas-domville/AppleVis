@@ -91,6 +91,7 @@ struct AppDetailView: View {
                     Color.clear.frame(height: 40)
                 }
             }
+            .background(preferences.colors.background)
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {

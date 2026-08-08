@@ -33,6 +33,7 @@ struct OnboardingView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: step)
+        .background(preferences.colors.background)
         .confirmationDialog(
             "Skip the rest of setup?",
             isPresented: $showCancelConfirm, titleVisibility: .visible
@@ -112,9 +113,9 @@ private struct WelcomeStep: View {
         ("newspaper",       "All the Content You Need",     "Forums, app reviews, podcasts, tutorials, and news in one place."),
         // RN's welcome copy is concrete about how many themes and which
         // ones — Swift's was generic ("High-contrast and low-vision-
-        // friendly themes built in") despite having the exact same 14
-        // themes available (PreferencesStore's AppTheme enum).
-        ("paintbrush",      "Accessible Themes",            "14 themes including High Contrast, Mouse, and Midnight — choose yours in the next few steps."),
+        // friendly themes built in") despite having the same 15 themes
+        // available (PreferencesStore's AppTheme enum).
+        ("paintbrush",      "Accessible Themes",            "15 themes including High Contrast, Mouse, and Midnight — choose yours in the next few steps."),
         ("bell.badge",      "Smart Notifications",          "Stay informed about the content that matters to you."),
     ]
 

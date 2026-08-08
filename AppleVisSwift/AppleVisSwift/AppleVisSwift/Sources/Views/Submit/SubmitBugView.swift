@@ -62,6 +62,7 @@ struct SubmitBugView: View {
                             Section { Text(error).foregroundStyle(.red) }
                         }
                     }
+                    .themedList(preferences.colors)
                 }
             }
             .navigationTitle("Submit a Bug Report")

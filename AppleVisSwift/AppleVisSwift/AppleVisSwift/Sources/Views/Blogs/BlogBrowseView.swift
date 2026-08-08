@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct BlogBrowseView: View {
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var posts: [BlogPost] = []
     @State private var isLoading = false
     @State private var error: String?
@@ -69,6 +70,7 @@ struct BlogBrowseView: View {
             }
         }
         .listStyle(.plain)
+        .themedList(preferences.colors)
     }
 
     private func load(reset: Bool) async {

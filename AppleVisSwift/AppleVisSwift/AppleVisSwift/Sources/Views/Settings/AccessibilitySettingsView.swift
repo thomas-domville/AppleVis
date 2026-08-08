@@ -81,6 +81,7 @@ struct AccessibilitySettingsView: View {
                 }
             }
         }
+        .themedList(preferences.colors)
         .navigationTitle("Accessibility")
         .navigationBarTitleDisplayMode(.inline)
     }

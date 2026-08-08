@@ -3,8 +3,15 @@ import SwiftUI
 /// Small floating affordance shown app-wide while a guided experience is
 /// paused for "Explore This Screen." Ported from RN's
 /// GuidedExperienceResumePrompt.tsx, which mounted once near the root layout.
+///
+/// Takes `pauseStore` as an explicit @ObservedObject rather than
+/// @EnvironmentObject: like TipOverlay, this is mounted via `.overlay { }`
+/// directly at the App/Scene level rather than nested as a normal
+/// ContentView descendant, and environment-object lookup through that
+/// specific path crashes at runtime ("No ObservableObject of type
+/// GuidedExperiencePauseStore found") on the iOS 26 SDK this targets.
 struct GuidedExperienceResumeBanner: View {
-    @EnvironmentObject private var pauseStore: GuidedExperiencePauseStore
+    @ObservedObject var pauseStore: GuidedExperiencePauseStore
     @State private var showTour = false
 
     var body: some View {

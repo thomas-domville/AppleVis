@@ -4,6 +4,7 @@ struct ProfileView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var showSignIn = false
     @State private var showSignOutConfirm = false
     @State private var showEditProfile = false
@@ -23,6 +24,7 @@ struct ProfileView: View {
                 aboutSection
             }
             .listStyle(.insetGrouped)
+            .themedList(preferences.colors)
             .navigationTitle("Profile")
         }
         .sheet(isPresented: $showSignIn) {

@@ -104,6 +104,7 @@ struct DownloadsView: View {
     @EnvironmentObject private var tips: TipStore
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var preferences: PreferencesStore
     @ObservedObject private var downloads = DownloadManager.shared
     @State private var showRemoveAllConfirm = false
 
@@ -162,6 +163,7 @@ struct DownloadsView: View {
                     SoundPlayer.shared.play(.refresh)
                     UIAccessibility.post(notification: .announcement, argument: "Downloads refreshed.")
                 }
+                .themedList(preferences.colors)
             }
         }
         .onChange(of: downloads.lastFailure) { _, failure in
@@ -279,6 +281,7 @@ struct SavedItemsView: View {
     @EnvironmentObject private var tips: TipStore
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var items: [SavedItem] = []
     /// Full episode metadata for saved podcasts, fetched on load — Saved
     /// only persists id/kind/title locally (see `SavedItem`), which isn't
@@ -344,6 +347,7 @@ struct SavedItemsView: View {
         } message: {
             Text("This removes them from Saved. It does not delete the original content.")
         }
+        .themedList(preferences.colors)
     }
 
     @ViewBuilder
@@ -587,6 +591,7 @@ private struct SavedPodcastEpisodeCard: View {
 struct FollowingView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var items: [FollowedItem] = []
     @State private var isLoading = false
     @State private var error: String?
@@ -611,6 +616,7 @@ struct FollowingView: View {
                     }
                 }
                 .refreshable { await load(); SoundPlayer.shared.play(.refresh) }
+                .themedList(preferences.colors)
             }
         }
         .task { await load() }

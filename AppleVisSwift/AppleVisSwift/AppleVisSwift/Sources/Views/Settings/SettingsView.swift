@@ -23,6 +23,7 @@ private struct SettingsSection: Identifiable {
 }
 
 struct SettingsView: View {
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var searchText = ""
 
     private var sections: [SettingsSection] {
@@ -146,6 +147,7 @@ struct SettingsView: View {
                     }
                 }
             }
+            .themedList(preferences.colors)
             .navigationTitle("Settings")
             .searchable(text: $searchText, prompt: "Search Settings")
         }

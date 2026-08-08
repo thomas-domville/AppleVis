@@ -59,6 +59,7 @@ struct SubmitPodcastView: View {
                             Section { Text(error).foregroundStyle(.red) }
                         }
                     }
+                    .themedList(preferences.colors)
                 }
             }
             .navigationTitle("Submit a Podcast")

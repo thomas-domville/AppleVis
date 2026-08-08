@@ -102,6 +102,7 @@ struct SubmitAppView: View {
                             Section { Text(error).foregroundStyle(.red) }
                         }
                     }
+                    .themedList(preferences.colors)
                 }
             }
             .navigationTitle("Submit an App")
@@ -215,6 +216,7 @@ struct SubmitAppView: View {
             }
             .padding()
         }
+        .background(preferences.colors.background)
     }
 
     private var canContinueBeforeYouBegin: Bool { agreedPersonalUse && agreedNotDeveloper }

@@ -9,6 +9,7 @@ struct SignInView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var preferences: PreferencesStore
     @AccessibilityFocusState private var isErrorFocused: Bool
 
     var body: some View {
@@ -99,6 +100,7 @@ struct SignInView: View {
                 }
                 .padding()
             }
+            .background(preferences.colors.background)
             .navigationTitle("Sign In")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

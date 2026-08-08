@@ -161,6 +161,7 @@ struct FullPlayerView: View {
                         .padding(.bottom, 32)
                     }
                 }
+                .background(preferences.colors.background)
                 .navigationTitle("Now Playing")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {

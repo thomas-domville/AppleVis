@@ -85,6 +85,7 @@ struct IntelligenceSettingsView: View {
                 .accessibilityElement(children: .combine)
             }
         }
+        .themedList(preferences.colors)
         .navigationTitle("Intelligence")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { tips.show(.settingsIntelligence) }

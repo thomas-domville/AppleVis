@@ -12,6 +12,7 @@ struct TranscriptView: View {
     @State private var isLoading = false
     @State private var error: String?
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var preferences: PreferencesStore
 
     var body: some View {
         NavigationStack {
@@ -28,6 +29,7 @@ struct TranscriptView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding()
                     }
+                    .background(preferences.colors.background)
                 } else {
                     EmptyStateView(
                         title: "No Transcript",

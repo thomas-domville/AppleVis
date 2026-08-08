@@ -3,6 +3,7 @@ import SwiftUI
 struct HelpArticleDetailView: View {
     let article: HelpArticle
 
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var showWelcomeTour = false
 
     /// Matches RN's "Read Article Summary" accessibility action format:
@@ -61,6 +62,7 @@ struct HelpArticleDetailView: View {
             }
             .padding(.vertical)
         }
+        .background(preferences.colors.background)
         .navigationTitle(article.title)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showWelcomeTour) {

@@ -3,6 +3,7 @@ import SwiftUI
 struct EditProfileView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var preferences: PreferencesStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var displayName = ""
@@ -109,6 +110,7 @@ struct EditProfileView: View {
                     }
                 }
             }
+            .themedList(preferences.colors)
             .navigationTitle("Edit Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

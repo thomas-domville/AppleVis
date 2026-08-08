@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DeleteAccountView: View {
     @EnvironmentObject private var auth: AuthStore
+    @EnvironmentObject private var preferences: PreferencesStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var confirmed = false
@@ -70,6 +71,7 @@ struct DeleteAccountView: View {
                 .accessibilityHint(confirmed ? "Deletes your account immediately and irreversibly." : "Confirm deletion above to activate this button.")
             }
         }
+        .themedList(preferences.colors)
         .navigationTitle("Delete Account")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

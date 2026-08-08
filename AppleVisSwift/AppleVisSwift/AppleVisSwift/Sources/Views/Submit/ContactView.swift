@@ -151,6 +151,7 @@ struct ContactView: View {
                             Section { Text(error).foregroundStyle(.red) }
                         }
                     }
+                    .themedList(preferences.colors)
                 }
             }
             .navigationTitle("Contact AppleVis")

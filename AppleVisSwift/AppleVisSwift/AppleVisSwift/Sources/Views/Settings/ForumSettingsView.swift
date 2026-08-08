@@ -51,6 +51,7 @@ struct ForumSettingsView: View {
                     .accessibilityHint("Limits the Home feed to topics directly related to Apple products and platforms.")
             }
         }
+        .themedList(preferences.colors)
         .navigationTitle("Forums")
         .navigationBarTitleDisplayMode(.inline)
     }

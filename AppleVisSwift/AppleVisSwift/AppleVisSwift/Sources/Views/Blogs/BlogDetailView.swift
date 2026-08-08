@@ -77,6 +77,7 @@ struct BlogDetailView: View {
                 }
                 .padding(.vertical)
             }
+            .background(preferences.colors.background)
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {

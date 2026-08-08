@@ -201,6 +201,7 @@ struct DiscoverView: View {
             }
             .padding(.top, 12)
         }
+        .background(preferences.colors.background)
     }
 
     @ViewBuilder

@@ -185,6 +185,7 @@ struct AboutView: View {
             }
             .listRowBackground(Color.clear)
         }
+        .themedList(preferences.colors)
         .navigationTitle("About AppleVis")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $contactType) { type in

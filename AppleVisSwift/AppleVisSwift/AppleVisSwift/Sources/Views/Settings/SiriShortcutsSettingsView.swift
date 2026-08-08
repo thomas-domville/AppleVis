@@ -7,6 +7,8 @@ import SwiftUI
 /// actual shortcuts so users know what's available, rather than a vague
 /// "you can ask Siri to open AppleVis" line.
 struct SiriShortcutsSettingsView: View {
+    @EnvironmentObject private var preferences: PreferencesStore
+
     var body: some View {
         Form {
             Section {
@@ -67,6 +69,7 @@ struct SiriShortcutsSettingsView: View {
                 )
             }
         }
+        .themedList(preferences.colors)
         .navigationTitle("Siri & Shortcuts")
         .navigationBarTitleDisplayMode(.inline)
     }

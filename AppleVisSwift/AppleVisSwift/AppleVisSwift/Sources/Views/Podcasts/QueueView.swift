@@ -3,6 +3,7 @@ import SwiftUI
 struct QueueView: View {
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var showClearConfirm = false
 
     var body: some View {
@@ -54,6 +55,7 @@ struct QueueView: View {
                     .toolbar {
                         EditButton()
                     }
+                    .themedList(preferences.colors)
                 }
             }
             .navigationTitle("Queue")
