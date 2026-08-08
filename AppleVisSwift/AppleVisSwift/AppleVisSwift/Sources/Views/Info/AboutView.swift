@@ -27,7 +27,10 @@ struct AboutView: View {
         }
     }
     private var screenSize: String {
-        let bounds = UIScreen.main.bounds
+        guard let bounds = UIApplication.shared.connectedScenes
+            .compactMap({ ($0 as? UIWindowScene)?.screen.bounds })
+            .first
+        else { return "—" }
         return "\(Int(bounds.width)) x \(Int(bounds.height)) pts"
     }
     private var dynamicTypeScale: String {
