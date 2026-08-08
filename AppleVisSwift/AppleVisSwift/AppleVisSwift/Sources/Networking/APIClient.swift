@@ -20,7 +20,7 @@ enum APIError: LocalizedError {
         switch self {
         case .network:       return "Network error. Check your connection and try again."
         case .timeout:       return "The request timed out. Try again."
-        case .unauthorized:  return "Incorrect username or password."
+        case .unauthorized:  return String(localized: "Invalid username or password.")
         case .forbidden:     return "You don't have permission to do that."
         case .rateLimited:   return "Too many requests. Please wait a moment."
         case .server:        return "AppleVis is having trouble right now. Try again later."

@@ -95,7 +95,7 @@ struct SignInView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(isSigningIn || username.trimmingCharacters(in: .whitespaces).isEmpty || password.isEmpty)
-                        .accessibilityLabel(String(localized: isSigningIn ? "Signing in, please wait" : "Sign in"))
+                        .accessibilityLabel(String(localized: isSigningIn ? "Signing in, please wait" : "Sign In"))
                     }
                 }
                 .padding()
@@ -147,7 +147,7 @@ struct SignInView: View {
             toast.success(String(localized: "Signed in as \(auth.user?.name ?? name)"))
             dismiss()
         } else {
-            signInError = auth.error ?? "Sign in failed. Please try again."
+            signInError = auth.error ?? String(localized: "Sign in failed")
             isErrorFocused = true
         }
     }

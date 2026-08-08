@@ -159,7 +159,7 @@ struct AboutView: View {
                     Label("Privacy Policy", systemImage: "hand.raised")
                 }
                 Link(destination: URL(string: "https://www.applevis.com/terms")!) {
-                    Label("Terms of Use", systemImage: "doc.plaintext")
+                    Label("Terms of Service", systemImage: "doc.plaintext")
                 }
                 Button {
                     contactType = .bug
@@ -186,7 +186,7 @@ struct AboutView: View {
             .listRowBackground(Color.clear)
         }
         .themedList(preferences.colors)
-        .navigationTitle("About AppleVis")
+        .navigationTitle("About")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $contactType) { type in
             ContactView(initialType: type)

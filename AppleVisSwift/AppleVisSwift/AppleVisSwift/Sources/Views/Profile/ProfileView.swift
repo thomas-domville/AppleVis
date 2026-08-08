@@ -167,7 +167,7 @@ struct ProfileView: View {
                     .accessibilityAddTraits(.isHeader)
                 Text("Sign in to post in forums, follow topics, receive notifications, and sync your saved items.")
                     .font(.subheadline).foregroundStyle(.secondary)
-                Button("Sign In to AppleVis") {
+                Button("Sign in to AppleVis") {
                     showSignIn = true
                 }
                 .buttonStyle(.borderedProminent)
@@ -227,9 +227,9 @@ struct ProfileView: View {
             .accessibilityLabel(String(localized: "Privacy Policy, opens in browser"))
 
             Link(destination: URL(string: "https://www.applevis.com/terms")!) {
-                Label("Terms of Use", systemImage: "doc.text")
+                Label("Terms of Service", systemImage: "doc.text")
             }
-            .accessibilityLabel(String(localized: "Terms of Use, opens in browser"))
+            .accessibilityLabel(String(localized: "Terms of Service, opens in browser"))
 
             Button {
                 showContact = true

@@ -68,7 +68,7 @@ struct SettingsView: View {
             SettingsSection(title: "Support", entries: [
                 SettingsEntry(icon: "questionmark.circle", label: "Help", subtitle: "Guides and support", color: .purple,
                               destination: AnyView(HelpView())),
-                SettingsEntry(icon: "info.circle", label: "About AppleVis", subtitle: "Version info and credits", color: .gray,
+                SettingsEntry(icon: "info.circle", label: "About", subtitle: "Version info and credits", color: .gray,
                               destination: AnyView(AboutView())),
             ]),
         ]
