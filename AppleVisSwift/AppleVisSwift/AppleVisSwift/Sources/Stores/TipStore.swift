@@ -24,10 +24,13 @@ enum TipKey: String {
 
 /// Ready-made tip content for every TipKey. Matches the original AppleVis tip library.
 ///
-/// Note: `.forumRotorActions` (VoiceOver rotor custom actions on forum comments) and
-/// `.reviewStarRating` (adjustable star-rating input) describe features that don't
-/// exist in this app yet — their content is kept here for when those land, but
-/// nothing currently calls `TipStore.show(.forumRotorActions, ...)` or `.reviewStarRating`.
+/// Note: `.reviewStarRating` (adjustable star-rating input) describes a feature
+/// that can't exist in this app — AppleVis's review comment bundle has no
+/// rating field on the backend (see `ComposeAppReviewView` in
+/// AppDetailView.swift), so there's nothing to add a rating control to
+/// without silently discarding whatever the user picks. Content kept here in
+/// case the backend ever adds one; nothing currently calls
+/// `TipStore.show(.reviewStarRating)`.
 enum Tips {
     static let content: [TipKey: TipContent] = [
         .forumRotorActions: TipContent(

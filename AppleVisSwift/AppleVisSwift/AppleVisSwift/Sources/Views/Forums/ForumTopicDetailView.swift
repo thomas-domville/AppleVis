@@ -15,6 +15,7 @@ struct ForumTopicDetailView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var tips: TipStore
     @State private var threadSummary: String?
     @State private var isSummarizing = false
     @State private var postSummary: String?
@@ -108,6 +109,7 @@ struct ForumTopicDetailView: View {
                             onThreadOverview: { announceThreadOverview(detail) },
                             onJumpToLast: { Task { await jumpToLastReply(proxy: proxy) } }
                         )
+                        .onAppear { tips.show(.forumRotorActions) }
 
                         if preferences.aiSummariesEnabled && IntelligenceService.isAvailable {
                             summarizeSection(detail)
