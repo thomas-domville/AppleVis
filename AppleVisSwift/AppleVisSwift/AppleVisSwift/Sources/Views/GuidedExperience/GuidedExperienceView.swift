@@ -49,7 +49,7 @@ struct GuidedExperienceView: View {
                                 .font(.title2).fontWeight(.bold)
                                 .multilineTextAlignment(.center)
                                 .accessibilityAddTraits(.isHeader)
-                                .accessibilityLabel("\(step.title). Step \(stepIndex + 1) of \(experience.steps.count).")
+                                .accessibilityLabel(String(localized: "\(step.title). Step \(stepIndex + 1) of \(experience.steps.count)."))
                                 .accessibilityFocused($isHeadingFocused)
                             Text(step.shortText)
                                 .font(.body)
@@ -117,7 +117,7 @@ struct GuidedExperienceView: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Step \(stepIndex + 1) of \(experience.steps.count)")
+        .accessibilityLabel(String(localized: "Step \(stepIndex + 1) of \(experience.steps.count)"))
     }
 
     // MARK: - Per-step actions (secondary + primary + skip)

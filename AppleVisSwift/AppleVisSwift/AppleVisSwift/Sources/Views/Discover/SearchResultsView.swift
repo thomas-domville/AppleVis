@@ -56,7 +56,7 @@ struct SearchResultsView: View {
                                 .font(.footnote).fontWeight(.semibold)
                         }
                         .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Some results may be missing: \(results.failedCategories.joined(separator: ", ")).")
+                        .accessibilityLabel(String(localized: "Some results may be missing: \(results.failedCategories.joined(separator: ", "))."))
                         .accessibilityAction(named: Text("Retry"), onRetry)
                     }
                     .listRowSeparator(.hidden)

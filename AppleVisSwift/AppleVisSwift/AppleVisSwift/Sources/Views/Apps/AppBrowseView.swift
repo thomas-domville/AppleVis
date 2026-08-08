@@ -69,7 +69,7 @@ struct AppBrowseView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        .accessibilityLabel("\(category.name), \(category.count) apps")
+                        .accessibilityLabel(String(localized: "\(category.name), \(category.count) apps"))
                     }
                 }
             }

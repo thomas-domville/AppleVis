@@ -145,7 +145,7 @@ struct BugDetailView: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Apple Feedback ID: \(feedbackId).")
+        .accessibilityLabel(String(localized: "Apple Feedback ID: \(feedbackId)."))
         .accessibilityHint(String(localized: "Double-tap to open Feedback Assistant."))
     }
 
@@ -273,8 +273,8 @@ struct BugDetailView: View {
         .tintedBackground(detail.status == .active ? Color.orange : Color.green, opacity: 0.1, cornerRadius: 10)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "\(detail.status.displayName) bug on \(detail.platform.displayName). " +
-            "\(detail.severity.displayName) severity."
+            String(localized: "\(detail.status.displayName) bug on \(detail.platform.displayName). ") +
+            String(localized: "\(detail.severity.displayName) severity.")
         )
     }
 

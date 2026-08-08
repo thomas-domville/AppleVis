@@ -146,7 +146,7 @@ struct HelpView: View {
                 .background(Color.secondary.opacity(0.15), in: Capsule())
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(section.title), \(section.articles.count) articles")
+        .accessibilityLabel(String(localized: "\(section.title), \(section.articles.count) articles"))
     }
 
     // MARK: - Article row

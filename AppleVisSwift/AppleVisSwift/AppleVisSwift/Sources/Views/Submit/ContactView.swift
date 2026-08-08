@@ -269,7 +269,7 @@ struct ContactView: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-        .accessibilityLabel("\(type.label). \(type.description)")
+        .accessibilityLabel(String(localized: "\(type.label). \(type.description)"))
         .accessibilityHint(type.hint)
     }
 
@@ -346,12 +346,12 @@ struct ContactView: View {
                         .font(.caption)
                         .fontWeight(messageLength < 20 ? .bold : .regular)
                         .foregroundStyle(messageLength < 20 ? .red : .secondary)
-                        .accessibilityLabel(messageLength < 20 ? "\(messageLength) of 20 minimum characters" : "\(messageLength) characters")
+                        .accessibilityLabel(messageLength < 20 ? String(localized: "\(messageLength) of 20 minimum characters") : String(localized: "\(messageLength) characters"))
                 }
                 TextEditor(text: $message)
                     .frame(minHeight: 160)
                     .accessibilityLabel(String(localized: "Message"))
-                    .accessibilityHint("Required. Minimum 20 characters. \(effectiveType.messagePlaceholder)")
+                    .accessibilityHint(String(localized: "Required. Minimum 20 characters. \(effectiveType.messagePlaceholder)"))
                     .onChange(of: message) { _, newValue in
                         handleMessageChange(newValue)
                         guidelines.textChanged(newValue)
@@ -423,7 +423,7 @@ struct ContactView: View {
                     .accessibilityHint(String(localized: "Goes back to edit your message."))
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Contact type: \(effectiveType.label)")
+                .accessibilityLabel(String(localized: "Contact type: \(effectiveType.label)"))
 
                 WizardReviewRow(label: "Subject", value: effectiveType.subject)
 

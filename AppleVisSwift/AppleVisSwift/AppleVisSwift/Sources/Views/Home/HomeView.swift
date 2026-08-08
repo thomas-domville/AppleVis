@@ -205,7 +205,7 @@ struct HomeView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 2))
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(Greeting.text()), \(name). Today is \(today).")
+                .accessibilityLabel(String(localized: "\(Greeting.text()), \(name). Today is \(today)."))
                 .accessibilityFocused($focusTarget, equals: .greeting)
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
                 .listRowSeparator(.hidden)
@@ -269,7 +269,7 @@ struct HomeView: View {
                         .padding(12)
                         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
                     }
-                    .accessibilityLabel("Notifications, \(notificationHistory.count) recent")
+                    .accessibilityLabel(String(localized: "Notifications, \(notificationHistory.count) recent"))
                     .accessibilityHint(String(localized: "Double-tap to view your recent notifications."))
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     .listRowSeparator(.hidden)
@@ -464,7 +464,7 @@ private struct SourceErrorBanner: View {
         .padding(12)
         .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Some sources could not be loaded: \(failedSources.joined(separator: ", ")).")
+        .accessibilityLabel(String(localized: "Some sources could not be loaded: \(failedSources.joined(separator: ", "))."))
         // .combine merges the nested "Retry Now" Button into this single
         // element, which can leave it unreachable as its own VoiceOver
         // stop — an explicit action guarantees it's still triggerable.
@@ -505,7 +505,7 @@ private struct WhatsNewCard: View {
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("What's New. \(message)")
+            .accessibilityLabel(String(localized: "What's New. \(message)"))
             .accessibilityHint(String(localized: "Double-tap to jump to where you left off in the feed."))
 
             Button("Dismiss", action: onDismiss)
@@ -552,7 +552,7 @@ private struct UnreadTopicsStrip: View {
             .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(count) new forum topic\(count == 1 ? "" : "s"). Activate to jump to the first one.")
+        .accessibilityLabel(String(localized: "\(count) new forum topic\(count == 1 ? "" : "s"). Activate to jump to the first one."))
     }
 }
 
@@ -591,7 +591,7 @@ struct NotificationHistoryView: View {
                     .buttonStyle(.plain)
                     .disabled(!isRoutable)
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(item.title). \(item.body).")
+                    .accessibilityLabel(String(localized: "\(item.title). \(item.body)."))
                     .accessibilityHint(isRoutable ? "Double-tap to open." : "")
                 }
             }

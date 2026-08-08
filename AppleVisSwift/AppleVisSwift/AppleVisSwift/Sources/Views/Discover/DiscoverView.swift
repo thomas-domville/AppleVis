@@ -273,7 +273,7 @@ struct DiscoverView: View {
             .padding()
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title). \(subtitle).")
+        .accessibilityLabel(String(localized: "\(title). \(subtitle)."))
         .accessibilityHint(String(localized: "Opens the Be My Eyes app."))
     }
 
@@ -344,7 +344,7 @@ struct DiscoverView: View {
                         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("\(link.description). Opens in your browser.")
+                    .accessibilityLabel(String(localized: "\(link.description). Opens in your browser."))
                     .accessibilityHint(String(localized: "Double-tap to open in your browser."))
                 }
             }

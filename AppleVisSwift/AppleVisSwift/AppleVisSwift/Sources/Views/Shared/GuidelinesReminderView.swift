@@ -33,7 +33,7 @@ struct GuidelinesReminderView: View {
                     .font(.subheadline)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(config.label): \(warning.rule). \(warning.message)")
+            .accessibilityLabel(String(localized: "\(config.label): \(warning.rule). \(warning.message)"))
 
             HStack(spacing: 10) {
                 Button(action: onDismiss) {

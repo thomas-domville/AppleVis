@@ -43,7 +43,7 @@ struct EpisodeDetailView: View {
         }
         .onChange(of: downloads.lastFailure) { _, failure in
             guard let failure, failure.episodeId == episode?.id else { return }
-            toast.error("Couldn't download \"\(failure.episodeTitle)\". Try again.")
+            toast.error(String(localized: "Couldn't download \"\(failure.episodeTitle)\". Try again."))
         }
     }
 
@@ -98,7 +98,7 @@ struct EpisodeDetailView: View {
                 }
                 .accessibilityLabel(
                     player.currentEpisode?.id == episode.id && player.isPlaying
-                    ? "Pause" : "Play \(episode.title)"
+                    ? String(localized: "Pause") : String(localized: "Play \(episode.title)")
                 )
 
                 downloadButton(episode)
@@ -165,8 +165,8 @@ struct EpisodeDetailView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "\(episode.title) by \(episode.showTitle)" +
-            (artworkDescription.map { ". Artwork \($0)" } ?? "")
+            String(localized: "\(episode.title) by \(episode.showTitle)") +
+            (artworkDescription.map { String(localized: ". Artwork \($0)") } ?? "")
         )
         .accessibilityAddTraits(.isHeader)
         .accessibilityFocused($isTitleFocused)
@@ -185,7 +185,7 @@ struct EpisodeDetailView: View {
         } else if downloads.activeDownloads.contains(episode.id) {
             ProgressView(value: downloads.progress[episode.id] ?? 0)
                 .progressViewStyle(.circular)
-                .accessibilityLabel("Downloading, \(Int((downloads.progress[episode.id] ?? 0) * 100)) percent")
+                .accessibilityLabel(String(localized: "Downloading, \(Int((downloads.progress[episode.id] ?? 0) * 100)) percent"))
         } else {
             Button {
                 downloads.download(episode)
@@ -354,7 +354,7 @@ struct ChapterRow: View {
             .padding(.vertical, 8)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(chapter.title), starts at \(formatTime(chapter.startTime))")
+        .accessibilityLabel(String(localized: "\(chapter.title), starts at \(formatTime(chapter.startTime))"))
         .accessibilityHint(String(localized: "Double-tap to seek."))
     }
 

@@ -94,7 +94,7 @@ struct CreditsView: View {
                         }
                         .padding(.vertical, 2)
                         .accessibilityElement(children: .combine)
-                        .accessibilityLabel("\(person.label): \(person.name)")
+                        .accessibilityLabel(String(localized: "\(person.label): \(person.name)"))
                     }
 
                     Text(section.body)

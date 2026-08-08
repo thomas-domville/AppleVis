@@ -63,7 +63,7 @@ struct CommunityDiscussionHeading: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
-            .accessibilityLabel("Community Discussion, \(count) comment\(count == 1 ? "" : "s")")
+            .accessibilityLabel(String(localized: "Community Discussion, \(count) comment\(count == 1 ? "" : "s")"))
             .accessibilityAction(named: Text("Thread overview"), onThreadOverview)
 
             if count > 0 {

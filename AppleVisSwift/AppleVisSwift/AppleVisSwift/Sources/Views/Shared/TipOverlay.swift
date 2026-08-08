@@ -64,7 +64,7 @@ private struct TipCard: View {
             Text(tip.content.title)
                 .font(.title3)
                 .fontWeight(.bold)
-                .accessibilityLabel("AppleVis Tip. \(tip.content.title). \(tip.content.message)")
+                .accessibilityLabel(String(localized: "AppleVis Tip. \(tip.content.title). \(tip.content.message)"))
                 .accessibilityFocused($isTitleFocused)
 
             Text(tip.content.message)

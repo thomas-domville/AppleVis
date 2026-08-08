@@ -63,7 +63,7 @@ struct GuideBrowseView: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                     .listRowSeparator(.hidden)
-                    .accessibilityLabel("\(resources.count) resources loaded.")
+                    .accessibilityLabel(String(localized: "\(resources.count) resources loaded."))
             }
         }
         .listStyle(.plain)

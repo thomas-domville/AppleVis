@@ -73,7 +73,7 @@ struct OnboardingView: View {
                 }
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Step \(step + 1) of \(totalSteps)")
+            .accessibilityLabel(String(localized: "Step \(step + 1) of \(totalSteps)"))
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
@@ -133,7 +133,7 @@ private struct WelcomeStep: View {
                         .fontWeight(.bold)
                         .multilineTextAlignment(.center)
                         .accessibilityAddTraits(.isHeader)
-                        .accessibilityLabel(stepInfo.map { "Welcome to AppleVis. Step \($0.current) of \($0.total)." } ?? "Welcome to AppleVis")
+                        .accessibilityLabel(stepInfo.map { String(localized: "Welcome to AppleVis. Step \($0.current) of \($0.total).") } ?? String(localized: "Welcome to AppleVis"))
                         .modifier(OptionalAccessibilityFocus(isFocused: headerFocus))
 
                     Text("The community for blind and low-vision Apple users.")
@@ -241,7 +241,7 @@ private struct SignInStep: View {
                                 .font(.caption).fontWeight(.semibold)
                         }
                         .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Error: \(error). If you have forgotten your password, you can reset it on the AppleVis website.")
+                        .accessibilityLabel(String(localized: "Error: \(error). If you have forgotten your password, you can reset it on the AppleVis website."))
                         .accessibilityFocused($isErrorFocused)
                     }
 
@@ -442,7 +442,7 @@ private struct AnnouncementStep: View {
                             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
                         }
                         .accessibilityAddTraits(preferences.announcementLevel == level ? [.isSelected] : [])
-                        .accessibilityHint("Preview: \(level.preview)")
+                        .accessibilityHint(String(localized: "Preview: \(level.preview)"))
                     }
                 }
                 .padding(.horizontal, 24)

@@ -54,7 +54,7 @@ struct AccessibilitySettingsView: View {
                         .padding(.vertical, 2)
                     }
                     .accessibilityAddTraits(preferences.announcementLevel == level ? [.isSelected] : [])
-                    .accessibilityHint("Example of what VoiceOver reads: \(level.preview)")
+                    .accessibilityHint(String(localized: "Example of what VoiceOver reads: \(level.preview)"))
                 }
             }
 

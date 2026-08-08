@@ -89,7 +89,7 @@ struct ProfileView: View {
             }
             .padding(.vertical, 4)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Signed in as \(user.name)\(user.isAdmin ? ", Administrator" : "")")
+            .accessibilityLabel(String(localized: "Signed in as \(user.name)\(user.isAdmin ? ", Administrator" : "")"))
         }
 
         Section("Saved Items") {
@@ -153,7 +153,7 @@ struct ProfileView: View {
                 Text("\(count)").foregroundStyle(.secondary)
             }
         }
-        .accessibilityLabel("Saved \(kind.displayName.lowercased())s, \(count)")
+        .accessibilityLabel(String(localized: "Saved \(kind.displayName.lowercased())s, \(count)"))
         .accessibilityHint(String(localized: "Double-tap to view."))
     }
 
@@ -247,7 +247,7 @@ struct ProfileView: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(
-                "Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown")"
+                String(localized: "Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown")")
             )
         }
     }

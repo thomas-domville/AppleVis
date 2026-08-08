@@ -191,7 +191,7 @@ struct HelpBlockView: View {
                         Text(item)
                     }
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Step \(index + 1). \(item)")
+                    .accessibilityLabel(String(localized: "Step \(index + 1). \(item)"))
                 }
             }
             .padding(.bottom, 8)
@@ -210,7 +210,7 @@ struct HelpBlockView: View {
             }
             .padding(.bottom, 10)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Question: \(question). Answer: \(answer)")
+            .accessibilityLabel(String(localized: "Question: \(question). Answer: \(answer)"))
         }
     }
 }
@@ -237,6 +237,6 @@ private struct Callout: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .padding(.bottom, 8)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(label). \(text)")
+        .accessibilityLabel(String(localized: "\(label). \(text)"))
     }
 }

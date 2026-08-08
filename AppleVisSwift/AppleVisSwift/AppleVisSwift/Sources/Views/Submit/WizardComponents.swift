@@ -38,7 +38,7 @@ struct WizardStepIndicator: View {
                 .font(.headline)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Step \(step) of \(total): \(title)")
+        .accessibilityLabel(String(localized: "Step \(step) of \(total): \(title)"))
         .accessibilityAddTraits(.isHeader)
         .modifier(OptionalAccessibilityFocus(isFocused: isFocused))
     }
@@ -70,7 +70,7 @@ struct OptionalStepAnnouncement: ViewModifier {
 
     func body(content: Content) -> some View {
         if let stepInfo {
-            content.accessibilityLabel("\(title). Step \(stepInfo.current) of \(stepInfo.total). \(subtitle)")
+            content.accessibilityLabel(String(localized: "\(title). Step \(stepInfo.current) of \(stepInfo.total). \(subtitle)"))
         } else {
             content
         }
@@ -139,6 +139,6 @@ struct WizardReviewRow: View {
         }
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(label): \(value.isEmpty ? "none" : value)")
+        .accessibilityLabel(String(localized: "\(label): \(value.isEmpty ? "none" : value)"))
     }
 }

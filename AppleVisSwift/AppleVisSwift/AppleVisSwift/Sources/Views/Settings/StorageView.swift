@@ -139,6 +139,6 @@ private struct StorageRow: View {
                 .fontWeight(bold ? .semibold : .regular)
                 .monospacedDigit()
         }
-        .accessibilityLabel("\(label): \(displayText)")
+        .accessibilityLabel(String(localized: "\(label): \(displayText)"))
     }
 }

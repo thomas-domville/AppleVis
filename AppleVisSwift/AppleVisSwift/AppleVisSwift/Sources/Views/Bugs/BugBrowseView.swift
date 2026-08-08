@@ -70,7 +70,7 @@ struct BugBrowseView: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                     .listRowSeparator(.hidden)
-                    .accessibilityLabel("\(bugs.count) reports loaded.")
+                    .accessibilityLabel(String(localized: "\(bugs.count) reports loaded."))
             }
         }
         .listStyle(.plain)

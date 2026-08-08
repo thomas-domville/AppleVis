@@ -154,7 +154,7 @@ struct SegmentedHTMLView: View {
                     Rectangle().fill(Color(red: 0xf5 / 255, green: 0x9e / 255, blue: 0x0b / 255)).frame(width: 3)
                 }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Quoted: \(segment.plainText)")
+                .accessibilityLabel(String(localized: "Quoted: \(segment.plainText)"))
         case .code:
             VStack(alignment: .leading, spacing: 4) {
                 Text("CODE")
@@ -168,7 +168,7 @@ struct SegmentedHTMLView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 6))
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Code: \(segment.plainText)")
+            .accessibilityLabel(String(localized: "Code: \(segment.plainText)"))
         case .prose:
             HTMLTextView(html: segment.html)
         }

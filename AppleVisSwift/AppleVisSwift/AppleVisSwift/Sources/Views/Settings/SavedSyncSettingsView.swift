@@ -42,7 +42,7 @@ struct SavedSyncSettingsView: View {
                         .controlSize(.small)
                     }
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Last synced: \(lastSyncDate.map { $0.formatted() } ?? "never"). Sync Now button.")
+                    .accessibilityLabel(String(localized: "Last synced: \(lastSyncDate.map { $0.formatted() } ?? "never"). Sync Now button."))
                 }
             }
 

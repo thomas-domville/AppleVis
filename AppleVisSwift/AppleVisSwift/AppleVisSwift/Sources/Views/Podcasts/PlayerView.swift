@@ -45,7 +45,7 @@ struct MiniPlayerView: View {
                         .font(.title3)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Skip forward \(Int(preferences.skipForwardInterval)) seconds")
+                .accessibilityLabel(String(localized: "Skip forward \(Int(preferences.skipForwardInterval)) seconds"))
 
                 Button {
                     player.stop()
@@ -65,8 +65,8 @@ struct MiniPlayerView: View {
             .onTapGesture { showFullPlayer = true }
             .accessibilityElement(children: .contain)
             .accessibilityLabel(
-                "\(episode.title) by \(episode.showTitle). " +
-                "\(player.isPlaying ? "Playing" : "Paused"). Double-tap to open player."
+                String(localized: "\(episode.title) by \(episode.showTitle). ") +
+                String(localized: "\(player.isPlaying ? "Playing" : "Paused"). Double-tap to open player.")
             )
             .sheet(isPresented: $showFullPlayer) {
                 FullPlayerView()
@@ -194,7 +194,7 @@ struct FullPlayerView: View {
                     .font(.system(size: 34))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Skip back \(Int(preferences.skipBackInterval)) seconds")
+            .accessibilityLabel(String(localized: "Skip back \(Int(preferences.skipBackInterval)) seconds"))
             .frame(maxWidth: .infinity)
 
             Button {
@@ -215,7 +215,7 @@ struct FullPlayerView: View {
                     .font(.system(size: 34))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Skip forward \(Int(preferences.skipForwardInterval)) seconds")
+            .accessibilityLabel(String(localized: "Skip forward \(Int(preferences.skipForwardInterval)) seconds"))
             .frame(maxWidth: .infinity)
         }
     }
@@ -236,7 +236,7 @@ struct FullPlayerView: View {
                 .glassEffect(in: Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Playback speed: \(speedLabel(current))×")
+        .accessibilityLabel(String(localized: "Playback speed: \(speedLabel(current))×"))
         .accessibilityHint(String(localized: "Double-tap to increase. Swipe up or down to adjust."))
         // Was double-tap-to-increase only, wrapping 3.0x back to 0.5x — a
         // VoiceOver user who overshot their target speed had to tap through
@@ -277,7 +277,7 @@ struct FullPlayerView: View {
                 .padding(.vertical, 8)
                 .glassEffect(in: Capsule())
         }
-        .accessibilityLabel("Sleep timer\(sleepTimerLabel.isEmpty ? "" : ": \(sleepTimerLabel)")")
+        .accessibilityLabel(String(localized: "Sleep timer\(sleepTimerLabel.isEmpty ? "" : ": \(sleepTimerLabel)")"))
     }
 
     private var sleepTimerLabel: String {

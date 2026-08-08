@@ -47,7 +47,7 @@ struct WhatsNewView: View {
         .padding()
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("What's new in AppleVis version \(ChangeItem.currentVersion)")
+        .accessibilityLabel(String(localized: "What's new in AppleVis version \(ChangeItem.currentVersion)"))
     }
 }
 
@@ -82,7 +82,7 @@ private struct ChangeCard: View {
         }
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(item.tag.rawValue): \(item.title). \(item.description)")
+        .accessibilityLabel(String(localized: "\(item.tag.rawValue): \(item.title). \(item.description)"))
     }
 }
 
@@ -138,7 +138,7 @@ private struct HistoryCard: View {
                 .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 0.5)
         )
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Also in \(section.title)")
+        .accessibilityLabel(String(localized: "Also in \(section.title)"))
     }
 }
 

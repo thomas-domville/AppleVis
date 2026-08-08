@@ -204,7 +204,7 @@ private struct InfoRow: View {
             Text(value).monospacedDigit()
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(label): \(value)")
+        .accessibilityLabel(String(localized: "\(label): \(value)"))
     }
 }
 
@@ -220,6 +220,6 @@ private struct AccessibilityStatusRow: View {
                 .fontWeight(isActive ? .semibold : .regular)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(label): \(isActive ? "On" : "Off")")
+        .accessibilityLabel(String(localized: "\(label): \(isActive ? "On" : "Off")"))
     }
 }

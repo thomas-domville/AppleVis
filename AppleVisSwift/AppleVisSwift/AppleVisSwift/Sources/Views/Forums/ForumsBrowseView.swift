@@ -148,7 +148,7 @@ struct ForumsBrowseView: View {
                     } label: {
                         Image(systemName: "line.3.horizontal.decrease.circle")
                     }
-                    .accessibilityLabel("Filter: \(filter.displayName)")
+                    .accessibilityLabel(String(localized: "Filter: \(filter.displayName)"))
                 }
             }
         }

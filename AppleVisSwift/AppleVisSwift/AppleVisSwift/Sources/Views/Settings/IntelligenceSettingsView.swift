@@ -129,6 +129,6 @@ struct FeatureInfoRow: View {
         }
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title). \(subtitle). \(detail)")
+        .accessibilityLabel(String(localized: "\(title). \(subtitle). \(detail)"))
     }
 }

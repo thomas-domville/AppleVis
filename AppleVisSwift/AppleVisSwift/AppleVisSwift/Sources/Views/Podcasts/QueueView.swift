@@ -148,12 +148,12 @@ private struct NowPlayingQueueCard: View {
                     }
                     .foregroundStyle(.secondary)
                 }
-                .accessibilityLabel("Playback progress: \(Int(p * 100)) percent")
+                .accessibilityLabel(String(localized: "Playback progress: \(Int(p * 100)) percent"))
             }
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Now playing: \(episode.title), \(episode.showTitle)")
+        .accessibilityLabel(String(localized: "Now playing: \(episode.title), \(episode.showTitle)"))
     }
 }
 
@@ -227,8 +227,8 @@ private struct QueueRow: View {
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "\(position) of \(total). \(episode.title), \(episode.showTitle)" +
-            (episode.duration.map { ", \(formatDuration($0))" } ?? "")
+            String(localized: "\(position) of \(total). \(episode.title), \(episode.showTitle)") +
+            (episode.duration.map { String(localized: ", \(formatDuration($0))") } ?? "")
         )
         .accessibilityHint(String(localized: "Double-tap to open. Use actions to move or remove."))
         .accessibilityAction(named: Text("Open Episode"), onOpen)

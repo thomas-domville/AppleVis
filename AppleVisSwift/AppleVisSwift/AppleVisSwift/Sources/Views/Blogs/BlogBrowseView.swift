@@ -66,7 +66,7 @@ struct BlogBrowseView: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                     .listRowSeparator(.hidden)
-                    .accessibilityLabel("\(posts.count) posts loaded.")
+                    .accessibilityLabel(String(localized: "\(posts.count) posts loaded."))
             }
         }
         .listStyle(.plain)

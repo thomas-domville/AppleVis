@@ -28,7 +28,7 @@ struct GuidedExperienceResumeBanner: View {
                         }
                         .padding(.leading, 10).padding(.vertical, 4)
                     }
-                    .accessibilityLabel("Resume Tour: \(paused.experienceTitle)")
+                    .accessibilityLabel(String(localized: "Resume Tour: \(paused.experienceTitle)"))
                     .accessibilityHint(String(localized: "Returns to the guided tour where you left off."))
 
                     Button {

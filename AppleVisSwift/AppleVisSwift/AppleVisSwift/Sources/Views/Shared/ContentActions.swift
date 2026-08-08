@@ -245,7 +245,7 @@ struct ContentActionsModifier: ViewModifier {
     private func startEdit() {
         Task {
             guard let content = await fetchEditableContent() else {
-                toast.error("Couldn't load \(kind.displayName.lowercased()) to edit.")
+                toast.error(String(localized: "Couldn't load \(kind.displayName.lowercased()) to edit."))
                 return
             }
             editingNode = content
@@ -278,7 +278,7 @@ struct ContentActionsModifier: ViewModifier {
     private func saveEdit(nodeTypeSuffix: String, title: String, body: String) async throws {
         guard let user = auth.user else { return }
         try await APIClient.shared.content.editNode(nodeId: id, nodeType: nodeTypeSuffix, title: title, body: body, csrfToken: user.csrfToken)
-        toast.success("\(kind.displayName) updated")
+        toast.success(String(localized: "\(kind.displayName) updated"))
     }
 
     private func unpublish() async {
@@ -286,7 +286,7 @@ struct ContentActionsModifier: ViewModifier {
         let suffix = await resolvedNodeTypeSuffix()
         do {
             try await APIClient.shared.content.unpublishNode(nodeId: id, nodeType: suffix, csrfToken: user.csrfToken)
-            toast.success("\(kind.displayName) unpublished")
+            toast.success(String(localized: "\(kind.displayName) unpublished"))
         } catch {
             toast.error(String(localized: "Couldn't unpublish."))
         }
@@ -298,7 +298,7 @@ struct ContentActionsModifier: ViewModifier {
         do {
             try await APIClient.shared.content.deleteNode(nodeId: id, nodeType: suffix, csrfToken: user.csrfToken)
             SpotlightIndexer.deindex(kind: kind, id: id)
-            toast.success("\(kind.displayName) deleted")
+            toast.success(String(localized: "\(kind.displayName) deleted"))
             onContentDeleted?()
         } catch {
             toast.error(String(localized: "Couldn't delete."))
@@ -525,23 +525,23 @@ struct ContentDetailActions: View {
                 DetailActionButton(
                     systemImage: isFollowing ? "bell.fill" : "bell",
                     visualLabel: isFollowing ? "Unfollow" : "Follow",
-                    accessibilityLabel: isFollowing ? "Unfollow \(kind.displayName)" : "Follow \(kind.displayName)"
+                    accessibilityLabel: isFollowing ? String(localized: "Unfollow \(kind.displayName)") : String(localized: "Follow \(kind.displayName)")
                 ) { Task { await toggleFollow() } }
             }
 
             DetailActionButton(
                 systemImage: isSaved ? "bookmark.fill" : "bookmark",
                 visualLabel: isSaved ? "Unsave" : "Save",
-                accessibilityLabel: isSaved ? "Unsave \(kind.displayName)" : "Save \(kind.displayName)"
+                accessibilityLabel: isSaved ? String(localized: "Unsave \(kind.displayName)") : String(localized: "Save \(kind.displayName)")
             ) { toggleSave() }
 
             if let url, let shareURL = URL(string: url) {
                 ShareLink(item: shareURL, subject: Text(title)) {
                     DetailActionButtonLabel(systemImage: "square.and.arrow.up", visualLabel: "Share")
                 }
-                .accessibilityLabel("Share \(kind.displayName)")
+                .accessibilityLabel(String(localized: "Share \(kind.displayName)"))
 
-                DetailActionButton(systemImage: "safari", visualLabel: "Browser", accessibilityLabel: "Open \(kind.displayName) in Browser") {
+                DetailActionButton(systemImage: "safari", visualLabel: "Browser", accessibilityLabel: String(localized: "Open \(kind.displayName) in Browser")) {
                     showBrowser = true
                 }
                 .sheet(isPresented: $showBrowser) {

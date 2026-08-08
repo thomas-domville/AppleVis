@@ -76,7 +76,7 @@ struct SignInView: View {
                             .padding(12)
                             .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
                             .accessibilityElement(children: .combine)
-                            .accessibilityLabel("\(err). If you have forgotten your password, you can reset it on the AppleVis website.")
+                            .accessibilityLabel(String(localized: "\(err). If you have forgotten your password, you can reset it on the AppleVis website."))
                             .accessibilityFocused($isErrorFocused)
                         }
 
@@ -144,7 +144,7 @@ struct SignInView: View {
         await auth.signIn(username: name, password: password)
         isSigningIn = false
         if auth.isSignedIn {
-            toast.success("Signed in as \(auth.user?.name ?? name)")
+            toast.success(String(localized: "Signed in as \(auth.user?.name ?? name)"))
             dismiss()
         } else {
             signInError = auth.error ?? "Sign in failed. Please try again."

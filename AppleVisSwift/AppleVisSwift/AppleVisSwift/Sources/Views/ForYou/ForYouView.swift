@@ -130,7 +130,7 @@ struct DownloadsView: View {
                                         .frame(width: 60)
                                 }
                                 .accessibilityElement(children: .combine)
-                                .accessibilityLabel("\(title), downloading, \(percent) percent.")
+                                .accessibilityLabel(String(localized: "\(title), downloading, \(percent) percent."))
                             }
                         }
                     }
@@ -168,7 +168,7 @@ struct DownloadsView: View {
         }
         .onChange(of: downloads.lastFailure) { _, failure in
             guard let failure else { return }
-            toast.error("Couldn't download \"\(failure.episodeTitle)\". Try again.")
+            toast.error(String(localized: "Couldn't download \"\(failure.episodeTitle)\". Try again."))
         }
     }
 
@@ -235,7 +235,7 @@ struct DownloadsView: View {
             .accessibilityHidden(true)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(meta.title). Downloaded. \(formattedSize(meta.fileSizeBytes)).")
+        .accessibilityLabel(String(localized: "\(meta.title). Downloaded. \(formattedSize(meta.fileSizeBytes))."))
         .accessibilityHint(String(localized: "Double-tap to open episode details."))
         .readAloudAction(meta.title)
         .accessibilityAction(named: Text(isCurrentlyPlaying ? "Pause" : "Play")) {
@@ -386,7 +386,7 @@ struct SavedItemsView: View {
         .padding(.leading, 6)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "\(item.title). \(item.kind.displayName). Saved \(item.savedAt.formatted(.relative(presentation: .named)))."
+            String(localized: "\(item.title). \(item.kind.displayName). Saved \(item.savedAt.formatted(.relative(presentation: .named))).")
         )
         .accessibilityHint(String(localized: "Double-tap to open."))
         .readAloudAction(item.title)
@@ -459,7 +459,7 @@ struct SavedItemsView: View {
         let toRemove = Set(filtered.map(\.id))
         for id in toRemove { PersistenceStore.shared.unsave(id: id) }
         items.removeAll { toRemove.contains($0.id) }
-        toast.success("Removed \(toRemove.count) item\(toRemove.count == 1 ? "" : "s") from Saved")
+        toast.success(String(localized: "Removed \(toRemove.count) item\(toRemove.count == 1 ? "" : "s") from Saved"))
         UIAccessibility.post(notification: .announcement, argument: "Removed saved items.")
         focusSummaryAfterDelay()
     }
@@ -566,7 +566,7 @@ private struct SavedPodcastEpisodeCard: View {
         .padding(.leading, 6)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "\(episode.title), \(episode.showTitle) podcast, saved \(savedItem.savedAt.formatted(.relative(presentation: .named)))."
+            String(localized: "\(episode.title), \(episode.showTitle) podcast, saved \(savedItem.savedAt.formatted(.relative(presentation: .named))).")
         )
         .readAloudAction(episode.title)
         .accessibilityAction(named: Text(isCurrentlyPlaying ? "Pause" : "Play")) {
@@ -650,8 +650,8 @@ struct FollowingView: View {
         .padding(.leading, 6)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "\(item.title). \(item.kind.displayName). Following." +
-            (item.lastActivityAt.map { ", last activity \($0.formatted(.relative(presentation: .named)))." } ?? "")
+            String(localized: "\(item.title). \(item.kind.displayName). Following.") +
+            (item.lastActivityAt.map { String(localized: ", last activity \($0.formatted(.relative(presentation: .named))).") } ?? "")
         )
         .accessibilityHint(String(localized: "Double-tap to open."))
         .readAloudAction(item.title)

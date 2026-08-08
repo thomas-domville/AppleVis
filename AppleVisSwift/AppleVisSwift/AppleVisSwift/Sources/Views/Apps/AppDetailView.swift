@@ -151,7 +151,7 @@ struct AppDetailView: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(detail.name) by \(detail.developer), \(detail.platform.displayName), \(detail.price)")
+        .accessibilityLabel(String(localized: "\(detail.name) by \(detail.developer), \(detail.platform.displayName), \(detail.price)"))
         .accessibilityAddTraits(.isHeader)
         .accessibilityFocused($isTitleFocused)
     }
@@ -196,7 +196,7 @@ struct AppDetailView: View {
                             }
                             .frame(height: 220)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .accessibilityLabel("Screenshot \(index + 1) of \(meta.screenshotUrls.count)")
+                            .accessibilityLabel(String(localized: "Screenshot \(index + 1) of \(meta.screenshotUrls.count)"))
                         }
                     }
                     .padding(.horizontal)
@@ -612,9 +612,9 @@ struct AppReviewRow: View {
             .font(.subheadline)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(
-                "Comment \(index) of \(total) by \(review.authorName). " +
-                (review.rating.map { "\($0) out of 5 stars. " } ?? "") +
-                (review.subject.isEmpty ? "" : "\(review.subject).")
+                String(localized: "Comment \(index) of \(total) by \(review.authorName). ") +
+                (review.rating.map { String(localized: "\($0) out of 5 stars. ") } ?? "") +
+                (review.subject.isEmpty ? "" : String(localized: "\(review.subject)."))
             )
             .modifier(OptionalReplyFocus(binding: focusBinding, id: review.id))
             .readAloudAction(review.body.strippingHTMLTags())
@@ -816,7 +816,7 @@ struct RatingGaugeView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(label): \(ratingText). \(level.description(for: category))")
+            .accessibilityLabel(String(localized: "\(label): \(ratingText). \(level.description(for: category))"))
         } else {
             // Unexpected value outside the known vocabulary — show as plain
             // text rather than silently dropping it.

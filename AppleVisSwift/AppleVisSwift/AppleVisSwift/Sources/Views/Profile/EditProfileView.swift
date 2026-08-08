@@ -35,7 +35,7 @@ struct EditProfileView: View {
                             .foregroundStyle(.secondary)
                     }
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Username: \(auth.user?.name ?? "unknown")")
+                    .accessibilityLabel(String(localized: "Username: \(auth.user?.name ?? "unknown")"))
 
                     LabeledContent("Real Name") {
                         TextField("Optional", text: $realName)
