@@ -152,7 +152,9 @@ struct FullPlayerView: View {
                                 speedButton
                                 sleepTimerButton
                                 RoutePickerView()
-                                    .frame(width: 32, height: 32)
+                                    .frame(width: 22, height: 22)
+                                    .padding(11)
+                                    .contentShape(Rectangle())
                                     .accessibilityLabel("Audio output")
                             }
                         }

@@ -162,7 +162,7 @@ struct BugDetailView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .tintedBackground(Color.accentColor, opacity: 0.08, cornerRadius: 10)
         .padding(.horizontal)
     }
 
@@ -269,10 +269,7 @@ struct BugDetailView: View {
             Spacer()
         }
         .padding(12)
-        .background(
-            (detail.status == .active ? Color.orange : Color.green).opacity(0.1),
-            in: RoundedRectangle(cornerRadius: 10)
-        )
+        .tintedBackground(detail.status == .active ? Color.orange : Color.green, opacity: 0.1, cornerRadius: 10)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             "\(detail.status.displayName) bug on \(detail.platform.displayName). " +

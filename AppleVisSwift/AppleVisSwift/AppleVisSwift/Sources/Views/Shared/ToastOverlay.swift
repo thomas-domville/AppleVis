@@ -17,11 +17,11 @@ struct ToastOverlay: View {
                 .padding(.vertical, 12)
                 .glassEffect(in: Capsule())
                 .shadow(radius: 4)
-                .transition(.move(edge: .top).combined(with: .opacity))
+                .transition(UIAccessibility.isReduceMotionEnabled ? .opacity : .move(edge: .top).combined(with: .opacity))
                 .padding(.top, 8)
             }
             Spacer()
         }
-        .animation(.spring(duration: 0.3), value: toast.current?.id)
+        .animation(UIAccessibility.isReduceMotionEnabled ? nil : .spring(duration: 0.3), value: toast.current?.id)
     }
 }

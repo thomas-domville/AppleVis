@@ -109,6 +109,10 @@ struct ForumTopicRow: View {
                 .foregroundStyle(.secondary)
             }
         }
+        .overlay(alignment: .leading) {
+            Rectangle().fill(ContentKind.forumTopic.accentColor).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
+        }
+        .padding(.leading, 6)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(topicLabel)
         .readAloudAction(topicLabel)
@@ -257,6 +261,10 @@ struct AppListingRow: View {
                 }
             }
         }
+        .overlay(alignment: .leading) {
+            Rectangle().fill(ContentKind.appListing.accentColor).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
+        }
+        .padding(.leading, 6)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(appLabel)
         .readAloudAction(appLabel)
@@ -304,6 +312,10 @@ struct ResourceRow: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .overlay(alignment: .leading) {
+            Rectangle().fill(ContentKind.resource.accentColor).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
+        }
+        .padding(.leading, 6)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(resourceLabel)
         .readAloudAction(resourceLabel)
@@ -356,6 +368,10 @@ struct BlogPostRow: View {
                 .foregroundStyle(.secondary)
             }
         }
+        .overlay(alignment: .leading) {
+            Rectangle().fill(ContentKind.blogPost.accentColor).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
+        }
+        .padding(.leading, 6)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(postLabel)
         .readAloudAction(postLabel)

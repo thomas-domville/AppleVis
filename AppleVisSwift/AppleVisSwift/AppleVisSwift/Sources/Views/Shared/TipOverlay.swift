@@ -22,10 +22,10 @@ struct TipOverlay: View {
 
                 TipCard(tip: tip) { tips.dismissActiveTip() }
                     .padding(.horizontal, 28)
-                    .transition(.scale(scale: 0.9).combined(with: .opacity))
+                    .transition(UIAccessibility.isReduceMotionEnabled ? .opacity : .scale(scale: 0.9).combined(with: .opacity))
             }
         }
-        .animation(.spring(duration: 0.25), value: tips.activeTip?.id)
+        .animation(UIAccessibility.isReduceMotionEnabled ? nil : .spring(duration: 0.25), value: tips.activeTip?.id)
     }
 }
 

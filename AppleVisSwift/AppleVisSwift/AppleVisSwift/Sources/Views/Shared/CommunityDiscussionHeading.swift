@@ -9,6 +9,26 @@ func withReduceMotionAwareAnimation<Result>(_ body: () throws -> Result) rethrow
     try withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .default, body)
 }
 
+extension View {
+    /// RN's tinted card backgrounds (`Color.accentColor.opacity(0.08)` and
+    /// similar) were swapped for a solid background whenever Reduce
+    /// Transparency was on — Swift used the same translucent-tint pattern
+    /// everywhere but never read the setting. `opacity` here is the tint
+    /// strength used in the non-reduced case; the reduced case renders the
+    /// same hue at full opacity mixed toward the system background instead
+    /// of leaving it see-through.
+    func tintedBackground(_ color: Color, opacity: Double, cornerRadius: CGFloat) -> some View {
+        Group {
+            if UIAccessibility.isReduceTransparencyEnabled {
+                self.background(color.opacity(min(opacity * 3, 1)), in: RoundedRectangle(cornerRadius: cornerRadius))
+                    .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: cornerRadius))
+            } else {
+                self.background(color.opacity(opacity), in: RoundedRectangle(cornerRadius: cornerRadius))
+            }
+        }
+    }
+}
+
 /// Shared comments/reviews-section heading used across all content-detail
 /// screens (forum topics, apps, podcast episodes, blog posts, resources).
 /// Includes a VoiceOver "Thread overview" custom action giving a spoken

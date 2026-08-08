@@ -62,7 +62,9 @@ struct HelpBlockView: View {
                     HStack(alignment: .top, spacing: 12) {
                         Text("\(index + 1)")
                             .font(.caption).fontWeight(.bold)
-                            .frame(width: 22, height: 22)
+                            .frame(minWidth: 22, minHeight: 22)
+                            .fixedSize()
+                            .padding(4)
                             .background(Color.accentColor, in: Circle())
                             .foregroundStyle(.white)
                         Text(item)

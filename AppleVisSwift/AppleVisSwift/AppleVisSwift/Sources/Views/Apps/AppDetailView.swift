@@ -260,7 +260,7 @@ struct AppDetailView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .tintedBackground(Color.accentColor, opacity: 0.08, cornerRadius: 10)
         .padding(.horizontal)
     }
 
@@ -802,7 +802,7 @@ struct RatingGaugeView: View {
                     Text(ratingText)
                         .font(.caption).fontWeight(.heavy).foregroundStyle(level.color)
                         .padding(.horizontal, 8).padding(.vertical, 2)
-                        .background(level.color.opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
+                        .tintedBackground(level.color, opacity: 0.15, cornerRadius: 6)
                 }
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {

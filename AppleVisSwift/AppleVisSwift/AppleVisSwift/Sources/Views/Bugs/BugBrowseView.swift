@@ -192,6 +192,10 @@ struct BugReportRow: View {
                 }
             }
         }
+        .overlay(alignment: .leading) {
+            Rectangle().fill(ContentKind.bugReport.accentColor).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
+        }
+        .padding(.leading, 6)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(bugLabel)
         .readAloudAction(bugLabel)
