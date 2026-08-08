@@ -268,7 +268,7 @@ struct FullPlayerView: View {
             }
             Button("End of Episode") { player.startSleepTimerAtEndOfEpisode() }
             if player.sleepTimerRemaining != nil || player.sleepAtEndOfEpisode {
-                Button("Turn Off", role: .destructive) { player.cancelSleepTimer() }
+                Button("Turn Off", role: .destructive) { player.userCancelSleepTimer() }
             }
         } label: {
             Label(sleepTimerLabel, systemImage: "moon.zzz")

@@ -38,7 +38,9 @@ final class PreferencesStore: ObservableObject {
     @AppStorage("podcast.skipForward")  var skipForwardInterval: Double = 30
     @AppStorage("podcast.autoPlay")     var autoPlayNext = true
     @AppStorage("podcast.sleepTimer")   var sleepTimerMinutes: Int = 0
-    @AppStorage("podcast.resumeRewind") var resumeRewindSeconds: Int = 0
+    // RN defaulted this to 15 seconds; Swift's default of 0 meant fresh
+    // installs got no resume-rewind at all out of the box.
+    @AppStorage("podcast.resumeRewind") var resumeRewindSeconds: Int = 15
     @AppStorage("podcast.trimSilence")  var trimSilence = false
     @AppStorage("podcast.voiceBoost")   var voiceBoost = false
     @AppStorage("podcast.eq")           var podcastEQ: PodcastEQ = .flat

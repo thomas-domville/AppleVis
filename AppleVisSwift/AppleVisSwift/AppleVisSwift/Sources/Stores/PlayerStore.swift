@@ -114,6 +114,19 @@ final class PlayerStore: ObservableObject {
         newPlayer.rate = playbackSpeed
         isPlaying = true
         saveLastPlayed()
+        applyDefaultSleepTimerIfNeeded()
+    }
+
+    /// Settings > Podcasts > Default Sleep Timer was read only to pre-check
+    /// the matching menu item in the player's sleep timer picker — it never
+    /// actually started a timer. A user who sets a default expected it to
+    /// apply automatically on every new episode, not require re-picking it
+    /// from the menu each time.
+    private func applyDefaultSleepTimerIfNeeded() {
+        guard sleepTimerRemaining == nil, !sleepAtEndOfEpisode else { return }
+        let minutes = UserDefaults.standard.integer(forKey: "podcast.sleepTimer")
+        guard minutes > 0 else { return }
+        startSleepTimer(minutes: minutes)
     }
 
     func play() {
@@ -225,11 +238,22 @@ final class PlayerStore: ObservableObject {
         sleepTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in self?.tickSleepTimer() }
         }
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "Sleep timer set for \(minutes) minutes."))
     }
 
     func startSleepTimerAtEndOfEpisode() {
         cancelSleepTimer()
         sleepAtEndOfEpisode = true
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "Sleep timer set for end of episode."))
+    }
+
+    /// Distinct from the plain `cancelSleepTimer()` below, which is also
+    /// called internally whenever a *new* timer starts — announcing
+    /// "cancelled" there too would be misleading. Only a deliberate user
+    /// action (the player's "Turn Off" control) should announce this.
+    func userCancelSleepTimer() {
+        cancelSleepTimer()
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "Sleep timer cancelled."))
     }
 
     func cancelSleepTimer() {
@@ -244,6 +268,10 @@ final class PlayerStore: ObservableObject {
         if remaining <= 1 {
             pause()
             cancelSleepTimer()
+            // Previously silent — a VoiceOver user not actively touching
+            // the screen when the timer expired got no explanation for
+            // why audio suddenly stopped.
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "Sleep timer ended. Playback paused."))
         } else {
             sleepTimerRemaining = remaining - 1
         }
@@ -388,6 +416,7 @@ final class PlayerStore: ObservableObject {
                 if self.sleepAtEndOfEpisode {
                     self.pause()
                     self.cancelSleepTimer()
+                    UIAccessibility.post(notification: .announcement, argument: String(localized: "Sleep timer: episode ended, playback stopped."))
                     return
                 }
                 guard UserDefaults.standard.object(forKey: "podcast.autoPlay") as? Bool ?? true else { return }
@@ -457,6 +486,56 @@ final class PlayerStore: ObservableObject {
                 self?.saveLastPlayed()
             }
             .store(in: &cancellables)
+
+        // Neither RN nor this port previously handled interruptions
+        // (phone call, Siri, another app's audio) at all — `isPlaying`
+        // and the Now Playing controls would silently drift out of sync
+        // with what was actually audible, and playback never resumed
+        // afterward even when the system allows it to.
+        NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)
+            .sink { [weak self] note in
+                self?.handleAudioInterruption(note)
+            }
+            .store(in: &cancellables)
+
+        // Matches standard iOS audio-app convention (Music, Podcasts):
+        // pause when the current output device disappears (headphones/
+        // Bluetooth unplugged or disconnected) rather than continuing to
+        // play out loud from the speaker unexpectedly.
+        NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)
+            .sink { [weak self] note in
+                self?.handleRouteChange(note)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func handleAudioInterruption(_ note: Notification) {
+        guard let info = note.userInfo,
+              let typeValue = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue)
+        else { return }
+
+        switch type {
+        case .began:
+            if isPlaying { pause() }
+        case .ended:
+            let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+            if AVAudioSession.InterruptionOptions(rawValue: optionsValue).contains(.shouldResume) {
+                play()
+            }
+        @unknown default:
+            break
+        }
+    }
+
+    private func handleRouteChange(_ note: Notification) {
+        guard let info = note.userInfo,
+              let reasonValue = info[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue)
+        else { return }
+        if reason == .oldDeviceUnavailable, isPlaying {
+            pause()
+        }
     }
 
     // MARK: - Persistence
