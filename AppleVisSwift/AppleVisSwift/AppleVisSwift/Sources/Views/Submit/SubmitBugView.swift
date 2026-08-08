@@ -1,13 +1,17 @@
 import SwiftUI
 
 /// Ported against src/services/drupalForm.ts's `/form/community-bug-report-form`
-/// webform. Requires an authenticated session — see DrupalFormClient's header
-/// comment on verification status.
+/// webform and src/contexts/BugWizardContext.tsx.
 ///
-/// Four-step wizard: Your Details → Description → Bug Details → Review,
-/// matching the original step-by-step design.
+/// RN requires sign-in (submission silently no-ops without a user, and posts
+/// under the account's name with no email field at all — verified via
+/// `app/submit-bug/review.tsx`'s `if (!user) return` + `name: user.name,
+/// email: ''`) — Swift previously had no sign-in gate and asked for free-text
+/// name/email instead.
+///
+/// Three-step wizard: Describe the Bug → Environment → Review.
 struct SubmitBugView: View {
-    private enum Step: Int { case details, description, bugInfo, review }
+    private enum Step: Int { case description, bugInfo, review }
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -17,9 +21,8 @@ struct SubmitBugView: View {
     @StateObject private var intelligence = ComposeIntelligenceState()
     @AccessibilityFocusState private var isStepFocused: Bool
 
-    @State private var step: Step = .details
-    @State private var name = ""
-    @State private var email = ""
+    @State private var step: Step = .description
+    @State private var showSignIn = false
     @State private var title = ""
     @State private var appleFeedbackId = ""
     @State private var platform = "iOS"
@@ -38,11 +41,6 @@ struct SubmitBugView: View {
         "No - please thank/recognize me anonymously",
     ]
 
-    private var detailsValid: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !email.trimmingCharacters(in: .whitespaces).isEmpty
-    }
-
     private var descriptionValid: Bool {
         !title.trimmingCharacters(in: .whitespaces).isEmpty &&
         !description.trimmingCharacters(in: .whitespaces).isEmpty
@@ -50,23 +48,28 @@ struct SubmitBugView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                switch step {
-                case .details:     detailsSection
-                case .description: descriptionSection
-                case .bugInfo:     bugInfoSection
-                case .review:      reviewSection
-                }
-                if let error {
-                    Section { Text(error).foregroundStyle(.red) }
+            Group {
+                if !auth.isSignedIn {
+                    signInRequiredView
+                } else {
+                    Form {
+                        switch step {
+                        case .description: descriptionSection
+                        case .bugInfo:     bugInfoSection
+                        case .review:      reviewSection
+                        }
+                        if let error {
+                            Section { Text(error).foregroundStyle(.red) }
+                        }
+                    }
                 }
             }
             .navigationTitle("Submit a Bug Report")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(step == .details ? "Cancel" : "Back") {
-                        if step == .details {
+                    Button(step == .description ? "Cancel" : "Back") {
+                        if step == .description {
                             SoundPlayer.shared.play(.screenClose)
                             dismiss()
                         } else {
@@ -74,57 +77,66 @@ struct SubmitBugView: View {
                         }
                     }
                 }
-                if step == .description && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
-                    ToolbarItem(placement: .secondaryAction) {
-                        Button("Rewrite") {
-                            Task {
-                                if let result = await intelligence.rewrite(subject: title, body: description, isTopic: true) {
-                                    title = result.subject ?? title
-                                    description = result.body
-                                } else {
-                                    toast.error("Couldn't rewrite this. Try again.")
+                if auth.isSignedIn {
+                    if step == .description && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+                        ToolbarItem(placement: .secondaryAction) {
+                            Button("Rewrite") {
+                                Task {
+                                    if let result = await intelligence.rewrite(subject: title, body: description, isTopic: true) {
+                                        title = result.subject ?? title
+                                        description = result.body
+                                    } else {
+                                        toast.error("Couldn't rewrite this. Try again.")
+                                    }
                                 }
                             }
+                            .disabled(description.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
                         }
-                        .disabled(description.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
                     }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    if step == .review {
-                        Button("Submit") { Task { await submit() } }
-                            .disabled(isSubmitting)
-                    } else {
-                        Button("Next") { goNext() }
-                            .disabled(step == .details ? !detailsValid : (step == .description ? !descriptionValid : false))
+                    ToolbarItem(placement: .confirmationAction) {
+                        if step == .review {
+                            Button("Submit") { Task { await submit() } }
+                                .disabled(isSubmitting)
+                        } else {
+                            Button("Next") { goNext() }
+                                .disabled(step == .description ? !descriptionValid : false)
+                        }
                     }
                 }
             }
-            .onAppear {
-                if name.isEmpty { name = auth.user?.name ?? "" }
-            }
+        }
+        .sheet(isPresented: $showSignIn) {
+            SignInView()
         }
     }
 
-    private var detailsSection: some View {
-        Group {
-            Section {
-                WizardStepIndicator(step: 1, total: 4, title: "Your Details", isFocused: $isStepFocused)
-                Text("Report an accessibility bug for the community Bug Tracker. Apple does not see this directly — file Feedback Assistant separately if you want Apple to see it.")
-                    .font(.subheadline).foregroundStyle(.secondary)
-            }
-            Section("Your Details") {
-                TextField("Name", text: $name)
-                TextField("Email", text: $email)
-                    .keyboardType(.emailAddress)
-                    .textInputAutocapitalization(.never)
-                    .accessibilityHint("We'll follow up at this address if we need more detail.")
-            }
+    private var signInRequiredView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "person.crop.circle.badge.exclamationmark")
+                .font(.system(size: 48))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            Text("Sign In Required")
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+            Text("You need to be signed in to your AppleVis account to submit a bug report.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Sign In") { showSignIn = true }
+                .buttonStyle(.borderedProminent)
         }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var descriptionSection: some View {
         Group {
-            Section { WizardStepIndicator(step: 2, total: 4, title: "Describe the Bug", isFocused: $isStepFocused) }
+            Section {
+                WizardStepIndicator(step: 1, total: 3, title: "Describe the Bug", isFocused: $isStepFocused)
+                Text("Report an accessibility bug for the community Bug Tracker. Apple does not see this directly — file Feedback Assistant separately if you want Apple to see it.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
             if intelligence.showTranslatePrompt {
                 Section {
                     TranslatePromptView(isProcessing: intelligence.isProcessing) {
@@ -166,7 +178,7 @@ struct SubmitBugView: View {
 
     private var bugInfoSection: some View {
         Group {
-            Section { WizardStepIndicator(step: 3, total: 4, title: "Environment", isFocused: $isStepFocused) }
+            Section { WizardStepIndicator(step: 2, total: 3, title: "Environment", isFocused: $isStepFocused) }
             Section("Where It Happens") {
                 Picker("Platform", selection: $platform) {
                     ForEach(platforms, id: \.self) { Text($0) }
@@ -190,10 +202,9 @@ struct SubmitBugView: View {
 
     private var reviewSection: some View {
         Group {
-            Section { WizardStepIndicator(step: 4, total: 4, title: "Review & Submit", isFocused: $isStepFocused) }
-            Section("Your Details") {
-                WizardReviewRow(label: "Name", value: name)
-                WizardReviewRow(label: "Email", value: email)
+            Section { WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused) }
+            Section("From") {
+                WizardReviewRow(label: "Posting As", value: auth.user?.name ?? "")
             }
             Section("Bug") {
                 WizardReviewRow(label: "Title", value: title)
@@ -217,7 +228,7 @@ struct SubmitBugView: View {
 
     private func goBack() {
         SoundPlayer.shared.play(.pickerTick)
-        step = Step(rawValue: step.rawValue - 1) ?? .details
+        step = Step(rawValue: step.rawValue - 1) ?? .description
         focusStepAfterTransition()
     }
 
@@ -229,9 +240,10 @@ struct SubmitBugView: View {
     }
 
     private func submit() async {
+        guard let user = auth.user else { return }
         isSubmitting = true; error = nil
         let result = await DrupalFormClient.submitBug(
-            name: name, email: email, title: title, appleFeedback: appleFeedbackId,
+            name: user.name, email: "", title: title, appleFeedback: appleFeedbackId,
             platform: platform, softwareVersion: softwareVersion, canReproduce: canReproduce,
             description: description, recognition: recognition
         )

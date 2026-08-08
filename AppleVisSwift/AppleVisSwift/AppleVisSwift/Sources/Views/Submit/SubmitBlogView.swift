@@ -1,14 +1,28 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Ported against src/services/drupalForm.ts's `/form/blog-submission` webform.
-/// Requires an authenticated session to reach the real form — could not be
-/// end-to-end verified live (see DrupalFormClient's header comment).
+/// Ported against src/services/drupalForm.ts's `/form/blog-submission` webform
+/// and src/contexts/BlogWizardContext.tsx.
 ///
-/// Three-step wizard: Your Details → Content → Review, matching the original
-/// step-by-step design (index → content → review).
+/// RN requires sign-in (submission silently no-ops without a user, and posts
+/// under the account's name with no email field at all — verified via
+/// `app/submit-blog/review.tsx`'s `if (!user) return` + `name: user.name,
+/// email: ''`) and collects Title + Category as step 1, not editable name/
+/// email fields — Swift previously fabricated a "Your Details" step asking
+/// for free-text name/email with no sign-in gate, and never collected Title
+/// or Category at all.
+///
+/// Three-step wizard: Title & Category → Content → Review, matching RN's
+/// index → content → review.
 struct SubmitBlogView: View {
     private enum Step: Int { case details, content, review }
+
+    static let categories = [
+        "Accessories", "Advocacy", "Apple", "Apple TV", "Apple Vision Pro",
+        "Apple Watch", "AppleVis", "Assistive Technology", "Braille", "Gaming",
+        "iOS", "iOS and iPadOS Apps", "iPad", "iPadOS", "iPhone",
+        "Mac Apps", "macOS", "News", "Opinion", "Reviews", "Rumors",
+    ]
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -19,8 +33,9 @@ struct SubmitBlogView: View {
     @AccessibilityFocusState private var isStepFocused: Bool
 
     @State private var step: Step = .details
-    @State private var name = ""
-    @State private var email = ""
+    @State private var showSignIn = false
+    @State private var title = ""
+    @State private var category = ""
     @State private var coverNote = ""
     @State private var blogDraft = ""
     @State private var isSubmitting = false
@@ -33,8 +48,7 @@ struct SubmitBlogView: View {
     }
 
     private var detailsValid: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !email.trimmingCharacters(in: .whitespaces).isEmpty
+        !title.trimmingCharacters(in: .whitespaces).isEmpty && !category.isEmpty
     }
 
     private var contentValid: Bool {
@@ -43,14 +57,20 @@ struct SubmitBlogView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                switch step {
-                case .details: detailsSection
-                case .content: contentSection
-                case .review:  reviewSection
-                }
-                if let error {
-                    Section { Text(error).foregroundStyle(.red) }
+            Group {
+                if !auth.isSignedIn {
+                    signInRequiredView
+                } else {
+                    Form {
+                        switch step {
+                        case .details: detailsSection
+                        case .content: contentSection
+                        case .review:  reviewSection
+                        }
+                        if let error {
+                            Section { Text(error).foregroundStyle(.red) }
+                        }
+                    }
                 }
             }
             .navigationTitle("Submit a Blog Post")
@@ -66,49 +86,71 @@ struct SubmitBlogView: View {
                         }
                     }
                 }
-                if step == .content && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
-                    ToolbarItem(placement: .secondaryAction) {
-                        Button("Rewrite") {
-                            Task {
-                                if let result = await intelligence.rewrite(subject: nil, body: blogDraft, isTopic: false) {
-                                    blogDraft = result.body
-                                } else {
-                                    toast.error("Couldn't rewrite this. Try again.")
+                if auth.isSignedIn {
+                    if step == .content && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+                        ToolbarItem(placement: .secondaryAction) {
+                            Button("Rewrite") {
+                                Task {
+                                    if let result = await intelligence.rewrite(subject: nil, body: blogDraft, isTopic: false) {
+                                        blogDraft = result.body
+                                    } else {
+                                        toast.error("Couldn't rewrite this. Try again.")
+                                    }
                                 }
                             }
+                            .disabled(blogDraft.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
                         }
-                        .disabled(blogDraft.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        if step == .review {
+                            Button("Submit") { Task { await submit() } }
+                                .disabled(isSubmitting)
+                        } else {
+                            Button("Next") { goNext() }
+                                .disabled(step == .details ? !detailsValid : !contentValid)
+                        }
                     }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    if step == .review {
-                        Button("Submit") { Task { await submit() } }
-                            .disabled(isSubmitting)
-                    } else {
-                        Button("Next") { goNext() }
-                            .disabled(step == .details ? !detailsValid : !contentValid)
-                    }
-                }
-            }
-            .onAppear {
-                if name.isEmpty { name = auth.user?.name ?? "" }
             }
         }
+        .sheet(isPresented: $showSignIn) {
+            SignInView()
+        }
+    }
+
+    private var signInRequiredView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "person.crop.circle.badge.exclamationmark")
+                .font(.system(size: 48))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            Text("Sign In Required")
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+            Text("You need to be signed in to your AppleVis account to submit a blog post.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Sign In") { showSignIn = true }
+                .buttonStyle(.borderedProminent)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var detailsSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 1, total: 3, title: "Your Details", isFocused: $isStepFocused)
+                WizardStepIndicator(step: 1, total: 3, title: "Title & Category", isFocused: $isStepFocused)
                 Text("Submit a blog post draft for the AppleVis editorial team to review. This does not publish immediately — an editor will follow up.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
-            Section("Your Details") {
-                TextField("Name", text: $name)
-                TextField("Email", text: $email)
-                    .keyboardType(.emailAddress)
-                    .textInputAutocapitalization(.never)
-                    .accessibilityHint("The editorial team will follow up at this address.")
+            Section("Blog Post") {
+                TextField("Blog title", text: $title)
+                Picker("Category", selection: $category) {
+                    Text("Choose a category").tag("")
+                    ForEach(Self.categories, id: \.self) { Text($0).tag($0) }
+                }
             }
         }
     }
@@ -136,7 +178,7 @@ struct SubmitBlogView: View {
                     GuidelinesReminderView(warning: warning) { guidelines.dismiss() }
                 }
             }
-            Section("Cover Note") {
+            Section("Note to Editors") {
                 TextEditor(text: $coverNote)
                     .frame(minHeight: 80)
                     .accessibilityHint("A private note to the editorial team, not published.")
@@ -207,13 +249,16 @@ struct SubmitBlogView: View {
     private var reviewSection: some View {
         Group {
             Section { WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused) }
-            Section("Your Details") {
-                WizardReviewRow(label: "Name", value: name)
-                WizardReviewRow(label: "Email", value: email)
+            Section("Blog Post") {
+                WizardReviewRow(label: "Title", value: title)
+                WizardReviewRow(label: "Category", value: category)
             }
             Section("Content") {
-                WizardReviewRow(label: "Cover Note", value: coverNote)
+                WizardReviewRow(label: "Note to Editors", value: coverNote)
                 WizardReviewRow(label: "Blog Post Draft", value: blogDraft)
+            }
+            Section("From") {
+                WizardReviewRow(label: "Posting As", value: auth.user?.name ?? "")
             }
         }
     }
@@ -238,8 +283,13 @@ struct SubmitBlogView: View {
     }
 
     private func submit() async {
+        guard let user = auth.user else { return }
         isSubmitting = true; error = nil
-        let result = await DrupalFormClient.submitBlog(name: name, email: email, message: coverNote, blogDraft: blogDraft)
+        var message = "Blog Title: \(title)\nCategory: \(category)"
+        if !coverNote.trimmingCharacters(in: .whitespaces).isEmpty {
+            message += "\n\nNote to editors:\n\(coverNote)"
+        }
+        let result = await DrupalFormClient.submitBlog(name: user.name, email: "", message: message, blogDraft: blogDraft)
         switch result {
         case .ok:
             toast.success("Blog post submitted for review")
