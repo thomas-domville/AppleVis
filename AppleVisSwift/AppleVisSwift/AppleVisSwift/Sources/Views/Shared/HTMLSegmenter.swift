@@ -38,11 +38,22 @@ enum HTMLSegmenter {
     /// Views only ever call this from the main thread, so a plain
     /// dictionary cache (no lock) is safe.
     private static var cache: [String: [HTMLSegment]] = [:]
+    /// Insertion order for eviction — keyed by the full HTML string, so a
+    /// long session browsing many distinct forum/blog bodies doesn't grow
+    /// this unboundedly. Capped well above what a normal session touches;
+    /// this is a low-priority safety net, not a response to an observed
+    /// memory problem (individual bodies are a few KB at most).
+    private static var order: [String] = []
+    private static let maxEntries = 200
 
     static func segment(_ html: String) -> [HTMLSegment] {
         if let cached = cache[html] { return cached }
         let result = computeSegments(html)
         cache[html] = result
+        order.append(html)
+        if order.count > maxEntries {
+            cache.removeValue(forKey: order.removeFirst())
+        }
         return result
     }
 

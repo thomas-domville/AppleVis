@@ -61,15 +61,39 @@ final class ICloudSyncManager {
         store.synchronize()
     }
 
+    /// Pushing always sent every synced setting as one blob, even keys this
+    /// device never touched, using whatever possibly-stale local copy it
+    /// happened to have. Two actively-used signed-in devices could silently
+    /// stomp each other: Device A backgrounds (pushing its stale copy of a
+    /// key Device B more recently changed) after Device B's push, and
+    /// Device B loses that change the next time it pulls. Per-key "shadow"
+    /// values (the last value this device knows to already be in sync) let
+    /// push only overwrite the keys THIS device actually changed, merging
+    /// everything else in from whatever's already in the cloud.
     func pushSettings() {
         guard isSyncEnabled("sync.settings") else { return }
-        var snapshot: [String: AnyCodableSettingValue] = [:]
+        let shadow = readShadow()
+        let cloud: [String: AnyCodableSettingValue] = getJSON(key: "icloud.settings") ?? [:]
+        var merged = cloud
+        var newShadow = shadow
         for key in Self.syncedSettingsKeys {
-            if let s = UserDefaults.standard.string(forKey: key) { snapshot[key] = .string(s) }
-            else if UserDefaults.standard.object(forKey: key) is Bool { snapshot[key] = .bool(UserDefaults.standard.bool(forKey: key)) }
-            else if UserDefaults.standard.object(forKey: key) != nil { snapshot[key] = .double(UserDefaults.standard.double(forKey: key)) }
+            guard let local = currentValue(for: key) else { continue }
+            if shadow[key] != local {
+                // Changed locally since this device last synced — this
+                // device's copy wins for this key.
+                merged[key] = local
+                newShadow[key] = local
+            } else if merged[key] == nil {
+                // Never synced before and untouched locally — seed it.
+                merged[key] = local
+                newShadow[key] = local
+            }
+            // Otherwise unchanged locally: leave whatever's already in
+            // `merged` (the cloud's copy, possibly newer from another
+            // device) alone.
         }
-        setJSON(snapshot, key: "icloud.settings")
+        setJSON(merged, key: "icloud.settings")
+        writeShadow(newShadow)
         store.synchronize()
     }
 
@@ -109,16 +133,28 @@ final class ICloudSyncManager {
         }
     }
 
+    /// Only accepts a cloud value for a key this device hasn't itself
+    /// changed since its last successful sync (per the `shadow` — if the
+    /// local value still matches the shadow, nothing local is at risk).
+    /// A key this device has locally dirtied but not yet pushed is left
+    /// alone rather than clobbered by an older or unrelated remote copy.
     private func pullSettings() {
         guard isSyncEnabled("sync.settings") else { return }
         guard let snapshot: [String: AnyCodableSettingValue] = getJSON(key: "icloud.settings") else { return }
-        for (key, value) in snapshot {
-            switch value {
+        var shadow = readShadow()
+        for key in Self.syncedSettingsKeys {
+            guard let cloudValue = snapshot[key] else { continue }
+            let local = currentValue(for: key)
+            guard local == shadow[key] else { continue } // locally dirty, don't clobber
+            guard cloudValue != local else { continue }
+            switch cloudValue {
             case .string(let s): UserDefaults.standard.set(s, forKey: key)
             case .bool(let b):   UserDefaults.standard.set(b, forKey: key)
             case .double(let d): UserDefaults.standard.set(d, forKey: key)
             }
+            shadow[key] = cloudValue
         }
+        writeShadow(shadow)
     }
 
     @objc private func handleExternalChange(_ note: Notification) {
@@ -126,6 +162,28 @@ final class ICloudSyncManager {
             pullAll()
             SoundPlayer.shared.play(.syncComplete)
         }
+    }
+
+    // MARK: - Settings merge helpers
+
+    private func currentValue(for key: String) -> AnyCodableSettingValue? {
+        if let s = UserDefaults.standard.string(forKey: key) { return .string(s) }
+        if UserDefaults.standard.object(forKey: key) is Bool { return .bool(UserDefaults.standard.bool(forKey: key)) }
+        if UserDefaults.standard.object(forKey: key) != nil { return .double(UserDefaults.standard.double(forKey: key)) }
+        return nil
+    }
+
+    /// Local-only (never pushed to `store`) record of the last value this
+    /// device knows to already be in sync for each key, keyed the same as
+    /// `syncedSettingsKeys`.
+    private func readShadow() -> [String: AnyCodableSettingValue] {
+        guard let data = UserDefaults.standard.data(forKey: "icloud.settings.shadow") else { return [:] }
+        return (try? JSONDecoder().decode([String: AnyCodableSettingValue].self, from: data)) ?? [:]
+    }
+
+    private func writeShadow(_ shadow: [String: AnyCodableSettingValue]) {
+        guard let data = try? JSONEncoder().encode(shadow) else { return }
+        UserDefaults.standard.set(data, forKey: "icloud.settings.shadow")
     }
 
     // MARK: - Storage helpers
@@ -141,6 +199,6 @@ final class ICloudSyncManager {
     }
 }
 
-private enum AnyCodableSettingValue: Codable {
+private enum AnyCodableSettingValue: Codable, Equatable {
     case string(String), bool(Bool), double(Double)
 }
