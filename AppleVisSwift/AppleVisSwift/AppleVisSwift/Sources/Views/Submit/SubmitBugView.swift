@@ -32,6 +32,7 @@ struct SubmitBugView: View {
     @State private var recognition = "Yes - please use my AppleVis username"
     @State private var isSubmitting = false
     @State private var error: String?
+    @State private var showDiscardConfirm = false
 
     private let platforms = ["iOS", "iPadOS", "macOS"]
     private let reproduceOptions = ["Yes, always", "Yes, sometimes", "No"]
@@ -71,8 +72,7 @@ struct SubmitBugView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(step == .description ? "Cancel" : "Back") {
                         if step == .description {
-                            SoundPlayer.shared.play(.screenClose)
-                            dismiss()
+                            requestCancel()
                         } else {
                             goBack()
                         }
@@ -108,6 +108,32 @@ struct SubmitBugView: View {
         }
         .sheet(isPresented: $showSignIn) {
             SignInView()
+        }
+        .confirmationDialog(
+            "Discard this submission?",
+            isPresented: $showDiscardConfirm, titleVisibility: .visible
+        ) {
+            Button("Discard", role: .destructive) { SoundPlayer.shared.play(.screenClose); dismiss() }
+            Button("Keep Editing", role: .cancel) {}
+        } message: {
+            Text("Your progress will be discarded.")
+        }
+    }
+
+    /// RN confirmed before discarding a filled-out form; Cancel here
+    /// previously dismissed immediately with no warning, silently losing a
+    /// written bug report with one accidental tap — same regression already
+    /// fixed for Submit App, now matched here.
+    private func requestCancel() {
+        let hasProgress = !title.trimmingCharacters(in: .whitespaces).isEmpty
+            || !description.trimmingCharacters(in: .whitespaces).isEmpty
+            || !appleFeedbackId.trimmingCharacters(in: .whitespaces).isEmpty
+            || !softwareVersion.trimmingCharacters(in: .whitespaces).isEmpty
+        if hasProgress {
+            showDiscardConfirm = true
+        } else {
+            SoundPlayer.shared.play(.screenClose)
+            dismiss()
         }
     }
 

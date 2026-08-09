@@ -35,7 +35,7 @@ struct ContentView: View {
                     .padding(.bottom, 49) // above tab bar
             }
         }
-        .animation(.spring(duration: 0.3), value: player.currentEpisode != nil)
+        .animation(UIAccessibility.isReduceMotionEnabled ? nil : .spring(duration: 0.3), value: player.currentEpisode != nil)
         .sheet(item: Binding(
             get: { deepLinkRouter.pendingContent.map { DeepLinkContent(kind: $0.kind, id: $0.id) } },
             set: { if $0 == nil { deepLinkRouter.pendingContent = nil } }

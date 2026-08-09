@@ -471,7 +471,8 @@ struct ContactView: View {
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .ignore)
                 .accessibilityAddTraits(.isButton)
-                .accessibilityLabel(String(localized: "Declaration: I understand that AppleVis does not accept sponsored posts or content, advertising, SEO, or any other type of paid proposals."))
+                .accessibilityLabel(String(localized: "Declaration"))
+                .accessibilityHint(String(localized: "I understand that AppleVis does not accept sponsored posts or content, advertising, SEO, or any other type of paid proposals."))
                 .accessibilityValue(declarationAgreed ? "Checked" : "Unchecked")
             }
         }

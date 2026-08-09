@@ -419,6 +419,7 @@ struct HubSectionHeader: View {
                     .font(.caption).fontWeight(.bold)
                     .foregroundStyle(accent)
                     .accessibilityLabel(title)
+                    .accessibilityAddTraits(.isHeader)
                 Text(subtitle)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)

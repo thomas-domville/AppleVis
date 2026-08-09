@@ -21,6 +21,12 @@ struct LoadingView: View {
                 .font(.subheadline)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // None of these three shared states ever told VoiceOver anything
+        // changed — a user pulling to refresh into an error or empty state
+        // (or a screen swapping from a spinner to real content) got no
+        // signal short of re-swiping to discover it. `.screenChanged` both
+        // re-scans the screen and speaks its argument.
+        .onAppear { UIAccessibility.post(notification: .screenChanged, argument: localized(message)) }
     }
 }
 
@@ -44,6 +50,7 @@ struct ErrorView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { UIAccessibility.post(notification: .screenChanged, argument: localized(message)) }
     }
 }
 
@@ -80,5 +87,6 @@ struct EmptyStateView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { UIAccessibility.post(notification: .screenChanged, argument: "\(localized(title)). \(localized(message))") }
     }
 }

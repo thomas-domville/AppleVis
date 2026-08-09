@@ -32,7 +32,7 @@ struct OnboardingView: View {
                 }
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: step)
+        .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut(duration: 0.3), value: step)
         .background(preferences.colors.background)
         .confirmationDialog(
             "Skip the rest of setup?",

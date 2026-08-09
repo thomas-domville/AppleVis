@@ -11,6 +11,7 @@ struct ComposeTopicView: View {
     @State private var categories: [ForumCategory] = []
     @State private var isSubmitting = false
     @State private var error: String?
+    @State private var showDiscardConfirm = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -19,6 +20,20 @@ struct ComposeTopicView: View {
     @StateObject private var intelligence = ComposeIntelligenceState()
 
     var isValid: Bool { !title.trimmingCharacters(in: .whitespaces).isEmpty && !bodyText.trimmingCharacters(in: .whitespaces).isEmpty && selectedCategory != nil }
+
+    /// RN confirmed before discarding a filled-out form; Cancel here
+    /// previously dismissed immediately with no warning, silently losing a
+    /// written topic with one accidental tap — same regression already
+    /// fixed for Submit App, now matched here.
+    private func requestCancel() {
+        let hasProgress = !title.trimmingCharacters(in: .whitespaces).isEmpty || !bodyText.trimmingCharacters(in: .whitespaces).isEmpty
+        if hasProgress {
+            showDiscardConfirm = true
+        } else {
+            SoundPlayer.shared.play(.screenClose)
+            dismiss()
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -78,7 +93,7 @@ struct ComposeTopicView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { SoundPlayer.shared.play(.screenClose); dismiss() }
+                    Button("Cancel") { requestCancel() }
                 }
                 if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
                     ToolbarItem(placement: .secondaryAction) {
@@ -101,6 +116,15 @@ struct ComposeTopicView: View {
                 }
             }
             .task { await loadCategories() }
+            .confirmationDialog(
+                "Discard this submission?",
+                isPresented: $showDiscardConfirm, titleVisibility: .visible
+            ) {
+                Button("Discard", role: .destructive) { SoundPlayer.shared.play(.screenClose); dismiss() }
+                Button("Keep Editing", role: .cancel) {}
+            } message: {
+                Text("Your progress will be discarded.")
+            }
         }
     }
 
@@ -133,8 +157,10 @@ struct ComposeReplyView: View {
     let onPosted: (ForumReply) -> Void
 
     @State private var bodyText: String
+    private let initialBodyText: String
     @State private var isSubmitting = false
     @State private var error: String?
+    @State private var showDiscardConfirm = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -147,12 +173,29 @@ struct ComposeReplyView: View {
         self.topicTitle = topicTitle
         self.quotedReply = quotedReply
         self.onPosted = onPosted
+        let initial: String
         if let quotedReply {
             let plain = quotedReply.body.strippingHTMLTags()
             let excerpt = plain.count > 150 ? String(plain.prefix(150)).trimmingCharacters(in: .whitespaces) + "…" : plain
-            _bodyText = State(initialValue: "\(quotedReply.authorName) wrote:\n> \(excerpt)\n\n")
+            initial = "\(quotedReply.authorName) wrote:\n> \(excerpt)\n\n"
         } else {
-            _bodyText = State(initialValue: "")
+            initial = ""
+        }
+        _bodyText = State(initialValue: initial)
+        initialBodyText = initial
+    }
+
+    /// RN confirmed before discarding a filled-out form; Cancel here
+    /// previously dismissed immediately with no warning. Compares against
+    /// `initialBodyText` rather than plain emptiness — a quoted reply
+    /// prefills a non-empty quote excerpt, which isn't itself "progress"
+    /// worth confirming a discard over.
+    private func requestCancel() {
+        if bodyText != initialBodyText {
+            showDiscardConfirm = true
+        } else {
+            SoundPlayer.shared.play(.screenClose)
+            dismiss()
         }
     }
 
@@ -200,7 +243,7 @@ struct ComposeReplyView: View {
             .navigationTitle("Reply")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { SoundPlayer.shared.play(.screenClose); dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { requestCancel() } }
                 if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
                     ToolbarItem(placement: .secondaryAction) {
                         Button("Rewrite") {
@@ -219,6 +262,15 @@ struct ComposeReplyView: View {
                     Button("Post") { Task { await submit() } }
                         .disabled(bodyText.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
                 }
+            }
+            .confirmationDialog(
+                "Discard this submission?",
+                isPresented: $showDiscardConfirm, titleVisibility: .visible
+            ) {
+                Button("Discard", role: .destructive) { SoundPlayer.shared.play(.screenClose); dismiss() }
+                Button("Keep Editing", role: .cancel) {}
+            } message: {
+                Text("Your progress will be discarded.")
             }
         }
     }

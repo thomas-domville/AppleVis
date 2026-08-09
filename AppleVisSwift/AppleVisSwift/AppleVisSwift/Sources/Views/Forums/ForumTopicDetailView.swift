@@ -23,6 +23,7 @@ struct ForumTopicDetailView: View {
     @State private var showBrowser = false
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedReplyId: String?
+    @State private var pendingFocusReplyId: String?
 
     var body: some View {
         Group {
@@ -48,6 +49,7 @@ struct ForumTopicDetailView: View {
             if let d = detail {
                 ComposeReplyView(topicId: d.id, topicTitle: d.title) { reply in
                     self.detail?.replies.append(reply)
+                    pendingFocusReplyId = reply.id
                 }
             }
         }
@@ -55,6 +57,7 @@ struct ForumTopicDetailView: View {
             if let d = detail {
                 ComposeReplyView(topicId: d.id, topicTitle: d.title, quotedReply: target) { reply in
                     self.detail?.replies.append(reply)
+                    pendingFocusReplyId = reply.id
                 }
             }
         }
@@ -159,6 +162,20 @@ struct ForumTopicDetailView: View {
                 .padding(.vertical)
             }
             .background(preferences.colors.background)
+            // A freshly-posted reply already has the AccessibilityFocusState
+            // plumbing (`focusBinding` above) and the same delayed-set
+            // pattern `jumpToLastReply` uses just above — it just never got
+            // wired at the point a reply is actually submitted, silently
+            // leaving VoiceOver focus wherever it was on the compose sheet.
+            .onChange(of: pendingFocusReplyId) { _, newId in
+                guard let newId else { return }
+                withReduceMotionAwareAnimation { proxy.scrollTo(newId, anchor: .bottom) }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    focusedReplyId = newId
+                    pendingFocusReplyId = nil
+                }
+            }
         }
     }
 

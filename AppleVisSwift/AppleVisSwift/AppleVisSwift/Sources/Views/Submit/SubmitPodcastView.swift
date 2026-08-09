@@ -29,6 +29,7 @@ struct SubmitPodcastView: View {
     @State private var showFileImporter = false
     @State private var isSubmitting = false
     @State private var error: String?
+    @State private var showDiscardConfirm = false
 
     /// Set when opened from the Share Extension with a shared podcast URL.
     /// This form needs an actual audio file upload — a shared link can't
@@ -68,8 +69,7 @@ struct SubmitPodcastView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(step == .audio ? "Cancel" : "Back") {
                         if step == .audio {
-                            SoundPlayer.shared.play(.screenClose)
-                            dismiss()
+                            requestCancel()
                         } else {
                             goBack()
                         }
@@ -107,6 +107,29 @@ struct SubmitPodcastView: View {
         }
         .sheet(isPresented: $showSignIn) {
             SignInView()
+        }
+        .confirmationDialog(
+            "Discard this submission?",
+            isPresented: $showDiscardConfirm, titleVisibility: .visible
+        ) {
+            Button("Discard", role: .destructive) { SoundPlayer.shared.play(.screenClose); dismiss() }
+            Button("Keep Editing", role: .cancel) {}
+        } message: {
+            Text("Your progress will be discarded.")
+        }
+    }
+
+    /// RN confirmed before discarding a filled-out form; Cancel here
+    /// previously dismissed immediately with no warning, silently losing a
+    /// selected audio file/description with one accidental tap — same
+    /// regression already fixed for Submit App, now matched here.
+    private func requestCancel() {
+        let hasProgress = audioFileURL != nil || !description.trimmingCharacters(in: .whitespaces).isEmpty
+        if hasProgress {
+            showDiscardConfirm = true
+        } else {
+            SoundPlayer.shared.play(.screenClose)
+            dismiss()
         }
     }
 

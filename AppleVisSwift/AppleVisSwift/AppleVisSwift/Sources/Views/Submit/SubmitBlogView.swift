@@ -41,6 +41,7 @@ struct SubmitBlogView: View {
     @State private var isSubmitting = false
     @State private var error: String?
     @State private var showFileImporter = false
+    @State private var showDiscardConfirm = false
 
     /// Set when opened from the Share Extension with shared text.
     init(prefillText: String? = nil) {
@@ -80,8 +81,7 @@ struct SubmitBlogView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(step == .details ? "Cancel" : "Back") {
                         if step == .details {
-                            SoundPlayer.shared.play(.screenClose)
-                            dismiss()
+                            requestCancel()
                         } else {
                             goBack()
                         }
@@ -216,6 +216,31 @@ struct SubmitBlogView: View {
             }
         }
         .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.plainText, .text, .rtf], onCompletion: handleFileImport)
+        .confirmationDialog(
+            "Discard this submission?",
+            isPresented: $showDiscardConfirm, titleVisibility: .visible
+        ) {
+            Button("Discard", role: .destructive) { SoundPlayer.shared.play(.screenClose); dismiss() }
+            Button("Keep Editing", role: .cancel) {}
+        } message: {
+            Text("Your progress will be discarded.")
+        }
+    }
+
+    /// RN confirmed before discarding a filled-out form; Cancel here
+    /// previously dismissed immediately with no warning, silently losing a
+    /// written blog post draft with one accidental tap — same regression
+    /// already fixed for Submit App, now matched here.
+    private func requestCancel() {
+        let hasProgress = !title.trimmingCharacters(in: .whitespaces).isEmpty
+            || !coverNote.trimmingCharacters(in: .whitespaces).isEmpty
+            || !blogDraft.trimmingCharacters(in: .whitespaces).isEmpty
+        if hasProgress {
+            showDiscardConfirm = true
+        } else {
+            SoundPlayer.shared.play(.screenClose)
+            dismiss()
+        }
     }
 
     /// Matches the old app's Write/Import/Paste content step, minus the
