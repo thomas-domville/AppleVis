@@ -143,7 +143,7 @@ struct HelpView: View {
                 .fontWeight(.semibold)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 2)
-                .background(Color.secondary.opacity(0.15), in: Capsule())
+                .themedPill(preferences.colors)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(String(localized: "\(section.title), \(section.articles.count) articles"))
@@ -161,10 +161,9 @@ struct HelpView: View {
                     Text(contentType.label)
                         .font(.caption2)
                         .fontWeight(.semibold)
-                        .foregroundStyle(Color.accentColor)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.accentColor.opacity(0.12), in: Capsule())
+                        .themedPill(preferences.colors)
                 }
             }
             Text(article.summary)

@@ -24,4 +24,17 @@ extension View {
             .background(colors.background)
             .listRowBackground(colors.card)
     }
+
+    /// The soft-accent capsule chip RN's `styles.ts` calls `pill`/`pillText`
+    /// (a pale accent-tinted background with full-accent-color text) — used
+    /// for "NEW" badges, license/genre tags, and unselected filter chips.
+    /// These previously hardcoded `Color.secondary.opacity(0.15)` or
+    /// `Color.accentColor.opacity(0.12))`, which is why every theme's
+    /// verified-against-RN `pill`/`pillText` hex pair went completely
+    /// unused despite being ported this session.
+    func themedPill(_ colors: ThemeColors) -> some View {
+        self
+            .foregroundStyle(colors.pillText)
+            .background(colors.pill, in: Capsule())
+    }
 }

@@ -700,6 +700,7 @@ struct FilterChip: View {
     let title: String
     let isSelected: Bool
     let action: () -> Void
+    @EnvironmentObject private var preferences: PreferencesStore
 
     var body: some View {
         Button(action: action) {
@@ -707,8 +708,8 @@ struct FilterChip: View {
                 .font(.caption)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(isSelected ? Color.accentColor : Color.secondary.opacity(0.15), in: Capsule())
-                .foregroundStyle(isSelected ? .white : .primary)
+                .background(isSelected ? Color.accentColor : preferences.colors.pill, in: Capsule())
+                .foregroundStyle(isSelected ? preferences.colors.accentText : preferences.colors.pillText)
         }
         .buttonStyle(.plain)
     }

@@ -36,8 +36,7 @@ struct OpenSourceView: View {
                                 .font(.caption2)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
-                                .background(Color.accentColor.opacity(0.12), in: Capsule())
-                                .foregroundStyle(Color.accentColor)
+                                .themedPill(preferences.colors)
                         }
                         Text(item.copyright)
                             .font(.caption)

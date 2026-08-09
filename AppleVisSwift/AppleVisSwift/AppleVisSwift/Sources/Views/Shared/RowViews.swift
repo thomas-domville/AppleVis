@@ -71,11 +71,12 @@ func detailLevelLabel(
 
 struct NewCountBadge: View {
     let count: Int
+    @EnvironmentObject private var preferences: PreferencesStore
 
     var body: some View {
         Text("\(count) NEW")
             .font(.caption2).fontWeight(.bold)
-            .foregroundStyle(.white)
+            .foregroundStyle(preferences.colors.accentText)
             .padding(.horizontal, 6).padding(.vertical, 2)
             .background(Color.accentColor, in: Capsule())
             .accessibilityHidden(true)

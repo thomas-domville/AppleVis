@@ -12,6 +12,12 @@ import SwiftUI
 /// GuidedExperiencePauseStore found") on the iOS 26 SDK this targets.
 struct GuidedExperienceResumeBanner: View {
     @ObservedObject var pauseStore: GuidedExperiencePauseStore
+    /// Explicit `@ObservedObject` parameter, not `@EnvironmentObject` — this
+    /// view is mounted via `.overlay {}` directly on the WindowGroup root
+    /// (AppleVisApp.swift), where `@EnvironmentObject` doesn't reliably
+    /// resolve on this SDK and crashes at launch. Same reasoning as
+    /// `pauseStore` above.
+    @ObservedObject var preferences: PreferencesStore
     @State private var showTour = false
 
     var body: some View {
@@ -40,7 +46,7 @@ struct GuidedExperienceResumeBanner: View {
                     }
                     .accessibilityLabel(String(localized: "Dismiss Resume Tour"))
                 }
-                .foregroundStyle(.white)
+                .foregroundStyle(preferences.colors.accentText)
                 .background(Color.accentColor, in: Capsule())
                 .shadow(radius: 10, y: 4)
                 .padding(.bottom, 76)

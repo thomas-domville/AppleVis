@@ -60,7 +60,7 @@ struct AppleVisApp: App {
             .tint(preferences.accentColor)
             .modifier(SystemAppearanceObserver(preferences: preferences))
             .overlay { TipOverlay(tips: tips) }
-            .overlay { GuidedExperienceResumeBanner(pauseStore: guidedExperiencePause) }
+            .overlay { GuidedExperienceResumeBanner(pauseStore: guidedExperiencePause, preferences: preferences) }
             .accessibilityAction(.magicTap) {
                 guard player.currentEpisode != nil else { return }
                 player.togglePlayPause()

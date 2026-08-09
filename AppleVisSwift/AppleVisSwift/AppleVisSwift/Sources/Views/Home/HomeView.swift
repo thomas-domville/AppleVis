@@ -617,6 +617,7 @@ struct FeedRow: View {
     /// new items still get a visible "NEW" marker on their card.
     var isNew: Bool = false
     var onMarkRead: (() -> Void)? = nil
+    @EnvironmentObject private var preferences: PreferencesStore
 
     var body: some View {
         Group {
@@ -636,7 +637,7 @@ struct FeedRow: View {
             if isNew && newCount == 0 {
                 Text("NEW")
                     .font(.caption2).fontWeight(.bold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(preferences.colors.accentText)
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(Color.accentColor, in: Capsule())
                     .accessibilityHidden(true)
