@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Local-only persistence for content the server has no concept of ("saved"
 /// items are never sent to Drupal — see src/services/persistence.ts in the RN
@@ -169,15 +170,24 @@ final class PersistenceStore {
     // MARK: - Storage
 
     private func persist<T: Encodable>(_ value: T, key: String) {
-        guard let data = try? JSONEncoder().encode(value) else { return }
-        defaults.set(data, forKey: key)
-        cache[key] = value
+        do {
+            defaults.set(try JSONEncoder().encode(value), forKey: key)
+            cache[key] = value
+        } catch {
+            AppLog.persistence.error("Failed to encode \(key, privacy: .public): \(error, privacy: .public)")
+        }
     }
 
     private func load<T: Decodable>(key: String) -> T? {
         if let cached = cache[key] as? T { return cached }
-        guard let data = defaults.data(forKey: key),
-              let decoded = try? JSONDecoder().decode(T.self, from: data) else { return nil }
+        guard let data = defaults.data(forKey: key) else { return nil }
+        let decoded: T
+        do {
+            decoded = try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            AppLog.persistence.error("Failed to decode \(key, privacy: .public): \(error, privacy: .public)")
+            return nil
+        }
         cache[key] = decoded
         return decoded
     }

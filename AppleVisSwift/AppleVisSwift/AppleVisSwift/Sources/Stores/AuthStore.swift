@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import Security
+import os
 
 @MainActor
 final class AuthStore: ObservableObject {
@@ -88,14 +89,20 @@ final class AuthStore: ObservableObject {
     // MARK: - Keychain
 
     private func saveToKeychain(_ user: AuthUser) {
-        guard let data = try? JSONEncoder().encode(user) else { return }
+        guard let data = try? JSONEncoder().encode(user) else {
+            AppLog.auth.error("Failed to encode AuthUser for Keychain save")
+            return
+        }
         let query: [String: Any] = [
             kSecClass as String:       kSecClassGenericPassword,
             kSecAttrAccount as String: keychainKey,
             kSecValueData as String:   data,
         ]
         SecItemDelete(query as CFDictionary)
-        SecItemAdd(query as CFDictionary, nil)
+        let status = SecItemAdd(query as CFDictionary, nil)
+        if status != errSecSuccess {
+            AppLog.auth.error("Keychain save failed: OSStatus \(status)")
+        }
     }
 
     private func deleteFromKeychain() {
@@ -114,8 +121,18 @@ final class AuthStore: ObservableObject {
             kSecMatchLimit as String:  kSecMatchLimitOne,
         ]
         var result: AnyObject?
-        SecItemCopyMatching(query as CFDictionary, &result)
-        guard let data = result as? Data else { return nil }
-        return try? JSONDecoder().decode(AuthUser.self, from: data)
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else {
+            if status != errSecSuccess && status != errSecItemNotFound {
+                AppLog.auth.error("Keychain load failed: OSStatus \(status)")
+            }
+            return nil
+        }
+        do {
+            return try JSONDecoder().decode(AuthUser.self, from: data)
+        } catch {
+            AppLog.auth.error("Failed to decode AuthUser from Keychain: \(error, privacy: .public)")
+            return nil
+        }
     }
 }

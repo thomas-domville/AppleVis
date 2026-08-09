@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Syncs a curated set of user data across devices via iCloud Key-Value
 /// storage, gated by the granular toggles in Settings → Saved & Sync.
@@ -247,13 +248,21 @@ final class ICloudSyncManager {
     // MARK: - Storage helpers
 
     private func setJSON<T: Encodable>(_ value: T, key: String) {
-        guard let data = try? JSONEncoder().encode(value) else { return }
-        store.set(data, forKey: key)
+        do {
+            store.set(try JSONEncoder().encode(value), forKey: key)
+        } catch {
+            AppLog.sync.error("Failed to encode \(key, privacy: .public) for iCloud push: \(error, privacy: .public)")
+        }
     }
 
     private func getJSON<T: Decodable>(key: String) -> T? {
         guard let data = store.data(forKey: key) else { return nil }
-        return try? JSONDecoder().decode(T.self, from: data)
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            AppLog.sync.error("Failed to decode \(key, privacy: .public) from iCloud: \(error, privacy: .public)")
+            return nil
+        }
     }
 }
 

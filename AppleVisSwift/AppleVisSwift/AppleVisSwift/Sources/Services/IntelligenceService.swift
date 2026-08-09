@@ -1,6 +1,7 @@
 import Foundation
 import NaturalLanguage
 import FoundationModels
+import os
 
 /// On-device "Apple Intelligence" features — non-English detection (NaturalLanguage),
 /// and rewrite/translate/summarize (FoundationModels on-device LLM, iOS 26+).
@@ -150,9 +151,9 @@ enum IntelligenceService {
             // guardrail rejection, and rate limiting all look identical to
             // callers otherwise, which made repeated reports of "it just
             // does nothing" hard to diagnose without a device console).
-            #if DEBUG
-            print("IntelligenceService generation failed: \(error)")
-            #endif
+            // Previously DEBUG-only, which meant the exact field reports
+            // this was added to diagnose were still invisible in Release.
+            AppLog.intelligence.error("Generation failed: \(error, privacy: .public)")
             return nil
         }
     }

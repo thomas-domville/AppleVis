@@ -2,6 +2,7 @@ import AVFoundation
 import MediaPlayer
 import Combine
 import SwiftUI
+import os
 
 @MainActor
 final class PlayerStore: ObservableObject {
@@ -374,7 +375,10 @@ final class PlayerStore: ObservableObject {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
-            print("Audio session setup failed: \(error)")
+            // Previously only a bare print() — playback would then silently
+            // fail or come out broken with no indication anywhere why.
+            AppLog.player.error("Audio session setup failed: \(error, privacy: .public)")
+            errorMessage = String(localized: "Couldn't set up audio playback. Try again.")
         }
     }
 
