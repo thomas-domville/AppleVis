@@ -216,12 +216,33 @@ struct EmptyJSONAPIResponse: Decodable {}
 enum HTMLText {
     static func decodeEntities(_ text: String) -> String {
         var result = text
+        // Drupal's WYSIWYG editor commonly emits named/numeric entities for
+        // smart quotes, dashes, and ellipses — previously only the 7 basic
+        // entities below were handled, so content using these showed up as
+        // literal "&rsquo;"/"&#8217;" text in previews and Spotlight/
+        // notification snippets instead of an apostrophe.
         let entities: [(String, String)] = [
             ("&nbsp;", " "), ("&amp;", "&"), ("&quot;", "\""),
             ("&#039;", "'"), ("&apos;", "'"), ("&lt;", "<"), ("&gt;", ">"),
+            ("&rsquo;", "\u{2019}"), ("&lsquo;", "\u{2018}"),
+            ("&rdquo;", "\u{201D}"), ("&ldquo;", "\u{201C}"),
+            ("&mdash;", "\u{2014}"), ("&ndash;", "\u{2013}"),
+            ("&hellip;", "\u{2026}"),
         ]
         for (entity, replacement) in entities {
             result = result.replacingOccurrences(of: entity, with: replacement)
+        }
+        // Catch-all for any remaining decimal numeric entity (&#8217; etc.)
+        // not already covered by name above, rather than enumerating every
+        // possible code point.
+        if let regex = try? NSRegularExpression(pattern: "&#([0-9]+);") {
+            let ns = result as NSString
+            let matches = regex.matches(in: result, range: NSRange(location: 0, length: ns.length))
+            for match in matches.reversed() {
+                let codeRange = match.range(at: 1)
+                guard let code = Int(ns.substring(with: codeRange)), let scalar = Unicode.Scalar(code) else { continue }
+                result = (result as NSString).replacingCharacters(in: match.range, with: String(Character(scalar)))
+            }
         }
         return result
     }

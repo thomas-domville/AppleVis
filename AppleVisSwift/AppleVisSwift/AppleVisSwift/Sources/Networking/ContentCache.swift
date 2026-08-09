@@ -23,6 +23,29 @@ final class ContentCache {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         directory = caches.appendingPathComponent("ContentCache", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        sweepExpired()
+    }
+
+    /// `get(_:key:)` only ever inspects a key someone actively re-requests —
+    /// an entry for content nobody revisits (an old forum topic, a since-
+    /// deleted app listing) would otherwise sit on disk forever, since
+    /// nothing previously deleted an `.expired` entry either on read or on
+    /// any schedule. Runs once at launch on the background cache queue.
+    private func sweepExpired() {
+        queue.async {
+            guard let files = try? FileManager.default.contentsOfDirectory(
+                at: self.directory, includingPropertiesForKeys: [.contentModificationDateKey]
+            ) else { return }
+            let now = Date()
+            for file in files {
+                let key = file.lastPathComponent
+                let expire = Self.ttl(for: key).expire
+                guard let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
+                      now.timeIntervalSince(modified) > expire
+                else { continue }
+                try? FileManager.default.removeItem(at: file)
+            }
+        }
     }
 
     // Mirrors contentCache.ts's STALE_MS/EXPIRE_MS tables: more-specific
@@ -73,6 +96,9 @@ final class ContentCache {
             let age = Date().timeIntervalSince(entry.fetchedAt)
             let (stale, expire) = Self.ttl(for: key)
             let freshness: Freshness = age > expire ? .expired : (age > stale ? .stale : .fresh)
+            if freshness == .expired {
+                try? FileManager.default.removeItem(at: fileURL(for: key))
+            }
             return (entry.data, freshness)
         }
     }

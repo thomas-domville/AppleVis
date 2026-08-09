@@ -39,12 +39,34 @@ final class ICloudSyncManager {
 
     // MARK: - Push (call after a local write)
 
+    /// Previously a full-blob overwrite exactly like the settings bug fixed
+    /// elsewhere in this file: pushed this device's entire saved/followed
+    /// list every time, discarding anything another device had added to
+    /// the cloud copy since this device's last pull. Same per-id "shadow"
+    /// merge strategy as `pushSettings`/`pullSettings`, applied to sets of
+    /// ids instead of scalar values.
     func pushSavedItems() {
         if isSyncEnabled("sync.savedItems") {
-            setJSON(PersistenceStore.shared.savedItems(), key: "icloud.saved")
+            let local = PersistenceStore.shared.savedItems()
+            let shadow = readIdShadow(key: "icloud.saved.shadow")
+            let cloud: [SavedItem] = getJSON(key: "icloud.saved") ?? []
+            let locallyRemoved = shadow.subtracting(Set(local.map(\.id)))
+            var merged = cloud.filter { !locallyRemoved.contains($0.id) }
+            let mergedIds = Set(merged.map(\.id))
+            merged += local.filter { !mergedIds.contains($0.id) }
+            setJSON(merged, key: "icloud.saved")
+            writeIdShadow(Set(merged.map(\.id)), key: "icloud.saved.shadow")
         }
         if isSyncEnabled("sync.followedItems") {
-            setJSON(PersistenceStore.shared.followedItems(), key: "icloud.followed")
+            let local = PersistenceStore.shared.followedItems()
+            let shadow = readIdShadow(key: "icloud.followed.shadow")
+            let cloud: [FollowedItem] = getJSON(key: "icloud.followed") ?? []
+            let locallyRemoved = shadow.subtracting(Set(local.map(\.id)))
+            var merged = cloud.filter { !locallyRemoved.contains($0.id) }
+            let mergedIds = Set(merged.map(\.id))
+            merged += local.filter { !mergedIds.contains($0.id) }
+            setJSON(merged, key: "icloud.followed")
+            writeIdShadow(Set(merged.map(\.id)), key: "icloud.followed.shadow")
         }
         store.synchronize()
     }
@@ -110,12 +132,35 @@ final class ICloudSyncManager {
         pullSettings()
     }
 
+    /// Adopts cloud additions unconditionally (never a data-loss risk), but
+    /// only removes a local item if this device hasn't independently
+    /// touched it since the last sync checkpoint — i.e. it's exactly where
+    /// the shadow last left it, so no local, not-yet-pushed change is at
+    /// risk of being silently clobbered by a remote removal.
     private func pullSavedItems() {
-        if isSyncEnabled("sync.savedItems"), let saved: [SavedItem] = getJSON(key: "icloud.saved") {
-            PersistenceStore.shared.replaceSavedItems(saved)
+        if isSyncEnabled("sync.savedItems"), let cloud: [SavedItem] = getJSON(key: "icloud.saved") {
+            let shadow = readIdShadow(key: "icloud.saved.shadow")
+            let cloudIds = Set(cloud.map(\.id))
+            let localIds = Set(PersistenceStore.shared.savedItems().map(\.id))
+            for item in cloud where !localIds.contains(item.id) {
+                PersistenceStore.shared.save(item)
+            }
+            for id in shadow.intersection(localIds).subtracting(cloudIds) {
+                PersistenceStore.shared.unsave(id: id)
+            }
+            writeIdShadow(Set(PersistenceStore.shared.savedItems().map(\.id)), key: "icloud.saved.shadow")
         }
-        if isSyncEnabled("sync.followedItems"), let followed: [FollowedItem] = getJSON(key: "icloud.followed") {
-            PersistenceStore.shared.replaceFollowedItems(followed)
+        if isSyncEnabled("sync.followedItems"), let cloud: [FollowedItem] = getJSON(key: "icloud.followed") {
+            let shadow = readIdShadow(key: "icloud.followed.shadow")
+            let cloudIds = Set(cloud.map(\.id))
+            let localIds = Set(PersistenceStore.shared.followedItems().map(\.id))
+            for item in cloud where !localIds.contains(item.id) {
+                PersistenceStore.shared.markFollowed(item)
+            }
+            for id in shadow.intersection(localIds).subtracting(cloudIds) {
+                PersistenceStore.shared.markUnfollowed(id: id)
+            }
+            writeIdShadow(Set(PersistenceStore.shared.followedItems().map(\.id)), key: "icloud.followed.shadow")
         }
     }
 
@@ -184,6 +229,19 @@ final class ICloudSyncManager {
     private func writeShadow(_ shadow: [String: AnyCodableSettingValue]) {
         guard let data = try? JSONEncoder().encode(shadow) else { return }
         UserDefaults.standard.set(data, forKey: "icloud.settings.shadow")
+    }
+
+    /// Same local-only "last known in sync" checkpoint concept as the
+    /// settings shadow above, but for a set of item ids (Saved/Followed).
+    private func readIdShadow(key: String) -> Set<String> {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let ids = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+        return Set(ids)
+    }
+
+    private func writeIdShadow(_ ids: Set<String>, key: String) {
+        guard let data = try? JSONEncoder().encode(Array(ids)) else { return }
+        UserDefaults.standard.set(data, forKey: key)
     }
 
     // MARK: - Storage helpers

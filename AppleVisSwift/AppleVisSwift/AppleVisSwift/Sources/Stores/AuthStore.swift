@@ -47,6 +47,19 @@ final class AuthStore: ObservableObject {
         SpotlightIndexer.deindexAll()
         user = nil
         deleteFromKeychain()
+        clearSessionCookies()
+    }
+
+    /// Independent of whether the server-side logout call above succeeds —
+    /// an offline sign-out previously left a fully-valid Drupal session
+    /// cookie sitting in the shared cookie jar indefinitely even though the
+    /// UI already showed "signed out," since URLSession(.default) persists
+    /// cookies to HTTPCookieStorage.shared and nothing ever purged them.
+    private func clearSessionCookies() {
+        guard let cookies = HTTPCookieStorage.shared.cookies else { return }
+        for cookie in cookies where cookie.domain.hasSuffix("applevis.com") {
+            HTTPCookieStorage.shared.deleteCookie(cookie)
+        }
     }
 
     /// Called when any request comes back 401 — the server has already
@@ -62,6 +75,7 @@ final class AuthStore: ObservableObject {
         SpotlightIndexer.deindexAll()
         user = nil
         deleteFromKeychain()
+        clearSessionCookies()
         Task { await PushNotificationManager.clearRegistration() }
     }
 

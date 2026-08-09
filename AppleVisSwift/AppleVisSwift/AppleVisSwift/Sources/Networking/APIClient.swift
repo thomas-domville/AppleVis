@@ -24,7 +24,7 @@ enum APIError: LocalizedError {
         case .forbidden:     return "You don't have permission to do that."
         case .rateLimited:   return "Too many requests. Please wait a moment."
         case .server:        return "AppleVis is having trouble right now. Try again later."
-        case .decoding(let e): return "Couldn't parse server response: \(e.localizedDescription)"
+        case .decoding: return "AppleVis sent back something this version of the app doesn't understand. Try updating the app."
         case .unknown(let c): return "Unexpected error (HTTP \(c))."
         case .offlineNoCache(let group): return "No saved \(group) content yet. Connect to the internet to load content for the first time."
         }

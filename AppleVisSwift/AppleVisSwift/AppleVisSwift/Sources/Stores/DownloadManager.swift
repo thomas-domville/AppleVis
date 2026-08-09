@@ -63,11 +63,22 @@ final class DownloadManager: NSObject, ObservableObject {
 
     func isDownloaded(_ episodeId: String) -> Bool { localURL(for: episodeId) != nil }
 
+    /// Filtered to `downloadedEpisodeIds` (disk-verified at launch by
+    /// `loadMetadata`) rather than raw `metadata.values` — otherwise a file
+    /// removed externally (Files app, backup restore) left its metadata
+    /// entry lingering here indefinitely: still listed as downloaded, still
+    /// counted in storage totals, until the next app launch reconciled it.
     var downloadedEpisodes: [DownloadedEpisodeMeta] {
-        metadata.values.sorted { $0.downloadedAt > $1.downloadedAt }
+        metadata.values
+            .filter { downloadedEpisodeIds.contains($0.id) }
+            .sorted { $0.downloadedAt > $1.downloadedAt }
     }
 
-    var totalSizeBytes: Int64 { metadata.values.reduce(0) { $0 + $1.fileSizeBytes } }
+    var totalSizeBytes: Int64 {
+        metadata.values
+            .filter { downloadedEpisodeIds.contains($0.id) }
+            .reduce(0) { $0 + $1.fileSizeBytes }
+    }
 
     // MARK: - Actions
 

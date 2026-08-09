@@ -40,11 +40,6 @@ final class PersistenceStore {
         Task { @MainActor in ICloudSyncManager.shared.pushSavedItems() }
     }
 
-    /// Overwrites the local saved list — used when adopting an iCloud sync.
-    func replaceSavedItems(_ items: [SavedItem]) {
-        persist(items, key: savedKey)
-    }
-
     // MARK: - Notification history (on-device only — nothing server-side tracks this)
 
     func notificationHistory() -> [NotificationHistoryItem] {
@@ -83,11 +78,6 @@ final class PersistenceStore {
         items.removeAll { $0.id == id }
         persist(items, key: followedKey)
         Task { @MainActor in ICloudSyncManager.shared.pushSavedItems() }
-    }
-
-    /// Overwrites the local followed list — used when adopting an iCloud sync.
-    func replaceFollowedItems(_ items: [FollowedItem]) {
-        persist(items, key: followedKey)
     }
 
     // MARK: - Seen forum topics (backs the "Unread" forums filter)
