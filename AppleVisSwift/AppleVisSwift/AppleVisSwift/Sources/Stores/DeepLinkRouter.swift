@@ -21,7 +21,11 @@ final class DeepLinkRouter: ObservableObject {
     }
 
     func handleUniversalLink(_ url: URL) {
-        guard url.host?.contains("applevis.com") == true else { return }
+        // `.contains` would also match a spoofed host like
+        // "applevis.com.attacker.com" — iOS's own universal-link domain
+        // verification already restricts which real domains can reach this
+        // handler at all, but the check itself should still be precise.
+        guard let host = url.host, host == "applevis.com" || host.hasSuffix(".applevis.com") else { return }
         pendingWebURL = url
     }
 

@@ -4,6 +4,7 @@ import Foundation
 /// items are never sent to Drupal — see src/services/persistence.ts in the RN
 /// reference client) plus a local cache of what this device has followed,
 /// since there is no bulk "list my followed items" endpoint on the backend.
+@MainActor
 final class PersistenceStore {
     static let shared = PersistenceStore()
 
@@ -12,6 +13,15 @@ final class PersistenceStore {
     private let notificationHistoryKey = "applevis.notificationHistory.v1"
     private let notificationHistoryLimit = 20
     private let defaults = UserDefaults.standard
+
+    /// Every browse-list row (Forums/Podcasts/Apps/Resources/Blogs) calls
+    /// through `savedItems()`/`followedItems()`/`allItemVisits()` on every
+    /// render to compute its saved/following/new-reply state — without this,
+    /// that meant a full JSON decode of the entire collection on every
+    /// single row's body evaluation, on every scroll/re-render. Cached
+    /// in-memory per key, filled on first read and kept in sync by
+    /// `persist(_:key:)` itself.
+    private var cache: [String: Any] = [:]
 
     private init() {}
 
@@ -153,6 +163,7 @@ final class PersistenceStore {
         defaults.removeObject(forKey: itemVisitsKey)
         defaults.removeObject(forKey: "applevis.forums.lastVisit")
         defaults.removeObject(forKey: "applevis.lastVisit")
+        cache.removeAll()
     }
 
     // MARK: - Storage
@@ -160,10 +171,14 @@ final class PersistenceStore {
     private func persist<T: Encodable>(_ value: T, key: String) {
         guard let data = try? JSONEncoder().encode(value) else { return }
         defaults.set(data, forKey: key)
+        cache[key] = value
     }
 
     private func load<T: Decodable>(key: String) -> T? {
-        guard let data = defaults.data(forKey: key) else { return nil }
-        return try? JSONDecoder().decode(T.self, from: data)
+        if let cached = cache[key] as? T { return cached }
+        guard let data = defaults.data(forKey: key),
+              let decoded = try? JSONDecoder().decode(T.self, from: data) else { return nil }
+        cache[key] = decoded
+        return decoded
     }
 }

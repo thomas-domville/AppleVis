@@ -43,6 +43,22 @@ final class APIClient {
     @MainActor static weak var authStore: AuthStore?
     @MainActor static weak var toastStore: ToastStore?
 
+    // Compiled once instead of per-decoded-date-field — these ran through
+    // the custom date-decoding strategy below on every timestamp in every
+    // network response, and ISO8601DateFormatter construction/configuration
+    // is comparatively expensive to repeat that often. Safe to share: only
+    // ever read from (`.date(from:)`), never mutated after creation.
+    private static let iso8601WithFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    private static let iso8601Plain: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
     private let session: URLSession
     private let baseURL = URL(string: "https://www.applevis.com")!
     private let jsonAPIBase = URL(string: "https://www.applevis.com/jsonapi")!
@@ -79,11 +95,8 @@ final class APIClient {
                 }
                 // Fall back to ISO8601
                 let str = try container.decode(String.self)
-                let iso = ISO8601DateFormatter()
-                iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                if let date = iso.date(from: str) { return date }
-                iso.formatOptions = [.withInternetDateTime]
-                if let date = iso.date(from: str) { return date }
+                if let date = APIClient.iso8601WithFractional.date(from: str) { return date }
+                if let date = APIClient.iso8601Plain.date(from: str) { return date }
                 throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot parse date: \(str)")
             }
         }

@@ -287,13 +287,23 @@ private func mapDirectoryListing(_ item: JSONValue) -> AppListing {
     )
 }
 
+// Compiled once instead of per-call — safe to share since only ever read
+// from, never mutated after creation.
+private let flexibleDateISOWithFractional: ISO8601DateFormatter = {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return f
+}()
+private let flexibleDateISOPlain: ISO8601DateFormatter = {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime]
+    return f
+}()
+
 private func parseFlexibleDate(_ text: String) -> Date? {
     if let ts = Double(text) {
         return Date(timeIntervalSince1970: ts > 10_000_000_000 ? ts / 1000 : ts)
     }
-    let iso = ISO8601DateFormatter()
-    iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    if let d = iso.date(from: text) { return d }
-    iso.formatOptions = [.withInternetDateTime]
-    return iso.date(from: text)
+    if let d = flexibleDateISOWithFractional.date(from: text) { return d }
+    return flexibleDateISOPlain.date(from: text)
 }

@@ -88,19 +88,31 @@ final class ContentCache {
     }
 
     /// Returns the cached value and how fresh it is, or `nil` if nothing is
-    /// cached for `key`.
-    func get<T: Codable>(_ type: T.Type, key: String) -> (data: T, freshness: Freshness)? {
-        queue.sync {
-            guard let raw = try? Data(contentsOf: fileURL(for: key)),
-                  let entry = try? JSONDecoder().decode(Entry<T>.self, from: raw) else { return nil }
-            let age = Date().timeIntervalSince(entry.fetchedAt)
-            let (stale, expire) = Self.ttl(for: key)
-            let freshness: Freshness = age > expire ? .expired : (age > stale ? .stale : .fresh)
-            if freshness == .expired {
-                try? FileManager.default.removeItem(at: fileURL(for: key))
+    /// cached for `key`. Genuinely asynchronous (dispatches to the
+    /// background cache queue via a continuation) rather than blocking the
+    /// calling thread with `queue.sync` — this runs on every cached network
+    /// fetch across the app (`fetchWithCache`), called from `@MainActor`
+    /// view models, so a blocking call here risked stalling the caller's
+    /// thread and, under concurrent fetches, starving the cooperative
+    /// thread pool that queue.sync was contending with.
+    func get<T: Codable>(_ type: T.Type, key: String) async -> (data: T, freshness: Freshness)? {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                continuation.resume(returning: self.getSync(type, key: key))
             }
-            return (entry.data, freshness)
         }
+    }
+
+    private func getSync<T: Codable>(_ type: T.Type, key: String) -> (data: T, freshness: Freshness)? {
+        guard let raw = try? Data(contentsOf: fileURL(for: key)),
+              let entry = try? JSONDecoder().decode(Entry<T>.self, from: raw) else { return nil }
+        let age = Date().timeIntervalSince(entry.fetchedAt)
+        let (stale, expire) = Self.ttl(for: key)
+        let freshness: Freshness = age > expire ? .expired : (age > stale ? .stale : .fresh)
+        if freshness == .expired {
+            try? FileManager.default.removeItem(at: fileURL(for: key))
+        }
+        return (entry.data, freshness)
     }
 
     func set<T: Codable>(_ value: T, key: String) {

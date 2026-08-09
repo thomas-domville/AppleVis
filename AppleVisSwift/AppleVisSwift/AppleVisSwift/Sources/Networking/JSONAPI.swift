@@ -92,6 +92,20 @@ enum JSONValue: Decodable {
     }
 }
 
+// Compiled once instead of per-call in `parseDrupalDate` below, which runs
+// on every date field of every mapped node. Safe to share across calls:
+// only ever read from (`.date(from:)`), never mutated after creation.
+private let drupalDateISOWithFractional: ISO8601DateFormatter = {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return f
+}()
+private let drupalDateISOPlain: ISO8601DateFormatter = {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime]
+    return f
+}()
+
 // MARK: - JSON:API node
 
 struct JsonApiNode: Decodable {
@@ -138,11 +152,8 @@ struct JsonApiNode: Decodable {
             if let ts = Double(s) {
                 return Date(timeIntervalSince1970: ts > 10_000_000_000 ? ts / 1000 : ts)
             }
-            let iso = ISO8601DateFormatter()
-            iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            if let d = iso.date(from: s) { return d }
-            iso.formatOptions = [.withInternetDateTime]
-            if let d = iso.date(from: s) { return d }
+            if let d = drupalDateISOWithFractional.date(from: s) { return d }
+            if let d = drupalDateISOPlain.date(from: s) { return d }
         }
         return .distantPast
     }
@@ -214,6 +225,21 @@ struct EmptyJSONAPIResponse: Decodable {}
 // MARK: - Text helpers (mirror src/services/api.ts textFromHtml/decodeHtml)
 
 enum HTMLText {
+    // Compiled once instead of per-call — these run on every forum post/bug
+    // report/app listing mapped from a network response, and NSRegularExpression
+    // compilation is comparatively expensive to repeat per item.
+    private static let numericEntityRegex = try? NSRegularExpression(pattern: "&#([0-9]+);")
+    private static let scriptTagRegex = try? NSRegularExpression(pattern: "<script[\\s\\S]*?</script>")
+    private static let styleTagRegex = try? NSRegularExpression(pattern: "<style[\\s\\S]*?</style>")
+    private static let anyTagRegex = try? NSRegularExpression(pattern: "<[^>]+>")
+    private static let whitespaceRunRegex = try? NSRegularExpression(pattern: "\\s+")
+
+    private static func replace(_ regex: NSRegularExpression?, in text: String, with template: String) -> String {
+        guard let regex else { return text }
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.stringByReplacingMatches(in: text, range: range, withTemplate: template)
+    }
+
     static func decodeEntities(_ text: String) -> String {
         var result = text
         // Drupal's WYSIWYG editor commonly emits named/numeric entities for
@@ -235,7 +261,7 @@ enum HTMLText {
         // Catch-all for any remaining decimal numeric entity (&#8217; etc.)
         // not already covered by name above, rather than enumerating every
         // possible code point.
-        if let regex = try? NSRegularExpression(pattern: "&#([0-9]+);") {
+        if let regex = numericEntityRegex {
             let ns = result as NSString
             let matches = regex.matches(in: result, range: NSRange(location: 0, length: ns.length))
             for match in matches.reversed() {
@@ -249,10 +275,10 @@ enum HTMLText {
 
     static func plainText(fromHTML html: String) -> String {
         var text = html
-        text = text.replacingOccurrences(of: "<script[\\s\\S]*?</script>", with: " ", options: .regularExpression)
-        text = text.replacingOccurrences(of: "<style[\\s\\S]*?</style>", with: " ", options: .regularExpression)
-        text = text.replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
-        text = text.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        text = replace(scriptTagRegex, in: text, with: " ")
+        text = replace(styleTagRegex, in: text, with: " ")
+        text = replace(anyTagRegex, in: text, with: " ")
+        text = replace(whitespaceRunRegex, in: text, with: " ")
         text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return decodeEntities(text)
     }

@@ -72,7 +72,7 @@
 
     <!-- NSUserDefaults — UserDefaults.standard throughout, plus the
          group.com.applevis.app App Group suite shared by the main app and
-         the Share Extension / Live Activity extension targets. -->
+         the Share Extension target. -->
     <dict>
       <key>NSPrivacyAccessedAPIType</key>
       <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
