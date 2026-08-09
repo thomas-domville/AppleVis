@@ -20,8 +20,16 @@ final class PreferencesStore: ObservableObject {
 
     // MARK: - Appearance
     @AppStorage("theme") var theme: AppTheme = .system
-    var colorScheme: ColorScheme? { theme.colorScheme }
-    var colors: ThemeColors { theme.colors }
+    /// Kept live by `SystemAppearanceObserver` (AppleVisApp.swift) via
+    /// `@Environment(\.colorScheme)`, which — unlike a raw
+    /// `UITraitCollection.current` read — actually updates when iOS's
+    /// appearance changes while the app is foregrounded. `.system`/
+    /// `.oppositeToSystem` used to read the trait directly and could go
+    /// stale until some unrelated re-render happened to recompute it.
+    @Published var systemIsDark: Bool = UITraitCollection.current.userInterfaceStyle == .dark
+    var colorScheme: ColorScheme? { theme.colorScheme(systemIsDark: systemIsDark) }
+    var colors: ThemeColors { theme.colors(systemIsDark: systemIsDark) }
+    var accentColor: Color { theme.accentColor(systemIsDark: systemIsDark) }
     @AppStorage("appearance.cardDensity") var cardDensity: CardDensity = .comfortable
 
     // MARK: - Home feed filters
@@ -176,15 +184,15 @@ enum AppTheme: String, CaseIterable, Identifiable {
     /// The underlying light/dark base every theme renders on top of —
     /// SwiftUI has no native "sepia"/"nebula"/etc. scheme, so themes
     /// differentiate via this base plus `accentColor` below.
-    var colorScheme: ColorScheme? {
+    /// `systemIsDark` must come from a reactive source (SwiftUI's
+    /// `@Environment(\.colorScheme)`, forwarded via `PreferencesStore
+    /// .systemIsDark`) rather than a raw `UITraitCollection.current` read —
+    /// the latter is a one-time snapshot that goes stale until some
+    /// unrelated re-render happens to recompute it.
+    func colorScheme(systemIsDark: Bool) -> ColorScheme? {
         switch self {
         case .system: return nil
-        case .oppositeToSystem:
-            // Reads the live system trait rather than a fixed value, so this
-            // stays correct if iOS's appearance changes while the app is
-            // running — the same live-tracking RN's ThemeContext did for
-            // this specific theme.
-            return UITraitCollection.current.userInterfaceStyle == .dark ? .light : .dark
+        case .oppositeToSystem: return systemIsDark ? .light : .dark
         case .light, .warm, .sepia, .applevisClassic, .mouseLight, .orchard, .goldenGate, .highContrastLight:
             return .light
         case .dark, .midnight, .mouseDark, .nebula, .highContrastDark:
@@ -193,11 +201,10 @@ enum AppTheme: String, CaseIterable, Identifiable {
     }
 
     /// Full palette for this theme, ported verbatim from RN's
-    /// `src/theme/themes.ts`. `.system`/`.oppositeToSystem` resolve
-    /// dynamically off the live system trait, matching RN's own
-    /// runtime-resolved placeholders for those two entries.
-    var colors: ThemeColors {
-        let systemIsDark = UITraitCollection.current.userInterfaceStyle == .dark
+    /// `src/theme/themes.ts`. `.system`/`.oppositeToSystem` resolve off
+    /// `systemIsDark`, matching RN's own runtime-resolved placeholders for
+    /// those two entries.
+    func colors(systemIsDark: Bool) -> ThemeColors {
         switch self {
         case .system:            return systemIsDark ? .dark : .light
         case .oppositeToSystem: return systemIsDark ? .light : .dark
@@ -217,19 +224,15 @@ enum AppTheme: String, CaseIterable, Identifiable {
         }
     }
 
-    var accentColor: Color {
+    /// Derived from `colors(systemIsDark:).accent` for every fixed palette
+    /// so there's a single source of truth for each theme's accent — this
+    /// used to hardcode its own independent RGB literals here, which had
+    /// quietly drifted from the verified-against-RN `ThemeColors.accent`
+    /// values for Midnight, Sepia, and High Contrast Light.
+    func accentColor(systemIsDark: Bool) -> Color {
         switch self {
         case .system, .oppositeToSystem, .light, .dark: return .accentColor
-        case .midnight:           return Color(red: 0.30, green: 0.55, blue: 1.0)
-        case .warm:               return Color(red: 0.757, green: 0.490, blue: 0.169)
-        case .sepia:              return Color(red: 0.55, green: 0.38, blue: 0.20)
-        case .applevisClassic:   return Color(red: 0.039, green: 0.373, blue: 1.0)
-        case .mouseLight, .mouseDark: return Color(red: 0.961, green: 0.651, blue: 0.137)
-        case .orchard:            return Color(red: 0.800, green: 0.200, blue: 0.200)
-        case .goldenGate:        return Color(red: 1.0, green: 0.420, blue: 0.169)
-        case .nebula:             return Color(red: 0.655, green: 0.545, blue: 0.980)
-        case .highContrastLight: return .black
-        case .highContrastDark:  return .yellow
+        default: return colors(systemIsDark: systemIsDark).accent
         }
     }
 }

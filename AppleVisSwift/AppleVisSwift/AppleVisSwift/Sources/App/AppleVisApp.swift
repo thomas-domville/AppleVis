@@ -57,7 +57,8 @@ struct AppleVisApp: App {
             .environmentObject(keyCommands)
             .environmentObject(guidedExperiencePause)
             .preferredColorScheme(preferences.colorScheme)
-            .tint(preferences.theme.accentColor)
+            .tint(preferences.accentColor)
+            .modifier(SystemAppearanceObserver(preferences: preferences))
             .overlay { TipOverlay(tips: tips) }
             .overlay { GuidedExperienceResumeBanner(pauseStore: guidedExperiencePause) }
             .accessibilityAction(.magicTap) {
@@ -142,5 +143,22 @@ struct AppleVisApp: App {
             guard let latest = try? await APIClient.shared.podcasts.episodes().first else { return }
             await player.load(latest)
         }
+    }
+}
+
+/// Keeps `PreferencesStore.systemIsDark` live via `@Environment(\.colorScheme)`
+/// — the one SwiftUI-reactive source for the system's current appearance —
+/// so the `.system`/`.oppositeToSystem` themes actually update while the app
+/// is foregrounded instead of only refreshing on the next unrelated re-render.
+private struct SystemAppearanceObserver: ViewModifier {
+    @Environment(\.colorScheme) private var systemColorScheme
+    @ObservedObject var preferences: PreferencesStore
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { preferences.systemIsDark = systemColorScheme == .dark }
+            .onChange(of: systemColorScheme) { _, newValue in
+                preferences.systemIsDark = newValue == .dark
+            }
     }
 }
