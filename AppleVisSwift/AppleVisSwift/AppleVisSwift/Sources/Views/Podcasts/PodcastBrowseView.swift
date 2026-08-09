@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PodcastBrowseView: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var toast: ToastStore
     @State private var episodes: [PodcastEpisode] = []
     @State private var tags: [PodcastTag] = []
     @State private var selectedTag: PodcastTag? = nil
@@ -86,10 +87,13 @@ struct PodcastBrowseView: View {
     private func loadMore() async {
         guard !isLoadingMore, hasMore else { return }
         isLoadingMore = true
-        page += 1
-        if let more = try? await APIClient.shared.podcasts.episodes(page: page, sort: sort, tagTid: selectedTag?.tid) {
+        do {
+            let more = try await APIClient.shared.podcasts.episodes(page: page + 1, sort: sort, tagTid: selectedTag?.tid)
+            page += 1
             episodes += more
             hasMore = more.count >= APIPaging.pageSize
+        } catch {
+            toast.error(String(localized: "Couldn't load more episodes."))
         }
         isLoadingMore = false
     }

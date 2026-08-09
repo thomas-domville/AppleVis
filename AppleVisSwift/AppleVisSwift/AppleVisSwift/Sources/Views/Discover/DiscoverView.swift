@@ -170,28 +170,28 @@ struct DiscoverView: View {
             VStack(alignment: .leading, spacing: 0) {
                 hubSection(title: "App Directory", subtitle: "Browse accessible apps by platform and category.", accent: .green) {
                     HubCard(title: "Apps", subtitle: "iOS accessibility apps", systemImage: "square.grid.2x2", color: .green) {
-                        AnyView(AppBrowseView())
+                        AppBrowseView()
                     }
                 }
                 hubSection(title: "Community", subtitle: "Find discussions and recent posts from AppleVis members.", accent: .blue) {
                     HubCard(title: "Forums", subtitle: "Discussion & help", systemImage: "bubble.left.and.bubble.right", color: .blue) {
-                        AnyView(ForumsBrowseView())
+                        ForumsBrowseView()
                     }
                     HubCard(title: "Blogs", subtitle: "Articles & news", systemImage: "newspaper", color: .red) {
-                        AnyView(BlogBrowseView())
+                        BlogBrowseView()
                     }
                 }
                 hubSection(title: "Learn", subtitle: "Explore guides, podcast episodes, and practical accessibility resources.", accent: .orange) {
                     HubCard(title: "Guides", subtitle: "Tutorials & resources", systemImage: "book", color: .orange) {
-                        AnyView(GuideBrowseView())
+                        GuideBrowseView()
                     }
                     HubCard(title: "Podcasts", subtitle: "Audio content", systemImage: "mic.fill", color: .purple) {
-                        AnyView(PodcastBrowseView())
+                        PodcastBrowseView()
                     }
                 }
                 hubSection(title: "Bug Tracker", subtitle: "Browse active accessibility bugs reported by the AppleVis community.", accent: .brown) {
                     HubCard(title: "Bug Reports", subtitle: "Known accessibility bugs", systemImage: "ant", color: .brown) {
-                        AnyView(BugBrowseView())
+                        BugBrowseView()
                     }
                 }
 

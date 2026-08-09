@@ -281,9 +281,13 @@ final class APIClient {
     }
 
     private func buildURL(path: String, base: BaseURL, queryItems: [URLQueryItem]) -> URL {
-        var components = URLComponents(url: resolvedBase(base).appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+        let resolved = resolvedBase(base).appendingPathComponent(path)
+        guard var components = URLComponents(url: resolved, resolvingAgainstBaseURL: false) else {
+            assertionFailure("Malformed endpoint path: \(path)")
+            return resolved
+        }
         if !queryItems.isEmpty { components.queryItems = queryItems }
-        return components.url!
+        return components.url ?? resolved
     }
 
     private func buildURL(path: String, base: BaseURL, query: [String: String]) -> URL {
@@ -292,11 +296,15 @@ final class APIClient {
         case .jsonAPI: self.jsonAPIBase
         case .v1:      self.v1Base
         }
-        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+        let resolved = baseURL.appendingPathComponent(path)
+        guard var components = URLComponents(url: resolved, resolvingAgainstBaseURL: false) else {
+            assertionFailure("Malformed endpoint path: \(path)")
+            return resolved
+        }
         if !query.isEmpty {
             components.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }
         }
-        return components.url!
+        return components.url ?? resolved
     }
 
     enum BaseURL { case root, jsonAPI, v1 }

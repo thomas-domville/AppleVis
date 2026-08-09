@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GuideBrowseView: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var toast: ToastStore
     @State private var resources: [Resource] = []
     @State private var isLoading = false
     @State private var error: String?
@@ -107,10 +108,13 @@ struct GuideBrowseView: View {
     private func loadMore() async {
         guard !isLoadingMore, hasMore else { return }
         isLoadingMore = true
-        page += 1
-        if let more = try? await APIClient.shared.resources.list(page: page, categoryTids: selectedFilter.tids) {
+        do {
+            let more = try await APIClient.shared.resources.list(page: page + 1, categoryTids: selectedFilter.tids)
+            page += 1
             resources += more
             hasMore = more.count >= APIPaging.pageSize
+        } catch {
+            toast.error(String(localized: "Couldn't load more resources."))
         }
         isLoadingMore = false
     }

@@ -115,6 +115,7 @@ struct AppCategoryDestination: Hashable {
 struct AppCategoryView: View {
     let destination: AppCategoryDestination
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var toast: ToastStore
     @State private var apps: [AppListing] = []
     @State private var isLoading = false
     @State private var error: String?
@@ -178,14 +179,17 @@ struct AppCategoryView: View {
     private func loadMore() async {
         guard !isLoadingMore, hasMore else { return }
         isLoadingMore = true
-        page += 1
-        if let more = try? await APIClient.shared.apps.list(
-            page: page,
-            platform: destination.platform,
-            categoryTid: destination.category.tid
-        ) {
+        do {
+            let more = try await APIClient.shared.apps.list(
+                page: page + 1,
+                platform: destination.platform,
+                categoryTid: destination.category.tid
+            )
+            page += 1
             apps += more
             hasMore = more.count >= APIPaging.pageSize
+        } catch {
+            toast.error(String(localized: "Couldn't load more apps."))
         }
         isLoadingMore = false
     }

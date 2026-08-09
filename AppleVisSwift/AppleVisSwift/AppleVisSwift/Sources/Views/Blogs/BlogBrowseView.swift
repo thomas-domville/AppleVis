@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BlogBrowseView: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var toast: ToastStore
     @State private var posts: [BlogPost] = []
     @State private var isLoading = false
     @State private var error: String?
@@ -88,10 +89,13 @@ struct BlogBrowseView: View {
     private func loadMore() async {
         guard !isLoadingMore, hasMore else { return }
         isLoadingMore = true
-        page += 1
-        if let more = try? await APIClient.shared.blogs.list(page: page) {
+        do {
+            let more = try await APIClient.shared.blogs.list(page: page + 1)
+            page += 1
             posts += more
             hasMore = more.count >= APIPaging.pageSize
+        } catch {
+            toast.error(String(localized: "Couldn't load more blog posts."))
         }
         isLoadingMore = false
     }

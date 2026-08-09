@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BugBrowseView: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var toast: ToastStore
     @State private var bugs: [BugReport] = []
     @State private var isLoading = false
     @State private var error: String?
@@ -140,12 +141,15 @@ struct BugBrowseView: View {
     private func loadMore() async {
         guard !isLoadingMore, hasMore else { return }
         isLoadingMore = true
-        page += 1
-        if let more = try? await APIClient.shared.bugReports.list(
-            page: page, platform: platform, status: statusFilter
-        ) {
+        do {
+            let more = try await APIClient.shared.bugReports.list(
+                page: page + 1, platform: platform, status: statusFilter
+            )
+            page += 1
             bugs += more
             hasMore = more.count >= APIPaging.pageSize
+        } catch {
+            toast.error(String(localized: "Couldn't load more bug reports."))
         }
         isLoadingMore = false
     }

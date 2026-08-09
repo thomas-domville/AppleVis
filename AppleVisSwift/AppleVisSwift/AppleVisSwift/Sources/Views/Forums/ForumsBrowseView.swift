@@ -33,6 +33,7 @@ struct ForumsBrowseView: View {
     @AccessibilityFocusState private var focusedTopicId: String?
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var toast: ToastStore
     @ObservedObject private var networkStatus = NetworkStatusStore.shared
 
     init(initialFilter: ForumFilter = .recent) {
@@ -253,10 +254,16 @@ struct ForumsBrowseView: View {
     private func loadMore() async {
         guard !isLoadingMore, hasMore else { return }
         isLoadingMore = true
-        page += 1
-        if let more = try? await APIClient.shared.forums.recent(page: page, appleOnly: appleTopicsFilter == .appleOnly) {
+        do {
+            // `page` only advances on success — a transient failure used to
+            // still increment it, permanently skipping that page's content
+            // once a later attempt succeeded.
+            let more = try await APIClient.shared.forums.recent(page: page + 1, appleOnly: appleTopicsFilter == .appleOnly)
+            page += 1
             topics += applyRefinements(to: more)
             hasMore = more.count >= APIPaging.pageSize
+        } catch {
+            toast.error(String(localized: "Couldn't load more topics."))
         }
         isLoadingMore = false
     }
