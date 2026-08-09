@@ -498,7 +498,7 @@ struct CommentRow: View {
 
     private func copyText() {
         UIPasteboard.general.string = text.strippingHTMLTags()
-        toast.success(String(localized: "Copied to clipboard."))
+        toast.success(String(localized: "Comment text copied."))
     }
 
     private func presentShareSheet() {

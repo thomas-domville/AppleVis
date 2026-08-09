@@ -413,7 +413,7 @@ struct SubmitAppView: View {
         UIAccessibility.post(
             notification: .announcement,
             argument: results.isEmpty
-                ? String(localized: "No results found")
+                ? String(localized: "No results")
                 : String(localized: "\(results.count) results found")
         )
     }

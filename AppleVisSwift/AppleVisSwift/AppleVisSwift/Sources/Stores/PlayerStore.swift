@@ -27,6 +27,8 @@ final class PlayerStore: ObservableObject {
     private var statusCancellable: AnyCancellable?
     private var cancellables = Set<AnyCancellable>()
     private var sleepTimer: Timer?
+    private var defaultSleepTimerSuppressed = false
+    private var wasPlayingBeforeInterruption = false
 
     // Per-episode saved playback position, in seconds.
     private var positions: [String: TimeInterval] = [:]
@@ -123,7 +125,7 @@ final class PlayerStore: ObservableObject {
     /// apply automatically on every new episode, not require re-picking it
     /// from the menu each time.
     private func applyDefaultSleepTimerIfNeeded() {
-        guard sleepTimerRemaining == nil, !sleepAtEndOfEpisode else { return }
+        guard sleepTimerRemaining == nil, !sleepAtEndOfEpisode, !defaultSleepTimerSuppressed else { return }
         let minutes = UserDefaults.standard.integer(forKey: "podcast.sleepTimer")
         guard minutes > 0 else { return }
         startSleepTimer(minutes: minutes)
@@ -233,6 +235,7 @@ final class PlayerStore: ObservableObject {
 
     func startSleepTimer(minutes: Int) {
         cancelSleepTimer()
+        defaultSleepTimerSuppressed = false
         sleepAtEndOfEpisode = false
         sleepTimerRemaining = TimeInterval(minutes * 60)
         sleepTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
@@ -243,6 +246,7 @@ final class PlayerStore: ObservableObject {
 
     func startSleepTimerAtEndOfEpisode() {
         cancelSleepTimer()
+        defaultSleepTimerSuppressed = false
         sleepAtEndOfEpisode = true
         UIAccessibility.post(notification: .announcement, argument: String(localized: "Sleep timer set for end of episode."))
     }
@@ -253,6 +257,11 @@ final class PlayerStore: ObservableObject {
     /// action (the player's "Turn Off" control) should announce this.
     func userCancelSleepTimer() {
         cancelSleepTimer()
+        // Otherwise a configured Settings > Podcasts default silently
+        // restarts the moment the next episode loads, contradicting the
+        // cancel the user just performed. Cleared by any explicit new timer
+        // action above, which is itself a fresh user choice.
+        defaultSleepTimerSuppressed = true
         UIAccessibility.post(notification: .announcement, argument: String(localized: "Sleep timer cancelled."))
     }
 
@@ -517,12 +526,19 @@ final class PlayerStore: ObservableObject {
 
         switch type {
         case .began:
+            // Only remember this as "we paused it" if playback was actually
+            // running — otherwise a call arriving while the user had already
+            // paused manually would still resume audio on `.ended` below,
+            // since the system's `shouldResume` hint has no idea the pause
+            // was intentional rather than interruption-caused.
+            wasPlayingBeforeInterruption = isPlaying
             if isPlaying { pause() }
         case .ended:
             let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
-            if AVAudioSession.InterruptionOptions(rawValue: optionsValue).contains(.shouldResume) {
+            if wasPlayingBeforeInterruption && AVAudioSession.InterruptionOptions(rawValue: optionsValue).contains(.shouldResume) {
                 play()
             }
+            wasPlayingBeforeInterruption = false
         @unknown default:
             break
         }

@@ -135,7 +135,7 @@ struct DiscoverView: View {
             !results.blogs.isEmpty, !results.podcasts.isEmpty, !results.bugs.isEmpty,
         ].filter { $0 }.count
         var message = total == 0
-            ? String(localized: "No results found")
+            ? String(localized: "No results")
             : "\(total) result\(total == 1 ? "" : "s") found in \(categoryCount) categor\(categoryCount == 1 ? "y" : "ies")."
         if !results.failedCategories.isEmpty {
             message += " Some results may be missing: \(results.failedCategories.joined(separator: ", "))."

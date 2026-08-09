@@ -147,7 +147,7 @@ struct SignInView: View {
             toast.success(String(localized: "Signed in as \(auth.user?.name ?? name)"))
             dismiss()
         } else {
-            signInError = auth.error ?? String(localized: "Sign in failed")
+            signInError = auth.error ?? "Sign in failed. Please try again."
             isErrorFocused = true
         }
     }

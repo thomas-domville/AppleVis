@@ -213,7 +213,7 @@ struct BugReportRow: View {
     }
 
     private var bugLabel: String {
-        let newLabel = newCount > 0 ? " \(newCount) new comment\(newCount == 1 ? "" : "s")." : ""
+        let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")." : ""
         return detailLevelLabel(
             title: bug.title,
             contentType: "\(bug.status.displayName), \(bug.severity.displayName) severity",

@@ -45,7 +45,7 @@ struct MiniPlayerView: View {
                         .font(.title3)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(String(localized: "Skip forward \(Int(preferences.skipForwardInterval)) seconds"))
+                .accessibilityLabel(String(localized: "Skip forward \(String(Int(preferences.skipForwardInterval))) seconds"))
 
                 Button {
                     player.stop()
@@ -194,7 +194,7 @@ struct FullPlayerView: View {
                     .font(.system(size: 34))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(String(localized: "Skip back \(Int(preferences.skipBackInterval)) seconds"))
+            .accessibilityLabel(String(localized: "Skip back \(String(Int(preferences.skipBackInterval))) seconds"))
             .frame(maxWidth: .infinity)
 
             Button {
@@ -215,7 +215,7 @@ struct FullPlayerView: View {
                     .font(.system(size: 34))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(String(localized: "Skip forward \(Int(preferences.skipForwardInterval)) seconds"))
+            .accessibilityLabel(String(localized: "Skip forward \(String(Int(preferences.skipForwardInterval))) seconds"))
             .frame(maxWidth: .infinity)
         }
     }
@@ -277,7 +277,14 @@ struct FullPlayerView: View {
                 .padding(.vertical, 8)
                 .glassEffect(in: Capsule())
         }
-        .accessibilityLabel(String(localized: "Sleep timer\(sleepTimerLabel.isEmpty ? "" : ": \(sleepTimerLabel)")"))
+        .accessibilityLabel(String(localized: sleepTimerAccessibilityLabel))
+    }
+
+    private var sleepTimerAccessibilityLabel: String.LocalizationValue {
+        if !player.sleepAtEndOfEpisode, !sleepTimerLabel.isEmpty {
+            return "Sleep Timer — \(sleepTimerLabel) remaining"
+        }
+        return "Sleep Timer"
     }
 
     private var sleepTimerLabel: String {

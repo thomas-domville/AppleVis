@@ -62,21 +62,21 @@ struct SearchResultsView: View {
                     .listRowSeparator(.hidden)
                 }
                 if !results.forums.isEmpty {
-                    Section("Forums (\(results.forums.count))") {
+                    Section("Forum Topics (\(String(results.forums.count)))") {
                         ForEach(results.forums) { topic in
                             ForumTopicRow(topic: topic)
                         }
                     }
                 }
                 if !results.apps.isEmpty {
-                    Section("Apps (\(results.apps.count))") {
+                    Section("Apps (\(String(results.apps.count)))") {
                         ForEach(results.apps) { app in
                             AppListingRow(app: app)
                         }
                     }
                 }
                 if !results.guides.isEmpty {
-                    Section("Guides (\(results.guides.count))") {
+                    Section("Resources (\(String(results.guides.count)))") {
                         ForEach(results.guides) { guide in
                             ResourceRow(resource: guide)
                         }

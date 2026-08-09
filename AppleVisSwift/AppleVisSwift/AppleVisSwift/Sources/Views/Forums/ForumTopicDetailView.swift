@@ -608,7 +608,7 @@ struct ReplyView: View {
 
     private func copyText() {
         UIPasteboard.general.string = reply.body.strippingHTMLTags()
-        toast.success(String(localized: "Copied to clipboard."))
+        toast.success(String(localized: "Comment text copied."))
     }
 
     /// Mirrors the old app's "Share Comment" action — shares the comment as

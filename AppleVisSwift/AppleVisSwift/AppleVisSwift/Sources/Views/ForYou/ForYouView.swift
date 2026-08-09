@@ -161,7 +161,7 @@ struct DownloadsView: View {
                 .refreshable {
                     downloads.applyAutoDeletePolicy()
                     SoundPlayer.shared.play(.refresh)
-                    UIAccessibility.post(notification: .announcement, argument: "Downloads refreshed.")
+                    UIAccessibility.post(notification: .announcement, argument: String(localized: "\("Downloads") refreshed"))
                 }
                 .themedList(preferences.colors)
             }

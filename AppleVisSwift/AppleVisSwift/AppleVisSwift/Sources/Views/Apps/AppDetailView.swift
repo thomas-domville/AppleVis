@@ -708,7 +708,7 @@ struct AppReviewRow: View {
 
     private func copyText() {
         UIPasteboard.general.string = review.body.strippingHTMLTags()
-        toast.success(String(localized: "Copied to clipboard."))
+        toast.success(String(localized: "Comment text copied."))
     }
 
     private func presentShareSheet() {

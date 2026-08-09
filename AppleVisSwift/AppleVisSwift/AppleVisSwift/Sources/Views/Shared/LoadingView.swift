@@ -1,12 +1,22 @@
 import SwiftUI
 
+/// Localizes a runtime `String` against the catalog the same way a literal
+/// passed directly to `Text("...")`/`Button("...")` would — needed anywhere
+/// a string arrives through a `String`-typed parameter, since that always
+/// resolves to `Text`'s/`Button`'s verbatim `StringProtocol` overload
+/// instead of the auto-matching `LocalizedStringKey` one, even when its
+/// value is character-for-character identical to a catalog key.
+private func localized(_ value: String) -> String {
+    String(localized: String.LocalizationValue(value))
+}
+
 struct LoadingView: View {
     var message: String = "Loading…"
 
     var body: some View {
         VStack(spacing: 12) {
             ProgressView()
-            Text(message)
+            Text(localized(message))
                 .foregroundStyle(.secondary)
                 .font(.subheadline)
         }
@@ -24,7 +34,7 @@ struct ErrorView: View {
                 .font(.system(size: 40))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
-            Text(message)
+            Text(localized(message))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
             Button("Retry") {
@@ -52,19 +62,19 @@ struct EmptyStateView: View {
                 .font(.system(size: 40))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
-            Text(title)
+            Text(localized(title))
                 .font(.headline)
-            Text(message)
+            Text(localized(message))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             if let primaryActionLabel, let primaryAction {
-                Button(primaryActionLabel, action: primaryAction)
+                Button(localized(primaryActionLabel), action: primaryAction)
                     .buttonStyle(.borderedProminent)
                     .padding(.top, 4)
             }
             if let secondaryActionLabel, let secondaryAction {
-                Button(secondaryActionLabel, action: secondaryAction)
+                Button(localized(secondaryActionLabel), action: secondaryAction)
                     .buttonStyle(.bordered)
             }
         }

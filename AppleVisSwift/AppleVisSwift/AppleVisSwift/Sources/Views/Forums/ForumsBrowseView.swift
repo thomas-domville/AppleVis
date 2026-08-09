@@ -152,7 +152,7 @@ struct ForumsBrowseView: View {
                     if auth.isSignedIn {
                         NavigationLink(destination: ComposeTopicView(onPosted: { topic in
                             topics.insert(topic, at: 0)
-                            focusOnTopic(topic.id)
+                            revealAndFocus(topic)
                         })) {
                             Image(systemName: "square.and.pencil")
                         }
@@ -210,6 +210,22 @@ struct ForumsBrowseView: View {
             try? await Task.sleep(for: .milliseconds(300))
             focusedTopicId = id
         }
+    }
+
+    /// Following/Saved render `localFilterItems` instead of `topicList` —
+    /// a completely different List that never wires up `focusedTopicId` at
+    /// all. Composing while one of those is active would insert the new
+    /// topic into `topics` (which isn't even on screen) and then try to
+    /// focus a row that doesn't exist in the rendered view, silently
+    /// stranding VoiceOver focus wherever it already was. `topics.insert`
+    /// bypasses `applyRefinements`, so the server-side filters (category,
+    /// Apple-only) don't need resetting here — the new topic is already
+    /// unconditionally visible in `filteredTopics` for every other filter.
+    private func revealAndFocus(_ topic: ForumTopic) {
+        if filter == .following || filter == .saved {
+            filter = .recent
+        }
+        focusOnTopic(topic.id)
     }
 
     private func load(reset: Bool) async {
