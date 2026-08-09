@@ -5,6 +5,7 @@ import SwiftUI
 struct MiniPlayerView: View {
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var toast: ToastStore
     @State private var showFullPlayer = false
 
     var body: some View {
@@ -70,6 +71,13 @@ struct MiniPlayerView: View {
             )
             .sheet(isPresented: $showFullPlayer) {
                 FullPlayerView()
+            }
+            // Previously `errorMessage` was set on a stream failure but
+            // nothing in the UI ever read it — a dropped connection just
+            // left playback silently stalled with no explanation anywhere.
+            .onChange(of: player.errorMessage) { _, message in
+                guard let message else { return }
+                toast.error(message)
             }
         }
     }
@@ -172,16 +180,22 @@ struct FullPlayerView: View {
             }
         }
         // Keyboard shortcuts — useful with a hardware keyboard (iPad/Mac Catalyst).
+        // `.opacity(0)` only hides these visually; `.accessibilityHidden(true)`
+        // is what actually keeps three unlabeled "Button" stops off the
+        // VoiceOver/Switch Control/Voice Control navigation order. Applied
+        // to this Group specifically, not the outer chain, so it doesn't
+        // hide the actual player content behind it.
         .background {
-            Button("") { player.togglePlayPause() }
-                .keyboardShortcut(.space, modifiers: [])
-                .opacity(0)
-            Button("") { Task { await player.skip(by: -preferences.skipBackInterval) } }
-                .keyboardShortcut(.leftArrow, modifiers: [])
-                .opacity(0)
-            Button("") { Task { await player.skip(by: preferences.skipForwardInterval) } }
-                .keyboardShortcut(.rightArrow, modifiers: [])
-                .opacity(0)
+            Group {
+                Button("") { player.togglePlayPause() }
+                    .keyboardShortcut(.space, modifiers: [])
+                Button("") { Task { await player.skip(by: -preferences.skipBackInterval) } }
+                    .keyboardShortcut(.leftArrow, modifiers: [])
+                Button("") { Task { await player.skip(by: preferences.skipForwardInterval) } }
+                    .keyboardShortcut(.rightArrow, modifiers: [])
+            }
+            .opacity(0)
+            .accessibilityHidden(true)
         }
     }
 

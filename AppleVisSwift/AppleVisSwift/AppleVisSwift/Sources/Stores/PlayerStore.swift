@@ -25,6 +25,8 @@ final class PlayerStore: ObservableObject {
     private var player: AVPlayer?
     private var timeObserver: Any?
     private var statusCancellable: AnyCancellable?
+    private var didFinishCancellable: AnyCancellable?
+    private var failureCancellable: AnyCancellable?
     private var cancellables = Set<AnyCancellable>()
     private var sleepTimer: Timer?
     private var defaultSleepTimerSuppressed = false
@@ -109,6 +111,7 @@ final class PlayerStore: ObservableObject {
 
         observeTime()
         observeDidFinish()
+        observeFailure()
         observeBuffering()
         updateNowPlayingInfo(episode: episode)
         setupRemoteCommands()
@@ -368,7 +371,7 @@ final class PlayerStore: ObservableObject {
 
     private func setupAudioSession() async {
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
             print("Audio session setup failed: \(error)")
@@ -415,8 +418,17 @@ final class PlayerStore: ObservableObject {
             }
     }
 
+    /// Assigning to `didFinishCancellable` (rather than `.store(in: &cancellables)`)
+    /// cancels the previous subscription automatically — this used to add a
+    /// new, never-removed subscription on every single episode load with no
+    /// `object:` filter, so after N episodes all N accumulated closures fired
+    /// on the next completion, each independently marking the episode
+    /// complete and calling `playNext()`, corrupting queue transitions with
+    /// multiple silent skips. Also now scoped to the specific player item.
     private func observeDidFinish() {
-        NotificationCenter.default.publisher(for: AVPlayerItem.didPlayToEndTimeNotification)
+        didFinishCancellable = NotificationCenter.default.publisher(
+            for: AVPlayerItem.didPlayToEndTimeNotification, object: player?.currentItem
+        )
             .sink { [weak self] _ in
                 guard let self else { return }
                 if let episode = self.currentEpisode {
@@ -431,7 +443,25 @@ final class PlayerStore: ObservableObject {
                 guard UserDefaults.standard.object(forKey: "podcast.autoPlay") as? Bool ?? true else { return }
                 Task { await self.playNext() }
             }
-            .store(in: &cancellables)
+    }
+
+    /// Previously nothing observed stream failures at all — `errorMessage`
+    /// was set once (a missing audio URL at `load()` time) and otherwise
+    /// never touched, so a stream dropping mid-playback just left
+    /// `isBuffering` stuck true forever with no error, no recovery, and
+    /// nothing in the UI even had a way to show `errorMessage` if it were
+    /// set. Now sets a friendly message and stops the stuck-buffering state
+    /// on either failure notification.
+    private func observeFailure() {
+        failureCancellable = NotificationCenter.default.publisher(
+            for: AVPlayerItem.failedToPlayToEndTimeNotification, object: player?.currentItem
+        )
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.errorMessage = String(localized: "Playback stopped — the connection to this episode was lost.")
+                self.isBuffering = false
+                self.pause()
+            }
     }
 
     private func removeTimeObserver() {

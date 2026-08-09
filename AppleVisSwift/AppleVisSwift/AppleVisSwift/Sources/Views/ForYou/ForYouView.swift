@@ -266,8 +266,17 @@ struct DownloadsView: View {
         )
     }
 
+    /// The play/pause button and its matching VoiceOver action both showed
+    /// a "Pause" affordance while this episode was the one actively
+    /// playing, but both always called `load()` — `load()`'s own guard
+    /// only resumes if `!isPlaying`, so tapping "Pause" while playing was a
+    /// complete no-op, both for sighted taps and VoiceOver's action.
     private func playDownloaded(_ meta: DownloadedEpisodeMeta) async {
-        await player.load(episode(for: meta))
+        if player.currentEpisode?.id == meta.id && player.isPlaying {
+            player.togglePlayPause()
+        } else {
+            await player.load(episode(for: meta))
+        }
     }
 
     private func formattedSize(_ bytes: Int64) -> String {
@@ -512,6 +521,18 @@ private struct SavedPodcastEpisodeCard: View {
         player.queue.contains { $0.id == episode.id }
     }
 
+    /// The play/pause button and its matching VoiceOver action both showed
+    /// a "Pause" affordance while this episode was actively playing, but
+    /// both always called `load()` — its own guard only resumes if
+    /// `!isPlaying`, so tapping "Pause" while playing was a complete no-op.
+    private func playOrToggle() async {
+        if isCurrentlyPlaying {
+            player.togglePlayPause()
+        } else {
+            await player.load(episode)
+        }
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             Button {
@@ -541,7 +562,7 @@ private struct SavedPodcastEpisodeCard: View {
             Spacer(minLength: 0)
 
             Button {
-                Task { await player.load(episode) }
+                Task { await playOrToggle() }
             } label: {
                 Image(systemName: isCurrentlyPlaying ? "pause.circle.fill" : "play.circle.fill")
                     .font(.title2)
@@ -570,7 +591,7 @@ private struct SavedPodcastEpisodeCard: View {
         )
         .readAloudAction(episode.title)
         .accessibilityAction(named: Text(isCurrentlyPlaying ? "Pause" : "Play")) {
-            Task { await player.load(episode) }
+            Task { await playOrToggle() }
         }
         .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to queue")) {
             if isQueued { player.removeFromQueue(id: episode.id) } else { player.enqueue(episode) }
