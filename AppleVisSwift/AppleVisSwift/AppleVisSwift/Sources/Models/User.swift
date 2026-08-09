@@ -10,16 +10,6 @@ struct AuthUser: Codable {
     var isAdmin: Bool { roles.contains("administrator") }
 }
 
-struct UserProfile: Identifiable, Codable {
-    let id: String
-    let uid: String
-    let name: String
-    let email: String?
-    let memberSince: Date
-    let postCount: Int
-    let profileUrl: String
-}
-
 struct SavedItem: Identifiable, Codable {
     let id: String
     let kind: ContentKind
