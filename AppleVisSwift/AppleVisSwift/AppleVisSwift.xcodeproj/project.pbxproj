@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		07E6340924CAAA98D16179C7 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 46851A2E07B18408855BF56A /* Foundation.framework */; };
+		906395BDB7486EF5FB6EBFD5 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 46851A2E07B18408855BF56A /* Foundation.framework */; };
 		DEC630EDC9D1B0626868AA5F /* AppleVisShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 349D7F728302C4405C947D9E /* AppleVisShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -18,6 +19,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 5DEB814E8E8E1F7621740F4A;
 			remoteInfo = AppleVisShareExtension;
+		};
+		9FF1F4B3E042D4CD937F90D1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E92FCDBE30085E49006E2C72 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E92FCDC530085E49006E2C72;
+			remoteInfo = AppleVisSwift;
 		};
 		D51922A28D1BECBDFB344491 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -48,10 +56,18 @@
 		4D4A25F764097BE700D35F23 /* ShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
 		9B70515002325C021087C8D7 /* ShareExtension-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "ShareExtension-Info.plist"; sourceTree = "<group>"; };
 		B26FCC675D17E003BD8CCAC5 /* AppleVisSwiftTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AppleVisSwiftTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CB75C66141A2E20E2FD0D1BA /* AppleVisSwiftUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AppleVisSwiftUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E92FCDC630085E49006E2C72 /* AppleVisSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AppleVisSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		4BF629389B6F2B489F6526E9 /* AppleVisSwiftUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			path = AppleVisSwiftUITests;
+			sourceTree = "<group>";
+		};
 		8633CF56CD4251223944B6E7 /* AppleVisSwiftTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -81,6 +97,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				07E6340924CAAA98D16179C7 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CDFAF6403E14AF6D76A36AD6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				906395BDB7486EF5FB6EBFD5 /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -119,6 +143,7 @@
 				E92FCDC730085E49006E2C72 /* Products */,
 				804394F72FB4E17B80A53698 /* Frameworks */,
 				8633CF56CD4251223944B6E7 /* AppleVisSwiftTests */,
+				4BF629389B6F2B489F6526E9 /* AppleVisSwiftUITests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -128,6 +153,7 @@
 				E92FCDC630085E49006E2C72 /* AppleVisSwift.app */,
 				349D7F728302C4405C947D9E /* AppleVisShareExtension.appex */,
 				B26FCC675D17E003BD8CCAC5 /* AppleVisSwiftTests.xctest */,
+				CB75C66141A2E20E2FD0D1BA /* AppleVisSwiftUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -206,6 +232,27 @@
 			productReference = E92FCDC630085E49006E2C72 /* AppleVisSwift.app */;
 			productType = "com.apple.product-type.application";
 		};
+		F734A5A428E113C79DDBE5B7 /* AppleVisSwiftUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 141812D594A6F4BAE8A33A95 /* Build configuration list for PBXNativeTarget "AppleVisSwiftUITests" */;
+			buildPhases = (
+				0C2F79F380C399627ABA3DC0 /* Sources */,
+				CDFAF6403E14AF6D76A36AD6 /* Frameworks */,
+				CB43A74D02F716467463662B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				658380136E41416048393A14 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				4BF629389B6F2B489F6526E9 /* AppleVisSwiftUITests */,
+			);
+			name = AppleVisSwiftUITests;
+			productName = AppleVisSwiftUITests;
+			productReference = CB75C66141A2E20E2FD0D1BA /* AppleVisSwiftUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -279,6 +326,7 @@
 				E92FCDC530085E49006E2C72 /* AppleVisSwift */,
 				5DEB814E8E8E1F7621740F4A /* AppleVisShareExtension */,
 				7C4F3B568F8F133A444ECAC4 /* AppleVisSwiftTests */,
+				F734A5A428E113C79DDBE5B7 /* AppleVisSwiftUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -298,6 +346,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CB43A74D02F716467463662B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E92FCDC430085E49006E2C72 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -308,6 +363,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		0C2F79F380C399627ABA3DC0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		690829B3F726C6540F3426FC /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -332,6 +394,12 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		658380136E41416048393A14 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = AppleVisSwift;
+			target = E92FCDC530085E49006E2C72 /* AppleVisSwift */;
+			targetProxy = 9FF1F4B3E042D4CD937F90D1 /* PBXContainerItemProxy */;
+		};
 		ED4D9E89D8A6D9C07F88DDA3 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = AppleVisSwift;
@@ -391,6 +459,45 @@
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		292DAE86F10CADE6480899DD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 97YM8TUSX8;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.applevis.AppleVisSwiftUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AppleVisSwift;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		4B8338396E2EC150A63D09CE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 97YM8TUSX8;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.applevis.AppleVisSwiftUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AppleVisSwift;
 			};
 			name = Debug;
 		};
@@ -631,6 +738,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		141812D594A6F4BAE8A33A95 /* Build configuration list for PBXNativeTarget "AppleVisSwiftUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				292DAE86F10CADE6480899DD /* Release */,
+				4B8338396E2EC150A63D09CE /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		5740F919517D6B147220D854 /* Build configuration list for PBXNativeTarget "AppleVisSwiftTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

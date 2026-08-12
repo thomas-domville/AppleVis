@@ -85,22 +85,19 @@ struct ForumTopicDetailView: View {
                         HStack {
                             AuthorProfileButton(name: "by \(detail.authorName)", authorId: detail.authorId)
                             Spacer()
-                            RelativeDateLabel(date: detail.createdAt)
+                            // A months-old topic with a comment three minutes
+                            // ago looked identical to one nobody's touched
+                            // since it was posted — only the original post
+                            // date showed anywhere near the top. Combined
+                            // into one line/one VoiceOver stop rather than a
+                            // separate swipe, per direct feedback.
+                            Text(postAndActivityDateText(detail))
                         }
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         Label(detail.category, systemImage: "bubble.left.and.bubble.right")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        // A months-old topic with a comment three minutes ago
-                        // looked identical to one nobody's touched since it
-                        // was posted — only the original post date showed
-                        // anywhere near the top. Reported directly.
-                        if detail.replyCount > 0 {
-                            Text("Last comment \(detail.lastActivityAt.formatted(.relative(presentation: .named)))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
                     }
                     .padding(.horizontal)
 
@@ -221,6 +218,12 @@ struct ForumTopicDetailView: View {
             .disabled(isSummarizing)
             .accessibilityLabel(String(localized: isSummarizing ? "Summarizing discussion, please wait" : "Summarize Discussion"))
         }
+    }
+
+    private func postAndActivityDateText(_ detail: ForumTopicDetail) -> String {
+        let posted = detail.createdAt.formatted(.relative(presentation: .named))
+        guard detail.replyCount > 0 else { return posted }
+        return "\(posted), last comment \(detail.lastActivityAt.formatted(.relative(presentation: .named)))"
     }
 
     private func summarizeThread(_ detail: ForumTopicDetail) async {

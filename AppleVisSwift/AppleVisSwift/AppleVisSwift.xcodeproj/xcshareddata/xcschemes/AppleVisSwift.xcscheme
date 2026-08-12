@@ -33,6 +33,19 @@
                ReferencedContainer = "container:AppleVisSwift.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F734A5A428E113C79DDBE5B7"
+               BuildableName = "AppleVisSwiftUITests.xctest"
+               ReferencedContainer = "container:AppleVisSwift.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -48,6 +61,15 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "7C4F3B568F8F133A444ECAC4"
                BuildableName = "AppleVisSwiftTests.xctest"
+               ReferencedContainer = "container:AppleVisSwift.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F734A5A428E113C79DDBE5B7"
+               BuildableName = "AppleVisSwiftUITests.xctest"
                ReferencedContainer = "container:AppleVisSwift.xcodeproj">
             </BuildableReference>
          </TestableReference>

@@ -175,8 +175,11 @@ struct HomeView: View {
             : (auth.user?.name.isEmpty == false ? .greeting : nil)
         if let target {
             Task {
-                try? await Task.sleep(for: .milliseconds(300))
-                focusTarget = target
+                for delayMs in [300, 550, 850] {
+                    try? await Task.sleep(for: .milliseconds(delayMs))
+                    focusTarget = nil
+                    focusTarget = target
+                }
             }
         }
     }
@@ -287,9 +290,25 @@ struct HomeView: View {
                             // moved the card visually but left a VoiceOver
                             // user's swipe cursor exactly where it was,
                             // making the action look like it did nothing.
+                            //
+                            // A single fixed delay isn't reliable: when the
+                            // target row is far down the list, List only
+                            // instantiates it once the scroll actually
+                            // reaches it, which can take longer than one
+                            // guessed delay on a slower device — and because
+                            // @AccessibilityFocusState only re-triggers on an
+                            // actual value change, re-assigning the exact
+                            // same case again is a no-op unless it's reset
+                            // to nil first. Reported directly: this looked
+                            // like it silently "forgot" where the user left
+                            // off. Retry the assignment across a spread of
+                            // delays instead of gambling on one.
                             Task {
-                                try? await Task.sleep(for: .milliseconds(400))
-                                focusTarget = .item(first.id)
+                                for delayMs in [150, 350, 600, 900] {
+                                    try? await Task.sleep(for: .milliseconds(delayMs))
+                                    focusTarget = nil
+                                    focusTarget = .item(first.id)
+                                }
                             }
                         },
                         onDismiss: { vm.isNewActivityDismissed = true }

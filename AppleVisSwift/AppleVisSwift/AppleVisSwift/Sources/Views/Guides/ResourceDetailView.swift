@@ -47,7 +47,11 @@ struct ResourceDetailView: View {
                             Label(detail.kind.displayName, systemImage: detail.kind.systemImage)
                                 .font(.caption).foregroundStyle(.secondary)
                             Spacer()
-                            RelativeDateLabel(date: detail.createdAt)
+                            // Combined into one line/one VoiceOver stop
+                            // rather than a separate swipe, per direct
+                            // feedback.
+                            Text(postAndActivityDateText(detail))
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                         Text(detail.title)
                             .font(.title2).fontWeight(.semibold)
@@ -57,10 +61,6 @@ struct ResourceDetailView: View {
                             .font(.subheadline).foregroundStyle(.secondary)
                         if !detail.categories.isEmpty {
                             Text(detail.categories.joined(separator: " · "))
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        if detail.commentCount > 0 {
-                            Text("Last comment \(detail.updatedAt.formatted(.relative(presentation: .named)))")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
@@ -212,6 +212,12 @@ struct ResourceDetailView: View {
             .disabled(isSummarizingDiscussion)
             .accessibilityLabel(isSummarizingDiscussion ? String(localized: "Summarizing discussion, please wait") : String(localized: "Summarize Discussion"))
         }
+    }
+
+    private func postAndActivityDateText(_ detail: ResourceDetail) -> String {
+        let posted = detail.createdAt.formatted(.relative(presentation: .named))
+        guard detail.commentCount > 0 else { return posted }
+        return "\(posted), last comment \(detail.updatedAt.formatted(.relative(presentation: .named)))"
     }
 
     private func summarizeDiscussion(_ detail: ResourceDetail) async {

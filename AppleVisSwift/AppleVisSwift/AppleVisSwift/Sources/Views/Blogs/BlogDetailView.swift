@@ -46,7 +46,11 @@ struct BlogDetailView: View {
                             Label("Blog", systemImage: "newspaper")
                                 .font(.caption).foregroundStyle(.secondary)
                             Spacer()
-                            RelativeDateLabel(date: detail.publishedAt)
+                            // Combined into one line/one VoiceOver stop
+                            // rather than a separate swipe, per direct
+                            // feedback.
+                            Text(postAndActivityDateText(detail))
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                         Text(detail.title)
                             .font(.title2).fontWeight(.semibold)
@@ -54,10 +58,6 @@ struct BlogDetailView: View {
                             .accessibilityFocused($isTitleFocused)
                         Text("by \(detail.authorName)")
                             .font(.subheadline).foregroundStyle(.secondary)
-                        if detail.commentCount > 0 {
-                            Text("Last comment \(detail.lastActivityAt.formatted(.relative(presentation: .named)))")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
                     }
                     .padding(.horizontal)
 
@@ -195,6 +195,12 @@ struct BlogDetailView: View {
             .disabled(isSummarizingDiscussion)
             .accessibilityLabel(String(localized: isSummarizingDiscussion ? "Summarizing discussion, please wait" : "Summarize Discussion"))
         }
+    }
+
+    private func postAndActivityDateText(_ detail: BlogPostDetail) -> String {
+        let posted = detail.publishedAt.formatted(.relative(presentation: .named))
+        guard detail.commentCount > 0 else { return posted }
+        return "\(posted), last comment \(detail.lastActivityAt.formatted(.relative(presentation: .named)))"
     }
 
     private func summarizeDiscussion(_ detail: BlogPostDetail) async {
