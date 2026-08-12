@@ -59,6 +59,20 @@ func byAuthorAndCount(_ author: String, _ count: String) -> String {
     author.isEmpty ? count : "by \(author), \(count)"
 }
 
+/// Omits the leading space when `category` is blank (a topic whose url
+/// didn't resolve to a category) rather than reading as a bare, leading-
+/// space "topic". Reported directly by a VoiceOver user.
+func forumContentType(category: String) -> String {
+    category.isEmpty ? "topic" : "\(category) topic"
+}
+
+/// Some show titles already end in "Podcast" (e.g. "AppleVis Podcast") —
+/// appending " podcast" unconditionally read as "AppleVis Podcast podcast".
+/// Reported via a live transcript.
+func podcastContentType(showTitle: String) -> String {
+    showTitle.localizedCaseInsensitiveContains("podcast") ? showTitle : "\(showTitle) podcast"
+}
+
 func detailLevelLabel(
     title: String,
     contentType: String,
@@ -177,11 +191,7 @@ struct ForumTopicRow: View {
             // "<show> podcast". Reported by a VoiceOver user: different
             // content kinds on Home read structurally differently with no
             // way to tell them apart by ear.
-            // categoryFromForumURL falls back to "" when a topic's url
-            // doesn't match /forum/{category}/{slug} (e.g. an unaliased
-            // /node/{nid} path) — omit the leading space rather than
-            // reading as a bare, uninformative "topic".
-            contentType: topic.category.isEmpty ? "topic" : "\(topic.category) topic",
+            contentType: forumContentType(category: topic.category),
             authorAndCount: byAuthorAndCount(topic.authorName, "\(topic.replyCount) comment\(topic.replyCount == 1 ? "" : "s")"),
             date: topic.lastActivityAt.formatted(.relative(presentation: .named)),
             alwaysAppend: "\(savedFollowingLabel)\(newLabel)"
@@ -324,11 +334,7 @@ struct PodcastEpisodeRow: View {
         let authorAndCount = [durationText, countText].filter { !$0.isEmpty }.joined(separator: ", ")
         return detailLevelLabel(
             title: episode.title,
-            // Some show titles already end in "Podcast" (e.g. "AppleVis
-            // Podcast") — appending " podcast" unconditionally read as
-            // "AppleVis Podcast podcast". Reported via a live transcript.
-            contentType: episode.showTitle.localizedCaseInsensitiveContains("podcast")
-                ? episode.showTitle : "\(episode.showTitle) podcast",
+            contentType: podcastContentType(showTitle: episode.showTitle),
             authorAndCount: authorAndCount,
             date: episode.publishedAt.formatted(.relative(presentation: .named)),
             alwaysAppend: "\(savedQueuedLabel)\(newLabel)"

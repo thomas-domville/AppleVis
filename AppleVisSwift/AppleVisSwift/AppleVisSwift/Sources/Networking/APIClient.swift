@@ -38,6 +38,24 @@ enum APIError: LocalizedError {
     }
 }
 
+extension APIError: Equatable {
+    static func == (lhs: APIError, rhs: APIError) -> Bool {
+        switch (lhs, rhs) {
+        case (.network, .network): return true
+        case (.timeout, .timeout): return true
+        case (.unauthorized, .unauthorized): return true
+        case (.forbidden, .forbidden): return true
+        case (.rateLimited, .rateLimited): return true
+        case (.server(let a), .server(let b)): return a == b
+        case (.decoding, .decoding): return true
+        case (.notFound, .notFound): return true
+        case (.unknown(let a), .unknown(let b)): return a == b
+        case (.offlineNoCache(let a), .offlineNoCache(let b)): return a == b
+        default: return false
+        }
+    }
+}
+
 // MARK: - HTTP client
 
 final class APIClient {
