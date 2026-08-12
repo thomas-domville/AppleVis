@@ -119,18 +119,16 @@ struct ContentActionsModifier: ViewModifier {
                     .accessibilityHidden(true)
                 }
             }
-            // VoiceOver's own "show context menu" gesture surfaces every
-            // item in a .contextMenu directly from the native menu
-            // presentation — that path ignores .accessibilityHidden on the
-            // individual buttons (confirmed: hiding them did not stop the
-            // duplication). Every one of these actions is already reachable
-            // through the explicit .accessibilityAction block below, so the
-            // menu itself is only attached at all when VoiceOver is off —
-            // sighted long-press users keep the full menu, VoiceOver users
-            // get exactly one copy of each action via the Actions rotor.
-            // Reported directly: "Save"/"Share" each showing up twice, for
-            // both VoiceOver and sighted users navigating the open menu.
-            .modifier(ConditionalContextMenu(isActive: !UIAccessibility.isVoiceOverRunning) {
+            // Previously gated to `!UIAccessibility.isVoiceOverRunning` to
+            // stop Save/Share appearing twice when reading through the open
+            // menu — but that also removed VoiceOver's own long-press
+            // gesture entirely, since it's what opens this exact menu.
+            // Reported directly: "long press doesn't seem to be working."
+            // A non-functional gesture is worse than an occasional
+            // duplicate, so this is back to unconditional; the duplication
+            // needs a more targeted fix (likely to the menu content itself,
+            // not to whether the menu is attached at all).
+            .contextMenu {
                 extraMenuItems
                 if newCount > 0 {
                     Button { markAsRead() } label: {
@@ -181,7 +179,7 @@ struct ContentActionsModifier: ViewModifier {
                         Label("Delete \(kind.displayName)", systemImage: "trash")
                     }
                 }
-            })
+            }
             .accessibilityAction(named: Text(isSaved ? "Unsave \(kind.saveActionNoun)" : "Save \(kind.saveActionNoun)")) {
                 toggleSave()
             }
@@ -477,24 +475,6 @@ struct ConditionalAccessibilityAction: ViewModifier {
     func body(content: Content) -> some View {
         if isActive {
             content.accessibilityAction(named: Text(name), action)
-        } else {
-            content
-        }
-    }
-}
-
-/// Attaches `.contextMenu` only when `isActive` — used to omit the whole
-/// menu while VoiceOver is running, since its native "show context menu"
-/// gesture exposes every item directly regardless of `.accessibilityHidden`
-/// on the individual buttons, duplicating the explicit `.accessibilityAction`
-/// equivalents that are the real, single VoiceOver source of truth.
-private struct ConditionalContextMenu<MenuItems: View>: ViewModifier {
-    let isActive: Bool
-    @ViewBuilder let menuItems: () -> MenuItems
-
-    func body(content: Content) -> some View {
-        if isActive {
-            content.contextMenu { menuItems() }
         } else {
             content
         }
