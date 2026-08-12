@@ -229,6 +229,12 @@ struct PodcastEpisodeRow: View {
                         if newCount > 0 {
                             NewCountBadge(count: newCount)
                         }
+                        if episode.isSaved {
+                            Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
+                        }
+                        if isQueued {
+                            Image(systemName: "text.badge.plus").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
+                        }
                         RelativeDateLabel(date: episode.publishedAt)
                     }
                 }
@@ -325,8 +331,21 @@ struct PodcastEpisodeRow: View {
                 ? episode.showTitle : "\(episode.showTitle) podcast",
             authorAndCount: authorAndCount,
             date: episode.publishedAt.formatted(.relative(presentation: .named)),
-            alwaysAppend: newLabel
+            alwaysAppend: "\(savedQueuedLabel)\(newLabel)"
         )
+    }
+
+    // Mirrors ForumTopicRow's savedFollowingLabel — episode.isSaved existed
+    // on the model but was never surfaced here, and the live player queue
+    // state had no VoiceOver announcement at all. Reported directly: saved/
+    // queued state used to be announced on cards and no longer is.
+    private var savedQueuedLabel: String {
+        switch (episode.isSaved, isQueued) {
+        case (true, true): return ". Saved, queued."
+        case (true, false): return ". Saved."
+        case (false, true): return ". Queued."
+        case (false, false): return ""
+        }
     }
 }
 
@@ -362,6 +381,9 @@ struct AppListingRow: View {
                         Spacer()
                         if newCount > 0 {
                             NewCountBadge(count: newCount)
+                        }
+                        if app.isSaved {
+                            Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
                         }
                         RelativeDateLabel(date: app.lastActivityAt)
                     }
@@ -415,7 +437,7 @@ struct AppListingRow: View {
             // "comment(s)"; matched for consistency, reported directly.
             authorAndCount: byAuthorAndCount(app.developer, "\(app.reviewCount) comment\(app.reviewCount == 1 ? "" : "s")"),
             date: app.lastActivityAt.formatted(.relative(presentation: .named)),
-            alwaysAppend: newLabel
+            alwaysAppend: "\(app.isSaved ? ". Saved." : "")\(newLabel)"
         )
     }
 }
@@ -436,6 +458,9 @@ struct ResourceRow: View {
                     Spacer()
                     if newCount > 0 {
                         NewCountBadge(count: newCount)
+                    }
+                    if resource.isSaved {
+                        Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
                     }
                     RelativeDateLabel(date: resource.updatedAt)
                 }
@@ -474,7 +499,7 @@ struct ResourceRow: View {
             contentType: resource.kind.displayName,
             authorAndCount: byAuthorAndCount(resource.authorName, "\(resource.commentCount) comment\(resource.commentCount == 1 ? "" : "s")"),
             date: resource.updatedAt.formatted(.relative(presentation: .named)),
-            alwaysAppend: newLabel
+            alwaysAppend: "\(resource.isSaved ? ". Saved." : "")\(newLabel)"
         )
     }
 }
@@ -495,6 +520,9 @@ struct BlogPostRow: View {
                     Spacer()
                     if newCount > 0 {
                         NewCountBadge(count: newCount)
+                    }
+                    if post.isSaved {
+                        Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
                     }
                     RelativeDateLabel(date: post.lastActivityAt)
                 }
@@ -537,7 +565,7 @@ struct BlogPostRow: View {
             contentType: "Blog post",
             authorAndCount: byAuthorAndCount(post.authorName, "\(post.commentCount) comment\(post.commentCount == 1 ? "" : "s")"),
             date: post.lastActivityAt.formatted(.relative(presentation: .named)),
-            alwaysAppend: newLabel
+            alwaysAppend: "\(post.isSaved ? ". Saved." : "")\(newLabel)"
         )
     }
 }

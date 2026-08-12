@@ -43,8 +43,8 @@ enum Mappers {
             categoryId: taxId ?? "",
             url: url,
             isUnread: false,
-            isFollowing: false,
-            isSaved: false
+            isFollowing: PersistenceStore.shared.isFollowed(id: node.id),
+            isSaved: PersistenceStore.shared.isSaved(id: node.id)
         )
     }
 
@@ -74,6 +74,16 @@ enum Mappers {
         let created = item["created"]?.doubleValue ?? 0
         let replyCount = item["comment_count"]?.intValue ?? 0
         let urlPath = item["url"]?.stringValue ?? ""
+        // Confirmed via a live repro: /api/v1/forums/recent has returned an
+        // item whose uuid actually belongs to an App Directory node, not a
+        // forum topic — its url was the app's real /apps/... page (which is
+        // why "Open in Browser" worked fine), but the app rendered it as a
+        // topic (bare "topic", blank category from categoryFromForumURL)
+        // and 400'd on open (node/forum/{uuid} doesn't resolve, since the
+        // node's actual bundle isn't "forum"). Reject anything that isn't
+        // genuinely a /forum/{category}/{slug} URL rather than show a
+        // broken, erroring card for content that isn't a forum topic.
+        guard isForumURL(urlPath) else { return nil }
         return ForumTopic(
             id: uuid,
             title: item["title"]?.stringValue ?? "",
@@ -91,11 +101,20 @@ enum Mappers {
         )
     }
 
+    private static func forumURLParts(_ urlString: String) -> [String]? {
+        guard let url = URL(string: urlString) ?? URL(string: base + urlString) else { return nil }
+        let parts = url.path.split(separator: "/").map(String.init)
+        guard parts.count >= 2, parts[0] == "forum" else { return nil }
+        return parts
+    }
+
+    private static func isForumURL(_ urlString: String) -> Bool {
+        forumURLParts(urlString) != nil
+    }
+
     /// e.g. "/forum/apple-beta-releases/some-topic" -> "Apple Beta Releases"
     private static func categoryFromForumURL(_ urlString: String) -> String {
-        guard let url = URL(string: urlString) ?? URL(string: base + urlString) else { return "" }
-        let parts = url.path.split(separator: "/").map(String.init)
-        guard parts.count >= 2, parts[0] == "forum" else { return "" }
+        guard let parts = forumURLParts(urlString) else { return "" }
         return parts[1]
             .split(separator: "-")
             .map { $0.prefix(1).uppercased() + $0.dropFirst() }
@@ -181,7 +200,7 @@ enum Mappers {
             commentCount: a["comment_node_podcast"]?["comment_count"]?.intValue ?? 0,
             authorName: authorName,
             url: url,
-            isSaved: false,
+            isSaved: PersistenceStore.shared.isSaved(id: node.id),
             isDownloaded: false,
             downloadProgress: nil
         )
@@ -252,7 +271,7 @@ enum Mappers {
             voiceOverPerformance: a["field_voiceover"]?.stringValue,
             summary: a["body"]?.richTextSummary ?? a["body"]?.richTextValue ?? "",
             url: url,
-            isSaved: false
+            isSaved: PersistenceStore.shared.isSaved(id: node.id)
         )
     }
 
@@ -293,7 +312,7 @@ enum Mappers {
             summary: a["body"]?.richTextSummary ?? a["body"]?.richTextValue ?? "",
             commentCount: a["comment_node_blog2"]?["comment_count"]?.intValue ?? 0,
             url: url,
-            isSaved: false
+            isSaved: PersistenceStore.shared.isSaved(id: node.id)
         )
     }
 
@@ -340,7 +359,7 @@ enum Mappers {
             updatedAt: node.changedDate,
             commentCount: a["comment_node_guides"]?["comment_count"]?.intValue ?? 0,
             url: url,
-            isSaved: false
+            isSaved: PersistenceStore.shared.isSaved(id: node.id)
         )
     }
 
