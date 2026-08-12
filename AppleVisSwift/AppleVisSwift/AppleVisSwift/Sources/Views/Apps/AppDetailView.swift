@@ -148,12 +148,23 @@ struct AppDetailView: View {
                     }
                 }
                 .font(.caption).foregroundStyle(.secondary)
+                Text(submittedAndReviewedText(detail))
+                    .font(.caption2).foregroundStyle(.secondary)
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "\(detail.name) by \(detail.developer), \(detail.platform.displayName), \(detail.price)"))
+        .accessibilityLabel(String(localized: "\(detail.name) by \(detail.developer), \(detail.platform.displayName), \(detail.price), \(submittedAndReviewedText(detail))"))
         .accessibilityAddTraits(.isHeader)
         .accessibilityFocused($isTitleFocused)
+    }
+
+    // A submission from 4 months ago and one reviewed 3 minutes ago looked
+    // identical here — nothing distinguished a stale listing from an
+    // actively-discussed one. Reported directly.
+    private func submittedAndReviewedText(_ detail: AppDetail) -> String {
+        let submitted = "Submitted \(detail.createdAt.formatted(.relative(presentation: .named)))"
+        guard detail.reviewCount > 0 else { return submitted }
+        return "\(submitted), last reviewed \(detail.lastUpdatedAt.formatted(.relative(presentation: .named)))"
     }
 
     private func appStoreInfoSection(_ meta: ItunesMetadata) -> some View {

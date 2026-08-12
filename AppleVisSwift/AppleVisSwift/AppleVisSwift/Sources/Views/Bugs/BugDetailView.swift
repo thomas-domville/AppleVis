@@ -9,8 +9,6 @@ struct BugDetailView: View {
     @State private var hasMoreComments = true
     @State private var showCompose = false
     @State private var quotedComment: BugComment?
-    @State private var bugSummary: String?
-    @State private var isSummarizingBug = false
     @State private var discussionSummary: String?
     @State private var isSummarizingDiscussion = false
     @AccessibilityFocusState private var isTitleFocused: Bool
@@ -154,39 +152,14 @@ struct BugDetailView: View {
     /// all, the last content-detail screen without it.
     @ViewBuilder
     private func aiSummarySection(_ detail: BugReportDetail) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            bugSummaryRow(detail)
-            if detail.comments.count >= 5 {
-                Divider()
+        if detail.comments.count >= 5 {
+            VStack(alignment: .leading, spacing: 12) {
                 discussionSummaryRow(detail)
             }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .tintedBackground(Color.accentColor, opacity: 0.08, cornerRadius: 10)
-        .padding(.horizontal)
-    }
-
-    @ViewBuilder
-    private func bugSummaryRow(_ detail: BugReportDetail) -> some View {
-        if let bugSummary {
-            VStack(alignment: .leading, spacing: 4) {
-                Label("Bug Report Summary", systemImage: "sparkles")
-                    .font(.caption).fontWeight(.bold).foregroundStyle(Color.accentColor)
-                Text(bugSummary).font(.subheadline)
-            }
-        } else {
-            Button {
-                Task { await summarizeBug(detail) }
-            } label: {
-                if isSummarizingBug {
-                    HStack(spacing: 8) { ProgressView(); Text("Summarizing…") }
-                } else {
-                    Label("Summarize Bug Report", systemImage: "sparkles")
-                }
-            }
-            .disabled(isSummarizingBug)
-            .accessibilityLabel(String(localized: isSummarizingBug ? "Summarizing bug report, please wait" : "Summarize Bug Report"))
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .tintedBackground(Color.accentColor, opacity: 0.08, cornerRadius: 10)
+            .padding(.horizontal)
         }
     }
 
@@ -211,26 +184,6 @@ struct BugDetailView: View {
             .disabled(isSummarizingDiscussion)
             .accessibilityLabel(String(localized: isSummarizingDiscussion ? "Summarizing discussion, please wait" : "Summarize Discussion"))
         }
-    }
-
-    private func summarizeBug(_ detail: BugReportDetail) async {
-        isSummarizingBug = true
-        UIAccessibility.post(notification: .announcement, argument: "Summarizing bug report. This may take a moment.")
-        var parts = ["Bug report: \(detail.title)", detail.body.strippingHTMLTags().prefix(1500).description]
-        if let steps = detail.stepsToReproduce, !steps.isEmpty {
-            parts.append("Steps to reproduce: \(steps.strippingHTMLTags().prefix(800))")
-        }
-        if let workaround = detail.workaround, !workaround.isEmpty {
-            parts.append("Workaround: \(workaround.strippingHTMLTags().prefix(500))")
-        }
-        let input = parts.joined(separator: "\n\n")
-        if let summary = await IntelligenceService.summarize(input) {
-            bugSummary = summary
-        } else {
-            toast.error(String(localized: "Couldn't generate a summary for this bug report. Try again."))
-            UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a summary for this bug report.")
-        }
-        isSummarizingBug = false
     }
 
     private func summarizeDiscussion(_ detail: BugReportDetail) async {

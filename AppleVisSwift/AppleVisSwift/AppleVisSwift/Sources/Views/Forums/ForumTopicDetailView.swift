@@ -18,8 +18,6 @@ struct ForumTopicDetailView: View {
     @EnvironmentObject private var tips: TipStore
     @State private var threadSummary: String?
     @State private var isSummarizing = false
-    @State private var postSummary: String?
-    @State private var isSummarizingPost = false
     @State private var showBrowser = false
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedReplyId: String?
@@ -94,6 +92,15 @@ struct ForumTopicDetailView: View {
                         Label(detail.category, systemImage: "bubble.left.and.bubble.right")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        // A months-old topic with a comment three minutes ago
+                        // looked identical to one nobody's touched since it
+                        // was posted — only the original post date showed
+                        // anywhere near the top. Reported directly.
+                        if detail.replyCount > 0 {
+                            Text("Last comment \(detail.lastActivityAt.formatted(.relative(presentation: .named)))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     .padding(.horizontal)
 
@@ -179,47 +186,16 @@ struct ForumTopicDetailView: View {
         }
     }
 
-    /// Split into two independent actions (matching the old app): "Summarize
-    /// Post" covers just the original post so a user can get its gist
-    /// before deciding to read replies at all, while "Summarize Discussion"
-    /// covers only the replies. Previously this was a single "Summarize
-    /// Thread" action that always included both together.
     @ViewBuilder
     private func summarizeSection(_ detail: ForumTopicDetail) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            summarizePostRow(detail)
-            if detail.replies.count >= 5 {
-                Divider()
+        if detail.replies.count >= 5 {
+            VStack(alignment: .leading, spacing: 12) {
                 summarizeDiscussionRow(detail)
             }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
-        .padding(.horizontal)
-    }
-
-    @ViewBuilder
-    private func summarizePostRow(_ detail: ForumTopicDetail) -> some View {
-        if let postSummary {
-            VStack(alignment: .leading, spacing: 4) {
-                Label("Post Summary", systemImage: "sparkles")
-                    .font(.caption).fontWeight(.bold)
-                    .foregroundStyle(Color.accentColor)
-                Text(postSummary).font(.subheadline)
-            }
-        } else {
-            Button {
-                Task { await summarizePost(detail) }
-            } label: {
-                if isSummarizingPost {
-                    HStack(spacing: 8) { ProgressView(); Text("Summarizing…") }
-                } else {
-                    Label("Summarize Post", systemImage: "sparkles")
-                }
-            }
-            .disabled(isSummarizingPost)
-            .accessibilityLabel(String(localized: isSummarizingPost ? "Summarizing post, please wait" : "Summarize Post"))
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal)
         }
     }
 
@@ -245,19 +221,6 @@ struct ForumTopicDetailView: View {
             .disabled(isSummarizing)
             .accessibilityLabel(String(localized: isSummarizing ? "Summarizing discussion, please wait" : "Summarize Discussion"))
         }
-    }
-
-    private func summarizePost(_ detail: ForumTopicDetail) async {
-        isSummarizingPost = true
-        UIAccessibility.post(notification: .announcement, argument: "Summarizing post. This may take a moment.")
-        let input = "Forum topic: \(detail.title)\n\n\(detail.body.strippingHTMLTags().prefix(3000))"
-        if let summary = await IntelligenceService.summarize(input) {
-            postSummary = summary
-        } else {
-            toast.error(String(localized: "Couldn't generate a summary for this post. Try again."))
-            UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a summary for this post.")
-        }
-        isSummarizingPost = false
     }
 
     private func summarizeThread(_ detail: ForumTopicDetail) async {

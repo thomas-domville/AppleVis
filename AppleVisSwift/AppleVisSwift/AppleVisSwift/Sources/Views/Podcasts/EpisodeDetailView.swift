@@ -161,11 +161,16 @@ struct EpisodeDetailView: View {
                     }
                     RelativeDateLabel(date: episode.publishedAt)
                 }
+                if episode.commentCount > 0 {
+                    Text("Last comment \(episode.lastActivityAt.formatted(.relative(presentation: .named)))")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
             }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            String(localized: "\(episode.title) by \(episode.showTitle)") +
+            String(localized: "\(episode.title) by \(episode.showTitle), published \(episode.publishedAt.formatted(.relative(presentation: .named)))") +
+            (episode.commentCount > 0 ? String(localized: ", last comment \(episode.lastActivityAt.formatted(.relative(presentation: .named)))") : "") +
             (artworkDescription.map { String(localized: ". Artwork \($0)") } ?? "")
         )
         .accessibilityAddTraits(.isHeader)

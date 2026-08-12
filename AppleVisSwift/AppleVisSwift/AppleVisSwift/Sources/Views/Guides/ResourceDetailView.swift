@@ -10,8 +10,6 @@ struct ResourceDetailView: View {
     @State private var quotedComment: ResourceComment?
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
-    @State private var guideSummary: String?
-    @State private var isSummarizingGuide = false
     @State private var discussionSummary: String?
     @State private var isSummarizingDiscussion = false
     @AccessibilityFocusState private var isTitleFocused: Bool
@@ -49,7 +47,7 @@ struct ResourceDetailView: View {
                             Label(detail.kind.displayName, systemImage: detail.kind.systemImage)
                                 .font(.caption).foregroundStyle(.secondary)
                             Spacer()
-                            RelativeDateLabel(date: detail.updatedAt)
+                            RelativeDateLabel(date: detail.createdAt)
                         }
                         Text(detail.title)
                             .font(.title2).fontWeight(.semibold)
@@ -59,6 +57,10 @@ struct ResourceDetailView: View {
                             .font(.subheadline).foregroundStyle(.secondary)
                         if !detail.categories.isEmpty {
                             Text(detail.categories.joined(separator: " · "))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        if detail.commentCount > 0 {
+                            Text("Last comment \(detail.updatedAt.formatted(.relative(presentation: .named)))")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
@@ -176,45 +178,16 @@ struct ResourceDetailView: View {
         }
     }
 
-    /// Two independent AI actions, matching Forums/Apps: one summarizes just
-    /// the guide's own text, the other summarizes the comment discussion —
-    /// previously ResourceDetailView had no Apple Intelligence integration
-    /// at all despite it being used elsewhere in the app.
     @ViewBuilder
     private func aiSummarySection(_ detail: ResourceDetail) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            guideSummaryRow(detail)
-            if detail.comments.count >= 5 {
-                Divider()
+        if detail.comments.count >= 5 {
+            VStack(alignment: .leading, spacing: 12) {
                 discussionSummaryRow(detail)
             }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
-        .padding(.horizontal)
-    }
-
-    @ViewBuilder
-    private func guideSummaryRow(_ detail: ResourceDetail) -> some View {
-        if let guideSummary {
-            VStack(alignment: .leading, spacing: 4) {
-                Label("Guide Summary", systemImage: "sparkles")
-                    .font(.caption).fontWeight(.bold).foregroundStyle(Color.accentColor)
-                Text(guideSummary).font(.subheadline)
-            }
-        } else {
-            Button {
-                Task { await summarizeGuide(detail) }
-            } label: {
-                if isSummarizingGuide {
-                    HStack(spacing: 8) { ProgressView(); Text("Summarizing…") }
-                } else {
-                    Label("Summarize Guide", systemImage: "sparkles")
-                }
-            }
-            .disabled(isSummarizingGuide)
-            .accessibilityLabel(isSummarizingGuide ? String(localized: "Summarizing guide, please wait") : String(localized: "Summarize Guide"))
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal)
         }
     }
 
@@ -239,19 +212,6 @@ struct ResourceDetailView: View {
             .disabled(isSummarizingDiscussion)
             .accessibilityLabel(isSummarizingDiscussion ? String(localized: "Summarizing discussion, please wait") : String(localized: "Summarize Discussion"))
         }
-    }
-
-    private func summarizeGuide(_ detail: ResourceDetail) async {
-        isSummarizingGuide = true
-        UIAccessibility.post(notification: .announcement, argument: "Summarizing guide. This may take a moment.")
-        let input = "Guide: \(detail.title)\n\n\(detail.body.strippingHTMLTags().prefix(3000))"
-        if let summary = await IntelligenceService.summarize(input) {
-            guideSummary = summary
-        } else {
-            toast.error(String(localized: "Couldn't generate a summary for this guide. Try again."))
-            UIAccessibility.post(notification: .announcement, argument: "Couldn't generate a summary for this guide.")
-        }
-        isSummarizingGuide = false
     }
 
     private func summarizeDiscussion(_ detail: ResourceDetail) async {
