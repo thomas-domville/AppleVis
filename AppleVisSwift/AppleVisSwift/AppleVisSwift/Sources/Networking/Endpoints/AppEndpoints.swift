@@ -78,7 +78,12 @@ struct AppEndpoints {
                 query: ["filter[entity_id.id]": id, "sort": "-created", "page[limit]": "100", "include": "uid"]
             )
 
-            let appResponse = try await appRes
+            let appResponse: JsonApiSingleResponse
+            do {
+                appResponse = try await appRes
+            } catch APIError.unknown(400) {
+                throw APIError.notFound
+            }
             let node = appResponse.data
             let a = node.attributes
             let listing = Mappers.app(node, included: appResponse.included ?? [])

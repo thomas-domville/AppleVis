@@ -41,7 +41,12 @@ struct ResourceEndpoints {
                 "comment/comment_node_guides",
                 query: ["filter[entity_id.id]": id, "sort": "created", "page[limit]": "100", "include": "uid"]
             )
-            let response = try await resourceRes
+            let response: JsonApiSingleResponse
+            do {
+                response = try await resourceRes
+            } catch APIError.unknown(400) {
+                throw APIError.notFound
+            }
             let node = response.data
             let resource = Mappers.resource(node, included: response.included ?? [])
             let body = node.attributes["body"]?.richTextValue ?? ""
@@ -125,7 +130,12 @@ struct BlogEndpoints {
                 "comment/comment_node_\(Self.contentType)",
                 query: ["filter[entity_id.id]": id, "sort": "created", "page[limit]": "100", "include": "uid"]
             )
-            let response = try await postRes
+            let response: JsonApiSingleResponse
+            do {
+                response = try await postRes
+            } catch APIError.unknown(400) {
+                throw APIError.notFound
+            }
             let node = response.data
             let post = Mappers.blog(node, included: response.included ?? [])
             let body = node.attributes["body"]?.richTextValue ?? ""
@@ -219,7 +229,12 @@ struct BugReportEndpoints {
                 "comment/\(commentBundle(for: platform))",
                 query: ["filter[entity_id.id]": id, "sort": "created", "page[limit]": "100", "include": "uid"]
             )
-            let response = try await nodeRes
+            let response: JsonApiSingleResponse
+            do {
+                response = try await nodeRes
+            } catch APIError.unknown(400) {
+                throw APIError.notFound
+            }
             var detail = Mappers.bugDetail(response.data, platform: platform)
             if let commentsResponse = try? await commentsRes {
                 detail.comments = commentsResponse.data.map { n in

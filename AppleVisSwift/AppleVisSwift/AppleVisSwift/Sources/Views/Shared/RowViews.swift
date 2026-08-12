@@ -142,7 +142,7 @@ struct ForumTopicRow: View {
                         Text("by \(topic.authorName)")
                     }
                     Spacer()
-                    ActivityCountLabel(count: topic.replyCount, noun: "reply")
+                    ActivityCountLabel(count: topic.replyCount, noun: "comment")
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -177,8 +177,12 @@ struct ForumTopicRow: View {
             // "<show> podcast". Reported by a VoiceOver user: different
             // content kinds on Home read structurally differently with no
             // way to tell them apart by ear.
-            contentType: "\(topic.category) topic",
-            authorAndCount: byAuthorAndCount(topic.authorName, "\(topic.replyCount) repl\(topic.replyCount == 1 ? "y" : "ies")"),
+            // categoryFromForumURL falls back to "" when a topic's url
+            // doesn't match /forum/{category}/{slug} (e.g. an unaliased
+            // /node/{nid} path) — omit the leading space rather than
+            // reading as a bare, uninformative "topic".
+            contentType: topic.category.isEmpty ? "topic" : "\(topic.category) topic",
+            authorAndCount: byAuthorAndCount(topic.authorName, "\(topic.replyCount) comment\(topic.replyCount == 1 ? "" : "s")"),
             date: topic.lastActivityAt.formatted(.relative(presentation: .named)),
             alwaysAppend: "\(savedFollowingLabel)\(newLabel)"
         )
@@ -314,7 +318,11 @@ struct PodcastEpisodeRow: View {
         let authorAndCount = [durationText, countText].filter { !$0.isEmpty }.joined(separator: ", ")
         return detailLevelLabel(
             title: episode.title,
-            contentType: "\(episode.showTitle) podcast",
+            // Some show titles already end in "Podcast" (e.g. "AppleVis
+            // Podcast") — appending " podcast" unconditionally read as
+            // "AppleVis Podcast podcast". Reported via a live transcript.
+            contentType: episode.showTitle.localizedCaseInsensitiveContains("podcast")
+                ? episode.showTitle : "\(episode.showTitle) podcast",
             authorAndCount: authorAndCount,
             date: episode.publishedAt.formatted(.relative(presentation: .named)),
             alwaysAppend: newLabel
@@ -393,14 +401,19 @@ struct AppListingRow: View {
     }
 
     private var appLabel: String {
-        let newLabel = newCount > 0 ? ". \(newCount) new review\(newCount == 1 ? "" : "s")" : ""
+        let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
         return detailLevelLabel(
             title: app.name,
             // Previously just the category ("Games"), with nothing in the
             // label saying this was an app listing at all — see the same
             // fix on ForumTopicRow's contentType for the full reasoning.
             contentType: "\(app.category) app entry",
-            authorAndCount: byAuthorAndCount(app.developer, "\(app.reviewCount) review\(app.reviewCount == 1 ? "" : "s")"),
+            // Despite the "reviewCount" field name, list-level counts come
+            // from Drupal's comment_count (Mappers.swift), not the separate
+            // Reviews feature on the app detail page — "review(s)" here was
+            // simply the wrong word. Every other row kind already says
+            // "comment(s)"; matched for consistency, reported directly.
+            authorAndCount: byAuthorAndCount(app.developer, "\(app.reviewCount) comment\(app.reviewCount == 1 ? "" : "s")"),
             date: app.lastActivityAt.formatted(.relative(presentation: .named)),
             alwaysAppend: newLabel
         )

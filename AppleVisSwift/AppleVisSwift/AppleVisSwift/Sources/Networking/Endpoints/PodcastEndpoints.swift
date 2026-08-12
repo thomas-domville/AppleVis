@@ -36,10 +36,12 @@ struct PodcastEndpoints {
 
     func episode(id: String) async throws -> PodcastEpisode {
         try await fetchWithCache(group: .podcasts, key: "podcasts:detail:\(id)") {
-            let response = try await client.jsonAPISingle(
-                "node/podcast/\(id)",
-                query: ["include": "field_podcast,uid,taxonomy_vocabulary_15"]
-            )
+            let response = try await client.remapping400ToNotFound {
+                try await client.jsonAPISingle(
+                    "node/podcast/\(id)",
+                    query: ["include": "field_podcast,uid,taxonomy_vocabulary_15"]
+                )
+            }
             return Mappers.podcast(response.data, included: response.included ?? [])
         }
     }

@@ -10,6 +10,12 @@ enum APIError: LocalizedError {
     case rateLimited
     case server(statusCode: Int)
     case decoding(underlying: Error)
+    /// Also thrown (remapped from .unknown(400)) by single-item detail
+    /// fetches — Drupal's JSON:API returns 400, not 404, for a UUID that
+    /// doesn't resolve to a resource of the expected bundle, which happens
+    /// for content that's been removed, unpublished, or moved since it was
+    /// cached in a feed.
+    case notFound
     case unknown(statusCode: Int)
     /// The content group's circuit breaker is down (or the live fetch
     /// failed) and there's no cached response to fall back to yet — see
@@ -25,6 +31,7 @@ enum APIError: LocalizedError {
         case .rateLimited:   return "Too many requests. Please wait a moment."
         case .server:        return "AppleVis is having trouble right now. Try again later."
         case .decoding: return "AppleVis sent back something this version of the app doesn't understand. Try updating the app."
+        case .notFound: return "This item is no longer available. It may have been removed, moved, or is awaiting moderation."
         case .unknown(let c): return "Unexpected error (HTTP \(c))."
         case .offlineNoCache(let group): return "No saved \(group) content yet. Connect to the internet to load content for the first time."
         }
@@ -279,9 +286,24 @@ final class APIClient {
             }
             throw APIError.unauthorized
         case 403: throw APIError.forbidden
+        case 404: throw APIError.notFound
         case 429: throw APIError.rateLimited
         case 500...599: throw APIError.server(statusCode: http.statusCode)
         default: throw APIError.unknown(statusCode: http.statusCode)
+        }
+    }
+
+    /// A content UUID sourced from a list/feed endpoint can outlive the
+    /// node it pointed to (removed, unpublished, or moved) — Drupal's
+    /// JSON:API returns 400, not 404, when a UUID doesn't resolve to a
+    /// resource of the expected bundle. Single-item detail fetches wrap
+    /// their call in this to surface a friendlier `.notFound` instead of a
+    /// raw HTTP code in that specific case.
+    func remapping400ToNotFound<T>(_ operation: () async throws -> T) async throws -> T {
+        do {
+            return try await operation()
+        } catch APIError.unknown(400) {
+            throw APIError.notFound
         }
     }
 

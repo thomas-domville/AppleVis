@@ -40,7 +40,9 @@ struct ForumEndpoints {
     }
 
     func topic(id: String) async throws -> ForumTopic {
-        let response = try await client.jsonAPISingle("node/forum/\(id)", query: ["include": "uid,taxonomy_forums"])
+        let response = try await client.remapping400ToNotFound {
+            try await client.jsonAPISingle("node/forum/\(id)", query: ["include": "uid,taxonomy_forums"])
+        }
         return Mappers.forum(response.data, included: response.included ?? [])
     }
 
@@ -52,7 +54,12 @@ struct ForumEndpoints {
                 query: ["filter[entity_id.id]": id, "sort": "created", "page[limit]": "100", "include": "uid"]
             )
 
-            let topicResponse = try await topicRes
+            let topicResponse: JsonApiSingleResponse
+            do {
+                topicResponse = try await topicRes
+            } catch APIError.unknown(400) {
+                throw APIError.notFound
+            }
             let node = topicResponse.data
             let included = topicResponse.included ?? []
             let topic = Mappers.forum(node, included: included)
