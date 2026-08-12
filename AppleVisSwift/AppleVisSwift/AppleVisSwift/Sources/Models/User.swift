@@ -53,12 +53,34 @@ enum ContentKind: String, Codable, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .forumTopic:     return "Forum Topic"
+        case .forumTopic:     return "Topic"
         case .podcastEpisode: return "Podcast"
-        case .appListing:     return "App"
+        case .appListing:     return "App Entry"
         case .resource:       return "Guide"
         case .blogPost:       return "Blog Post"
         case .bugReport:      return "Bug Report"
+        }
+    }
+
+    /// Used specifically for the Save/Unsave action wording — everywhere
+    /// else `displayName`'s "Podcast" is correct (you're following/sharing/
+    /// opening the show), but "Save Podcast" reads as ambiguous about
+    /// whether the whole show or just this one episode gets saved. "Save
+    /// Episode" says exactly what's being saved. Reported directly by a
+    /// VoiceOver user after noticing Save/Follow wording was the one place
+    /// on every row that never named the content kind at all.
+    var saveActionNoun: String {
+        self == .podcastEpisode ? "Episode" : displayName
+    }
+
+    /// Lowercased, correctly-pluralized `displayName` for count summaries
+    /// ("20 new topics," "18 new app entries") — naively appending "s"
+    /// broke for "App Entry" ("18 new app entrys").
+    func displayNamePlural(_ count: Int) -> String {
+        guard count != 1 else { return displayName.lowercased() }
+        switch self {
+        case .appListing: return "app entries"
+        default:          return displayName.lowercased() + "s"
         }
     }
 

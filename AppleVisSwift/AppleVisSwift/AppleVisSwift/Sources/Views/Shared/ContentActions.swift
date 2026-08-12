@@ -50,6 +50,10 @@ struct ContentActionsModifier: ViewModifier {
     /// Fired after an admin/owner delete succeeds — lets the parent list
     /// prune the row, matching the onDelete pattern comment rows already use.
     var onContentDeleted: (() -> Void)? = nil
+    /// Kind-specific primary actions (Play/Add to Queue for podcasts, Open
+    /// App Store for apps) shown at the top of the menu, above the generic
+    /// actions every kind shares.
+    var extraMenuItems: AnyView = AnyView(EmptyView())
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -115,58 +119,83 @@ struct ContentActionsModifier: ViewModifier {
                     .accessibilityHidden(true)
                 }
             }
+            // Every Button here gets .accessibilityHidden(true), same as the
+            // swipeActions above and for the same reason: SwiftUI
+            // auto-derives a VoiceOver custom action from each contextMenu
+            // item too, so without this a VoiceOver user heard BOTH this
+            // generic "Save"/"Share" AND the kind-specific "Save Topic"/
+            // "Share Podcast" from the explicit .accessibilityAction block
+            // below for the same action — reported directly as "Save" and
+            // "Share" each showing up twice. The .accessibilityAction block
+            // remains the single source of truth for VoiceOver; these labels
+            // are now purely for sighted long-press users, so they're worded
+            // with the content kind for the same reason the row's own label
+            // does — inconsistent, kind-less wording was the original
+            // complaint.
             .contextMenu {
+                extraMenuItems
                 if newCount > 0 {
                     Button { markAsRead() } label: {
                         Label("Mark as Read", systemImage: "checkmark.circle")
                     }
+                    .accessibilityHidden(true)
                 }
                 Button { addComment() } label: {
                     Label(addCommentLabel, systemImage: "bubble.left")
                 }
+                .accessibilityHidden(true)
                 Button {
                     toggleSave()
                 } label: {
-                    Label(isSaved ? "Unsave" : "Save", systemImage: isSaved ? "bookmark.slash" : "bookmark")
+                    Label(isSaved ? "Unsave \(kind.saveActionNoun)" : "Save \(kind.saveActionNoun)", systemImage: isSaved ? "bookmark.slash" : "bookmark")
                 }
+                .accessibilityHidden(true)
                 if supportsFollow && auth.isSignedIn {
                     Button {
                         Task { await toggleFollow() }
                     } label: {
-                        Label(isFollowing ? "Unfollow" : "Follow", systemImage: isFollowing ? "bell.slash" : "bell")
+                        Label(isFollowing ? "Unfollow \(kind.displayName)" : "Follow \(kind.displayName)", systemImage: isFollowing ? "bell.slash" : "bell")
                     }
+                    .accessibilityHidden(true)
                 }
                 if url.flatMap(URL.init) != nil {
                     Button { showBrowser = true } label: {
-                        Label("Open in Browser", systemImage: "safari")
+                        Label("Open \(kind.displayName) in Browser", systemImage: "safari")
                     }
+                    .accessibilityHidden(true)
                 }
                 if let url, let shareURL = URL(string: url) {
                     ShareLink(item: shareURL, subject: Text(title)) {
-                        Label("Share", systemImage: "square.and.arrow.up")
+                        Label("Share \(kind.displayName)", systemImage: "square.and.arrow.up")
                     }
+                    .accessibilityHidden(true)
                 }
                 if isOwnTopic {
                     Button { startEdit() } label: {
                         Label("Edit Topic", systemImage: "pencil")
                     }
+                    .accessibilityHidden(true)
                     Button(role: .destructive) { showDeleteConfirm = true } label: {
                         Label("Delete Topic", systemImage: "trash")
                     }
+                    .accessibilityHidden(true)
                 }
                 if isAdmin {
                     Button { startEdit() } label: {
                         Label("Edit \(kind.displayName)", systemImage: "pencil")
                     }
+                    .accessibilityHidden(true)
                     Button { showUnpublishConfirm = true } label: {
                         Label("Unpublish \(kind.displayName)", systemImage: "eye.slash")
                     }
+                    .accessibilityHidden(true)
                     Button(role: .destructive) { showDeleteConfirm = true } label: {
                         Label("Delete \(kind.displayName)", systemImage: "trash")
                     }
+                    .accessibilityHidden(true)
                 }
             }
-            .accessibilityAction(named: Text(isSaved ? "Unsave \(kind.displayName)" : "Save \(kind.displayName)")) {
+            .accessibilityAction(named: Text(isSaved ? "Unsave \(kind.saveActionNoun)" : "Save \(kind.saveActionNoun)")) {
                 toggleSave()
             }
             .modifier(ConditionalAccessibilityAction(isActive: isOwnTopic, name: "Edit Topic") { startEdit() })
@@ -481,18 +510,25 @@ extension View {
     }
 
     /// Adds save/follow/share swipe actions + context menu to a row or detail screen.
+    /// `extraMenuItems` inserts kind-specific primary actions (e.g. Play/Add
+    /// to Queue for podcast rows) at the top of the shared context menu,
+    /// visible to sighted long-press users the same way the VoiceOver-only
+    /// equivalents already were — these used to only exist as
+    /// `.accessibilityAction`s, invisible to anyone not using VoiceOver.
     func contentActions(
         id: String, kind: ContentKind, title: String,
         lastActivityAt: Date? = nil, url: String? = nil, supportsFollow: Bool = true,
         onSaveToggle: ((Bool) -> Void)? = nil, onFollowToggle: ((Bool) -> Void)? = nil,
         currentCommentCount: Int? = nil, onAddComment: (() -> Void)? = nil,
-        authorId: String? = nil, onContentDeleted: (() -> Void)? = nil
+        authorId: String? = nil, onContentDeleted: (() -> Void)? = nil,
+        @ViewBuilder extraMenuItems: () -> some View = { EmptyView() }
     ) -> some View {
         modifier(ContentActionsModifier(
             id: id, kind: kind, title: title, lastActivityAt: lastActivityAt, url: url, supportsFollow: supportsFollow,
             onSaveToggle: onSaveToggle, onFollowToggle: onFollowToggle,
             currentCommentCount: currentCommentCount, onAddComment: onAddComment,
-            authorId: authorId, onContentDeleted: onContentDeleted
+            authorId: authorId, onContentDeleted: onContentDeleted,
+            extraMenuItems: AnyView(extraMenuItems())
         ))
     }
 }

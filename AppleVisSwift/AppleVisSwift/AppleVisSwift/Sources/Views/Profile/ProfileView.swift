@@ -148,12 +148,12 @@ struct ProfileView: View {
             deepLinkRouter.pendingSiriDestination = .savedItems(filter: kind)
         } label: {
             HStack {
-                Label("Saved \(kind.displayName)s", systemImage: icon)
+                Label("Saved \(kind.displayNamePlural(2).capitalized)", systemImage: icon)
                 Spacer()
                 Text("\(count)").foregroundStyle(.secondary)
             }
         }
-        .accessibilityLabel(String(localized: "Saved \(kind.displayName.lowercased())s, \(count)"))
+        .accessibilityLabel(String(localized: "Saved \(kind.displayNamePlural(2)), \(count)"))
         .accessibilityHint(String(localized: "Double-tap to view."))
     }
 

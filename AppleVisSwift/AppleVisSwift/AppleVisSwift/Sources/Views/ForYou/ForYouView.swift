@@ -415,7 +415,7 @@ struct SavedItemsView: View {
         let counts = Dictionary(grouping: items, by: { $0.kind }).mapValues(\.count)
         return Text(filter == nil
             ? "\(items.count) item\(items.count == 1 ? "" : "s")"
-            : "\(filtered.count) \(filter!.displayName.lowercased())\(filtered.count == 1 ? "" : "s")"
+            : "\(filtered.count) \(filter!.displayNamePlural(filtered.count))"
         )
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -432,7 +432,7 @@ struct SavedItemsView: View {
         }
         let parts = ContentKind.allCases.compactMap { kind -> String? in
             guard let count = counts[kind], count > 0 else { return nil }
-            return "\(count) \(kind.displayName.lowercased())\(count == 1 ? "" : "s")"
+            return "\(count) \(kind.displayNamePlural(count))"
         }
         UIAccessibility.post(
             notification: .announcement,

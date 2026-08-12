@@ -68,7 +68,7 @@ final class HomeViewModel: ObservableObject {
             }
         } else {
             error = nil
-            items = fetched.sorted { $0.lastActivityAt > $1.lastActivityAt }
+            items = Self.deduplicated(fetched.sorted { $0.lastActivityAt > $1.lastActivityAt })
             hasMore = fetched.count >= pageSize
             itemVisits = PersistenceStore.shared.allItemVisits()
             buildNewActivitySummary()
@@ -82,8 +82,22 @@ final class HomeViewModel: ObservableObject {
         page += 1
         let (more, _) = await fetchPage(page: page)
         let merged = (items + more).sorted { $0.lastActivityAt > $1.lastActivityAt }
-        items = merged
+        items = Self.deduplicated(merged)
         hasMore = more.count >= pageSize
+    }
+
+    /// Content posted between one page fetch and the next shifts every
+    /// subsequent page by however many new items landed — the same
+    /// forum topic/app/etc. already on screen from an earlier page can
+    /// reappear on a later one. `ForEach(items)` keys rows by `FeedItem.id`,
+    /// so two entries sharing an id is an actual SwiftUI identity
+    /// collision, not just a visual duplicate — it was observed to pair a
+    /// row with the wrong underlying item, tapping through to a stale/
+    /// mismatched detail fetch that the server rejected outright (HTTP
+    /// 400). Keeps the first (most-recently-sorted) occurrence of each id.
+    private static func deduplicated(_ items: [FeedItem]) -> [FeedItem] {
+        var seen = Set<String>()
+        return items.filter { seen.insert($0.id).inserted }
     }
 
     /// New replies/comments on an item the user has visited before — distinct
@@ -246,7 +260,7 @@ final class HomeViewModel: ObservableObject {
         var parts: [String] = []
         for kind in [ContentKind.forumTopic, .podcastEpisode, .appListing, .resource, .blogPost] {
             guard let n = brandNewByKind[kind], n > 0 else { continue }
-            parts.append("\(n) new \(kind.displayName.lowercased())\(n == 1 ? "" : "s")")
+            parts.append("\(n) new \(kind.displayNamePlural(n))")
         }
         if newCommentTotal > 0 {
             parts.append("\(newCommentTotal) new comment\(newCommentTotal == 1 ? "" : "s")")

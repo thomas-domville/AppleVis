@@ -161,7 +161,13 @@ struct ForumTopicRow: View {
         let newLabel = newCount > 0 ? ". \(newCount) new repl\(newCount == 1 ? "y" : "ies")" : ""
         return detailLevelLabel(
             title: topic.title,
-            contentType: topic.category,
+            // Previously just the category ("iOS/iPadOS Gaming"), with
+            // nothing anywhere in the label saying this was a forum topic
+            // at all — inconsistent with Podcast rows, which always say
+            // "<show> podcast". Reported by a VoiceOver user: different
+            // content kinds on Home read structurally differently with no
+            // way to tell them apart by ear.
+            contentType: "\(topic.category) topic",
             authorAndCount: "by \(topic.authorName), \(topic.replyCount) repl\(topic.replyCount == 1 ? "y" : "ies")",
             date: topic.lastActivityAt.formatted(.relative(presentation: .named)),
             alwaysAppend: "\(savedFollowingLabel)\(newLabel)"
@@ -214,7 +220,7 @@ struct PodcastEpisodeRow: View {
                 }
 
                 Button {
-                    Task { await player.load(episode) }
+                    Task { await playOrToggle() }
                 } label: {
                     Image(systemName: isCurrentlyPlaying ? "pause.circle.fill" : "play.circle.fill")
                         .font(.title2)
@@ -228,14 +234,34 @@ struct PodcastEpisodeRow: View {
         .accessibilityLabel(episodeLabel)
         .readAloudAction(episodeLabel)
         .accessibilityAction(named: Text(isCurrentlyPlaying ? "Pause" : "Play")) {
-            Task { await player.load(episode) }
+            Task { await playOrToggle() }
+        }
+        .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to queue")) {
+            if isQueued { player.removeFromQueue(id: episode.id) } else { player.enqueue(episode) }
         }
         .contentActions(
             id: episode.id, kind: .podcastEpisode, title: episode.title, lastActivityAt: episode.lastActivityAt, url: episode.url,
             currentCommentCount: episode.commentCount,
             onAddComment: { showComposeComment = true },
             onContentDeleted: onDelete
-        )
+        ) {
+            // These already exist as VoiceOver-only .accessibilityActions
+            // above — .accessibilityHidden here keeps this purely a visual
+            // addition for sighted long-press users, not a second
+            // VoiceOver-announced "Play"/"Add to Queue".
+            Button {
+                Task { await playOrToggle() }
+            } label: {
+                Label(isCurrentlyPlaying ? "Pause" : "Play", systemImage: isCurrentlyPlaying ? "pause.circle" : "play.circle")
+            }
+            .accessibilityHidden(true)
+            Button {
+                if isQueued { player.removeFromQueue(id: episode.id) } else { player.enqueue(episode) }
+            } label: {
+                Label(isQueued ? "Remove from Queue" : "Add to Queue", systemImage: isQueued ? "text.badge.minus" : "text.badge.plus")
+            }
+            .accessibilityHidden(true)
+        }
         .cardDensityPadding()
         .sheet(isPresented: $showComposeComment) {
             ComposePodcastCommentView(episodeId: episode.id, title: episode.title) { _ in }
@@ -244,6 +270,27 @@ struct PodcastEpisodeRow: View {
 
     private var isCurrentlyPlaying: Bool {
         player.currentEpisode?.id == episode.id && player.isPlaying
+    }
+
+    /// Was entirely missing from this row — every other podcast-episode
+    /// surface in the app (ForYouView's saved-episode card) already has
+    /// Add to Queue as an action; this shared row (used by Home and every
+    /// podcast browse list) never did. Reported directly.
+    private var isQueued: Bool {
+        player.queue.contains { $0.id == episode.id }
+    }
+
+    /// The visible Play/Pause button and its matching VoiceOver action both
+    /// showed a "Pause" affordance while this episode was playing, but both
+    /// always called `load()` — its own guard only resumes if `!isPlaying`,
+    /// so tapping "Pause" while playing was a complete no-op. Same bug
+    /// already fixed in ForYouView's podcast rows.
+    private func playOrToggle() async {
+        if isCurrentlyPlaying {
+            player.togglePlayPause()
+        } else {
+            await player.load(episode)
+        }
     }
 
     private var newCount: Int {
@@ -313,7 +360,19 @@ struct AppListingRow: View {
         .contentActions(
             id: app.id, kind: .appListing, title: app.name, lastActivityAt: app.lastActivityAt, url: app.url,
             currentCommentCount: app.reviewCount, onContentDeleted: onDelete
-        )
+        ) {
+            // "Open App Entry in Browser" (the generic action every kind
+            // gets) opens the Drupal directory page, not the actual App
+            // Store listing — previously reaching the real App Store link
+            // required opening the detail screen first, which already has
+            // this exact action. Long-pressing straight from the row now
+            // reaches it directly.
+            if let appStoreUrl = app.appStoreUrl, let storeURL = URL(string: appStoreUrl) {
+                Link(destination: storeURL) {
+                    Label("Open in App Store", systemImage: "arrow.up.forward.app")
+                }
+            }
+        }
         .cardDensityPadding()
     }
 
@@ -325,7 +384,10 @@ struct AppListingRow: View {
         let newLabel = newCount > 0 ? ". \(newCount) new review\(newCount == 1 ? "" : "s")" : ""
         return detailLevelLabel(
             title: app.name,
-            contentType: app.category,
+            // Previously just the category ("Games"), with nothing in the
+            // label saying this was an app listing at all — see the same
+            // fix on ForumTopicRow's contentType for the full reasoning.
+            contentType: "\(app.category) app entry",
             authorAndCount: "by \(app.developer), \(app.reviewCount) review\(app.reviewCount == 1 ? "" : "s")",
             date: app.lastActivityAt.formatted(.relative(presentation: .named)),
             alwaysAppend: newLabel

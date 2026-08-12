@@ -16,6 +16,7 @@ enum HomeFeedFilter: String, CaseIterable, Identifiable {
 enum HomeFocusTarget: Hashable {
     case summary
     case greeting
+    case item(String)
 }
 
 /// Time-of-day greeting shown on the Home tab's greeting card.
@@ -233,20 +234,6 @@ struct HomeView: View {
         return !groups.isDisjoint(with: networkStatus.degradedGroups)
     }
 
-    /// Deliberately brand-new topics only (no prior visit record) — the
-    /// same population the What's New card's "N new forum topics" counts.
-    /// This used to count every forum topic in `newItems`, including ones
-    /// that had merely picked up new replies since a prior visit, so this
-    /// strip's number could legitimately disagree with the very similar-
-    /// sounding figure right above it. Matching definitions means the two
-    /// numbers can never contradict each other.
-    private var unreadForumTopics: [FeedItem] {
-        vm.newItems.filter {
-            guard case .forumTopic = $0 else { return false }
-            return vm.newReplyCount(for: $0) == 0
-        }
-    }
-
     // MARK: - Feed list
 
     private var feedList: some View {
@@ -295,18 +282,19 @@ struct HomeView: View {
                         onTap: {
                             guard let first = vm.newItems.first else { return }
                             withReduceMotionAwareAnimation { proxy.scrollTo(first.id, anchor: .top) }
+                            // Scrolling the viewport doesn't move VoiceOver's
+                            // focus on its own — without this, double-tapping
+                            // moved the card visually but left a VoiceOver
+                            // user's swipe cursor exactly where it was,
+                            // making the action look like it did nothing.
+                            Task {
+                                try? await Task.sleep(for: .milliseconds(400))
+                                focusTarget = .item(first.id)
+                            }
                         },
                         onDismiss: { vm.isNewActivityDismissed = true }
                     )
                     .accessibilityFocused($focusTarget, equals: .summary)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                    .listRowSeparator(.hidden)
-                }
-
-                if let firstUnread = unreadForumTopics.first {
-                    UnreadTopicsStrip(count: unreadForumTopics.count) {
-                        withReduceMotionAwareAnimation { proxy.scrollTo(firstUnread.id, anchor: .top) }
-                    }
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     .listRowSeparator(.hidden)
                 }
@@ -362,6 +350,7 @@ struct HomeView: View {
                         vm.markAsRead(item)
                     }
                     .id(item.id)
+                    .accessibilityFocused($focusTarget, equals: .item(item.id))
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 }
 
@@ -391,8 +380,7 @@ struct HomeView: View {
         for item in visibleItems { counts[item.kind, default: 0] += 1 }
         let parts = [ContentKind.forumTopic, .podcastEpisode, .appListing, .resource, .blogPost].compactMap { kind -> String? in
             guard let n = counts[kind], n > 0 else { return nil }
-            let label = kind.displayName.lowercased()
-            return "\(n) \(label)\(n == 1 ? "" : "s")"
+            return "\(n) \(kind.displayNamePlural(n))"
         }
         return "\(visibleItems.count) item\(visibleItems.count == 1 ? "" : "s"): \(parts.joined(separator: ", "))."
     }
@@ -522,40 +510,6 @@ private struct WhatsNewCard: View {
     }
 }
 
-// MARK: - New topics strip
-
-/// Deliberately says "new forum topics," not "unread" — Home uses "new"
-/// everywhere else (NewCountBadge, the New feed filter, the What's New
-/// card right above this), and having the one "unread"-labeled element on
-/// the whole screen sit directly under a "new" one read as a second,
-/// possibly-different count rather than a shortcut into the same figure.
-private struct UnreadTopicsStrip: View {
-    let count: Int
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(Color.accentColor)
-                    .frame(width: 8, height: 8)
-                    .accessibilityHidden(true)
-                Text("\(count) new forum topic\(count == 1 ? "" : "s")")
-                    .font(.subheadline).fontWeight(.semibold)
-                    .foregroundStyle(Color.accentColor)
-                Spacer()
-                Text("Jump to first →")
-                    .font(.subheadline).fontWeight(.medium)
-                    .foregroundStyle(Color.accentColor)
-            }
-            .padding(12)
-            .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(String(localized: "\(count) new forum topic\(count == 1 ? "" : "s"). Activate to jump to the first one."))
-    }
-}
-
 // MARK: - Notification history
 
 /// Home's "Notification summary" destination (docs/APPLEVIS_2026_1_MASTER_SPEC.md)
@@ -645,7 +599,13 @@ struct FeedRow: View {
             }
         }
         .accessibilityValue(isNew && newCount == 0 ? "New." : "")
-        .modifier(ConditionalAccessibilityAction(isActive: newCount > 0 && onMarkRead != nil, name: "Mark as Read") {
+        // A brand-new, never-visited item has no prior comment-count
+        // baseline to diff against, so `newCount` (a *reply-delta*, not a
+        // newness flag) is 0 for it even though `isNew` is true — the old
+        // `newCount > 0`-only gate meant a "NEW" card had no way to be
+        // marked read at all until it happened to also pick up a reply.
+        // Reported directly: a card marked New offered no Mark as Read action.
+        .modifier(ConditionalAccessibilityAction(isActive: (isNew || newCount > 0) && onMarkRead != nil, name: "Mark as Read") {
             onMarkRead?()
         })
     }
