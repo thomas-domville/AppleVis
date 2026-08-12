@@ -51,6 +51,14 @@ struct NowPlayingWaveform: View {
 /// additions with no RN equivalent tier) is unconditional at every level,
 /// since "this has new activity" is exactly the kind of thing a
 /// fast-scanning Simple-mode user still wants to hear.
+/// Builds "by <author>, <count>" gracefully when `author` is empty (a real,
+/// live data gap on some content — a topic with no author on record) rather
+/// than producing "by , 39 replies," which read as a data typo rather than
+/// a missing name. Reported directly by a VoiceOver user.
+func byAuthorAndCount(_ author: String, _ count: String) -> String {
+    author.isEmpty ? count : "by \(author), \(count)"
+}
+
 func detailLevelLabel(
     title: String,
     contentType: String,
@@ -130,7 +138,9 @@ struct ForumTopicRow: View {
                     .font(.body)
                     .lineLimit(2)
                 HStack {
-                    Text("by \(topic.authorName)")
+                    if !topic.authorName.isEmpty {
+                        Text("by \(topic.authorName)")
+                    }
                     Spacer()
                     ActivityCountLabel(count: topic.replyCount, noun: "reply")
                 }
@@ -168,7 +178,7 @@ struct ForumTopicRow: View {
             // content kinds on Home read structurally differently with no
             // way to tell them apart by ear.
             contentType: "\(topic.category) topic",
-            authorAndCount: "by \(topic.authorName), \(topic.replyCount) repl\(topic.replyCount == 1 ? "y" : "ies")",
+            authorAndCount: byAuthorAndCount(topic.authorName, "\(topic.replyCount) repl\(topic.replyCount == 1 ? "y" : "ies")"),
             date: topic.lastActivityAt.formatted(.relative(presentation: .named)),
             alwaysAppend: "\(savedFollowingLabel)\(newLabel)"
         )
@@ -334,9 +344,11 @@ struct AppListingRow: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(app.name)
                         .font(.body)
-                    Text(app.developer)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if !app.developer.isEmpty {
+                        Text(app.developer)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     HStack {
                         Text(app.category)
                         Spacer()
@@ -388,7 +400,7 @@ struct AppListingRow: View {
             // label saying this was an app listing at all — see the same
             // fix on ForumTopicRow's contentType for the full reasoning.
             contentType: "\(app.category) app entry",
-            authorAndCount: "by \(app.developer), \(app.reviewCount) review\(app.reviewCount == 1 ? "" : "s")",
+            authorAndCount: byAuthorAndCount(app.developer, "\(app.reviewCount) review\(app.reviewCount == 1 ? "" : "s")"),
             date: app.lastActivityAt.formatted(.relative(presentation: .named)),
             alwaysAppend: newLabel
         )
@@ -417,9 +429,11 @@ struct ResourceRow: View {
                 Text(resource.title)
                     .font(.body)
                     .lineLimit(2)
-                Text("by \(resource.authorName)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if !resource.authorName.isEmpty {
+                    Text("by \(resource.authorName)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .overlay(alignment: .leading) {
@@ -445,7 +459,7 @@ struct ResourceRow: View {
         return detailLevelLabel(
             title: resource.title,
             contentType: resource.kind.displayName,
-            authorAndCount: "by \(resource.authorName), \(resource.commentCount) comment\(resource.commentCount == 1 ? "" : "s")",
+            authorAndCount: byAuthorAndCount(resource.authorName, "\(resource.commentCount) comment\(resource.commentCount == 1 ? "" : "s")"),
             date: resource.updatedAt.formatted(.relative(presentation: .named)),
             alwaysAppend: newLabel
         )
@@ -475,7 +489,9 @@ struct BlogPostRow: View {
                     .font(.body)
                     .lineLimit(2)
                 HStack {
-                    Text("by \(post.authorName)")
+                    if !post.authorName.isEmpty {
+                        Text("by \(post.authorName)")
+                    }
                     Spacer()
                     ActivityCountLabel(count: post.commentCount, noun: "comment")
                 }
@@ -506,7 +522,7 @@ struct BlogPostRow: View {
         return detailLevelLabel(
             title: post.title,
             contentType: "Blog post",
-            authorAndCount: "by \(post.authorName), \(post.commentCount) comment\(post.commentCount == 1 ? "" : "s")",
+            authorAndCount: byAuthorAndCount(post.authorName, "\(post.commentCount) comment\(post.commentCount == 1 ? "" : "s")"),
             date: post.lastActivityAt.formatted(.relative(presentation: .named)),
             alwaysAppend: newLabel
         )
