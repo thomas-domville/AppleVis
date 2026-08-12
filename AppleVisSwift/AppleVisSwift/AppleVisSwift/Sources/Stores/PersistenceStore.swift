@@ -36,19 +36,24 @@ final class PersistenceStore {
         savedItems().contains { $0.id == id }
     }
 
-    func save(_ item: SavedItem) {
+    /// `sync` defaults to `true` for every normal caller (a user tapping
+    /// Save). `ICloudSyncManager`'s pull passes `false` — it's adopting an
+    /// item that just came FROM iCloud, so its shadow is already settled;
+    /// pushing again immediately after would just be a same-data no-op
+    /// round trip, multiplied by however many items a single pull adopts.
+    func save(_ item: SavedItem, sync: Bool = true) {
         var items = savedItems()
         guard !items.contains(where: { $0.id == item.id }) else { return }
         items.insert(item, at: 0)
         persist(items, key: savedKey)
-        Task { @MainActor in ICloudSyncManager.shared.pushSavedItems() }
+        if sync { Task { @MainActor in ICloudSyncManager.shared.pushSavedItems() } }
     }
 
-    func unsave(id: String) {
+    func unsave(id: String, sync: Bool = true) {
         var items = savedItems()
         items.removeAll { $0.id == id }
         persist(items, key: savedKey)
-        Task { @MainActor in ICloudSyncManager.shared.pushSavedItems() }
+        if sync { Task { @MainActor in ICloudSyncManager.shared.pushSavedItems() } }
     }
 
     // MARK: - Notification history (on-device only — nothing server-side tracks this)
@@ -76,19 +81,19 @@ final class PersistenceStore {
         followedItems().contains { $0.id == id }
     }
 
-    func markFollowed(_ item: FollowedItem) {
+    func markFollowed(_ item: FollowedItem, sync: Bool = true) {
         var items = followedItems()
         guard !items.contains(where: { $0.id == item.id }) else { return }
         items.insert(item, at: 0)
         persist(items, key: followedKey)
-        Task { @MainActor in ICloudSyncManager.shared.pushSavedItems() }
+        if sync { Task { @MainActor in ICloudSyncManager.shared.pushSavedItems() } }
     }
 
-    func markUnfollowed(id: String) {
+    func markUnfollowed(id: String, sync: Bool = true) {
         var items = followedItems()
         items.removeAll { $0.id == id }
         persist(items, key: followedKey)
-        Task { @MainActor in ICloudSyncManager.shared.pushSavedItems() }
+        if sync { Task { @MainActor in ICloudSyncManager.shared.pushSavedItems() } }
     }
 
     // MARK: - Seen forum topics (backs the "Unread" forums filter)

@@ -77,10 +77,14 @@ final class PlayerStore: ObservableObject {
             return
         }
 
+        errorMessage = nil
         await setupAudioSession()
         player?.pause()
         removeTimeObserver()
-        errorMessage = nil
+        // NOT reset here — setupAudioSession() may have just set a failure
+        // message above; resetting again after it returns would silently
+        // wipe out the exact toast this was added to surface, leaving
+        // playback failing with no explanation to the user again.
         isBuffering = true
         currentChapter = nil
 

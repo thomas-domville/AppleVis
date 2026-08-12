@@ -144,10 +144,10 @@ final class ICloudSyncManager {
             let cloudIds = Set(cloud.map(\.id))
             let localIds = Set(PersistenceStore.shared.savedItems().map(\.id))
             for item in cloud where !localIds.contains(item.id) {
-                PersistenceStore.shared.save(item)
+                PersistenceStore.shared.save(item, sync: false)
             }
             for id in shadow.intersection(localIds).subtracting(cloudIds) {
-                PersistenceStore.shared.unsave(id: id)
+                PersistenceStore.shared.unsave(id: id, sync: false)
             }
             writeIdShadow(Set(PersistenceStore.shared.savedItems().map(\.id)), key: "icloud.saved.shadow")
         }
@@ -156,10 +156,10 @@ final class ICloudSyncManager {
             let cloudIds = Set(cloud.map(\.id))
             let localIds = Set(PersistenceStore.shared.followedItems().map(\.id))
             for item in cloud where !localIds.contains(item.id) {
-                PersistenceStore.shared.markFollowed(item)
+                PersistenceStore.shared.markFollowed(item, sync: false)
             }
             for id in shadow.intersection(localIds).subtracting(cloudIds) {
-                PersistenceStore.shared.markUnfollowed(id: id)
+                PersistenceStore.shared.markUnfollowed(id: id, sync: false)
             }
             writeIdShadow(Set(PersistenceStore.shared.followedItems().map(\.id)), key: "icloud.followed.shadow")
         }
