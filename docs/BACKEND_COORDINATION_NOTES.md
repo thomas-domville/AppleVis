@@ -12,10 +12,9 @@ specific brief (kept separate since it's substantial on its own).
 - **The issue:** Every other primary browse-list endpoint (Apps, Podcasts,
   Guides, Blogs, Bug Reports) uses Drupal JSON:API, which returns a
   standard `links.next` entry the client can trust as a true "is there
-  another page" signal — those five have been converged onto it (see
-  `ThemeColors`... no, see the pagination convergence commit/changes in
-  `AppEndpoints`, `PodcastEndpoints`, `ContentEndpoints`). Forums' list is
-  the one exception: `/api/v1/forums/recent` is a custom native REST
+  another page" signal — those five have been converged onto it (see the
+  `PagedListResult` changes in `AppEndpoints`, `PodcastEndpoints`, and
+  `ContentEndpoints`). Forums' list is the one exception: `/api/v1/forums/recent` is a custom native REST
   endpoint that returns a bare JSON array with no pagination metadata at
   all, so the client has no choice but to keep guessing "more" from
   whether the last page came back full — which is wrong whenever a page
@@ -26,6 +25,23 @@ specific brief (kept separate since it's substantial on its own).
   already returns, or move Forums' list onto a JSON:API-backed endpoint
   the way the other content types are — whichever is less work on the
   Drupal side.
+- **Already checked, so this doesn't need re-confirming:** verified live
+  against production (2026-08-15) that `GET /api/v1/forums/recent?page=0`
+  truly has no pagination signal anywhere — not in the JSON body, not in
+  any response header (no `Link`, no `X-Total-Count`), returns exactly 20
+  items per page. Also tried routing Forums' list through the same Solr
+  JSON:API index (`jsonapi/index/solr_site_index`) the app's search
+  feature now uses, since that index does return a standard `links.next`
+  — it works for listing `type=forum` nodes without a search term, but its
+  default sort (`sort=-changed`) doesn't match the site's actual "sorted
+  by last comment activity" ordering (a topic with a brand-new comment but
+  an old node-edit timestamp ranks low, when it should rank near the top —
+  same mismatch the original code comment already flagged). Tried
+  `sort=-comment_forum.last_comment_timestamp` on that index directly —
+  server returns `400 Bad Request`, so that field isn't exposed as a sort
+  key on the index today. So this can't be worked around purely
+  client-side; either the native endpoint needs the pagination field
+  added, or the Solr index needs that sort key exposed.
 - **Not blocking:** the heuristic isn't wrong most of the time — it only
   misfires at the specific boundary of an exactly-full final page — so this
   is a real but low-frequency bug, not a functional break.
