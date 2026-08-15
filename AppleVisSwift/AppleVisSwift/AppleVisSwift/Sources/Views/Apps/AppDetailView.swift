@@ -12,6 +12,8 @@ struct AppDetailView: View {
     @State private var developerApps: [ItunesDeveloperApp] = []
     @State private var isLoadingMoreReviews = false
     @State private var hasMoreReviews = true
+    @State private var newReviewCount = 0
+    @State private var pendingFocusReviewId: String?
     @State private var accessibilitySummary: String?
     @State private var isSummarizingAccessibility = false
     @State private var reviewsSummary: String?
@@ -92,6 +94,18 @@ struct AppDetailView: View {
                 }
             }
             .background(preferences.colors.background)
+            // No focus confirmation after posting a review, unlike Forums'
+            // well-implemented equivalent (ALL-04) — a VoiceOver user
+            // wasn't confirmed their review posted or where it landed.
+            .onChange(of: pendingFocusReviewId) { _, newId in
+                guard let newId else { return }
+                withReduceMotionAwareAnimation { proxy.scrollTo(newId, anchor: .bottom) }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    focusedReviewId = newId
+                    pendingFocusReviewId = nil
+                }
+            }
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -115,11 +129,13 @@ struct AppDetailView: View {
         .sheet(isPresented: $showReviewCompose) {
             ComposeAppReviewView(appId: detail.id, appName: detail.name) { review in
                 self.detail?.reviews.append(review)
+                pendingFocusReviewId = review.id
             }
         }
         .sheet(item: $quotedReview) { target in
             ComposeAppReviewView(appId: detail.id, appName: detail.name, quotedReview: target) { review in
                 self.detail?.reviews.append(review)
+                pendingFocusReviewId = review.id
             }
         }
     }
@@ -442,7 +458,9 @@ struct AppDetailView: View {
         CommunityDiscussionHeading(
             count: detail.reviewCount,
             onThreadOverview: { announceThreadOverview(detail) },
-            onJumpToLast: { Task { await jumpToLastReview(proxy: proxy) } }
+            onJumpToLast: { Task { await jumpToLastReview(proxy: proxy) } },
+            newCount: newReviewCount,
+            onJumpToFirstNew: { Task { await jumpToFirstNewReview(proxy: proxy) } }
         )
 
         if detail.reviews.isEmpty {
@@ -520,6 +538,11 @@ struct AppDetailView: View {
                 }
             }
             if let detail {
+                // Captured before stampItemVisit below overwrites it —
+                // same fix already applied to Podcasts' equivalent (ALL-01).
+                newReviewCount = PersistenceStore.shared.newReplyCount(
+                    kind: .appListing, id: detail.id, currentCount: detail.reviewCount
+                )
                 PersistenceStore.shared.stampItemVisit(
                     id: FeedItem.visitKey(kind: .appListing, contentId: detail.id),
                     commentCount: detail.reviewCount
@@ -569,6 +592,21 @@ struct AppDetailView: View {
         focusedReviewId = lastId
     }
 
+    /// "Jump to First New Comment" (ALL-01) — reviews arrive chronologically
+    /// oldest-first (matches "Jump to Last" scrolling to `.last`), so the
+    /// first of the `newReviewCount` most recently posted reviews sits at
+    /// `reviews.count - newReviewCount`.
+    private func jumpToFirstNewReview(proxy: ScrollViewProxy) async {
+        if hasMoreReviews { await loadMoreReviews() }
+        let reviews = self.detail?.reviews ?? []
+        let targetIndex = reviews.count - newReviewCount
+        guard newReviewCount > 0, targetIndex >= 0, targetIndex < reviews.count else { return }
+        let targetId = reviews[targetIndex].id
+        withReduceMotionAwareAnimation { proxy.scrollTo(targetId, anchor: .top) }
+        try? await Task.sleep(for: .milliseconds(400))
+        focusedReviewId = targetId
+    }
+
     /// VoiceOver lands on the back button after push navigation by default;
     /// this moves it to the page heading instead, per
     /// docs/IMPLEMENTATION_NOTES.md's "VoiceOver Detail Page Navigation"
@@ -615,8 +653,13 @@ struct AppReviewRow: View {
             // full review body inside the same accessibility label as the
             // header, unlike ForumReply/CommentRow.
             HStack {
-                AuthorAvatarView(name: review.authorName, diameter: 28)
-                Text(review.authorName).fontWeight(.medium)
+                // Author names were inert plain Text everywhere except
+                // Forums, despite authorId already being available — a
+                // VoiceOver user had no equivalent to a sighted user's
+                // "tap the name to see who this is" (APPS-05). Matches
+                // Forums' ReplyView, which already puts AuthorProfileButton
+                // inside this exact combine+explicit-label header structure.
+                AuthorProfileButton(name: review.authorName, authorId: review.authorId, showAvatar: true)
                 Spacer()
                 RelativeDateLabel(date: review.createdAt)
             }
@@ -629,13 +672,19 @@ struct AppReviewRow: View {
             )
             .modifier(OptionalReplyFocus(binding: focusBinding, id: review.id))
             .readAloudAction(review.body.strippingHTMLTags())
-            .modifier(ConditionalAccessibilityAction(isActive: onReplyTo != nil, name: "Reply to this Comment") { onReplyTo?() })
-            .accessibilityAction(named: Text("Copy Comment Text")) { copyText() }
-            .accessibilityAction(named: Text("Share Comment")) { presentShareSheet() }
+            // "Review" throughout, matching the toolbar/sheet/toast wording
+            // this whole feature already uses everywhere else — these 5
+            // actions previously said "Comment" (likely copied from the
+            // shared Forums/Blogs/Bugs comment-row pattern without
+            // adapting the wording), contradicting "Edit Review"/"Delete
+            // Review" in the exact same menu.
+            .modifier(ConditionalAccessibilityAction(isActive: onReplyTo != nil, name: "Reply to this Review") { onReplyTo?() })
+            .accessibilityAction(named: Text("Copy Review Text")) { copyText() }
+            .accessibilityAction(named: Text("Share Review")) { presentShareSheet() }
             .accessibilityAction(named: Text("Mark as Helpful")) {
                 toast.warning(String(localized: "Helpful votes are coming once the Drupal Flags API is confirmed."))
             }
-            .accessibilityAction(named: Text("Report Comment")) {
+            .accessibilityAction(named: Text("Report Review")) {
                 toast.warning(String(localized: "Reporting is coming once the Drupal Flags API is confirmed."))
             }
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Edit Review") { showEditSheet = true })
@@ -664,20 +713,20 @@ struct AppReviewRow: View {
             // user doing an ordinary long-press saw none of them.
             if onReplyTo != nil {
                 Button { onReplyTo?() } label: {
-                    Label("Reply to this Comment", systemImage: "arrowshape.turn.up.left")
+                    Label("Reply to this Review", systemImage: "arrowshape.turn.up.left")
                 }
             }
             Button { copyText() } label: {
-                Label("Copy Comment Text", systemImage: "doc.on.doc")
+                Label("Copy Review Text", systemImage: "doc.on.doc")
             }
             Button { presentShareSheet() } label: {
-                Label("Share Comment", systemImage: "square.and.arrow.up")
+                Label("Share Review", systemImage: "square.and.arrow.up")
             }
             Button { toast.warning(String(localized: "Helpful votes are coming once the Drupal Flags API is confirmed.")) } label: {
                 Label("Mark as Helpful", systemImage: "hand.thumbsup")
             }
             Button { toast.warning(String(localized: "Reporting is coming once the Drupal Flags API is confirmed.")) } label: {
-                Label("Report Comment", systemImage: "flag")
+                Label("Report Review", systemImage: "flag")
             }
             if canDelete {
                 Button { showEditSheet = true } label: {

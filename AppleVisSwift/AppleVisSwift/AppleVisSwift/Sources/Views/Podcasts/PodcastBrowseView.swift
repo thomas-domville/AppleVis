@@ -76,9 +76,9 @@ struct PodcastBrowseView: View {
             async let eps = APIClient.shared.podcasts.episodes(page: page, sort: sort, tagTid: selectedTag?.tid)
             async let tagList = tags.isEmpty ? APIClient.shared.podcasts.tags() : []
             let (fetched, fetchedTags) = try await (eps, tagList)
-            episodes = fetched
+            episodes = fetched.items
             if !fetchedTags.isEmpty { tags = fetchedTags }
-            hasMore = fetched.count >= APIPaging.pageSize
+            hasMore = fetched.hasMore
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Could not load episodes" }
         isLoading = false
@@ -90,8 +90,8 @@ struct PodcastBrowseView: View {
         do {
             let more = try await APIClient.shared.podcasts.episodes(page: page + 1, sort: sort, tagTid: selectedTag?.tid)
             page += 1
-            episodes += more
-            hasMore = more.count >= APIPaging.pageSize
+            episodes += more.items
+            hasMore = more.hasMore
         } catch {
             toast.error(String(localized: "Couldn't load more episodes."))
         }

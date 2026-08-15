@@ -107,15 +107,24 @@ struct DownloadsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @ObservedObject private var downloads = DownloadManager.shared
     @State private var showRemoveAllConfirm = false
+    @State private var showBrowsePodcasts = false
 
     var body: some View {
         Group {
             if downloads.downloadedEpisodes.isEmpty && downloads.activeDownloads.isEmpty {
+                // Previously descriptive text only, no direct next step
+                // (FORYOU-07) — a first-time user with nothing downloaded
+                // had no path forward besides leaving the tab on their own.
                 EmptyStateView(
                     title: "No Downloads",
                     message: "Download episodes for offline playback from any episode's detail page.",
-                    systemImage: "arrow.down.circle"
+                    systemImage: "arrow.down.circle",
+                    primaryActionLabel: "Browse Podcasts",
+                    primaryAction: { showBrowsePodcasts = true }
                 )
+                .sheet(isPresented: $showBrowsePodcasts) {
+                    NavigationStack { PodcastBrowseView() }
+                }
             } else {
                 List {
                     if !downloads.activeDownloads.isEmpty {
@@ -131,6 +140,20 @@ struct DownloadsView: View {
                                 }
                                 .accessibilityElement(children: .combine)
                                 .accessibilityLabel(String(localized: "\(title), downloading, \(percent) percent."))
+                                // DownloadManager.cancelDownload(_:) existed but
+                                // nothing in the app called it anywhere — no one
+                                // had a way to stop an unwanted download (PODCAST-03).
+                                .accessibilityAction(named: Text("Cancel Download")) {
+                                    downloads.cancelDownload(id)
+                                }
+                                .swipeActions(edge: .trailing) {
+                                    Button(role: .destructive) {
+                                        downloads.cancelDownload(id)
+                                    } label: {
+                                        Label("Cancel", systemImage: "xmark.circle")
+                                    }
+                                    .accessibilityHidden(true)
+                                }
                             }
                         }
                     }
@@ -241,7 +264,7 @@ struct DownloadsView: View {
         .accessibilityAction(named: Text(isCurrentlyPlaying ? "Pause" : "Play")) {
             Task { await playDownloaded(meta) }
         }
-        .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to queue")) {
+        .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to Queue")) {
             if isQueued {
                 player.removeFromQueue(id: meta.id)
             } else {
@@ -252,7 +275,11 @@ struct DownloadsView: View {
             downloads.delete(meta.id)
         }
         .swipeActions {
-            Button("Delete", role: .destructive) { downloads.delete(meta.id) }
+            // Matches the VoiceOver action ("Remove Download") and the bulk
+            // "Remove Downloads" button — a Voice Control user who hears one
+            // name from VoiceOver but sees "Delete" on the swipe button
+            // itself has no way to know they're the same action.
+            Button("Remove", role: .destructive) { downloads.delete(meta.id) }
                 .accessibilityHidden(true)
         }
     }
@@ -302,6 +329,7 @@ struct SavedItemsView: View {
     @State private var error: String?
     @State private var filter: ContentKind?
     @State private var showUnsaveAllConfirm = false
+    @State private var showBrowseContent = false
     @AccessibilityFocusState private var summaryFocused: Bool
 
     /// Saved has no server concept and needs no sign-in (see
@@ -324,12 +352,42 @@ struct SavedItemsView: View {
             } else if let error {
                 ErrorView(message: error) { await load() }
             } else if filtered.isEmpty {
-                EmptyStateView(title: "Nothing Saved", message: "Tap the bookmark icon on any item to save it.", systemImage: "bookmark")
+                // Distinguishes "you have other saved items, just none of
+                // this filtered kind" from "you have nothing saved at all"
+                // (FORYOU-08) — previously both showed the identical
+                // generic empty state with no way back to "show everything."
+                if filter != nil && !items.isEmpty {
+                    EmptyStateView(
+                        title: "No Saved Items of This Kind",
+                        message: "You have other saved items — clear the filter to see them.",
+                        systemImage: "bookmark",
+                        primaryActionLabel: "Clear Filter",
+                        primaryAction: { filter = nil }
+                    )
+                } else {
+                    EmptyStateView(
+                        title: "Nothing Saved",
+                        message: "Tap the bookmark icon on any item to save it.",
+                        systemImage: "bookmark",
+                        primaryActionLabel: "Browse Content",
+                        primaryAction: { showBrowseContent = true }
+                    )
+                    .sheet(isPresented: $showBrowseContent) {
+                        NavigationStack { DiscoverView() }
+                    }
+                }
             } else {
                 savedList
             }
         }
         .task { await load() }
+        // `.task` only (re-)runs on first appearance or a view-identity
+        // change — not on returning to this tab after saving something
+        // elsewhere in the app while this screen stayed in the background
+        // (FORYOU-05). `load()` is a cheap local read plus an idempotent
+        // enrichment fetch (guarded on ids not already cached), so
+        // re-running it on every reappearance is safe.
+        .onAppear { Task { await load() } }
     }
 
     private var savedList: some View {
@@ -551,7 +609,7 @@ private struct SavedPodcastEpisodeCard: View {
                         Text(episode.showTitle).font(.caption).foregroundStyle(.secondary)
                         Text(episode.title).font(.body).lineLimit(2)
                         if let duration = episode.duration {
-                            Text(Duration.seconds(duration).formatted(.units(allowed: [.hours, .minutes])))
+                            Text(PodcastDuration.abbreviated(duration))
                                 .font(.caption2).foregroundStyle(.secondary)
                         }
                     }
@@ -593,7 +651,7 @@ private struct SavedPodcastEpisodeCard: View {
         .accessibilityAction(named: Text(isCurrentlyPlaying ? "Pause" : "Play")) {
             Task { await playOrToggle() }
         }
-        .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to queue")) {
+        .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to Queue")) {
             if isQueued { player.removeFromQueue(id: episode.id) } else { player.enqueue(episode) }
         }
         .contentActions(
@@ -616,6 +674,7 @@ struct FollowingView: View {
     @State private var items: [FollowedItem] = []
     @State private var isLoading = false
     @State private var error: String?
+    @State private var showBrowseForums = false
     @AccessibilityFocusState private var summaryFocused: Bool
 
     var body: some View {
@@ -627,7 +686,16 @@ struct FollowingView: View {
             } else if let error {
                 ErrorView(message: error) { await load() }
             } else if items.isEmpty {
-                EmptyStateView(title: "Not Following Anything", message: "Follow forum topics to get notified of new replies.", systemImage: "bell")
+                EmptyStateView(
+                    title: "Not Following Anything",
+                    message: "Follow forum topics to get notified of new replies.",
+                    systemImage: "bell",
+                    primaryActionLabel: "Browse Forums",
+                    primaryAction: { showBrowseForums = true }
+                )
+                .sheet(isPresented: $showBrowseForums) {
+                    NavigationStack { ForumsBrowseView() }
+                }
             } else {
                 List {
                     summaryHeader
@@ -641,6 +709,10 @@ struct FollowingView: View {
             }
         }
         .task { await load() }
+        // Same staleness gap as SavedItemsView (FORYOU-05): `.task` alone
+        // doesn't re-run when returning to this tab after following
+        // something elsewhere while this screen stayed in the background.
+        .onAppear { Task { await load() } }
     }
 
     private func row(for item: FollowedItem) -> some View {

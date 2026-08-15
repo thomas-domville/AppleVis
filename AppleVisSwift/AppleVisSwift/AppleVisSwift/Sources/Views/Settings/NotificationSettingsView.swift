@@ -64,29 +64,50 @@ struct NotificationSettingsView: View {
             if auth.isSignedIn {
                 Section {
                     Toggle("Forum Replies", isOn: $preferences.notifyForumReplies)
+                        .disabled(pushDenied)
                         .accessibilityHint(String(localized: "Get notified when someone replies to your forum topics."))
                     Toggle("Mentions", isOn: $preferences.notifyMentions)
+                        .disabled(pushDenied)
                         .accessibilityHint(String(localized: "Get notified when someone mentions you in a post or comment."))
                     Toggle("Followed Topics", isOn: $preferences.notifyFollowedTopics)
+                        .disabled(pushDenied)
                         .accessibilityHint(String(localized: "Get notified about activity in topics you follow."))
                 } header: {
                     Text("My Activity")
                 } footer: {
-                    Text("These alerts are only available while signed in.")
+                    Text(pushDenied
+                        ? "These alerts are only available while signed in, and won't arrive until push notifications are allowed in iOS Settings above."
+                        : "These alerts are only available while signed in.")
                 }
             }
 
-            Section("Community") {
+            Section {
                 Toggle("New Forum Topics", isOn: $preferences.notifyNewTopics)
+                    .disabled(pushDenied)
                     .accessibilityHint(String(localized: "Get notified when new forum discussions are posted."))
                 Toggle("New App Listings", isOn: $preferences.notifyAppUpdates)
+                    .disabled(pushDenied)
                     .accessibilityHint(String(localized: "Get notified when existing apps are updated or new accessible apps are added to the AppleVis App Directory."))
                 Toggle("New Podcast Episodes", isOn: $preferences.notifyNewEpisodes)
+                    .disabled(pushDenied)
                     .accessibilityHint(String(localized: "Get notified when new podcast episodes are published."))
                 Toggle("New Resources", isOn: $preferences.notifyNewResources)
+                    .disabled(pushDenied)
                     .accessibilityHint(String(localized: "Get notified when new guides, tutorials, and tips are published."))
                 Toggle("Announcements", isOn: $preferences.notifyAnnouncements)
+                    .disabled(pushDenied)
                     .accessibilityHint(String(localized: "Get notified about important AppleVis announcements."))
+            } header: {
+                Text("Community")
+            } footer: {
+                // These toggles previously stayed fully interactive and
+                // appeared "on" regardless of actual system push-permission
+                // status, with no way to tell why nothing was arriving
+                // (SETTINGS-03) — worst for a screen-reader user, who can't
+                // visually cross-reference the system Settings app.
+                if pushDenied {
+                    Text("Push notifications are blocked in iOS Settings — these won't arrive until allowed above.")
+                }
             }
 
             if !auth.isSignedIn {
@@ -102,6 +123,21 @@ struct NotificationSettingsView: View {
                 }
                 .accessibilityElement(children: .combine)
             }
+
+            Section {
+                ResetToDefaultsButton {
+                    preferences.notifyForumReplies = false
+                    preferences.notifyMentions = false
+                    preferences.notifyNewTopics = true
+                    preferences.notifyFollowedTopics = false
+                    preferences.notifyNewEpisodes = true
+                    preferences.notifyAppUpdates = false
+                    preferences.notifyNewResources = false
+                    preferences.notifyAnnouncements = true
+                    preferences.notificationSound = .mouseSqueak
+                    preferences.badgeCountEnabled = true
+                }
+            }
         }
         .themedList(preferences.colors)
         .navigationTitle("Notifications")
@@ -110,6 +146,8 @@ struct NotificationSettingsView: View {
     }
 
     // MARK: - Permission
+
+    private var pushDenied: Bool { systemAuthStatus == .denied }
 
     private var statusText: String {
         switch systemAuthStatus {

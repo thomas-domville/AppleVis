@@ -50,6 +50,18 @@ struct ForumSettingsView: View {
                 Toggle("Apple Topics Only", isOn: $preferences.appleOnlyForums)
                     .accessibilityHint(String(localized: "Limits the Home feed to topics directly related to Apple products and platforms."))
             }
+
+            Section {
+                ResetToDefaultsButton {
+                    preferences.forumsDefaultFilter = .recent
+                    preferences.showForums = true
+                    preferences.showPodcasts = true
+                    preferences.showApps = true
+                    preferences.showGuides = true
+                    preferences.showBlogs = true
+                    preferences.appleOnlyForums = false
+                }
+            }
         }
         .themedList(preferences.colors)
         .navigationTitle("Forums")

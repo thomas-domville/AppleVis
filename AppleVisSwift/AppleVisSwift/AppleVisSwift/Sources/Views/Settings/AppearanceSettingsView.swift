@@ -60,6 +60,13 @@ struct AppearanceSettingsView: View {
                 .padding(.vertical, 4)
                 .accessibilityElement(children: .combine)
             }
+
+            Section {
+                ResetToDefaultsButton {
+                    preferences.theme = .system
+                    preferences.cardDensity = .comfortable
+                }
+            }
         }
         .themedList(preferences.colors)
         .navigationTitle("Appearance")

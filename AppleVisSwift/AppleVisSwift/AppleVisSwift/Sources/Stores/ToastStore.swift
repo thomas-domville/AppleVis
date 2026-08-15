@@ -31,7 +31,8 @@ final class ToastStore: ObservableObject {
     }
 
     func show(_ message: String, kind: Toast.Kind = .success) {
-        current = Toast(message: message, kind: kind)
+        let toast = Toast(message: message, kind: kind)
+        current = toast
         SoundPlayer.shared.play(kind == .success ? .success : .error)
         // The toast itself renders on screen with its own distinct text,
         // but the sound alone doesn't tell a VoiceOver user *which*
@@ -40,7 +41,15 @@ final class ToastStore: ObservableObject {
         UIAccessibility.post(notification: .announcement, argument: message)
         Task {
             try? await Task.sleep(for: .seconds(3))
-            current = nil
+            // CONC-02: previously nilled `current` unconditionally — two
+            // toasts within 3 seconds (e.g. Save immediately followed by
+            // Follow) meant the first toast's timer cleared the *second*
+            // toast early, cutting its on-screen/VoiceOver-announced
+            // duration short. Only clear if `current` is still this exact
+            // toast.
+            if current?.id == toast.id {
+                current = nil
+            }
         }
     }
 

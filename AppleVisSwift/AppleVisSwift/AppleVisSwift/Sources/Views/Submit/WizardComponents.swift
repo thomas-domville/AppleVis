@@ -124,6 +124,21 @@ struct ThankYouView: View {
     }
 }
 
+/// Announces a submission failure to VoiceOver and moves accessibility focus
+/// to the error message — call from a wizard's `submit()` failure branch.
+/// Previously only `ContactView` gave any VoiceOver feedback at all on
+/// failure; the other four wizards just set `error` and left focus wherever
+/// it was, so a VoiceOver user got silence after tapping Submit with no
+/// indication anything had gone wrong. The delay mirrors the wizards'
+/// existing `focusStepAfterTransition()` pattern — SwiftUI needs a beat after
+/// a body-changing state write before the focus target actually exists.
+@MainActor
+func announceWizardFailure(_ message: String, focus: AccessibilityFocusState<Bool>.Binding) async {
+    UIAccessibility.post(notification: .announcement, argument: message)
+    try? await Task.sleep(for: .milliseconds(300))
+    focus.wrappedValue = true
+}
+
 /// A single label/value row on a wizard's final review screen.
 struct WizardReviewRow: View {
     let label: String

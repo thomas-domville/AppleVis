@@ -30,16 +30,18 @@ struct AppEndpoints {
     /// Category-scoped list uses the native REST directory API (the confirmed
     /// working path for app-directory browsing). A general (no category) list
     /// falls back to the JSON:API node listing sorted by last change.
-    func list(page: Int = 0, platform: AppPlatform? = nil, categoryTid: Int? = nil) async throws -> [AppListing] {
+    func list(page: Int = 0, platform: AppPlatform? = nil, categoryTid: Int? = nil) async throws -> PagedListResult<AppListing> {
         if let platform, let categoryTid {
-            return try await categoryListing(platform: platform.rawValue, categoryId: "\(categoryTid)", page: page).items
+            let result = try await categoryListing(platform: platform.rawValue, categoryId: "\(categoryTid)", page: page)
+            return PagedListResult(items: result.items, hasMore: result.hasMore)
         }
         return try await fetchWithCache(group: .apps, key: "apps:list:\(page)") {
             let response = try await client.jsonAPIList(
                 "node/ios_app_directory",
                 query: ["include": "uid", "sort": "-changed", "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)"]
             )
-            return response.data.map { Mappers.app($0, included: response.included ?? []) }
+            let items = response.data.map { Mappers.app($0, included: response.included ?? []) }
+            return PagedListResult(items: items, hasMore: response.hasNextPage)
         }
     }
 
@@ -66,6 +68,35 @@ struct AppEndpoints {
             return CategoryListingPage(items: rawItems.map { mapDirectoryListing($0) }, hasMore: hasMore)
         }
         return (result.items, result.hasMore)
+    }
+
+    /// Cross-category, title-CONTAINS search across the full App Directory —
+    /// previously the only way to find an app was Platform → Category →
+    /// paged list, with no way to type a name directly (APPS-01), a named
+    /// violation of the master spec's explicit "Search and filters"
+    /// requirement for this screen.
+    func search(_ query: String) async throws -> [AppListing] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        let response = try await client.jsonAPIList(
+            "node/ios_app_directory",
+            query: ["include": "uid", "filter[title][operator]": "CONTAINS", "filter[title][value]": trimmed, "sort": "-changed", "page[limit]": "25"]
+        )
+        return response.data.map { Mappers.app($0, included: response.included ?? []) }
+    }
+
+    /// Title-contains lookup against the existing directory, run before a new
+    /// submission — legacy's `submit-wizard/confirm.tsx` `checkForDuplicate()`
+    /// had no native equivalent anywhere (SUBMIT-004): a submitter had no way
+    /// to know they were about to duplicate an existing entry.
+    func checkForDuplicate(appName: String) async throws -> [AppListing] {
+        let trimmed = appName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        let response = try await client.jsonAPIList(
+            "node/ios_app_directory",
+            query: ["include": "uid", "filter[title][operator]": "CONTAINS", "filter[title][value]": trimmed, "page[limit]": "5"]
+        )
+        return response.data.map { Mappers.app($0, included: response.included ?? []) }
     }
 
     /// Fetches an app listing with full body text and all reviews.

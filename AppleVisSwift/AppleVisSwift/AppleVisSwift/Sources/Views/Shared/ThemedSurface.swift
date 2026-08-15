@@ -37,4 +37,18 @@ extension View {
             .foregroundStyle(colors.pillText)
             .background(colors.pill, in: Capsule())
     }
+
+    /// `.glassEffect` (iOS 26's Liquid Glass) with a pre-26 fallback. The
+    /// app's deployment target is iOS 17, well below Liquid Glass's iOS 26
+    /// floor, so every call site needs a runtime availability check —
+    /// centralized here so there's one fallback design, not several
+    /// independently-tuned ones.
+    @ViewBuilder
+    func adaptiveGlass<S: Shape>(in shape: S) -> some View {
+        if #available(iOS 26.0, *) {
+            self.glassEffect(in: shape)
+        } else {
+            self.background(.ultraThinMaterial, in: shape)
+        }
+    }
 }

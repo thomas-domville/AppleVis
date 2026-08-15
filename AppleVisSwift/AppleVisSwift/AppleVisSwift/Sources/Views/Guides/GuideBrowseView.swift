@@ -45,6 +45,17 @@ struct GuideBrowseView: View {
                 OfflineBanner()
                     .listRowSeparator(.hidden)
             }
+            if searchText.isEmpty {
+                // No local Saved filter existed anywhere in Guides
+                // (GUIDES-04) — the master spec's Saved Model explicitly
+                // requires "Resources Saved" as a local filter, same gap as
+                // Apps (APPS-02).
+                Section {
+                    NavigationLink(destination: SavedItemsView(initialFilter: .resource)) {
+                        Label("Saved Guides", systemImage: "bookmark")
+                    }
+                }
+            }
             if !searchText.isEmpty && visible.isEmpty {
                 EmptyStateView(title: "No Results", message: "No guides match \"\(searchText)\".", systemImage: "magnifyingglass")
                     .listRowSeparator(.hidden)
@@ -98,8 +109,8 @@ struct GuideBrowseView: View {
         isLoading = true; error = nil
         do {
             let fetched = try await APIClient.shared.resources.list(page: page, categoryTids: selectedFilter.tids)
-            resources = fetched
-            hasMore = fetched.count >= APIPaging.pageSize
+            resources = fetched.items
+            hasMore = fetched.hasMore
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Could not load resources" }
         isLoading = false
@@ -111,8 +122,8 @@ struct GuideBrowseView: View {
         do {
             let more = try await APIClient.shared.resources.list(page: page + 1, categoryTids: selectedFilter.tids)
             page += 1
-            resources += more
-            hasMore = more.count >= APIPaging.pageSize
+            resources += more.items
+            hasMore = more.hasMore
         } catch {
             toast.error(String(localized: "Couldn't load more resources."))
         }

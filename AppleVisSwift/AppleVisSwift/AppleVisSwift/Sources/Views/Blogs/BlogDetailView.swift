@@ -9,6 +9,8 @@ struct BlogDetailView: View {
     @State private var quotedComment: BlogComment?
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
+    @State private var newCommentCount = 0
+    @State private var pendingFocusCommentId: String?
     @State private var discussionSummary: String?
     @State private var isSummarizingDiscussion = false
     @AccessibilityFocusState private var isTitleFocused: Bool
@@ -56,7 +58,10 @@ struct BlogDetailView: View {
                             .font(.title2).fontWeight(.semibold)
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityFocused($isTitleFocused)
-                        Text("by \(detail.authorName)")
+                        // Inert plain text everywhere except Forums'
+                        // matching topic header, despite authorId already
+                        // being available (BLOGS-06).
+                        AuthorProfileButton(name: "by \(detail.authorName)", authorId: detail.authorId)
                             .font(.subheadline).foregroundStyle(.secondary)
                     }
                     .padding(.horizontal)
@@ -80,6 +85,17 @@ struct BlogDetailView: View {
                 .padding(.vertical)
             }
             .background(preferences.colors.background)
+            // No focus confirmation after posting a comment, unlike Forums'
+            // well-implemented equivalent (ALL-04).
+            .onChange(of: pendingFocusCommentId) { _, newId in
+                guard let newId else { return }
+                withReduceMotionAwareAnimation { proxy.scrollTo(newId, anchor: .bottom) }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    focusedCommentId = newId
+                    pendingFocusCommentId = nil
+                }
+            }
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -97,11 +113,13 @@ struct BlogDetailView: View {
         .sheet(isPresented: $showCompose) {
             ComposeBlogCommentView(blogId: detail.id, title: detail.title) { comment in
                 self.detail?.comments.append(comment)
+                pendingFocusCommentId = comment.id
             }
         }
         .sheet(item: $quotedComment) { target in
             ComposeBlogCommentView(blogId: detail.id, title: detail.title, quotedComment: target) { comment in
                 self.detail?.comments.append(comment)
+                pendingFocusCommentId = comment.id
             }
         }
     }
@@ -111,7 +129,9 @@ struct BlogDetailView: View {
         CommunityDiscussionHeading(
             count: detail.commentCount,
             onThreadOverview: { announceThreadOverview(detail) },
-            onJumpToLast: { Task { await jumpToLastComment(proxy: proxy) } }
+            onJumpToLast: { Task { await jumpToLastComment(proxy: proxy) } },
+            newCount: newCommentCount,
+            onJumpToFirstNew: { Task { await jumpToFirstNewComment(proxy: proxy) } }
         )
 
         if detail.comments.isEmpty {
@@ -259,6 +279,10 @@ struct BlogDetailView: View {
                 Task { await loadMoreComments() }
             }
             if let detail {
+                // Captured before stampItemVisit below overwrites it (ALL-01).
+                newCommentCount = PersistenceStore.shared.newReplyCount(
+                    kind: .blogPost, id: detail.id, currentCount: detail.commentCount
+                )
                 PersistenceStore.shared.stampItemVisit(
                     id: FeedItem.visitKey(kind: .blogPost, contentId: detail.id),
                     commentCount: detail.commentCount
@@ -315,6 +339,20 @@ struct BlogDetailView: View {
         withReduceMotionAwareAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
         try? await Task.sleep(for: .milliseconds(400))
         focusedCommentId = lastId
+    }
+
+    /// "Jump to First New Comment" (ALL-01) — comments arrive chronologically
+    /// oldest-first, so the first of the `newCommentCount` most recently
+    /// posted comments sits at `comments.count - newCommentCount`.
+    private func jumpToFirstNewComment(proxy: ScrollViewProxy) async {
+        if hasMoreComments { await loadMoreComments() }
+        let comments = self.detail?.comments ?? []
+        let targetIndex = comments.count - newCommentCount
+        guard newCommentCount > 0, targetIndex >= 0, targetIndex < comments.count else { return }
+        let targetId = comments[targetIndex].id
+        withReduceMotionAwareAnimation { proxy.scrollTo(targetId, anchor: .top) }
+        try? await Task.sleep(for: .milliseconds(400))
+        focusedCommentId = targetId
     }
 }
 

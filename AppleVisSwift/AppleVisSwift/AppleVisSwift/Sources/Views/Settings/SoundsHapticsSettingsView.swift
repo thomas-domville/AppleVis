@@ -23,6 +23,13 @@ struct SoundsHapticsSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section {
+                ResetToDefaultsButton {
+                    preferences.confirmationSoundsEnabled = true
+                    preferences.interfaceSoundsEnabled = false
+                }
+            }
         }
         .themedList(preferences.colors)
         .navigationTitle("Sounds & Haptics")

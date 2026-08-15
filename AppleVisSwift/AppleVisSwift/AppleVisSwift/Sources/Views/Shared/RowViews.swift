@@ -100,7 +100,7 @@ struct NewCountBadge: View {
             .font(.caption2).fontWeight(.bold)
             .foregroundStyle(preferences.colors.accentText)
             .padding(.horizontal, 6).padding(.vertical, 2)
-            .background(Color.accentColor, in: Capsule())
+            .background(preferences.colors.unread, in: Capsule())
             .accessibilityHidden(true)
     }
 }
@@ -231,7 +231,7 @@ struct PodcastEpisodeRow: View {
                             NowPlayingWaveform()
                         }
                         if let duration = episode.duration {
-                            Text(Duration.seconds(duration).formatted(.units(allowed: [.hours, .minutes])))
+                            Text(PodcastDuration.abbreviated(duration))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -266,7 +266,7 @@ struct PodcastEpisodeRow: View {
         .accessibilityAction(named: Text(isCurrentlyPlaying ? "Pause" : "Play")) {
             Task { await playOrToggle() }
         }
-        .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to queue")) {
+        .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to Queue")) {
             if isQueued { player.removeFromQueue(id: episode.id) } else { player.enqueue(episode) }
         }
         .contentActions(
@@ -329,16 +329,23 @@ struct PodcastEpisodeRow: View {
 
     private var episodeLabel: String {
         let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
-        let durationText = episode.duration.map { Duration.seconds($0).formatted(.units(allowed: [.hours, .minutes])) } ?? ""
+        let durationText = episode.duration.map { PodcastDuration.abbreviated($0) } ?? ""
         let countText = episode.commentCount > 0 ? "\(episode.commentCount) comment\(episode.commentCount == 1 ? "" : "s")" : ""
         let authorAndCount = [durationText, countText].filter { !$0.isEmpty }.joined(separator: ", ")
-        return detailLevelLabel(
+        let base = detailLevelLabel(
             title: episode.title,
             contentType: podcastContentType(showTitle: episode.showTitle),
             authorAndCount: authorAndCount,
             date: episode.publishedAt.formatted(.relative(presentation: .named)),
             alwaysAppend: "\(savedQueuedLabel)\(newLabel)"
         )
+        // The visible NowPlayingWaveform and play/pause icon are both
+        // .accessibilityHidden — nothing else here ever spoke playing state,
+        // so a VoiceOver user had no way to tell which row was playing short
+        // of opening the rotor and reading the Play/Pause action's current
+        // wording (PODCAST-07). Matches QueueView's NowPlayingQueueCard,
+        // which already prepends this correctly.
+        return isCurrentlyPlaying ? String(localized: "Now playing. \(base)") : base
     }
 
     // Mirrors ForumTopicRow's savedFollowingLabel — episode.isSaved existed

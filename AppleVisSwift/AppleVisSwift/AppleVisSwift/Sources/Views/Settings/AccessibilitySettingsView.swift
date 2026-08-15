@@ -80,6 +80,16 @@ struct AccessibilitySettingsView: View {
                     Label("Open iOS Settings", systemImage: "gear")
                 }
             }
+
+            Section {
+                ResetToDefaultsButton {
+                    preferences.helpfulTipsEnabled = true
+                    preferences.welcomeSummaryEnabled = true
+                    preferences.searchAutoFocusEnabled = true
+                    preferences.homeStartupBehavior = .helpful
+                    preferences.announcementLevel = .normal
+                }
+            }
         }
         .themedList(preferences.colors)
         .navigationTitle("Accessibility")

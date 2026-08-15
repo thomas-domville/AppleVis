@@ -85,6 +85,22 @@ struct PodcastSettingsView: View {
                 }
                 .accessibilityHint(String(localized: "Automatically removes played episodes to free up storage."))
             }
+
+            Section {
+                ResetToDefaultsButton {
+                    preferences.playbackSpeed = 1.0
+                    preferences.skipBackInterval = 10
+                    preferences.skipForwardInterval = 30
+                    preferences.autoPlayNext = true
+                    preferences.sleepTimerMinutes = 0
+                    preferences.resumeRewindSeconds = 15
+                    preferences.trimSilence = false
+                    preferences.voiceBoost = false
+                    preferences.podcastEQ = .flat
+                    preferences.autoDownload = .off
+                    preferences.autoDelete = .off
+                }
+            }
         }
         .themedList(preferences.colors)
         .navigationTitle("Podcasts")

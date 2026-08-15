@@ -1,9 +1,15 @@
 import SwiftUI
 
 struct QueueView: View {
+    /// Set when presented as a sheet (e.g. from the full player, PODCAST-13)
+    /// rather than pushed as the Podcasts tab's own root — adds a "Done"
+    /// toolbar button, which wouldn't make sense on the persistent tab root
+    /// where there's nothing to dismiss back to.
+    var isModal: Bool = false
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @EnvironmentObject private var preferences: PreferencesStore
+    @Environment(\.dismiss) private var dismiss
     @State private var showClearConfirm = false
 
     var body: some View {
@@ -59,6 +65,13 @@ struct QueueView: View {
                 }
             }
             .navigationTitle("Queue")
+            .toolbar {
+                if isModal {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                    }
+                }
+            }
             .confirmationDialog(
                 "Clear the entire queue?", isPresented: $showClearConfirm, titleVisibility: .visible
             ) {
@@ -80,7 +93,7 @@ struct QueueView: View {
             .accessibilityAddTraits(.isHeader)
             .accessibilityAction(named: Text("Queue summary")) {
                 let totalSeconds = player.queue.reduce(0.0) { $0 + ($1.duration ?? 0) }
-                let duration = totalSeconds > 0 ? ", about \(formatDuration(totalSeconds))" : ""
+                let duration = totalSeconds > 0 ? ", about \(PodcastDuration.abbreviated(totalSeconds))" : ""
                 UIAccessibility.post(
                     notification: .announcement,
                     argument: "\(player.queue.count) episode\(player.queue.count == 1 ? "" : "s") in queue\(duration)."
@@ -133,27 +146,37 @@ private struct NowPlayingQueueCard: View {
                 }
             }
 
-            if let p = progress {
+            if progress != nil {
                 VStack(alignment: .leading, spacing: 4) {
-                    ProgressView(value: p)
+                    ProgressView(value: progress ?? 0)
                         .tint(Color.accentColor)
                     HStack {
-                        Text(formatTime(player.position))
+                        Text(PodcastDuration.colon(player.position))
                             .font(.caption2)
                             .monospacedDigit()
                         Spacer()
-                        Text(formatTime(player.duration))
+                        Text(PodcastDuration.colon(player.duration))
                             .font(.caption2)
                             .monospacedDigit()
                     }
                     .foregroundStyle(.secondary)
                 }
-                .accessibilityLabel(String(localized: "Playback progress: \(Int(p * 100)) percent"))
+                // This progress detail previously had its own
+                // .accessibilityLabel, but the outer .accessibilityElement
+                // (children: .combine) + explicit .accessibilityLabel below
+                // on the SAME element replaces rather than merges with a
+                // combined-children label — an explicit label on an ancestor
+                // always wins over .combine's auto-composition, so this text
+                // was silently never spoken. Folded into the outer label
+                // directly instead, and standardized on elapsed-of-total
+                // phrasing (PODCAST-11) — percent was redundant alongside
+                // the time already shown.
             }
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "Now playing: \(episode.title), \(episode.showTitle)"))
+        .accessibilityLabel(String(localized: "Now playing: \(episode.title), \(episode.showTitle).") +
+            (progress != nil ? String(localized: " \(PodcastDuration.colon(player.position)) of \(PodcastDuration.colon(player.duration)).") : ""))
     }
 }
 
@@ -188,7 +211,7 @@ private struct QueueRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if let duration = episode.duration {
-                        Text(formatDuration(duration))
+                        Text(PodcastDuration.abbreviated(duration))
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
@@ -228,7 +251,7 @@ private struct QueueRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             String(localized: "\(position) of \(total). \(episode.title), \(episode.showTitle)") +
-            (episode.duration.map { String(localized: ", \(formatDuration($0))") } ?? "")
+            (episode.duration.map { String(localized: ", \(PodcastDuration.abbreviated($0))") } ?? "")
         )
         .accessibilityHint(String(localized: "Double-tap to open. Use actions to move or remove."))
         .accessibilityAction(named: Text("Open Episode"), onOpen)
@@ -238,21 +261,3 @@ private struct QueueRow: View {
     }
 }
 
-// MARK: - Helpers
-
-private func formatTime(_ seconds: TimeInterval) -> String {
-    let totalSeconds = Int(seconds)
-    let hours = totalSeconds / 3600
-    let minutes = (totalSeconds % 3600) / 60
-    let secs = totalSeconds % 60
-    return hours > 0
-        ? String(format: "%d:%02d:%02d", hours, minutes, secs)
-        : String(format: "%d:%02d", minutes, secs)
-}
-
-private func formatDuration(_ seconds: TimeInterval) -> String {
-    let mins = Int(seconds) / 60
-    let hrs = mins / 60
-    let rem = mins % 60
-    return hrs > 0 ? "\(hrs)h \(rem)m" : "\(mins)m"
-}

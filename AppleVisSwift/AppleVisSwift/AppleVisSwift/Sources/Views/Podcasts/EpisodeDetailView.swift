@@ -11,6 +11,8 @@ struct EpisodeDetailView: View {
     @State private var showTranscript = false
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
+    @State private var newCommentCount = 0
+    @State private var pendingFocusCommentId: String?
     @State private var artworkDescription: String?
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedCommentId: String?
@@ -20,6 +22,10 @@ struct EpisodeDetailView: View {
     @EnvironmentObject private var tips: TipStore
     @EnvironmentObject private var preferences: PreferencesStore
     @ObservedObject private var downloads = DownloadManager.shared
+
+    private func isQueued(_ episode: PodcastEpisode) -> Bool {
+        player.queue.contains { $0.id == episode.id }
+    }
 
     var body: some View {
         Group {
@@ -83,6 +89,20 @@ struct EpisodeDetailView: View {
                 }
             }
             .background(preferences.colors.background)
+            // None of the four Apps/Guides/Blogs/Bugs compose flows (nor
+            // this one) set focus after a successful post, unlike Forums'
+            // well-implemented pendingFocusReplyId pattern — a VoiceOver
+            // user wasn't confirmed, without extra swiping, that their
+            // comment posted or where it landed (ALL-04).
+            .onChange(of: pendingFocusCommentId) { _, newId in
+                guard let newId else { return }
+                withReduceMotionAwareAnimation { proxy.scrollTo(newId, anchor: .bottom) }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    focusedCommentId = newId
+                    pendingFocusCommentId = nil
+                }
+            }
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -116,6 +136,43 @@ struct EpisodeDetailView: View {
                     }
                     .accessibilityLabel(String(localized: "Add comment"))
                 }
+
+                // Every other podcast surface (browse row, queue screen)
+                // supports queueing; the single most detailed view of an
+                // episode had no way to queue it without leaving the screen
+                // (PODCAST-14). Play Next and Mark as Played were both
+                // entirely absent natively despite What's New advertising
+                // "Mark as Played actions" as already shipped.
+                Menu {
+                    Button {
+                        if isQueued(episode) {
+                            player.removeFromQueue(id: episode.id)
+                        } else {
+                            player.enqueue(episode)
+                        }
+                    } label: {
+                        Label(isQueued(episode) ? "Remove from Queue" : "Add to Queue", systemImage: isQueued(episode) ? "text.badge.minus" : "text.badge.plus")
+                    }
+                    Button {
+                        player.playNext(episode)
+                        toast.success(String(localized: "Playing next"))
+                    } label: {
+                        Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
+                    }
+                    if PersistenceStore.shared.isEpisodePlayed(episode.id) {
+                        Label("Played", systemImage: "checkmark.circle.fill")
+                    } else {
+                        Button {
+                            PersistenceStore.shared.markEpisodePlayed(episode.id)
+                            toast.success(String(localized: "Marked as played"))
+                        } label: {
+                            Label("Mark as Played", systemImage: "checkmark.circle")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .accessibilityLabel(String(localized: "More episode actions"))
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -124,11 +181,13 @@ struct EpisodeDetailView: View {
         .sheet(isPresented: $showCompose) {
             ComposePodcastCommentView(episodeId: episode.id, title: episode.title) { comment in
                 comments.append(comment)
+                pendingFocusCommentId = comment.id
             }
         }
         .sheet(item: $quotedComment) { target in
             ComposePodcastCommentView(episodeId: episode.id, title: episode.title, quotedComment: target) { comment in
                 comments.append(comment)
+                pendingFocusCommentId = comment.id
             }
         }
         .sheet(isPresented: $showTranscript) {
@@ -156,7 +215,7 @@ struct EpisodeDetailView: View {
                     .font(.body).fontWeight(.semibold).lineLimit(3)
                 HStack {
                     if let duration = episode.duration {
-                        Text(Duration.seconds(duration).formatted(.units(allowed: [.hours, .minutes])))
+                        Text(PodcastDuration.abbreviated(duration))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     RelativeDateLabel(date: episode.publishedAt)
@@ -188,9 +247,18 @@ struct EpisodeDetailView: View {
             .accessibilityLabel(String(localized: "Downloaded"))
             .accessibilityHint(String(localized: "Double-tap to remove download."))
         } else if downloads.activeDownloads.contains(episode.id) {
-            ProgressView(value: downloads.progress[episode.id] ?? 0)
-                .progressViewStyle(.circular)
-                .accessibilityLabel(String(localized: "Downloading, \(Int((downloads.progress[episode.id] ?? 0) * 100)) percent"))
+            // Previously a bare, non-interactive ProgressView — DownloadManager.
+            // cancelDownload(_:) existed but nothing in the app ever called
+            // it, so no one (sighted or VoiceOver) had any way to stop an
+            // unwanted or mistaken download (PODCAST-03).
+            Button {
+                downloads.cancelDownload(episode.id)
+            } label: {
+                ProgressView(value: downloads.progress[episode.id] ?? 0)
+                    .progressViewStyle(.circular)
+            }
+            .accessibilityLabel(String(localized: "Downloading, \(Int((downloads.progress[episode.id] ?? 0) * 100)) percent"))
+            .accessibilityHint(String(localized: "Double-tap to cancel."))
         } else {
             Button {
                 downloads.download(episode)
@@ -213,7 +281,9 @@ struct EpisodeDetailView: View {
         CommunityDiscussionHeading(
             count: episode.commentCount,
             onThreadOverview: { announceThreadOverview() },
-            onJumpToLast: { Task { await jumpToLastComment(proxy: proxy) } }
+            onJumpToLast: { Task { await jumpToLastComment(proxy: proxy) } },
+            newCount: newCommentCount,
+            onJumpToFirstNew: { Task { await jumpToFirstNewComment(proxy: proxy) } }
         )
 
         if comments.isEmpty {
@@ -290,6 +360,13 @@ struct EpisodeDetailView: View {
             // Comparing against the episode's own known commentCount is
             // correct regardless of the server's actual page size.
             hasMoreComments = fetchedComments.count < fetchedEp.commentCount
+            // Captured from the PREVIOUS visit snapshot before stampItemVisit
+            // below overwrites it — reading newReplyCount AFTER the stamp
+            // would always return 0, the same class of bug fixed for
+            // ForumTopicDetailView's isNew wiring earlier.
+            newCommentCount = PersistenceStore.shared.newReplyCount(
+                kind: .podcastEpisode, id: fetchedEp.id, currentCount: fetchedEp.commentCount
+            )
             PersistenceStore.shared.stampItemVisit(
                 id: FeedItem.visitKey(kind: .podcastEpisode, contentId: fetchedEp.id),
                 commentCount: fetchedEp.commentCount
@@ -305,6 +382,15 @@ struct EpisodeDetailView: View {
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Couldn't load episode." }
         isLoading = false
+        // isTitleFocused was declared and bound to the hero card but never
+        // actually set anywhere — VoiceOver focus was left wherever it was
+        // before navigating in, instead of landing on the episode title.
+        if episode != nil {
+            Task {
+                try? await Task.sleep(for: .milliseconds(400))
+                isTitleFocused = true
+            }
+        }
     }
 
     /// Loads every remaining page in one go instead of requiring a tap per
@@ -336,6 +422,20 @@ struct EpisodeDetailView: View {
         try? await Task.sleep(for: .milliseconds(400))
         focusedCommentId = lastId
     }
+
+    /// "Jump to First New Comment" — comments arrive chronologically
+    /// oldest-first (matches "Jump to Last Comment" scrolling to `.last`
+    /// for the most recent), so the first of the `newCommentCount` most
+    /// recently posted comments sits at `comments.count - newCommentCount`.
+    private func jumpToFirstNewComment(proxy: ScrollViewProxy) async {
+        if hasMoreComments { await loadMoreComments() }
+        let targetIndex = comments.count - newCommentCount
+        guard newCommentCount > 0, targetIndex >= 0, targetIndex < comments.count else { return }
+        let targetId = comments[targetIndex].id
+        withReduceMotionAwareAnimation { proxy.scrollTo(targetId, anchor: .top) }
+        try? await Task.sleep(for: .milliseconds(400))
+        focusedCommentId = targetId
+    }
 }
 
 // MARK: - Chapter row
@@ -349,7 +449,7 @@ struct ChapterRow: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(chapter.title).font(.subheadline)
-                    Text(formatTime(chapter.startTime))
+                    Text(PodcastDuration.colon(chapter.startTime))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -359,18 +459,8 @@ struct ChapterRow: View {
             .padding(.vertical, 8)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(String(localized: "\(chapter.title), starts at \(formatTime(chapter.startTime))"))
+        .accessibilityLabel(String(localized: "\(chapter.title), starts at \(PodcastDuration.colon(chapter.startTime))"))
         .accessibilityHint(String(localized: "Double-tap to seek."))
-    }
-
-    private func formatTime(_ seconds: TimeInterval) -> String {
-        let s = Int(seconds)
-        let h = s / 3600
-        let m = (s % 3600) / 60
-        let sec = s % 60
-        return h > 0
-            ? String(format: "%d:%02d:%02d", h, m, sec)
-            : String(format: "%d:%02d", m, sec)
     }
 }
 

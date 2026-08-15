@@ -8,6 +8,8 @@ struct DeleteAccountView: View {
     @State private var confirmed = false
     @State private var isDeleting = false
     @State private var errorMessage: String?
+    @State private var showFinalConfirm = false
+    @AccessibilityFocusState private var isErrorFocused: Bool
 
     var body: some View {
         Form {
@@ -48,12 +50,13 @@ struct DeleteAccountView: View {
                 Section {
                     Label(error, systemImage: "exclamationmark.circle")
                         .foregroundStyle(.red)
+                        .accessibilityFocused($isErrorFocused)
                 }
             }
 
             Section {
                 Button(role: .destructive) {
-                    deleteAccount()
+                    showFinalConfirm = true
                 } label: {
                     HStack {
                         Spacer()
@@ -79,6 +82,21 @@ struct DeleteAccountView: View {
                 Button("Cancel") { dismiss() }
             }
         }
+        // Every other destructive action in the app (Sign Out, Remove
+        // Downloads, Unsave All, Clear Queue) requires a confirmationDialog
+        // as a second step; this one — the only truly irreversible action —
+        // previously went straight from the toggle to the API call, so a
+        // single mistimed tap (a slipped VoiceOver double-tap, a Switch
+        // Control scan landing wrong) deleted the account immediately.
+        .confirmationDialog(
+            "Delete your account permanently?",
+            isPresented: $showFinalConfirm, titleVisibility: .visible
+        ) {
+            Button("Delete My Account Permanently", role: .destructive) { deleteAccount() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This cannot be undone.")
+        }
     }
 
     private func deleteAccount() {
@@ -92,9 +110,11 @@ struct DeleteAccountView: View {
             } catch let error as APIError {
                 errorMessage = error.localizedDescription
                 isDeleting = false
+                isErrorFocused = true
             } catch {
                 errorMessage = "Could not delete account. Please contact support."
                 isDeleting = false
+                isErrorFocused = true
             }
         }
     }

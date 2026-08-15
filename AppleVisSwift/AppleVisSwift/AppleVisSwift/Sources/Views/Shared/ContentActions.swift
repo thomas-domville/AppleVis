@@ -128,76 +128,94 @@ struct ContentActionsModifier: ViewModifier {
             // duplicate, so this is back to unconditional; the duplication
             // needs a more targeted fix (likely to the menu content itself,
             // not to whether the menu is attached at all).
+            // Every button below also has a corresponding .accessibilityAction
+            // further down, so each is marked .accessibilityHidden(true) here
+            // — otherwise SwiftUI exposes the context menu's own buttons as a
+            // second, redundant set of VoiceOver custom actions alongside the
+            // explicit ones (e.g. "Save Forum Topic" announced twice). Order
+            // matches the .accessibilityAction chain below: routine actions
+            // first, admin/destructive actions last.
             .contextMenu {
                 extraMenuItems
                 if newCount > 0 {
                     Button { markAsRead() } label: {
                         Label("Mark as Read", systemImage: "checkmark.circle")
                     }
-                }
-                Button { addComment() } label: {
-                    Label(addCommentLabel, systemImage: "bubble.left")
+                    .accessibilityHidden(true)
                 }
                 Button {
                     toggleSave()
                 } label: {
                     Label(isSaved ? "Unsave \(kind.saveActionNoun)" : "Save \(kind.saveActionNoun)", systemImage: isSaved ? "bookmark.slash" : "bookmark")
                 }
+                .accessibilityHidden(true)
                 if supportsFollow && auth.isSignedIn {
                     Button {
                         Task { await toggleFollow() }
                     } label: {
                         Label(isFollowing ? "Unfollow \(kind.displayName)" : "Follow \(kind.displayName)", systemImage: isFollowing ? "bell.slash" : "bell")
                     }
+                    .accessibilityHidden(true)
+                }
+                Button { addComment() } label: {
+                    Label(addCommentLabel, systemImage: "bubble.left")
+                }
+                .accessibilityHidden(true)
+                if let url, let shareURL = URL(string: url) {
+                    ShareLink(item: shareURL, subject: Text(title)) {
+                        Label("Share \(kind.displayName)", systemImage: "square.and.arrow.up")
+                    }
+                    .accessibilityHidden(true)
                 }
                 if url.flatMap(URL.init) != nil {
                     Button { showBrowser = true } label: {
                         Label("Open \(kind.displayName) in Browser", systemImage: "safari")
                     }
+                    .accessibilityHidden(true)
                 }
-                if let url, let shareURL = URL(string: url) {
-                    ShareLink(item: shareURL, subject: Text(title)) {
-                        Label("Share \(kind.displayName)", systemImage: "square.and.arrow.up")
-                    }
-                }
-                if isOwnTopic {
+                // Owner-only Edit/Delete are gated on !isAdmin: kind.displayName
+                // resolves to "Topic" for forum topics either way, so an
+                // owner who is also an admin previously saw two
+                // indistinguishable "Edit Topic"/"Delete Topic" entries — the
+                // admin block below already covers this case, plus Unpublish.
+                if isOwnTopic && !isAdmin {
                     Button { startEdit() } label: {
                         Label("Edit Topic", systemImage: "pencil")
                     }
+                    .accessibilityHidden(true)
                     Button(role: .destructive) { showDeleteConfirm = true } label: {
                         Label("Delete Topic", systemImage: "trash")
                     }
+                    .accessibilityHidden(true)
                 }
                 if isAdmin {
                     Button { startEdit() } label: {
                         Label("Edit \(kind.displayName)", systemImage: "pencil")
                     }
+                    .accessibilityHidden(true)
                     Button { showUnpublishConfirm = true } label: {
                         Label("Unpublish \(kind.displayName)", systemImage: "eye.slash")
                     }
+                    .accessibilityHidden(true)
                     Button(role: .destructive) { showDeleteConfirm = true } label: {
                         Label("Delete \(kind.displayName)", systemImage: "trash")
                     }
+                    .accessibilityHidden(true)
                 }
             }
-            .accessibilityAction(named: Text(isSaved ? "Unsave \(kind.saveActionNoun)" : "Save \(kind.saveActionNoun)")) {
-                toggleSave()
-            }
-            .modifier(ConditionalAccessibilityAction(isActive: isOwnTopic, name: "Edit Topic") { startEdit() })
-            .modifier(ConditionalAccessibilityAction(isActive: isOwnTopic, name: "Delete Topic") { showDeleteConfirm = true })
-            .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Edit \(kind.displayName)") { startEdit() })
-            .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Unpublish \(kind.displayName)") { showUnpublishConfirm = true })
-            .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Delete \(kind.displayName)") { showDeleteConfirm = true })
             .modifier(ConditionalAccessibilityAction(isActive: newCount > 0, name: "Mark as Read") {
                 markAsRead()
             })
-            .accessibilityAction(named: Text(addCommentLabel)) { addComment() }
+            .accessibilityAction(named: Text(isSaved ? "Unsave \(kind.saveActionNoun)" : "Save \(kind.saveActionNoun)")) {
+                toggleSave()
+            }
             .modifier(ConditionalAccessibilityAction(
-                isActive: url.flatMap(URL.init) != nil,
-                name: "Open \(kind.displayName) in Browser"
+                isActive: supportsFollow && auth.isSignedIn,
+                name: isFollowing ? "Unfollow \(kind.displayName)" : "Follow \(kind.displayName)"
             ) {
-                showBrowser = true
+                Task { await toggleFollow() }
             })
+            .accessibilityAction(named: Text(addCommentLabel)) { addComment() }
             .modifier(ConditionalAccessibilityAction(
                 isActive: url.flatMap(URL.init) != nil,
                 name: "Share \(kind.displayName)"
@@ -205,11 +223,16 @@ struct ContentActionsModifier: ViewModifier {
                 presentShareSheet()
             })
             .modifier(ConditionalAccessibilityAction(
-                isActive: supportsFollow && auth.isSignedIn,
-                name: isFollowing ? "Unfollow \(kind.displayName)" : "Follow \(kind.displayName)"
+                isActive: url.flatMap(URL.init) != nil,
+                name: "Open \(kind.displayName) in Browser"
             ) {
-                Task { await toggleFollow() }
+                showBrowser = true
             })
+            .modifier(ConditionalAccessibilityAction(isActive: isOwnTopic && !isAdmin, name: "Edit Topic") { startEdit() })
+            .modifier(ConditionalAccessibilityAction(isActive: isOwnTopic && !isAdmin, name: "Delete Topic") { showDeleteConfirm = true })
+            .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Edit \(kind.displayName)") { startEdit() })
+            .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Unpublish \(kind.displayName)") { showUnpublishConfirm = true })
+            .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Delete \(kind.displayName)") { showDeleteConfirm = true })
             .sheet(isPresented: $showBrowser) {
                 if let url, let shareURL = URL(string: url) {
                     SafariView(url: shareURL)
@@ -396,7 +419,69 @@ struct ContentActionsModifier: ViewModifier {
     }
 }
 
-private struct EditableNode: Identifiable {
+/// Canonical action identity — every action `ContentActionsModifier` can
+/// expose, independent of its (state-dependent) display label. Exists so the
+/// ordering/dedup established in `body` above can be checked by a real
+/// permutation test (`ContentActionsOrderingTests`) instead of only by
+/// eyeballing the modifier chain — CARD-01/CARD-03/FORUM-03 (duplicate and
+/// out-of-order VoiceOver actions, including an admin-who-owns-the-topic
+/// seeing two indistinguishable "Edit Topic" entries) were exactly this kind
+/// of drift going unnoticed.
+///
+/// IMPORTANT: this mirrors the conditions and order of the `.contextMenu`
+/// block and `.accessibilityAction`/`ConditionalAccessibilityAction` chain in
+/// `body` above by hand — it does not drive them. If you change which
+/// actions appear, in what order, or under what condition up there, update
+/// `canonicalActions` below to match, or the test suite will pass against a
+/// mirror that no longer reflects the real UI.
+enum ContentAction: Equatable {
+    case markAsRead
+    case save
+    case follow
+    case addComment
+    case share
+    case openInBrowser
+    case editTopic
+    case deleteTopic
+    case editContent
+    case unpublish
+    case deleteContent
+}
+
+extension ContentActionsModifier {
+    static func canonicalActions(
+        hasNewCount: Bool,
+        supportsFollow: Bool,
+        isSignedIn: Bool,
+        hasUrl: Bool,
+        isOwnTopic: Bool,
+        isAdmin: Bool
+    ) -> [ContentAction] {
+        var actions: [ContentAction] = []
+        if hasNewCount { actions.append(.markAsRead) }
+        actions.append(.save)
+        if supportsFollow && isSignedIn { actions.append(.follow) }
+        actions.append(.addComment)
+        if hasUrl { actions.append(.share) }
+        if hasUrl { actions.append(.openInBrowser) }
+        if isOwnTopic && !isAdmin {
+            actions.append(.editTopic)
+            actions.append(.deleteTopic)
+        }
+        if isAdmin {
+            actions.append(.editContent)
+            actions.append(.unpublish)
+            actions.append(.deleteContent)
+        }
+        return actions
+    }
+}
+
+/// Not private — `ForumTopicDetailView` reuses this and `EditNodeSheet`
+/// directly for topic-level Edit/Delete/Unpublish, which previously had no
+/// equivalent anywhere on the detail screen itself (only from a browse-list
+/// row's long-press menu).
+struct EditableNode: Identifiable {
     let id = UUID()
     let title: String
     let body: String
@@ -406,7 +491,7 @@ private struct EditableNode: Identifiable {
 /// Generic title+body editor for admin/owner "Edit" actions — reused across
 /// every content kind (Forums/Podcasts/Apps/Guides/Blogs/Bug Reports) rather
 /// than building 6 nearly-identical edit screens.
-private struct EditNodeSheet: View {
+struct EditNodeSheet: View {
     let onSave: (String, String) async throws -> Void
 
     @State private var title: String
@@ -541,7 +626,15 @@ struct ContentDetailActions: View {
     @State private var showBrowser = false
 
     var body: some View {
+        // Order matches ContentActionsModifier's canonical action order:
+        // routine self-state actions first (Save, then Follow), Share/Browser last.
         HStack(spacing: 0) {
+            DetailActionButton(
+                systemImage: isSaved ? "bookmark.fill" : "bookmark",
+                visualLabel: isSaved ? "Unsave" : "Save",
+                accessibilityLabel: isSaved ? String(localized: "Unsave \(kind.displayName)") : String(localized: "Save \(kind.displayName)")
+            ) { toggleSave() }
+
             if supportsFollow && auth.isSignedIn {
                 DetailActionButton(
                     systemImage: isFollowing ? "bell.fill" : "bell",
@@ -549,12 +642,6 @@ struct ContentDetailActions: View {
                     accessibilityLabel: isFollowing ? String(localized: "Unfollow \(kind.displayName)") : String(localized: "Follow \(kind.displayName)")
                 ) { Task { await toggleFollow() } }
             }
-
-            DetailActionButton(
-                systemImage: isSaved ? "bookmark.fill" : "bookmark",
-                visualLabel: isSaved ? "Unsave" : "Save",
-                accessibilityLabel: isSaved ? String(localized: "Unsave \(kind.displayName)") : String(localized: "Save \(kind.displayName)")
-            ) { toggleSave() }
 
             if let url, let shareURL = URL(string: url) {
                 ShareLink(item: shareURL, subject: Text(title)) {
@@ -643,7 +730,10 @@ struct DetailActionButtonLabel: View {
     var body: some View {
         VStack(spacing: 4) {
             Image(systemName: systemImage)
-                .font(.system(size: 20))
+                // CARD-11: fixed-point size didn't scale with Dynamic Type;
+                // .title3 matches the prior 20pt default exactly while
+                // still responding to the system text-size setting.
+                .font(.title3)
             Text(String(localized: String.LocalizationValue(visualLabel)))
                 .font(.caption2)
         }

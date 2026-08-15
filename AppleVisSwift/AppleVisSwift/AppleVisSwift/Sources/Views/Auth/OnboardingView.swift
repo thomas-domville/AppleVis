@@ -143,6 +143,28 @@ private struct WelcomeStep: View {
                 }
                 .padding(.top, 48)
 
+                // This app has no way to detect an upgrade from the previous
+                // AppleVis app (a deliberate choice — see Phase D of the
+                // release audit: no Expo→native migration code, full local
+                // reset accepted as a one-time cost), so this note is shown
+                // to everyone rather than guessed at. It's a no-op for a
+                // genuinely new user and the one explanation a returning
+                // user gets for why they need to sign in and reconfigure
+                // preferences again.
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("Used AppleVis before?", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                    Text("This is a rebuilt version of the app. Your forum posts, reviews, and account are all still there on the website — just sign back in. Local settings like your saved episodes and preferences were reset and will need to be set up again.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(16)
+                .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 24)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(String(localized: "Used AppleVis before? This is a rebuilt version of the app. Your forum posts, reviews, and account are all still there on the website — just sign back in. Local settings like your saved episodes and preferences were reset and will need to be set up again."))
+
                 VStack(spacing: 20) {
                     ForEach(features, id: \.title) { feature in
                         HStack(alignment: .top, spacing: 16) {
@@ -212,6 +234,13 @@ private struct SignInStep: View {
                             .textFieldStyle(.roundedBorder)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                            // Missing here despite being present and correct
+                            // on the standalone SignInView (ONBOARD-05) — no
+                            // shared component, so the two drifted. This is
+                            // most users' very first sign-in in the app,
+                            // arguably the moment AutoFill/Strong Password/
+                            // Keychain credential offers matter most.
+                            .textContentType(.username)
                             .accessibilityLabel(String(localized: "Username field"))
                             .accessibilityFocused($isUsernameFocused)
                     }
@@ -220,6 +249,7 @@ private struct SignInStep: View {
                         Text("Password").font(.caption).foregroundStyle(.secondary)
                         SecureField("Password", text: $password)
                             .textFieldStyle(.roundedBorder)
+                            .textContentType(.password)
                             .accessibilityLabel(String(localized: "Password field"))
                             .onSubmit { signIn() }
                     }

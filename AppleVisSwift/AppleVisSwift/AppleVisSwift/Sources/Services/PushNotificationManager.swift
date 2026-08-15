@@ -122,7 +122,26 @@ final class AppleVisAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         Task { @MainActor in PushNotificationManager.registerCategories() }
+        // Touched here, not just lazily on first UI access — a background
+        // URLSession relaunch can happen before any SwiftUI view appears,
+        // and the session needs to reattach under its stable identifier as
+        // early as possible to receive queued delegate callbacks.
+        _ = DownloadManager.shared
         return true
+    }
+
+    /// A background download completed (or failed) while the app was
+    /// suspended or not running — the OS relaunches the app under this
+    /// exact entry point to deliver the news. The completion handler must
+    /// be called once `DownloadManager` confirms it's received every queued
+    /// callback (`urlSessionDidFinishEvents`), or the OS considers the app
+    /// unresponsive.
+    func application(
+        _ application: UIApplication,
+        handleEventsForBackgroundURLSession identifier: String,
+        completionHandler: @escaping () -> Void
+    ) {
+        DownloadManager.shared.backgroundSessionCompletionHandler = completionHandler
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {

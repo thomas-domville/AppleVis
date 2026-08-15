@@ -10,8 +10,15 @@ enum IntelligenceService {
 
     // MARK: - Availability
 
+    // FoundationModels itself requires iOS 26+; the app's deployment target
+    // is iOS 17, so every reference to its types must be behind a runtime
+    // #available check even though every public function here keeps a
+    // plain, OS-agnostic signature (Bool/String?/[GuidelineWarning]) — on
+    // iOS 17-25 these simply behave as if Apple Intelligence were never
+    // available, exactly like an unsupported device today.
     static var isAvailable: Bool {
-        SystemLanguageModel.default.availability == .available
+        guard #available(iOS 26.0, *) else { return false }
+        return SystemLanguageModel.default.availability == .available
     }
 
     // MARK: - Non-English detection (NaturalLanguage — no model download needed)
@@ -139,7 +146,7 @@ enum IntelligenceService {
     // MARK: - Private
 
     private static func rawResponse(_ prompt: String) async -> String? {
-        guard isAvailable else { return nil }
+        guard #available(iOS 26.0, *), isAvailable else { return nil }
         do {
             let session = LanguageModelSession()
             let response = try await session.respond(to: prompt)
@@ -153,7 +160,7 @@ enum IntelligenceService {
             // does nothing" hard to diagnose without a device console).
             // Previously DEBUG-only, which meant the exact field reports
             // this was added to diagnose were still invisible in Release.
-            AppLog.intelligence.error("Generation failed: \(error, privacy: .public)")
+            AppLog.intelligence.error("Generation failed: \(error, privacy: .private)")
             return nil
         }
     }

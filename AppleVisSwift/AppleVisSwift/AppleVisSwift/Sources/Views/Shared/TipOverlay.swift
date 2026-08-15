@@ -72,13 +72,20 @@ private struct TipCard: View {
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
 
-            Button("Got it", action: onDismiss)
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-                .buttonStyle(.glassProminent)
-                .tint(Self.brandColor)
-                .accessibilityHint(String(localized: "Dismisses this tip. It will not appear again."))
+            Group {
+                if #available(iOS 26.0, *) {
+                    Button("Got it", action: onDismiss)
+                        .buttonStyle(.glassProminent)
+                } else {
+                    Button("Got it", action: onDismiss)
+                        .buttonStyle(.borderedProminent)
+                }
+            }
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .tint(Self.brandColor)
+            .accessibilityHint(String(localized: "Dismisses this tip. It will not appear again."))
         }
         .padding(22)
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22))

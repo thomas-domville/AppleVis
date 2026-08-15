@@ -31,6 +31,7 @@ struct SubmitBlogView: View {
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
     @AccessibilityFocusState private var isStepFocused: Bool
+    @AccessibilityFocusState private var isErrorFocused: Bool
 
     @State private var step: Step = .details
     @State private var showSignIn = false
@@ -42,6 +43,8 @@ struct SubmitBlogView: View {
     @State private var error: String?
     @State private var showFileImporter = false
     @State private var showDiscardConfirm = false
+    @State private var submitted = false
+    @State private var blogDraftMinimumAnnounced = false
 
     /// Set when opened from the Share Extension with shared text.
     init(prefillText: String? = nil) {
@@ -52,14 +55,39 @@ struct SubmitBlogView: View {
         !title.trimmingCharacters(in: .whitespaces).isEmpty && !category.isEmpty
     }
 
+    private var blogDraftLength: Int { blogDraft.trimmingCharacters(in: .whitespacesAndNewlines).count }
+
+    /// 50-char minimum matches legacy's `submit-blog/content.tsx`
+    /// `canContinue`, dropped in the native port (SUBMIT-012).
     private var contentValid: Bool {
-        !blogDraft.trimmingCharacters(in: .whitespaces).isEmpty
+        blogDraftLength >= 50
+    }
+
+    /// Mirrors Contact's crossing-the-threshold announcement so VoiceOver
+    /// users learn the moment they can continue, not just via Next's
+    /// disabled state.
+    private func handleBlogDraftChange(_ newValue: String) {
+        let length = newValue.trimmingCharacters(in: .whitespacesAndNewlines).count
+        if !blogDraftMinimumAnnounced && length >= 50 {
+            blogDraftMinimumAnnounced = true
+            UIAccessibility.post(notification: .announcement, argument: "Minimum length reached. You can now continue.")
+        } else if blogDraftMinimumAnnounced && length < 50 {
+            blogDraftMinimumAnnounced = false
+        }
     }
 
     var body: some View {
         NavigationStack {
             Group {
-                if !auth.isSignedIn {
+                if submitted {
+                    ThankYouView(
+                        icon: "doc.text",
+                        heading: "Blog post submitted!",
+                        message: "Thanks for your submission. The AppleVis editorial team will review your draft and follow up.",
+                        doneLabel: "Done",
+                        onDone: { dismiss() }
+                    )
+                } else if !auth.isSignedIn {
                     signInRequiredView
                 } else {
                     Form {
@@ -69,7 +97,12 @@ struct SubmitBlogView: View {
                         case .review:  reviewSection
                         }
                         if let error {
-                            Section { Text(error).foregroundStyle(.red) }
+                            Section {
+                                Text(error)
+                                    .foregroundStyle(.red)
+                                    .accessibilityAddTraits(.isHeader)
+                                    .accessibilityFocused($isErrorFocused)
+                            }
                         }
                     }
                     .themedList(preferences.colors)
@@ -78,6 +111,7 @@ struct SubmitBlogView: View {
             .navigationTitle("Submit a Blog Post")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                if !submitted {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(step == .details ? "Cancel" : "Back") {
                         if step == .details {
@@ -111,6 +145,7 @@ struct SubmitBlogView: View {
                                 .disabled(step == .details ? !detailsValid : !contentValid)
                         }
                     }
+                }
                 }
             }
         }
@@ -148,10 +183,12 @@ struct SubmitBlogView: View {
             }
             Section("Blog Post") {
                 TextField("Blog title", text: $title)
+                    .accessibilityHint(String(localized: "Required."))
                 Picker("Category", selection: $category) {
                     Text("Choose a category").tag("")
                     ForEach(Self.categories, id: \.self) { Text($0).tag($0) }
                 }
+                .accessibilityHint(String(localized: "Required."))
             }
         }
     }
@@ -184,10 +221,22 @@ struct SubmitBlogView: View {
                     .frame(minHeight: 80)
                     .accessibilityHint(String(localized: "A private note to the editorial team, not published."))
             }
-            Section("Blog Post Draft") {
+            Section {
+                HStack {
+                    Text("Blog Post Draft").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text(blogDraftLength < 50 ? "\(blogDraftLength) / 50 min" : "\(blogDraftLength) chars")
+                        .font(.caption)
+                        .fontWeight(blogDraftLength < 50 ? .bold : .regular)
+                        .foregroundStyle(blogDraftLength < 50 ? .red : .secondary)
+                        .accessibilityLabel(blogDraftLength < 50 ? String(localized: "\(blogDraftLength) of 50 minimum characters") : String(localized: "\(blogDraftLength) characters"))
+                }
                 TextEditor(text: $blogDraft)
                     .frame(minHeight: 200)
+                    .accessibilityLabel(String(localized: "Blog Post Draft"))
+                    .accessibilityHint(String(localized: "Required. Minimum 50 characters."))
                     .onChange(of: blogDraft) { _, newValue in
+                        handleBlogDraftChange(newValue)
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
                             newValue,
@@ -318,10 +367,11 @@ struct SubmitBlogView: View {
         let result = await DrupalFormClient.submitBlog(name: user.name, email: "", message: message, blogDraft: blogDraft)
         switch result {
         case .ok:
-            toast.success(String(localized: "Blog post submitted for review"))
-            dismiss()
+            SoundPlayer.shared.play(.success)
+            submitted = true
         case .failure(let message):
             error = message
+            await announceWizardFailure(message, focus: $isErrorFocused)
         }
         isSubmitting = false
     }

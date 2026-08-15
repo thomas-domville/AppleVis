@@ -6,6 +6,10 @@ import os
 
 @MainActor
 final class PlayerStore: ObservableObject {
+    /// Lets SoundPlayer check whether a podcast is loaded without needing
+    /// PlayerStore injected — mirrors PreferencesStore.current's pattern.
+    static weak var current: PlayerStore?
+
     @Published private(set) var currentEpisode: PodcastEpisode?
     @Published private(set) var queue: [PodcastEpisode] = []
     @Published private(set) var isPlaying = false
@@ -37,6 +41,7 @@ final class PlayerStore: ObservableObject {
     private var positions: [String: TimeInterval] = [:]
 
     init() {
+        PlayerStore.current = self
         playbackSpeed = Float(UserDefaults.standard.object(forKey: Self.speedKey) as? Double ?? 1.0)
         volume = Float(UserDefaults.standard.object(forKey: Self.volumeKey) as? Double ?? 1.0)
         restoreQueue()
@@ -217,6 +222,15 @@ final class PlayerStore: ObservableObject {
         saveQueue()
     }
 
+    /// Inserts at the front of "Up Next" instead of the end — `enqueue`
+    /// alone had no way to say "play this one right after the current
+    /// episode" versus "play this one last."
+    func playNext(_ episode: PodcastEpisode) {
+        queue.removeAll { $0.id == episode.id }
+        queue.insert(episode, at: 0)
+        saveQueue()
+    }
+
     func removeFromQueue(id: String) {
         queue.removeAll { $0.id == id }
         saveQueue()
@@ -381,7 +395,7 @@ final class PlayerStore: ObservableObject {
         } catch {
             // Previously only a bare print() — playback would then silently
             // fail or come out broken with no indication anywhere why.
-            AppLog.player.error("Audio session setup failed: \(error, privacy: .public)")
+            AppLog.player.error("Audio session setup failed: \(error, privacy: .private)")
             errorMessage = String(localized: "Couldn't set up audio playback. Try again.")
         }
     }
@@ -441,6 +455,7 @@ final class PlayerStore: ObservableObject {
                 guard let self else { return }
                 if let episode = self.currentEpisode {
                     DownloadManager.shared.markPlayCompleted(episode.id)
+                    PersistenceStore.shared.markEpisodePlayed(episode.id)
                 }
                 if self.sleepAtEndOfEpisode {
                     self.pause()

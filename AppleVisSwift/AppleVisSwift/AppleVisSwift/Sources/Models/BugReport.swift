@@ -66,4 +66,20 @@ enum BugSeverity: String, Codable {
     case low, medium, high
 
     var displayName: String { rawValue.capitalized }
+
+    // BUGS-06: severity previously had no visual distinction at all beyond
+    // its plain text label — sighted/low-vision users scanning a bug list
+    // had no non-text cue to pick out high-severity reports at a glance.
+    // Icon is additive alongside the existing text label, not a
+    // replacement for it, so nothing regresses for VoiceOver users (who
+    // already get the label via `displayName`). Color is resolved by
+    // callers from `ThemeColors.warning`/`.error`/`.success` (CARD-07) so
+    // it stays theme-consistent rather than a fixed system color.
+    var iconName: String {
+        switch self {
+        case .low: return "arrow.down.circle.fill"
+        case .medium: return "equal.circle.fill"
+        case .high: return "exclamationmark.triangle.fill"
+        }
+    }
 }

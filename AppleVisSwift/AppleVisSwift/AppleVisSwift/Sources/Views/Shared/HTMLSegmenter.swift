@@ -1,12 +1,14 @@
 import SwiftUI
 
 /// One top-level block of HTML content — heading, blockquote, code block,
-/// or ordinary prose.
+/// table, or ordinary prose.
 enum HTMLSegmentKind: Equatable {
     case heading(level: Int)
     case quote
     case code
     case prose
+    /// `rows[0]` is the header row's cell text when `hasHeaderRow` is true.
+    case table(rows: [[String]], hasHeaderRow: Bool)
 }
 
 struct HTMLSegment: Identifiable {
@@ -58,8 +60,16 @@ enum HTMLSegmenter {
     }
 
     private static func computeSegments(_ html: String) -> [HTMLSegment] {
+        // `table` added to the existing top-level block scan (GUIDES-02) —
+        // previously tables fell into the generic .prose case and were
+        // flattened by the HTML importer into unstructured text, with no
+        // VoiceOver row/column semantics and no Braille cell boundaries.
+        // Comparison tables are common in accessibility how-to guides
+        // ("which gesture does what") — a sighted user can still visually
+        // parse a mis-rendered table's grid; a VoiceOver/Braille user gets
+        // no equivalent fallback once the structure is gone.
         guard let regex = try? NSRegularExpression(
-            pattern: #"(?is)<(h[1-6]|blockquote|pre)\b[^>]*>.*?</\1>"#
+            pattern: #"(?is)<(h[1-6]|blockquote|pre|table)\b[^>]*>.*?</\1>"#
         ) else {
             return [HTMLSegment(kind: .prose, html: html, plainText: html.strippingHTMLTags())]
         }
@@ -75,6 +85,15 @@ enum HTMLSegmenter {
             }
             let tag = ns.substring(with: match.range(at: 1)).lowercased()
             let blockHTML = ns.substring(with: match.range)
+            if tag == "table" {
+                let (rows, hasHeaderRow) = parseTableRows(blockHTML)
+                if !rows.isEmpty {
+                    let plain = rows.map { $0.joined(separator: ", ") }.joined(separator: "; ")
+                    segments.append(HTMLSegment(kind: .table(rows: rows, hasHeaderRow: hasHeaderRow), html: blockHTML, plainText: plain))
+                }
+                cursor = match.range.location + match.range.length
+                continue
+            }
             let plain = blockHTML.strippingHTMLTags().trimmingCharacters(in: .whitespacesAndNewlines)
             if !plain.isEmpty {
                 if tag.hasPrefix("h"), let level = Int(tag.dropFirst()) {
@@ -94,6 +113,41 @@ enum HTMLSegmenter {
         return segments.isEmpty
             ? [HTMLSegment(kind: .prose, html: html, plainText: html.strippingHTMLTags())]
             : segments
+    }
+
+    /// Best-effort `<tr>`/`<th>`/`<td>` extraction — good enough for the
+    /// well-formed HTML Drupal's rich-text table editor actually produces,
+    /// matching this file's existing regex-scan philosophy rather than a
+    /// full HTML parser. A row is only kept if it has at least one cell;
+    /// the header row is detected as a first row whose cells are all `<th>`.
+    private static func parseTableRows(_ tableHTML: String) -> (rows: [[String]], hasHeaderRow: Bool) {
+        guard let rowRegex = try? NSRegularExpression(pattern: #"(?is)<tr\b[^>]*>(.*?)</tr>"#),
+              let cellRegex = try? NSRegularExpression(pattern: #"(?is)<(th|td)\b[^>]*>(.*?)</\1>"#)
+        else { return ([], false) }
+
+        let ns = tableHTML as NSString
+        let rowMatches = rowRegex.matches(in: tableHTML, range: NSRange(location: 0, length: ns.length))
+
+        var rows: [[String]] = []
+        var hasHeaderRow = false
+        for rowMatch in rowMatches {
+            let rowContent = ns.substring(with: rowMatch.range(at: 1))
+            let rowNs = rowContent as NSString
+            let cellMatches = cellRegex.matches(in: rowContent, range: NSRange(location: 0, length: rowNs.length))
+            guard !cellMatches.isEmpty else { continue }
+
+            var cells: [String] = []
+            var allHeaderCells = true
+            for cellMatch in cellMatches {
+                let cellTag = rowNs.substring(with: cellMatch.range(at: 1)).lowercased()
+                if cellTag != "th" { allHeaderCells = false }
+                let cellHTML = rowNs.substring(with: cellMatch.range(at: 2))
+                cells.append(cellHTML.strippingHTMLTags().trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+            if rows.isEmpty { hasHeaderRow = allHeaderCells }
+            rows.append(cells)
+        }
+        return (rows, hasHeaderRow)
     }
 
     private static func appendProse(_ html: String, to segments: inout [HTMLSegment]) {
@@ -180,9 +234,53 @@ struct SegmentedHTMLView: View {
             .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 6))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(String(localized: "Code: \(segment.plainText)"))
+        case .table(let rows, let hasHeaderRow):
+            tableView(rows: rows, hasHeaderRow: hasHeaderRow)
         case .prose:
             HTMLTextView(html: segment.html)
         }
+    }
+
+    /// SwiftUI has no dedicated table-cell accessibility role, so each data
+    /// cell's spoken label folds in its column header text directly
+    /// ("VoiceOver support: Full" rather than just "Full") — the practical
+    /// equivalent of real row/column semantics given what's actually
+    /// available, while each cell stays its own separately-focusable
+    /// element for cell-by-cell navigation and natural Braille boundaries.
+    @ViewBuilder
+    private func tableView(rows: [[String]], hasHeaderRow: Bool) -> some View {
+        let columnCount = rows.map(\.count).max() ?? 0
+        ScrollView(.horizontal, showsIndicators: true) {
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { rowIndex, row in
+                    GridRow {
+                        ForEach(0..<columnCount, id: \.self) { columnIndex in
+                            let cellText = columnIndex < row.count ? row[columnIndex] : ""
+                            let isHeaderCell = hasHeaderRow && rowIndex == 0
+                            Text(cellText)
+                                .font(.subheadline)
+                                .fontWeight(isHeaderCell ? .semibold : .regular)
+                                .accessibilityAddTraits(isHeaderCell ? .isHeader : [])
+                                .accessibilityLabel(tableCellAccessibilityLabel(
+                                    rows: rows, rowIndex: rowIndex, columnIndex: columnIndex, hasHeaderRow: hasHeaderRow
+                                ))
+                        }
+                    }
+                }
+            }
+            .padding(10)
+        }
+        .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func tableCellAccessibilityLabel(rows: [[String]], rowIndex: Int, columnIndex: Int, hasHeaderRow: Bool) -> String {
+        let cellText = columnIndex < rows[rowIndex].count ? rows[rowIndex][columnIndex] : ""
+        guard hasHeaderRow, rowIndex > 0, columnIndex < rows[0].count else { return cellText }
+        let headerText = rows[0][columnIndex]
+        guard !headerText.isEmpty, headerText != cellText else { return cellText }
+        return cellText.isEmpty
+            ? String(localized: "\(headerText): blank")
+            : String(localized: "\(headerText): \(cellText)")
     }
 }
 

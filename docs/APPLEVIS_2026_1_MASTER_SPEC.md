@@ -2,7 +2,17 @@
 
 ## Final Navigation
 
-Bottom tab bar on iPhone must have exactly five tabs to avoid iOS creating a More tab:
+Superseded by a later product decision (the "3-tab redesign"): the shipped
+bottom tab bar has three tabs — Home, Discover, For You — with Forums,
+Podcasts, Apps, and Resources reachable as a hub grid inside Discover rather
+than as top-level tabs. This section originally specified five top-level
+tabs (Home/Forums/Podcasts/Apps/Resources); that structure was deliberately
+replaced and is kept below only as historical context, not current direction.
+Any other requirement in this document that assumes Forums/Podcasts/Apps/
+Resources are directly-reachable top-level tabs should be read against the
+current hub-based model instead (DISCOVER-03).
+
+Original five-tab specification (superseded):
 
 1. Home
 2. Forums
@@ -173,7 +183,10 @@ All app sounds must be optional. Default on: notification, save confirmation, do
 ## iPadOS Requirements
 
 - Native iPad layout, not a stretched iPhone layout.
-- Sidebar navigation with Home, Forums, Podcasts, Apps, Resources.
+- Sidebar navigation with Home, Forums, Podcasts, Apps, Resources — see the
+  "Final Navigation" note above: this list should be read against the
+  current three-tab/Discover-hub model (Forums/Podcasts/Apps/Resources as
+  hub entries, not independent sidebar destinations), not taken literally.
 - Split view: list on left, detail on right.
 - Podcast mini-player pinned at bottom.
 - Full keyboard navigation.

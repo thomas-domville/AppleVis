@@ -60,7 +60,7 @@ struct MiniPlayerView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+            .adaptiveGlass(in: RoundedRectangle(cornerRadius: 16))
             .padding(.horizontal, 8)
             .contentShape(Rectangle())
             .onTapGesture { showFullPlayer = true }
@@ -89,6 +89,7 @@ struct FullPlayerView: View {
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var preferences: PreferencesStore
     @Environment(\.dismiss) private var dismiss
+    @State private var showQueue = false
 
     private let speedOptions: [Float] = PodcastSpeedOptions.all.map(Float.init)
 
@@ -140,9 +141,9 @@ struct FullPlayerView: View {
 
                         // Time labels
                         HStack {
-                            Text(formatTime(player.position))
+                            Text(PodcastDuration.colon(player.position))
                             Spacer()
-                            Text("-\(formatTime(max(0, player.duration - player.position)))")
+                            Text("-\(PodcastDuration.colon(max(0, player.duration - player.position)))")
                         }
                         .font(.caption).foregroundStyle(.secondary)
                         .padding(.horizontal, 28)
@@ -154,9 +155,14 @@ struct FullPlayerView: View {
                             .padding(.horizontal, 24)
                             .padding(.bottom, 28)
 
-                        // Speed + Sleep Timer + AirPlay
-                        GlassEffectContainer(spacing: 12) {
-                            HStack(spacing: 12) {
+                        // Speed + Sleep Timer + AirPlay. GlassEffectContainer
+                        // (iOS 26+) coalesces the individual .adaptiveGlass
+                        // shapes' rendering; below iOS 26 there's no
+                        // equivalent to imitate, so the content just renders
+                        // directly — each button's own .adaptiveGlass
+                        // fallback still applies.
+                        Group {
+                            let buttons = HStack(spacing: 12) {
                                 speedButton
                                 sleepTimerButton
                                 RoutePickerView()
@@ -164,6 +170,11 @@ struct FullPlayerView: View {
                                     .padding(11)
                                     .contentShape(Rectangle())
                                     .accessibilityLabel(String(localized: "Audio output"))
+                            }
+                            if #available(iOS 26.0, *) {
+                                GlassEffectContainer(spacing: 12) { buttons }
+                            } else {
+                                buttons
                             }
                         }
                         .padding(.bottom, 32)
@@ -173,9 +184,24 @@ struct FullPlayerView: View {
                 .navigationTitle("Now Playing")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    // No way to reach Up Next from Now Playing (PODCAST-13) —
+                    // users had to dismiss the full player and navigate
+                    // elsewhere to see or reorder the queue.
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button {
+                            showQueue = true
+                        } label: {
+                            Image(systemName: "list.number")
+                        }
+                        .accessibilityLabel(String(localized: "Queue"))
+                        .accessibilityHint(String(localized: "Shows what's playing next."))
+                    }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button("Done") { SoundPlayer.shared.play(.screenClose); dismiss() }
                     }
+                }
+                .sheet(isPresented: $showQueue) {
+                    QueueView(isModal: true)
                 }
             }
         }
@@ -247,10 +273,15 @@ struct FullPlayerView: View {
                 .font(.subheadline).fontWeight(.bold)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 8)
-                .glassEffect(in: Capsule())
+                .adaptiveGlass(in: Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(String(localized: "Playback speed: \(speedLabel(current))×"))
+        // Split into a static label + dynamic value (PODCAST-06) — VoiceOver's
+        // automatic post-adjustment announcement speaks accessibilityValue,
+        // not the label, so baking the current speed only into the label
+        // risked no audible confirmation after swiping to change it.
+        .accessibilityLabel(String(localized: "Playback speed"))
+        .accessibilityValue(String(localized: "\(speedLabel(current))×"))
         .accessibilityHint(String(localized: "Double-tap to increase. Swipe up or down to adjust."))
         // Was double-tap-to-increase only, wrapping 3.0x back to 0.5x — a
         // VoiceOver user who overshot their target speed had to tap through
@@ -289,7 +320,7 @@ struct FullPlayerView: View {
                 .font(.subheadline).fontWeight(.bold)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 8)
-                .glassEffect(in: Capsule())
+                .adaptiveGlass(in: Capsule())
         }
         .accessibilityLabel(String(localized: sleepTimerAccessibilityLabel))
     }
@@ -303,18 +334,8 @@ struct FullPlayerView: View {
 
     private var sleepTimerLabel: String {
         if player.sleepAtEndOfEpisode { return "End" }
-        if let remaining = player.sleepTimerRemaining { return formatTime(remaining) }
+        if let remaining = player.sleepTimerRemaining { return PodcastDuration.colon(remaining) }
         return ""
-    }
-
-    private func formatTime(_ seconds: TimeInterval) -> String {
-        let s = max(0, Int(seconds))
-        let h = s / 3600
-        let m = (s % 3600) / 60
-        let sec = s % 60
-        return h > 0
-            ? String(format: "%d:%02d:%02d", h, m, sec)
-            : String(format: "%d:%02d", m, sec)
     }
 
     private func speedLabel(_ speed: Float) -> String {
@@ -322,20 +343,6 @@ struct FullPlayerView: View {
             ? String(format: "%.0f", speed)
             : String(format: "%.2g", speed)
     }
-}
-
-/// Shared by ScrubberView's VoiceOver value and FullPlayerView's visible time
-/// labels — the scrubber previously announced only a bare percentage since
-/// the visible time labels are `.accessibilityHidden`, giving VoiceOver
-/// users no spoken elapsed/remaining time at all.
-private func formatScrubberTime(_ seconds: TimeInterval) -> String {
-    let s = max(0, Int(seconds))
-    let h = s / 3600
-    let m = (s % 3600) / 60
-    let sec = s % 60
-    return h > 0
-        ? String(format: "%d:%02d:%02d", h, m, sec)
-        : String(format: "%d:%02d", m, sec)
 }
 
 // MARK: - Scrubber (extracted so it can read geometry)
@@ -370,9 +377,12 @@ private struct ScrubberView: View {
         .frame(height: 28)
         .accessibilityElement()
         .accessibilityLabel(String(localized: "Playback position"))
+        // Standardized on elapsed-of-total phrasing (PODCAST-11) — percent
+        // was redundant alongside the time and made repeated Braille reads
+        // during a seek gesture more verbose than necessary.
         .accessibilityValue(player.duration > 0
-            ? "\(formatScrubberTime(player.position)) of \(formatScrubberTime(player.duration)), \(Int(player.position / player.duration * 100))%"
-            : "0%"
+            ? "\(PodcastDuration.colon(player.position)) of \(PodcastDuration.colon(player.duration))"
+            : "0:00"
         )
         .accessibilityAdjustableAction { direction in
             // Was hardcoded to 30s/15s regardless of the user's configured

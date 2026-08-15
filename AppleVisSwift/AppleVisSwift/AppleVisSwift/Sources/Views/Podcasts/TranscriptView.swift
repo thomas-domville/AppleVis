@@ -22,12 +22,24 @@ struct TranscriptView: View {
                 } else if let error {
                     ErrorView(message: error) { await load() }
                 } else if let transcript, !transcript.isEmpty {
+                    // Previously one Text(transcript) covering the whole
+                    // multi-thousand-word string — a single accessibility
+                    // element with no way to jump to a point, review one
+                    // line at a time on a Braille display, or navigate by
+                    // paragraph via the rotor (PODCAST-04). The API returns
+                    // plain text, not HTML, so this is a dedicated plain-text
+                    // segmenter rather than a reuse of SegmentedHTMLView's
+                    // tag-based one.
                     ScrollView {
-                        Text(transcript)
-                            .font(.body)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding()
+                        VStack(alignment: .leading, spacing: 16) {
+                            ForEach(Self.segmentTranscript(transcript)) { segment in
+                                Text(segment.text)
+                                    .font(.body)
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                        .padding()
                     }
                     .background(preferences.colors.background)
                 } else {
@@ -56,4 +68,43 @@ struct TranscriptView: View {
         } catch { self.error = "Couldn't load transcript." }
         isLoading = false
     }
+
+    /// Splits on blank-line paragraph breaks first (the common case for a
+    /// prose transcript); falls back to single-line breaks if the text has
+    /// no blank lines (common for a speaker-turn-per-line transcript); if
+    /// neither produces more than one piece, falls back to sentence-boundary
+    /// splitting grouped a few sentences at a time so even a single
+    /// unbroken blob of text still becomes individually-navigable chunks
+    /// instead of one giant element.
+    static func segmentTranscript(_ text: String) -> [TranscriptSegment] {
+        let byParagraph = nonEmptyTrimmedPieces(text.components(separatedBy: "\n\n"))
+        if byParagraph.count > 1 { return byParagraph.map(TranscriptSegment.init) }
+
+        let byLine = nonEmptyTrimmedPieces(text.components(separatedBy: "\n"))
+        if byLine.count > 1 { return byLine.map(TranscriptSegment.init) }
+
+        var sentences: [String] = []
+        text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: .bySentences) { substring, _, _, _ in
+            if let s = substring?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty {
+                sentences.append(s)
+            }
+        }
+        guard sentences.count > 1 else {
+            return [TranscriptSegment(text: text.trimmingCharacters(in: .whitespacesAndNewlines))]
+        }
+        let groupSize = 4
+        return stride(from: 0, to: sentences.count, by: groupSize).map { start in
+            let end = min(start + groupSize, sentences.count)
+            return TranscriptSegment(text: sentences[start..<end].joined(separator: " "))
+        }
+    }
+
+    private static func nonEmptyTrimmedPieces(_ pieces: [String]) -> [String] {
+        pieces.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+    }
+}
+
+struct TranscriptSegment: Identifiable {
+    let id = UUID()
+    let text: String
 }

@@ -18,6 +18,15 @@ struct BlogBrowseView: View {
                 LoadingView()
             } else if let error, posts.isEmpty {
                 ErrorView(message: error) { await load(reset: true) }
+            } else if posts.isEmpty && searchText.isEmpty {
+                // A legitimately empty successful load previously fell
+                // through to a blank List — indistinguishable from a silent
+                // failure, with no title, message, or retry (BLOGS-01).
+                EmptyStateView(
+                    title: "No Blog Posts",
+                    message: "There are no blog posts to show right now.",
+                    systemImage: "newspaper"
+                )
             } else {
                 postList
             }
@@ -79,8 +88,8 @@ struct BlogBrowseView: View {
         isLoading = true; error = nil
         do {
             let fetched = try await APIClient.shared.blogs.list(page: page)
-            posts = fetched
-            hasMore = fetched.count >= APIPaging.pageSize
+            posts = fetched.items
+            hasMore = fetched.hasMore
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Couldn't load posts." }
         isLoading = false
@@ -92,8 +101,8 @@ struct BlogBrowseView: View {
         do {
             let more = try await APIClient.shared.blogs.list(page: page + 1)
             page += 1
-            posts += more
-            hasMore = more.count >= APIPaging.pageSize
+            posts += more.items
+            hasMore = more.hasMore
         } catch {
             toast.error(String(localized: "Couldn't load more blog posts."))
         }

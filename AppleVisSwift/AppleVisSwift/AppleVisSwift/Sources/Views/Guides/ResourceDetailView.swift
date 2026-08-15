@@ -10,6 +10,8 @@ struct ResourceDetailView: View {
     @State private var quotedComment: ResourceComment?
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
+    @State private var newCommentCount = 0
+    @State private var pendingFocusCommentId: String?
     @State private var discussionSummary: String?
     @State private var isSummarizingDiscussion = false
     @AccessibilityFocusState private var isTitleFocused: Bool
@@ -57,7 +59,10 @@ struct ResourceDetailView: View {
                             .font(.title2).fontWeight(.semibold)
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityFocused($isTitleFocused)
-                        Text("by \(detail.authorName)")
+                        // Inert plain text everywhere except Forums'
+                        // matching topic header, despite authorId already
+                        // being available (GUIDES-06).
+                        AuthorProfileButton(name: "by \(detail.authorName)", authorId: detail.authorId)
                             .font(.subheadline).foregroundStyle(.secondary)
                         if !detail.categories.isEmpty {
                             Text(detail.categories.joined(separator: " · "))
@@ -97,6 +102,17 @@ struct ResourceDetailView: View {
                 .padding(.vertical)
             }
             .background(preferences.colors.background)
+            // No focus confirmation after posting a comment, unlike Forums'
+            // well-implemented equivalent (ALL-04).
+            .onChange(of: pendingFocusCommentId) { _, newId in
+                guard let newId else { return }
+                withReduceMotionAwareAnimation { proxy.scrollTo(newId, anchor: .bottom) }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    focusedCommentId = newId
+                    pendingFocusCommentId = nil
+                }
+            }
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -114,11 +130,13 @@ struct ResourceDetailView: View {
         .sheet(isPresented: $showCompose) {
             ComposeResourceCommentView(resourceId: detail.id, title: detail.title) { comment in
                 self.detail?.comments.append(comment)
+                pendingFocusCommentId = comment.id
             }
         }
         .sheet(item: $quotedComment) { target in
             ComposeResourceCommentView(resourceId: detail.id, title: detail.title, quotedComment: target) { comment in
                 self.detail?.comments.append(comment)
+                pendingFocusCommentId = comment.id
             }
         }
     }
@@ -128,7 +146,9 @@ struct ResourceDetailView: View {
         CommunityDiscussionHeading(
             count: detail.commentCount,
             onThreadOverview: { announceThreadOverview(detail) },
-            onJumpToLast: { Task { await jumpToLastComment(proxy: proxy) } }
+            onJumpToLast: { Task { await jumpToLastComment(proxy: proxy) } },
+            newCount: newCommentCount,
+            onJumpToFirstNew: { Task { await jumpToFirstNewComment(proxy: proxy) } }
         )
 
         if detail.comments.isEmpty {
@@ -274,6 +294,10 @@ struct ResourceDetailView: View {
                 Task { await loadMoreComments() }
             }
             if let detail {
+                // Captured before stampItemVisit below overwrites it (ALL-01).
+                newCommentCount = PersistenceStore.shared.newReplyCount(
+                    kind: .resource, id: detail.id, currentCount: detail.commentCount
+                )
                 PersistenceStore.shared.stampItemVisit(
                     id: FeedItem.visitKey(kind: .resource, contentId: detail.id),
                     commentCount: detail.commentCount
@@ -333,6 +357,20 @@ struct ResourceDetailView: View {
         try? await Task.sleep(for: .milliseconds(400))
         focusedCommentId = lastId
     }
+
+    /// "Jump to First New Comment" (ALL-01) — comments arrive chronologically
+    /// oldest-first, so the first of the `newCommentCount` most recently
+    /// posted comments sits at `comments.count - newCommentCount`.
+    private func jumpToFirstNewComment(proxy: ScrollViewProxy) async {
+        if hasMoreComments { await loadMoreComments() }
+        let comments = self.detail?.comments ?? []
+        let targetIndex = comments.count - newCommentCount
+        guard newCommentCount > 0, targetIndex >= 0, targetIndex < comments.count else { return }
+        let targetId = comments[targetIndex].id
+        withReduceMotionAwareAnimation { proxy.scrollTo(targetId, anchor: .top) }
+        try? await Task.sleep(for: .milliseconds(400))
+        focusedCommentId = targetId
+    }
 }
 
 // MARK: - Generic comment row (shared across resource/blog/podcast)
@@ -388,8 +426,13 @@ struct CommentRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                AuthorAvatarView(name: authorName, diameter: 28)
-                Text(authorName).fontWeight(.medium)
+                // Author names were inert plain Text everywhere except
+                // Forums, despite authorId already being available on this
+                // shared row used by Guides/Blogs/Podcasts/Bugs (GUIDES-06/
+                // BLOGS-06/BUGS-10). Matches Forums' ReplyView, which
+                // already puts AuthorProfileButton inside this exact
+                // combine+explicit-label header structure.
+                AuthorProfileButton(name: authorName, authorId: authorId ?? "", showAvatar: true)
                 Spacer()
                 RelativeDateLabel(date: date)
             }

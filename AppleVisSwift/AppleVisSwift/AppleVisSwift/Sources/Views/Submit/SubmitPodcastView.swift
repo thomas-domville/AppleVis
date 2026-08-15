@@ -21,15 +21,19 @@ struct SubmitPodcastView: View {
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
     @AccessibilityFocusState private var isStepFocused: Bool
+    @AccessibilityFocusState private var isErrorFocused: Bool
 
     @State private var step: Step = .audio
     @State private var showSignIn = false
     @State private var description = ""
     @State private var audioFileURL: URL?
+    @State private var audioFileData: Data?
     @State private var showFileImporter = false
     @State private var isSubmitting = false
     @State private var error: String?
     @State private var showDiscardConfirm = false
+    @State private var submitted = false
+    @State private var descriptionMinimumAnnounced = false
 
     /// Set when opened from the Share Extension with a shared podcast URL.
     /// This form needs an actual audio file upload — a shared link can't
@@ -41,14 +45,40 @@ struct SubmitPodcastView: View {
         }
     }
 
+    /// 20-char minimum on the description matches legacy's
+    /// `submit-podcast/index.tsx` `canContinue`, dropped in the native port
+    /// (SUBMIT-017).
+    private var descriptionLength: Int { description.trimmingCharacters(in: .whitespacesAndNewlines).count }
+
     private var audioValid: Bool {
-        !description.trimmingCharacters(in: .whitespaces).isEmpty && audioFileURL != nil
+        descriptionLength >= 20 && audioFileData != nil
+    }
+
+    /// Mirrors Contact's crossing-the-threshold announcement so VoiceOver
+    /// users learn the moment they can continue, not just via Next's
+    /// disabled state.
+    private func handleDescriptionChange(_ newValue: String) {
+        let length = newValue.trimmingCharacters(in: .whitespacesAndNewlines).count
+        if !descriptionMinimumAnnounced && length >= 20 {
+            descriptionMinimumAnnounced = true
+            UIAccessibility.post(notification: .announcement, argument: "Minimum length reached. You can now continue.")
+        } else if descriptionMinimumAnnounced && length < 20 {
+            descriptionMinimumAnnounced = false
+        }
     }
 
     var body: some View {
         NavigationStack {
             Group {
-                if !auth.isSignedIn {
+                if submitted {
+                    ThankYouView(
+                        icon: "mic",
+                        heading: "Podcast submitted!",
+                        message: "Thanks for sharing your podcast. The AppleVis team will review it before it appears in the directory.",
+                        doneLabel: "Done",
+                        onDone: { dismiss() }
+                    )
+                } else if !auth.isSignedIn {
                     signInRequiredView
                 } else {
                     Form {
@@ -57,7 +87,12 @@ struct SubmitPodcastView: View {
                         case .review: reviewSection
                         }
                         if let error {
-                            Section { Text(error).foregroundStyle(.red) }
+                            Section {
+                                Text(error)
+                                    .foregroundStyle(.red)
+                                    .accessibilityAddTraits(.isHeader)
+                                    .accessibilityFocused($isErrorFocused)
+                            }
                         }
                     }
                     .themedList(preferences.colors)
@@ -66,6 +101,7 @@ struct SubmitPodcastView: View {
             .navigationTitle("Submit a Podcast")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                if !submitted {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(step == .audio ? "Cancel" : "Back") {
                         if step == .audio {
@@ -100,10 +136,9 @@ struct SubmitPodcastView: View {
                         }
                     }
                 }
+                }
             }
-            .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.audio]) { result in
-                if case .success(let url) = result { audioFileURL = url }
-            }
+            .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.audio], onCompletion: handleFileImport)
         }
         .sheet(isPresented: $showSignIn) {
             SignInView()
@@ -124,12 +159,36 @@ struct SubmitPodcastView: View {
     /// selected audio file/description with one accidental tap — same
     /// regression already fixed for Submit App, now matched here.
     private func requestCancel() {
-        let hasProgress = audioFileURL != nil || !description.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasProgress = audioFileData != nil || !description.trimmingCharacters(in: .whitespaces).isEmpty
         if hasProgress {
             showDiscardConfirm = true
         } else {
             SoundPlayer.shared.play(.screenClose)
             dismiss()
+        }
+    }
+
+    /// fileImporter hands back a security-scoped URL for files outside the
+    /// sandbox (iCloud Drive, other Files providers) — that access is only
+    /// valid for the duration of this callback, and `submit()` runs much
+    /// later after Review. Read the bytes into memory now, while the scope
+    /// is open, instead of deferring the read to submit time (which
+    /// previously read via `try? Data(contentsOf:)` with no scope at all,
+    /// silently producing no data and no error for iCloud Drive picks —
+    /// the audio was simply omitted from the multipart body server-side).
+    private func handleFileImport(_ result: Result<URL, Error>) {
+        switch result {
+        case .success(let url):
+            let didAccess = url.startAccessingSecurityScopedResource()
+            defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+            guard let data = try? Data(contentsOf: url) else {
+                toast.error(String(localized: "Couldn't read that audio file. Try choosing it again."))
+                return
+            }
+            audioFileURL = url
+            audioFileData = data
+        case .failure:
+            toast.error(String(localized: "Couldn't read that audio file. Try choosing it again."))
         }
     }
 
@@ -180,10 +239,22 @@ struct SubmitPodcastView: View {
                     GuidelinesReminderView(warning: warning) { guidelines.dismiss() }
                 }
             }
-            Section("Episode Description") {
+            Section {
+                HStack {
+                    Text("Episode Description").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text(descriptionLength < 20 ? "\(descriptionLength) / 20 min" : "\(descriptionLength) chars")
+                        .font(.caption)
+                        .fontWeight(descriptionLength < 20 ? .bold : .regular)
+                        .foregroundStyle(descriptionLength < 20 ? .red : .secondary)
+                        .accessibilityLabel(descriptionLength < 20 ? String(localized: "\(descriptionLength) of 20 minimum characters") : String(localized: "\(descriptionLength) characters"))
+                }
                 TextEditor(text: $description)
                     .frame(minHeight: 120)
+                    .accessibilityLabel(String(localized: "Episode Description"))
+                    .accessibilityHint(String(localized: "Required. Minimum 20 characters."))
                     .onChange(of: description) { _, newValue in
+                        handleDescriptionChange(newValue)
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
                             newValue,
@@ -238,13 +309,17 @@ struct SubmitPodcastView: View {
     private func submit() async {
         guard let user = auth.user else { return }
         isSubmitting = true; error = nil
-        let result = await DrupalFormClient.submitPodcast(name: user.name, email: "", description: description, audioFileURL: audioFileURL)
+        let result = await DrupalFormClient.submitPodcast(
+            name: user.name, email: "", description: description,
+            audioFileName: audioFileURL?.lastPathComponent, audioFileData: audioFileData
+        )
         switch result {
         case .ok:
-            toast.success(String(localized: "Podcast submitted for review"))
-            dismiss()
+            SoundPlayer.shared.play(.success)
+            submitted = true
         case .failure(let message):
             error = message
+            await announceWizardFailure(message, focus: $isErrorFocused)
         }
         isSubmitting = false
     }

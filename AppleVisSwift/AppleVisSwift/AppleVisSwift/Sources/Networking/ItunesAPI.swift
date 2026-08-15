@@ -40,14 +40,30 @@ struct ItunesSearchHit: Identifiable {
     let appStoreUrl: String
 }
 
+/// iTunes Search API's `entity` parameter differs per platform — needed so
+/// the App Submission wizard's platform picker (iOS/macOS/tvOS) actually
+/// changes what `ItunesAPI.search`/`fetchMetadata` look up, instead of every
+/// platform silently searching iOS software only (SUBMIT-003: no platform
+/// picker meant native could never submit a macOS or Apple TV app entry).
+extension AppPlatform {
+    var itunesEntity: String {
+        switch self {
+        case .ios:     return "software"
+        case .macos:   return "macSoftware"
+        case .tvos:    return "tvSoftware"
+        case .watchos: return "software" // watchOS apps ship bundled in an iOS entry; no dedicated entity
+        }
+    }
+}
+
 enum ItunesAPI {
-    static func search(_ query: String, limit: Int = 20) async -> [ItunesSearchHit] {
+    static func search(_ query: String, limit: Int = 20, entity: String = "software") async -> [ItunesSearchHit] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
         var components = URLComponents(string: "https://itunes.apple.com/search")!
         components.queryItems = [
             URLQueryItem(name: "term", value: trimmed),
-            URLQueryItem(name: "entity", value: "software"),
+            URLQueryItem(name: "entity", value: entity),
             URLQueryItem(name: "limit", value: "\(limit)"),
             URLQueryItem(name: "country", value: "us"),
         ]
@@ -74,9 +90,9 @@ enum ItunesAPI {
 
     /// Returns metadata on success, `nil` if the app isn't on the App Store
     /// (or the URL has no extractable numeric id) or the request failed.
-    static func fetchMetadata(appStoreUrl: String) async -> ItunesMetadata? {
+    static func fetchMetadata(appStoreUrl: String, entity: String = "software") async -> ItunesMetadata? {
         guard let id = extractAppStoreId(appStoreUrl) else { return nil }
-        guard let url = URL(string: "https://itunes.apple.com/lookup?id=\(id)&entity=software") else { return nil }
+        guard let url = URL(string: "https://itunes.apple.com/lookup?id=\(id)&entity=\(entity)") else { return nil }
 
         var request = URLRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "Accept")

@@ -4,14 +4,23 @@ import SwiftUI
 
 struct AppBrowseView: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var toast: ToastStore
     @State private var platform: AppPlatform = .ios
     @State private var categories: [AppCategory] = []
     @State private var isLoading = false
     @State private var error: String?
+    @State private var searchText = ""
+    @State private var searchResults: [AppListing] = []
+    @State private var isSearching = false
+    @State private var searchTask: Task<Void, Never>?
+
+    private var isSearchActive: Bool { !searchText.trimmingCharacters(in: .whitespaces).isEmpty }
 
     var body: some View {
         Group {
-            if isLoading && categories.isEmpty {
+            if isSearchActive {
+                searchResultsSection
+            } else if isLoading && categories.isEmpty {
                 LoadingView()
             } else if let error, categories.isEmpty {
                 ErrorView(message: error) { await load() }
@@ -28,11 +37,58 @@ struct AppBrowseView: View {
         .task { await load() }
         .refreshable { await load(); SoundPlayer.shared.play(.refresh) }
         .onChange(of: platform) { _, _ in Task { await load() } }
+        .searchable(text: $searchText, prompt: "Search apps")
+        .onChange(of: searchText) { _, newValue in runSearch(newValue) }
         .navigationDestination(for: AppCategoryDestination.self) { dest in
             AppCategoryView(destination: dest)
         }
         .navigationDestination(for: AppListing.self) { app in
             AppDetailView(appId: app.id)
+        }
+    }
+
+    @ViewBuilder
+    private var searchResultsSection: some View {
+        if isSearching {
+            LoadingView()
+        } else if searchResults.isEmpty {
+            EmptyStateView(
+                title: "No Results",
+                message: "No apps match \"\(searchText)\".",
+                systemImage: "magnifyingglass"
+            )
+        } else {
+            List {
+                ForEach(searchResults) { app in
+                    AppListingRow(app: app)
+                }
+            }
+            .listStyle(.plain)
+            .themedList(preferences.colors)
+        }
+    }
+
+    /// Same synchronous-before-debounce fix already applied to Discover's
+    /// search (SEARCH-01) — flipping isSearching only after the debounce
+    /// briefly rendered a fabricated "No Results" on every fresh search.
+    private func runSearch(_ query: String) {
+        searchTask?.cancel()
+        guard query.trimmingCharacters(in: .whitespaces).count >= 2 else {
+            searchResults = []
+            isSearching = false
+            return
+        }
+        isSearching = true
+        searchTask = Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            do {
+                searchResults = try await APIClient.shared.apps.search(query)
+            } catch {
+                toast.error(String(localized: "Couldn't search apps."))
+                searchResults = []
+            }
+            isSearching = false
         }
     }
 
@@ -57,6 +113,15 @@ struct AppBrowseView: View {
 
     private var categoryList: some View {
         List {
+            Section {
+                // No local Saved filter existed anywhere in the Apps tab
+                // (APPS-02) — the master spec's Saved Model explicitly
+                // requires "Apps Saved" as a local filter, reachable from
+                // within the content area itself, not just via Home/For You.
+                NavigationLink(destination: SavedItemsView(initialFilter: .appListing)) {
+                    Label("Saved Apps", systemImage: "bookmark")
+                }
+            }
             ForEach(groupedCategories, id: \.letter) { group in
                 Section(group.letter) {
                     ForEach(group.categories) { category in
@@ -169,8 +234,8 @@ struct AppCategoryView: View {
                 platform: destination.platform,
                 categoryTid: destination.category.tid
             )
-            apps = fetched
-            hasMore = fetched.count >= APIPaging.pageSize
+            apps = fetched.items
+            hasMore = fetched.hasMore
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Could not load apps" }
         isLoading = false
@@ -186,8 +251,8 @@ struct AppCategoryView: View {
                 categoryTid: destination.category.tid
             )
             page += 1
-            apps += more
-            hasMore = more.count >= APIPaging.pageSize
+            apps += more.items
+            hasMore = more.hasMore
         } catch {
             toast.error(String(localized: "Couldn't load more apps."))
         }

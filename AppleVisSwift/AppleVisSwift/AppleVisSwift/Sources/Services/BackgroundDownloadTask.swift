@@ -46,7 +46,7 @@ enum BackgroundDownloadTask {
                 task.setTaskCompleted(success: false)
                 return
             }
-            for episode in episodes.prefix(3) {
+            for episode in episodes.items.prefix(3) {
                 await MainActor.run { DownloadManager.shared.download(episode) }
             }
             task.setTaskCompleted(success: true)

@@ -181,16 +181,16 @@ final class HomeViewModel: ObservableObject {
               }
             : SourceFetchResult(items: [], failedName: nil)
         async let podcasts = showPodcasts
-            ? fetchSource(name: "Podcasts") { try await APIClient.shared.podcasts.episodes(page: page).map { FeedItem.podcastEpisode($0) } }
+            ? fetchSource(name: "Podcasts") { try await APIClient.shared.podcasts.episodes(page: page).items.map { FeedItem.podcastEpisode($0) } }
             : SourceFetchResult(items: [], failedName: nil)
         async let apps = showApps
-            ? fetchSource(name: "Apps") { try await APIClient.shared.apps.list(page: page).map { FeedItem.appListing($0) } }
+            ? fetchSource(name: "Apps") { try await APIClient.shared.apps.list(page: page).items.map { FeedItem.appListing($0) } }
             : SourceFetchResult(items: [], failedName: nil)
         async let guides = showGuides
-            ? fetchSource(name: "Guides") { try await APIClient.shared.resources.list(page: page).map { FeedItem.resource($0) } }
+            ? fetchSource(name: "Guides") { try await APIClient.shared.resources.list(page: page).items.map { FeedItem.resource($0) } }
             : SourceFetchResult(items: [], failedName: nil)
         async let blogs = showBlogs
-            ? fetchSource(name: "Blogs") { try await APIClient.shared.blogs.list(page: page).map { FeedItem.blogPost($0) } }
+            ? fetchSource(name: "Blogs") { try await APIClient.shared.blogs.list(page: page).items.map { FeedItem.blogPost($0) } }
             : SourceFetchResult(items: [], failedName: nil)
 
         let results = await [forums, podcasts, apps, guides, blogs]

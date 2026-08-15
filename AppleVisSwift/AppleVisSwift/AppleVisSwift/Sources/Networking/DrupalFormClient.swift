@@ -45,19 +45,41 @@ enum DrupalFormClient {
         let honeypotTime: String
     }
 
+    /// Previously a bare `nil` on any failure — a form-page fetch that
+    /// failed outright (network/HTTP error) and a fetch that succeeded but
+    /// no longer contained a `form_build_id` (e.g. the form markup changed
+    /// server-side) were indistinguishable from the caller's perspective
+    /// and left no trace to tell them apart from, beyond the generic
+    /// user-facing "could not load the submission form" string.
     private static func fetchTokens(path: String) async -> FormTokens? {
-        guard let url = URL(string: "\(base)\(path)") else { return nil }
+        guard let url = URL(string: "\(base)\(path)") else {
+            AppLog.network.error("Invalid form URL for path \(path, privacy: .public)")
+            return nil
+        }
         var request = URLRequest(url: url)
         applyBypassHeaders(to: &request)
         request.setValue("text/html,application/xhtml+xml", forHTTPHeaderField: "Accept")
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
-              let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
-              let html = String(data: data, encoding: .utf8) else { return nil }
+        guard let (data, response) = try? await URLSession.shared.data(for: request) else {
+            AppLog.network.error("Form page fetch failed for \(path, privacy: .public)")
+            return nil
+        }
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            AppLog.network.error("Form page fetch for \(path, privacy: .public) returned status \(status)")
+            return nil
+        }
+        guard let html = String(data: data, encoding: .utf8) else {
+            AppLog.network.error("Form page response for \(path, privacy: .public) was not valid UTF-8")
+            return nil
+        }
 
         let formBuildId = firstMatch(#"name="form_build_id"\s+value="([^"]+)""#, in: html)
         let formToken = firstMatch(#"name="form_token"\s+value="([^"]+)""#, in: html)
         let honeypotTime = firstMatch(#"name="honeypot_time"\s+value="([^"]+)""#, in: html)
-        guard let formBuildId, !formBuildId.isEmpty else { return nil }
+        guard let formBuildId, !formBuildId.isEmpty else {
+            AppLog.network.error("No form_build_id found scraping \(path, privacy: .public) — form markup may have changed")
+            return nil
+        }
         return FormTokens(formBuildId: formBuildId, formToken: formToken ?? "", honeypotTime: honeypotTime ?? "")
     }
 
@@ -89,10 +111,13 @@ enum DrupalFormClient {
         request.httpBody = body
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
-            return wasRedirected(response, from: path)
-                ? .ok
-                : .failure("The submission was not accepted. Please check your content and try again.")
+            if wasRedirected(response, from: path) {
+                return .ok
+            }
+            AppLog.network.error("Form POST to \(path, privacy: .public) was not redirected — likely a form validation error")
+            return .failure("The submission was not accepted. Please check your content and try again.")
         } catch {
+            AppLog.network.error("Form POST to \(path, privacy: .public) failed: \(error, privacy: .private)")
             return .failure(error.localizedDescription)
         }
     }
@@ -136,7 +161,16 @@ enum DrupalFormClient {
 
     // MARK: - Podcast submission (/podcasts/upload) — multipart, includes an audio file
 
-    static func submitPodcast(name: String, email: String, description: String, audioFileURL: URL?) async -> FormResult {
+    static func submitPodcast(name: String, email: String, description: String, audioFileName: String?, audioFileData: Data?) async -> FormResult {
+        // The caller reads the file into memory itself (while its
+        // security-scoped access is valid) and hands us bytes, not a URL —
+        // this used to be `try? Data(contentsOf: audioFileURL)` here, which
+        // silently produced nil (and thus a file-less submission with no
+        // error) for any file outside the sandbox, since no security scope
+        // was ever opened at this point in time.
+        guard let audioFileData, let audioFileName else {
+            return .failure("No audio file was attached. Please choose an audio file and try again.")
+        }
         let path = "/podcasts/upload"
         guard let tokens = await fetchTokens(path: path) else {
             return .failure("Could not load the submission form. Check your connection and try again.")
@@ -162,15 +196,12 @@ enum DrupalFormClient {
         appendField("url", "")
         appendField("op", "Send message")
 
-        if let audioFileURL, let fileData = try? Data(contentsOf: audioFileURL) {
-            let filename = audioFileURL.lastPathComponent
-            let mimeType = mimeType(for: audioFileURL)
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"files[field_podcast_file_0]\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
-            body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
-            body.append(fileData)
-            body.append("\r\n".data(using: .utf8)!)
-        }
+        let mimeType = mimeType(for: URL(fileURLWithPath: audioFileName))
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"files[field_podcast_file_0]\"; filename=\"\(audioFileName)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+        body.append(audioFileData)
+        body.append("\r\n".data(using: .utf8)!)
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
 
         var request = URLRequest(url: url)
@@ -181,10 +212,13 @@ enum DrupalFormClient {
 
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
-            return wasRedirected(response, from: path)
-                ? .ok
-                : .failure("The submission was not accepted. Please check your content and try again.")
+            if wasRedirected(response, from: path) {
+                return .ok
+            }
+            AppLog.network.error("Podcast upload POST to \(path, privacy: .public) was not redirected — likely a form validation error")
+            return .failure("The submission was not accepted. Please check your content and try again.")
         } catch {
+            AppLog.network.error("Podcast upload POST to \(path, privacy: .public) failed: \(error, privacy: .private)")
             return .failure(error.localizedDescription)
         }
     }
@@ -210,9 +244,13 @@ enum DrupalFormClient {
         guard let (data, pageResponse) = try? await URLSession.shared.data(for: pageRequest),
               let http = pageResponse as? HTTPURLResponse, (200...299).contains(http.statusCode),
               let html = String(data: data, encoding: .utf8)
-        else { return .failure("Could not load the contact form. Check your connection and try again.") }
+        else {
+            AppLog.network.error("Contact form page fetch failed for \(path, privacy: .public)")
+            return .failure("Could not load the contact form. Check your connection and try again.")
+        }
 
         guard let formBuildId = firstMatch(#"name="form_build_id"\s+value="([^"]+)""#, in: html), !formBuildId.isEmpty else {
+            AppLog.network.error("No form_build_id found scraping \(path, privacy: .public) — form markup may have changed")
             return .failure("Could not load the contact form. Check your connection and try again.")
         }
         let captchaSid = firstMatch(#"name="captcha_sid"\s+value="([^"]+)""#, in: html) ?? ""

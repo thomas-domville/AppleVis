@@ -22,6 +22,19 @@ struct ForumTopicDetailView: View {
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedReplyId: String?
     @State private var pendingFocusReplyId: String?
+    // Topic-level moderation — previously only reachable from a browse-list
+    // row's long-press menu (ContentActionsModifier); the detail screen for
+    // the topic itself had no Edit/Delete/Unpublish at all.
+    @State private var editingTopicNode: EditableNode?
+    @State private var showDeleteTopicConfirm = false
+    @State private var showUnpublishTopicConfirm = false
+    @Environment(\.dismiss) private var dismiss
+
+    private var isAdmin: Bool { auth.user?.isAdmin ?? false }
+    private var isOwnTopic: Bool {
+        guard let detail, let user = auth.user else { return false }
+        return !detail.authorId.isEmpty && user.uuid == detail.authorId
+    }
 
     var body: some View {
         Group {
@@ -47,6 +60,7 @@ struct ForumTopicDetailView: View {
             if let d = detail {
                 ComposeReplyView(topicId: d.id, topicTitle: d.title) { reply in
                     self.detail?.replies.append(reply)
+                    self.detail?.replyCount += 1
                     pendingFocusReplyId = reply.id
                 }
             }
@@ -55,6 +69,7 @@ struct ForumTopicDetailView: View {
             if let d = detail {
                 ComposeReplyView(topicId: d.id, topicTitle: d.title, quotedReply: target) { reply in
                     self.detail?.replies.append(reply)
+                    self.detail?.replyCount += 1
                     pendingFocusReplyId = reply.id
                 }
             }
@@ -65,16 +80,102 @@ struct ForumTopicDetailView: View {
             }
         }
         .handoff(title: detail?.title, url: detail?.url)
+        .toolbar {
+            // Owner-only actions gated on !isAdmin: an owner who is also an
+            // admin already gets the superset admin block below (which also
+            // adds Unpublish) — otherwise they'd see two indistinguishable
+            // "Edit Topic" entries, the same duplicate class of bug fixed
+            // app-wide for row context menus in ContentActionsModifier.
+            if isOwnTopic && !isAdmin {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button { startEditTopic() } label: { Label("Edit Topic", systemImage: "pencil") }
+                        Button(role: .destructive) { showDeleteTopicConfirm = true } label: { Label("Delete Topic", systemImage: "trash") }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .accessibilityLabel(String(localized: "Topic actions"))
+                }
+            }
+            if isAdmin {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button { startEditTopic() } label: { Label("Edit Topic", systemImage: "pencil") }
+                        Button { showUnpublishTopicConfirm = true } label: { Label("Unpublish Topic", systemImage: "eye.slash") }
+                        Button(role: .destructive) { showDeleteTopicConfirm = true } label: { Label("Delete Topic", systemImage: "trash") }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .accessibilityLabel(String(localized: "Topic actions"))
+                }
+            }
+        }
+        .sheet(item: $editingTopicNode) { node in
+            EditNodeSheet(initialTitle: node.title, initialBody: node.body) { newTitle, newBody in
+                try await saveTopicEdit(title: newTitle, body: newBody)
+            }
+        }
+        .confirmationDialog(
+            "Unpublish this topic?", isPresented: $showUnpublishTopicConfirm, titleVisibility: .visible
+        ) {
+            Button("Unpublish", role: .destructive) { Task { await unpublishTopic() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This hides it from public view.")
+        }
+        .confirmationDialog(
+            "Delete this topic?", isPresented: $showDeleteTopicConfirm, titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) { Task { await deleteTopic() } }
+            Button("Cancel", role: .cancel) {}
+        }
         .task {
             SoundPlayer.shared.play(.articleOpen)
             await load()
         }
     }
 
+    private func startEditTopic() {
+        guard let detail else { return }
+        editingTopicNode = EditableNode(title: detail.title, body: detail.body, nodeTypeSuffix: "forum")
+    }
+
+    private func saveTopicEdit(title: String, body: String) async throws {
+        guard let user = auth.user, let detail else { return }
+        try await APIClient.shared.content.editNode(nodeId: detail.id, nodeType: "forum", title: title, body: body, csrfToken: user.csrfToken)
+        self.detail?.title = title
+        self.detail?.body = body
+        toast.success(String(localized: "Topic updated"))
+    }
+
+    private func unpublishTopic() async {
+        guard let user = auth.user, let detail else { return }
+        do {
+            try await APIClient.shared.content.unpublishNode(nodeId: detail.id, nodeType: "forum", csrfToken: user.csrfToken)
+            toast.success(String(localized: "Topic unpublished"))
+        } catch {
+            toast.error(String(localized: "Couldn't unpublish."))
+        }
+    }
+
+    /// Deletes the topic the user is currently reading — unlike row-level
+    /// deletion elsewhere, there's no list to prune; the only sensible next
+    /// step is leaving the screen.
+    private func deleteTopic() async {
+        guard let user = auth.user, let detail else { return }
+        do {
+            try await APIClient.shared.content.deleteNode(nodeId: detail.id, nodeType: "forum", csrfToken: user.csrfToken)
+            toast.success(String(localized: "Topic deleted"))
+            dismiss()
+        } catch {
+            toast.error(String(localized: "Couldn't delete."))
+        }
+    }
+
     private func topicContent(_ detail: ForumTopicDetail) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: 16) {
                     // Header
                     VStack(alignment: .leading, spacing: 8) {
                         Text(detail.title)
@@ -114,7 +215,9 @@ struct ForumTopicDetailView: View {
                         CommunityDiscussionHeading(
                             count: detail.replyCount,
                             onThreadOverview: { announceThreadOverview(detail) },
-                            onJumpToLast: { Task { await jumpToLastReply(proxy: proxy) } }
+                            onJumpToLast: { Task { await jumpToLastReply(proxy: proxy) } },
+                            newCount: newReplyCountForHeading,
+                            onJumpToFirstNew: { Task { await jumpToFirstNewReply(proxy: proxy) } }
                         )
                         .onAppear { tips.show(.forumRotorActions) }
 
@@ -134,7 +237,15 @@ struct ForumTopicDetailView: View {
                                     quotedReplyTarget = reply
                                 },
                                 onDelete: {
-                                    self.detail?.replies.removeAll { $0.id == reply.id }
+                                    let replies = self.detail?.replies ?? []
+                                    guard let idx = replies.firstIndex(where: { $0.id == reply.id }) else { return }
+                                    // Next reply first — it slides into the deleted one's visual
+                                    // position, the most natural "stayed in place" focus target.
+                                    let neighborId: String? = idx + 1 < replies.count ? replies[idx + 1].id
+                                        : (idx > 0 ? replies[idx - 1].id : nil)
+                                    self.detail?.replies.remove(at: idx)
+                                    self.detail?.replyCount = max(0, (self.detail?.replyCount ?? 1) - 1)
+                                    focusAfterReplyDeletion(neighborId: neighborId)
                                 }, onEdit: { newBody in
                                     guard let idx = self.detail?.replies.firstIndex(where: { $0.id == reply.id }) else { return }
                                     self.detail?.replies[idx] = ForumReply(
@@ -155,7 +266,7 @@ struct ForumTopicDetailView: View {
                             } else {
                                 let remaining = detail.replyCount - detail.replies.count
                                 Button(remaining > 0 ? "Load \(remaining) More Replies" : "Load More Replies") {
-                                    Task { await loadMoreReplies() }
+                                    Task { await loadMoreRepliesPage() }
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding()
@@ -309,6 +420,21 @@ struct ForumTopicDetailView: View {
             isFollowing = detail.map { PersistenceStore.shared.isFollowed(id: $0.id) } ?? false
             isSaved = detail.map { PersistenceStore.shared.isSaved(id: $0.id) } ?? false
             PersistenceStore.shared.markTopicSeen(id: topicId)
+            PersistenceStore.shared.lastViewedForumTopicId = topicId
+            // ForumReply.isNew was hardcoded false in Mappers.swift and never
+            // set anywhere — wire it to the same per-item visit-stamp
+            // mechanism Home already uses for its own "N new" counts.
+            // Captured before stampItemVisit below overwrites it with "now".
+            // A topic with no prior visit record has no baseline, so nothing
+            // is marked new on a first-ever open (matches the rule Home
+            // already follows for the same reason).
+            if var currentDetail = detail,
+               let previousVisit = PersistenceStore.shared.allItemVisits()[FeedItem.visitKey(kind: .forumTopic, contentId: currentDetail.id)] {
+                for index in currentDetail.replies.indices {
+                    currentDetail.replies[index].isNew = currentDetail.replies[index].createdAt > previousVisit.seenAt
+                }
+                detail = currentDetail
+            }
             // Opening the topic itself should clear its "new" state on Home,
             // not just Home's own explicit "Mark as Read" action — otherwise
             // a topic you've actually read stays flagged as new indefinitely.
@@ -379,7 +505,35 @@ struct ForumTopicDetailView: View {
     /// (see the hasMoreReplies fix above), so a thread with hundreds of
     /// replies could otherwise take several manual "Load More" taps to
     /// fully unroll. Reported directly as unwanted friction.
-    private func loadMoreReplies() async {
+    /// Fetches exactly one page of replies — the manual "Load More Replies"
+    /// button uses this. Previously the button called the fetch-everything
+    /// loop below, so a single tap on a 100+ reply thread could trigger
+    /// dozens of round trips and construct the entire remaining list at
+    /// once (FORUM-05). Tapping again fetches the next page.
+    private func loadMoreRepliesPage() async {
+        guard let current = self.detail, current.replies.count < current.replyCount else {
+            hasMoreReplies = false
+            return
+        }
+        isLoadingMoreReplies = true
+        do {
+            let more = try await APIClient.shared.forums.moreReplies(topicId: current.id, offset: current.replies.count)
+            if more.isEmpty {
+                hasMoreReplies = false
+            } else {
+                self.detail?.replies.append(contentsOf: more)
+            }
+        } catch {
+            toast.error(String(localized: "Couldn't load more replies."))
+        }
+        hasMoreReplies = (self.detail?.replies.count ?? 0) < (self.detail?.replyCount ?? 0)
+        isLoadingMoreReplies = false
+    }
+
+    /// Fetches every remaining page in one go — used only by "Jump to Last
+    /// Comment" (`jumpToLastReply`), which genuinely needs the true last
+    /// reply regardless of how many pages remain.
+    private func loadAllRemainingReplies() async {
         isLoadingMoreReplies = true
         do {
             while let current = self.detail, current.replies.count < current.replyCount {
@@ -400,8 +554,47 @@ struct ForumTopicDetailView: View {
     /// directly as an alternative to manually scrolling through a long
     /// thread. Loads any not-yet-fetched replies first so it always lands
     /// on the true last reply, not just the last of whatever's loaded so far.
+    /// Focuses a stable neighbor after a reply is deleted (FORUM-11) —
+    /// mirrors the existing post-reply focus pattern (`pendingFocusReplyId`),
+    /// but without its scroll-to-bottom animation, since the neighbor is
+    /// typically already visible right where the deleted reply was. Falls
+    /// back to the topic title if the deleted reply had no neighbors (it
+    /// was the only one left).
+    private func focusAfterReplyDeletion(neighborId: String?) {
+        UIAccessibility.post(notification: .announcement, argument: "Reply deleted.")
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            if let neighborId {
+                focusedReplyId = neighborId
+            } else {
+                isTitleFocused = true
+            }
+        }
+    }
+
+    /// "Community Discussion - N comments - N new" — the app's own
+    /// documented convention (docs/IMPLEMENTATION_NOTES.md) that
+    /// `CommunityDiscussionHeading` never actually surfaced anywhere
+    /// (ALL-01). Reuses the per-reply `isNew` flag already wired up above,
+    /// which is more precise than a raw count-delta since it survives a
+    /// reply being deleted and a different one added in the same visit.
+    private var newReplyCountForHeading: Int {
+        detail?.replies.filter(\.isNew).count ?? 0
+    }
+
+    /// "Jump to First New Comment" — mirrors jumpToLastReply, landing on
+    /// the earliest reply posted since the previous visit instead of the
+    /// thread's very end.
+    private func jumpToFirstNewReply(proxy: ScrollViewProxy) async {
+        if hasMoreReplies { await loadAllRemainingReplies() }
+        guard let firstNew = detail?.replies.first(where: { $0.isNew }) else { return }
+        withReduceMotionAwareAnimation { proxy.scrollTo(firstNew.id, anchor: .top) }
+        try? await Task.sleep(for: .milliseconds(400))
+        focusedReplyId = firstNew.id
+    }
+
     private func jumpToLastReply(proxy: ScrollViewProxy) async {
-        if hasMoreReplies { await loadMoreReplies() }
+        if hasMoreReplies { await loadAllRemainingReplies() }
         guard let lastId = self.detail?.replies.last?.id else { return }
         withReduceMotionAwareAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
         // Scrolling the viewport doesn't move VoiceOver's focus on its own —
@@ -534,11 +727,6 @@ struct ReplyView: View {
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Delete Comment") { showDeleteConfirm = true })
 
             SegmentedHTMLView(html: reply.body)
-            if reply.loveCount > 0 {
-                Label("\(reply.loveCount)", systemImage: "heart.fill")
-                    .font(.caption)
-                    .foregroundStyle(.pink)
-            }
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
@@ -564,27 +752,32 @@ struct ReplyView: View {
             Button { toast.warning(String(localized: "Reporting is coming once the Drupal Flags API is confirmed.")) } label: {
                 Label("Report Comment", systemImage: "flag")
             }
+            // "Comment" throughout, matching the rest of this screen (the
+            // header label, Reply/Copy/Share/Helpful/Report actions above,
+            // and the "Comment text copied" toast) — this pair previously
+            // said "Reply" here despite VoiceOver already calling the exact
+            // same actions "Edit Comment"/"Delete Comment".
             if canDelete {
                 Button { showEditSheet = true } label: {
-                    Label("Edit Reply", systemImage: "pencil")
+                    Label("Edit Comment", systemImage: "pencil")
                 }
                 Button(role: .destructive) { showDeleteConfirm = true } label: {
-                    Label("Delete Reply", systemImage: "trash")
+                    Label("Delete Comment", systemImage: "trash")
                 }
             }
         }
-        .confirmationDialog("Delete this reply?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+        .confirmationDialog("Delete this comment?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { Task { await delete() } }
             Button("Cancel", role: .cancel) {}
         }
         .sheet(isPresented: $showEditSheet) {
-            EditContentSheet(title: "Edit Reply", initialText: reply.body) { newText in
+            EditContentSheet(title: "Edit Comment", initialText: reply.body) { newText in
                 guard let user = auth.user else { return }
                 try await APIClient.shared.content.editComment(
                     commentType: "comment_forum", commentId: reply.id, newBody: newText, format: "basic_html", csrfToken: user.csrfToken
                 )
                 onEdit?(newText)
-                toast.success(String(localized: "Reply updated"))
+                toast.success(String(localized: "Comment updated"))
             }
         }
     }

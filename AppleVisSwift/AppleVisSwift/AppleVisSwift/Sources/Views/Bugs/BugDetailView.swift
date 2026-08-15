@@ -7,6 +7,8 @@ struct BugDetailView: View {
     @State private var error: String?
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
+    @State private var newCommentCount = 0
+    @State private var pendingFocusCommentId: String?
     @State private var showCompose = false
     @State private var quotedComment: BugComment?
     @State private var discussionSummary: String?
@@ -93,6 +95,17 @@ struct BugDetailView: View {
                 .padding(.vertical)
             }
             .background(preferences.colors.background)
+            // No focus confirmation after posting a comment, unlike Forums'
+            // well-implemented equivalent (ALL-04).
+            .onChange(of: pendingFocusCommentId) { _, newId in
+                guard let newId else { return }
+                withReduceMotionAwareAnimation { proxy.scrollTo(newId, anchor: .bottom) }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    focusedCommentId = newId
+                    pendingFocusCommentId = nil
+                }
+            }
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -115,11 +128,13 @@ struct BugDetailView: View {
         .sheet(isPresented: $showCompose) {
             ComposeBugCommentView(platform: detail.platform, bugId: detail.id, title: detail.title) { comment in
                 self.detail?.comments.append(comment)
+                pendingFocusCommentId = comment.id
             }
         }
         .sheet(item: $quotedComment) { target in
             ComposeBugCommentView(platform: detail.platform, bugId: detail.id, title: detail.title, quotedComment: target) { comment in
                 self.detail?.comments.append(comment)
+                pendingFocusCommentId = comment.id
             }
         }
     }
@@ -261,6 +276,12 @@ struct BugDetailView: View {
             Text(value)
                 .font(.caption)
         }
+        // Was missing here, unlike AppDetailView's structurally identical
+        // infoRow — every metadata row (First Seen, Fixed In, Device, etc.)
+        // exposed as two separate VoiceOver stops instead of one combined
+        // "First Seen: March 2025"-style stop, doubling the swipes needed
+        // to read through a bug's metadata block (BUGS-02).
+        .accessibilityElement(children: .combine)
     }
 
     /// Matches BugReportEndpoints' private `commentBundle(for:)` — Edit/
@@ -280,7 +301,9 @@ struct BugDetailView: View {
         CommunityDiscussionHeading(
             count: detail.commentCount,
             onThreadOverview: { announceThreadOverview(detail) },
-            onJumpToLast: { Task { await jumpToLastComment(proxy: proxy) } }
+            onJumpToLast: { Task { await jumpToLastComment(proxy: proxy) } },
+            newCount: newCommentCount,
+            onJumpToFirstNew: { Task { await jumpToFirstNewComment(proxy: proxy) } }
         )
 
         if detail.comments.isEmpty {
@@ -358,6 +381,18 @@ struct BugDetailView: View {
                 Task { await loadMoreComments() }
             }
             if let detail {
+                // BugDetailView never called stampItemVisit at all — meaning
+                // BugReportRow's existing "N new" badge (which reads
+                // newReplyCount for .bugReport) could never show anything,
+                // and this screen's own heading had no "new" count to show
+                // either (ALL-01). Captured before the stamp overwrites it.
+                newCommentCount = PersistenceStore.shared.newReplyCount(
+                    kind: .bugReport, id: detail.id, currentCount: detail.commentCount
+                )
+                PersistenceStore.shared.stampItemVisit(
+                    id: FeedItem.visitKey(kind: .bugReport, contentId: detail.id),
+                    commentCount: detail.commentCount
+                )
                 SpotlightIndexer.index(BugReport(
                     id: detail.id, title: detail.title, platform: detail.platform, status: detail.status,
                     severity: detail.severity, firstSeen: detail.firstSeen, fixedIn: detail.fixedIn,
@@ -412,6 +447,20 @@ struct BugDetailView: View {
         withReduceMotionAwareAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
         try? await Task.sleep(for: .milliseconds(400))
         focusedCommentId = lastId
+    }
+
+    /// "Jump to First New Comment" (ALL-01) — comments arrive chronologically
+    /// oldest-first, so the first of the `newCommentCount` most recently
+    /// posted comments sits at `comments.count - newCommentCount`.
+    private func jumpToFirstNewComment(proxy: ScrollViewProxy) async {
+        if hasMoreComments { await loadMoreComments() }
+        let comments = self.detail?.comments ?? []
+        let targetIndex = comments.count - newCommentCount
+        guard newCommentCount > 0, targetIndex >= 0, targetIndex < comments.count else { return }
+        let targetId = comments[targetIndex].id
+        withReduceMotionAwareAnimation { proxy.scrollTo(targetId, anchor: .top) }
+        try? await Task.sleep(for: .milliseconds(400))
+        focusedCommentId = targetId
     }
 }
 

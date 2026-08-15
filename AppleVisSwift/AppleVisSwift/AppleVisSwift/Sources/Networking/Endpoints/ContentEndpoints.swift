@@ -16,7 +16,7 @@ struct ResourceEndpoints {
     let client: APIClient
     private static let pageSize = 20
 
-    func list(page: Int = 0, categoryTids: [Int] = []) async throws -> [Resource] {
+    func list(page: Int = 0, categoryTids: [Int] = []) async throws -> PagedListResult<Resource> {
         let categoryKey = categoryTids.isEmpty ? "" : ":categories:\(categoryTids.sorted())"
         return try await fetchWithCache(group: .resources, key: "resources:list:\(page)\(categoryKey)") {
             var query: [String: String] = [
@@ -29,7 +29,8 @@ struct ResourceEndpoints {
                 for (i, tid) in categoryTids.enumerated() { query["filter[category][condition][value][\(i)]"] = "\(tid)" }
             }
             let response = try await client.jsonAPIList("node/guides", query: query)
-            return response.data.map { Mappers.resource($0, included: response.included ?? []) }
+            let items = response.data.map { Mappers.resource($0, included: response.included ?? []) }
+            return PagedListResult(items: items, hasMore: response.hasNextPage)
         }
     }
 
@@ -112,13 +113,14 @@ struct BlogEndpoints {
     /// Confirmed live Drupal content type for blog posts.
     private static let contentType = "blog2"
 
-    func list(page: Int = 0) async throws -> [BlogPost] {
+    func list(page: Int = 0) async throws -> PagedListResult<BlogPost> {
         try await fetchWithCache(group: .blogs, key: "blogs:list:\(page)") {
             let response = try await client.jsonAPIList(
                 "node/\(Self.contentType)",
                 query: ["sort": "-changed", "include": "uid", "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)"]
             )
-            return response.data.map { Mappers.blog($0, included: response.included ?? []) }
+            let items = response.data.map { Mappers.blog($0, included: response.included ?? []) }
+            return PagedListResult(items: items, hasMore: response.hasNextPage)
         }
     }
 
@@ -200,7 +202,7 @@ struct BugReportEndpoints {
         platform == .ios ? "ios_bug_report" : "os_x_bug_report"
     }
 
-    func list(page: Int = 0, platform: BugPlatform? = nil, status: BugStatus? = nil) async throws -> [BugReport] {
+    func list(page: Int = 0, platform: BugPlatform? = nil, status: BugStatus? = nil) async throws -> PagedListResult<BugReport> {
         let effectivePlatform = platform ?? .ios
         let key = "bugs:list:\(effectivePlatform.rawValue):\(status?.rawValue ?? "all"):\(page)"
         return try await fetchWithCache(group: .bugs, key: key) {
@@ -211,7 +213,8 @@ struct BugReportEndpoints {
             // "active" maps to "all" (there is no server-side "fixed" filter).
             if status == .active { query["filter[field_status]"] = "1" }
             let response = try await client.jsonAPIList("node/\(nodeType(for: effectivePlatform))", query: query)
-            return response.data.map { Mappers.bug($0, platform: effectivePlatform) }
+            let items = response.data.map { Mappers.bug($0, platform: effectivePlatform) }
+            return PagedListResult(items: items, hasMore: response.hasNextPage)
         }
     }
 

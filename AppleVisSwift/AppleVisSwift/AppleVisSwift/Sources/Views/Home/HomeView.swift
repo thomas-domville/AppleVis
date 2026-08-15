@@ -174,13 +174,7 @@ struct HomeView: View {
             ? .summary
             : (auth.user?.name.isEmpty == false ? .greeting : nil)
         if let target {
-            Task {
-                for delayMs in [300, 550, 850] {
-                    try? await Task.sleep(for: .milliseconds(delayMs))
-                    focusTarget = nil
-                    focusTarget = target
-                }
-            }
+            Task { await retryAccessibilityFocus(target, into: $focusTarget) }
         }
     }
 
@@ -191,9 +185,13 @@ struct HomeView: View {
                 let today = Date().formatted(date: .complete, time: .omitted)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(Greeting.text()),")
-                        .font(.system(size: 20, weight: .light))
+                        // CARD-11: fixed-point sizes didn't respond to the
+                        // system Dynamic Type setting at all — a user who'd
+                        // turned on a larger text size everywhere else in
+                        // iOS still got this card frozen at 20pt/26pt.
+                        .font(.title3.weight(.light))
                     Text(name)
-                        .font(.system(size: 26, weight: .bold))
+                        .font(.title2.weight(.bold))
                         .foregroundStyle(Color.accentColor)
                     Text(today)
                         .font(.caption)
@@ -291,24 +289,12 @@ struct HomeView: View {
                             // user's swipe cursor exactly where it was,
                             // making the action look like it did nothing.
                             //
-                            // A single fixed delay isn't reliable: when the
-                            // target row is far down the list, List only
-                            // instantiates it once the scroll actually
-                            // reaches it, which can take longer than one
-                            // guessed delay on a slower device — and because
-                            // @AccessibilityFocusState only re-triggers on an
-                            // actual value change, re-assigning the exact
-                            // same case again is a no-op unless it's reset
-                            // to nil first. Reported directly: this looked
+                            // Reported directly: a single fixed delay looked
                             // like it silently "forgot" where the user left
-                            // off. Retry the assignment across a spread of
-                            // delays instead of gambling on one.
+                            // off on a slower device — see
+                            // retryAccessibilityFocus's doc comment (CARD-12).
                             Task {
-                                for delayMs in [150, 350, 600, 900] {
-                                    try? await Task.sleep(for: .milliseconds(delayMs))
-                                    focusTarget = nil
-                                    focusTarget = .item(first.id)
-                                }
+                                await retryAccessibilityFocus(.item(first.id), into: $focusTarget, delaysMs: [150, 350, 600, 900])
                             }
                         },
                         onDismiss: { vm.isNewActivityDismissed = true }
@@ -343,7 +329,7 @@ struct HomeView: View {
                 if !visibleItems.isEmpty {
                     HStack {
                         Text(homeFeedFilter == .new ? "New Activity" : "Latest Activity")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.footnote.weight(.bold))
                             .foregroundStyle(.secondary)
                             .textCase(.uppercase)
                             .accessibilityAddTraits(.isHeader)
@@ -355,7 +341,7 @@ struct HomeView: View {
                             Button("Mark All Read") {
                                 vm.markAllAsRead(visibleItems)
                             }
-                            .font(.system(size: 12, weight: .bold))
+                            .font(.caption.weight(.bold))
                             .accessibilityLabel(String(localized: "Mark all new activity as read"))
                             .accessibilityHint(String(localized: "Clears all items from the New view."))
                         }

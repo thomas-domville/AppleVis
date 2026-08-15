@@ -47,6 +47,12 @@ struct CommunityDiscussionHeading: View {
     let count: Int
     let onThreadOverview: () -> Void
     var onJumpToLast: (() -> Void)? = nil
+    /// Comments posted since this content was last visited — when set (and
+    /// > 0), shows a "Jump to First New Comment" link above "Jump to Last
+    /// Comment," so a returning reader can go straight to what they haven't
+    /// seen instead of the thread's very end.
+    var newCount: Int = 0
+    var onJumpToFirstNew: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -70,6 +76,21 @@ struct CommunityDiscussionHeading: View {
                 Text("\(count) comment\(count == 1 ? "" : "s")")
                     .font(.caption).foregroundStyle(.secondary)
                     .accessibilityHidden(true)
+            }
+
+            if let onJumpToFirstNew, newCount > 0 {
+                Button(action: onJumpToFirstNew) {
+                    HStack {
+                        Text("Jump to First New Comment")
+                            .font(.subheadline).fontWeight(.medium)
+                        Spacer()
+                        Image(systemName: "arrow.down.to.line.compact")
+                    }
+                    .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(String(localized: "Jump to First New Comment"))
+                .accessibilityHint(String(localized: "Moves to the first comment posted since your last visit."))
             }
 
             if let onJumpToLast, count > 1 {

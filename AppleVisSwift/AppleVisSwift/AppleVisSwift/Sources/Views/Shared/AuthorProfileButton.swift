@@ -124,9 +124,23 @@ private struct AuthorProfileSheet: View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 6) {
+                    // docs/IMPLEMENTATION_NOTES.md requires the member name
+                    // be the heading here — was missing the trait entirely
+                    // (PROFILE-04).
                     Text(profile.displayName).font(.title3).fontWeight(.semibold)
-                    Text("Member since \(profile.memberSince.formatted(date: .abbreviated, time: .omitted))")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .accessibilityAddTraits(.isHeader)
+                    // .distantPast is JsonApiNode.parseDrupalDate's sentinel
+                    // for a missing/malformed "created" field, not a real
+                    // date — rendering it unconditionally produced a
+                    // nonsensical "Member since January 1, 1" with no
+                    // visual "this looks wrong" cue for a VoiceOver user to
+                    // catch, contradicting IMPLEMENTATION_NOTES.md's own
+                    // rule to render this "only when the API returns them"
+                    // (PROFILE-03).
+                    if profile.memberSince != .distantPast {
+                        Text("Member since \(profile.memberSince.formatted(date: .abbreviated, time: .omitted))")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
                 .padding(.vertical, 4)
             }

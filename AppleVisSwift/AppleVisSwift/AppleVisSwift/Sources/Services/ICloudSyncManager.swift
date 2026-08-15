@@ -138,27 +138,44 @@ final class ICloudSyncManager {
     /// touched it since the last sync checkpoint — i.e. it's exactly where
     /// the shadow last left it, so no local, not-yet-pushed change is at
     /// risk of being silently clobbered by a remote removal.
+    /// Reconciles a local id set against a cloud id set using a shadow (the
+    /// last-known-synced id set), producing which ids to add locally and
+    /// which to remove locally. Pulled out of `pullSavedItems` as a pure
+    /// function so the actual merge decision — previously only exercisable
+    /// end-to-end via `NSUbiquitousKeyValueStore` — has direct unit test
+    /// coverage (see `ICloudSyncManagerMergeTests`).
+    ///
+    /// An id present in cloud but not local is always added. An id is only
+    /// removed locally if it was BOTH in the shadow AND still locally
+    /// present but absent from cloud — i.e. a genuine remote deletion. An
+    /// id added locally since the last sync (present locally, never in the
+    /// shadow) is left alone rather than being clobbered just because the
+    /// cloud copy hasn't caught up to it yet.
+    nonisolated static func reconcileIds(cloud: Set<String>, local: Set<String>, shadow: Set<String>) -> (toAdd: Set<String>, toRemove: Set<String>) {
+        (toAdd: cloud.subtracting(local), toRemove: shadow.intersection(local).subtracting(cloud))
+    }
+
     private func pullSavedItems() {
         if isSyncEnabled("sync.savedItems"), let cloud: [SavedItem] = getJSON(key: "icloud.saved") {
             let shadow = readIdShadow(key: "icloud.saved.shadow")
-            let cloudIds = Set(cloud.map(\.id))
             let localIds = Set(PersistenceStore.shared.savedItems().map(\.id))
-            for item in cloud where !localIds.contains(item.id) {
+            let (toAdd, toRemove) = Self.reconcileIds(cloud: Set(cloud.map(\.id)), local: localIds, shadow: shadow)
+            for item in cloud where toAdd.contains(item.id) {
                 PersistenceStore.shared.save(item, sync: false)
             }
-            for id in shadow.intersection(localIds).subtracting(cloudIds) {
+            for id in toRemove {
                 PersistenceStore.shared.unsave(id: id, sync: false)
             }
             writeIdShadow(Set(PersistenceStore.shared.savedItems().map(\.id)), key: "icloud.saved.shadow")
         }
         if isSyncEnabled("sync.followedItems"), let cloud: [FollowedItem] = getJSON(key: "icloud.followed") {
             let shadow = readIdShadow(key: "icloud.followed.shadow")
-            let cloudIds = Set(cloud.map(\.id))
             let localIds = Set(PersistenceStore.shared.followedItems().map(\.id))
-            for item in cloud where !localIds.contains(item.id) {
+            let (toAdd, toRemove) = Self.reconcileIds(cloud: Set(cloud.map(\.id)), local: localIds, shadow: shadow)
+            for item in cloud where toAdd.contains(item.id) {
                 PersistenceStore.shared.markFollowed(item, sync: false)
             }
-            for id in shadow.intersection(localIds).subtracting(cloudIds) {
+            for id in toRemove {
                 PersistenceStore.shared.markUnfollowed(id: id, sync: false)
             }
             writeIdShadow(Set(PersistenceStore.shared.followedItems().map(\.id)), key: "icloud.followed.shadow")
@@ -251,7 +268,7 @@ final class ICloudSyncManager {
         do {
             store.set(try JSONEncoder().encode(value), forKey: key)
         } catch {
-            AppLog.sync.error("Failed to encode \(key, privacy: .public) for iCloud push: \(error, privacy: .public)")
+            AppLog.sync.error("Failed to encode \(key, privacy: .public) for iCloud push: \(error, privacy: .private)")
         }
     }
 
@@ -260,7 +277,7 @@ final class ICloudSyncManager {
         do {
             return try JSONDecoder().decode(T.self, from: data)
         } catch {
-            AppLog.sync.error("Failed to decode \(key, privacy: .public) from iCloud: \(error, privacy: .public)")
+            AppLog.sync.error("Failed to decode \(key, privacy: .public) from iCloud: \(error, privacy: .private)")
             return nil
         }
     }

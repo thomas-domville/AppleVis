@@ -117,6 +117,7 @@ final class TipStore: ObservableObject {
     }
 
     func show(_ key: TipKey) {
+        guard PreferencesStore.current?.helpfulTipsEnabled ?? true else { return }
         guard !seenThisSession.contains(key), let content = Tips.content[key] else { return }
         guard !Self.isSeen(key) else {
             seenThisSession.insert(key)

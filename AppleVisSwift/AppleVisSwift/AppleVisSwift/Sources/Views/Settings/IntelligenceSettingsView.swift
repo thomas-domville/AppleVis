@@ -84,6 +84,16 @@ struct IntelligenceSettingsView: View {
                 }
                 .accessibilityElement(children: .combine)
             }
+
+            Section {
+                ResetToDefaultsButton {
+                    preferences.nonEnglishDetectionEnabled = true
+                    preferences.composeRewriteEnabled = true
+                    preferences.composeTranslationEnabled = true
+                    preferences.searchTranslationEnabled = true
+                    preferences.aiSummariesEnabled = true
+                }
+            }
         }
         .themedList(preferences.colors)
         .navigationTitle("Intelligence")

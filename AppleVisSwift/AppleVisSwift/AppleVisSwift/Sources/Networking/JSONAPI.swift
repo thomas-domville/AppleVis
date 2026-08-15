@@ -169,6 +169,19 @@ struct JsonApiCollectionResponse: Decodable {
     var hasNextPage: Bool { links?["next"] != nil }
 }
 
+/// ARCH-10: browse-list endpoints previously discarded this response's own
+/// `hasNextPage` (the standard JSON:API `links.next`, provided automatically
+/// by Drupal's JSON:API module) and left callers to guess "is there more"
+/// from a client-side "did this page come back full" heuristic — wrong
+/// whenever a page happens to land exactly full but no more data actually
+/// exists. `fetchWithCache` requires a `Codable` return type (for its own
+/// disk cache), so this wraps the true server signal in a small reusable
+/// shape rather than each endpoint duplicating its own page-result struct.
+struct PagedListResult<Item: Codable>: Codable {
+    let items: [Item]
+    let hasMore: Bool
+}
+
 struct JsonApiSingleResponse: Decodable {
     let data: JsonApiNode
     let included: [JsonApiNode]?

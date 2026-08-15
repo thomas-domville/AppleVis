@@ -20,6 +20,7 @@ struct SubmitBugView: View {
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
     @AccessibilityFocusState private var isStepFocused: Bool
+    @AccessibilityFocusState private var isErrorFocused: Bool
 
     @State private var step: Step = .description
     @State private var showSignIn = false
@@ -33,6 +34,8 @@ struct SubmitBugView: View {
     @State private var isSubmitting = false
     @State private var error: String?
     @State private var showDiscardConfirm = false
+    @State private var submitted = false
+    @State private var descriptionMinimumAnnounced = false
 
     private let platforms = ["iOS", "iPadOS", "macOS"]
     private let reproduceOptions = ["Yes, always", "Yes, sometimes", "No"]
@@ -42,15 +45,49 @@ struct SubmitBugView: View {
         "No - please thank/recognize me anonymously",
     ]
 
+    /// 30-char minimum on the description matches legacy's
+    /// `submit-bug/description.tsx` `canContinue`, dropped in the native
+    /// port (title had no floor legacy either — a non-empty check is enough).
+    private var descriptionLength: Int { description.trimmingCharacters(in: .whitespacesAndNewlines).count }
+
     private var descriptionValid: Bool {
-        !title.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !description.trimmingCharacters(in: .whitespaces).isEmpty
+        !title.trimmingCharacters(in: .whitespaces).isEmpty && descriptionLength >= 30
+    }
+
+    /// Mirrors Contact's crossing-the-threshold announcement so VoiceOver
+    /// users learn the moment they can continue, not just via Next's
+    /// disabled state.
+    private func handleDescriptionChange(_ newValue: String) {
+        let length = newValue.trimmingCharacters(in: .whitespacesAndNewlines).count
+        if !descriptionMinimumAnnounced && length >= 30 {
+            descriptionMinimumAnnounced = true
+            UIAccessibility.post(notification: .announcement, argument: "Minimum length reached. You can now continue.")
+        } else if descriptionMinimumAnnounced && length < 30 {
+            descriptionMinimumAnnounced = false
+        }
+    }
+
+    /// Legacy's `submit-bug/index.tsx` blocked continuing past this step
+    /// without a software version; the native Next button here was
+    /// previously hardcoded to never disable regardless of step, so this
+    /// gate could be skipped with Software Version left empty through
+    /// submission.
+    private var bugInfoValid: Bool {
+        !softwareVersion.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     var body: some View {
         NavigationStack {
             Group {
-                if !auth.isSignedIn {
+                if submitted {
+                    ThankYouView(
+                        icon: "ladybug",
+                        heading: "Bug report submitted!",
+                        message: "Thanks for helping improve accessibility. The AppleVis team will review your report.",
+                        doneLabel: "Done",
+                        onDone: { dismiss() }
+                    )
+                } else if !auth.isSignedIn {
                     signInRequiredView
                 } else {
                     Form {
@@ -60,7 +97,12 @@ struct SubmitBugView: View {
                         case .review:      reviewSection
                         }
                         if let error {
-                            Section { Text(error).foregroundStyle(.red) }
+                            Section {
+                                Text(error)
+                                    .foregroundStyle(.red)
+                                    .accessibilityAddTraits(.isHeader)
+                                    .accessibilityFocused($isErrorFocused)
+                            }
                         }
                     }
                     .themedList(preferences.colors)
@@ -69,6 +111,7 @@ struct SubmitBugView: View {
             .navigationTitle("Submit a Bug Report")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                if !submitted {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(step == .description ? "Cancel" : "Back") {
                         if step == .description {
@@ -100,9 +143,10 @@ struct SubmitBugView: View {
                                 .disabled(isSubmitting)
                         } else {
                             Button("Next") { goNext() }
-                                .disabled(step == .description ? !descriptionValid : false)
+                                .disabled(step == .description ? !descriptionValid : !bugInfoValid)
                         }
                     }
+                }
                 }
             }
         }
@@ -187,11 +231,24 @@ struct SubmitBugView: View {
             }
             Section("Bug Details") {
                 TextField("Title", text: $title)
+                    .accessibilityHint(String(localized: "Required."))
             }
-            Section("Description") {
+            Section {
+                HStack {
+                    Text("Description").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text(descriptionLength < 30 ? "\(descriptionLength) / 30 min" : "\(descriptionLength) chars")
+                        .font(.caption)
+                        .fontWeight(descriptionLength < 30 ? .bold : .regular)
+                        .foregroundStyle(descriptionLength < 30 ? .red : .secondary)
+                        .accessibilityLabel(descriptionLength < 30 ? String(localized: "\(descriptionLength) of 30 minimum characters") : String(localized: "\(descriptionLength) characters"))
+                }
                 TextEditor(text: $description)
                     .frame(minHeight: 160)
+                    .accessibilityLabel(String(localized: "Description"))
+                    .accessibilityHint(String(localized: "Required. Minimum 30 characters."))
                     .onChange(of: description) { _, newValue in
+                        handleDescriptionChange(newValue)
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
                             newValue,
@@ -211,6 +268,7 @@ struct SubmitBugView: View {
                     ForEach(platforms, id: \.self) { Text($0) }
                 }
                 TextField("Software Version", text: $softwareVersion)
+                    .accessibilityHint(String(localized: "Required."))
                 TextField("Apple Feedback ID (optional)", text: $appleFeedbackId)
                     .accessibilityHint(String(localized: "The FB number from Apple's Feedback Assistant, if you also filed this there."))
                 Picker("Can you reproduce it?", selection: $canReproduce) {
@@ -276,10 +334,11 @@ struct SubmitBugView: View {
         )
         switch result {
         case .ok:
-            toast.success(String(localized: "Bug report submitted"))
-            dismiss()
+            SoundPlayer.shared.play(.success)
+            submitted = true
         case .failure(let message):
             error = message
+            await announceWizardFailure(message, focus: $isErrorFocused)
         }
         isSubmitting = false
     }

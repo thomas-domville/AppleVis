@@ -30,7 +30,18 @@ struct ForumsBrowseView: View {
     @State private var isLoadingMore = false
     @State private var showFilterSheet = false
     @State private var searchText = ""
+    /// Snapshot of `forumsLastVisit` taken once per genuine visit (in
+    /// `.task`, when the Forums tab is actually entered) rather than read
+    /// live from the ever-advancing store — see `ForumFilter.apply`'s doc
+    /// comment and FORUM-01. The persisted value itself only advances in
+    /// `.onDisappear`, a real end-of-visit signal, decoupled from
+    /// `load(reset:)` which runs many times per visit (pull-to-refresh,
+    /// filter changes, pagination).
+    @State private var sessionLastVisit: Date = PersistenceStore.shared.forumsLastVisit
+    @State private var autoPaginateAttempts = 0
+    private static let maxAutoPaginateAttempts = 20
     @AccessibilityFocusState private var focusedTopicId: String?
+    @AccessibilityFocusState private var isEmptyStateFocused: Bool
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var toast: ToastStore
@@ -90,7 +101,7 @@ struct ForumsBrowseView: View {
     /// instead, the same string both `categories()` and the recent feed
     /// already surface.
     private func applyRefinements(to fetched: [ForumTopic]) -> [ForumTopic] {
-        var result = filter.apply(to: fetched)
+        var result = filter.apply(to: fetched, lastVisit: sessionLastVisit)
         if appleTopicsFilter == .nonAppleOnly {
             result = result.filter { ForumsBrowseView.isNonAppleCategory($0.category) }
         }
@@ -139,8 +150,25 @@ struct ForumsBrowseView: View {
                 LoadingView(message: "Loading \(filter.displayName)…")
             } else if let error, topics.isEmpty {
                 ErrorView(message: error) { await load(reset: true) }
+            } else if filteredTopics.isEmpty && hasMore && autoPaginateAttempts < Self.maxAutoPaginateAttempts {
+                // A page filtering down to zero doesn't mean no matches
+                // exist — Unread/New/Since Last Visit are applied
+                // client-side to a filter-agnostic "recent" feed, so a later
+                // page can still have matches even though this one didn't.
+                // Keep paging automatically instead of dead-ending on a
+                // false empty state (FORUM-02), capped so a filter with
+                // genuinely no matches can't loop against a live feed forever.
+                LoadingView(message: "Looking for \(filter.displayName)…")
+                    .task { await loadMoreUntilMatchOrCap() }
             } else if filteredTopics.isEmpty {
-                EmptyStateView(title: "No topics", message: forumsEmptyMessage, systemImage: "bubble.left.and.bubble.right")
+                EmptyStateView(
+                    title: "No topics",
+                    message: hasMore ? "No matches in the topics checked so far." : forumsEmptyMessage,
+                    systemImage: "bubble.left.and.bubble.right",
+                    primaryActionLabel: hasMore ? "Keep Looking" : nil,
+                    primaryAction: hasMore ? { autoPaginateAttempts = 0 } : nil,
+                    titleFocus: $isEmptyStateFocused
+                )
             } else {
                 topicList
             }
@@ -175,12 +203,38 @@ struct ForumsBrowseView: View {
                 // wherever the OS defaulted it — typically back near the
                 // toolbar filter button — instead of on the new content.
                 UIAccessibility.post(notification: .announcement, argument: String(localized: "Showing \(filter.displayName)."))
-                if let first = filteredTopics.first { focusOnTopic(first.id) }
+                if let first = filteredTopics.first {
+                    focusOnTopic(first.id)
+                } else {
+                    // Previously nothing moved focus to the empty state
+                    // itself after a filter change landed on zero results
+                    // (FORUM-18) — VoiceOver's cursor stayed on the
+                    // now-hidden filter control.
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(300))
+                        isEmptyStateFocused = true
+                    }
+                }
             }
         }) {
             ForumFilterSheetView(filter: $filter, appleTopicsFilter: $appleTopicsFilter, selectedCategory: $selectedCategory, categories: categories)
         }
-        .task { await load(reset: true) }
+        .task {
+            // Snapshot once per genuine visit — NOT inside load(reset:),
+            // which also runs on pull-to-refresh and filter changes within
+            // the same visit and must not shift the New/Since-Last-Visit
+            // baseline each time. See FORUM-01.
+            sessionLastVisit = PersistenceStore.shared.forumsLastVisit
+            await load(reset: true)
+            restoreLastViewedTopicIfPresent()
+        }
+        .onDisappear {
+            // A real end-of-visit signal: fires on tab switch away, not on
+            // pushing/popping a topic detail screen within this same
+            // NavigationStack (SwiftUI doesn't toggle a stack root's
+            // onAppear/onDisappear for child pushes).
+            PersistenceStore.shared.markForumsVisited()
+        }
         .refreshable { await load(reset: true); SoundPlayer.shared.play(.refresh) }
     }
 
@@ -191,7 +245,7 @@ struct ForumsBrowseView: View {
                     .listRowSeparator(.hidden)
             }
             ForEach(filteredTopics) { topic in
-                ForumTopicRow(topic: topic, onDelete: { topics.removeAll { $0.id == topic.id } })
+                ForumTopicRow(topic: topic, onDelete: { deleteTopicWithFocus(topic) })
                     .accessibilityFocused($focusedTopicId, equals: topic.id)
             }
             if hasMore {
@@ -206,6 +260,35 @@ struct ForumsBrowseView: View {
     /// Delayed since setting focus before the target row has laid out is a
     /// common way for it to silently fail (same pattern used for wizard
     /// step transitions elsewhere in the app).
+    /// Focuses a stable neighbor after deleting a topic from the list
+    /// (FORUM-12) — same class of gap, same fix pattern, as FORUM-11's
+    /// reply-deletion focus in ForumTopicDetailView.
+    private func deleteTopicWithFocus(_ topic: ForumTopic) {
+        let list = filteredTopics
+        guard let idx = list.firstIndex(where: { $0.id == topic.id }) else {
+            topics.removeAll { $0.id == topic.id }
+            return
+        }
+        let neighborId: String? = idx + 1 < list.count ? list[idx + 1].id : (idx > 0 ? list[idx - 1].id : nil)
+        topics.removeAll { $0.id == topic.id }
+        if let neighborId {
+            focusOnTopic(neighborId)
+        }
+    }
+
+    /// FORUM-14: "remember forum list position by content ID." Scrolls/
+    /// focuses back to the topic the user most recently opened, if it's
+    /// still present in the currently loaded, currently filtered list —
+    /// tolerating that new activity may have reordered or dropped it.
+    /// Consumed once (cleared after use) so it doesn't keep yanking focus
+    /// back on every later pull-to-refresh within the same visit.
+    private func restoreLastViewedTopicIfPresent() {
+        guard let lastId = PersistenceStore.shared.lastViewedForumTopicId else { return }
+        PersistenceStore.shared.lastViewedForumTopicId = nil
+        guard filteredTopics.contains(where: { $0.id == lastId }) else { return }
+        focusOnTopic(lastId)
+    }
+
     private func focusOnTopic(_ id: String) {
         Task {
             try? await Task.sleep(for: .milliseconds(300))
@@ -230,7 +313,7 @@ struct ForumsBrowseView: View {
     }
 
     private func load(reset: Bool) async {
-        if reset { page = 0; topics = [] }
+        if reset { page = 0; topics = []; autoPaginateAttempts = 0 }
         isLoading = true
         error = nil
         do {
@@ -240,10 +323,27 @@ struct ForumsBrowseView: View {
             topics = applyRefinements(to: fetched)
             if !cats.isEmpty { categories = cats }
             hasMore = fetched.count >= APIPaging.pageSize
-            PersistenceStore.shared.markForumsVisited()
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Could not load topics" }
         isLoading = false
+    }
+
+    /// Keeps calling `loadMore()` while the current filter has zero visible
+    /// matches — a filter-agnostic "recent" feed page can legitimately
+    /// filter down to zero while later pages still have matches, so
+    /// dead-ending on an empty state here would be wrong (FORUM-02). A
+    /// single `.task` loops internally rather than relying on SwiftUI to
+    /// start a fresh task on every re-render, since an already-attached
+    /// `.task` doesn't restart just because surrounding state changed.
+    private func loadMoreUntilMatchOrCap() async {
+        while filteredTopics.isEmpty && hasMore && autoPaginateAttempts < Self.maxAutoPaginateAttempts {
+            let pageBefore = page
+            autoPaginateAttempts += 1
+            await loadMore()
+            // loadMore() failed (page didn't advance) — it already toasted
+            // the error once; stop instead of retrying in a tight loop.
+            if page == pageBefore { break }
+        }
     }
 
     /// `hasMore` is intentionally driven by the raw (pre-filter) page size,

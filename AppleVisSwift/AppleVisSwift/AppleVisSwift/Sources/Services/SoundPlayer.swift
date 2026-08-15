@@ -107,6 +107,12 @@ final class SoundPlayer {
     /// the app session (AVAudioPlayer.play() just no-ops under the wrong
     /// category, with no error anywhere).
     private func configureSession() {
+        // Never reassert .ambient while a podcast episode is loaded — PlayerStore
+        // sets the shared session to .playback/.spokenAudio, and every play/pause
+        // (including Lock Screen remote commands) plays a confirmation sound here.
+        // Resetting the category on every one of those calls silently downgraded
+        // playback away from background/Lock-Screen eligibility on the first pause.
+        guard PlayerStore.current?.currentEpisode == nil else { return }
         let session = AVAudioSession.sharedInstance()
         guard session.category != .ambient || !session.categoryOptions.contains(.mixWithOthers) else { return }
         try? session.setCategory(.ambient, options: [.mixWithOthers])

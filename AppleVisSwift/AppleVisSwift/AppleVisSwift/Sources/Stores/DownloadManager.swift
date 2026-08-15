@@ -34,7 +34,25 @@ final class DownloadManager: NSObject, ObservableObject {
 
     private var metadata: [String: DownloadedEpisodeMeta] = [:]
     private var tasks: [String: URLSessionDownloadTask] = [:]
-    private lazy var session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
+    /// A background session, not `.default` — a foreground session's
+    /// in-flight downloads stall or die as soon as the app is backgrounded
+    /// or suspended, a completely normal thing to happen mid-download
+    /// (PODCAST-02). The identifier must stay stable across launches: the OS
+    /// relaunches the app in the background under this exact identifier to
+    /// deliver completion events, which is why `DownloadManager.shared` is
+    /// deliberately touched from `AppleVisAppDelegate.didFinishLaunching`
+    /// (not just lazily on first UI access) so the session reattaches
+    /// immediately even on a silent background relaunch.
+    private lazy var session: URLSession = {
+        let config = URLSessionConfiguration.background(withIdentifier: "com.applevis.app.podcastDownloads")
+        config.sessionSendsLaunchEvents = true
+        return URLSession(configuration: config, delegate: self, delegateQueue: nil)
+    }()
+    /// Stashed by `AppleVisAppDelegate.application(_:handleEventsForBackgroundURLSession:completionHandler:)`;
+    /// called once `urlSessionDidFinishEvents(forBackgroundURLSession:)`
+    /// confirms every queued delegate callback for this background session
+    /// has been delivered, telling the OS it can suspend the app again.
+    var backgroundSessionCompletionHandler: (() -> Void)?
 
     private let metadataKey = "applevis.downloads.metadata.v1"
 
@@ -51,6 +69,29 @@ final class DownloadManager: NSObject, ObservableObject {
         super.init()
         loadMetadata()
         applyAutoDeletePolicy()
+        reconcileActiveDownloadsFromSession()
+    }
+
+    /// After a background relaunch, in-memory `tasks`/`activeDownloads`/
+    /// `progress` start empty even though the OS-level background session
+    /// may still have downloads in flight from before the app was
+    /// suspended/killed — ask the session directly instead of assuming
+    /// nothing is happening, so the UI doesn't silently show an in-progress
+    /// download as never-started.
+    private func reconcileActiveDownloadsFromSession() {
+        session.getAllTasks { [weak self] sessionTasks in
+            guard let self else { return }
+            let downloadTasks = sessionTasks.compactMap { $0 as? URLSessionDownloadTask }
+            guard !downloadTasks.isEmpty else { return }
+            DispatchQueue.main.async {
+                for task in downloadTasks {
+                    guard let id = task.taskDescription else { continue }
+                    self.tasks[id] = task
+                    self.activeDownloads.insert(id)
+                    if self.progress[id] == nil { self.progress[id] = 0 }
+                }
+            }
+        }
     }
 
     // MARK: - Queries
@@ -223,6 +264,17 @@ extension DownloadManager: URLSessionDownloadDelegate {
             self.tasks[episodeId] = nil
             self.saveMetadata()
             self.lastFailure = DownloadFailure(episodeId: episodeId, episodeTitle: title)
+        }
+    }
+
+    /// Required for a background session: tells the OS every delegate
+    /// callback queued while the app was suspended has now been delivered,
+    /// so it's safe to call the stashed completion handler and let the app
+    /// be suspended again.
+    func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
+        DispatchQueue.main.async {
+            self.backgroundSessionCompletionHandler?()
+            self.backgroundSessionCompletionHandler = nil
         }
     }
 }

@@ -265,10 +265,13 @@ final class APIClient {
         } catch let apiError as APIError {
             throw apiError
         } catch let urlError as URLError where urlError.code == .timedOut {
+            AppLog.network.error("Request timed out: \(request.url?.path ?? "?", privacy: .public)")
             throw APIError.timeout
         } catch let urlError as URLError {
+            AppLog.network.error("Network error on \(request.url?.path ?? "?", privacy: .public): \(urlError, privacy: .private)")
             throw APIError.network(underlying: urlError)
         } catch let decodeError as DecodingError {
+            AppLog.network.error("Decode failed for \(request.url?.path ?? "?", privacy: .public): \(decodeError, privacy: .private)")
             throw APIError.decoding(underlying: decodeError)
         }
     }
@@ -284,10 +287,13 @@ final class APIClient {
         } catch let apiError as APIError {
             throw apiError
         } catch let urlError as URLError where urlError.code == .timedOut {
+            AppLog.network.error("Request timed out: \(request.url?.path ?? "?", privacy: .public)")
             throw APIError.timeout
         } catch let urlError as URLError {
+            AppLog.network.error("Network error on \(request.url?.path ?? "?", privacy: .public): \(urlError, privacy: .private)")
             throw APIError.network(underlying: urlError)
         } catch let decodeError as DecodingError {
+            AppLog.network.error("Decode failed for \(request.url?.path ?? "?", privacy: .public): \(decodeError, privacy: .private)")
             throw APIError.decoding(underlying: decodeError)
         }
     }
@@ -306,8 +312,12 @@ final class APIClient {
         case 403: throw APIError.forbidden
         case 404: throw APIError.notFound
         case 429: throw APIError.rateLimited
-        case 500...599: throw APIError.server(statusCode: http.statusCode)
-        default: throw APIError.unknown(statusCode: http.statusCode)
+        case 500...599:
+            AppLog.network.error("Server error \(http.statusCode) from \(http.url?.path ?? "?", privacy: .public)")
+            throw APIError.server(statusCode: http.statusCode)
+        default:
+            AppLog.network.error("Unexpected status \(http.statusCode) from \(http.url?.path ?? "?", privacy: .public)")
+            throw APIError.unknown(statusCode: http.statusCode)
         }
     }
 

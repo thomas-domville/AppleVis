@@ -124,6 +124,41 @@ final class PersistenceStore {
         defaults.set(Date().timeIntervalSince1970, forKey: "applevis.forums.lastVisit")
     }
 
+    /// Backs FORUM-14 ("remember forum list position by content ID, not
+    /// only by scroll offset"): the id of the topic the user most recently
+    /// opened from the Forums browse list, so returning to that list can
+    /// scroll/focus back to it — tolerating that new activity may have
+    /// reordered the list around it, since this is just an id lookup
+    /// against whatever's currently loaded, not a fixed row index.
+    var lastViewedForumTopicId: String? {
+        get { defaults.string(forKey: "applevis.forums.lastViewedTopicId") }
+        set { defaults.set(newValue, forKey: "applevis.forums.lastViewedTopicId") }
+    }
+
+    // MARK: - Played episodes
+
+    private let playedEpisodesKey = "applevis.podcast.playedEpisodeIds"
+
+    /// General-purpose "played" state for any episode, downloaded or not.
+    /// `DownloadManager.markPlayCompleted(_:)` is a separate, narrower
+    /// mechanism scoped only to downloaded episodes (it drives Auto-Delete
+    /// and is a no-op with nothing downloaded) — What's New already
+    /// advertised a user-facing "Mark as Played" action, but no general
+    /// mechanism usable on any episode actually existed anywhere.
+    func isEpisodePlayed(_ id: String) -> Bool {
+        playedEpisodeIds().contains(id)
+    }
+
+    func markEpisodePlayed(_ id: String) {
+        var ids = playedEpisodeIds()
+        guard ids.insert(id).inserted else { return }
+        defaults.set(Array(ids), forKey: playedEpisodesKey)
+    }
+
+    private func playedEpisodeIds() -> Set<String> {
+        Set(defaults.stringArray(forKey: playedEpisodesKey) ?? [])
+    }
+
     // MARK: - Per-item visit tracking (backs Home's "Mark as Read" and new-reply detection)
 
     private let itemVisitsKey = "applevis.home.itemVisits"
@@ -179,7 +214,7 @@ final class PersistenceStore {
             defaults.set(try JSONEncoder().encode(value), forKey: key)
             cache[key] = value
         } catch {
-            AppLog.persistence.error("Failed to encode \(key, privacy: .public): \(error, privacy: .public)")
+            AppLog.persistence.error("Failed to encode \(key, privacy: .public): \(error, privacy: .private)")
         }
     }
 
@@ -190,7 +225,7 @@ final class PersistenceStore {
         do {
             decoded = try JSONDecoder().decode(T.self, from: data)
         } catch {
-            AppLog.persistence.error("Failed to decode \(key, privacy: .public): \(error, privacy: .public)")
+            AppLog.persistence.error("Failed to decode \(key, privacy: .public): \(error, privacy: .private)")
             return nil
         }
         cache[key] = decoded

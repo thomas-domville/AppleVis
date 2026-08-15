@@ -19,6 +19,7 @@ struct EditProfileView: View {
     @State private var isLoading = true
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @AccessibilityFocusState private var isErrorFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -107,6 +108,7 @@ struct EditProfileView: View {
                     Section {
                         Label(error, systemImage: "exclamationmark.circle")
                             .foregroundStyle(.red)
+                            .accessibilityFocused($isErrorFocused)
                     }
                 }
             }
@@ -127,7 +129,7 @@ struct EditProfileView: View {
                 if isSaving {
                     ProgressView("Saving…")
                         .padding(20)
-                        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+                        .adaptiveGlass(in: RoundedRectangle(cornerRadius: 12))
                 } else if isLoading {
                     ProgressView("Loading…")
                 }
@@ -153,6 +155,7 @@ struct EditProfileView: View {
             mastodon = fields.mastodon ?? ""
         } catch {
             errorMessage = "Couldn't load your current profile. You can still make changes below."
+            isErrorFocused = true
         }
         isLoading = false
     }
@@ -182,8 +185,10 @@ struct EditProfileView: View {
                 dismiss()
             } catch let error as APIError {
                 errorMessage = error.localizedDescription
+                isErrorFocused = true
             } catch {
                 errorMessage = "Could not save profile. Please try again."
+                isErrorFocused = true
             }
             isSaving = false
         }

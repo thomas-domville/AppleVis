@@ -108,6 +108,17 @@ struct SavedSyncSettingsView: View {
                     .accessibilityElement(children: .combine)
                 }
             }
+
+            Section {
+                ResetToDefaultsButton {
+                    preferences.iCloudSync = true
+                    preferences.savedItemsSync = true
+                    preferences.followedItemsSync = true
+                    preferences.podcastPositionSync = true
+                    preferences.queueSync = true
+                    preferences.settingsSync = true
+                }
+            }
         }
         .themedList(preferences.colors)
         .navigationTitle("Saved & Sync")

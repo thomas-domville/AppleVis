@@ -9,7 +9,7 @@ struct PodcastEndpoints {
 
     private static let pageSize = 20
 
-    func episodes(page: Int = 0, sort: PodcastSort = .recent, tagTid: Int? = nil) async throws -> [PodcastEpisode] {
+    func episodes(page: Int = 0, sort: PodcastSort = .recent, tagTid: Int? = nil) async throws -> PagedListResult<PodcastEpisode> {
         try await fetchWithCache(group: .podcasts, key: "podcasts:episodes:\(page):\(sort.drupalSort):\(tagTid ?? -1)") {
             var query: [String: String] = [
                 "sort": sort.drupalSort,
@@ -19,7 +19,8 @@ struct PodcastEndpoints {
             ]
             if let tagTid { query["filter[taxonomy_vocabulary_15.drupal_internal__tid]"] = "\(tagTid)" }
             let response = try await client.jsonAPIList("node/podcast", query: query)
-            return response.data.map { Mappers.podcast($0, included: response.included ?? []) }
+            let items = response.data.map { Mappers.podcast($0, included: response.included ?? []) }
+            return PagedListResult(items: items, hasMore: response.hasNextPage)
         }
     }
 

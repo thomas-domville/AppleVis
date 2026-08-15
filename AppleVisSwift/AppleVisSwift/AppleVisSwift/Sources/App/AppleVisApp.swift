@@ -140,7 +140,7 @@ struct AppleVisApp: App {
         case .resume:
             player.play()
         case .playLatest:
-            guard let latest = try? await APIClient.shared.podcasts.episodes().first else { return }
+            guard let latest = try? await APIClient.shared.podcasts.episodes().items.first else { return }
             await player.load(latest)
         }
     }

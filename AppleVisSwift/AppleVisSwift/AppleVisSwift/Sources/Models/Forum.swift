@@ -18,7 +18,9 @@ struct ForumTopic: Identifiable, Codable, Hashable {
 
 struct ForumTopicDetail: Identifiable, Codable {
     let id: String
-    let title: String
+    // title/body are var, not let: an admin/owner editing the topic from
+    // its own detail screen updates these in place after a successful save.
+    var title: String
     let authorName: String
     let authorId: String
     let createdAt: Date
@@ -27,7 +29,7 @@ struct ForumTopicDetail: Identifiable, Codable {
     let viewCount: Int
     let category: String
     let categoryId: String
-    let body: String
+    var body: String
     let url: String
     var isFollowing: Bool
     var isSaved: Bool
@@ -56,8 +58,15 @@ extension ForumFilter {
     /// Applies this filter to a page of "recent" topics. Not meaningful for
     /// `.following`/`.saved` — those are sourced directly from
     /// `PersistenceStore` (see `supportsRefinement`), not from "recent".
-    func apply(to topics: [ForumTopic]) -> [ForumTopic] {
-        let lastVisit = PersistenceStore.shared.forumsLastVisit
+    ///
+    /// `lastVisit` is passed in rather than read from `PersistenceStore`
+    /// directly — the caller is responsible for capturing one stable
+    /// snapshot per genuine visit (see `ForumsBrowseView.sessionLastVisit`).
+    /// Reading the live, ever-advancing store value here directly caused
+    /// FORUM-01: `forumsLastVisit` was re-stamped to "now" on every reload,
+    /// so `.new`/`.sinceLastVisit` compared against a timestamp of "this
+    /// exact moment" and were almost always empty.
+    func apply(to topics: [ForumTopic], lastVisit: Date) -> [ForumTopic] {
         switch self {
         case .recent:
             return topics

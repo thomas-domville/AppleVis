@@ -15,7 +15,7 @@ struct ToastOverlay: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .glassEffect(in: Capsule())
+                .adaptiveGlass(in: Capsule())
                 .shadow(radius: 4)
                 .transition(UIAccessibility.isReduceMotionEnabled ? .opacity : .move(edge: .top).combined(with: .opacity))
                 .padding(.top, 8)

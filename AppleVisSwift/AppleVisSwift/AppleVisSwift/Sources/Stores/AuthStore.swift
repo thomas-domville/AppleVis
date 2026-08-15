@@ -49,6 +49,13 @@ final class AuthStore: ObservableObject {
         user = nil
         deleteFromKeychain()
         clearSessionCookies()
+        // ARCH-04/PERS-05: previously only cleared the session itself —
+        // saved items, followed topics, read/visited state, and
+        // notification history all survived sign-out fully intact, so the
+        // next person to sign in on a shared device inherited the prior
+        // user's data. Same scoped clear Settings > Privacy's "Clear All
+        // Local Data" button already used.
+        PersistenceStore.shared.clearAllLocalData()
     }
 
     /// Independent of whether the server-side logout call above succeeds —
@@ -77,6 +84,7 @@ final class AuthStore: ObservableObject {
         user = nil
         deleteFromKeychain()
         clearSessionCookies()
+        PersistenceStore.shared.clearAllLocalData()
         Task { await PushNotificationManager.clearRegistration() }
     }
 
@@ -131,7 +139,11 @@ final class AuthStore: ObservableObject {
         do {
             return try JSONDecoder().decode(AuthUser.self, from: data)
         } catch {
-            AppLog.auth.error("Failed to decode AuthUser from Keychain: \(error, privacy: .public)")
+            // SEC-07: a corrupted Keychain entry's DecodingError.debugDescription
+            // has a narrow but non-zero chance of surfacing a fragment of the
+            // decoded AuthUser blob (which carries csrfToken/logoutToken) —
+            // .private is the safer default and costs nothing.
+            AppLog.auth.error("Failed to decode AuthUser from Keychain: \(error, privacy: .private)")
             return nil
         }
     }

@@ -7,22 +7,40 @@ import UIKit
 /// to prefill App Store details, condensed from RN's 6-screen wizard into a
 /// single search-then-form flow.
 struct SubmitAppView: View {
+    /// Legacy's `submit-wizard` had a dedicated confirm/review step before
+    /// submit; native previously went straight from the details form to
+    /// Submit with nothing to check over first (SUBMIT-010).
+    private enum Step { case search, details, review }
+
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
     @Environment(\.dismiss) private var dismiss
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
+    @AccessibilityFocusState private var isStepFocused: Bool
+    @AccessibilityFocusState private var isErrorFocused: Bool
 
+    @State private var step: Step = .search
+    /// Restricted to the three platforms legacy's `submit-wizard/platform.tsx`
+    /// offered (watchOS apps ship bundled in an iOS entry, not submitted
+    /// separately) — previously there was no platform state at all and every
+    /// search silently searched iOS software only (SUBMIT-003).
+    @State private var platform: AppPlatform = .ios
     @State private var searchQuery = ""
     @State private var searchResults: [ItunesSearchHit] = []
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
     @State private var selectedHit: ItunesSearchHit?
+    @State private var duplicateMatches: [AppListing] = []
+    @State private var isCheckingDuplicates = false
+    @State private var acknowledgedDuplicate = false
+    @State private var accessibilityCommentsMinimumAnnounced = false
 
     @State private var payload = SubmitAppPayload()
     @State private var isSubmitting = false
     @State private var error: String?
+    @State private var submitted = false
 
     // "Before You Begin" gate — RN required these two confirmations before
     // a submitter could even reach the form (step 1 of its 5-step wizard).
@@ -77,29 +95,64 @@ struct SubmitAppView: View {
         "The app is totally inaccessible.",
     ]
 
+    // The accessibility assessment is this form's entire reason for existing —
+    // previously only appName/appStoreUrl/category were required, so a
+    // submission could reach the server with every accessibility field blank.
+    private var accessibilityCommentsLength: Int { payload.accessibilityComments.trimmingCharacters(in: .whitespacesAndNewlines).count }
+
     private var isValid: Bool {
         !payload.appName.trimmingCharacters(in: .whitespaces).isEmpty &&
         !payload.appStoreUrl.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !payload.category.isEmpty
+        !payload.category.isEmpty &&
+        !payload.osVersion.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !payload.voiceOverPerformance.isEmpty &&
+        !payload.buttonLabelling.isEmpty &&
+        !payload.usabilityNotes.isEmpty &&
+        accessibilityCommentsLength >= 20
+    }
+
+    /// Mirrors Contact's crossing-the-threshold announcement so VoiceOver
+    /// users learn the moment they can continue, not just via the toolbar
+    /// button's disabled state.
+    private func handleAccessibilityCommentsChange(_ newValue: String) {
+        let length = newValue.trimmingCharacters(in: .whitespacesAndNewlines).count
+        if !accessibilityCommentsMinimumAnnounced && length >= 20 {
+            accessibilityCommentsMinimumAnnounced = true
+            UIAccessibility.post(notification: .announcement, argument: "Minimum length reached.")
+        } else if accessibilityCommentsMinimumAnnounced && length < 20 {
+            accessibilityCommentsMinimumAnnounced = false
+        }
     }
 
     var body: some View {
         NavigationStack {
             Group {
-                if !auth.isSignedIn {
+                if submitted {
+                    ThankYouView(
+                        icon: "app.badge",
+                        heading: "App submitted!",
+                        message: "Thanks for documenting this app's accessibility. The AppleVis team will review your submission before it appears in the directory.",
+                        doneLabel: "Done",
+                        onDone: { dismiss() }
+                    )
+                } else if !auth.isSignedIn {
                     signInRequiredView
                 } else if !hasAgreedToBeforeYouBegin {
                     beforeYouBeginView
                 } else {
                     Form {
-                        if selectedHit == nil {
-                            searchSection
-                        }
-                        if selectedHit != nil || !payload.appName.isEmpty {
-                            detailsSection
+                        switch step {
+                        case .search:  searchSection
+                        case .details: detailsSection
+                        case .review:  reviewSection
                         }
                         if let error {
-                            Section { Text(error).foregroundStyle(.red) }
+                            Section {
+                                Text(error)
+                                    .foregroundStyle(.red)
+                                    .accessibilityAddTraits(.isHeader)
+                                    .accessibilityFocused($isErrorFocused)
+                            }
                         }
                     }
                     .themedList(preferences.colors)
@@ -108,11 +161,18 @@ struct SubmitAppView: View {
             .navigationTitle("Submit an App")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                if !submitted {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { requestCancel() }
+                    Button(step == .search ? "Cancel" : "Back") {
+                        if step == .search {
+                            requestCancel()
+                        } else {
+                            goBack()
+                        }
+                    }
                 }
                 if auth.isSignedIn && hasAgreedToBeforeYouBegin {
-                    if selectedHit != nil && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+                    if step == .details && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
                         ToolbarItem(placement: .secondaryAction) {
                             Button("Rewrite") {
                                 Task {
@@ -127,9 +187,15 @@ struct SubmitAppView: View {
                         }
                     }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Submit") { Task { await submit() } }
-                            .disabled(!isValid || isSubmitting)
+                        if step == .review {
+                            Button("Submit") { Task { await submit() } }
+                                .disabled(!isValid || isSubmitting)
+                        } else if step == .details {
+                            Button("Review") { goNext() }
+                                .disabled(!isValid)
+                        }
                     }
+                }
                 }
             }
             .confirmationDialog(
@@ -272,7 +338,8 @@ struct SubmitAppView: View {
         guard let prefillAppStoreURL, selectedHit == nil else { return }
         selectedHit = ItunesSearchHit(appStoreId: "", appName: "", developerName: "", artworkUrl: "", appStoreUrl: prefillAppStoreURL)
         payload.appStoreUrl = prefillAppStoreURL
-        if let meta = await ItunesAPI.fetchMetadata(appStoreUrl: prefillAppStoreURL) {
+        step = .details
+        if let meta = await ItunesAPI.fetchMetadata(appStoreUrl: prefillAppStoreURL, entity: platform.itunesEntity) {
             payload.appName = meta.appName
             payload.appVersion = meta.version
             payload.price = meta.price
@@ -283,6 +350,24 @@ struct SubmitAppView: View {
     }
 
     private var searchSection: some View {
+        Group {
+            Section { WizardStepIndicator(step: 1, total: 3, title: "Find the App", isFocused: $isStepFocused) }
+            Section("Platform") {
+                Picker("Platform", selection: $platform) {
+                    ForEach([AppPlatform.ios, .macos, .tvos]) { Text($0.displayName).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: platform) { _, _ in
+                    searchResults = []
+                    Task { await search() }
+                }
+                .accessibilityHint(String(localized: "Which App Store this app is listed on. Changes what search looks up."))
+            }
+            searchResultsSection
+        }
+    }
+
+    private var searchResultsSection: some View {
         Section("Find the App on the App Store") {
             TextField("Search App Store", text: $searchQuery)
                 .onSubmit { Task { await search() } }
@@ -314,6 +399,9 @@ struct SubmitAppView: View {
                 }
                 Button("Enter Details Manually") {
                     selectedHit = ItunesSearchHit(appStoreId: "", appName: "", developerName: "", artworkUrl: "", appStoreUrl: "")
+                    SoundPlayer.shared.play(.pickerTick)
+                    step = .details
+                    focusStepAfterTransition()
                 }
                 .font(.caption)
             }
@@ -322,18 +410,23 @@ struct SubmitAppView: View {
 
     private var detailsSection: some View {
         Group {
+            Section { WizardStepIndicator(step: 2, total: 3, title: "App Details", isFocused: $isStepFocused) }
             Section("App Details") {
                 TextField("App Name", text: $payload.appName)
+                    .accessibilityHint(String(localized: "Required."))
                 TextField("App Store URL", text: $payload.appStoreUrl)
                     .keyboardType(.URL)
                     .textInputAutocapitalization(.never)
+                    .accessibilityHint(String(localized: "Required."))
                 TextField("Version", text: $payload.appVersion)
                 TextField("Price (e.g. Free, $2.99)", text: $payload.price)
                 Picker("Category", selection: $payload.category) {
                     Text("Choose…").tag("")
                     ForEach(categories, id: \.self) { Text($0).tag($0) }
                 }
+                .accessibilityHint(String(localized: "Required."))
                 TextField("Minimum iOS Version", text: $payload.osVersion)
+                    .accessibilityHint(String(localized: "Required."))
             }
 
             Section("Accessibility Assessment") {
@@ -341,17 +434,17 @@ struct SubmitAppView: View {
                     Text("Choose…").tag("")
                     ForEach(voiceOverOptions, id: \.self) { Text($0).tag($0) }
                 }
-                .accessibilityHint(String(localized: "How well VoiceOver works overall in this app."))
+                .accessibilityHint(String(localized: "Required. How well VoiceOver works overall in this app."))
                 Picker("Button Labelling", selection: $payload.buttonLabelling) {
                     Text("Choose…").tag("")
                     ForEach(buttonLabellingOptions, id: \.self) { Text($0).tag($0) }
                 }
-                .accessibilityHint(String(localized: "Whether buttons and controls have clear, accurate VoiceOver labels."))
+                .accessibilityHint(String(localized: "Required. Whether buttons and controls have clear, accurate VoiceOver labels."))
                 Picker("Usability", selection: $payload.usabilityNotes) {
                     Text("Choose…").tag("")
                     ForEach(usabilityOptions, id: \.self) { Text($0).tag($0) }
                 }
-                .accessibilityHint(String(localized: "How easy the app is to use as a blind or low-vision user overall."))
+                .accessibilityHint(String(localized: "Required. How easy the app is to use as a blind or low-vision user overall."))
             }
 
             if intelligence.showTranslatePrompt {
@@ -375,10 +468,22 @@ struct SubmitAppView: View {
                 }
             }
 
-            Section("Accessibility Comments") {
+            Section {
+                HStack {
+                    Text("Accessibility Comments").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text(accessibilityCommentsLength < 20 ? "\(accessibilityCommentsLength) / 20 min" : "\(accessibilityCommentsLength) chars")
+                        .font(.caption)
+                        .fontWeight(accessibilityCommentsLength < 20 ? .bold : .regular)
+                        .foregroundStyle(accessibilityCommentsLength < 20 ? .red : .secondary)
+                        .accessibilityLabel(accessibilityCommentsLength < 20 ? String(localized: "\(accessibilityCommentsLength) of 20 minimum characters") : String(localized: "\(accessibilityCommentsLength) characters"))
+                }
                 TextEditor(text: $payload.accessibilityComments)
                     .frame(minHeight: 120)
+                    .accessibilityLabel(String(localized: "Accessibility Comments"))
+                    .accessibilityHint(String(localized: "Required. Minimum 20 characters."))
                     .onChange(of: payload.accessibilityComments) { _, newValue in
+                        handleAccessibilityCommentsChange(newValue)
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
                             newValue,
@@ -406,7 +511,7 @@ struct SubmitAppView: View {
             return
         }
         isSearching = true
-        let results = await ItunesAPI.search(searchQuery)
+        let results = await ItunesAPI.search(searchQuery, entity: platform.itunesEntity)
         guard !Task.isCancelled else { return }
         searchResults = results
         isSearching = false
@@ -422,8 +527,11 @@ struct SubmitAppView: View {
         selectedHit = hit
         payload.appName = hit.appName
         payload.appStoreUrl = hit.appStoreUrl
+        SoundPlayer.shared.play(.pickerTick)
+        step = .details
+        focusStepAfterTransition()
         Task {
-            if let meta = await ItunesAPI.fetchMetadata(appStoreUrl: hit.appStoreUrl) {
+            if let meta = await ItunesAPI.fetchMetadata(appStoreUrl: hit.appStoreUrl, entity: platform.itunesEntity) {
                 payload.appVersion = meta.version
                 payload.price = meta.price
                 payload.category = meta.category
@@ -433,17 +541,114 @@ struct SubmitAppView: View {
         }
     }
 
+    private func goNext() {
+        guard step == .details else { return }
+        SoundPlayer.shared.play(.pickerTick)
+        step = .review
+        acknowledgedDuplicate = false
+        focusStepAfterTransition()
+        Task { await checkForDuplicates() }
+    }
+
+    private func goBack() {
+        SoundPlayer.shared.play(.pickerTick)
+        switch step {
+        case .review:  step = .details
+        case .details: step = .search
+        case .search:  break
+        }
+        focusStepAfterTransition()
+    }
+
+    private func focusStepAfterTransition() {
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            isStepFocused = true
+        }
+    }
+
+    /// Title-contains lookup against the existing directory before this
+    /// submission goes through — legacy warned the submitter and offered
+    /// View Existing/Continue Anyway; native had no equivalent check at all
+    /// (SUBMIT-004). Non-blocking: the submitter can acknowledge and proceed,
+    /// since a title match isn't necessarily the same app.
+    private func checkForDuplicates() async {
+        isCheckingDuplicates = true
+        duplicateMatches = (try? await APIClient.shared.apps.checkForDuplicate(appName: payload.appName)) ?? []
+        isCheckingDuplicates = false
+    }
+
+    private var reviewSection: some View {
+        Group {
+            Section { WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused) }
+            if isCheckingDuplicates {
+                Section {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Checking for existing entries…")
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            } else if !duplicateMatches.isEmpty && !acknowledgedDuplicate {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Possible duplicate", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                            .font(.subheadline.weight(.semibold))
+                        Text(duplicateMatches.count == 1
+                            ? "An app entry already in the directory has a similar name:"
+                            : "\(duplicateMatches.count) app entries already in the directory have a similar name:")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        ForEach(duplicateMatches) { match in
+                            Text(match.name)
+                                .font(.caption.weight(.medium))
+                        }
+                        Button("This is a different app — continue anyway") {
+                            acknowledgedDuplicate = true
+                        }
+                        .font(.caption)
+                    }
+                }
+            }
+            Section("From") {
+                WizardReviewRow(label: "Posting As", value: auth.user?.name ?? "")
+            }
+            Section("App") {
+                WizardReviewRow(label: "Platform", value: platform.displayName)
+                WizardReviewRow(label: "App Name", value: payload.appName)
+                WizardReviewRow(label: "App Store URL", value: payload.appStoreUrl)
+                WizardReviewRow(label: "Version", value: payload.appVersion)
+                WizardReviewRow(label: "Price", value: payload.price)
+                WizardReviewRow(label: "Category", value: payload.category)
+                WizardReviewRow(label: "Minimum OS Version", value: payload.osVersion)
+            }
+            Section("Accessibility Assessment") {
+                WizardReviewRow(label: "VoiceOver Performance", value: payload.voiceOverPerformance)
+                WizardReviewRow(label: "Button Labelling", value: payload.buttonLabelling)
+                WizardReviewRow(label: "Usability", value: payload.usabilityNotes)
+                WizardReviewRow(label: "Accessibility Comments", value: payload.accessibilityComments)
+            }
+            Section("Additional") {
+                WizardReviewRow(label: "Short Summary", value: payload.shortSummary)
+                WizardReviewRow(label: "Additional Comments", value: payload.otherComments)
+            }
+        }
+    }
+
     private func submit() async {
         guard let user = auth.user else { return }
         isSubmitting = true; error = nil
         do {
             _ = try await APIClient.shared.apps.submitApp(payload: payload, csrfToken: user.csrfToken)
-            toast.success(String(localized: "App submitted for review"))
-            dismiss()
+            SoundPlayer.shared.play(.success)
+            submitted = true
         } catch let e as APIError {
             error = e.localizedDescription
+            await announceWizardFailure(e.localizedDescription, focus: $isErrorFocused)
         } catch {
             self.error = "Couldn't submit app."
+            await announceWizardFailure("Couldn't submit app.", focus: $isErrorFocused)
         }
         isSubmitting = false
     }

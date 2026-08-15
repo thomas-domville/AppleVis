@@ -20,6 +20,18 @@ struct BugBrowseView: View {
                 LoadingView()
             } else if let error, bugs.isEmpty {
                 ErrorView(message: error) { await load(reset: true) }
+            } else if bugs.isEmpty && searchText.isEmpty {
+                // The default .active filter combined with zero currently-
+                // active bugs previously rendered a blank list with no
+                // explanation (BUGS-01) — worded to reflect the active
+                // filter so it doesn't read as "the tracker is empty."
+                EmptyStateView(
+                    title: "No Bug Reports",
+                    message: statusFilter == .active
+                        ? "No active bugs for \(platform.displayName) right now."
+                        : "No bug reports for \(platform.displayName) right now.",
+                    systemImage: "ladybug"
+                )
             } else {
                 bugList
             }
@@ -131,8 +143,8 @@ struct BugBrowseView: View {
                 platform: platform,
                 status: statusFilter
             )
-            bugs = fetched
-            hasMore = fetched.count >= APIPaging.pageSize
+            bugs = fetched.items
+            hasMore = fetched.hasMore
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Couldn't load bug reports." }
         isLoading = false
@@ -146,8 +158,8 @@ struct BugBrowseView: View {
                 page: page + 1, platform: platform, status: statusFilter
             )
             page += 1
-            bugs += more
-            hasMore = more.count >= APIPaging.pageSize
+            bugs += more.items
+            hasMore = more.hasMore
         } catch {
             toast.error(String(localized: "Couldn't load more bug reports."))
         }
@@ -160,6 +172,19 @@ struct BugBrowseView: View {
 struct BugReportRow: View {
     let bug: BugReport
     var onDelete: (() -> Void)? = nil
+    @EnvironmentObject private var preferences: PreferencesStore
+
+    // BUGS-06: maps severity to a theme-consistent semantic color rather
+    // than a fixed system color, so it stays readable/distinct across all
+    // 13 palettes (including both high-contrast themes) the same way
+    // status already did.
+    private var severityColor: Color {
+        switch bug.severity {
+        case .low: return preferences.colors.success
+        case .medium: return preferences.colors.warning
+        case .high: return preferences.colors.error
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -174,6 +199,10 @@ struct BugReportRow: View {
                     .foregroundStyle(bug.status == .active ? .orange : .green)
                 Text("·")
                     .font(.caption).foregroundStyle(.secondary)
+                Image(systemName: bug.severity.iconName)
+                    .font(.caption)
+                    .foregroundStyle(severityColor)
+                    .accessibilityHidden(true)
                 Text(bug.severity.displayName)
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()

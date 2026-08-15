@@ -12,6 +12,7 @@ private func localized(_ value: String) -> String {
 
 struct LoadingView: View {
     var message: String = "Loading…"
+    @EnvironmentObject private var preferences: PreferencesStore
 
     var body: some View {
         VStack(spacing: 12) {
@@ -21,6 +22,13 @@ struct LoadingView: View {
                 .font(.subheadline)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Previously unthemed — on a custom theme (especially the two
+        // dedicated high-contrast themes, or the darker midnight/nebula
+        // themes) this flashed to the default system background during
+        // every loading/error/empty transition, then back once real themed
+        // content rendered (SEARCH-09). A jarring flash to a low-contrast
+        // default is a real low-vision usability problem, not cosmetic.
+        .background(preferences.colors.background)
         // None of these three shared states ever told VoiceOver anything
         // changed — a user pulling to refresh into an error or empty state
         // (or a screen swapping from a spinner to real content) got no
@@ -33,6 +41,7 @@ struct LoadingView: View {
 struct ErrorView: View {
     let message: String
     let retry: () async -> Void
+    @EnvironmentObject private var preferences: PreferencesStore
 
     var body: some View {
         VStack(spacing: 16) {
@@ -50,6 +59,7 @@ struct ErrorView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(preferences.colors.background)
         .onAppear { UIAccessibility.post(notification: .screenChanged, argument: localized(message)) }
     }
 }
@@ -62,6 +72,12 @@ struct EmptyStateView: View {
     var primaryAction: (() -> Void)? = nil
     var secondaryActionLabel: String? = nil
     var secondaryAction: (() -> Void)? = nil
+    /// Lets a caller move VoiceOver focus here explicitly — e.g. after a
+    /// filter change lands on an empty result set, where the generic
+    /// `.screenChanged` announcement below doesn't reliably land focus on
+    /// this specific message (FORUM-18).
+    var titleFocus: AccessibilityFocusState<Bool>.Binding? = nil
+    @EnvironmentObject private var preferences: PreferencesStore
 
     var body: some View {
         VStack(spacing: 12) {
@@ -71,6 +87,7 @@ struct EmptyStateView: View {
                 .accessibilityHidden(true)
             Text(localized(title))
                 .font(.headline)
+                .modifier(OptionalAccessibilityFocus(isFocused: titleFocus))
             Text(localized(message))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -87,6 +104,7 @@ struct EmptyStateView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(preferences.colors.background)
         .onAppear { UIAccessibility.post(notification: .screenChanged, argument: "\(localized(title)). \(localized(message))") }
     }
 }

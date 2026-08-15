@@ -13,6 +13,7 @@ struct DiscoverView: View {
     @State private var showTranslateSearchPrompt = false
     @State private var isTranslatingSearch = false
     @State private var lastAnnouncedResultCount: Int?
+    @State private var lastAnnouncedMessage: String?
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var toast: ToastStore
@@ -109,11 +110,21 @@ struct DiscoverView: View {
         searchTask?.cancel()
         // Matches the old RN app's minimum: below 2 characters is too broad
         // to be a useful title-CONTAINS search and just wastes a request.
-        guard query.trimmingCharacters(in: .whitespaces).count >= 2 else { searchResults = nil; return }
+        guard query.trimmingCharacters(in: .whitespaces).count >= 2 else {
+            searchResults = nil
+            isSearching = false
+            return
+        }
+        // Set synchronously, before the debounce Task even starts — this
+        // previously only flipped true after the 400ms Task.sleep, so
+        // during that window SearchResultsView rendered either a
+        // fabricated "No Results" (nothing had actually been searched yet)
+        // or stale results from the previous query with no loading cue
+        // (SEARCH-01/SEARCH-08).
+        isSearching = true
         searchTask = Task {
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
-            isSearching = true
             searchResults = try? await APIClient.shared.search.query(query)
             isSearching = false
             announceSearchResults()
@@ -140,6 +151,11 @@ struct DiscoverView: View {
         if !results.failedCategories.isEmpty {
             message += " Some results may be missing: \(results.failedCategories.joined(separator: ", "))."
         }
+        // Previously posted on every debounce settle even when byte-for-byte
+        // identical to the last announcement (e.g. typing then deleting a
+        // character) — an interrupting, redundant re-announcement (SEARCH-02).
+        guard message != lastAnnouncedMessage else { return }
+        lastAnnouncedMessage = message
         UIAccessibility.post(notification: .announcement, argument: message)
 
         if lastAnnouncedResultCount != total {
@@ -363,6 +379,7 @@ struct DiscoverView: View {
                     Text("Sign In Required").font(.caption).foregroundStyle(.secondary)
                 }
                 Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
             .padding()
         }
