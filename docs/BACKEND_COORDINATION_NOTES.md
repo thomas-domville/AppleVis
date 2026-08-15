@@ -29,3 +29,30 @@ specific brief (kept separate since it's substantial on its own).
 - **Not blocking:** the heuristic isn't wrong most of the time — it only
   misfires at the specific boundary of an exactly-full final page — so this
   is a real but low-frequency bug, not a functional break.
+
+## "Report Comment" has no real backend flag to submit to (App Store Guideline 1.2)
+
+- **Where:** `ResourceDetailView.swift`'s `ConditionalAccessibilityAction`/
+  Menu "Report Comment" action (and the same shared comment-row component
+  used by Blog/Bug Report comments) — currently just shows a toast:
+  "Reporting is coming once the Drupal Flags API is confirmed."
+- **The issue:** Apple's Guideline 1.2 (User-Generated Content) expects a
+  real mechanism for users to flag objectionable content, not just a UI
+  affordance that does nothing server-side. The app already has a working
+  generic Drupal "flagging" JSON:API pattern for follows (see
+  `FlagEndpoints.follow`/`unfollow` in `ContentEndpoints.swift`, machine
+  name `subscribe_node`) — the same pattern would work for abuse reporting
+  IF there's a configured flag for it, but guessing a machine name and
+  wiring it up blind risks silently hitting a 404 or, worse, flagging the
+  wrong thing.
+- **What's needed:** Confirm whether a content-abuse-report flag already
+  exists in Drupal's Flag module config on this site (a plausible machine
+  name would be something like `report_content` or `abuse`, but this needs
+  confirming, not guessing) and, if so, its exact machine name. If none
+  exists yet, it needs to be created before this can go from a "coming
+  soon" stub to a real, submittable moderation mechanism.
+- **Not fully blocking on its own:** the app also has a general Contact
+  App Support wizard as a fallback reporting path, and existing post-hoc
+  moderation (admin-gated edit/delete/unpublish) is real and functional —
+  but Apple review notes should mention both explicitly if this ships
+  before the dedicated Report flag is wired up.

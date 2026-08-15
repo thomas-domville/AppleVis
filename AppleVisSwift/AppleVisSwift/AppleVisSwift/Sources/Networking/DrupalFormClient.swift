@@ -19,17 +19,10 @@ import os
 enum DrupalFormClient {
     private static let base = "https://www.applevis.com"
 
-    // Same Cloudflare-bypass headers as APIClient — the backend serves an
-    // HTML challenge page instead of the real form to any request missing
-    // these, so every request built here needs them explicitly (this client
-    // uses URLSession.shared, not APIClient's session).
-    private static let bypassHeaders: [String: String] = [
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 AppleVis/2026",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Origin": base,
-        "Referer": "\(base)/",
-        "X-App-Auth": "2ff01dc7bf35469d93c6",
-    ]
+    // Same Cloudflare-bypass headers as APIClient (see CloudflareBypass.swift)
+    // — this client uses URLSession.shared, not APIClient's session, so it
+    // still needs them applied explicitly per-request.
+    private static let bypassHeaders: [String: String] = CloudflareBypass.headers(origin: base)
 
     private static func applyBypassHeaders(to request: inout URLRequest) {
         bypassHeaders.forEach { request.setValue($1, forHTTPHeaderField: $0) }

@@ -32,6 +32,10 @@ struct DeleteAccountView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
+                    Text("Your downloaded episodes, playback queue, and app settings on this device are not affected and will remain until you clear them yourself in Settings.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
                     Text("This cannot be undone. Consider signing out instead if you just want a break.")
                         .font(.caption)
                         .foregroundStyle(.secondary)

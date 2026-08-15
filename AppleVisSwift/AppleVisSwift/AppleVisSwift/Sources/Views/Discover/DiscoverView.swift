@@ -14,6 +14,7 @@ struct DiscoverView: View {
     @State private var isTranslatingSearch = false
     @State private var lastAnnouncedResultCount: Int?
     @State private var lastAnnouncedMessage: String?
+    @FocusState private var isSearchFieldFocused: Bool
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var toast: ToastStore
@@ -73,12 +74,22 @@ struct DiscoverView: View {
                 }
             }
             .searchable(text: $searchText, prompt: "Search AppleVis")
+            .searchFocused($isSearchFieldFocused)
             .onChange(of: searchText) { _, newValue in runSearch(newValue) }
             .task {
                 // .onChange doesn't fire for a prefilled initial value (e.g.
                 // opened via the "Search AppleVis" Siri intent) — kick it off
                 // manually in that case.
                 if !searchText.isEmpty, searchResults == nil { runSearch(searchText) }
+                // "Auto-Focus Search Field" (Settings > Accessibility) was
+                // declared and shown in Settings but never actually
+                // consumed anywhere — this was the only missing piece. Only
+                // applies when landing here with no query already driving
+                // focus/results (e.g. the Siri "Search AppleVis" intent),
+                // since that path already has an obvious next action.
+                if preferences.searchAutoFocusEnabled, searchText.isEmpty {
+                    isSearchFieldFocused = true
+                }
             }
             .navigationDestination(for: ForumTopic.self) { topic in
                 ForumTopicDetailView(topicId: topic.id)

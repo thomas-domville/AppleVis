@@ -96,17 +96,7 @@ final class APIClient {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 10
         config.timeoutIntervalForResource = 30
-        // The backend sits behind Cloudflare bot protection that blocks
-        // requests without a recognized app signature — every request needs
-        // these headers or it gets served an HTML challenge page instead of
-        // JSON (confirmed against the live RN client's COMMON_HEADERS).
-        config.httpAdditionalHeaders = [
-            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 AppleVis/2026",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Origin": "https://www.applevis.com",
-            "Referer": "https://www.applevis.com/",
-            "X-App-Auth": "2ff01dc7bf35469d93c6",
-        ]
+        config.httpAdditionalHeaders = CloudflareBypass.headers(origin: "https://www.applevis.com")
         session = URLSession(configuration: config)
 
         func makeDateStrategy() -> (Decoder) throws -> Date {
