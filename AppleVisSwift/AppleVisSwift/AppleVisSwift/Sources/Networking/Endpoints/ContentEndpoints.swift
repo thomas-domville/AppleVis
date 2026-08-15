@@ -290,43 +290,49 @@ struct BugReportEndpoints {
 }
 
 // MARK: - Search
-// Per-content-type title-CONTAINS search (matches the RN reference client;
-// there is no full-text search API configured on the backend yet).
+// Full-text search against the Solr site index (index/solr_site_index),
+// scoped to one content type per request via filter[type] — the endpoint
+// doesn't support comma-joined types in a single call. Same node--* resource
+// types and attributes/relationships as the direct node endpoints, so the
+// existing Mappers just work; this replaces the previous per-category
+// title-CONTAINS fan-out (searched only titles, never body text) with real
+// full-text relevance search across each category's actual content.
 
 struct SearchEndpoints {
     let client: APIClient
+    private static let solrIndexPath = "index/solr_site_index"
 
     func query(_ text: String) async throws -> SearchResults {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return SearchResults(forums: [], apps: [], guides: [], blogs: [], podcasts: [], bugs: []) }
 
         async let forumsRes = client.jsonAPIList(
-            "node/forum",
-            query: ["filter[title][operator]": "CONTAINS", "filter[title][value]": trimmed, "sort": "-changed", "page[limit]": "10"]
+            Self.solrIndexPath,
+            query: ["filter[fulltext]": trimmed, "filter[type]": "forum", "include": "uid,taxonomy_forums", "page[limit]": "10"]
         )
         async let appsRes = client.jsonAPIList(
-            "node/ios_app_directory",
-            query: ["include": "uid", "filter[title][operator]": "CONTAINS", "filter[title][value]": trimmed, "sort": "-changed", "page[limit]": "10"]
+            Self.solrIndexPath,
+            query: ["filter[fulltext]": trimmed, "filter[type]": "ios_app_directory", "include": "uid", "page[limit]": "10"]
         )
         async let guidesRes = client.jsonAPIList(
-            "node/guides",
-            query: ["filter[title][operator]": "CONTAINS", "filter[title][value]": trimmed, "sort": "-changed", "page[limit]": "10"]
+            Self.solrIndexPath,
+            query: ["filter[fulltext]": trimmed, "filter[type]": "guides", "page[limit]": "10"]
         )
         async let blogsRes = client.jsonAPIList(
-            "node/blog2",
-            query: ["include": "uid", "filter[title][operator]": "CONTAINS", "filter[title][value]": trimmed, "sort": "-changed", "page[limit]": "10"]
+            Self.solrIndexPath,
+            query: ["filter[fulltext]": trimmed, "filter[type]": "blog2", "include": "uid", "page[limit]": "10"]
         )
         async let podcastsRes = client.jsonAPIList(
-            "node/podcast",
-            query: ["include": "field_podcast,uid,taxonomy_vocabulary_15", "filter[title][operator]": "CONTAINS", "filter[title][value]": trimmed, "sort": "-changed", "page[limit]": "10"]
+            Self.solrIndexPath,
+            query: ["filter[fulltext]": trimmed, "filter[type]": "podcast", "include": "field_podcast,uid,taxonomy_vocabulary_15", "page[limit]": "10"]
         )
         async let iosBugsRes = client.jsonAPIList(
-            "node/ios_bug_report",
-            query: ["filter[title][operator]": "CONTAINS", "filter[title][value]": trimmed, "sort": "-changed", "page[limit]": "10"]
+            Self.solrIndexPath,
+            query: ["filter[fulltext]": trimmed, "filter[type]": "ios_bug_report", "page[limit]": "10"]
         )
         async let macBugsRes = client.jsonAPIList(
-            "node/os_x_bug_report",
-            query: ["filter[title][operator]": "CONTAINS", "filter[title][value]": trimmed, "sort": "-changed", "page[limit]": "10"]
+            Self.solrIndexPath,
+            query: ["filter[fulltext]": trimmed, "filter[type]": "os_x_bug_report", "page[limit]": "10"]
         )
 
         var failed: [String] = []
