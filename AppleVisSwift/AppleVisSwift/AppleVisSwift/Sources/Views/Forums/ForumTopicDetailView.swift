@@ -460,7 +460,7 @@ struct ForumTopicDetailView: View {
             // shows the true total (replyCount), so leaving the rest behind
             // a manual tap just contradicted what the count said was there.
             if hasMoreReplies {
-                Task { await loadMoreReplies() }
+                Task { await loadAllRemainingReplies() }
             }
             if let detail {
                 SpotlightIndexer.index(ForumTopic(

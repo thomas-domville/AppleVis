@@ -25,7 +25,9 @@ struct ForumTopicDetail: Identifiable, Codable {
     let authorId: String
     let createdAt: Date
     let lastActivityAt: Date
-    let replyCount: Int
+    // Not let: incremented in place after a successful reply post so the
+    // UI reflects the new count without a full re-fetch.
+    var replyCount: Int
     let viewCount: Int
     let category: String
     let categoryId: String

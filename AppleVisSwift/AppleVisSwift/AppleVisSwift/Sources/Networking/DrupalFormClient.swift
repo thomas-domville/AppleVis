@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Drupal HTML form submission — ported from src/services/drupalForm.ts.
 ///

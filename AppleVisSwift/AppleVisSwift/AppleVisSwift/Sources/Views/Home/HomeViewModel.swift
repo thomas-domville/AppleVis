@@ -176,7 +176,9 @@ final class HomeViewModel: ObservableObject {
                 // Following/Saved aren't meaningful as a Home-feed filter
                 // (Home already mixes several content kinds) — treat them
                 // the same as Recent here.
-                let filtered = defaultFilter.supportsRefinement ? defaultFilter.apply(to: topics) : topics
+                let filtered = defaultFilter.supportsRefinement
+                    ? defaultFilter.apply(to: topics, lastVisit: await PersistenceStore.shared.forumsLastVisit)
+                    : topics
                 return filtered.map { FeedItem.forumTopic($0) }
               }
             : SourceFetchResult(items: [], failedName: nil)

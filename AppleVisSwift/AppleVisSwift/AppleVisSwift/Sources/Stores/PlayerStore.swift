@@ -41,9 +41,9 @@ final class PlayerStore: ObservableObject {
     private var positions: [String: TimeInterval] = [:]
 
     init() {
-        PlayerStore.current = self
         playbackSpeed = Float(UserDefaults.standard.object(forKey: Self.speedKey) as? Double ?? 1.0)
         volume = Float(UserDefaults.standard.object(forKey: Self.volumeKey) as? Double ?? 1.0)
+        PlayerStore.current = self
         restoreQueue()
         restorePositions()
         restoreLastPlayed()
