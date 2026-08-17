@@ -28,13 +28,28 @@ enum PushNotificationManager {
 
     private static var cachedDeviceToken: String?
 
+    /// Which APNs environment this build's token is only valid against.
+    /// Locally Debug-signed builds run against Apple's sandbox APNs host;
+    /// TestFlight and App Store builds are distribution-signed and run
+    /// against production. A token sent to the wrong one silently receives
+    /// nothing. The backend needs this alongside the device token once
+    /// device registration is decoupled from the signed-in user (see
+    /// NotificationEndpoints.swift).
+    static var apnsEnvironment: String {
+        #if DEBUG
+        return "sandbox"
+        #else
+        return "production"
+        #endif
+    }
+
     static func registerCategories() {
         let viewAction = UNNotificationAction(identifier: "VIEW", title: "View", options: [.foreground])
         let dismissAction = UNNotificationAction(identifier: "DISMISS", title: "Dismiss", options: [.destructive])
 
         let categories: [UNNotificationCategory] = [
             "forumReply", "mention", "newTopic", "followedTopic",
-            "newEpisode", "appUpdate", "newResource", "announcement",
+            "newEpisode", "appUpdate", "newResource", "announcement", "newComment",
         ].map { id in
             UNNotificationCategory(
                 identifier: id, actions: [viewAction, dismissAction],

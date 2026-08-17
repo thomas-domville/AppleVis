@@ -63,7 +63,7 @@ struct NotificationSettingsView: View {
             // Category toggles - community (auth required)
             if auth.isSignedIn {
                 Section {
-                    Toggle("Forum Replies", isOn: $preferences.notifyForumReplies)
+                    Toggle("Replies to My Posts", isOn: $preferences.notifyForumReplies)
                         .disabled(pushDenied)
                         .accessibilityHint(String(localized: "Get notified when someone replies to your forum topics."))
                     Toggle("Mentions", isOn: $preferences.notifyMentions)
@@ -97,6 +97,9 @@ struct NotificationSettingsView: View {
                 Toggle("Announcements", isOn: $preferences.notifyAnnouncements)
                     .disabled(pushDenied)
                     .accessibilityHint(String(localized: "Get notified about important AppleVis announcements."))
+                Toggle("New Comments", isOn: $preferences.notifyNewComments)
+                    .disabled(pushDenied)
+                    .accessibilityHint(String(localized: "Get notified about new comments on any forum topic, podcast episode, app entry, blog post, or guide — not just ones you follow. This can be frequent."))
             } header: {
                 Text("Community")
             } footer: {
@@ -134,6 +137,7 @@ struct NotificationSettingsView: View {
                     preferences.notifyAppUpdates = false
                     preferences.notifyNewResources = false
                     preferences.notifyAnnouncements = true
+                    preferences.notifyNewComments = false
                     preferences.notificationSound = .mouseSqueak
                     preferences.badgeCountEnabled = true
                 }

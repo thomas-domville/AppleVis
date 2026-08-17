@@ -64,6 +64,11 @@ final class PreferencesStore: ObservableObject {
     @AppStorage("notif.appUpdates")     var notifyAppUpdates     = false
     @AppStorage("notif.newResources")   var notifyNewResources   = false
     @AppStorage("notif.announcements")  var notifyAnnouncements  = true
+    /// Comments on any content type (forum/podcast/app/blog/guide), regardless
+    /// of follow status — distinct from `notifyForumReplies`, which is only
+    /// replies to topics the user themselves started. Defaults off: this is
+    /// the highest-volume category by far.
+    @AppStorage("notif.newComments")    var notifyNewComments    = false
     @AppStorage("notif.sound")          var notificationSound: NotificationSound = .mouseSqueak
     /// RN's `notifBadge` ("Shows a number on the AppleVis icon... tap the
     /// app and the badge clears") had no Swift equivalent at all.
