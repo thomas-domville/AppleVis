@@ -76,6 +76,7 @@ struct ForumEndpoints {
 
             return ForumTopicDetail(
                 id: topic.id,
+                nid: node.attributes["drupal_internal__nid"]?.intValue ?? 0,
                 title: topic.title,
                 authorName: topic.authorName,
                 authorId: topic.authorId,

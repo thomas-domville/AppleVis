@@ -291,7 +291,7 @@ struct DownloadsView: View {
 
     private func episode(for meta: DownloadedEpisodeMeta) -> PodcastEpisode {
         PodcastEpisode(
-            id: meta.id, title: meta.title, showTitle: meta.showTitle, audioUrl: "",
+            id: meta.id, nid: 0, title: meta.title, showTitle: meta.showTitle, audioUrl: "",
             duration: nil, publishedAt: meta.downloadedAt, lastActivityAt: meta.downloadedAt,
             description: "", artworkUrl: nil, transcriptUrl: nil, chapters: [], tags: [],
             commentCount: 0, authorName: "", url: "", isSaved: false, isDownloaded: true, downloadProgress: nil

@@ -186,6 +186,7 @@ enum Mappers {
 
         return PodcastEpisode(
             id: node.id,
+            nid: a["drupal_internal__nid"]?.intValue ?? 0,
             title: a["title"]?.stringValue ?? "",
             showTitle: "AppleVis Podcast",
             audioUrl: audioUrl,
@@ -417,6 +418,7 @@ enum Mappers {
         let howOften: String = howOftenInt == 2 ? "always" : (howOftenInt == 1 ? "sometimes" : "rarely")
         return BugReportDetail(
             id: base.id,
+            nid: a["drupal_internal__nid"]?.intValue ?? 0,
             title: base.title,
             platform: base.platform,
             status: base.status,

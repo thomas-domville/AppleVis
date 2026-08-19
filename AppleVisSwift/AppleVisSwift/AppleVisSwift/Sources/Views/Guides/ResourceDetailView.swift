@@ -320,6 +320,12 @@ struct ResourceDetailView: View {
                     id: FeedItem.visitKey(kind: .resource, contentId: detail.id),
                     commentCount: detail.commentCount
                 )
+                // Keeps the website's own "read" state (Drupal core's
+                // History module) in sync with what's viewed in the app —
+                // signed-out users still rely on the local stamp above only.
+                if let csrfToken = auth.user?.csrfToken {
+                    Task { await APIClient.shared.history.markRead(nid: detail.nid, csrfToken: csrfToken) }
+                }
                 SpotlightIndexer.index(Resource(
                     id: detail.id, title: detail.title, kind: detail.kind, authorName: detail.authorName,
                     authorId: detail.authorId, categories: detail.categories, summary: detail.body,

@@ -503,6 +503,12 @@ struct EpisodeDetailView: View {
                 id: FeedItem.visitKey(kind: .podcastEpisode, contentId: fetchedEp.id),
                 commentCount: fetchedEp.commentCount
             )
+            // Keeps the website's own "read" state (Drupal core's History
+            // module) in sync with what's viewed in the app — signed-out
+            // users still rely on the local stamp above only.
+            if let csrfToken = auth.user?.csrfToken {
+                Task { await APIClient.shared.history.markRead(nid: fetchedEp.nid, csrfToken: csrfToken) }
+            }
             // Fetch every remaining page automatically instead of waiting for
             // a "Load More" tap — the heading already shows the true total
             // (commentCount), so leaving the rest behind a manual tap just

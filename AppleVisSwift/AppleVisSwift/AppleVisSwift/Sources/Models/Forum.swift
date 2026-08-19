@@ -18,6 +18,10 @@ struct ForumTopic: Identifiable, Codable, Hashable {
 
 struct ForumTopicDetail: Identifiable, Codable {
     let id: String
+    /// Drupal's internal integer node ID (distinct from `id`, the JSON:API
+    /// UUID) — needed to call History's `/history/{nid}/read`, which is
+    /// keyed on the classic integer ID like the rest of Drupal core.
+    let nid: Int
     // title/body are var, not let: an admin/owner editing the topic from
     // its own detail screen updates these in place after a successful save.
     var title: String

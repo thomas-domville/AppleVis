@@ -2,6 +2,10 @@ import Foundation
 
 struct PodcastEpisode: Identifiable, Codable, Hashable {
     let id: String
+    /// Drupal's internal integer node ID — needed to call History's
+    /// `/history/{nid}/read`, which is keyed on the classic integer ID,
+    /// distinct from `id` (the JSON:API UUID).
+    let nid: Int
     let title: String
     let showTitle: String
     let audioUrl: String

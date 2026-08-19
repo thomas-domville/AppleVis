@@ -63,7 +63,8 @@ struct ResourceEndpoints {
             }
 
             return ResourceDetail(
-                id: resource.id, title: resource.title, kind: resource.kind,
+                id: resource.id, nid: node.attributes["drupal_internal__nid"]?.intValue ?? 0,
+                title: resource.title, kind: resource.kind,
                 authorName: resource.authorName, authorId: resource.authorId,
                 categories: resource.categories, summary: resource.summary, body: body,
                 createdAt: resource.createdAt, updatedAt: resource.updatedAt,
@@ -153,7 +154,8 @@ struct BlogEndpoints {
             }
 
             return BlogPostDetail(
-                id: post.id, title: post.title, authorName: post.authorName, authorId: post.authorId,
+                id: post.id, nid: node.attributes["drupal_internal__nid"]?.intValue ?? 0,
+                title: post.title, authorName: post.authorName, authorId: post.authorId,
                 publishedAt: post.publishedAt, lastActivityAt: post.lastActivityAt, body: body,
                 commentCount: post.commentCount, url: post.url, comments: comments, isSaved: false
             )

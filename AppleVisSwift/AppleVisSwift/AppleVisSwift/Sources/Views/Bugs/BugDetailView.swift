@@ -415,6 +415,12 @@ struct BugDetailView: View {
                     id: FeedItem.visitKey(kind: .bugReport, contentId: detail.id),
                     commentCount: detail.commentCount
                 )
+                // Keeps the website's own "read" state (Drupal core's
+                // History module) in sync with what's viewed in the app —
+                // signed-out users still rely on the local stamp above only.
+                if let csrfToken = auth.user?.csrfToken {
+                    Task { await APIClient.shared.history.markRead(nid: detail.nid, csrfToken: csrfToken) }
+                }
                 SpotlightIndexer.index(BugReport(
                     id: detail.id, title: detail.title, platform: detail.platform, status: detail.status,
                     severity: detail.severity, firstSeen: detail.firstSeen, fixedIn: detail.fixedIn,

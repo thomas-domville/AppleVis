@@ -484,6 +484,12 @@ struct ForumTopicDetailView: View {
                     id: FeedItem.visitKey(kind: .forumTopic, contentId: detail.id),
                     commentCount: detail.replyCount
                 )
+                // Keeps the website's own "read" state (Drupal core's
+                // History module) in sync with what's viewed in the app —
+                // signed-out users still rely on the local stamp above only.
+                if let csrfToken = auth.user?.csrfToken {
+                    Task { await APIClient.shared.history.markRead(nid: detail.nid, csrfToken: csrfToken) }
+                }
             }
             // Was `>= 100` — the page size *requested*, not what the server
             // actually returns. Drupal JSON:API deployments commonly clamp

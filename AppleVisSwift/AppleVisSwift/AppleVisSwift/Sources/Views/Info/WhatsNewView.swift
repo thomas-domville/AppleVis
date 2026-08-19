@@ -278,6 +278,12 @@ struct ChangeItem: Identifiable {
             title: "Supported Devices on App Entries",
             description: "App Directory pages now show which devices an app works on — iPhone, iPad, iPod touch, Apple Watch, Mac, and Apple TV."
         ),
+        ChangeItem(
+            systemImage: "checkmark.circle",
+            tag: .new,
+            title: "Read Status Now Matches the Website",
+            description: "When you're signed in, opening a topic, episode, app entry, blog post, or guide in the app now also marks it as read on the website — so what counts as \"new\" stays the same whether you're using the app or a browser. If you're signed out, the app keeps track of what you've read on your own device only, just like before."
+        ),
     ]
 }
 

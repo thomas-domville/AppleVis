@@ -17,6 +17,9 @@ struct Resource: Identifiable, Codable, Hashable {
 
 struct ResourceDetail: Identifiable, Codable {
     let id: String
+    /// Drupal's internal integer node ID — needed to call History's
+    /// `/history/{nid}/read`, distinct from `id` (the JSON:API UUID).
+    let nid: Int
     let title: String
     let kind: ResourceKind
     let authorName: String

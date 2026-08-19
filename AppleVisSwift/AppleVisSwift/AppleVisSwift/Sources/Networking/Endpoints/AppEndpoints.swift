@@ -128,6 +128,7 @@ struct AppEndpoints {
 
             return AppDetail(
                 id: listing.id,
+                nid: a["drupal_internal__nid"]?.intValue ?? 0,
                 name: listing.name,
                 developer: listing.developer,
                 platform: listing.platform,
