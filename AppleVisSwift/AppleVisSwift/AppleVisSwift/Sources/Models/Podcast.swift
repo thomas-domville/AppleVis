@@ -1,6 +1,6 @@
 import Foundation
 
-struct PodcastEpisode: Identifiable, Codable, Hashable {
+nonisolated struct PodcastEpisode: Identifiable, Codable, Hashable, Sendable {
     let id: String
     /// Drupal's internal integer node ID — needed to call History's
     /// `/history/{nid}/read`, which is keyed on the classic integer ID,
@@ -31,21 +31,21 @@ struct PodcastEpisode: Identifiable, Codable, Hashable {
     var downloadProgress: Double?
 }
 
-struct Chapter: Identifiable, Codable, Hashable {
+nonisolated struct Chapter: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let title: String
     let startTime: TimeInterval
     let endTime: TimeInterval
 }
 
-struct PodcastTag: Identifiable, Codable, Hashable {
+nonisolated struct PodcastTag: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let name: String
     let tid: Int
     let count: Int
 }
 
-struct PodcastComment: Identifiable, Codable {
+nonisolated struct PodcastComment: Identifiable, Codable, Sendable {
     let id: String
     let authorName: String
     let authorId: String

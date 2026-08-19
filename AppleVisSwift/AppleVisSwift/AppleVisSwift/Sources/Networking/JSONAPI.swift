@@ -5,7 +5,7 @@ import Foundation
 /// A minimal dynamic JSON value, used to read Drupal JSON:API `attributes` /
 /// `relationships` payloads whose shape varies per content type (mirrors how
 /// the RN client treats `node.attributes` as a loosely-typed object).
-enum JSONValue: Decodable {
+nonisolated enum JSONValue: Decodable, Sendable {
     case string(String)
     case number(Double)
     case bool(Bool)
@@ -95,12 +95,12 @@ enum JSONValue: Decodable {
 // Compiled once instead of per-call in `parseDrupalDate` below, which runs
 // on every date field of every mapped node. Safe to share across calls:
 // only ever read from (`.date(from:)`), never mutated after creation.
-private let drupalDateISOWithFractional: ISO8601DateFormatter = {
+nonisolated(unsafe) private let drupalDateISOWithFractional: ISO8601DateFormatter = {
     let f = ISO8601DateFormatter()
     f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     return f
 }()
-private let drupalDateISOPlain: ISO8601DateFormatter = {
+nonisolated(unsafe) private let drupalDateISOPlain: ISO8601DateFormatter = {
     let f = ISO8601DateFormatter()
     f.formatOptions = [.withInternetDateTime]
     return f
@@ -108,7 +108,7 @@ private let drupalDateISOPlain: ISO8601DateFormatter = {
 
 // MARK: - JSON:API node
 
-struct JsonApiNode: Decodable {
+nonisolated struct JsonApiNode: Decodable, Sendable {
     let id: String
     let type: String
     let attributes: [String: JSONValue]
@@ -161,7 +161,7 @@ struct JsonApiNode: Decodable {
 
 // MARK: - Response envelopes
 
-struct JsonApiCollectionResponse: Decodable {
+nonisolated struct JsonApiCollectionResponse: Decodable, Sendable {
     let data: [JsonApiNode]
     let included: [JsonApiNode]?
     let links: JSONValue?
@@ -177,12 +177,12 @@ struct JsonApiCollectionResponse: Decodable {
 /// exists. `fetchWithCache` requires a `Codable` return type (for its own
 /// disk cache), so this wraps the true server signal in a small reusable
 /// shape rather than each endpoint duplicating its own page-result struct.
-struct PagedListResult<Item: Codable>: Codable {
+nonisolated struct PagedListResult<Item: Codable & Sendable>: Codable, Sendable {
     let items: [Item]
     let hasMore: Bool
 }
 
-struct JsonApiSingleResponse: Decodable {
+nonisolated struct JsonApiSingleResponse: Decodable, Sendable {
     let data: JsonApiNode
     let included: [JsonApiNode]?
 }

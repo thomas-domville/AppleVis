@@ -74,7 +74,7 @@ struct DiscoverView: View {
                 }
             }
             .searchable(text: $searchText, prompt: "Search AppleVis")
-            .searchFocused($isSearchFieldFocused)
+            .applySearchFocus($isSearchFieldFocused)
             .onChange(of: searchText) { _, newValue in runSearch(newValue) }
             .task {
                 // .onChange doesn't fire for a prefilled initial value (e.g.
@@ -393,6 +393,19 @@ struct DiscoverView: View {
                     .accessibilityHidden(true)
             }
             .padding()
+        }
+    }
+}
+
+extension View {
+    /// `.searchFocused` requires iOS 18; below that, the "Auto-Focus Search
+    /// Field" preference simply has no effect instead of failing to build.
+    @ViewBuilder
+    func applySearchFocus(_ binding: FocusState<Bool>.Binding) -> some View {
+        if #available(iOS 18.0, *) {
+            self.searchFocused(binding)
+        } else {
+            self
         }
     }
 }

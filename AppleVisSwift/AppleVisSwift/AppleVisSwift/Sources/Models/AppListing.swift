@@ -1,6 +1,6 @@
 import Foundation
 
-struct AppListing: Identifiable, Codable, Hashable {
+nonisolated struct AppListing: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let name: String
     let developer: String
@@ -23,7 +23,7 @@ struct AppListing: Identifiable, Codable, Hashable {
     var isSaved: Bool
 }
 
-struct AppDetail: Identifiable, Codable {
+nonisolated struct AppDetail: Identifiable, Codable, Sendable {
     let id: String
     /// Drupal's internal integer node ID — needed to call History's
     /// `/history/{nid}/read`, distinct from `id` (the JSON:API UUID).
@@ -54,7 +54,7 @@ struct AppDetail: Identifiable, Codable {
     var isSaved: Bool
 }
 
-struct AppReview: Identifiable, Codable {
+nonisolated struct AppReview: Identifiable, Codable, Sendable {
     let id: String
     let subject: String
     let authorName: String
@@ -64,7 +64,7 @@ struct AppReview: Identifiable, Codable {
     let createdAt: Date
 }
 
-struct AppCategory: Identifiable, Codable, Hashable {
+nonisolated struct AppCategory: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let name: String
     let slug: String
@@ -72,7 +72,7 @@ struct AppCategory: Identifiable, Codable, Hashable {
     let count: Int
 }
 
-enum AppPlatform: String, Codable, CaseIterable, Identifiable {
+nonisolated enum AppPlatform: String, Codable, CaseIterable, Identifiable, Sendable {
     case ios
     case macos
     case watchos

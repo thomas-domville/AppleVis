@@ -125,10 +125,11 @@ struct BugDetailView: View {
                 }
             }
             .accessibilityRotor("Replies to Me") {
-                ForEach(detail.comments) { comment in
-                    if let name = auth.user?.name, QuotedReply.isDirectedAt(name, body: comment.body) {
-                        AccessibilityRotorEntry(comment.authorName, id: comment.id)
-                    }
+                ForEach(detail.comments.filter { comment in
+                    guard let name = auth.user?.name else { return false }
+                    return QuotedReply.isDirectedAt(name, body: comment.body)
+                }) { comment in
+                    AccessibilityRotorEntry(comment.authorName, id: comment.id)
                 }
             }
         }

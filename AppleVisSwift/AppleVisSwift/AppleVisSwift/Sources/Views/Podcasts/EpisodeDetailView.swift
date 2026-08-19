@@ -130,10 +130,11 @@ struct EpisodeDetailView: View {
                 }
             }
             .accessibilityRotor("Replies to Me") {
-                ForEach(comments) { comment in
-                    if let name = auth.user?.name, QuotedReply.isDirectedAt(name, body: comment.body) {
-                        AccessibilityRotorEntry(comment.authorName, id: comment.id)
-                    }
+                ForEach(comments.filter { comment in
+                    guard let name = auth.user?.name else { return false }
+                    return QuotedReply.isDirectedAt(name, body: comment.body)
+                }) { comment in
+                    AccessibilityRotorEntry(comment.authorName, id: comment.id)
                 }
             }
             // Chapters exist specifically as navigation waypoints — the

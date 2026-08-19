@@ -1,6 +1,6 @@
 import Foundation
 
-struct ForumTopic: Identifiable, Codable, Hashable {
+nonisolated struct ForumTopic: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let title: String
     let authorName: String
@@ -16,7 +16,7 @@ struct ForumTopic: Identifiable, Codable, Hashable {
     var isSaved: Bool
 }
 
-struct ForumTopicDetail: Identifiable, Codable {
+nonisolated struct ForumTopicDetail: Identifiable, Codable, Sendable {
     let id: String
     /// Drupal's internal integer node ID (distinct from `id`, the JSON:API
     /// UUID) — needed to call History's `/history/{nid}/read`, which is
@@ -42,7 +42,7 @@ struct ForumTopicDetail: Identifiable, Codable {
     var replies: [ForumReply]
 }
 
-struct ForumReply: Identifiable, Codable {
+nonisolated struct ForumReply: Identifiable, Codable, Sendable {
     let id: String
     let subject: String
     let authorName: String
@@ -53,7 +53,7 @@ struct ForumReply: Identifiable, Codable {
     var isNew: Bool
 }
 
-struct ForumCategory: Identifiable, Codable, Hashable {
+nonisolated struct ForumCategory: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let name: String
     let tid: Int

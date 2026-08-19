@@ -9,7 +9,7 @@ import Foundation
 final class ContentCache {
     static let shared = ContentCache()
 
-    private struct Entry<T: Codable>: Codable {
+    private nonisolated struct Entry<T: Codable & Sendable>: Codable, Sendable {
         let data: T
         let fetchedAt: Date
     }
@@ -95,7 +95,7 @@ final class ContentCache {
     /// view models, so a blocking call here risked stalling the caller's
     /// thread and, under concurrent fetches, starving the cooperative
     /// thread pool that queue.sync was contending with.
-    func get<T: Codable>(_ type: T.Type, key: String) async -> (data: T, freshness: Freshness)? {
+    func get<T: Codable & Sendable>(_ type: T.Type, key: String) async -> (data: T, freshness: Freshness)? {
         await withCheckedContinuation { continuation in
             queue.async {
                 continuation.resume(returning: self.getSync(type, key: key))
@@ -103,7 +103,7 @@ final class ContentCache {
         }
     }
 
-    private func getSync<T: Codable>(_ type: T.Type, key: String) -> (data: T, freshness: Freshness)? {
+    private func getSync<T: Codable & Sendable>(_ type: T.Type, key: String) -> (data: T, freshness: Freshness)? {
         guard let raw = try? Data(contentsOf: fileURL(for: key)),
               let entry = try? JSONDecoder().decode(Entry<T>.self, from: raw) else { return nil }
         let age = Date().timeIntervalSince(entry.fetchedAt)
@@ -115,7 +115,7 @@ final class ContentCache {
         return (entry.data, freshness)
     }
 
-    func set<T: Codable>(_ value: T, key: String) {
+    func set<T: Codable & Sendable>(_ value: T, key: String) {
         let entry = Entry(data: value, fetchedAt: Date())
         queue.async {
             guard let raw = try? JSONEncoder().encode(entry) else { return }

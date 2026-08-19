@@ -31,14 +31,18 @@ struct HTMLSegment: Identifiable {
 /// and gave no way to jump directly to a heading. A best-effort top-level
 /// regex scan rather than a full HTML parser — good enough for the
 /// well-formed HTML Drupal's rich-text editor actually produces.
-enum HTMLSegmenter {
+nonisolated enum HTMLSegmenter {
     /// `SegmentedHTMLView.body` previously called `segment(_:)` fresh on
     /// every SwiftUI re-render (it was a computed property, re-invoked
     /// whenever anything in the view re-evaluated, not just when `html`
     /// itself changed) — a full regex scan over potentially thousands of
     /// characters repeated for no reason on every unrelated state change.
-    /// Views only ever call this from the main thread, so a plain
-    /// dictionary cache (no lock) is safe.
+    /// Guarded by `lock` rather than assumed main-thread-only: that
+    /// assumption held for every in-app caller but not for the test suite,
+    /// where Swift Testing's default parallel execution mutated this
+    /// concurrently from multiple threads and corrupted the dictionary
+    /// (surfaced as a `doesNotRecognizeSelector` crash inside
+    /// `Dictionary.subscript.setter`).
     private static var cache: [String: [HTMLSegment]] = [:]
     /// Insertion order for eviction — keyed by the full HTML string, so a
     /// long session browsing many distinct forum/blog bodies doesn't grow
@@ -47,8 +51,11 @@ enum HTMLSegmenter {
     /// memory problem (individual bodies are a few KB at most).
     private static var order: [String] = []
     private static let maxEntries = 200
+    private static let lock = NSLock()
 
     static func segment(_ html: String) -> [HTMLSegment] {
+        lock.lock()
+        defer { lock.unlock() }
         if let cached = cache[html] { return cached }
         let result = computeSegments(html)
         cache[html] = result

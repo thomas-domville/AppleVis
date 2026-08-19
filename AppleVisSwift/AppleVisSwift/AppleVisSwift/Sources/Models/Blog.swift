@@ -1,6 +1,6 @@
 import Foundation
 
-struct BlogPost: Identifiable, Codable, Hashable {
+nonisolated struct BlogPost: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let title: String
     let authorName: String
@@ -13,7 +13,7 @@ struct BlogPost: Identifiable, Codable, Hashable {
     var isSaved: Bool
 }
 
-struct BlogPostDetail: Identifiable, Codable {
+nonisolated struct BlogPostDetail: Identifiable, Codable, Sendable {
     let id: String
     /// Drupal's internal integer node ID — needed to call History's
     /// `/history/{nid}/read`, distinct from `id` (the JSON:API UUID).
@@ -30,7 +30,7 @@ struct BlogPostDetail: Identifiable, Codable {
     var isSaved: Bool
 }
 
-struct BlogComment: Identifiable, Codable {
+nonisolated struct BlogComment: Identifiable, Codable, Sendable {
     let id: String
     let authorName: String
     let authorId: String

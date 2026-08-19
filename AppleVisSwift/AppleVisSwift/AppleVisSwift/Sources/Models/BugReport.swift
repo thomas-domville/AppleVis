@@ -1,6 +1,6 @@
 import Foundation
 
-struct BugReport: Identifiable, Codable, Hashable {
+nonisolated struct BugReport: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let title: String
     let platform: BugPlatform
@@ -16,7 +16,7 @@ struct BugReport: Identifiable, Codable, Hashable {
     let url: String
 }
 
-struct BugReportDetail: Identifiable, Codable {
+nonisolated struct BugReportDetail: Identifiable, Codable, Sendable {
     let id: String
     /// Drupal's internal integer node ID — needed to call History's
     /// `/history/{nid}/read`, distinct from `id` (the JSON:API UUID).
@@ -40,7 +40,7 @@ struct BugReportDetail: Identifiable, Codable {
     var comments: [BugComment]
 }
 
-struct BugComment: Identifiable, Codable {
+nonisolated struct BugComment: Identifiable, Codable, Sendable {
     let id: String
     let authorName: String
     let authorId: String
@@ -49,7 +49,7 @@ struct BugComment: Identifiable, Codable {
     let createdAt: Date
 }
 
-enum BugPlatform: String, Codable, CaseIterable, Identifiable {
+nonisolated enum BugPlatform: String, Codable, CaseIterable, Identifiable, Sendable {
     case ios
     case macos
 
@@ -57,7 +57,7 @@ enum BugPlatform: String, Codable, CaseIterable, Identifiable {
     var displayName: String { rawValue == "ios" ? "iOS" : "macOS" }
 }
 
-enum BugStatus: String, Codable {
+nonisolated enum BugStatus: String, Codable, Sendable {
     case active
     case fixed
 
@@ -65,7 +65,7 @@ enum BugStatus: String, Codable {
     var color: String { rawValue == "active" ? "red" : "green" }
 }
 
-enum BugSeverity: String, Codable {
+nonisolated enum BugSeverity: String, Codable, Sendable {
     case low, medium, high
 
     var displayName: String { rawValue.capitalized }

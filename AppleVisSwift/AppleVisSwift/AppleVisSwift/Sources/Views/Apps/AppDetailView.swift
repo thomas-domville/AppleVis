@@ -137,10 +137,11 @@ struct AppDetailView: View {
                 }
             }
             .accessibilityRotor("Replies to Me") {
-                ForEach(detail.reviews) { review in
-                    if let name = auth.user?.name, QuotedReply.isDirectedAt(name, body: review.body) {
-                        AccessibilityRotorEntry(review.authorName, id: review.id)
-                    }
+                ForEach(detail.reviews.filter { review in
+                    guard let name = auth.user?.name else { return false }
+                    return QuotedReply.isDirectedAt(name, body: review.body)
+                }) { review in
+                    AccessibilityRotorEntry(review.authorName, id: review.id)
                 }
             }
         }

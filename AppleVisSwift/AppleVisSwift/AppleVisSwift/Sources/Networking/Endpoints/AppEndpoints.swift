@@ -45,7 +45,7 @@ struct AppEndpoints {
         }
     }
 
-    private struct CategoryListingPage: Codable {
+    private nonisolated struct CategoryListingPage: Codable, Sendable {
         let items: [AppListing]
         let hasMore: Bool
     }

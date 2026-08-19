@@ -22,7 +22,7 @@ struct ForumEndpoints {
             }
             let raw: JSONValue = try await client.get("forums/recent", queryItems: queryItems)
             let items = raw.arrayValue ?? []
-            return items.compactMap { $0.objectValue }.compactMap(Mappers.forumFromRecent)
+            return items.compactMap { $0.objectValue }.compactMap { Mappers.forumFromRecent($0) }
         }
     }
 

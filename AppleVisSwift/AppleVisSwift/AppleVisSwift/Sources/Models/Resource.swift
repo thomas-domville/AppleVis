@@ -1,6 +1,6 @@
 import Foundation
 
-struct Resource: Identifiable, Codable, Hashable {
+nonisolated struct Resource: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let title: String
     let kind: ResourceKind
@@ -15,7 +15,7 @@ struct Resource: Identifiable, Codable, Hashable {
     var isSaved: Bool
 }
 
-struct ResourceDetail: Identifiable, Codable {
+nonisolated struct ResourceDetail: Identifiable, Codable, Sendable {
     let id: String
     /// Drupal's internal integer node ID — needed to call History's
     /// `/history/{nid}/read`, distinct from `id` (the JSON:API UUID).
@@ -35,7 +35,7 @@ struct ResourceDetail: Identifiable, Codable {
     var isSaved: Bool
 }
 
-struct ResourceComment: Identifiable, Codable {
+nonisolated struct ResourceComment: Identifiable, Codable, Sendable {
     let id: String
     let authorName: String
     let authorId: String
@@ -44,7 +44,7 @@ struct ResourceComment: Identifiable, Codable {
     let createdAt: Date
 }
 
-enum ResourceKind: String, Codable, CaseIterable, Identifiable {
+nonisolated enum ResourceKind: String, Codable, CaseIterable, Identifiable, Sendable {
     case guide
     case tutorial
     case article

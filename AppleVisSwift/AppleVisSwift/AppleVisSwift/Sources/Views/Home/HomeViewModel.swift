@@ -156,7 +156,7 @@ final class HomeViewModel: ObservableObject {
     /// `try await (a, b, c, d, e)` on a tuple of `async let`s would do —
     /// the first throw propagates and every other result, even ones that
     /// already succeeded, gets discarded.
-    private func fetchSource(name: String, _ fetch: @escaping () async throws -> [FeedItem]) async -> SourceFetchResult {
+    private func fetchSource(name: String, _ fetch: @escaping @MainActor () async throws -> [FeedItem]) async -> SourceFetchResult {
         do {
             return SourceFetchResult(items: try await fetch(), failedName: nil)
         } catch {
@@ -182,9 +182,12 @@ final class HomeViewModel: ObservableObject {
                 // Following/Saved aren't meaningful as a Home-feed filter
                 // (Home already mixes several content kinds) — treat them
                 // the same as Recent here.
-                let filtered = defaultFilter.supportsRefinement
-                    ? defaultFilter.apply(to: topics, lastVisit: await PersistenceStore.shared.forumsLastVisit)
-                    : topics
+                let filtered: [ForumTopic]
+                if defaultFilter.supportsRefinement {
+                    filtered = defaultFilter.apply(to: topics, lastVisit: PersistenceStore.shared.forumsLastVisit)
+                } else {
+                    filtered = topics
+                }
                 return filtered.map { FeedItem.forumTopic($0) }
               }
             : SourceFetchResult(items: [], failedName: nil)

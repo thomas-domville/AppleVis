@@ -315,10 +315,8 @@ struct ForumTopicDetailView: View {
             // rotor stays in that filtered set across swipes — the natural
             // next step when there's more than one new reply to get through.
             .accessibilityRotor("New Comments") {
-                ForEach(detail.replies) { reply in
-                    if reply.isNew {
-                        AccessibilityRotorEntry(reply.authorName, id: reply.id)
-                    }
+                ForEach(detail.replies.filter(\.isNew)) { reply in
+                    AccessibilityRotorEntry(reply.authorName, id: reply.id)
                 }
             }
             // "Replies to Me" only means anything once signed in — auth.user
@@ -326,10 +324,11 @@ struct ForumTopicDetailView: View {
             // false for an empty name, but the rotor shouldn't advertise a
             // category that can never have entries for a signed-out reader.
             .accessibilityRotor("Replies to Me") {
-                ForEach(detail.replies) { reply in
-                    if let name = auth.user?.name, QuotedReply.isDirectedAt(name, body: reply.body) {
-                        AccessibilityRotorEntry(reply.authorName, id: reply.id)
-                    }
+                ForEach(detail.replies.filter { reply in
+                    guard let name = auth.user?.name else { return false }
+                    return QuotedReply.isDirectedAt(name, body: reply.body)
+                }) { reply in
+                    AccessibilityRotorEntry(reply.authorName, id: reply.id)
                 }
             }
         }

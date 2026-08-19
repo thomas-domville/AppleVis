@@ -8,10 +8,10 @@ import Foundation
 /// list/detail endpoint that benefits from this — one per content group —
 /// wraps its existing network call with this instead of changing its
 /// return type, so call sites elsewhere in the app are unaffected.
-func fetchWithCache<T: Codable>(
+func fetchWithCache<T: Codable & Sendable>(
     group: ContentGroup,
     key: String,
-    fetch: () async throws -> T
+    fetch: @MainActor () async throws -> T
 ) async throws -> T {
     if await !ApiHealthMonitor.shared.isAvailable(group) {
         if let cached = await ContentCache.shared.get(T.self, key: key) {
