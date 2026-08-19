@@ -10,6 +10,15 @@ import Combine
 @MainActor
 final class DeepLinkRouter: ObservableObject {
     @Published var pendingContent: (kind: ContentKind, id: String)?
+    /// Set alongside `pendingContent` by a card's "Jump to First New
+    /// Comment" action (ContentActionsModifier) — tells ContentView's
+    /// destination(for:) to open the detail screen with focus already
+    /// landing on the first new reply/comment, instead of the top of the
+    /// screen like every other route into `pendingContent` (Spotlight,
+    /// push notifications, Siri). Kept separate from `pendingContent`
+    /// itself rather than widening its tuple, since every other caller of
+    /// pendingContent has no such intent and shouldn't need to supply one.
+    @Published var pendingContentIntent: ContentOpenIntent?
     @Published var pendingWebURL: URL?
     @Published var pendingSubmit: PendingSubmit?
     @Published var pendingSiriDestination: SiriDestination?
@@ -79,6 +88,10 @@ final class DeepLinkRouter: ObservableObject {
             pendingSubmit = .podcast(url: url)
         }
     }
+}
+
+enum ContentOpenIntent {
+    case firstNewComment
 }
 
 enum PendingSubmit: Identifiable {

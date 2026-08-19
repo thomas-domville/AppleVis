@@ -3,6 +3,11 @@ import UIKit
 
 struct AppDetailView: View {
     let appId: String
+    /// Set when opened via a card's "Jump to First New Comment" action —
+    /// see the same property on ForumTopicDetailView for the full
+    /// reasoning; routed the same way through DeepLinkRouter.pendingContentIntent.
+    var focusFirstNewCommentOnAppear: Bool = false
+    @State private var hasAppliedFirstNewCommentFocus = false
     @State private var detail: AppDetail?
     @State private var isLoading = false
     @State private var error: String?
@@ -51,13 +56,15 @@ struct AppDetailView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     heroCard(detail).padding()
 
-                    if let meta = itunesMetadata {
-                        appStoreInfoSection(meta)
-                    }
-
-                    if !developerApps.isEmpty {
-                        developerAppsSection(detail)
-                    }
+                    // A second, earlier entry point to the same "Jump to
+                    // First New Comment" the Community Discussion heading
+                    // offers further down — for someone who just wants to
+                    // see what's new without scrolling past About/ratings/
+                    // App Store Info/More By to find it. Not a duplicate
+                    // feature, just a second door to the same one; the
+                    // heading below still has its own copy for anyone who
+                    // reaches it via the reviews section directly.
+                    newCommentShortcut(proxy: proxy)
 
                     if !detail.body.isEmpty {
                         sectionHeading("About")
@@ -84,6 +91,14 @@ struct AppDetailView: View {
                             .padding(.horizontal).padding(.bottom, 8)
                     }
 
+                    if let meta = itunesMetadata {
+                        appStoreInfoSection(meta)
+                    }
+
+                    if !developerApps.isEmpty {
+                        developerAppsSection(detail)
+                    }
+
                     if preferences.aiSummariesEnabled && IntelligenceService.isAvailable {
                         aiSummarySection(detail)
                     }
@@ -106,6 +121,28 @@ struct AppDetailView: View {
                     pendingFocusReviewId = nil
                 }
             }
+            .task {
+                guard focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
+                hasAppliedFirstNewCommentFocus = true
+                await jumpToFirstNewReview(proxy: proxy)
+            }
+            // See ForumTopicDetailView's identical pair for the full
+            // reasoning. AppReview has no per-item "isNew" flag (only
+            // Forums' ForumReply does), so "New Comments" here is the
+            // newest `newReviewCount` reviews by position, not a per-item
+            // check — see `newestSuffix(count:)`.
+            .accessibilityRotor("New Comments") {
+                ForEach(detail.reviews.newestSuffix(count: newReviewCount)) { review in
+                    AccessibilityRotorEntry(review.authorName, id: review.id)
+                }
+            }
+            .accessibilityRotor("Replies to Me") {
+                ForEach(detail.reviews) { review in
+                    if let name = auth.user?.name, QuotedReply.isDirectedAt(name, body: review.body) {
+                        AccessibilityRotorEntry(review.authorName, id: review.id)
+                    }
+                }
+            }
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -115,16 +152,13 @@ struct AppDetailView: View {
                     }
                     .accessibilityLabel(String(localized: "Open in App Store"))
                 }
-                if auth.isSignedIn {
-                    Button { showReviewCompose = true } label: {
-                        Image(systemName: "square.and.pencil")
-                    }
-                    .accessibilityLabel(String(localized: "Write review"))
-                }
             }
         }
         .safeAreaInset(edge: .bottom) {
-            ContentDetailActions(id: detail.id, kind: .appListing, title: detail.name, lastActivityAt: detail.lastUpdatedAt, url: detail.url)
+            ContentDetailActions(
+                id: detail.id, kind: .appListing, title: detail.name, lastActivityAt: detail.lastUpdatedAt, url: detail.url,
+                onAddComment: { showReviewCompose = true }
+            )
         }
         .sheet(isPresented: $showReviewCompose) {
             ComposeAppReviewView(appId: detail.id, appName: detail.name) { review in
@@ -140,38 +174,102 @@ struct AppDetailView: View {
         }
     }
 
-    private func heroCard(_ detail: AppDetail) -> some View {
-        HStack(spacing: 16) {
-            AsyncImage(url: detail.iconUrl.flatMap(URL.init)) { image in
-                image.resizable().scaledToFill()
-            } placeholder: {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color.secondary.opacity(0.2))
-                    .overlay(Image(systemName: "square.grid.2x2").foregroundStyle(.secondary))
-            }
-            .frame(width: 80, height: 80)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(detail.name).font(.title3).fontWeight(.bold)
-                Text(detail.developer).font(.subheadline).foregroundStyle(.secondary)
-                HStack(spacing: 6) {
-                    Label(detail.platform.displayName, systemImage: "iphone")
-                    if !detail.price.isEmpty {
-                        Text("·")
-                        Text(detail.price)
-                    }
+    @ViewBuilder
+    private func newCommentShortcut(proxy: ScrollViewProxy) -> some View {
+        if newReviewCount > 0 {
+            Button {
+                Task { await jumpToFirstNewReview(proxy: proxy) }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.down.to.line.compact")
+                    Text("\(newReviewCount) new comment\(newReviewCount == 1 ? "" : "s") — Jump to First New Comment")
+                        .font(.subheadline).fontWeight(.medium)
+                    Spacer(minLength: 0)
                 }
-                .font(.caption).foregroundStyle(.secondary)
-                Text(submittedAndReviewedText(detail))
-                    .font(.caption2).foregroundStyle(.secondary)
+                .foregroundStyle(Color.accentColor)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .tintedBackground(Color.accentColor, opacity: 0.1, cornerRadius: 10)
             }
+            .buttonStyle(.plain)
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+            .accessibilityLabel(String(localized: "\(newReviewCount) new comment\(newReviewCount == 1 ? "" : "s")"))
+            .accessibilityHint(String(localized: "Double-tap to jump to the first new comment."))
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "\(detail.name) by \(detail.developer), \(detail.platform.displayName), \(detail.price), \(submittedAndReviewedText(detail))"))
-        .accessibilityAddTraits(.isHeader)
-        .accessibilityFocused($isTitleFocused)
+    }
+
+    private func heroCard(_ detail: AppDetail) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 16) {
+                AsyncImage(url: detail.iconUrl.flatMap(URL.init)) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color.secondary.opacity(0.2))
+                        .overlay(Image(systemName: "square.grid.2x2").foregroundStyle(.secondary))
+                }
+                .frame(width: 80, height: 80)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .accessibilityHidden(true)
+
+                // Category doubles as the subtitle line under the title —
+                // the App Store's own short tagline isn't in the free
+                // iTunes API this page already relies on for everything
+                // else below, so there's nothing else authentic to put
+                // here. Chosen over leaving it blank since it's real data
+                // this page never actually surfaced before.
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(detail.name).font(.title3).fontWeight(.bold)
+                    if !detail.category.isEmpty {
+                        Text(detail.category).font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    Text(submittedAndReviewedText(detail))
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(String(localized: "\(detail.name), \(detail.category), \(submittedAndReviewedText(detail))"))
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityFocused($isTitleFocused)
+
+            // Developer/Platform/Price as their own scannable rows —
+            // matches the label-value "spec sheet" style App Store Info
+            // already uses below, instead of the three being run together
+            // into one dense inline string ("Developer · Platform · Price").
+            // Each is now its own swipe stop, individually readable in
+            // Braille rather than one long combined line.
+            VStack(spacing: 0) {
+                infoRow("Developer", detail.developer)
+                infoRow("Platform", detail.platform.displayName)
+                if !detail.price.isEmpty { infoRow("Price", detail.price) }
+                if !supportedDevicesText(detail).isEmpty { infoRow("Devices", supportedDevicesText(detail)) }
+            }
+            .padding(.horizontal)
+            .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    /// iTunes (when available) is the live, authoritative source for
+    /// iPhone/iPad/iPod touch/Apple Watch — it can't confirm native Mac or
+    /// Apple TV support (see ItunesMetadata.deviceFamilies), so those two
+    /// are added from AppleVis's own submitted `field_device_used` data only
+    /// when iTunes hasn't already confirmed Mac via a Catalyst build. If
+    /// iTunes metadata isn't available at all (no App Store link, or the
+    /// lookup failed), falls back to AppleVis's raw list entirely.
+    private func supportedDevicesText(_ detail: AppDetail) -> String {
+        var families = itunesMetadata?.deviceFamilies ?? []
+        guard !families.isEmpty else {
+            return detail.supportedDevices.joined(separator: ", ")
+        }
+        let drupalLower = detail.supportedDevices.map { $0.lowercased() }
+        if !families.contains("Mac"), drupalLower.contains(where: { $0.contains("mac") }) {
+            families.append("Mac")
+        }
+        if drupalLower.contains(where: { $0.contains("apple tv") || $0.contains("tvos") }) {
+            families.append("Apple TV")
+        }
+        return families.joined(separator: ", ")
     }
 
     // A submission from 4 months ago and one reviewed 3 minutes ago looked
@@ -187,43 +285,40 @@ struct AppDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeading("App Store Info")
             VStack(spacing: 0) {
+                // Price dropped here — it's already shown once, up in the
+                // hero card, and repeating it in both places was pure
+                // redundancy (the two prior versions could even read
+                // slightly differently, ours vs. the App Store's own).
                 if !meta.version.isEmpty { infoRow("Version", meta.version) }
-                if !meta.price.isEmpty { infoRow("Price", meta.price) }
                 if let rating = meta.appStoreRating {
                     infoRow("Rating", String(format: "%.1f ★ (%d ratings)", rating, meta.appStoreRatingCount))
                 }
-                if !meta.fileSizeMb.isEmpty { infoRow("Size", meta.fileSizeMb) }
                 if !meta.minimumOsVersion.isEmpty { infoRow("Requires", "iOS \(meta.minimumOsVersion)+") }
+                if !meta.languageCodes.isEmpty { infoRow("Language", meta.languageNames) }
                 if !meta.ageRating.isEmpty { infoRow("Age Rating", meta.ageRating) }
+                if !meta.fileSizeMb.isEmpty { infoRow("Size", meta.fileSizeMb) }
             }
             .padding(.horizontal)
             .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
             .padding(.horizontal)
 
             if !meta.releaseNotes.isEmpty {
-                Text("What's New")
-                    .font(.subheadline).fontWeight(.semibold)
-                    .padding(.horizontal).padding(.top, 8)
+                sectionHeading("What's New")
                 Text(meta.releaseNotes)
                     .font(.subheadline).foregroundStyle(.secondary)
                     .padding(.horizontal)
             }
 
             if !meta.screenshotUrls.isEmpty {
-                Text("Screenshots")
-                    .font(.subheadline).fontWeight(.semibold)
-                    .padding(.horizontal).padding(.top, 8)
+                sectionHeading("Screenshots")
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
+                    // LazyHStack, not HStack — each screenshot's own
+                    // on-device description (below) only runs once it's
+                    // actually scrolled into view, not for all of them the
+                    // instant the page loads.
+                    LazyHStack(spacing: 10) {
                         ForEach(Array(meta.screenshotUrls.enumerated()), id: \.offset) { index, url in
-                            AsyncImage(url: URL(string: url)) { image in
-                                image.resizable().scaledToFit()
-                            } placeholder: {
-                                RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.15))
-                            }
-                            .frame(height: 220)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .accessibilityLabel(String(localized: "Screenshot \(index + 1) of \(meta.screenshotUrls.count)"))
+                            ScreenshotThumbnail(urlString: url, index: index, total: meta.screenshotUrls.count)
                         }
                     }
                     .padding(.horizontal)
@@ -616,6 +711,39 @@ struct AppDetailView: View {
         Task {
             try? await Task.sleep(for: .milliseconds(300))
             isTitleFocused = true
+        }
+    }
+}
+
+// MARK: - Screenshot thumbnail
+
+/// One screenshot in the horizontal strip — previously just "Screenshot N
+/// of M" with no indication of what's actually in the image, which tells a
+/// VoiceOver user nothing a sighted person glancing at the same thumbnail
+/// doesn't get for free. Reuses the same on-device Vision description
+/// (`ImageDescriber`) already used for podcast artwork on the episode
+/// detail screen; its own `.task` only fires once this view actually
+/// appears, which `LazyHStack` at the call site only does once it's
+/// scrolled into view — not eagerly for every screenshot on page load.
+private struct ScreenshotThumbnail: View {
+    let urlString: String
+    let index: Int
+    let total: Int
+    @State private var description: String?
+
+    var body: some View {
+        AsyncImage(url: URL(string: urlString)) { image in
+            image.resizable().scaledToFit()
+        } placeholder: {
+            RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.15))
+        }
+        .frame(height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .accessibilityLabel(description.map { String(localized: "Screenshot \(index + 1) of \(total): \($0)") }
+            ?? String(localized: "Screenshot \(index + 1) of \(total)"))
+        .task {
+            guard let url = URL(string: urlString) else { return }
+            description = await ImageDescriber.describe(imageAt: url)
         }
     }
 }

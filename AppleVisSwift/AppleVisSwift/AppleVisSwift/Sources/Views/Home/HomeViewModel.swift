@@ -28,6 +28,11 @@ final class HomeViewModel: ObservableObject {
     /// ["Forums", "Podcasts"]. Non-empty alongside a populated `items` means
     /// a partial failure — some sources loaded fine, these didn't.
     @Published private(set) var failedSourceNames: [String] = []
+    /// Set only on a genuinely successful load — a failed attempt (e.g. no
+    /// network) shouldn't count as "fresh" and block the next foreground
+    /// retry within the staleness window. Backs HomeView's foreground
+    /// auto-refresh (see its `.onChange(of: scenePhase)`).
+    @Published private(set) var lastLoadedAt: Date?
 
     private let pageSize = 20
     private var page = 0
@@ -72,6 +77,7 @@ final class HomeViewModel: ObservableObject {
             hasMore = fetched.count >= pageSize
             itemVisits = PersistenceStore.shared.allItemVisits()
             buildNewActivitySummary()
+            lastLoadedAt = Date()
         }
 
         isLoading = false

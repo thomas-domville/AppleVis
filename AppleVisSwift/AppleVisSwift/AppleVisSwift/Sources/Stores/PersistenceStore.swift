@@ -202,9 +202,48 @@ final class PersistenceStore {
         defaults.removeObject(forKey: notificationHistoryKey)
         defaults.removeObject(forKey: seenTopicsKey)
         defaults.removeObject(forKey: itemVisitsKey)
+        defaults.removeObject(forKey: episodeAudioMetadataKey)
         defaults.removeObject(forKey: "applevis.forums.lastVisit")
         defaults.removeObject(forKey: "applevis.lastVisit")
         cache.removeAll()
+    }
+
+    // MARK: - Probed episode audio metadata (duration/chapters read directly
+    // from the audio file, since Drupal doesn't provide either — the API's
+    // `duration` field is hardcoded to 0 server-side, and `field_chapters`
+    // is only ever populated for episodes the host bothered to chapter-mark
+    // in the CMS. `PodcastAudioMetadataProbe` reads both client-side;
+    // cached here so a given episode is only ever probed once.
+
+    private let episodeAudioMetadataKey = "applevis.podcast.audioMetadata.v1"
+
+    struct EpisodeAudioMetadata: Codable {
+        var duration: TimeInterval?
+        var chapters: [Chapter]
+    }
+
+    func cachedAudioMetadata(episodeId: String) -> EpisodeAudioMetadata? {
+        audioMetadataCache()[episodeId]
+    }
+
+    func cacheProbedDuration(episodeId: String, duration: TimeInterval) {
+        var all = audioMetadataCache()
+        var entry = all[episodeId] ?? EpisodeAudioMetadata(duration: nil, chapters: [])
+        entry.duration = duration
+        all[episodeId] = entry
+        persist(all, key: episodeAudioMetadataKey)
+    }
+
+    func cacheProbedChapters(episodeId: String, chapters: [Chapter]) {
+        var all = audioMetadataCache()
+        var entry = all[episodeId] ?? EpisodeAudioMetadata(duration: nil, chapters: [])
+        entry.chapters = chapters
+        all[episodeId] = entry
+        persist(all, key: episodeAudioMetadataKey)
+    }
+
+    private func audioMetadataCache() -> [String: EpisodeAudioMetadata] {
+        load(key: episodeAudioMetadataKey) ?? [:]
     }
 
     // MARK: - Storage

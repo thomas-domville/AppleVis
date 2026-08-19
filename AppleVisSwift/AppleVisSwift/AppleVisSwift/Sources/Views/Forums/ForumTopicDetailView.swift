@@ -3,6 +3,12 @@ import UIKit
 
 struct ForumTopicDetailView: View {
     let topicId: String
+    /// Set when opened via a card's "Jump to First New Comment" action
+    /// (ContentActionsModifier, routed through DeepLinkRouter.pendingContentIntent)
+    /// — scrolls/focuses straight to the first new reply once loaded,
+    /// instead of landing at the top of the topic like a normal open.
+    var focusFirstNewCommentOnAppear: Bool = false
+    @State private var hasAppliedFirstNewCommentFocus = false
     @State private var detail: ForumTopicDetail?
     @State private var isLoading = false
     @State private var error: String?
@@ -289,6 +295,41 @@ struct ForumTopicDetailView: View {
                     try? await Task.sleep(for: .milliseconds(400))
                     focusedReplyId = newId
                     pendingFocusReplyId = nil
+                }
+            }
+            .task {
+                // Guarded on hasApplied rather than just the intent flag —
+                // topicContent(_:) re-renders on every reply-list mutation
+                // (posting a reply, deleting one), and this should only ever
+                // fire once, right after the initial load this screen was
+                // opened for.
+                guard focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
+                hasAppliedFirstNewCommentFocus = true
+                await jumpToFirstNewReply(proxy: proxy)
+            }
+            // Two custom VoiceOver rotor categories — turn two fingers to
+            // reach "New Comments"/"Replies to Me" alongside the built-in
+            // Headings/Links options, then swipe with one finger to move
+            // only between entries in whichever one is selected. Unlike
+            // "Jump to First New Comment" (a one-shot landing spot), the
+            // rotor stays in that filtered set across swipes — the natural
+            // next step when there's more than one new reply to get through.
+            .accessibilityRotor("New Comments") {
+                ForEach(detail.replies) { reply in
+                    if reply.isNew {
+                        AccessibilityRotorEntry(reply.authorName, id: reply.id)
+                    }
+                }
+            }
+            // "Replies to Me" only means anything once signed in — auth.user
+            // is nil otherwise, and isDirectedAt(_:body:) already returns
+            // false for an empty name, but the rotor shouldn't advertise a
+            // category that can never have entries for a signed-out reader.
+            .accessibilityRotor("Replies to Me") {
+                ForEach(detail.replies) { reply in
+                    if let name = auth.user?.name, QuotedReply.isDirectedAt(name, body: reply.body) {
+                        AccessibilityRotorEntry(reply.authorName, id: reply.id)
+                    }
                 }
             }
         }
@@ -620,21 +661,51 @@ struct ForumTopicDetailView: View {
         }
     }
 
-    private func bottomActionBar(_ detail: ForumTopicDetail) -> some View {
-        HStack(spacing: 0) {
-            if auth.isSignedIn {
-                DetailActionButton(
-                    systemImage: isFollowing ? "bell.fill" : "bell",
-                    visualLabel: isFollowing ? "Unfollow" : "Follow",
-                    accessibilityLabel: isFollowing ? "Unfollow Topic" : "Follow Topic"
-                ) { Task { await toggleFollow() } }
-            }
+    /// Both Follow and Reply used to be hidden entirely until signed in —
+    /// invisible to a VoiceOver user with no way to discover either exists,
+    /// and inconsistent with Home's Add menu and the other five detail
+    /// screens' Comment/Review buttons, which now show always and gate on
+    /// tap instead. `toggleFollow()`'s own `guard let user = auth.user`
+    /// previously made a signed-out Follow tap possible in theory (had the
+    /// button ever been reachable) a silent no-op with zero feedback.
+    private func requestFollowToggle() {
+        guard auth.isSignedIn else {
+            toast.warning(String(localized: "Sign in to follow this topic."))
+            return
+        }
+        Task { await toggleFollow() }
+    }
 
+    private func requestReply() {
+        guard auth.isSignedIn else {
+            toast.warning(String(localized: "Sign in to reply to this topic."))
+            return
+        }
+        showReplyCompose = true
+    }
+
+    private func bottomActionBar(_ detail: ForumTopicDetail) -> some View {
+        // Order matches ContentDetailActions' canonical order: Save,
+        // Follow, Comment/Reply, then Share/Browser last — previously Follow
+        // sat before Save here, the one detail screen with its own bespoke
+        // bar rather than the shared component, and no one had reconciled
+        // the two orderings.
+        HStack(spacing: 0) {
             DetailActionButton(
                 systemImage: isSaved ? "bookmark.fill" : "bookmark",
                 visualLabel: isSaved ? "Unsave" : "Save",
                 accessibilityLabel: isSaved ? "Unsave Topic" : "Save Topic"
             ) { toggleSave() }
+
+            DetailActionButton(
+                systemImage: isFollowing ? "bell.fill" : "bell",
+                visualLabel: isFollowing ? "Unfollow" : "Follow",
+                accessibilityLabel: isFollowing ? "Unfollow Topic" : "Follow Topic"
+            ) { requestFollowToggle() }
+
+            DetailActionButton(systemImage: "square.and.pencil", visualLabel: "Reply", accessibilityLabel: "Reply to topic") {
+                requestReply()
+            }
 
             if let shareURL = URL(string: detail.url) {
                 ShareLink(item: shareURL, subject: Text(detail.title)) {
@@ -644,12 +715,6 @@ struct ForumTopicDetailView: View {
 
                 DetailActionButton(systemImage: "safari", visualLabel: "Browser", accessibilityLabel: "Open topic in browser") {
                     showBrowser = true
-                }
-            }
-
-            if auth.isSignedIn {
-                DetailActionButton(systemImage: "square.and.pencil", visualLabel: "Reply", accessibilityLabel: "Reply to topic") {
-                    showReplyCompose = true
                 }
             }
         }

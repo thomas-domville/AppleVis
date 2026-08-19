@@ -21,6 +21,30 @@ struct ItunesMetadata {
     let ageRating: String
     let screenshotUrls: [String]
     let appStoreDescription: String
+    let languageCodes: [String]
+    /// Friendly device families ("iPhone", "iPad", "Apple Watch", "Mac")
+    /// derived from the lookup's raw `supportedDevices` codename array and
+    /// `features` flags. Deliberately excludes native (non-Catalyst) Mac and
+    /// Apple TV support — those ship as entirely separate App Store listings
+    /// with their own track IDs that this lookup has no way to link back to
+    /// this one, so they'd otherwise be silently and confidently wrong.
+    /// AppDetailView fills those two in from AppleVis's own submitted data
+    /// instead. See ItunesAPI.deviceFamilies(supportedDevices:features:).
+    let deviceFamilies: [String]
+
+    /// `languageCodes` arrives as raw ISO 639-1 codes ("EN", "ES", "FR") —
+    /// spoken and read as letters by VoiceOver with no indication they're
+    /// language codes at all. Expanded to full names via `Locale` in the
+    /// current app language (a French user reading this page sees "Anglais,
+    /// Espagnol, Français", not the English names), sorted for a stable,
+    /// scannable order. Falls back to the raw code for anything `Locale`
+    /// doesn't recognize rather than silently dropping it.
+    var languageNames: String {
+        languageCodes
+            .map { Locale.current.localizedString(forLanguageCode: $0.lowercased()) ?? $0 }
+            .sorted()
+            .joined(separator: ", ")
+    }
 }
 
 struct ItunesDeveloperApp: Identifiable {
@@ -118,6 +142,8 @@ enum ItunesAPI {
         let rating = r["averageUserRating"] as? Double
         let ratingCount = (r["userRatingCount"] as? Int) ?? 0
         let fileSizeBytes = (r["fileSizeBytes"] as? String).flatMap(Int64.init) ?? Int64((r["fileSizeBytes"] as? NSNumber)?.int64Value ?? 0)
+        let rawSupportedDevices = (r["supportedDevices"] as? [String]) ?? []
+        let features = (r["features"] as? [String]) ?? []
 
         return ItunesMetadata(
             appStoreId: id,
@@ -136,8 +162,27 @@ enum ItunesAPI {
             minimumOsVersion: str("minimumOsVersion"),
             ageRating: str("contentAdvisoryRating"),
             screenshotUrls: (r["screenshotUrls"] as? [String]) ?? [],
-            appStoreDescription: str("description")
+            appStoreDescription: str("description"),
+            languageCodes: (r["languageCodesISO2A"] as? [String]) ?? [],
+            deviceFamilies: deviceFamilies(supportedDevices: rawSupportedDevices, features: features)
         )
+    }
+
+    /// Buckets iTunes's raw per-model `supportedDevices` codenames (e.g.
+    /// "iPhone15Pro-iPhone15Pro", "iPadAir4Cellular-iPadAir4Cellular") into
+    /// friendly device families, plus "Mac" when the `features` array flags
+    /// a Mac Catalyst build. Verified against live lookups: e.g. Fantastical
+    /// (a Universal Purchase app) returns `Watch*` entries here for its
+    /// Apple Watch companion, but nothing Mac-related — its native Mac app
+    /// is a separate track ID this endpoint has no way to expose.
+    static func deviceFamilies(supportedDevices: [String], features: [String]) -> [String] {
+        var families: [String] = []
+        if supportedDevices.contains(where: { $0.hasPrefix("iPhone") }) { families.append("iPhone") }
+        if supportedDevices.contains(where: { $0.hasPrefix("iPad") }) { families.append("iPad") }
+        if supportedDevices.contains(where: { $0.hasPrefix("iPodTouch") }) { families.append("iPod touch") }
+        if supportedDevices.contains(where: { $0.hasPrefix("Watch") }) { families.append("Apple Watch") }
+        if features.contains("macCatalyst") { families.append("Mac") }
+        return families
     }
 
     /// Other apps by the same developer — the old app fetches and shows

@@ -38,7 +38,7 @@ struct WhatsNewView: View {
                 .tracking(0.8)
                 .accessibilityHidden(true)
 
-            Text("Sharing into AppleVis from other apps, picking up where you left off on another device, iPad keyboard shortcuts, and a big pass making sure everything actually works as expected.")
+            Text("A new app icon badge, a redesigned App Directory page, better podcast episode info, a smoother setup process, and a batch of VoiceOver and sign-in fixes.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -173,38 +173,110 @@ struct ChangeItem: Identifiable {
     let title: String
     let description: String
 
-    static let currentVersion = "2026.0.7"
+    static let currentVersion = "2026.0.9"
 
     static let current: [ChangeItem] = [
         ChangeItem(
-            systemImage: "square.and.arrow.up",
+            systemImage: "app.badge",
             tag: .new,
-            title: "Share Into AppleVis From Other Apps",
-            description: "Found an app, podcast, or article somewhere else? Use the Share button in Safari or any other app and choose AppleVis. It opens the right submission form automatically with the link already filled in."
+            title: "App Icon Badge",
+            description: "Turn on Badge Count in Settings → Notifications to see a number on the AppleVis icon for what's new — only counting the kinds of notifications you've actually turned on. Opening the app clears it."
         ),
         ChangeItem(
-            systemImage: "laptopcomputer.and.iphone",
-            tag: .new,
-            title: "Pick Up Where You Left Off on Another Device",
-            description: "Reading a topic or listening to a podcast on your iPhone? With Handoff, an AppleVis icon appears on your nearby iPad or Mac so you can jump straight back in on that device."
-        ),
-        ChangeItem(
-            systemImage: "keyboard",
-            tag: .new,
-            title: "Keyboard Shortcuts on iPad",
-            description: "If you use an external keyboard with your iPad, hold down the Command key to see new shortcuts — jump to Search, Settings, or straight to Forums, Apps, Podcasts, or Resources."
-        ),
-        ChangeItem(
-            systemImage: "checkmark.seal",
+            systemImage: "hand.point.up.left",
             tag: .fixed,
-            title: "Several Features Now Actually Work",
-            description: "A thorough check turned up a number of features that looked fine but were not fully working behind the scenes. Apple Intelligence, Siri Shortcuts, AirPlay, Spotlight search results, Lock Screen and Control Center playback controls, Voice Boost, Trim Silence, on-device podcast artwork descriptions, and iCloud sync of your podcast library are now all working properly."
+            title: "Duplicate VoiceOver Actions on Cards",
+            description: "VoiceOver no longer repeats \"Save\" and \"Share\" twice when swiping through the actions on a topic, episode, app, blog, or guide card. The same fix applies to downloaded episodes."
         ),
         ChangeItem(
-            systemImage: "bell.badge",
+            systemImage: "arrow.up.forward.app",
             tag: .improved,
-            title: "AppleVis Categories in Focus Settings",
-            description: "AppleVis notification categories now appear in Settings → Focus, so you can start choosing which ones — like mentions or new episodes — you want to allow through during a Focus mode."
+            title: "App Entry Cards",
+            description: "\"Write a Review\" is now called \"Add New Comment\", matching every other card. \"Open in App Store\" is also more reliable now with VoiceOver."
+        ),
+        ChangeItem(
+            systemImage: "arrow.down.circle",
+            tag: .new,
+            title: "Download Episode on Podcast Cards",
+            description: "Podcast cards now have their own Download button, so you can download, cancel, or remove an episode without opening it first. Saving an episode is still separate from downloading it."
+        ),
+        ChangeItem(
+            systemImage: "plus.circle",
+            tag: .new,
+            title: "Add Button on Home",
+            description: "A new Add button on the Home tab lets you start a new forum topic or add a new app to the App Directory. It's there whether or not you're signed in — tap it while signed out and you'll be asked to sign in first. Blog posts, podcasts, and bug reports still go through Discover's Contribute section, since those need to be reviewed before they're published."
+        ),
+        ChangeItem(
+            systemImage: "bubble.left",
+            tag: .fixed,
+            title: "Comment Button on Detail Pages",
+            description: "Every topic, episode, app, blog post, and guide page now has a Comment (or Write Review) button at the bottom of the screen, whether or not you're signed in."
+        ),
+        ChangeItem(
+            systemImage: "arrow.down.to.line",
+            tag: .new,
+            title: "Jump to First New Comment from Any Card",
+            description: "Cards with new activity now offer a \"Jump to First New Comment\" option, so you can go straight to what's new instead of scrolling through the whole page."
+        ),
+        ChangeItem(
+            systemImage: "square.grid.2x2",
+            tag: .fixed,
+            title: "Tab Selection Announced",
+            description: "Switching between Home, Discover, and For You with VoiceOver now tells you which tab you landed on, instead of just playing a sound."
+        ),
+        ChangeItem(
+            systemImage: "person.crop.circle.badge.exclamationmark",
+            tag: .fixed,
+            title: "Sign In",
+            description: "Fixed a bug where signing in with the correct username and password could fail with a confusing \"item is no longer available\" error."
+        ),
+        ChangeItem(
+            systemImage: "arrow.clockwise",
+            tag: .new,
+            title: "Home Refreshes on Return",
+            description: "Coming back to AppleVis after being away now refreshes the Home tab automatically — as long as you're on the Home tab and it's been more than 5 minutes since it last loaded."
+        ),
+        ChangeItem(
+            systemImage: "app.badge",
+            tag: .improved,
+            title: "App Entry Page Redesigned",
+            description: "App Directory pages are now easier to follow, with a clearer layout and a shortcut to new comments near the top. Screenshots now have real descriptions instead of just \"Screenshot 2 of 5.\""
+        ),
+        ChangeItem(
+            systemImage: "dial.medium",
+            tag: .new,
+            title: "Custom VoiceOver Rotor Options",
+            description: "New VoiceOver rotor options make it quicker to jump to new comments, replies to you, and podcast chapters, plus quick filters for what's new on the Home tab."
+        ),
+        ChangeItem(
+            systemImage: "waveform",
+            tag: .new,
+            title: "Real Episode Duration and Chapters",
+            description: "Podcast episodes now show their real length instead of a placeholder, and chapters are available even when they weren't included in AppleVis's own listing. The transcript no longer shows up twice on the episode page — use the Transcript button instead."
+        ),
+        ChangeItem(
+            systemImage: "slider.horizontal.3",
+            tag: .improved,
+            title: "Episode Page Playback Controls",
+            description: "Playback speed, sleep timer, and AirPlay are now available directly from the episode page, without needing to start playing first."
+        ),
+        ChangeItem(
+            systemImage: "moon.stars",
+            tag: .fixed,
+            title: "System (Inverted) Theme",
+            description: "Fixed a bug where selecting the System (Inverted) theme made the screen flicker back and forth between light and dark."
+        ),
+        ChangeItem(
+            systemImage: "figure.wave",
+            tag: .improved,
+            title: "Setup Wizard",
+            description: "Several improvements to the setup steps you see the first time you open the app: notifications now start off instead of on, clearer step-by-step wording throughout, and a theme name change."
+        ),
+        ChangeItem(
+            systemImage: "ipad.and.iphone",
+            tag: .new,
+            title: "Supported Devices on App Entries",
+            description: "App Directory pages now show which devices an app works on — iPhone, iPad, iPod touch, Apple Watch, Mac, and Apple TV."
         ),
     ]
 }
@@ -215,6 +287,13 @@ struct HistorySection: Identifiable {
     let items: [String]
 
     static let all: [HistorySection] = [
+        HistorySection(title: "Also in 2026.0.8 – 2026.0.7", items: [
+            "Share into AppleVis from other apps — Safari or any app's Share button opens the right submission form with the link already filled in",
+            "Handoff — pick up a topic or podcast on a nearby iPad or Mac right where you left off on iPhone",
+            "iPad keyboard shortcuts — hold Command for shortcuts to Search, Settings, Forums, Apps, Podcasts, and Resources",
+            "Apple Intelligence, Siri Shortcuts, AirPlay, Spotlight search results, Lock Screen and Control Center playback, Voice Boost, Trim Silence, on-device podcast artwork descriptions, and iCloud podcast sync all fixed and working properly",
+            "AppleVis notification categories now appear in Settings → Focus",
+        ]),
         HistorySection(title: "Also in 2026.0.6", items: [
             "Contact App Support wizard — reach the AppleVis team without leaving the app or using Mail",
             "Apple Intelligence features — summarize, simplify, and translate text on-device (iPhone 15 Pro+, iOS 26)",

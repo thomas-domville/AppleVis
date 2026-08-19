@@ -126,6 +126,56 @@ enum PushNotificationManager {
             contentId: kind != nil ? contentId : nil
         ))
     }
+
+    // MARK: - Badge count
+
+    /// Client-maintained running total, kept because the Drupal backend
+    /// doesn't send a per-user `aps.badge` yet (see apnsEnvironment above) —
+    /// once it does, that value becomes authoritative and this can be
+    /// dropped in favor of the `.badge` presentation option. Until then this
+    /// is the only thing that makes the "Badge Count" toggle in
+    /// NotificationSettingsView actually do anything.
+    private static let badgeCountKey = "notif.localBadgeCount"
+
+    /// Whether `categoryIdentifier` (one of the ids `registerCategories()`
+    /// registers) maps to a granular toggle the user currently has on.
+    /// Unrecognized categories default to counted, matching "on" as the
+    /// safer default for anything future categories don't yet cover here.
+    private static func isCategoryOptedIn(_ categoryIdentifier: String) -> Bool {
+        guard let prefs = PreferencesStore.current else { return true }
+        switch categoryIdentifier {
+        case "forumReply":    return prefs.notifyForumReplies
+        case "mention":       return prefs.notifyMentions
+        case "newTopic":      return prefs.notifyNewTopics
+        case "followedTopic": return prefs.notifyFollowedTopics
+        case "newEpisode":    return prefs.notifyNewEpisodes
+        case "appUpdate":     return prefs.notifyAppUpdates
+        case "newResource":   return prefs.notifyNewResources
+        case "announcement":  return prefs.notifyAnnouncements
+        case "newComment":    return prefs.notifyNewComments
+        default:              return true
+        }
+    }
+
+    /// Bumps the app icon badge by one for a just-arrived notification —
+    /// but only when the master "Badge Count" toggle is on AND this
+    /// notification's own category is one the user opted into. A category
+    /// switched off in Settings never contributes, regardless of what the
+    /// server sends.
+    static func incrementBadgeIfOptedIn(content: UNNotificationContent) {
+        guard PreferencesStore.current?.badgeCountEnabled ?? true,
+              isCategoryOptedIn(content.categoryIdentifier) else { return }
+        let next = UserDefaults.standard.integer(forKey: badgeCountKey) + 1
+        UserDefaults.standard.set(next, forKey: badgeCountKey)
+        UNUserNotificationCenter.current().setBadgeCount(next)
+    }
+
+    /// Matches the app icon badge being cleared to 0 — called alongside
+    /// every `setBadgeCount(0)` so the local running total doesn't drift
+    /// out of sync with what's actually shown.
+    static func resetBadgeCount() {
+        UserDefaults.standard.set(0, forKey: badgeCountKey)
+    }
 }
 
 /// Bridges UIKit app-delegate callbacks (APNs registration, foreground
@@ -173,12 +223,13 @@ final class AppleVisAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
     ) async -> UNNotificationPresentationOptions {
         await MainActor.run {
             PushNotificationManager.recordHistory(content: notification.request.content)
+            // Sets the badge itself via setBadgeCount(_:) rather than
+            // relying on an `.badge` presentation option applying the
+            // payload's own aps.badge — the Drupal backend doesn't send one
+            // yet, so there'd be nothing for that option to apply.
+            PushNotificationManager.incrementBadgeIfOptedIn(content: notification.request.content)
         }
-        var options: UNNotificationPresentationOptions = [.banner, .sound]
-        if await MainActor.run(body: { PreferencesStore.current?.badgeCountEnabled ?? true }) {
-            options.insert(.badge)
-        }
-        return options
+        return [.banner, .sound]
     }
 
     func userNotificationCenter(
@@ -191,6 +242,7 @@ final class AppleVisAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
         // concern since willPresent only fires for foreground delivery.
         await MainActor.run {
             PushNotificationManager.recordHistory(content: response.notification.request.content)
+            PushNotificationManager.incrementBadgeIfOptedIn(content: response.notification.request.content)
         }
         guard response.actionIdentifier != "DISMISS" else { return }
         await MainActor.run {

@@ -58,25 +58,6 @@ struct OptionalAccessibilityFocus: ViewModifier {
     }
 }
 
-/// Injects "Step X of Y." between a header's title and subtitle in its
-/// combined accessibility label — used by OnboardingView so VoiceOver users
-/// get a sense of progress through the flow (RN did this on every step),
-/// without dropping the subtitle that `.accessibilityElement(children:
-/// .combine)` would otherwise speak automatically.
-struct OptionalStepAnnouncement: ViewModifier {
-    let title: String
-    let subtitle: String
-    let stepInfo: (current: Int, total: Int)?
-
-    func body(content: Content) -> some View {
-        if let stepInfo {
-            content.accessibilityLabel(String(localized: "\(title). Step \(stepInfo.current) of \(stepInfo.total). \(subtitle)"))
-        } else {
-            content
-        }
-    }
-}
-
 /// Post-submit confirmation screen shown by a wizard after a successful send,
 /// matching RN's shared `ThankYouScreen` (`app/submit-blog/review.tsx`) —
 /// previously wizards just toasted and dismissed immediately, giving VoiceOver

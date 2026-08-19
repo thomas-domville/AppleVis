@@ -22,8 +22,9 @@ struct AccountEndpoints {
         }
 
         let response: Response = try await client.post(
-            "user/login?_format=json",
+            "user/login",
             base: .root,
+            query: ["_format": "json"],
             body: Body(name: username, pass: password),
             headers: ["Accept": "application/json", "Content-Type": "application/json"]
         )
@@ -48,8 +49,9 @@ struct AccountEndpoints {
     func logout(csrfToken: String, logoutToken: String) async throws {
         struct EmptyResponse: Decodable {}
         let _: EmptyResponse? = try? await client.post(
-            "user/logout?_format=json&token=\(logoutToken)",
+            "user/logout",
             base: .root,
+            query: ["_format": "json", "token": logoutToken],
             body: EmptyEncodable(),
             headers: ["X-CSRF-Token": csrfToken]
         )

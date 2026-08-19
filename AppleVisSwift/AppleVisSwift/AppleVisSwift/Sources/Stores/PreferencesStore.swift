@@ -20,12 +20,29 @@ final class PreferencesStore: ObservableObject {
 
     // MARK: - Appearance
     @AppStorage("theme") var theme: AppTheme = .system
-    /// Kept live by `SystemAppearanceObserver` (AppleVisApp.swift) via
-    /// `@Environment(\.colorScheme)`, which — unlike a raw
-    /// `UITraitCollection.current` read — actually updates when iOS's
-    /// appearance changes while the app is foregrounded. `.system`/
-    /// `.oppositeToSystem` used to read the trait directly and could go
-    /// stale until some unrelated re-render happened to recompute it.
+    /// Refreshed from `UITraitCollection.current` on every foreground
+    /// (`AppleVisApp`'s `.onChange(of: scenePhase)`), not read live via
+    /// SwiftUI's `@Environment(\.colorScheme)` — a `SystemAppearanceObserver`
+    /// modifier tried exactly that and caused System (Inverted)
+    /// (`.oppositeToSystem`) to flicker continuously the instant it was
+    /// selected. The mechanism: `.preferredColorScheme(preferences.colorScheme)`
+    /// is applied at the app root, and that modifier overrides the
+    /// `colorScheme` environment value for everything beneath it —
+    /// including a `.modifier()` chained after it, which is exactly where
+    /// the observer sat. So it wasn't reading the true system appearance;
+    /// it was reading its own app's already-inverted output. For every
+    /// other theme, colorScheme() doesn't depend on `systemIsDark`, so nothing
+    /// closes the loop — `.oppositeToSystem` is the one case where the
+    /// observed value and the applied override are the same value, chasing
+    /// itself: inverted-to-dark → environment reports dark → systemIsDark
+    /// set true → recomputes inverted-to-light → environment reports light →
+    /// systemIsDark set false → back to dark, forever. `UITraitCollection.current`
+    /// is a plain UIKit global, untouched by what SwiftUI's environment is
+    /// doing, so it can't self-trigger — the tradeoff is that a system
+    /// appearance change made while the app sits actively foregrounded
+    /// isn't picked up until the next foreground transition, rather than
+    /// instantly. Reported directly: System (Inverted) "flashes... as if
+    /// it's fighting with the system."
     @Published var systemIsDark: Bool = UITraitCollection.current.userInterfaceStyle == .dark
     var colorScheme: ColorScheme? { theme.colorScheme(systemIsDark: systemIsDark) }
     var colors: ThemeColors { theme.colors(systemIsDark: systemIsDark) }
@@ -56,14 +73,19 @@ final class PreferencesStore: ObservableObject {
     @AppStorage("podcast.autoDelete")   var autoDelete: PodcastAutoDelete = .off
 
     // MARK: - Notifications (granular)
+    // All default off — opt-in, not opt-out. Three of these (newTopics,
+    // newEpisodes, announcements) previously defaulted on, so a fresh
+    // install effectively signed every user up for push notifications
+    // they'd never explicitly asked for. Reported directly by a beta
+    // tester during onboarding review.
     @AppStorage("notif.forumReplies")   var notifyForumReplies  = false
     @AppStorage("notif.mentions")       var notifyMentions       = false
-    @AppStorage("notif.newTopics")      var notifyNewTopics      = true
+    @AppStorage("notif.newTopics")      var notifyNewTopics      = false
     @AppStorage("notif.followedTopics") var notifyFollowedTopics = false
-    @AppStorage("notif.newEpisodes")    var notifyNewEpisodes    = true
+    @AppStorage("notif.newEpisodes")    var notifyNewEpisodes    = false
     @AppStorage("notif.appUpdates")     var notifyAppUpdates     = false
     @AppStorage("notif.newResources")   var notifyNewResources   = false
-    @AppStorage("notif.announcements")  var notifyAnnouncements  = true
+    @AppStorage("notif.announcements")  var notifyAnnouncements  = false
     /// Comments on any content type (forum/podcast/app/blog/guide), regardless
     /// of follow status — distinct from `notifyForumReplies`, which is only
     /// replies to topics the user themselves started. Defaults off: this is
@@ -159,7 +181,14 @@ enum AppTheme: String, CaseIterable, Identifiable {
         case .mouseLight:        return "Mouse — Light"
         case .mouseDark:         return "Mouse — Dark"
         case .orchard:            return "Orchard"
-        case .goldenGate:        return "Golden Gate"
+        // Was "Golden Gate" — Apple's own macOS 26 code name, and not
+        // worth the trademark risk for a theme name with no real
+        // connection to it beyond both evoking San Francisco. Reported
+        // directly by a beta tester. The `goldenGate` case name itself is
+        // untouched — it's what `@AppStorage` actually persists, so
+        // renaming it would silently reset this specific choice back to
+        // the default for anyone who'd already picked it.
+        case .goldenGate:        return "Cupertino Sunset"
         case .nebula:             return "Nebula"
         case .highContrastLight: return "High Contrast Light"
         case .highContrastDark:  return "High Contrast Dark"
@@ -366,7 +395,15 @@ enum NotificationSound: String, CaseIterable, Identifiable {
         case .mouseSqueak:         return "The AppleVis signature sound, soft and distinctive."
         case .appleCrunch:         return "A crisp apple crunch."
         case .goldenRetrieverBark: return "A friendly golden retriever bark, warm and cheerful."
-        case .system:              return "Your iPhone's standard notification tone."
+        // iOS has no API for a third-party app to read or play back
+        // exactly which alert tone a user has personally set as their
+        // device default — this sends "default" in the push payload,
+        // which does correctly tell the system to use whatever that tone
+        // actually is when a real notification arrives. There's just
+        // nothing to preview in-app beforehand that's guaranteed to match
+        // it. Reworded after a beta tester's preview played Tri-Tone while
+        // their actual configured default was Rebound.
+        case .system:              return "Uses your device's own default alert tone when a notification arrives. Can't be previewed here — iOS doesn't allow apps to play back exactly which tone that is."
         }
     }
     /// Value stored server-side in `field_push_sound` so a push payload can

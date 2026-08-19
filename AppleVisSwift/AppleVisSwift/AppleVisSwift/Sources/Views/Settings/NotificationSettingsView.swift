@@ -56,6 +56,11 @@ struct NotificationSettingsView: View {
 
                 Toggle("Badge Count", isOn: $preferences.badgeCountEnabled)
                     .accessibilityHint(String(localized: "Shows a number on the AppleVis icon for unread notifications. Opening the app clears it."))
+                    .onChange(of: preferences.badgeCountEnabled) { _, isOn in
+                        guard !isOn else { return }
+                        UNUserNotificationCenter.current().setBadgeCount(0)
+                        PushNotificationManager.resetBadgeCount()
+                    }
             } header: {
                 Text("Sound")
             }
@@ -85,7 +90,7 @@ struct NotificationSettingsView: View {
                 Toggle("New Forum Topics", isOn: $preferences.notifyNewTopics)
                     .disabled(pushDenied)
                     .accessibilityHint(String(localized: "Get notified when new forum discussions are posted."))
-                Toggle("New App Listings", isOn: $preferences.notifyAppUpdates)
+                Toggle("New App Directory Entries", isOn: $preferences.notifyAppUpdates)
                     .disabled(pushDenied)
                     .accessibilityHint(String(localized: "Get notified when existing apps are updated or new accessible apps are added to the AppleVis App Directory."))
                 Toggle("New Podcast Episodes", isOn: $preferences.notifyNewEpisodes)
@@ -131,12 +136,12 @@ struct NotificationSettingsView: View {
                 ResetToDefaultsButton {
                     preferences.notifyForumReplies = false
                     preferences.notifyMentions = false
-                    preferences.notifyNewTopics = true
+                    preferences.notifyNewTopics = false
                     preferences.notifyFollowedTopics = false
-                    preferences.notifyNewEpisodes = true
+                    preferences.notifyNewEpisodes = false
                     preferences.notifyAppUpdates = false
                     preferences.notifyNewResources = false
-                    preferences.notifyAnnouncements = true
+                    preferences.notifyAnnouncements = false
                     preferences.notifyNewComments = false
                     preferences.notificationSound = .mouseSqueak
                     preferences.badgeCountEnabled = true

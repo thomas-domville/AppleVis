@@ -52,7 +52,17 @@ struct HomeView: View {
     @State private var showCustomizeHome = false
     @State private var homeFeedFilter: HomeFeedFilter = .all
     @State private var notificationHistory: [NotificationHistoryItem] = []
+    @State private var showComposeTopic = false
+    @State private var showSubmitApp = false
     @AccessibilityFocusState private var focusTarget: HomeFocusTarget?
+    @Environment(\.scenePhase) private var scenePhase
+    /// How long Home's feed can sit unrefreshed before returning to the
+    /// foreground triggers a reload — briefly switching to another app and
+    /// back (checking a text, glancing at a notification) shouldn't refetch
+    /// every time; actually leaving the app for a while should. 5 minutes is
+    /// a reasonable starting point, not a value with strong justification
+    /// behind it.
+    private static let staleThreshold: TimeInterval = 5 * 60
 
     /// Items actually shown below the feed picker — narrowed to just what's
     /// new since the last visit when the "New" segment is selected. Distinct
@@ -94,10 +104,51 @@ struct HomeView: View {
                     .accessibilityHint(String(localized: "Choose what content types appear on your Home screen"))
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink(destination: ProfileView()) {
-                        Image(systemName: "person.circle")
+                    HStack {
+                        // New Topic and New App Entry are immediate, user-
+                        // authored content (same as everything else Home
+                        // shows) — unlike Blog/Podcast/Bug submissions,
+                        // which go through editorial review before
+                        // publishing under AppleVis, not the user, so those
+                        // stay exclusively in Discover's Contribute section
+                        // rather than living here too. Reuses the same
+                        // ComposeTopicView/SubmitAppView Forums and Discover
+                        // already have — this is just a second, faster way
+                        // in from the tab a user actually lands on.
+                        //
+                        // Shown to everyone, signed in or not — matches
+                        // Discover's Contribute section, which shows its
+                        // Submit rows to every user with a "Sign In
+                        // Required" label rather than hiding them, and
+                        // lets the destination screen prompt for sign-in
+                        // instead. A hidden button here would mean a
+                        // signed-out (and especially a VoiceOver) user has
+                        // no way to discover this exists at all. Both
+                        // ComposeTopicView and SubmitAppView already show
+                        // their own sign-in prompt when opened signed-out.
+                        Menu {
+                            Button {
+                                showComposeTopic = true
+                            } label: {
+                                Label("New Topic", systemImage: "text.bubble")
+                            }
+                            Button {
+                                showSubmitApp = true
+                            } label: {
+                                Label("New App Entry", systemImage: "square.grid.2x2")
+                            }
+                        } label: {
+                            Image(systemName: "plus.circle")
+                        }
+                        .accessibilityLabel(String(localized: "Add"))
+                        .accessibilityHint(auth.isSignedIn
+                            ? String(localized: "Create a new forum topic or app entry")
+                            : String(localized: "Sign in required to create a new forum topic or app entry"))
+                        NavigationLink(destination: ProfileView()) {
+                            Image(systemName: "person.circle")
+                        }
+                        .accessibilityLabel(String(localized: "Profile and Settings"))
                     }
-                    .accessibilityLabel(String(localized: "Profile and Settings"))
                 }
             }
             .refreshable {
@@ -106,9 +157,27 @@ struct HomeView: View {
                 SoundPlayer.shared.play(.refresh)
             }
             .onReceive(keyCommands.refreshRequested) { Task { await vm.load() } }
+            // Returning to the foreground while on some other tab
+            // deliberately does nothing here — refreshing a list the user
+            // isn't even looking at isn't worth the data/battery cost, and
+            // they'll get a normal load next time they actually switch to
+            // Home. Reported directly: nothing refreshed Home at all before
+            // this, no matter how long the app sat backgrounded.
+            .onChange(of: scenePhase) { _, newPhase in
+                guard newPhase == .active, keyCommands.selectedTab == 0 else { return }
+                let isStale = vm.lastLoadedAt.map { Date().timeIntervalSince($0) > Self.staleThreshold } ?? true
+                guard isStale else { return }
+                Task { await vm.load() }
+            }
             .overlay(alignment: .top) { ToastOverlay() }
             .sheet(isPresented: $showCustomizeHome, onDismiss: { Task { await vm.load() } }) {
                 CustomizeHomeView()
+            }
+            .sheet(isPresented: $showComposeTopic, onDismiss: { Task { await vm.load() } }) {
+                ComposeTopicView()
+            }
+            .sheet(isPresented: $showSubmitApp, onDismiss: { Task { await vm.load() } }) {
+                SubmitAppView()
             }
             .onChange(of: vm.isLoading) { _, isLoading in
                 guard !isLoading else { return }
@@ -373,6 +442,36 @@ struct HomeView: View {
             }
             .listStyle(.plain)
             .themedList(preferences.colors)
+            // "New Items" mirrors the per-screen "New Comments" rotors on
+            // detail pages — reuses the same vm.newItems already driving
+            // the New/All picker and the "N new activity items" banner, so
+            // it's just a different way to move through the same set.
+            .accessibilityRotor("New Items") {
+                ForEach(vm.newItems) { item in
+                    AccessibilityRotorEntry(item.title, id: item.id)
+                }
+            }
+            // Home is the one place in the app that genuinely interleaves
+            // every content kind into a single flat list with no section
+            // headers to jump via the built-in Headings rotor (unlike
+            // Search Results, which is already grouped) — these five let
+            // someone narrow to just one kind for this scan without
+            // permanently hiding the others via Customize Home. Scoped to
+            // `visibleItems`, not the full feed, so a rotor built while
+            // the New filter is active only offers what's actually
+            // on screen.
+            .accessibilityRotor("Forum Topics") { kindRotorContent(.forumTopic) }
+            .accessibilityRotor("Podcast Episodes") { kindRotorContent(.podcastEpisode) }
+            .accessibilityRotor("App Entries") { kindRotorContent(.appListing) }
+            .accessibilityRotor("Guides") { kindRotorContent(.resource) }
+            .accessibilityRotor("Blog Posts") { kindRotorContent(.blogPost) }
+        }
+    }
+
+    @AccessibilityRotorContentBuilder
+    private func kindRotorContent(_ kind: ContentKind) -> some AccessibilityRotorContent {
+        ForEach(visibleItems.filter { $0.kind == kind }) { item in
+            AccessibilityRotorEntry(item.title, id: item.id)
         }
     }
 

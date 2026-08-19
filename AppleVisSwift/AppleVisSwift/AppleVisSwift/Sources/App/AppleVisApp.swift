@@ -58,7 +58,6 @@ struct AppleVisApp: App {
             .environmentObject(guidedExperiencePause)
             .preferredColorScheme(preferences.colorScheme)
             .tint(preferences.accentColor)
-            .modifier(SystemAppearanceObserver(preferences: preferences))
             .overlay { TipOverlay(tips: tips) }
             .overlay { GuidedExperienceResumeBanner(pauseStore: guidedExperiencePause, preferences: preferences) }
             .accessibilityAction(.magicTap) {
@@ -87,12 +86,19 @@ struct AppleVisApp: App {
                     // notifBadge description: "tap the app and the badge
                     // clears") — opening the app clears it.
                     UNUserNotificationCenter.current().setBadgeCount(0)
+                    PushNotificationManager.resetBadgeCount()
                     // Previously only pulled once at cold launch (`.task`
                     // runs once per view identity) — switching between two
                     // signed-in devices within the same session meant the
                     // other device's saved items/queue/settings changes
                     // never appeared until a full quit and relaunch.
                     ICloudSyncManager.shared.pullAll()
+                    // Refreshes `.system`/`.oppositeToSystem`'s notion of the
+                    // real device appearance from UIKit directly — see the
+                    // doc comment on `PreferencesStore.systemIsDark` for why
+                    // this can no longer come from SwiftUI's
+                    // `@Environment(\.colorScheme)`.
+                    preferences.systemIsDark = UITraitCollection.current.userInterfaceStyle == .dark
                 }
             }
             .task {
@@ -146,19 +152,3 @@ struct AppleVisApp: App {
     }
 }
 
-/// Keeps `PreferencesStore.systemIsDark` live via `@Environment(\.colorScheme)`
-/// — the one SwiftUI-reactive source for the system's current appearance —
-/// so the `.system`/`.oppositeToSystem` themes actually update while the app
-/// is foregrounded instead of only refreshing on the next unrelated re-render.
-private struct SystemAppearanceObserver: ViewModifier {
-    @Environment(\.colorScheme) private var systemColorScheme
-    @ObservedObject var preferences: PreferencesStore
-
-    func body(content: Content) -> some View {
-        content
-            .onAppear { preferences.systemIsDark = systemColorScheme == .dark }
-            .onChange(of: systemColorScheme) { _, newValue in
-                preferences.systemIsDark = newValue == .dark
-            }
-    }
-}

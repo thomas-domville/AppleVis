@@ -5,13 +5,19 @@ struct PodcastEpisode: Identifiable, Codable, Hashable {
     let title: String
     let showTitle: String
     let audioUrl: String
-    let duration: TimeInterval?
+    // `var`, not `let` — the API never actually supplies either (duration
+    // is hardcoded to 0 server-side; chapters are only ever present for
+    // episodes a host bothered to chapter-mark in Drupal). Both get
+    // overwritten in place once `PodcastAudioMetadataProbe` resolves real
+    // values by reading the audio file itself, from the cache or a fresh
+    // client-side probe.
+    var duration: TimeInterval?
     let publishedAt: Date
     let lastActivityAt: Date
     let description: String
     let artworkUrl: String?
     let transcriptUrl: String?
-    let chapters: [Chapter]
+    var chapters: [Chapter]
     let tags: [PodcastTag]
     let commentCount: Int
     let authorName: String

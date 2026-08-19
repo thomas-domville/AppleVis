@@ -182,7 +182,14 @@ struct ForumTopicRow: View {
     }
 
     private var topicLabel: String {
-        let newLabel = newCount > 0 ? ". \(newCount) new repl\(newCount == 1 ? "y" : "ies")" : ""
+        // Every other row kind already says "comment(s)" here (see
+        // PodcastEpisodeRow/AppListingRow/ResourceRow/BlogPostRow/
+        // BugReportRow below) — this was the one holdout still saying
+        // "reply"/"replies". "Reply" stays reserved for the actual compose
+        // action (Reply to topic, Reply to this Comment); this is the
+        // generic new-activity count, same word everywhere else. Reported
+        // directly.
+        let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
         return detailLevelLabel(
             title: topic.title,
             // Previously just the category ("iOS/iPadOS Gaming"), with
@@ -205,7 +212,16 @@ struct PodcastEpisodeRow: View {
     let episode: PodcastEpisode
     var onDelete: (() -> Void)? = nil
     @EnvironmentObject private var player: PlayerStore
+    @ObservedObject private var downloads = DownloadManager.shared
     @State private var showComposeComment = false
+    /// See `PodcastAudioMetadataProbe` — Drupal's `duration` is always 0, so
+    /// `episode.duration` alone can't be trusted for display. Read-only
+    /// against the cache first; only falls back to a live probe if this
+    /// specific episode hasn't been resolved anywhere yet, via `.task`
+    /// below, which — same as `ScreenshotThumbnail`'s AI descriptions on
+    /// the App Entry page — only fires once this row actually scrolls into
+    /// view, not for every row in a long list at once.
+    @State private var resolvedDuration: TimeInterval?
 
     var body: some View {
         NavigationLink(value: episode) {
@@ -230,7 +246,7 @@ struct PodcastEpisodeRow: View {
                         if isCurrentlyPlaying {
                             NowPlayingWaveform()
                         }
-                        if let duration = episode.duration {
+                        if let duration = displayDuration {
                             Text(PodcastDuration.abbreviated(duration))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -244,6 +260,9 @@ struct PodcastEpisodeRow: View {
                         }
                         if isQueued {
                             Image(systemName: "text.badge.plus").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
+                        }
+                        if downloads.isDownloaded(episode.id) {
+                            Image(systemName: "arrow.down.circle.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
                         }
                         RelativeDateLabel(date: episode.publishedAt)
                     }
@@ -269,6 +288,17 @@ struct PodcastEpisodeRow: View {
         .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to Queue")) {
             if isQueued { player.removeFromQueue(id: episode.id) } else { player.enqueue(episode) }
         }
+        // Save bookmarks the episode for later; it never implied a download
+        // (data usage/storage the user didn't ask for), and Settings already
+        // has a separate, opt-in Auto-Download preference for that. But
+        // "Download Episode" itself previously only existed on the episode
+        // detail screen — a VoiceOver user browsing the list had no way to
+        // download for offline listening without opening the episode first.
+        // Three-state like the detail screen's downloadButton: download,
+        // then cancel-while-in-flight, then remove-once-downloaded — same
+        // wording DownloadsView already uses for the latter two, so a user
+        // who has heard either place recognizes the other.
+        .accessibilityAction(named: Text(downloadActionLabel)) { performDownloadAction() }
         .contentActions(
             id: episode.id, kind: .podcastEpisode, title: episode.title, lastActivityAt: episode.lastActivityAt, url: episode.url,
             currentCommentCount: episode.commentCount,
@@ -278,7 +308,7 @@ struct PodcastEpisodeRow: View {
             // These already exist as VoiceOver-only .accessibilityActions
             // above — .accessibilityHidden here keeps this purely a visual
             // addition for sighted long-press users, not a second
-            // VoiceOver-announced "Play"/"Add to Queue".
+            // VoiceOver-announced "Play"/"Add to Queue"/download action.
             Button {
                 Task { await playOrToggle() }
             } label: {
@@ -291,8 +321,15 @@ struct PodcastEpisodeRow: View {
                 Label(isQueued ? "Remove from Queue" : "Add to Queue", systemImage: isQueued ? "text.badge.minus" : "text.badge.plus")
             }
             .accessibilityHidden(true)
+            Button {
+                performDownloadAction()
+            } label: {
+                Label(downloadActionLabel, systemImage: downloadActionSystemImage)
+            }
+            .accessibilityHidden(true)
         }
         .cardDensityPadding()
+        .task { await resolveDurationIfNeeded() }
         .sheet(isPresented: $showComposeComment) {
             ComposePodcastCommentView(episodeId: episode.id, title: episode.title) { _ in }
         }
@@ -300,6 +337,26 @@ struct PodcastEpisodeRow: View {
 
     private var isCurrentlyPlaying: Bool {
         player.currentEpisode?.id == episode.id && player.isPlaying
+    }
+
+    /// `episode.duration` is never trustworthy on its own — 0 from the API
+    /// means "unknown," not "zero seconds long" — so this only ever shows
+    /// a value once it's genuinely positive, whether that came from the
+    /// server (should it ever start sending real data), the resolved-here
+    /// cache, or this row's own live probe.
+    private var displayDuration: TimeInterval? {
+        resolvedDuration ?? episode.duration.flatMap { $0 > 0 ? $0 : nil }
+    }
+
+    private func resolveDurationIfNeeded() async {
+        guard displayDuration == nil else { return }
+        if let cached = PersistenceStore.shared.cachedAudioMetadata(episodeId: episode.id)?.duration {
+            resolvedDuration = cached
+            return
+        }
+        guard let probed = await PodcastAudioMetadataProbe.resolveDuration(audioUrl: episode.audioUrl) else { return }
+        PersistenceStore.shared.cacheProbedDuration(episodeId: episode.id, duration: probed)
+        resolvedDuration = probed
     }
 
     /// Was entirely missing from this row — every other podcast-episode
@@ -323,13 +380,36 @@ struct PodcastEpisodeRow: View {
         }
     }
 
+    private var downloadActionLabel: String {
+        if downloads.isDownloaded(episode.id) { return "Remove Download" }
+        if downloads.activeDownloads.contains(episode.id) { return "Cancel Download" }
+        return "Download Episode"
+    }
+
+    private var downloadActionSystemImage: String {
+        if downloads.isDownloaded(episode.id) { return "arrow.down.circle.fill" }
+        if downloads.activeDownloads.contains(episode.id) { return "xmark.circle" }
+        return "arrow.down.circle"
+    }
+
+    private func performDownloadAction() {
+        if downloads.isDownloaded(episode.id) {
+            downloads.delete(episode.id)
+        } else if downloads.activeDownloads.contains(episode.id) {
+            downloads.cancelDownload(episode.id)
+        } else {
+            downloads.download(episode)
+        }
+    }
+
     private var newCount: Int {
         PersistenceStore.shared.newReplyCount(kind: .podcastEpisode, id: episode.id, currentCount: episode.commentCount)
     }
 
     private var episodeLabel: String {
         let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
-        let durationText = episode.duration.map { PodcastDuration.abbreviated($0) } ?? ""
+        let downloadedLabel = downloads.isDownloaded(episode.id) ? ". Downloaded." : ""
+        let durationText = displayDuration.map { PodcastDuration.abbreviated($0) } ?? ""
         let countText = episode.commentCount > 0 ? "\(episode.commentCount) comment\(episode.commentCount == 1 ? "" : "s")" : ""
         let authorAndCount = [durationText, countText].filter { !$0.isEmpty }.joined(separator: ", ")
         let base = detailLevelLabel(
@@ -337,7 +417,7 @@ struct PodcastEpisodeRow: View {
             contentType: podcastContentType(showTitle: episode.showTitle),
             authorAndCount: authorAndCount,
             date: episode.publishedAt.formatted(.relative(presentation: .named)),
-            alwaysAppend: "\(savedQueuedLabel)\(newLabel)"
+            alwaysAppend: "\(savedQueuedLabel)\(downloadedLabel)\(newLabel)"
         )
         // The visible NowPlayingWaveform and play/pause icon are both
         // .accessibilityHidden — nothing else here ever spoke playing state,
@@ -412,23 +492,38 @@ struct AppListingRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(appLabel)
         .readAloudAction(appLabel)
+        // "Open App Entry in Browser" (the generic action every kind gets)
+        // opens the Drupal directory page, not the actual App Store listing
+        // — reaching the real App Store link previously required opening
+        // the detail screen first. Explicit like every other action here
+        // (rather than left to the unhidden Link below alone) so a
+        // VoiceOver user gets it reliably instead of depending on
+        // .contextMenu's own — separate, untested — custom-action bridging.
+        .modifier(ConditionalAccessibilityAction(
+            isActive: appStoreURL != nil,
+            name: "Open in App Store"
+        ) {
+            guard let appStoreURL else { return }
+            UIApplication.shared.open(appStoreURL)
+        })
         .contentActions(
             id: app.id, kind: .appListing, title: app.name, lastActivityAt: app.lastActivityAt, url: app.url,
             currentCommentCount: app.reviewCount, onContentDeleted: onDelete
         ) {
-            // "Open App Entry in Browser" (the generic action every kind
-            // gets) opens the Drupal directory page, not the actual App
-            // Store listing — previously reaching the real App Store link
-            // required opening the detail screen first, which already has
-            // this exact action. Long-pressing straight from the row now
-            // reaches it directly.
-            if let appStoreUrl = app.appStoreUrl, let storeURL = URL(string: appStoreUrl) {
-                Link(destination: storeURL) {
+            // Matches the explicit .accessibilityAction above — hidden so
+            // VoiceOver doesn't announce "Open in App Store" a second time.
+            if let appStoreURL {
+                Link(destination: appStoreURL) {
                     Label("Open in App Store", systemImage: "arrow.up.forward.app")
                 }
+                .accessibilityHidden(true)
             }
         }
         .cardDensityPadding()
+    }
+
+    private var appStoreURL: URL? {
+        app.appStoreUrl.flatMap(URL.init)
     }
 
     private var newCount: Int {

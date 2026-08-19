@@ -12,6 +12,15 @@ struct ComposeTopicView: View {
     @State private var isSubmitting = false
     @State private var error: String?
     @State private var showDiscardConfirm = false
+    /// Was reachable only from a toolbar button already hidden behind
+    /// `auth.isSignedIn` (ForumsBrowseView) — never actually needed to
+    /// handle being opened signed-out. Now that Home's Add menu shows this
+    /// entry point to everyone (matching how Discover's Contribute section
+    /// already treats Submit App/Blog/Podcast/Bug), a signed-out tap needs
+    /// its own graceful prompt instead of a Post button that silently
+    /// no-ops (`submit()`'s `guard let user = auth.user` already bailed
+    /// with no feedback at all).
+    @State private var showSignIn = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -37,82 +46,90 @@ struct ComposeTopicView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Title") {
-                    TextField("Topic title", text: $title)
-                }
-                Section("Category") {
-                    Picker("Category", selection: $selectedCategory) {
-                        Text("Choose…").tag(Optional<ForumCategory>.none)
-                        ForEach(categories) { cat in
-                            Text(cat.name).tag(Optional(cat))
+            Group {
+                if !auth.isSignedIn {
+                    signInRequiredView
+                } else {
+                    Form {
+                        Section("Title") {
+                            TextField("Topic title", text: $title)
                         }
-                    }
-                }
-                if intelligence.showTranslatePrompt {
-                    Section {
-                        TranslatePromptView(isProcessing: intelligence.isProcessing) {
-                            Task {
-                                if let result = await intelligence.translate(subject: title, body: bodyText, isTopic: true) {
-                                    title = result.subject ?? title
-                                    bodyText = result.body
-                                } else {
-                                    toast.error(String(localized: "Couldn't translate this. Try again."))
+                        Section("Category") {
+                            Picker("Category", selection: $selectedCategory) {
+                                Text("Choose…").tag(Optional<ForumCategory>.none)
+                                ForEach(categories) { cat in
+                                    Text(cat.name).tag(Optional(cat))
                                 }
                             }
-                        } onDismiss: {
-                            intelligence.dismissTranslatePrompt()
+                        }
+                        if intelligence.showTranslatePrompt {
+                            Section {
+                                TranslatePromptView(isProcessing: intelligence.isProcessing) {
+                                    Task {
+                                        if let result = await intelligence.translate(subject: title, body: bodyText, isTopic: true) {
+                                            title = result.subject ?? title
+                                            bodyText = result.body
+                                        } else {
+                                            toast.error(String(localized: "Couldn't translate this. Try again."))
+                                        }
+                                    }
+                                } onDismiss: {
+                                    intelligence.dismissTranslatePrompt()
+                                }
+                            }
+                        }
+                        if let warning = guidelines.topWarning {
+                            Section {
+                                GuidelinesReminderView(warning: warning) { guidelines.dismiss() }
+                            }
+                        }
+                        Section("Body") {
+                            TextEditor(text: $bodyText)
+                                .frame(minHeight: 200)
+                                .onChange(of: bodyText) { _, newValue in
+                                    guidelines.textChanged(newValue)
+                                    intelligence.textChanged(
+                                        newValue,
+                                        translationEnabled: preferences.composeTranslationEnabled,
+                                        detectionEnabled: preferences.nonEnglishDetectionEnabled
+                                    )
+                                }
+                        }
+                        if let error {
+                            Section {
+                                Text(error).foregroundStyle(.red)
+                            }
                         }
                     }
-                }
-                if let warning = guidelines.topWarning {
-                    Section {
-                        GuidelinesReminderView(warning: warning) { guidelines.dismiss() }
-                    }
-                }
-                Section("Body") {
-                    TextEditor(text: $bodyText)
-                        .frame(minHeight: 200)
-                        .onChange(of: bodyText) { _, newValue in
-                            guidelines.textChanged(newValue)
-                            intelligence.textChanged(
-                                newValue,
-                                translationEnabled: preferences.composeTranslationEnabled,
-                                detectionEnabled: preferences.nonEnglishDetectionEnabled
-                            )
-                        }
-                }
-                if let error {
-                    Section {
-                        Text(error).foregroundStyle(.red)
-                    }
+                    .themedList(preferences.colors)
                 }
             }
-            .themedList(preferences.colors)
             .navigationTitle("New Topic")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { requestCancel() }
                 }
-                if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
-                    ToolbarItem(placement: .secondaryAction) {
-                        Button("Rewrite") {
-                            Task {
-                                if let result = await intelligence.rewrite(subject: title, body: bodyText, isTopic: true) {
-                                    title = result.subject ?? title
-                                    bodyText = result.body
-                                } else {
-                                    toast.error(String(localized: "Couldn't rewrite this. Try again."))
+                if auth.isSignedIn {
+                    if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+                        ToolbarItem(placement: .secondaryAction) {
+                            Button("Rewrite") {
+                                Task {
+                                    if let result = await intelligence.rewrite(subject: title, body: bodyText, isTopic: true) {
+                                        title = result.subject ?? title
+                                        bodyText = result.body
+                                    } else {
+                                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
+                                    }
                                 }
                             }
+                            .disabled(bodyText.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
                         }
-                        .disabled(bodyText.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
                     }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Post") { Task { await submit() } }
-                        .disabled(!isValid || isSubmitting)
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Post") { Task { await submit() } }
+                            .disabled(!isValid || isSubmitting)
+                    }
                 }
             }
             .task { await loadCategories() }
@@ -125,7 +142,28 @@ struct ComposeTopicView: View {
             } message: {
                 Text("Your progress will be discarded.")
             }
+            .sheet(isPresented: $showSignIn) { SignInView() }
         }
+    }
+
+    private var signInRequiredView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "person.crop.circle.badge.exclamationmark")
+                .font(.system(size: 48))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            Text("Sign In Required")
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+            Text("You need to be signed in to your AppleVis account to post a new topic.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Sign In") { showSignIn = true }
+                .buttonStyle(.borderedProminent)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func loadCategories() async {

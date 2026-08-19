@@ -193,6 +193,16 @@ private struct QueueRow: View {
     let onMoveDown: () -> Void
     let onRemove: () -> Void
 
+    /// Drupal's `duration` is hardcoded to 0, never nil (see
+    /// `PodcastAudioMetadataProbe`) — falls back to whatever's already been
+    /// resolved and cached elsewhere, read-only; an episode reaching the
+    /// queue has already been encountered via a browse row or its detail
+    /// page, both of which do trigger a live probe.
+    private var displayDuration: TimeInterval? {
+        if let duration = episode.duration, duration > 0 { return duration }
+        return PersistenceStore.shared.cachedAudioMetadata(episodeId: episode.id)?.duration
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             Text("\(position)")
@@ -210,7 +220,7 @@ private struct QueueRow: View {
                     Text(episode.showTitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    if let duration = episode.duration {
+                    if let duration = displayDuration {
                         Text(PodcastDuration.abbreviated(duration))
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
@@ -251,7 +261,7 @@ private struct QueueRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             String(localized: "\(position) of \(total). \(episode.title), \(episode.showTitle)") +
-            (episode.duration.map { String(localized: ", \(PodcastDuration.abbreviated($0))") } ?? "")
+            (displayDuration.map { String(localized: ", \(PodcastDuration.abbreviated($0))") } ?? "")
         )
         .accessibilityHint(String(localized: "Double-tap to open. Use actions to move or remove."))
         .accessibilityAction(named: Text("Open Episode"), onOpen)

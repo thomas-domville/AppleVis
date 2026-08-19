@@ -170,4 +170,35 @@ enum QuotedReply {
         let excerpt = plain.count > 150 ? String(plain.prefix(150)).trimmingCharacters(in: .whitespaces) + "…" : plain
         return "\(authorName) wrote:\n> \(excerpt)\n\n"
     }
+
+    /// Backs each detail screen's "Replies to Me" rotor. Nothing in the
+    /// Drupal comment data links a reply back to the specific comment or
+    /// author it's responding to — no parent id, no mentions field — so
+    /// this is the only signal available: does `body` open with exactly the
+    /// quote format `prefix(authorName:body:)` produces when someone taps
+    /// "Reply to this Comment" on one of `authorName`'s own comments. That
+    /// means this only catches explicit quote-replies, not a free-text
+    /// "@username" mention typed into an ordinary comment — there's no
+    /// distinct, detectable feature for that here at all.
+    static func isDirectedAt(_ authorName: String, body: String) -> Bool {
+        guard !authorName.isEmpty else { return false }
+        return body.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("\(authorName) wrote:")
+    }
+}
+
+extension Array {
+    /// The `n` most-recently-posted items in a comment/reply/review list —
+    /// backs each detail screen's "New Comments" rotor everywhere except
+    /// Forums, whose `ForumReply` is the only model with a real per-item
+    /// `isNew` flag. Every other kind's API only ever gives a count
+    /// (`newCommentCount`/`newReviewCount`), so this relies on the same
+    /// "arrives chronologically oldest-first" invariant each screen's
+    /// `jumpToFirstNew*` function already depends on to find just the
+    /// first new one — this is the same math, generalized to the full set.
+    /// Always returns a valid (possibly empty) slice, however `n` compares
+    /// to `count`.
+    func newestSuffix(count n: Int) -> ArraySlice<Element> {
+        let clamped = Swift.max(0, Swift.min(n, count))
+        return self[(count - clamped)...]
+    }
 }

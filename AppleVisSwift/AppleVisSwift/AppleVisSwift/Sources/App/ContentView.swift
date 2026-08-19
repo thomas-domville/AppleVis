@@ -25,8 +25,16 @@ struct ContentView: View {
                     .tabItem { Label("For You", systemImage: "person.crop.circle") }
                     .tag(2)
             }
-            .onChange(of: keyCommands.selectedTab) { _, _ in
+            .onChange(of: keyCommands.selectedTab) { _, newTab in
                 SoundPlayer.shared.play(.tabChange)
+                // Double-tapping a tab bar item to switch to it doesn't
+                // reliably re-announce the new selected state on this SDK's
+                // TabView the way exploring back onto an already-selected
+                // tab by touch does (that read comes for free from the
+                // .isSelected trait; this doesn't). Reported directly: a
+                // VoiceOver user double-tapping Discover heard only the
+                // tab-change tone, with no confirmation it had switched.
+                UIAccessibility.post(notification: .announcement, argument: String(localized: "\(tabName(for: newTab)) tab, selected."))
             }
 
             if player.currentEpisode != nil {
@@ -38,7 +46,10 @@ struct ContentView: View {
         .animation(UIAccessibility.isReduceMotionEnabled ? nil : .spring(duration: 0.3), value: player.currentEpisode != nil)
         .sheet(item: Binding(
             get: { deepLinkRouter.pendingContent.map { DeepLinkContent(kind: $0.kind, id: $0.id) } },
-            set: { if $0 == nil { deepLinkRouter.pendingContent = nil } }
+            set: { if $0 == nil {
+                deepLinkRouter.pendingContent = nil
+                deepLinkRouter.pendingContentIntent = nil
+            } }
         )) { content in
             NavigationStack { destination(for: content) }
         }
@@ -68,6 +79,18 @@ struct ContentView: View {
             Text("See a short, skippable walkthrough of Home, Discover, For You, Search, Profile, and Settings.")
         }
         .onAppear { offerWelcomeTourIfNeeded() }
+    }
+
+    /// Mirrors the `.tabItem` labels above — kept as a plain switch rather
+    /// than reading the label back out of the TabView, since there's no
+    /// direct way to do that from an `.onChange(of: selection)` handler.
+    private func tabName(for tab: Int) -> String {
+        switch tab {
+        case 0:  return String(localized: "Home")
+        case 1:  return String(localized: "Discover")
+        case 2:  return String(localized: "For You")
+        default: return ""
+        }
     }
 
     /// Matches RN's post-setup "Take a quick tour?" alert (app/onboarding/
@@ -104,13 +127,20 @@ struct ContentView: View {
 
     @ViewBuilder
     private func destination(for content: DeepLinkContent) -> some View {
+        let jumpToFirstNewComment = deepLinkRouter.pendingContentIntent == .firstNewComment
         switch content.kind {
-        case .forumTopic: ForumTopicDetailView(topicId: content.id)
-        case .podcastEpisode: EpisodeDetailView(episodeId: content.id)
-        case .appListing: AppDetailView(appId: content.id)
-        case .resource: ResourceDetailView(resourceId: content.id)
-        case .blogPost: BlogDetailView(postId: content.id)
-        case .bugReport: BugDetailView(bugId: content.id)
+        case .forumTopic:
+            ForumTopicDetailView(topicId: content.id, focusFirstNewCommentOnAppear: jumpToFirstNewComment)
+        case .podcastEpisode:
+            EpisodeDetailView(episodeId: content.id, focusFirstNewCommentOnAppear: jumpToFirstNewComment)
+        case .appListing:
+            AppDetailView(appId: content.id, focusFirstNewCommentOnAppear: jumpToFirstNewComment)
+        case .resource:
+            ResourceDetailView(resourceId: content.id, focusFirstNewCommentOnAppear: jumpToFirstNewComment)
+        case .blogPost:
+            BlogDetailView(postId: content.id, focusFirstNewCommentOnAppear: jumpToFirstNewComment)
+        case .bugReport:
+            BugDetailView(bugId: content.id, focusFirstNewCommentOnAppear: jumpToFirstNewComment)
         }
     }
 }

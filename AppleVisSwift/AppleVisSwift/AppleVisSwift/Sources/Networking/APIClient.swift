@@ -148,8 +148,8 @@ final class APIClient {
         return try await perform(request: request)
     }
 
-    func post<Body: Encodable, T: Decodable>(_ path: String, base: BaseURL = .v1, body: Body, headers: [String: String] = [:]) async throws -> T {
-        let url = buildURL(path: path, base: base, query: [:])
+    func post<Body: Encodable, T: Decodable>(_ path: String, base: BaseURL = .v1, query: [String: String] = [:], body: Body, headers: [String: String] = [:]) async throws -> T {
+        let url = buildURL(path: path, base: base, query: query)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -334,13 +334,44 @@ final class APIClient {
         }
     }
 
+    /// A handful of Drupal REST endpoints are conventionally written with
+    /// their query string baked directly into the path literal, e.g.
+    /// `"user/login?_format=json"` — `post(_:)` had no `query:` parameter to
+    /// express this properly until now. That mattered because
+    /// `appendingPathComponent` percent-encodes "?" as an ordinary path
+    /// character instead of treating it as a query separator: the resulting
+    /// request actually went to `/user/login%3F_format=json`, a route that
+    /// doesn't exist, so Drupal 404'd and the app surfaced "This item is no
+    /// longer available" on sign-in — a content-not-found message with
+    /// nothing to do with what was actually wrong. Splitting any embedded
+    /// query out of `path` before it reaches `appendingPathComponent` fixes
+    /// every call site using this pattern, including `post(_:)` callers that
+    /// still write their path this way instead of using its new `query:`
+    /// parameter (`logout`, `contact_message` — same bug, previously masked
+    /// there because both calls silently discard failures).
+    private func splitEmbeddedQuery(from path: String) -> (path: String, query: [String: String]) {
+        guard let queryStart = path.firstIndex(of: "?") else { return (path, [:]) }
+        let pathOnly = String(path[path.startIndex..<queryStart])
+        let queryString = path[path.index(after: queryStart)...]
+        var result: [String: String] = [:]
+        for pair in queryString.split(separator: "&") {
+            let parts = pair.split(separator: "=", maxSplits: 1)
+            guard let key = parts.first, !key.isEmpty else { continue }
+            let rawValue = parts.count > 1 ? String(parts[1]) : ""
+            result[String(key)] = rawValue.removingPercentEncoding ?? rawValue
+        }
+        return (pathOnly, result)
+    }
+
     private func buildURL(path: String, base: BaseURL, queryItems: [URLQueryItem]) -> URL {
-        let resolved = resolvedBase(base).appendingPathComponent(path)
+        let (pathOnly, embeddedQuery) = splitEmbeddedQuery(from: path)
+        let resolved = resolvedBase(base).appendingPathComponent(pathOnly)
         guard var components = URLComponents(url: resolved, resolvingAgainstBaseURL: false) else {
             assertionFailure("Malformed endpoint path: \(path)")
             return resolved
         }
-        if !queryItems.isEmpty { components.queryItems = queryItems }
+        let mergedItems = embeddedQuery.map { URLQueryItem(name: $0.key, value: $0.value) } + queryItems
+        if !mergedItems.isEmpty { components.queryItems = mergedItems }
         return components.url ?? resolved
     }
 
@@ -350,13 +381,15 @@ final class APIClient {
         case .jsonAPI: self.jsonAPIBase
         case .v1:      self.v1Base
         }
-        let resolved = baseURL.appendingPathComponent(path)
+        let (pathOnly, embeddedQuery) = splitEmbeddedQuery(from: path)
+        let resolved = baseURL.appendingPathComponent(pathOnly)
         guard var components = URLComponents(url: resolved, resolvingAgainstBaseURL: false) else {
             assertionFailure("Malformed endpoint path: \(path)")
             return resolved
         }
-        if !query.isEmpty {
-            components.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }
+        let mergedQuery = embeddedQuery.merging(query) { _, new in new }
+        if !mergedQuery.isEmpty {
+            components.queryItems = mergedQuery.map { URLQueryItem(name: $0.key, value: $0.value) }
         }
         return components.url ?? resolved
     }

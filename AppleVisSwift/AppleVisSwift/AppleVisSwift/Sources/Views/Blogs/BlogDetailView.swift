@@ -2,6 +2,11 @@ import SwiftUI
 
 struct BlogDetailView: View {
     let postId: String
+    /// Set when opened via a card's "Jump to First New Comment" action —
+    /// see the same property on ForumTopicDetailView for the full
+    /// reasoning; routed the same way through DeepLinkRouter.pendingContentIntent.
+    var focusFirstNewCommentOnAppear: Bool = false
+    @State private var hasAppliedFirstNewCommentFocus = false
     @State private var detail: BlogPostDetail?
     @State private var isLoading = false
     @State private var error: String?
@@ -96,19 +101,32 @@ struct BlogDetailView: View {
                     pendingFocusCommentId = nil
                 }
             }
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
-                if auth.isSignedIn {
-                    Button { showCompose = true } label: {
-                        Image(systemName: "square.and.pencil")
+            .task {
+                guard focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
+                hasAppliedFirstNewCommentFocus = true
+                await jumpToFirstNewComment(proxy: proxy)
+            }
+            // See ForumTopicDetailView's identical pair for the full
+            // reasoning; BlogComment has no per-item "isNew" flag, so this
+            // is the newest `newCommentCount` comments by position.
+            .accessibilityRotor("New Comments") {
+                ForEach(detail.comments.newestSuffix(count: newCommentCount)) { comment in
+                    AccessibilityRotorEntry(comment.authorName, id: comment.id)
+                }
+            }
+            .accessibilityRotor("Replies to Me") {
+                ForEach(detail.comments) { comment in
+                    if let name = auth.user?.name, QuotedReply.isDirectedAt(name, body: comment.body) {
+                        AccessibilityRotorEntry(comment.authorName, id: comment.id)
                     }
-                    .accessibilityLabel(String(localized: "Add comment"))
                 }
             }
         }
         .safeAreaInset(edge: .bottom) {
-            ContentDetailActions(id: detail.id, kind: .blogPost, title: detail.title, lastActivityAt: detail.lastActivityAt, url: detail.url)
+            ContentDetailActions(
+                id: detail.id, kind: .blogPost, title: detail.title, lastActivityAt: detail.lastActivityAt, url: detail.url,
+                onAddComment: { showCompose = true }
+            )
         }
         .sheet(isPresented: $showCompose) {
             ComposeBlogCommentView(blogId: detail.id, title: detail.title) { comment in

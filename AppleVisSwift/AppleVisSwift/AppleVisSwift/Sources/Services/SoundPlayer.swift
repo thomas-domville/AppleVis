@@ -75,7 +75,15 @@ final class SoundPlayer {
         case .goldenRetrieverBark:
             play(filename: "Golden Retriever Bark", ext: "wav")
         case .system:
-            AudioServicesPlaySystemSound(1007)
+            // Previously played system sound ID 1007 (a fixed Tri-Tone-like
+            // alert) as if it were "the" system default — but there's no
+            // per-device default to play back here at all: iOS has no API
+            // exposing which alert tone a user has actually set as their
+            // own default, so 1007 was frequently just wrong, not a
+            // preview. A beta tester caught this directly (heard Tri-Tone,
+            // their real default was Rebound). Silence here is honest;
+            // NotificationSound.system's description explains why.
+            break
         }
     }
 

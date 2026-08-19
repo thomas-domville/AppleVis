@@ -2,6 +2,11 @@ import SwiftUI
 
 struct EpisodeDetailView: View {
     let episodeId: String
+    /// Set when opened via a card's "Jump to First New Comment" action —
+    /// see the same property on ForumTopicDetailView for the full
+    /// reasoning; routed the same way through DeepLinkRouter.pendingContentIntent.
+    var focusFirstNewCommentOnAppear: Bool = false
+    @State private var hasAppliedFirstNewCommentFocus = false
     @State private var episode: PodcastEpisode?
     @State private var comments: [PodcastComment] = []
     @State private var isLoading = false
@@ -9,6 +14,7 @@ struct EpisodeDetailView: View {
     @State private var showCompose = false
     @State private var quotedComment: PodcastComment?
     @State private var showTranscript = false
+    @State private var showFullPlayer = false
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
     @State private var newCommentCount = 0
@@ -61,6 +67,13 @@ struct EpisodeDetailView: View {
                     // Hero
                     heroCard(episode).padding()
 
+                    // Same shortcut the App Entry page has — a second,
+                    // earlier entry point to the same "Jump to First New
+                    // Comment" the Community Discussion heading offers
+                    // further down, for anyone who just wants to see what's
+                    // new without scrolling past Chapters/Episode Notes.
+                    newCommentShortcut(proxy: proxy)
+
                     // Chapters
                     if !episode.chapters.isEmpty {
                         sectionHeading("Chapters")
@@ -74,9 +87,9 @@ struct EpisodeDetailView: View {
                     }
 
                     // Description
-                    if !episode.description.isEmpty {
+                    if !notesWithoutTranscript(episode).isEmpty {
                         sectionHeading("Episode Notes")
-                        SegmentedHTMLView(html: episode.description)
+                        SegmentedHTMLView(html: notesWithoutTranscript(episode))
                             .padding(.horizontal).padding(.bottom, 16)
                     }
 
@@ -101,6 +114,34 @@ struct EpisodeDetailView: View {
                     try? await Task.sleep(for: .milliseconds(400))
                     focusedCommentId = newId
                     pendingFocusCommentId = nil
+                }
+            }
+            .task {
+                guard focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
+                hasAppliedFirstNewCommentFocus = true
+                await jumpToFirstNewComment(proxy: proxy)
+            }
+            // See ForumTopicDetailView's identical pair for the full
+            // reasoning; PodcastComment has no per-item "isNew" flag, so
+            // this is the newest `newCommentCount` comments by position.
+            .accessibilityRotor("New Comments") {
+                ForEach(comments.newestSuffix(count: newCommentCount)) { comment in
+                    AccessibilityRotorEntry(comment.authorName, id: comment.id)
+                }
+            }
+            .accessibilityRotor("Replies to Me") {
+                ForEach(comments) { comment in
+                    if let name = auth.user?.name, QuotedReply.isDirectedAt(name, body: comment.body) {
+                        AccessibilityRotorEntry(comment.authorName, id: comment.id)
+                    }
+                }
+            }
+            // Chapters exist specifically as navigation waypoints — the
+            // rotor is arguably a more natural fit here than anywhere else
+            // it's used in the app.
+            .accessibilityRotor("Chapters") {
+                ForEach(episode.chapters) { chapter in
+                    AccessibilityRotorEntry(chapter.title, id: chapter.id)
                 }
             }
         }
@@ -130,13 +171,6 @@ struct EpisodeDetailView: View {
                     .accessibilityLabel(String(localized: "View Transcript"))
                 }
 
-                if auth.isSignedIn {
-                    Button { showCompose = true } label: {
-                        Image(systemName: "square.and.pencil")
-                    }
-                    .accessibilityLabel(String(localized: "Add comment"))
-                }
-
                 // Every other podcast surface (browse row, queue screen)
                 // supports queueing; the single most detailed view of an
                 // episode had no way to queue it without leaving the screen
@@ -144,6 +178,35 @@ struct EpisodeDetailView: View {
                 // entirely absent natively despite What's New advertising
                 // "Mark as Played actions" as already shipped.
                 Menu {
+                    // Speed, Sleep Timer, Voice Boost, Trim Silence, and
+                    // AirPlay all exist already — on FullPlayerView (speed/
+                    // sleep timer/AirPlay) and in Settings → Podcasts (all
+                    // of them) — but this detail page had no path to either
+                    // one at all unless something was already playing,
+                    // since the only way to reach FullPlayerView anywhere
+                    // in the app was tapping the mini-player bar, which
+                    // doesn't exist until playback has started. Loads this
+                    // episode first if it isn't already the current one, so
+                    // the controls that open always have something to act on.
+                    Button {
+                        // `load()` does real async setup (audio session,
+                        // AVPlayerItem construction) before it sets
+                        // `currentEpisode` — presenting the sheet before
+                        // that finishes would show FullPlayerView with
+                        // `player.currentEpisode` still nil, which renders
+                        // as a blank sheet (there's no "nothing playing"
+                        // fallback there). Awaiting inside the same Task
+                        // guarantees the episode is already current by the
+                        // time the sheet appears.
+                        Task {
+                            if player.currentEpisode?.id != episode.id {
+                                await player.load(episode)
+                            }
+                            showFullPlayer = true
+                        }
+                    } label: {
+                        Label("Player Controls", systemImage: "slider.horizontal.3")
+                    }
                     Button {
                         if isQueued(episode) {
                             player.removeFromQueue(id: episode.id)
@@ -176,7 +239,10 @@ struct EpisodeDetailView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            ContentDetailActions(id: episode.id, kind: .podcastEpisode, title: episode.title, lastActivityAt: episode.lastActivityAt, url: episode.url)
+            ContentDetailActions(
+                id: episode.id, kind: .podcastEpisode, title: episode.title, lastActivityAt: episode.lastActivityAt, url: episode.url,
+                onAddComment: { showCompose = true }
+            )
         }
         .sheet(isPresented: $showCompose) {
             ComposePodcastCommentView(episodeId: episode.id, title: episode.title) { comment in
@@ -192,6 +258,43 @@ struct EpisodeDetailView: View {
         }
         .sheet(isPresented: $showTranscript) {
             TranscriptView(episodeId: episode.id, episodeTitle: episode.title)
+        }
+        .sheet(isPresented: $showFullPlayer) {
+            FullPlayerView()
+        }
+    }
+
+    /// Drupal's `duration` is hardcoded to 0, never nil — see
+    /// `PodcastAudioMetadataProbe` — so `> 0` guards against ever showing
+    /// or speaking "0 min" during the brief window before that probe (or
+    /// its cache) resolves a real value in place.
+    private func validDuration(_ episode: PodcastEpisode) -> TimeInterval? {
+        guard let duration = episode.duration, duration > 0 else { return nil }
+        return duration
+    }
+
+    @ViewBuilder
+    private func newCommentShortcut(proxy: ScrollViewProxy) -> some View {
+        if newCommentCount > 0 {
+            Button {
+                Task { await jumpToFirstNewComment(proxy: proxy) }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.down.to.line.compact")
+                    Text("\(newCommentCount) new comment\(newCommentCount == 1 ? "" : "s") — Jump to First New Comment")
+                        .font(.subheadline).fontWeight(.medium)
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(Color.accentColor)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .tintedBackground(Color.accentColor, opacity: 0.1, cornerRadius: 10)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+            .accessibilityLabel(String(localized: "\(newCommentCount) new comment\(newCommentCount == 1 ? "" : "s")"))
+            .accessibilityHint(String(localized: "Double-tap to jump to the first new comment."))
         }
     }
 
@@ -214,7 +317,7 @@ struct EpisodeDetailView: View {
                 Text(episode.title)
                     .font(.body).fontWeight(.semibold).lineLimit(3)
                 HStack {
-                    if let duration = episode.duration {
+                    if let duration = validDuration(episode) {
                         Text(PodcastDuration.abbreviated(duration))
                             .font(.caption).foregroundStyle(.secondary)
                     }
@@ -229,6 +332,7 @@ struct EpisodeDetailView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             String(localized: "\(episode.title) by \(episode.showTitle), published \(episode.publishedAt.formatted(.relative(presentation: .named)))") +
+            (validDuration(episode).map { String(localized: ", \(PodcastDuration.abbreviated($0))") } ?? "") +
             (episode.commentCount > 0 ? String(localized: ", last comment \(episode.lastActivityAt.formatted(.relative(presentation: .named)))") : "") +
             (artworkDescription.map { String(localized: ". Artwork \($0)") } ?? "")
         )
@@ -274,6 +378,33 @@ struct EpisodeDetailView: View {
             .padding(.horizontal)
             .padding(.top, 16).padding(.bottom, 4)
             .accessibilityAddTraits(.isHeader)
+    }
+
+    /// Strips AppleVis's own "Transcript" block off the end of show notes —
+    /// confirmed against a real episode: a "Transcript" heading, an AI-
+    /// transcription disclaimer, then the full transcript, running straight
+    /// to the end of the body with nothing after it. `TranscriptView`
+    /// already fetches the real transcript from its own dedicated endpoint
+    /// (`APIClient.podcasts.transcript(id:)`), entirely independent of this
+    /// HTML — so it was never a source of truth, just a second, unformatted
+    /// copy of the same text sitting where the notes should end. Reuses
+    /// `HTMLSegmenter` (already splitting this exact body for rendering)
+    /// instead of a fresh regex: finds the first heading segment whose text
+    /// is exactly "Transcript" and drops it and everything after.
+    /// Only applied when `transcriptUrl` is set — otherwise the dedicated
+    /// button/modal won't be there to replace what got removed, and this
+    /// text is the only copy that would exist.
+    private func notesWithoutTranscript(_ episode: PodcastEpisode) -> String {
+        guard let transcriptUrl = episode.transcriptUrl, !transcriptUrl.isEmpty else {
+            return episode.description
+        }
+        let segments = HTMLSegmenter.segment(episode.description)
+        guard let transcriptIndex = segments.firstIndex(where: {
+            $0.isHeading && $0.plainText.trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare("Transcript") == .orderedSame
+        }) else {
+            return episode.description
+        }
+        return segments[..<transcriptIndex].map(\.html).joined()
     }
 
     @ViewBuilder
@@ -354,6 +485,7 @@ struct EpisodeDetailView: View {
             let (fetchedEp, fetchedComments) = try await (ep, cms)
             episode = fetchedEp
             comments = fetchedComments
+            resolveAudioMetadataIfNeeded(for: fetchedEp)
             // Was `>= 100` (the page size requested, not what the server
             // actually returns — Drupal JSON:API commonly clamps a
             // requested page[limit] down to a lower site-configured max).
@@ -389,6 +521,38 @@ struct EpisodeDetailView: View {
             Task {
                 try? await Task.sleep(for: .milliseconds(400))
                 isTitleFocused = true
+            }
+        }
+    }
+
+    /// Fire-and-forget — doesn't block the page's own loading spinner, since
+    /// a live probe means a network round-trip on top of the episode fetch
+    /// that already happened. Checks PersistenceStore's cache first (no
+    /// network at all); only reaches for `PodcastAudioMetadataProbe` if
+    /// nothing's cached yet for this episode, and caches whatever it finds
+    /// so this episode is never probed twice. See `PodcastAudioMetadataProbe`
+    /// for why Drupal alone can't supply either value.
+    private func resolveAudioMetadataIfNeeded(for fetchedEpisode: PodcastEpisode) {
+        Task {
+            let cached = PersistenceStore.shared.cachedAudioMetadata(episodeId: fetchedEpisode.id)
+
+            if let cachedDuration = cached?.duration {
+                episode?.duration = cachedDuration
+            } else if fetchedEpisode.duration == nil || fetchedEpisode.duration == 0 {
+                if let probed = await PodcastAudioMetadataProbe.resolveDuration(audioUrl: fetchedEpisode.audioUrl) {
+                    PersistenceStore.shared.cacheProbedDuration(episodeId: fetchedEpisode.id, duration: probed)
+                    episode?.duration = probed
+                }
+            }
+
+            if let cachedChapters = cached?.chapters, !cachedChapters.isEmpty {
+                episode?.chapters = cachedChapters
+            } else if fetchedEpisode.chapters.isEmpty {
+                let probed = await PodcastAudioMetadataProbe.resolveChapters(audioUrl: fetchedEpisode.audioUrl)
+                if !probed.isEmpty {
+                    PersistenceStore.shared.cacheProbedChapters(episodeId: fetchedEpisode.id, chapters: probed)
+                    episode?.chapters = probed
+                }
             }
         }
     }

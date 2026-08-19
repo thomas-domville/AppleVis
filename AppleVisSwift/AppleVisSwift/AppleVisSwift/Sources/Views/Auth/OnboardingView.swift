@@ -108,7 +108,12 @@ private struct WelcomeStep: View {
     var stepInfo: (current: Int, total: Int)? = nil
 
     private let features: [(icon: String, title: String, desc: String)] = [
-        ("voiceover",       "Built for VoiceOver",         "Every screen crafted for screen-reader access from the ground up."),
+        // Was "Built for VoiceOver" — every app claims some variant of this
+        // wording now, so it reads as filler rather than a real signal.
+        // "Community-Driven" below already covers who makes AppleVis, so
+        // this one names something concrete instead: real testing, not a
+        // slogan. Reported by a beta tester.
+        ("voiceover",       "Tested, Not Just Labeled",    "Every screen is actually used and tested with VoiceOver, not just checked off against a guideline."),
         ("person.3",        "Community-Driven",             "Tips, reviews, and guides contributed by blind and low-vision users."),
         ("newspaper",       "All the Content You Need",     "Forums, app reviews, podcasts, tutorials, and news in one place."),
         // RN's welcome copy is concrete about how many themes and which
@@ -224,6 +229,7 @@ private struct SignInStep: View {
                     icon: "person.crop.circle",
                     title: "Sign In",
                     subtitle: "Sign in to post in forums, track saved items, and sync across devices. You can skip this and sign in later.",
+                    headerFocus: headerFocus,
                     stepInfo: stepInfo
                 )
 
@@ -471,8 +477,13 @@ private struct AnnouncementStep: View {
                             .padding(16)
                             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
                         }
+                        // VoiceOver was auto-combining the displayName Text and the
+                        // italic preview Text with no indication the second one was
+                        // an example rather than a description, and the hint then
+                        // repeated the same preview text again. A beta tester asked
+                        // for this to clearly say "<Level>. Example: <preview>" once.
+                        .accessibilityLabel(String(localized: "\(level.displayName). Example: \(level.preview)"))
                         .accessibilityAddTraits(preferences.announcementLevel == level ? [.isSelected] : [])
-                        .accessibilityHint(String(localized: "Preview: \(level.preview)"))
                     }
                 }
                 .padding(.horizontal, 24)
@@ -518,7 +529,7 @@ private struct NotificationsStep: View {
                     NotifToggle("New Forum Topics",  isOn: $preferences.notifyNewTopics)
                     NotifToggle("New Podcast Episodes", isOn: $preferences.notifyNewEpisodes)
                     NotifToggle("Announcements",     isOn: $preferences.notifyAnnouncements)
-                    NotifToggle("New App Listings",  isOn: $preferences.notifyAppUpdates)
+                    NotifToggle("New App Directory Entries", isOn: $preferences.notifyAppUpdates)
                 }
                 .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
                 .padding(.horizontal, 24)
@@ -721,19 +732,25 @@ private struct OnboardingHeader: View {
                 .font(.system(size: 56))
                 .foregroundStyle(Color.accentColor)
                 .accessibilityHidden(true)
+            // Title and subtitle used to be one combined swipe-stop, with
+            // the full explanation folded into the same spoken label as the
+            // heading — a beta tester found this made the heading read as
+            // long and unclear. Splitting them (matching WelcomeStep's
+            // existing pattern below) gives VoiceOver users a short heading
+            // as one swipe-stop and the explanation as its own, separate
+            // swipe-stop right after it.
             Text(title)
                 .font(.largeTitle)
                 .fontWeight(.bold)
                 .multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
+                .accessibilityLabel(stepInfo.map { String(localized: "\(title). Step \($0.current) of \($0.total).") } ?? title)
+                .modifier(OptionalAccessibilityFocus(isFocused: headerFocus))
             Text(subtitle)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 24)
-        .accessibilityElement(children: .combine)
-        .modifier(OptionalStepAnnouncement(title: title, subtitle: subtitle, stepInfo: stepInfo))
-        .modifier(OptionalAccessibilityFocus(isFocused: headerFocus))
     }
 }

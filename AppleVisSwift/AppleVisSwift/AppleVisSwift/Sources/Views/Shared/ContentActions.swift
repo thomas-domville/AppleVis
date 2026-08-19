@@ -58,6 +58,7 @@ struct ContentActionsModifier: ViewModifier {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var tips: TipStore
+    @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @State private var isSaved = false
     @State private var isFollowing = false
     @State private var showBrowser = false
@@ -70,9 +71,14 @@ struct ContentActionsModifier: ViewModifier {
         return PersistenceStore.shared.newReplyCount(kind: kind, id: id, currentCount: currentCommentCount)
     }
 
-    private var addCommentLabel: String {
-        kind == .appListing ? "Write a Review" : "Add New Comment"
-    }
+    /// Was "Write a Review" for app listings only — but this action's
+    /// actual behavior (`addComment()` below) is identical for every kind
+    /// with no `onAddComment` handler wired in: a stub toast telling the
+    /// user to open the item first. The label promised something app rows
+    /// alone didn't actually do, and it was the only kind that read
+    /// differently from the rest of the row types for the same action.
+    /// Reported directly.
+    private var addCommentLabel: String { "Add New Comment" }
 
     private var isAdmin: Bool { auth.user?.isAdmin ?? false }
 
@@ -83,31 +89,24 @@ struct ContentActionsModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            // The visible swipe buttons below are hidden from the
-            // accessibility tree (.accessibilityHidden) and are NOT the
-            // source of VoiceOver's custom actions — on this SDK,
-            // .accessibilityLabel applied to a .swipeActions button doesn't
-            // replace its auto-derived custom-action name, it adds a SECOND
-            // one, so VoiceOver announced both "Save" and "Save Forum Topic"
-            // back to back for the same action. The .accessibilityAction
-            // block further down is the single, explicit source of truth
-            // instead, giving full control with no duplicates.
-            .swipeActions(edge: .leading) {
+            // See `VoiceOverAwareSwipeActions`'s doc comment for why this
+            // has to be an all-or-nothing gate on VoiceOver, not per-button
+            // `.accessibilityHidden` (which was here before and did not
+            // actually stop "Save"/"Share" from being announced a second
+            // time, duplicating "Save Topic"/"Share Topic" below).
+            .voiceOverAwareSwipeActions {
                 Button {
                     toggleSave()
                 } label: {
                     Label(isSaved ? "Unsave" : "Save", systemImage: isSaved ? "bookmark.slash" : "bookmark")
                 }
                 .tint(.orange)
-                .accessibilityHidden(true)
-            }
-            .swipeActions(edge: .trailing) {
+            } trailing: {
                 if let url, let shareURL = URL(string: url) {
                     ShareLink(item: shareURL, subject: Text(title)) {
                         Label("Share", systemImage: "square.and.arrow.up")
                     }
                     .tint(.blue)
-                    .accessibilityHidden(true)
                 }
                 if supportsFollow && auth.isSignedIn {
                     Button {
@@ -116,7 +115,6 @@ struct ContentActionsModifier: ViewModifier {
                         Label(isFollowing ? "Unfollow" : "Follow", systemImage: isFollowing ? "bell.slash" : "bell")
                     }
                     .tint(.indigo)
-                    .accessibilityHidden(true)
                 }
             }
             // Previously gated to `!UIAccessibility.isVoiceOverRunning` to
@@ -140,6 +138,10 @@ struct ContentActionsModifier: ViewModifier {
                 if newCount > 0 {
                     Button { markAsRead() } label: {
                         Label("Mark as Read", systemImage: "checkmark.circle")
+                    }
+                    .accessibilityHidden(true)
+                    Button { jumpToFirstNewComment() } label: {
+                        Label("Jump to First New Comment", systemImage: "arrow.down.to.line")
                     }
                     .accessibilityHidden(true)
                 }
@@ -205,6 +207,9 @@ struct ContentActionsModifier: ViewModifier {
             }
             .modifier(ConditionalAccessibilityAction(isActive: newCount > 0, name: "Mark as Read") {
                 markAsRead()
+            })
+            .modifier(ConditionalAccessibilityAction(isActive: newCount > 0, name: "Jump to First New Comment") {
+                jumpToFirstNewComment()
             })
             .accessibilityAction(named: Text(isSaved ? "Unsave \(kind.saveActionNoun)" : "Save \(kind.saveActionNoun)")) {
                 toggleSave()
@@ -364,6 +369,19 @@ struct ContentActionsModifier: ViewModifier {
         UIAccessibility.post(notification: .announcement, argument: "Marked as read.")
     }
 
+    /// Opens the item and lands VoiceOver focus directly on the first new
+    /// reply/comment/review, instead of the top of the screen — every
+    /// detail screen already has its own "Jump to First New Comment" logic
+    /// (ForumTopicDetailView.jumpToFirstNewReply and its siblings); this
+    /// just tells DeepLinkRouter which content to open with that intent
+    /// already set, so it's ready the moment the screen finishes loading.
+    /// Opens as a sheet rather than a push — see pendingContentIntent's doc
+    /// comment on DeepLinkRouter for why.
+    private func jumpToFirstNewComment() {
+        deepLinkRouter.pendingContentIntent = .firstNewComment
+        deepLinkRouter.pendingContent = (kind: kind, id: id)
+    }
+
     /// ShareLink has no programmatic trigger, so the explicit VoiceOver
     /// Share action presents the same system share sheet directly via UIKit.
     private func presentShareSheet() {
@@ -436,6 +454,7 @@ struct ContentActionsModifier: ViewModifier {
 /// mirror that no longer reflects the real UI.
 enum ContentAction: Equatable {
     case markAsRead
+    case jumpToFirstNewComment
     case save
     case follow
     case addComment
@@ -458,7 +477,10 @@ extension ContentActionsModifier {
         isAdmin: Bool
     ) -> [ContentAction] {
         var actions: [ContentAction] = []
-        if hasNewCount { actions.append(.markAsRead) }
+        if hasNewCount {
+            actions.append(.markAsRead)
+            actions.append(.jumpToFirstNewComment)
+        }
         actions.append(.save)
         if supportsFollow && isSignedIn { actions.append(.follow) }
         actions.append(.addComment)
@@ -566,6 +588,63 @@ struct ConditionalAccessibilityAction: ViewModifier {
     }
 }
 
+/// Attaches `.swipeActions` only while VoiceOver is off.
+///
+/// `.accessibilityHidden(true)` on a swipe-action button does NOT stop it
+/// from becoming its own VoiceOver custom action: List's leading/trailing
+/// swipe actions are bridged straight to UIKit's row-action mechanism, and
+/// VoiceOver derives an action from each button's title there — entirely
+/// outside the SwiftUI accessibility tree `.accessibilityHidden` affects.
+/// That's why every row using this pattern kept announcing a bare "Save"/
+/// "Share"/"Cancel"/"Remove" back to back with its explicit, correctly-named
+/// `.accessibilityAction` (e.g. "Save Topic") — hiding the button never
+/// touched the actual source. The only real fix is to not attach
+/// `.swipeActions` at all while VoiceOver is running: a VoiceOver user's
+/// one-finger swipe is already claimed by element navigation, so the
+/// gesture these buttons exist for isn't reachable to them anyway, and
+/// every call site pairs each swipe button with an equivalent explicit
+/// `.accessibilityAction`. Found independently duplicated (and subtly
+/// wrong every time) in `ContentActionsModifier` and twice more in
+/// `ForYouView`'s Downloads rows — reason enough to centralize it here
+/// instead of hand-rolling the VoiceOver-status tracking a fourth time.
+struct VoiceOverAwareSwipeActions<Leading: View, Trailing: View>: ViewModifier {
+    @ViewBuilder let leading: () -> Leading
+    @ViewBuilder let trailing: () -> Trailing
+    @State private var isVoiceOverRunning = UIAccessibility.isVoiceOverRunning
+
+    func body(content: Content) -> some View {
+        Group {
+            if isVoiceOverRunning {
+                content
+            } else {
+                content
+                    .swipeActions(edge: .leading) { leading() }
+                    .swipeActions(edge: .trailing) { trailing() }
+            }
+        }
+        .onAppear { isVoiceOverRunning = UIAccessibility.isVoiceOverRunning }
+        .onReceive(NotificationCenter.default.publisher(for: UIAccessibility.voiceOverStatusDidChangeNotification)) { _ in
+            isVoiceOverRunning = UIAccessibility.isVoiceOverRunning
+        }
+    }
+}
+
+extension View {
+    /// Trailing-only convenience — most rows only need a trailing swipe set.
+    func voiceOverAwareSwipeActions<Trailing: View>(
+        @ViewBuilder trailing: @escaping () -> Trailing
+    ) -> some View {
+        modifier(VoiceOverAwareSwipeActions(leading: { EmptyView() }, trailing: trailing))
+    }
+
+    func voiceOverAwareSwipeActions<Leading: View, Trailing: View>(
+        @ViewBuilder leading: @escaping () -> Leading,
+        @ViewBuilder trailing: @escaping () -> Trailing
+    ) -> some View {
+        modifier(VoiceOverAwareSwipeActions(leading: leading, trailing: trailing))
+    }
+}
+
 private struct CardDensityPaddingModifier: ViewModifier {
     @AppStorage("appearance.cardDensity") private var cardDensity: CardDensity = .comfortable
     func body(content: Content) -> some View {
@@ -617,6 +696,18 @@ struct ContentDetailActions: View {
     let lastActivityAt: Date?
     let url: String?
     var supportsFollow: Bool = true
+    /// Add Comment / Write Review — the same compose flow every detail
+    /// screen already had, previously sitting in the top toolbar and
+    /// hidden entirely until signed in. Relocated into this bottom bar to
+    /// match Forums, whose Reply button has always lived here rather than
+    /// the toolbar, and switched from hidden-when-signed-out to always
+    /// shown but gated on tap — matching the same shift ComposeTopicView
+    /// and Home's Add menu already went through. Reported directly: "Add
+    /// a New Comment" looked entirely missing from the topic detail page,
+    /// which turned out to be true for every OTHER content kind's detail
+    /// screen too (it lived in the toolbar, not here) and was additionally
+    /// invisible whenever signed out.
+    var onAddComment: () -> Void
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -625,9 +716,32 @@ struct ContentDetailActions: View {
     @State private var isFollowing = false
     @State private var showBrowser = false
 
+    private var addCommentVisualLabel: String { kind == .appListing ? "Review" : "Comment" }
+    private var addCommentAccessibilityLabel: String {
+        kind == .appListing ? String(localized: "Write review") : String(localized: "Add comment")
+    }
+
+    private func requestAddComment() {
+        guard auth.isSignedIn else {
+            toast.warning(kind == .appListing
+                ? String(localized: "Sign in to write a review.")
+                : String(localized: "Sign in to add a comment."))
+            return
+        }
+        onAddComment()
+    }
+
+    private func requestFollowToggle() {
+        guard auth.isSignedIn else {
+            toast.warning(String(localized: "Sign in to follow \(kind.displayName.lowercased())."))
+            return
+        }
+        Task { await toggleFollow() }
+    }
+
     var body: some View {
         // Order matches ContentActionsModifier's canonical action order:
-        // routine self-state actions first (Save, then Follow), Share/Browser last.
+        // Save, Follow, Comment, then Share/Browser last.
         HStack(spacing: 0) {
             DetailActionButton(
                 systemImage: isSaved ? "bookmark.fill" : "bookmark",
@@ -635,13 +749,19 @@ struct ContentDetailActions: View {
                 accessibilityLabel: isSaved ? String(localized: "Unsave \(kind.displayName)") : String(localized: "Save \(kind.displayName)")
             ) { toggleSave() }
 
-            if supportsFollow && auth.isSignedIn {
+            if supportsFollow {
                 DetailActionButton(
                     systemImage: isFollowing ? "bell.fill" : "bell",
                     visualLabel: isFollowing ? "Unfollow" : "Follow",
                     accessibilityLabel: isFollowing ? String(localized: "Unfollow \(kind.displayName)") : String(localized: "Follow \(kind.displayName)")
-                ) { Task { await toggleFollow() } }
+                ) { requestFollowToggle() }
             }
+
+            DetailActionButton(
+                systemImage: "bubble.left",
+                visualLabel: addCommentVisualLabel,
+                accessibilityLabel: addCommentAccessibilityLabel
+            ) { requestAddComment() }
 
             if let url, let shareURL = URL(string: url) {
                 ShareLink(item: shareURL, subject: Text(title)) {

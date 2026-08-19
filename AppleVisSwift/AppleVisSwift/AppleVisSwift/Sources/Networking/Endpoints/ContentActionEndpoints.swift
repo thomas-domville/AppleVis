@@ -122,7 +122,7 @@ struct UserEndpoints {
             recipient: [.init(targetId: numericUid)]
         )
         let _: EmptyResponse? = try? await client.post(
-            "contact_message?_format=json", base: .root, body: body, headers: ["X-CSRF-Token": csrfToken]
+            "contact_message", base: .root, query: ["_format": "json"], body: body, headers: ["X-CSRF-Token": csrfToken]
         )
     }
 

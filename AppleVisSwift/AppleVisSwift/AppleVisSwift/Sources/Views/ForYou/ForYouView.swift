@@ -146,13 +146,16 @@ struct DownloadsView: View {
                                 .accessibilityAction(named: Text("Cancel Download")) {
                                     downloads.cancelDownload(id)
                                 }
-                                .swipeActions(edge: .trailing) {
+                                // .accessibilityHidden(true) on this button did not
+                                // stop it from also being announced as a bare "Cancel"
+                                // custom action alongside "Cancel Download" above — see
+                                // VoiceOverAwareSwipeActions's doc comment.
+                                .voiceOverAwareSwipeActions {
                                     Button(role: .destructive) {
                                         downloads.cancelDownload(id)
                                     } label: {
                                         Label("Cancel", systemImage: "xmark.circle")
                                     }
-                                    .accessibilityHidden(true)
                                 }
                             }
                         }
@@ -274,13 +277,15 @@ struct DownloadsView: View {
         .accessibilityAction(named: Text("Remove Download")) {
             downloads.delete(meta.id)
         }
-        .swipeActions {
-            // Matches the VoiceOver action ("Remove Download") and the bulk
-            // "Remove Downloads" button — a Voice Control user who hears one
-            // name from VoiceOver but sees "Delete" on the swipe button
-            // itself has no way to know they're the same action.
+        // .accessibilityHidden(true) on this button did not stop it from
+        // also being announced as a bare "Remove" custom action alongside
+        // "Remove Download" above — see VoiceOverAwareSwipeActions's doc
+        // comment. Matches the VoiceOver action ("Remove Download") and the
+        // bulk "Remove Downloads" button — a Voice Control user who hears
+        // one name from VoiceOver but sees "Delete" on the swipe button
+        // itself has no way to know they're the same action.
+        .voiceOverAwareSwipeActions {
             Button("Remove", role: .destructive) { downloads.delete(meta.id) }
-                .accessibilityHidden(true)
         }
     }
 
@@ -579,6 +584,17 @@ private struct SavedPodcastEpisodeCard: View {
         player.queue.contains { $0.id == episode.id }
     }
 
+    /// Drupal's `duration` is hardcoded to 0, never nil (see
+    /// `PodcastAudioMetadataProbe`), so `episode.duration` alone can't be
+    /// trusted for display — falls back to whatever the browse row/detail
+    /// page may have already resolved and cached, read-only: this card
+    /// doesn't trigger its own live probe, since by the time an episode is
+    /// saved it's already been encountered on one of those primary paths.
+    private var displayDuration: TimeInterval? {
+        if let duration = episode.duration, duration > 0 { return duration }
+        return PersistenceStore.shared.cachedAudioMetadata(episodeId: episode.id)?.duration
+    }
+
     /// The play/pause button and its matching VoiceOver action both showed
     /// a "Pause" affordance while this episode was actively playing, but
     /// both always called `load()` — its own guard only resumes if
@@ -608,7 +624,7 @@ private struct SavedPodcastEpisodeCard: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(episode.showTitle).font(.caption).foregroundStyle(.secondary)
                         Text(episode.title).font(.body).lineLimit(2)
-                        if let duration = episode.duration {
+                        if let duration = displayDuration {
                             Text(PodcastDuration.abbreviated(duration))
                                 .font(.caption2).foregroundStyle(.secondary)
                         }
