@@ -152,19 +152,30 @@ Include a Settings search field in production.
 
 Built-in notification sounds from original ZIP:
 
-- Apple Crunch.wav
-- Mouse Squeak.wav
+- apple_crunch.wav
+- mouse_squeak.wav
 
-Generated placeholder app sounds included in this project:
+App sounds included in this project:
 
-- tab-change.wav
-- open-section.wav
-- picker-change.wav
-- save-confirm.wav
-- download-complete.wav
-- error-soft.wav
-- podcast-play.wav
-- podcast-pause.wav
+- article_open.wav
+- bookmark_saved.wav
+- download_complete.wav
+- error.wav
+- golden_retriever_bark.wav
+- loading_start.wav
+- offline.wav
+- picker_tick.wav
+- podcast_pause.wav
+- podcast_play.wav
+- refresh.wav
+- reply.wav
+- screen_close.wav
+- search_complete.wav
+- success.wav
+- sync_complete.wav
+- tab_change.wav
+- tip_popup.wav
+- welcome.wav
 
 All app sounds must be optional. Default on: notification, save confirmation, download complete, and podcast actions. Default off: tab switching, picker changes, opening screens, and list refresh sounds.
 

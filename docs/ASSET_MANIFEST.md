@@ -1,39 +1,60 @@
 # Asset Manifest
 
-## Original user-provided notification sounds
+Asset filenames should use lowercase `snake_case` with no spaces. User-facing labels can stay title case in Swift; bundled file names should stay predictable for Xcode, push payloads, and code review.
 
-- assets/sounds/Apple Crunch.wav
-- assets/sounds/Mouse Squeak.wav
+## Runtime Sounds
 
-These came from the original uploaded AppleVis.zip.
+Bundled in `AppleVis/Sources/Resources/Sounds/` and mirrored in `assets/sounds/`.
 
-## Generated placeholder app sounds
+- `apple_crunch.wav`
+- `article_open.wav`
+- `bookmark_saved.wav`
+- `download_complete.wav`
+- `error.wav`
+- `golden_retriever_bark.wav`
+- `loading_start.wav`
+- `mouse_squeak.wav`
+- `offline.wav`
+- `picker_tick.wav`
+- `podcast_pause.wav`
+- `podcast_play.wav`
+- `refresh.wav`
+- `reply.wav`
+- `screen_close.wav`
+- `search_complete.wav`
+- `success.wav`
+- `sync_complete.wav`
+- `tab_change.wav`
+- `tip_popup.wav`
+- `welcome.wav`
 
-- assets/sounds/tab-change.wav
-- assets/sounds/open-section.wav
-- assets/sounds/picker-change.wav
-- assets/sounds/save-confirm.wav
-- assets/sounds/download-complete.wav
-- assets/sounds/error-soft.wav
-- assets/sounds/podcast-play.wav
-- assets/sounds/podcast-pause.wav
+The app loads these through `SoundPlayer` and `NotificationSound.pushSoundFile`.
 
-These were generated as simple placeholder tones for prototyping. Replace or review before App Store release.
+## Icons
 
-## Generated placeholder icons/images
+Reference copies live in `assets/icons/`. The app icon catalog lives in `AppleVis/Assets.xcassets/`.
 
-- assets/icons/app-icon.png
-- assets/images/splash.png
-- assets/images/home-card.png
-- assets/images/forums-card.png
-- assets/images/podcasts-card.png
-- assets/images/apps-card.png
-- assets/images/resources-card.png
+- `app-icon.png`
+- `app-icon-dark.png`
+- `app-icon-tinted.png`
 
-These are placeholder graphics for development.
+## Images
 
-## Generated placeholder animation
+Reference images live in `assets/images/`.
 
-- assets/animations/save-pulse.json
+- `applevis-logo.png`
+- `applevis-logo-2026-black.png`
+- `apps-card.png`
+- `forums-card.png`
+- `home-card.png`
+- `podcasts-card.png`
+- `resources-card.png`
+- `splash.png`
 
-Simple Lottie placeholder animation for save confirmation.
+## Animation
+
+- `assets/animations/save-pulse.json`
+
+## Original Archive
+
+The `archive/original-assets/` folder preserves historical source material as received and is not the app's runtime asset source.

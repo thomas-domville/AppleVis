@@ -1,0 +1,66 @@
+Hey,
+
+Hope you're doing well! We just finished rebuilding the AppleVis app natively in Swift (it used to be React Native/Expo), and push notifications are one of the last pieces we need your help wiring up on the Drupal side. Wanted to lay out exactly what changed and what we need from you.
+
+WHAT CHANGED
+
+The app now talks directly to Apple's push service (APNs) and registers a raw Apple device token — not an Expo token anymore. So if the current send logic is going out through Expo's relay (exp.host), that path is dead and needs to be swapped for sending straight to APNs.
+
+WHAT WE NEED
+
+1. Guests should be able to get notifications too, not just signed-in users.
+
+We want general/community notifications (new forum topics, new podcast episodes, announcements, etc.) to go to anyone who's allowed push, whether they're signed in or not. Only the "about me" stuff (someone replied to my post, someone mentioned me, activity on something I follow) should require being signed in. So push registration probably needs to live independently of the user account rather than hanging off the user entity — however you want to structure that on your end is up to you.
+
+2. Signing out shouldn't kill the device's registration.
+
+If someone signs out, they should stop getting the personal notifications, but still get the general ones. So unlinking on sign-out, not wiping the token entirely.
+
+3. Notification categories, with who needs to be signed in and default on/off:
+
+Signed-in only:
+- forumReply — someone replied to my topic (default off)
+- mention — someone @mentioned me (default off)
+- followedTopic — activity on something I follow (default off)
+
+Anyone:
+- newTopic — new forum topic posted (default ON)
+- newEpisode — new podcast episode (default ON)
+- announcement — AppleVis announcements (default ON)
+- appUpdate — app added/updated in the App Directory (default off)
+- newResource — new guide/tutorial (default off)
+- newComment — any comment on any content type, forum/podcast/app/blog/guide, regardless of follow status (default off — this one could get noisy so we want it opt-in)
+
+Ideally these get filtered server-side at send time based on what each device has opted into, rather than sending everything and having the app sort it out.
+
+4. Sandbox vs. production tracking per device.
+
+Dev/TestFlight builds and App Store builds hit different APNs endpoints (sandbox vs. production), so whatever registers the device needs to note which environment that token belongs to. Otherwise sends just silently fail for the wrong bucket.
+
+5. Payload shape the app expects.
+
+Here's what the app parses out of a push:
+
+{
+  "aps": {
+    "alert": { "title": "New reply", "body": "JaneD replied to your topic" },
+    "sound": "Mouse Squeak.wav",
+    "badge": 1
+  },
+  "category": "forumReply",
+  "kind": "forumTopic",
+  "id": "<content UUID>"
+}
+
+- category: one of the machine names listed above
+- kind: one of forumTopic, podcastEpisode, appListing, resource, blogPost, bugReport
+- id: UUID of the content to open
+- sound: whatever file the user picked — Mouse Squeak.wav, Apple Crunch.wav, Golden Retriever Bark.wav, or default
+
+A FEW QUESTIONS FOR YOU
+
+- Is the current send code hitting Expo's relay, or already talking to APNs directly?
+- Do we have an APNs Auth Key (.p8) set up for our bundle ID yet, or does that need to happen first?
+- Any concerns on your end with the guest-registration piece in #1?
+
+Let me know your thoughts whenever you get a chance — happy to hop on a call if it's easier to talk through than type through. Thanks for helping get this across the finish line!
