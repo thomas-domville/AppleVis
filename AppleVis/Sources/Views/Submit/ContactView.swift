@@ -85,6 +85,7 @@ struct ContactView: View {
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
     @AccessibilityFocusState private var isStepFocused: Bool
+    @AccessibilityFocusState private var isErrorFocused: Bool
 
     /// Lets callers outside RN's own flow (About's "Report a Bug"/"Send
     /// Feedback", which RN just opened in Safari) preselect a type — the

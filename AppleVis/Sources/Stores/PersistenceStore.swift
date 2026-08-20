@@ -107,7 +107,7 @@ final class PersistenceStore {
 
     func isTopicSeen(id: String) -> Bool {
         guard isReadHistoryTrackingEnabled else { return false }
-        seenTopicIds().contains(id)
+        return seenTopicIds().contains(id)
     }
 
     func markTopicSeen(id: String) {
@@ -185,7 +185,7 @@ final class PersistenceStore {
 
     func allItemVisits() -> [String: ItemVisit] {
         guard isReadHistoryTrackingEnabled else { return [:] }
-        load(key: itemVisitsKey) ?? [:]
+        return load(key: itemVisitsKey) ?? [:]
     }
 
     func stampItemVisit(id: String, commentCount: Int) {

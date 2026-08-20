@@ -100,7 +100,7 @@ struct AppDetailView: View {
                     }
 
                     if let meta = itunesMetadata {
-                        appStoreInfoSection(meta)
+                        appStoreInfoSection(detail, meta)
                     }
 
                     if !developerApps.isEmpty {
@@ -301,7 +301,7 @@ struct AppDetailView: View {
         return "Current App Store title. Originally listed on AppleVis as \(appleVisTitle)."
     }
 
-    private func appStoreInfoSection(_ meta: ItunesMetadata) -> some View {
+    private func appStoreInfoSection(_ detail: AppDetail, _ meta: ItunesMetadata) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeading("App Store Info")
             VStack(spacing: 0) {
@@ -633,7 +633,6 @@ struct AppDetailView: View {
             ForEach(Array(detail.reviews.enumerated()), id: \.element.id) { index, review in
                 AppReviewRow(
                     review: review, index: index + 1, total: detail.reviews.count,
-                    parentTitle: detail.name,
                     onDelete: {
                         self.detail?.reviews.removeAll { $0.id == review.id }
                     },
@@ -651,6 +650,7 @@ struct AppDetailView: View {
                         }
                         quotedReview = review
                     },
+                    parentTitle: detail.name,
                     focusBinding: $focusedReviewId
                 )
                 .id(review.id)

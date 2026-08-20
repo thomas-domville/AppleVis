@@ -23,9 +23,9 @@ final class AuthStore: ObservableObject {
     private let onboardedKey = "applevis.onboarded"
 
     init() {
-        AuthStore.current = self
         isOnboarded = UserDefaults.standard.bool(forKey: "applevis.onboarded")
         user = Self.loadFromKeychain()
+        AuthStore.current = self
     }
 
     func signIn(username: String, password: String) async {

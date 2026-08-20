@@ -59,7 +59,7 @@ nonisolated struct PodcastComment: Identifiable, Codable, Sendable {
 /// different output for the same value across screens — "2:15:00" in the
 /// player, "2h 15m" in the queue, "2 hr 15 min" in the browse list
 /// (PODCAST-10).
-enum PodcastDuration {
+nonisolated enum PodcastDuration {
     /// "1:23:45" or "23:45" — used for elapsed/remaining time in the player,
     /// scrubber, and chapter list, where seconds-level precision matters.
     static func colon(_ seconds: TimeInterval) -> String {
