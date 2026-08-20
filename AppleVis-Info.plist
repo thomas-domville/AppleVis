@@ -2,18 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>audio</string>
-		<string>processing</string>
-	</array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>com.applevis.autodownload</string>
-	</array>
-	<key>NSUserActivityTypes</key>
-	<array>
-		<string>com.applevis.viewing</string>
 	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
@@ -25,6 +16,15 @@
 				<string>applevis</string>
 			</array>
 		</dict>
+	</array>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>com.applevis.viewing</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>processing</string>
 	</array>
 </dict>
 </plist>

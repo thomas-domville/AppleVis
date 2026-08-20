@@ -44,7 +44,7 @@ final class DownloadManager: NSObject, ObservableObject {
     /// (not just lazily on first UI access) so the session reattaches
     /// immediately even on a silent background relaunch.
     private lazy var session: URLSession = {
-        let config = URLSessionConfiguration.background(withIdentifier: "com.applevis.app.podcastDownloads")
+        let config = URLSessionConfiguration.background(withIdentifier: "com.applevis.AppleVisSwift.podcastDownloads")
         config.sessionSendsLaunchEvents = true
         return URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }()

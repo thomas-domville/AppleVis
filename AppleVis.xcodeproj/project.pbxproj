@@ -63,29 +63,21 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4BF629389B6F2B489F6526E9 /* AppleVisUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = AppleVisUITests;
 			sourceTree = "<group>";
 		};
 		8633CF56CD4251223944B6E7 /* AppleVisTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = AppleVisTests;
 			sourceTree = "<group>";
 		};
-		B7D19609EAB36B32278CD870 /* ShareExtension */ = {
+		B7D19609EAB36B32278CD870 /* AppleVisShareExtension */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = AppleVisShareExtension;
 			sourceTree = "<group>";
 		};
 		E92FCDC830085E49006E2C72 /* AppleVis */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = AppleVis;
 			sourceTree = "<group>";
 		};
@@ -137,7 +129,7 @@
 			isa = PBXGroup;
 			children = (
 				E92FCDC830085E49006E2C72 /* AppleVis */,
-				B7D19609EAB36B32278CD870 /* ShareExtension */,
+				B7D19609EAB36B32278CD870 /* AppleVisShareExtension */,
 				9B70515002325C021087C8D7 /* AppleVisShareExtension-Info.plist */,
 				4D4A25F764097BE700D35F23 /* AppleVisShareExtension.entitlements */,
 				E92FCDC730085E49006E2C72 /* Products */,
@@ -182,7 +174,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				B7D19609EAB36B32278CD870 /* ShareExtension */,
+				B7D19609EAB36B32278CD870 /* AppleVisShareExtension */,
 			);
 			name = AppleVisShareExtension;
 			productName = AppleVisShareExtension;
@@ -277,13 +269,13 @@
 							com.apple.ApplicationGroups.iOS = {
 								enabled = 1;
 							};
+							com.apple.AssociatedDomains = {
+								enabled = 1;
+							};
 							com.apple.Push = {
 								enabled = 1;
 							};
 							com.apple.iCloud = {
-								enabled = 1;
-							};
-							com.apple.AssociatedDomains = {
 								enabled = 1;
 							};
 						};
@@ -443,7 +435,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = AppleVisShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = 97YM8TUSX8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "AppleVisShareExtension-Info.plist";
@@ -454,7 +446,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 2026.0.10;
-				PRODUCT_BUNDLE_IDENTIFIER = com.applevis.app.ShareExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = com.applevis.AppleVisSwift.ShareExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
@@ -529,7 +521,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = AppleVisShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = 97YM8TUSX8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "AppleVisShareExtension-Info.plist";
@@ -540,7 +532,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 2026.0.10;
-				PRODUCT_BUNDLE_IDENTIFIER = com.applevis.app.ShareExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = com.applevis.AppleVisSwift.ShareExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -677,7 +669,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = AppleVis.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = 97YM8TUSX8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -693,7 +685,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 2026.0.10;
-				PRODUCT_BUNDLE_IDENTIFIER = com.applevis.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.applevis.AppleVisSwift;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -712,7 +704,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = AppleVis.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = 97YM8TUSX8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -728,7 +720,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 2026.0.10;
-				PRODUCT_BUNDLE_IDENTIFIER = com.applevis.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.applevis.AppleVisSwift;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
