@@ -104,7 +104,6 @@ struct AppBrowseView: View {
             Section("Platform") {
                 platformPicker
             }
-                // (APPS-02) — the master spec's Saved Model explicitly
             ForEach(groupedCategories, id: \.letter) { group in
                 Section(group.letter) {
                     ForEach(group.categories) { category in

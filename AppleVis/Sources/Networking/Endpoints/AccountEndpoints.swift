@@ -5,15 +5,18 @@ import Foundation
 struct AccountEndpoints {
     let client: APIClient
 
+    // No explicit CodingKeys here — APIClient's shared decoder already has
+    // .convertFromSnakeCase, which converts "current_user" -> "currentUser"
+    // before key matching. A manual `case currentUser = "current_user"`
+    // then compares that already-converted key against its own un-converted
+    // raw value and never matches, so decoding this response always threw
+    // keyNotFound (100% sign-in failure, confirmed by live-testing against
+    // the real API — the raw HTTP response was well-formed and correct).
     private struct SignInResponse: Decodable {
         let currentUser: CurrentUser
         let csrfToken: String
         let logoutToken: String
         struct CurrentUser: Decodable { let uid: String; let name: String }
-
-        enum CodingKeys: String, CodingKey {
-            case currentUser = "current_user", csrfToken = "csrf_token", logoutToken = "logout_token"
-        }
     }
 
     /// Signs in via Drupal's REST Simple Auth login endpoint, then resolves the
