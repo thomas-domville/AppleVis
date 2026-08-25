@@ -15,9 +15,11 @@ struct DiscoverView: View {
     @State private var lastAnnouncedResultCount: Int?
     @State private var lastAnnouncedMessage: String?
     @FocusState private var isSearchFieldFocused: Bool
+    @AccessibilityFocusState private var isHubFocused: Bool
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var keyCommands: KeyCommandRouter
     @Environment(\.openURL) private var openURL
 
     private static let bmeAppStoreURL = URL(string: "https://apps.apple.com/us/app/be-my-eyes/id905177575")!
@@ -71,6 +73,7 @@ struct DiscoverView: View {
                         Image(systemName: "person.circle")
                     }
                     .accessibilityLabel(String(localized: "Profile and Settings"))
+                    .accessibilityHint(String(localized: "Sign in, manage your account, and access app settings."))
                 }
             }
             .searchable(text: $searchText, prompt: "Search AppleVis")
@@ -91,6 +94,30 @@ struct DiscoverView: View {
                     isSearchFieldFocused = true
                 }
             }
+            // TabView keeps every tab's content alive, so unlike a pushed
+            // screen this view's own .task only ever runs once — switching
+            // back to this tab later doesn't recreate it. Watching
+            // selectedTab directly is what actually catches "the user just
+            // switched to Discover," matching the announcement
+            // ContentView.swift already posts on the same change, so a
+            // VoiceOver user's cursor lands somewhere real instead of
+            // wherever it happened to be on the previous tab. Skipped
+            // while actively searching so it doesn't yank focus away
+            // from typed results.
+            .onChange(of: keyCommands.selectedTab) { _, newTab in
+                guard newTab == 1 else {
+                    // .searchFocused is a two-way binding into .searchable's
+                    // own "was search active" state restoration — leaving
+                    // this still true while switching away means returning
+                    // to Discover later can silently re-raise the keyboard
+                    // with nothing here having asked for it, even with
+                    // auto-focus off. Reported directly.
+                    isSearchFieldFocused = false
+                    return
+                }
+                guard searchText.trimmingCharacters(in: .whitespaces).count < 2 else { return }
+                Task { await retryAccessibilityFocus(into: $isHubFocused) }
+            }
             .navigationDestination(for: ForumTopic.self) { topic in
                 ForumTopicDetailView(topicId: topic.id)
             }
@@ -98,7 +125,20 @@ struct DiscoverView: View {
                 EpisodeDetailView(episodeId: episode.id)
             }
             .navigationDestination(for: AppListing.self) { app in
-                AppDetailView(appId: app.id)
+                AppDetailView(appId: app.id, platform: app.platform)
+            }
+            // AppBrowseView (pushed above, like every other hub card, via
+            // the old-style NavigationLink(destination:) in HubCard) used
+            // to declare this on itself instead. A navigationDestination(for:)
+            // living on a screen that was itself reached that way doesn't
+            // reliably wire up on the first push — the tap silently did
+            // nothing, and only the back button revealed AppCategoryView
+            // had actually been pushed underneath. Every other section
+            // registers its destinations up here for the same reason.
+            // Reported directly: double-tapping a category (e.g. "Books")
+            // in the App Directory appeared to do nothing.
+            .navigationDestination(for: AppCategoryDestination.self) { dest in
+                AppCategoryView(destination: dest)
             }
             .navigationDestination(for: Resource.self) { resource in
                 ResourceDetailView(resourceId: resource.id)
@@ -195,6 +235,19 @@ struct DiscoverView: View {
     private var hubGrid: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                // Matches the setup wizard/Welcome Tour convention of a
+                // heading announcing the screen name — the tab-switch focus
+                // move introduced earlier landed on the first hub section
+                // instead, which never actually says "Discover." Invisible
+                // to sighted users so it doesn't duplicate the nav bar
+                // title visually. Reported directly.
+                Color.clear
+                    .frame(width: 0, height: 0)
+                    .accessibilityElement()
+                    .accessibilityLabel("Discover")
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($isHubFocused)
+
                 hubSection(title: "App Directory", subtitle: "Browse accessible apps by platform and category.", accent: .green) {
                     HubCard(title: "Apps", subtitle: "Apps by platform and category", systemImage: "square.grid.2x2", color: .green) {
                         AppBrowseView()
@@ -219,6 +272,11 @@ struct DiscoverView: View {
                 hubSection(title: "Bug Tracker", subtitle: "Browse active accessibility bugs reported by the AppleVis community.", accent: .brown) {
                     HubCard(title: "Bug Reports", subtitle: "Known accessibility bugs", systemImage: "ant", color: .brown) {
                         BugBrowseView()
+                    }
+                }
+                hubSection(title: "Stay Updated", subtitle: "Subscribe to AppleVis updates outside the app.", accent: .cyan) {
+                    HubCard(title: "RSS Feeds", subtitle: "Copy or share feed links", systemImage: "dot.radiowaves.left.and.right", color: .cyan) {
+                        RSSFeedsView()
                     }
                 }
 

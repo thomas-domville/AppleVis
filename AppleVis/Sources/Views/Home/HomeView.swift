@@ -16,6 +16,7 @@ enum HomeFeedFilter: String, CaseIterable, Identifiable {
 enum HomeFocusTarget: Hashable {
     case summary
     case greeting
+    case heading
     case item(String)
 }
 
@@ -50,7 +51,12 @@ struct HomeView: View {
     @ObservedObject private var networkStatus = NetworkStatusStore.shared
     @State private var hasAnnouncedWelcome = false
     @State private var showCustomizeHome = false
-    @State private var homeFeedFilter: HomeFeedFilter = .all
+    // @AppStorage, not @State — plain @State reset to .all on every fresh
+    // launch (TabView already keeps it alive across tab switches within a
+    // session; the actual gap was surviving a full relaunch). Reported
+    // directly: selecting "New" and relaunching the app always landed back
+    // on "All" instead of remembering the choice.
+    @AppStorage("home.feedFilter") private var homeFeedFilter: HomeFeedFilter = .all
     @State private var notificationHistory: [NotificationHistoryItem] = []
     @State private var showComposeTopic = false
     @State private var showSubmitApp = false
@@ -148,13 +154,42 @@ struct HomeView: View {
                             Image(systemName: "person.circle")
                         }
                         .accessibilityLabel(String(localized: "Profile and Settings"))
+                        .accessibilityHint(String(localized: "Sign in, manage your account, and access app settings."))
                     }
                 }
             }
             .refreshable {
+                // announceWelcomeIfNeeded() only ever fires once per
+                // session (see hasAnnouncedWelcome), so a manual
+                // pull-to-refresh otherwise gets nothing but a non-speech
+                // chime — a VoiceOver user has no way to tell the refresh
+                // even happened, let alone whether it found anything.
+                // Reported directly: users couldn't tell a refresh that
+                // found nothing new from one that silently failed.
+                let previousLoadedAt = vm.lastLoadedAt
                 await vm.load()
                 notificationHistory = PersistenceStore.shared.notificationHistory()
                 SoundPlayer.shared.play(.refresh)
+
+                // lastLoadedAt only advances on a genuinely successful
+                // load (see HomeViewModel.load()), so an unchanged value
+                // here means the refresh failed outright — the
+                // OfflineBanner/SourceErrorBanner already covers that
+                // case, and announcing "no new activity" over a failure
+                // would be actively misleading.
+                guard vm.lastLoadedAt != previousLoadedAt else { return }
+
+                // Deliberately not gated on homeStartupBehavior == .quiet
+                // like announceWelcomeIfNeeded() — that preference is
+                // about suppressing the unsolicited on-launch greeting,
+                // not about withholding feedback from an action the user
+                // just explicitly took.
+                if !vm.newItems.isEmpty && !vm.isNewActivityDismissed {
+                    UIAccessibility.post(notification: .announcement, argument: vm.newActivitySummary)
+                    Task { await retryAccessibilityFocus(.summary, into: $focusTarget) }
+                } else {
+                    UIAccessibility.post(notification: .announcement, argument: String(localized: "No new activity since your last visit."))
+                }
             }
             .onReceive(keyCommands.refreshRequested) { Task { await vm.load() } }
             // Returning to the foreground while on some other tab
@@ -190,7 +225,7 @@ struct HomeView: View {
                 EpisodeDetailView(episodeId: episode.id)
             }
             .navigationDestination(for: AppListing.self) { app in
-                AppDetailView(appId: app.id)
+                AppDetailView(appId: app.id, platform: app.platform)
             }
             .navigationDestination(for: Resource.self) { resource in
                 ResourceDetailView(resourceId: resource.id)
@@ -238,13 +273,15 @@ struct HomeView: View {
         // new activity to summarize) instead of leaving it whereever it was
         // before navigation/launch — a short delay because setting focus
         // before the List has actually laid out the new content is a common
-        // way for it to silently fail.
-        let target: HomeFocusTarget? = !vm.newItems.isEmpty && !vm.isNewActivityDismissed
+        // way for it to silently fail. Previously fell through to no focus
+        // move at all for a signed-out user with no name to greet — the
+        // "Home" screen heading is always a valid fallback, so landing here
+        // should never be silent. Reported directly: Home had no heading
+        // announcing the screen name the way every other screen does.
+        let target: HomeFocusTarget = !vm.newItems.isEmpty && !vm.isNewActivityDismissed
             ? .summary
-            : (auth.user?.name.isEmpty == false ? .greeting : nil)
-        if let target {
-            Task { await retryAccessibilityFocus(target, into: $focusTarget) }
-        }
+            : (auth.user?.name.isEmpty == false ? .greeting : .heading)
+        Task { await retryAccessibilityFocus(target, into: $focusTarget) }
     }
 
     private var greetingCard: some View {
@@ -268,7 +305,7 @@ struct HomeView: View {
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                .background(preferences.colors.card, in: RoundedRectangle(cornerRadius: 12))
                 .overlay(alignment: .leading) {
                     Rectangle()
                         .fill(Greeting.accentColor())
@@ -309,6 +346,22 @@ struct HomeView: View {
     private var feedList: some View {
         ScrollViewReader { proxy in
             List {
+                // Matches the setup wizard/Welcome Tour convention of a
+                // heading announcing the screen name — Home previously had
+                // only `.navigationTitle("Home")`, which VoiceOver doesn't
+                // reliably announce on tab arrival (same reason every
+                // pushed detail screen needs its own explicit focus-to-
+                // heading logic). Invisible to sighted users so it doesn't
+                // duplicate the nav bar title visually. Reported directly.
+                Color.clear
+                    .frame(width: 0, height: 0)
+                    .accessibilityElement()
+                    .accessibilityLabel("Home")
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($focusTarget, equals: .heading)
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+
                 greetingCard
 
                 if !notificationHistory.isEmpty {
@@ -324,7 +377,7 @@ struct HomeView: View {
                                 .font(.subheadline).foregroundStyle(.secondary)
                         }
                         .padding(12)
-                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                        .background(preferences.colors.card, in: RoundedRectangle(cornerRadius: 10))
                     }
                     .accessibilityLabel(String(localized: "Notifications, \(notificationHistory.count) recent"))
                     .accessibilityHint(String(localized: "Double-tap to view your recent notifications."))
@@ -402,6 +455,12 @@ struct HomeView: View {
                             .foregroundStyle(.secondary)
                             .textCase(.uppercase)
                             .accessibilityAddTraits(.isHeader)
+                            // .textCase(.uppercase) only transforms the visual
+                            // glyphs — on some iOS/VoiceOver versions an
+                            // all-caps-rendered string gets spelled out
+                            // letter-by-letter instead of read as a word.
+                            // An explicit label bypasses the transformed text.
+                            .accessibilityLabel(homeFeedFilter == .new ? "New Activity" : "Latest Activity")
                             .accessibilityAction(named: Text("Feed summary")) {
                                 UIAccessibility.post(notification: .announcement, argument: feedSummary)
                             }
@@ -447,8 +506,17 @@ struct HomeView: View {
             // the New/All picker and the "N new activity items" banner, so
             // it's just a different way to move through the same set.
             .accessibilityRotor("New Items") {
+                // Previously just the bare title — gave no way to tell a
+                // brand-new item from one with a handful of new replies
+                // without leaving the rotor to check. Mirrors the same
+                // newCount-vs-isNew split each card's own label already
+                // uses. Reported directly.
                 ForEach(vm.newItems) { item in
-                    AccessibilityRotorEntry(item.title, id: item.id)
+                    let newCount = vm.newReplyCount(for: item)
+                    let label = newCount > 0
+                        ? "\(item.title), \(newCount) new comment\(newCount == 1 ? "" : "s")"
+                        : "\(item.title), new"
+                    AccessibilityRotorEntry(label, id: item.id)
                 }
             }
             // Home is the one place in the app that genuinely interleaves
@@ -518,6 +586,7 @@ struct CustomizeHomeView: View {
                         .accessibilityHint(String(localized: "Hides non-Apple forum categories from Home."))
                 }
             }
+            .themedList(preferences.colors)
             .navigationTitle("Customize Home")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -538,11 +607,12 @@ struct CustomizeHomeView: View {
 private struct SourceErrorBanner: View {
     let failedSources: [String]
     let onRetry: () -> Void
+    @EnvironmentObject private var preferences: PreferencesStore
 
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle")
-                .foregroundStyle(.orange)
+                .foregroundStyle(preferences.colors.warning)
                 .accessibilityHidden(true)
             Text("Some sources could not be loaded: \(failedSources.joined(separator: ", ")).")
                 .font(.footnote)
@@ -554,7 +624,7 @@ private struct SourceErrorBanner: View {
                 .controlSize(.small)
         }
         .padding(12)
-        .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+        .background(preferences.colors.warning.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(String(localized: "Some sources could not be loaded: \(failedSources.joined(separator: ", "))."))
         // .combine merges the nested "Retry Now" Button into this single
@@ -624,6 +694,7 @@ private struct WhatsNewCard: View {
 /// announcements) are shown but not tappable.
 struct NotificationHistoryView: View {
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var items: [NotificationHistoryItem] = []
 
     var body: some View {
@@ -652,6 +723,7 @@ struct NotificationHistoryView: View {
                     .accessibilityLabel(String(localized: "\(item.title). \(item.body)."))
                     .accessibilityHint(isRoutable ? "Double-tap to open." : "")
                 }
+                .themedList(preferences.colors)
             }
         }
         .navigationTitle("Notifications")
@@ -675,33 +747,18 @@ struct FeedRow: View {
     /// new items still get a visible "NEW" marker on their card.
     var isNew: Bool = false
     var onMarkRead: (() -> Void)? = nil
-    @EnvironmentObject private var preferences: PreferencesStore
 
     var body: some View {
         Group {
             switch item {
-            case .forumTopic(let t):     ForumTopicRow(topic: t)
-            case .podcastEpisode(let e): PodcastEpisodeRow(episode: e)
-            case .appListing(let a):     AppListingRow(app: a)
-            case .resource(let r):       ResourceRow(resource: r)
-            case .blogPost(let b):       BlogPostRow(post: b)
+            case .forumTopic(let t):     ForumTopicRow(topic: t, isNew: isNew)
+            case .podcastEpisode(let e): PodcastEpisodeRow(episode: e, isNew: isNew)
+            case .appListing(let a):     AppListingRow(app: a, isNew: isNew)
+            case .resource(let r):       ResourceRow(resource: r, isNew: isNew)
+            case .blogPost(let b):       BlogPostRow(post: b, isNew: isNew)
             }
         }
         .unreadIndicator(item.isUnread)
-        .overlay(alignment: .topTrailing) {
-            // Only shown when the row itself has no reply-count badge of
-            // its own to show (newCount == 0) — otherwise a revisited item
-            // with fresh replies would show two "new" badges at once.
-            if isNew && newCount == 0 {
-                Text("NEW")
-                    .font(.caption2).fontWeight(.bold)
-                    .foregroundStyle(preferences.colors.accentText)
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Color.accentColor, in: Capsule())
-                    .accessibilityHidden(true)
-                    .padding(6)
-            }
-        }
         .accessibilityValue(isNew && newCount == 0 ? "New." : "")
         // A brand-new, never-visited item has no prior comment-count
         // baseline to diff against, so `newCount` (a *reply-delta*, not a

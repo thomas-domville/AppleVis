@@ -304,7 +304,14 @@ struct ContentActionsModifier: ViewModifier {
             return EditableNode(title: d.title, body: d.description, nodeTypeSuffix: "podcast")
         case .appListing:
             guard let d = try? await APIClient.shared.apps.detail(id: id) else { return nil }
-            return EditableNode(title: d.name, body: d.body, nodeTypeSuffix: "ios_app_directory")
+            let nodeTypeSuffix: String
+            switch d.platform {
+            case .tvos:    nodeTypeSuffix = "tv_directory"
+            case .watchos: nodeTypeSuffix = "watch_directory"
+            case .macos:   nodeTypeSuffix = "mac_app_directory"
+            case .ios:     nodeTypeSuffix = "ios_app_directory"
+            }
+            return EditableNode(title: d.name, body: d.body, nodeTypeSuffix: nodeTypeSuffix)
         case .resource:
             guard let d = try? await APIClient.shared.resources.detail(id: id) else { return nil }
             return EditableNode(title: d.title, body: d.body, nodeTypeSuffix: "guides")
@@ -600,8 +607,7 @@ struct EditNodeSheet: View {
     private func submit() async {
         if let message = ContentSubmissionPolicy.blockingMessage(
             subject: title,
-            body: bodyText,
-            detectNonEnglish: preferences.nonEnglishDetectionEnabled
+            body: bodyText
         ) {
             error = message
             return

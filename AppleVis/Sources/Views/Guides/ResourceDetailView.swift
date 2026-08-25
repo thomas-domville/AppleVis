@@ -181,6 +181,9 @@ struct ResourceDetailView: View {
                     index: index, total: detail.comments.count,
                     subject: comment.subject, parentTitle: detail.title,
                     commentId: comment.id, authorId: comment.authorId, commentType: "comment_node_guides",
+                    onUnpublish: {
+                        self.detail?.comments.removeAll { $0.id == comment.id }
+                    },
                     supportsReport: false,
                     onDelete: {
                         self.detail?.comments.removeAll { $0.id == comment.id }
@@ -343,12 +346,12 @@ struct ResourceDetailView: View {
     /// VoiceOver lands on the back button after push navigation by default;
     /// this moves it to the page heading instead, per
     /// docs/IMPLEMENTATION_NOTES.md's "VoiceOver Detail Page Navigation"
-    /// guidance. Delayed slightly since setting focus before the new content
-    /// has actually laid out is a common way for it to silently fail.
+    /// guidance. Retries at each delay rather than a single guessed one —
+    /// a single attempt could silently go nowhere on a slower device or
+    /// slower load. Reported directly.
     private func focusTitleAfterLoad() {
         Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            isTitleFocused = true
+            await retryAccessibilityFocus(into: $isTitleFocused)
         }
     }
 
@@ -417,6 +420,11 @@ struct CommentRow: View {
     /// since it's already-shipped functionality, not a regression.
     var supportsReport: Bool = true
     var onDelete: (() -> Void)? = nil
+    /// Mirrors `onDelete` exactly — unpublishing, like deleting, means this
+    /// comment shouldn't stay in the currently-displayed list, since the
+    /// client has no distinct "hidden but still there" presentation for
+    /// it. Same treatment Forums' own reply unpublish already uses.
+    var onUnpublish: (() -> Void)? = nil
     var onEdit: ((String) -> Void)? = nil
     var onReplyTo: (() -> Void)? = nil
     /// Set by the parent when it supports "Jump to Last Comment" — lets
@@ -426,12 +434,22 @@ struct CommentRow: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @State private var showDeleteConfirm = false
+    @State private var showUnpublishConfirm = false
     @State private var showEditSheet = false
 
     private var canDelete: Bool {
         guard let user = auth.user, let authorId, commentId != nil, commentType != nil else { return false }
         return !authorId.isEmpty && (user.isAdmin || user.uuid == authorId)
     }
+
+    /// Edit/Delete: author of the comment, or an admin. Unpublish is
+    /// admin-only, kept separate — mirrors Forums' own reply actions
+    /// (`ForumTopicDetailView`'s ReplyView), which already had this split.
+    /// This shared row — used by Guide/Blog/Podcast/Bug comments — had
+    /// Edit and Delete but no Unpublish at all, unlike Forums, even though
+    /// `APIClient.shared.content.unpublishComment` already exists and
+    /// already works for exactly this purpose. Reported directly.
+    private var isAdmin: Bool { auth.user?.isAdmin ?? false }
 
     /// Was fetched from the API and then thrown away entirely — the shared
     /// comment mapper never read the `subject` field, so a commenter's
@@ -475,6 +493,7 @@ struct CommentRow: View {
                 toast.warning(String(localized: "Reporting is coming once the Drupal Flags API is confirmed."))
             })
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Edit Comment") { showEditSheet = true })
+            .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Unpublish Comment") { showUnpublishConfirm = true })
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Delete Comment") { showDeleteConfirm = true })
 
             if let displaySubject {
@@ -509,10 +528,23 @@ struct CommentRow: View {
                 Button { showEditSheet = true } label: {
                     Label("Edit Comment", systemImage: "pencil")
                 }
+            }
+            if isAdmin {
+                Button { showUnpublishConfirm = true } label: {
+                    Label("Unpublish Comment", systemImage: "eye.slash")
+                }
+            }
+            if canDelete {
                 Button(role: .destructive) { showDeleteConfirm = true } label: {
                     Label("Delete Comment", systemImage: "trash")
                 }
             }
+        }
+        .confirmationDialog("Unpublish this comment?", isPresented: $showUnpublishConfirm, titleVisibility: .visible) {
+            Button("Unpublish", role: .destructive) { Task { await unpublish() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This hides it from public view.")
         }
         .confirmationDialog("Delete this comment?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { Task { await delete() } }
@@ -554,6 +586,17 @@ struct CommentRow: View {
             toast.success(String(localized: "Comment deleted"))
         } catch {
             toast.error(String(localized: "Couldn't delete comment."))
+        }
+    }
+
+    private func unpublish() async {
+        guard let user = auth.user, let commentId, let commentType else { return }
+        do {
+            try await APIClient.shared.content.unpublishComment(commentType: commentType, commentId: commentId, csrfToken: user.csrfToken)
+            onUnpublish?()
+            toast.success(String(localized: "Comment unpublished"))
+        } catch {
+            toast.error(String(localized: "Couldn't unpublish comment."))
         }
     }
 }
@@ -655,8 +698,7 @@ struct ComposeResourceCommentView: View {
     private func submit() async {
         guard let user = auth.user else { return }
         if let message = ContentSubmissionPolicy.blockingMessage(
-            body: commentText,
-            detectNonEnglish: ContentSubmissionPolicy.shouldDetectNonEnglish
+            body: commentText
         ) {
             submitError = message
             return

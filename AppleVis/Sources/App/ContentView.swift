@@ -10,7 +10,7 @@ struct ContentView: View {
     @State private var showWelcomeTourFromPrompt = false
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        ZStack {
             TabView(selection: $keyCommands.selectedTab) {
                 HomeView()
                     .tabItem { Label("Home", systemImage: "house") }
@@ -37,10 +37,22 @@ struct ContentView: View {
                 UIAccessibility.post(notification: .announcement, argument: String(localized: "\(tabName(for: newTab)) tab, selected."))
             }
 
-            if player.currentEpisode != nil {
-                MiniPlayerView()
-                    .transition(.move(edge: .bottom))
-                    .padding(.bottom, 49) // above tab bar
+            // `ZStack(alignment: .bottom)` sizing the mini player off the
+            // TabView's own bounds was landing it at the top of the screen
+            // instead of just above the tab bar. GuidedExperienceResumeBanner
+            // pins its own floating bottom bar reliably with
+            // `VStack { Spacer(); content }` instead, which forces the
+            // container to full height and anchors content to the bottom
+            // itself rather than depending on ZStack's alignment computation
+            // against a sibling — matching that working pattern here.
+            // Reported directly.
+            VStack {
+                Spacer()
+                if player.currentEpisode != nil {
+                    MiniPlayerView()
+                        .transition(.move(edge: .bottom))
+                        .padding(.bottom, 49) // above tab bar
+                }
             }
         }
         .animation(UIAccessibility.isReduceMotionEnabled ? nil : .spring(duration: 0.3), value: player.currentEpisode != nil)
@@ -123,6 +135,7 @@ struct ContentView: View {
         case .app(let url): SubmitAppView(prefillAppStoreURL: url)
         case .blog(let text): SubmitBlogView(prefillText: text)
         case .podcast(let url): SubmitPodcastView(prefillSharedURL: url)
+        case .podcastAudio(let data, let fileName): SubmitPodcastView(prefillAudioData: data, prefillAudioFileName: fileName)
         }
     }
 

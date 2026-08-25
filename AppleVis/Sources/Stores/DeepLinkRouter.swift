@@ -57,6 +57,10 @@ final class DeepLinkRouter: ObservableObject {
         case "submit-podcast":
             _ = AppShareConsumer.consumePendingPodcastURL()
             if let podURL = value("url") { pendingSubmit = .podcast(url: podURL) }
+        case "submit-podcast-audio":
+            if let (data, fileName) = AppShareConsumer.consumePendingPodcastAudio() {
+                pendingSubmit = .podcastAudio(data: data, fileName: fileName)
+            }
         case "forums":
             let filter = value("filter").flatMap(ForumFilter.init(rawValue:)) ?? .recent
             pendingSiriDestination = .forums(filter: filter)
@@ -86,6 +90,8 @@ final class DeepLinkRouter: ObservableObject {
             pendingSubmit = .blog(text: text)
         } else if let url = AppShareConsumer.consumePendingPodcastURL() {
             pendingSubmit = .podcast(url: url)
+        } else if let (data, fileName) = AppShareConsumer.consumePendingPodcastAudio() {
+            pendingSubmit = .podcastAudio(data: data, fileName: fileName)
         }
     }
 }
@@ -98,12 +104,17 @@ enum PendingSubmit: Identifiable {
     case app(url: String)
     case blog(text: String)
     case podcast(url: String)
+    /// A shared audio file (.mp3/.m4a/.wav) headed straight into the audio
+    /// slot a manual "Choose Audio File" pick would fill — see
+    /// `AppShareConsumer.consumePendingPodcastAudio()`.
+    case podcastAudio(data: Data, fileName: String)
 
     var id: String {
         switch self {
         case .app(let url): return "app:\(url)"
         case .blog(let text): return "blog:\(text.prefix(40))"
         case .podcast(let url): return "podcast:\(url)"
+        case .podcastAudio(let data, let fileName): return "podcastAudio:\(fileName):\(data.count)"
         }
     }
 }

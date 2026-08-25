@@ -105,10 +105,31 @@ struct NewCountBadge: View {
     }
 }
 
+/// Plain "NEW" pill for an item with no reply-count baseline yet (see
+/// FeedRow.isNew). Rendered inline in the same badge slot each row already
+/// reserves for NewCountBadge — previously drawn as a card-level
+/// `.overlay(alignment: .topTrailing)` in FeedRow, which sat on top of
+/// whatever that row already had in its top-right corner (the relative date,
+/// saved/following/queued icons). Reported directly: the badge visually
+/// merged with that corner's existing text/icons.
+struct NewBadge: View {
+    @EnvironmentObject private var preferences: PreferencesStore
+
+    var body: some View {
+        Text("NEW")
+            .font(.caption2).fontWeight(.bold)
+            .foregroundStyle(preferences.colors.accentText)
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .background(Color.accentColor, in: Capsule())
+            .accessibilityHidden(true)
+    }
+}
+
 // MARK: - Forum Topic Row
 
 struct ForumTopicRow: View {
     let topic: ForumTopic
+    var isNew: Bool = false
     var onDelete: (() -> Void)? = nil
     @State private var showComposeReply = false
 
@@ -139,6 +160,8 @@ struct ForumTopicRow: View {
                     Spacer()
                     if newCount > 0 {
                         NewCountBadge(count: newCount)
+                    } else if isNew {
+                        NewBadge()
                     }
                     if topic.isSaved {
                         Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
@@ -210,10 +233,15 @@ struct ForumTopicRow: View {
 
 struct PodcastEpisodeRow: View {
     let episode: PodcastEpisode
+    var isNew: Bool = false
     var onDelete: (() -> Void)? = nil
     @EnvironmentObject private var player: PlayerStore
     @ObservedObject private var downloads = DownloadManager.shared
     @State private var showComposeComment = false
+    // Grows moderately with Dynamic Type instead of staying pinned at 48pt
+    // while the adjacent title (unbounded, .lineLimit(2)) wraps across
+    // several lines at the largest accessibility text sizes.
+    @ScaledMetric(relativeTo: .body) private var artworkSize: CGFloat = 48
     /// See `PodcastAudioMetadataProbe` — Drupal's `duration` is always 0, so
     /// `episode.duration` alone can't be trusted for display. Read-only
     /// against the cache first; only falls back to a live probe if this
@@ -232,7 +260,7 @@ struct PodcastEpisodeRow: View {
                     Image(systemName: "mic.fill")
                         .foregroundStyle(.secondary)
                 }
-                .frame(width: 48, height: 48)
+                .frame(width: artworkSize, height: artworkSize)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -254,6 +282,8 @@ struct PodcastEpisodeRow: View {
                         Spacer()
                         if newCount > 0 {
                             NewCountBadge(count: newCount)
+                        } else if isNew {
+                            NewBadge()
                         }
                         if episode.isSaved {
                             Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
@@ -285,6 +315,10 @@ struct PodcastEpisodeRow: View {
                 .accessibilityHidden(true)
             }
         }
+        .overlay(alignment: .leading) {
+            Rectangle().fill(ContentKind.podcastEpisode.accentColor).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
+        }
+        .padding(.leading, 6)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(episodeLabel)
         .readAloudAction(episodeLabel)
@@ -475,7 +509,11 @@ struct PodcastEpisodeRow: View {
 
 struct AppListingRow: View {
     let app: AppListing
+    var isNew: Bool = false
     var onDelete: (() -> Void)? = nil
+    // See PodcastEpisodeRow.artworkSize — same fixed-vs-scaling mismatch
+    // against the adjacent, unbounded app name.
+    @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 48
 
     var body: some View {
         NavigationLink(value: app) {
@@ -487,7 +525,7 @@ struct AppListingRow: View {
                         .fill(Color.secondary.opacity(0.2))
                         .overlay(Image(systemName: "square.grid.2x2").foregroundStyle(.secondary))
                 }
-                .frame(width: 48, height: 48)
+                .frame(width: iconSize, height: iconSize)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -503,6 +541,8 @@ struct AppListingRow: View {
                         Spacer()
                         if newCount > 0 {
                             NewCountBadge(count: newCount)
+                        } else if isNew {
+                            NewBadge()
                         }
                         if app.isSaved {
                             Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
@@ -583,6 +623,7 @@ struct AppListingRow: View {
 
 struct ResourceRow: View {
     let resource: Resource
+    var isNew: Bool = false
     var onDelete: (() -> Void)? = nil
 
     var body: some View {
@@ -595,6 +636,8 @@ struct ResourceRow: View {
                     Spacer()
                     if newCount > 0 {
                         NewCountBadge(count: newCount)
+                    } else if isNew {
+                        NewBadge()
                     }
                     if resource.isSaved {
                         Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
@@ -645,6 +688,7 @@ struct ResourceRow: View {
 
 struct BlogPostRow: View {
     let post: BlogPost
+    var isNew: Bool = false
     var onDelete: (() -> Void)? = nil
 
     var body: some View {
@@ -657,6 +701,8 @@ struct BlogPostRow: View {
                     Spacer()
                     if newCount > 0 {
                         NewCountBadge(count: newCount)
+                    } else if isNew {
+                        NewBadge()
                     }
                     if post.isSaved {
                         Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)

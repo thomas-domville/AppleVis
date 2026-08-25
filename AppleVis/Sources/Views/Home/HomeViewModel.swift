@@ -37,6 +37,20 @@ final class HomeViewModel: ObservableObject {
     private let pageSize = 20
     private var page = 0
     private var itemVisits: [String: PersistenceStore.ItemVisit] = [:]
+    private static let visitBoundaryKey = "applevis.home.visitBoundary"
+    /// How long since the last successful load before a new one counts as
+    /// "returning after being away" rather than "still in the same
+    /// sitting" — matches HomeView's own foreground-refresh staleness
+    /// window (`staleThreshold`), since both are answering the same
+    /// underlying question with the same in-memory `lastLoadedAt`.
+    private static let sittingGapThreshold: TimeInterval = 5 * 60
+    /// The boundary a never-individually-visited item is compared against
+    /// — captured once per load() (see `advanceVisitBoundaryIfNeeded`) so
+    /// it stays fixed for the whole current sitting rather than drifting
+    /// with live wall-clock time, which would make content that was
+    /// genuinely new when the sitting started flicker in and out of "New"
+    /// as the clock ticks.
+    private var currentVisitBoundary: Date = .distantPast
 
     func load() async {
         SoundPlayer.shared.play(.loadingStart)
@@ -47,19 +61,12 @@ final class HomeViewModel: ObservableObject {
         isReturningVisit = UserDefaults.standard.object(forKey: "applevis.lastVisit") != nil
         // Stamped exactly once, ever, purely to distinguish "first launch
         // of this install" (don't flood a brand-new user with everything
-        // in the feed marked "new") from every launch after that. Earlier
-        // attempts tried to use this as a moving "last visit" boundary that
-        // advanced on every load(), then on every background/foreground
-        // cycle — both silently dropped still-unread items out of "New"
-        // the moment the boundary moved past them (a screen simply locking
-        // counts as backgrounding). isNewActivity() below no longer
-        // compares against a timestamp at all — an item stays "new" for as
-        // long as it's genuinely unvisited, full stop, which is what
-        // "shows all 11 until they're read" actually requires.
+        // in the feed marked "new") from every launch after that.
         if !isReturningVisit {
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "applevis.lastVisit")
         }
 
+        let previousLoadedAt = lastLoadedAt
         let (fetched, failed) = await fetchPage(page: 0)
         failedSourceNames = failed
 
@@ -76,11 +83,40 @@ final class HomeViewModel: ObservableObject {
             items = Self.deduplicated(fetched.sorted { $0.lastActivityAt > $1.lastActivityAt })
             hasMore = fetched.count >= pageSize
             itemVisits = PersistenceStore.shared.allItemVisits()
+            // Captured BEFORE potentially advancing it below, so this
+            // sitting's own "is this genuinely new" comparisons use the
+            // boundary as it stood at the start of the sitting, not one
+            // that was just moved to "now."
+            currentVisitBoundary = visitBoundary
+            advanceVisitBoundaryIfNeeded(previousLoadedAt: previousLoadedAt)
             buildNewActivitySummary()
             lastLoadedAt = Date()
         }
 
         isLoading = false
+    }
+
+    private var visitBoundary: Date {
+        let stored = UserDefaults.standard.double(forKey: Self.visitBoundaryKey)
+        return stored > 0 ? Date(timeIntervalSince1970: stored) : .distantPast
+    }
+
+    /// Advances the boundary only when this load() represents a genuine new
+    /// sitting — a cold launch (`previousLoadedAt` nil, since that's an
+    /// in-memory property that resets every process launch), or returning
+    /// after being away longer than `sittingGapThreshold` — never on a
+    /// same-sitting refresh (pull-to-refresh, a filter change, Customize
+    /// Home). An earlier version of this idea advanced on every load() and
+    /// every background/foreground cycle, and silently dropped still-
+    /// unread items out of "New" the moment the boundary moved past them —
+    /// gating on a real gap is what avoids repeating that regression while
+    /// still keeping stale backlog from counting as new. Reported directly:
+    /// a fresh page of results was entirely "new" regardless of age, since
+    /// nothing in it had an individual visit record yet to compare against.
+    private func advanceVisitBoundaryIfNeeded(previousLoadedAt: Date?) {
+        let isNewSitting = previousLoadedAt.map { Date().timeIntervalSince($0) > Self.sittingGapThreshold } ?? true
+        guard isNewSitting else { return }
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: Self.visitBoundaryKey)
     }
 
     func loadMore() async {
@@ -141,7 +177,17 @@ final class HomeViewModel: ObservableObject {
         }
         isNewActivityDismissed = true
         recomputeNewActivity()
-        UIAccessibility.post(notification: .announcement, argument: "All new activity marked as read.")
+        // Unlike single-item markAsRead above, this collapses several
+        // sections at once — the What's New card, the New/Latest picker's
+        // contents, and the whole New list emptying out — all in the same
+        // pass as this announcement. Posting it immediately raced that
+        // layout change and VoiceOver dropped it silently. A short delay
+        // lets the collapse finish first. Reported directly: "Mark All
+        // Read" said nothing.
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(400))
+            UIAccessibility.post(notification: .announcement, argument: "All new activity marked as read.")
+        }
     }
 
     // MARK: - Private
@@ -219,19 +265,22 @@ final class HomeViewModel: ObservableObject {
         recomputeNewActivity()
     }
 
-    /// An item counts as new if it's never been individually visited, or it
-    /// has replies/comments (or any activity) beyond what it had the last
-    /// time it *was* visited — purely per-item, no global "last visit"
-    /// timestamp involved. It stays "new" across any number of refreshes,
-    /// backgrounds, or relaunches until the user actually opens it or hits
-    /// "Mark All Read" — that's the only thing that should make an unread
-    /// item stop being new. Suppressed entirely on a device's very first
-    /// launch (isReturningVisit false) so a fresh install isn't flooded
-    /// with everything in the feed marked new.
+    /// An item counts as new if it has replies/comments (or any activity)
+    /// beyond what it had the last time it *was* visited, or — for
+    /// something never individually visited — if it was actually posted or
+    /// updated since the current sitting started (`currentVisitBoundary`).
+    /// That second half used to be unconditional ("never visited" alone was
+    /// enough), which meant a full page of page-sized results was always
+    /// entirely "new" regardless of actual age, since nothing in a freshly
+    /// fetched page has a visit record yet. Suppressed entirely on a
+    /// device's very first launch (isReturningVisit false) so a fresh
+    /// install isn't flooded with everything in the feed marked new.
     private func isNewActivity(_ item: FeedItem) -> Bool {
         guard isReturningVisit else { return false }
         if newReplyCount(for: item) > 0 { return true }
-        guard let visit = itemVisits[item.id] else { return true }
+        guard let visit = itemVisits[item.id] else {
+            return item.lastActivityAt > currentVisitBoundary
+        }
         return visit.seenAt < item.lastActivityAt
     }
 

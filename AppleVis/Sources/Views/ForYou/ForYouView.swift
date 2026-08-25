@@ -3,11 +3,26 @@ import SwiftUI
 struct ForYouView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var player: PlayerStore
+    @EnvironmentObject private var keyCommands: KeyCommandRouter
     @State private var selectedTab: ForYouTab = .saved
+    @AccessibilityFocusState private var isPickerFocused: Bool
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                // Matches the setup wizard/Welcome Tour convention of a
+                // heading announcing the screen name — the tab-switch focus
+                // move introduced earlier landed on the section picker
+                // instead, which never actually says "For You." Invisible
+                // to sighted users so it doesn't duplicate the nav bar
+                // title visually. Reported directly.
+                Color.clear
+                    .frame(width: 0, height: 0)
+                    .accessibilityElement()
+                    .accessibilityLabel("For You")
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($isPickerFocused)
+
                 // Orientation text and section-accent strip are sighted/
                 // low-vision affordances, not decoration — RN hid both from
                 // VoiceOver (accessibilityElementsHidden, foryou.tsx
@@ -24,6 +39,14 @@ struct ForYouView: View {
                     .padding(.top, 12)
                     .accessibilityHidden(true)
 
+                // .menu instead of .segmented — a segmented control puts
+                // all four sections on screen as separate adjacent
+                // elements, which VoiceOver reads as a row of same-sounding
+                // "button"s with no indication they're a connected set. A
+                // menu picker collapses to one element announcing the
+                // current section, and opens a standard single-choice list
+                // to switch — the same pattern already used for the
+                // Platform picker in App Directory. Reported directly.
                 Picker("Section", selection: $selectedTab) {
                     ForEach(ForYouTab.allCases) { tab in
                         Text(tab.displayName)
@@ -31,7 +54,8 @@ struct ForYouView: View {
                             .accessibilityLabel(Text(tab.accessibilityLabel))
                     }
                 }
-                .pickerStyle(.segmented)
+                .pickerStyle(.menu)
+                .accessibilityHint(String(localized: "Choose which For You section to view."))
                 .padding()
                 .onChange(of: selectedTab) { _, _ in
                     SoundPlayer.shared.play(.pickerTick)
@@ -68,7 +92,19 @@ struct ForYouView: View {
                         Image(systemName: "person.circle")
                     }
                     .accessibilityLabel(String(localized: "Profile and Settings"))
+                    .accessibilityHint(String(localized: "Sign in, manage your account, and access app settings."))
                 }
+            }
+            // TabView keeps every tab's content alive, so this view is
+            // never recreated on a later switch back to it — watching
+            // selectedTab directly is what catches "the user just switched
+            // to For You," matching the announcement ContentView.swift
+            // already posts on the same change, so a VoiceOver user's
+            // cursor lands on the section picker instead of wherever it
+            // happened to be on the previous tab.
+            .onChange(of: keyCommands.selectedTab) { _, newTab in
+                guard newTab == 2 else { return }
+                Task { await retryAccessibilityFocus(into: $isPickerFocused) }
             }
         }
     }
@@ -549,13 +585,12 @@ struct SavedItemsView: View {
         focusSummaryAfterDelay()
     }
 
-    /// A short delay before moving VoiceOver focus, same pattern Home uses —
-    /// setting focus before the List has re-laid-out after a row disappears
-    /// is a common way for it to silently fail.
+    /// Retries at each delay rather than a single guessed one — setting
+    /// focus before the List has re-laid-out after a row disappears is a
+    /// common way for a single attempt to silently fail on a slower device.
     private func focusSummaryAfterDelay() {
         Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            summaryFocused = true
+            await retryAccessibilityFocus(into: $summaryFocused)
         }
     }
 
@@ -807,8 +842,7 @@ struct FollowingView: View {
 
     private func focusSummaryAfterDelay() {
         Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            summaryFocused = true
+            await retryAccessibilityFocus(into: $summaryFocused)
         }
     }
 

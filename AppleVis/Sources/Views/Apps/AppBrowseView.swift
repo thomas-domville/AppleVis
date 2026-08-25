@@ -13,6 +13,7 @@ struct AppBrowseView: View {
     @State private var searchResults: [AppListing] = []
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     private var isSearchActive: Bool { !searchText.trimmingCharacters(in: .whitespaces).isEmpty }
 
@@ -32,16 +33,11 @@ struct AppBrowseView: View {
         }
         .navigationTitle("App Directory")
         .task { await load() }
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
         .refreshable { await load(); SoundPlayer.shared.play(.refresh) }
         .onChange(of: platform) { _, _ in Task { await load() } }
         .searchable(text: $searchText, prompt: "Search apps")
         .onChange(of: searchText) { _, newValue in runSearch(newValue) }
-        .navigationDestination(for: AppCategoryDestination.self) { dest in
-            AppCategoryView(destination: dest)
-        }
-        .navigationDestination(for: AppListing.self) { app in
-            AppDetailView(appId: app.id)
-        }
     }
 
     @ViewBuilder
@@ -102,6 +98,7 @@ struct AppBrowseView: View {
     private var categoryList: some View {
         List {
             Section("Platform") {
+                AccessibleScreenHeading(title: "App Directory", isFocused: $isTitleFocused)
                 platformPicker
             }
             ForEach(groupedCategories, id: \.letter) { group in
@@ -111,12 +108,24 @@ struct AppBrowseView: View {
                             HStack {
                                 Text(category.name)
                                 Spacer()
-                                Text("\(category.count)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                // Apple TV categories have no live count
+                                // available (see `categories(platform:)` —
+                                // the REST endpoint that provides it for
+                                // every other platform doesn't exist for
+                                // tvOS), reported as `count: 0`. Showing
+                                // "0" next to every category would read as
+                                // "empty," which isn't known to be true —
+                                // hidden instead of shown wrong.
+                                if category.count > 0 {
+                                    Text("\(category.count)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
-                        .accessibilityLabel(String(localized: "\(category.name), \(category.count) apps"))
+                        .accessibilityLabel(category.count > 0
+                            ? String(localized: "\(category.name), \(category.count) apps")
+                            : category.name)
                     }
                 }
             }
@@ -162,19 +171,17 @@ struct AppCategoryDestination: Hashable {
 struct AppCategoryView: View {
     let destination: AppCategoryDestination
     @EnvironmentObject private var preferences: PreferencesStore
-    @EnvironmentObject private var toast: ToastStore
     @State private var apps: [AppListing] = []
     @State private var isLoading = false
     @State private var error: String?
-    @State private var page = 0
-    @State private var hasMore = false
-    @State private var isLoadingMore = false
+    @State private var pageLimit = 20
     @ObservedObject private var networkStatus = NetworkStatusStore.shared
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         Group {
             if isLoading && apps.isEmpty {
-                LoadingView(message: "Loading apps…")
+                LoadingView(message: initialLoadingMessage)
             } else if let error, apps.isEmpty {
                 ErrorView(message: error) { await load(reset: true) }
             } else if apps.isEmpty {
@@ -190,17 +197,13 @@ struct AppCategoryView: View {
                         .foregroundStyle(.secondary)
                         .listRowSeparator(.hidden)
                         .accessibilityAddTraits(.isHeader)
+                        .accessibilityFocused($isTitleFocused)
                     if networkStatus.degradedGroups.contains(.apps) {
                         OfflineBanner()
                             .listRowSeparator(.hidden)
                     }
                     ForEach(apps) { app in
                         AppListingRow(app: app, onDelete: { apps.removeAll { $0.id == app.id } })
-                    }
-                    if hasMore {
-                        ProgressView().frame(maxWidth: .infinity).accessibilityLabel(String(localized: "Loading more…"))
-                            .listRowSeparator(.hidden)
-                            .task { await loadMore() }
                     }
                 }
                 .listStyle(.plain)
@@ -209,40 +212,95 @@ struct AppCategoryView: View {
         }
         .navigationTitle(destination.category.name)
         .task { await load(reset: true) }
-        .refreshable { await load(reset: true); SoundPlayer.shared.play(.refresh) }
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
+        // forceRefresh: true — a deliberate pull is the user asking "is
+        // there anything new," and this category's pages can sit cached as
+        // "fresh" for up to 6 hours (ContentCache's default apps: TTL); an
+        // ordinary tab visit is fine reusing that, a manual pull shouldn't
+        // silently replay the same stale response.
+        .refreshable { await load(reset: true, forceRefresh: true); SoundPlayer.shared.play(.refresh) }
     }
 
-    private func load(reset: Bool) async {
-        if reset { page = 0; apps = [] }
+    /// Names the wait up front for a category too big for one request (see
+    /// the 200-item cap in `load(reset:)`) — otherwise a VoiceOver user
+    /// staring at a bare "Loading apps…" for a 500+ item category has no
+    /// way to tell a long wait is expected rather than stuck. `LoadingView`
+    /// already speaks whatever message it's given via `.screenChanged`, so
+    /// this needs no extra announcement plumbing of its own.
+    private var initialLoadingMessage: String {
+        let count = destination.category.count
+        guard count > 200 else { return String(localized: "Loading apps…") }
+        return String(localized: "Loading \(count) apps in \(destination.category.name). This may take a few moments.")
+    }
+
+    // Fetches every page before showing any of them, rather than revealing
+    // results 200 at a time — merging a later page into an already-visible,
+    // already-alphabetized list can reshuffle rows the user already swiped
+    // past (an item from page 2 can sort earlier than one already shown
+    // from page 1). A longer wait up front — with initialLoadingMessage
+    // naming it for anything past the single-page cap — was judged the
+    // better tradeoff than a list that reorders itself mid-browse.
+    // Reported directly.
+    private func load(reset: Bool, forceRefresh: Bool = false) async {
+        if reset {
+            apps = []
+            // The category row already told the user the total (e.g.
+            // "Books, 47 apps") — request that many per page instead of
+            // always paging 20 at a time, so a small category like this
+            // arrives in a single request. Clamped so a very large category
+            // (e.g. Games) can't trigger one enormous request; anything
+            // past the cap is simply fetched as further pages below, all
+            // before anything is shown.
+            pageLimit = min(max(destination.category.count, 20), 200)
+        }
         isLoading = true; error = nil
         do {
-            let fetched = try await APIClient.shared.apps.list(
-                page: page,
-                platform: destination.platform,
-                categoryTid: destination.category.tid
-            )
-            apps = fetched.items
-            hasMore = fetched.hasMore
+            var allItems: [AppListing] = []
+            var page = 0
+            var hasMore = true
+            // 50 pages at the current limit is already 1,000-10,000 apps —
+            // comfortably past any real category size, just a backstop
+            // against a backend pagination bug leaving this looping forever
+            // with the user staring at an unmoving loading screen.
+            while hasMore, page < 50 {
+                let fetched: (items: [AppListing], hasMore: Bool)
+                if destination.platform == .tvos {
+                    // `list(categoryTid:)` assumes a numeric Drupal tid,
+                    // which Apple TV categories don't have here (see
+                    // `categories(platform:)` — they're built from taxonomy
+                    // UUIDs, not the REST directory API). Calls
+                    // `categoryListing` directly with that UUID instead.
+                    fetched = try await APIClient.shared.apps.categoryListing(
+                        platform: .tvos,
+                        categoryId: destination.category.id,
+                        page: page,
+                        limit: pageLimit,
+                        forceRefresh: forceRefresh
+                    )
+                } else {
+                    let pageResult = try await APIClient.shared.apps.list(
+                        page: page,
+                        platform: destination.platform,
+                        categoryTid: destination.category.tid,
+                        limit: pageLimit,
+                        forceRefresh: forceRefresh
+                    )
+                    fetched = (items: pageResult.items, hasMore: pageResult.hasMore)
+                }
+                allItems += fetched.items
+                hasMore = fetched.hasMore
+                page += 1
+            }
+            apps = alphabetized(allItems)
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Could not load apps" }
         isLoading = false
     }
 
-    private func loadMore() async {
-        guard !isLoadingMore, hasMore else { return }
-        isLoadingMore = true
-        do {
-            let more = try await APIClient.shared.apps.list(
-                page: page + 1,
-                platform: destination.platform,
-                categoryTid: destination.category.tid
-            )
-            page += 1
-            apps += more.items
-            hasMore = more.hasMore
-        } catch {
-            toast.error(String(localized: "Couldn't load more apps."))
-        }
-        isLoadingMore = false
+    /// The native app-directory category endpoint accepts no sort
+    /// parameter at all — ordering is whatever the backend returns by
+    /// default. Applied client-side after every fetch/append instead.
+    private func alphabetized(_ items: [AppListing]) -> [AppListing] {
+        items.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 }

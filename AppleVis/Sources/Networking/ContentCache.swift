@@ -123,6 +123,15 @@ final class ContentCache {
         }
     }
 
+    /// Evicts a single cached entry outright — used when a live fetch
+    /// confirms the underlying content is gone (APIError.notFound), so a
+    /// deleted item can't keep serving from cache after that point.
+    func remove(key: String) {
+        queue.async {
+            try? FileManager.default.removeItem(at: self.fileURL(for: key))
+        }
+    }
+
     /// Total on-disk size — surfaced by StorageView alongside the system
     /// URLCache so "Cached Content" actually reflects everything AppleVis
     /// caches, not just images/network responses.

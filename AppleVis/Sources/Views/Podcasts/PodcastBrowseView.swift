@@ -13,6 +13,7 @@ struct PodcastBrowseView: View {
     @State private var hasMore = false
     @State private var isLoadingMore = false
     @ObservedObject private var networkStatus = NetworkStatusStore.shared
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         Group {
@@ -47,11 +48,13 @@ struct PodcastBrowseView: View {
             }
         }
         .task { await load(reset: true) }
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
         .refreshable { await load(reset: true); SoundPlayer.shared.play(.refresh) }
     }
 
     private var episodeList: some View {
         List {
+            AccessibleScreenHeading(title: "Podcasts", isFocused: $isTitleFocused)
             if networkStatus.degradedGroups.contains(.podcasts) {
                 OfflineBanner()
                     .listRowSeparator(.hidden)

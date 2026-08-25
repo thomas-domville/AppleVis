@@ -640,6 +640,13 @@ struct EpisodeDetailView: View {
         }
     }
 
+    // Same stacked title/byline/posted-and-last-comment shape Blog/Forum/
+    // Guide headers use (BlogDetailView.content, ForumTopicDetailView.content),
+    // adapted for a podcast: showTitle stands in for the byline (there's no
+    // per-episode author profile to link the way Blog's AuthorProfileButton
+    // does), and a final line covers total length plus remaining time when
+    // this episode is the one currently loaded and in progress — neither of
+    // which the other content types have an equivalent for.
     private func heroCard(_ episode: PodcastEpisode) -> some View {
         HStack(alignment: .top, spacing: 14) {
             AsyncImage(url: episode.artworkUrl.flatMap(URL.init)) { image in
@@ -654,32 +661,59 @@ struct EpisodeDetailView: View {
             .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(episode.showTitle)
-                    .font(.caption).foregroundStyle(.secondary)
                 Text(episode.title)
                     .font(.body).fontWeight(.semibold).lineLimit(3)
-                HStack {
-                    if let duration = validDuration(episode) {
-                        Text(PodcastDuration.abbreviated(duration))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    RelativeDateLabel(date: episode.publishedAt)
-                }
-                if episode.commentCount > 0 {
-                    Text("Last comment \(episode.lastActivityAt.formatted(.relative(presentation: .named)))")
-                        .font(.caption2).foregroundStyle(.secondary)
+                Text(episode.showTitle)
+                    .font(.subheadline).foregroundStyle(.secondary)
+                Text(postedAndLastCommentText(episode))
+                    .font(.caption).foregroundStyle(.secondary)
+                if let duration = resolvedDuration(episode) {
+                    Text(lengthAndRemainingText(duration: duration, remaining: remainingDuration(episode)))
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            String(localized: "\(episode.title) by \(episode.showTitle), published \(episode.publishedAt.formatted(.relative(presentation: .named)))") +
-            (validDuration(episode).map { String(localized: ", \(PodcastDuration.accessibilityLabel($0))") } ?? "") +
-            (episode.commentCount > 0 ? String(localized: ", last comment \(episode.lastActivityAt.formatted(.relative(presentation: .named)))") : "") +
-            (artworkDescription.map { String(localized: ". Artwork \($0)") } ?? "")
-        )
+        .accessibilityLabel(heroAccessibilityLabel(episode))
         .accessibilityAddTraits(.isHeader)
         .accessibilityFocused($isTitleFocused)
+    }
+
+    private func postedAndLastCommentText(_ episode: PodcastEpisode) -> String {
+        let posted = String(localized: "Posted \(episode.publishedAt.formatted(.relative(presentation: .named)))")
+        guard episode.commentCount > 0 else { return posted }
+        return String(localized: "\(posted), last comment \(episode.lastActivityAt.formatted(.relative(presentation: .named)))")
+    }
+
+    /// Prefers the live player's duration over `episode.duration` when this
+    /// episode is loaded — Drupal hardcodes `episode.duration` to 0
+    /// server-side (see `validDuration`), so once AVPlayer has actually
+    /// opened the file its real duration is the only trustworthy source.
+    private func resolvedDuration(_ episode: PodcastEpisode) -> TimeInterval? {
+        if isCurrentEpisode(episode), player.duration > 0 { return player.duration }
+        return validDuration(episode)
+    }
+
+    private func remainingDuration(_ episode: PodcastEpisode) -> TimeInterval? {
+        guard isCurrentEpisode(episode), player.position > 0, player.duration > 0 else { return nil }
+        let remaining = player.duration - player.position
+        return remaining > 0 ? remaining : nil
+    }
+
+    private func lengthAndRemainingText(duration: TimeInterval, remaining: TimeInterval?) -> String {
+        let total = PodcastDuration.abbreviated(duration)
+        guard let remaining else { return total }
+        return String(localized: "\(total) · \(PodcastDuration.abbreviated(remaining)) remaining")
+    }
+
+    private func heroAccessibilityLabel(_ episode: PodcastEpisode) -> String {
+        let duration = resolvedDuration(episode)
+        let remaining = remainingDuration(episode)
+        return String(localized: "\(episode.title) by \(episode.showTitle), posted \(episode.publishedAt.formatted(.relative(presentation: .named)))") +
+            (episode.commentCount > 0 ? String(localized: ", last comment \(episode.lastActivityAt.formatted(.relative(presentation: .named)))") : "") +
+            (duration.map { String(localized: ", \(PodcastDuration.accessibilityLabel($0))") } ?? "") +
+            (remaining.map { String(localized: ", \(PodcastDuration.accessibilityRemaining($0))") } ?? "") +
+            (artworkDescription.map { String(localized: ". Artwork \($0)") } ?? "")
     }
 
     @ViewBuilder
@@ -789,6 +823,9 @@ struct EpisodeDetailView: View {
                     onDelete: {
                         comments.removeAll { $0.id == comment.id }
                     },
+                    onUnpublish: {
+                        comments.removeAll { $0.id == comment.id }
+                    },
                     onEdit: { newText in
                         guard let idx = comments.firstIndex(where: { $0.id == comment.id }) else { return }
                         comments[idx] = PodcastComment(id: comment.id, authorName: comment.authorName, authorId: comment.authorId, subject: comment.subject, body: newText, createdAt: comment.createdAt)
@@ -881,10 +918,12 @@ struct EpisodeDetailView: View {
         // isTitleFocused was declared and bound to the hero card but never
         // actually set anywhere — VoiceOver focus was left wherever it was
         // before navigating in, instead of landing on the episode title.
+        // Retries at each delay rather than a single guessed one — a single
+        // attempt could silently go nowhere on a slower device or slower
+        // load. Reported directly.
         if episode != nil {
             Task {
-                try? await Task.sleep(for: .milliseconds(400))
-                isTitleFocused = true
+                await retryAccessibilityFocus(into: $isTitleFocused)
             }
         }
     }
@@ -1141,8 +1180,7 @@ struct ComposePodcastCommentView: View {
     private func submit() async {
         guard let user = auth.user else { return }
         if let message = ContentSubmissionPolicy.blockingMessage(
-            body: commentText,
-            detectNonEnglish: ContentSubmissionPolicy.shouldDetectNonEnglish
+            body: commentText
         ) {
             submitError = message
             return

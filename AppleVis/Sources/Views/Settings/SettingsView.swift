@@ -25,6 +25,7 @@ private struct SettingsSection: Identifiable {
 struct SettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var searchText = ""
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     private var sections: [SettingsSection] {
         [
@@ -100,6 +101,7 @@ struct SettingsView: View {
             List {
                 if searchText.isEmpty {
                     Section {
+                        AccessibleScreenHeading(title: "Settings", isFocused: $isTitleFocused)
                         HStack(alignment: .top, spacing: 12) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 8)
@@ -150,6 +152,7 @@ struct SettingsView: View {
             .themedList(preferences.colors)
             .navigationTitle("Settings")
             .searchable(text: $searchText, prompt: "Search Settings")
+            .task { await retryAccessibilityFocus(into: $isTitleFocused) }
         }
     }
 }

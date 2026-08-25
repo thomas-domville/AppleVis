@@ -18,6 +18,10 @@ struct GuidedExperienceResumeBanner: View {
     /// resolve on this SDK and crashes at launch. Same reasoning as
     /// `pauseStore` above.
     @ObservedObject var preferences: PreferencesStore
+    /// Same reasoning as `pauseStore`/`preferences` — needed to pass down
+    /// to the "Resume Tour" sheet below, not read directly by this view's
+    /// own body.
+    @ObservedObject var keyCommands: KeyCommandRouter
     @State private var showTour = false
 
     var body: some View {
@@ -44,7 +48,8 @@ struct GuidedExperienceResumeBanner: View {
                             .font(.caption)
                             .padding(8)
                     }
-                    .accessibilityLabel(String(localized: "Dismiss Resume Tour"))
+                    .accessibilityLabel(String(localized: "Dismiss Tour"))
+                    .accessibilityHint(String(localized: "Dismisses this reminder without resuming the tour. You can still replay it later from Profile."))
                 }
                 .foregroundStyle(preferences.colors.accentText)
                 .background(Color.accentColor, in: Capsule())
@@ -55,7 +60,21 @@ struct GuidedExperienceResumeBanner: View {
         }
         .animation(UIAccessibility.isReduceMotionEnabled ? nil : .spring(duration: 0.3), value: pauseStore.paused?.experienceId)
         .sheet(isPresented: $showTour) {
+            // GuidedExperienceView itself relies on @EnvironmentObject for
+            // all three of these — inherited from wherever it's presented.
+            // Presenting it from here (this banner, itself mounted at the
+            // same problematic App-root `.overlay {}` position described
+            // above) means none of them resolve from the environment on
+            // their own; this is the exact same crash, just one call site
+            // further down, and previously unfixed here. Reported directly:
+            // "Explore This Screen" on the Home step, then "Resume Tour,"
+            // crashed every time, including after a fresh relaunch — a
+            // fully deterministic environment-object crash, not corrupted
+            // saved progress.
             GuidedExperienceView(experience: GuidedExperienceRegistry.welcome)
+                .environmentObject(pauseStore)
+                .environmentObject(preferences)
+                .environmentObject(keyCommands)
         }
     }
 }

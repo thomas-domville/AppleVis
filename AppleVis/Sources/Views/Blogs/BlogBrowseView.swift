@@ -11,6 +11,7 @@ struct BlogBrowseView: View {
     @State private var searchText = ""
     @State private var isLoadingMore = false
     @ObservedObject private var networkStatus = NetworkStatusStore.shared
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         Group {
@@ -33,6 +34,7 @@ struct BlogBrowseView: View {
         }
         .navigationTitle("AppleVis Blog")
         .task { await load(reset: true) }
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
         .refreshable { await load(reset: true); SoundPlayer.shared.play(.refresh) }
         .searchable(text: $searchText, prompt: "Search posts")
     }
@@ -47,6 +49,7 @@ struct BlogBrowseView: View {
 
     private var postList: some View {
         List {
+            AccessibleScreenHeading(title: "AppleVis Blog", isFocused: $isTitleFocused)
             if networkStatus.degradedGroups.contains(.blogs) {
                 OfflineBanner()
                     .listRowSeparator(.hidden)

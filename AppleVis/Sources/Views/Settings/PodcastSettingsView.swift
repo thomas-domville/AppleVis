@@ -12,10 +12,12 @@ struct PodcastSettingsView: View {
     private let resumeRewindOptions: [(label: String, seconds: Int)] = [
         ("Off", 0), ("5 seconds", 5), ("10 seconds", 10), ("15 seconds", 15), ("30 seconds", 30)
     ]
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         Form {
             Section("Playback") {
+                AccessibleScreenHeading(title: "Podcasts", isFocused: $isTitleFocused)
                 Picker("Speed", selection: $preferences.playbackSpeed) {
                     ForEach(speedOptions, id: \.self) { speed in
                         Text(speedLabel(speed)).tag(speed)
@@ -105,6 +107,7 @@ struct PodcastSettingsView: View {
         .themedList(preferences.colors)
         .navigationTitle("Podcasts")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
     }
 
     private func speedLabel(_ speed: Double) -> String {

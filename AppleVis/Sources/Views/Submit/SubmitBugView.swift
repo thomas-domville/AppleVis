@@ -25,6 +25,10 @@ struct SubmitBugView: View {
     @State private var step: Step = .description
     @State private var showSignIn = false
     @State private var title = ""
+    /// This webform's `email` field is genuinely required, same as the
+    /// Blog submission form's — previously hardcoded to an empty string at
+    /// submit time. Reported directly.
+    @State private var email = ""
     @State private var appleFeedbackId = ""
     @State private var platform = "iOS"
     @State private var softwareVersion = ""
@@ -51,7 +55,7 @@ struct SubmitBugView: View {
     private var descriptionLength: Int { description.trimmingCharacters(in: .whitespacesAndNewlines).count }
 
     private var descriptionValid: Bool {
-        !title.trimmingCharacters(in: .whitespaces).isEmpty && descriptionLength >= 30
+        !title.trimmingCharacters(in: .whitespaces).isEmpty && descriptionLength >= 30 && email.contains("@")
     }
 
     /// Mirrors Contact's crossing-the-threshold announcement so VoiceOver
@@ -71,9 +75,20 @@ struct SubmitBugView: View {
     /// without a software version; the native Next button here was
     /// previously hardcoded to never disable regardless of step, so this
     /// gate could be skipped with Software Version left empty through
-    /// submission.
+    /// submission. Apple Feedback # is also required here now — verified
+    /// directly against the live form, whose own description reads "We
+    /// will not accept reports unless they are first filed with Apple,"
+    /// not the optional, only-if-you-also-filed-it framing this screen
+    /// previously gave it. Format-checked for the "FB" prefix the field's
+    /// own description asks for, same level of validation as the numeric
+    /// FB number itself gets no further checking beyond that. Reported
+    /// directly.
     private var bugInfoValid: Bool {
-        !softwareVersion.trimmingCharacters(in: .whitespaces).isEmpty
+        !softwareVersion.trimmingCharacters(in: .whitespaces).isEmpty && isAppleFeedbackIdValid
+    }
+
+    private var isAppleFeedbackIdValid: Bool {
+        appleFeedbackId.trimmingCharacters(in: .whitespaces).uppercased().hasPrefix("FB")
     }
 
     var body: some View {
@@ -171,6 +186,7 @@ struct SubmitBugView: View {
     private func requestCancel() {
         let hasProgress = !title.trimmingCharacters(in: .whitespaces).isEmpty
             || !description.trimmingCharacters(in: .whitespaces).isEmpty
+            || !email.trimmingCharacters(in: .whitespaces).isEmpty
             || !appleFeedbackId.trimmingCharacters(in: .whitespaces).isEmpty
             || !softwareVersion.trimmingCharacters(in: .whitespaces).isEmpty
         if hasProgress {
@@ -205,7 +221,14 @@ struct SubmitBugView: View {
         Group {
             Section {
                 WizardStepIndicator(step: 1, total: 3, title: "Describe the Bug", isFocused: $isStepFocused)
-                Text("Report an accessibility bug for the community Bug Tracker. Apple does not see this directly — file Feedback Assistant separately if you want Apple to see it.")
+                // Previously framed filing with Apple's Feedback Assistant
+                // as optional ("if you want Apple to see it") — the live
+                // form's own description says the opposite: AppleVis won't
+                // accept a report that hasn't been filed with Apple first.
+                // Surfaced here, at the very start of the wizard, rather
+                // than as a surprise once Environment asks for the FB
+                // number. Reported directly.
+                Text("Report an accessibility bug for the community Bug Tracker. AppleVis requires every report to first be filed with Apple's Feedback Assistant — you'll need the FB number from that report to submit here.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             if intelligence.showTranslatePrompt {
@@ -247,6 +270,14 @@ struct SubmitBugView: View {
                     .accessibilityHint(String(localized: "Required."))
             }
             Section {
+                TextField("Your Email", text: $email)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .accessibilityHint(String(localized: "Required. The AppleVis team may reply to follow up on your report."))
+            } header: {
+                Text("Your Email")
+            }
+            Section {
                 HStack {
                     Text("Description").font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -282,11 +313,28 @@ struct SubmitBugView: View {
                 }
                 TextField("Software Version", text: $softwareVersion)
                     .accessibilityHint(String(localized: "Required."))
-                TextField("Apple Feedback ID (optional)", text: $appleFeedbackId)
-                    .accessibilityHint(String(localized: "The FB number from Apple's Feedback Assistant, if you also filed this there."))
                 Picker("Can you reproduce it?", selection: $canReproduce) {
                     ForEach(reproduceOptions, id: \.self) { Text($0) }
                 }
+            }
+            // Genuinely required on the live form — see `bugInfoValid`'s
+            // doc comment. Its own section (rather than folded into "Where
+            // It Happens" with the rest) so the policy explanation has
+            // room to stand out instead of reading like a minor aside next
+            // to Platform/Software Version.
+            Section {
+                TextField("Apple Feedback #", text: $appleFeedbackId)
+                    .textInputAutocapitalization(.characters)
+                    .accessibilityHint(String(localized: "Required. Starts with FB."))
+                if !appleFeedbackId.isEmpty && !isAppleFeedbackIdValid {
+                    Text("Should start with \"FB\", matching your Feedback Assistant submission number.")
+                        .font(.caption)
+                        .foregroundStyle(preferences.colors.warning)
+                }
+            } header: {
+                Text("Apple Feedback #")
+            } footer: {
+                Text("AppleVis does not accept bug reports that haven't first been filed with Apple's Feedback Assistant. This is kept confidential.")
             }
             Section("Recognition") {
                 Picker("Recognize your contribution?", selection: $recognition) {
@@ -307,6 +355,7 @@ struct SubmitBugView: View {
             Section("Bug") {
                 WizardReviewRow(label: "Title", value: title)
                 WizardReviewRow(label: "Description", value: description)
+                WizardReviewRow(label: "Email", value: email)
             }
             Section("Environment") {
                 WizardReviewRow(label: "Platform", value: platform)
@@ -341,8 +390,7 @@ struct SubmitBugView: View {
         guard let user = auth.user else { return }
         if let message = ContentSubmissionPolicy.blockingMessage(
             subject: title,
-            body: [description, recognition].joined(separator: "\n\n"),
-            detectNonEnglish: preferences.nonEnglishDetectionEnabled
+            body: [description, recognition].joined(separator: "\n\n")
         ) {
             error = message
             await announceWizardFailure(message, focus: $isErrorFocused)
@@ -350,7 +398,7 @@ struct SubmitBugView: View {
         }
         isSubmitting = true; error = nil
         let result = await DrupalFormClient.submitBug(
-            name: user.name, email: "", title: title, appleFeedback: appleFeedbackId,
+            name: user.name, email: email.trimmingCharacters(in: .whitespacesAndNewlines), title: title, appleFeedback: appleFeedbackId,
             platform: platform, softwareVersion: softwareVersion, canReproduce: canReproduce,
             description: description, recognition: recognition
         )

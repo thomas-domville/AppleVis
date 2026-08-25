@@ -56,3 +56,48 @@ func retryAccessibilityFocus<T: Hashable>(
         binding.wrappedValue = target
     }
 }
+
+/// Same retry rationale as the generic version above, for the plain-`Bool`
+/// `@AccessibilityFocusState` every content detail page (topic, episode,
+/// app, blog, resource, bug) uses for its title — those previously each set
+/// focus once after a single guessed delay (e.g. `Task.sleep(300ms)`), which
+/// is exactly the unreliable-on-slower-devices pattern this file's doc
+/// comment already describes; only Home had been upgraded to retry.
+/// Reported directly: topic detail's title focus sometimes went silent.
+@MainActor
+func retryAccessibilityFocus(
+    into binding: AccessibilityFocusState<Bool>.Binding,
+    delaysMs: [Int] = [300, 550, 850]
+) async {
+    for delayMs in delaysMs {
+        try? await Task.sleep(for: .milliseconds(delayMs))
+        binding.wrappedValue = false
+        binding.wrappedValue = true
+    }
+}
+
+/// Gives a Form/List-based screen (Settings, Profile) the same "VoiceOver
+/// focus lands on the page heading after a push" behavior every custom
+/// content detail page already has. Those screens have a real, visible
+/// title `Text` to bind focus to; a `Form` relies on `.navigationTitle`
+/// instead, which isn't a view SwiftUI can attach `.accessibilityFocused`
+/// to — so without this, a pushed Settings/Profile screen silently defaults
+/// to focusing the back button, exactly the "nothing is spoken" behavior
+/// reported directly for the Settings and Profile screens. Zero-size and
+/// row-collapsed so it's invisible to sighted users while still a real,
+/// focusable accessibility element for VoiceOver.
+struct AccessibleScreenHeading: View {
+    let title: String
+    var isFocused: AccessibilityFocusState<Bool>.Binding
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .accessibilityElement()
+            .accessibilityLabel(title)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityFocused(isFocused)
+            .listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
+    }
+}

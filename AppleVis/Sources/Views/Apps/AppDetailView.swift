@@ -1,8 +1,63 @@
 import SwiftUI
 import UIKit
 
+private enum AppStoreLookupIssue {
+    case notFound
+    case invalidLink
+    case failed
+
+    var title: String {
+        switch self {
+        case .notFound:
+            return "This app may no longer be available in the App Store."
+        case .invalidLink:
+            return "The App Store link for this entry needs review."
+        case .failed:
+            return "App Store information is temporarily unavailable."
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .notFound:
+            return "AppleVis still has this community entry, but the App Store listing could not be found."
+        case .invalidLink:
+            return "AppleVis could not find a valid App Store app ID in the saved link."
+        case .failed:
+            return "AppleVis could not check the App Store right now. Try again later."
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .notFound, .invalidLink:
+            return "exclamationmark.triangle"
+        case .failed:
+            return "wifi.exclamationmark"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .notFound, .invalidLink:
+            return .orange
+        case .failed:
+            return .secondary
+        }
+    }
+}
+
 struct AppDetailView: View {
     let appId: String
+    /// Known when navigated to from an `AppListing` already carrying its
+    /// own `.platform` (Home, Discover, search, saved items); `nil` when
+    /// only a bare content id is available (deep link, Spotlight,
+    /// notification) — `AppEndpoints.detail(id:platform:)` resolves the
+    /// content type itself in that case. Reported directly: this is what
+    /// makes an Apple TV entry actually openable at all outside the Submit
+    /// wizard, previously the only place `node--tv_directory` was ever
+    /// touched.
+    var platform: AppPlatform? = nil
     /// Set when opened via a card's "Jump to First New Comment" action —
     /// see the same property on ForumTopicDetailView for the full
     /// reasoning; routed the same way through DeepLinkRouter.pendingContentIntent.
@@ -15,6 +70,12 @@ struct AppDetailView: View {
     @State private var showReviewCompose = false
     @State private var quotedReview: AppReview?
     @State private var itunesMetadata: ItunesMetadata?
+    @State private var appStoreLookupIssue: AppStoreLookupIssue?
+    /// True when `itunesMetadata` came from `matchAppleTVEntryToAppStore()`'s
+    /// best-effort name match rather than a real App Store link AppleVis
+    /// itself stored — drives a visible caveat in `appStoreInfoSection` so
+    /// this is never presented as something AppleVis verified.
+    @State private var isMatchedNotConfirmed = false
     @State private var developerApps: [ItunesDeveloperApp] = []
     @State private var isLoadingMoreReviews = false
     @State private var hasMoreReviews = true
@@ -26,6 +87,8 @@ struct AppDetailView: View {
     @State private var isSummarizingReviews = false
     @State private var accessibilityConsensus: String?
     @State private var isSummarizingConsensus = false
+    @State private var showUpdateAppInfoConfirm = false
+    @State private var isUpdatingAppInformation = false
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedReviewId: String?
     @EnvironmentObject private var auth: AuthStore
@@ -56,6 +119,7 @@ struct AppDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     heroCard(detail).padding()
+                    appStoreAvailabilityNotice(detail)
 
                     // A second, earlier entry point to the same "Jump to
                     // First New Comment" the Community Discussion heading
@@ -82,15 +146,21 @@ struct AppDetailView: View {
                     }
 
                     if let vo = detail.voiceOverPerformance, !vo.isEmpty {
-                        RatingGaugeView(label: "VoiceOver Performance", ratingText: vo, category: .voiceOver)
+                        RatingGaugeView(label: "VoiceOver Performance", ratingText: vo, options: AppAccessibilityRatings.voiceOverPerformance.map(\.value))
                             .padding(.horizontal).padding(.bottom, 12)
                     }
                     if let bl = detail.buttonLabelling, !bl.isEmpty {
-                        RatingGaugeView(label: "Button Labelling", ratingText: bl, category: .buttonLabeling)
+                        RatingGaugeView(label: "Button Labelling", ratingText: bl, options: AppAccessibilityRatings.buttonLabelling.map(\.value))
                             .padding(.horizontal).padding(.bottom, 12)
                     }
                     if let usability = detail.usabilityNotes, !usability.isEmpty {
-                        RatingGaugeView(label: "Usability", ratingText: usability, category: .usability)
+                        RatingGaugeView(
+                            label: "Usability",
+                            ratingText: usability,
+                            options: detail.platform == .tvos || detail.platform == .watchos
+                                ? AppAccessibilityRatings.usabilitySimpleScale
+                                : AppAccessibilityRatings.usabilityIOS
+                        )
                             .padding(.horizontal).padding(.bottom, 12)
                     }
                     if let acc = detail.accessibilityComments, !acc.isEmpty {
@@ -155,13 +225,45 @@ struct AppDetailView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
+                if canUpdateAppInformation(detail) {
+                    Button {
+                        showUpdateAppInfoConfirm = true
+                    } label: {
+                        if isUpdatingAppInformation {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                        }
+                    }
+                    .disabled(isUpdatingAppInformation)
+                    .accessibilityLabel(String(localized: "Update App Information"))
+                    .accessibilityHint(String(localized: "Updates the AppleVis app title, description, App Store link, and current version from the App Store listing."))
+                }
                 if let storeURL = detail.appStoreUrl.flatMap(URL.init) {
                     Link(destination: storeURL) {
                         Image(systemName: "arrow.up.right.square")
                     }
                     .accessibilityLabel(String(localized: "Open in App Store"))
+                } else if let macUpdateURL = detail.macUpdateUrl.flatMap(URL.init) {
+                    // Only ever reachable for a Mac entry with no App Store
+                    // link at all — AppleVis's own fallback reference for
+                    // apps not in the Mac App Store. Reported directly.
+                    Link(destination: macUpdateURL) {
+                        Image(systemName: "arrow.up.right.square")
+                    }
+                    .accessibilityLabel(String(localized: "Open on MacUpdate"))
                 }
             }
+        }
+        .confirmationDialog(
+            "Update App Information?",
+            isPresented: $showUpdateAppInfoConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Update App Information") { Task { await updateAppInformationFromStore() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will replace the AppleVis title, description, App Store link, and current version with the current App Store listing. It will not change accessibility ratings, comments, reviews, category, price, or tested devices.")
         }
         .safeAreaInset(edge: .bottom) {
             ContentDetailActions(
@@ -170,16 +272,53 @@ struct AppDetailView: View {
             )
         }
         .sheet(isPresented: $showReviewCompose) {
-            ComposeAppReviewView(appId: detail.id, appName: detail.name) { review in
+            ComposeAppReviewView(appId: detail.id, appName: detail.name, platform: detail.platform) { review in
                 self.detail?.reviews.append(review)
                 pendingFocusReviewId = review.id
             }
         }
         .sheet(item: $quotedReview) { target in
-            ComposeAppReviewView(appId: detail.id, appName: detail.name, quotedReview: target) { review in
+            ComposeAppReviewView(appId: detail.id, appName: detail.name, quotedReview: target, platform: detail.platform) { review in
                 self.detail?.reviews.append(review)
                 pendingFocusReviewId = review.id
             }
+        }
+    }
+
+    private func canUpdateAppInformation(_ detail: AppDetail) -> Bool {
+        guard auth.user?.isAdmin == true,
+              itunesMetadata != nil,
+              !isMatchedNotConfirmed,
+              !(detail.appStoreUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return false }
+        return detail.platform != .tvos
+    }
+
+    @ViewBuilder
+    private func appStoreAvailabilityNotice(_ detail: AppDetail) -> some View {
+        if let issue = appStoreLookupIssue,
+           !(detail.appStoreUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: issue.systemImage)
+                    .font(.title3)
+                    .foregroundStyle(issue.tint)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(issue.title)
+                        .font(.headline)
+                    Text(issue.message)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(issue.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal)
+            .padding(.bottom, 16)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(String(localized: "\(issue.title) \(issue.message)"))
         }
     }
 
@@ -208,10 +347,19 @@ struct AppDetailView: View {
         }
     }
 
+    /// Apple TV directory entries have no stored icon at all (`detail.iconUrl`
+    /// is always nil — see `Mappers.tvApp`) unless `matchAppleTVEntryToAppStore()`
+    /// finds a confirmed match; falls back to `itunesMetadata`'s artwork in
+    /// that case, same as `detail.iconUrl` would already reflect for an iOS
+    /// entry via `AppDetail.enriched(with:)`.
+    private func iconURL(_ detail: AppDetail) -> URL? {
+        detail.iconUrl.flatMap(URL.init) ?? itunesMetadata.flatMap { URL(string: $0.artworkUrl) }
+    }
+
     private func heroCard(_ detail: AppDetail) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 16) {
-                AsyncImage(url: detail.iconUrl.flatMap(URL.init)) { image in
+                AsyncImage(url: iconURL(detail)) { image in
                     image.resizable().scaledToFill()
                 } placeholder: {
                     RoundedRectangle(cornerRadius: 14)
@@ -259,16 +407,74 @@ struct AppDetailView: View {
             }
             .padding(.horizontal)
             .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+
+            storeActionButton(detail)
         }
     }
 
+    @ViewBuilder
+    private func storeActionButton(_ detail: AppDetail) -> some View {
+        if let storeURL = detail.appStoreUrl.flatMap(URL.init) {
+            Link(destination: storeURL) {
+                storeActionLabel(
+                    title: "Open in App Store",
+                    caption: "Downloads and purchases are handled by Apple.",
+                    systemImage: "arrow.up.forward.app"
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(String(localized: "Open \(detail.name) in the App Store."))
+            .accessibilityHint(String(localized: "Opens the App Store listing. Downloads and purchases are handled by Apple."))
+        } else if let macUpdateURL = detail.macUpdateUrl.flatMap(URL.init) {
+            Link(destination: macUpdateURL) {
+                storeActionLabel(
+                    title: "Open on MacUpdate",
+                    caption: "Downloads and purchases are handled outside AppleVis.",
+                    systemImage: "arrow.up.forward.square"
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(String(localized: "Open \(detail.name) on MacUpdate."))
+            .accessibilityHint(String(localized: "Opens the app listing in your browser. Downloads and purchases are handled outside AppleVis."))
+        }
+    }
+
+    private func storeActionLabel(title: String, caption: String, systemImage: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.title3)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+                Text(caption)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(.white)
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12))
+    }
+
     /// iTunes (when available) is the live, authoritative source for
-    /// iPhone/iPad/iPod touch/Apple Watch — it can't confirm native Mac or
-    /// Apple TV support (see ItunesMetadata.deviceFamilies), so those two
-    /// are added from AppleVis's own submitted `field_device_used` data only
-    /// when iTunes hasn't already confirmed Mac via a Catalyst build. If
-    /// iTunes metadata isn't available at all (no App Store link, or the
-    /// lookup failed), falls back to AppleVis's raw list entirely.
+    /// iPhone/iPad/iPod touch/Apple Watch, and — via the supplementary
+    /// `confirmAppleTVSupport(for:)` check `load()` runs — Apple TV too.
+    /// It still can't confirm native Mac support (a Mac Catalyst build is
+    /// the only Mac signal `deviceFamilies` can see; a genuinely separate
+    /// native Mac app has its own track id this lookup has no way to find),
+    /// so Mac alone still falls back to AppleVis's own submitted
+    /// `field_device_used` data. If iTunes metadata isn't available at all
+    /// (no App Store link, match, or the lookup failed), falls back to
+    /// AppleVis's raw list entirely. Previously also tried to source Apple
+    /// TV from `field_device_used` too, but that option was never actually
+    /// offered on the live iOS submission form (only iPhone/iPad/Mac are),
+    /// so that branch could never fire from real data — removed in favor
+    /// of the real, live-confirmed signal above. Reported directly.
     private func supportedDevicesText(_ detail: AppDetail) -> String {
         var families = itunesMetadata?.deviceFamilies ?? []
         guard !families.isEmpty else {
@@ -277,9 +483,6 @@ struct AppDetailView: View {
         let drupalLower = detail.supportedDevices.map { $0.lowercased() }
         if !families.contains("Mac"), drupalLower.contains(where: { $0.contains("mac") }) {
             families.append("Mac")
-        }
-        if drupalLower.contains(where: { $0.contains("apple tv") || $0.contains("tvos") }) {
-            families.append("Apple TV")
         }
         return families.joined(separator: ", ")
     }
@@ -293,6 +496,13 @@ struct AppDetailView: View {
         return "\(submitted), last reviewed \(detail.lastUpdatedAt.formatted(.relative(presentation: .named)))"
     }
 
+    /// "Nov 11, 2019 (6 years ago)" — the absolute date plus the same kind
+    /// of relative "ago" wording `submittedAndReviewedText` above already
+    /// uses elsewhere on this page, so both read consistently.
+    private static func releaseDateText(_ date: Date) -> String {
+        "\(date.formatted(date: .abbreviated, time: .omitted)) (\(date.formatted(.relative(presentation: .named))))"
+    }
+
     private func appStoreTitleNotice(for detail: AppDetail) -> String? {
         guard let appleVisTitle,
               !appleVisTitle.isEmpty,
@@ -304,6 +514,13 @@ struct AppDetailView: View {
     private func appStoreInfoSection(_ detail: AppDetail, _ meta: ItunesMetadata) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeading("App Store Info")
+            if isMatchedNotConfirmed {
+                Text("Matched automatically from the App Store by name — not confirmed by AppleVis.")
+                    .font(.caption)
+                    .foregroundStyle(preferences.colors.warning)
+                    .padding(.horizontal)
+                    .padding(.bottom, 4)
+            }
             VStack(spacing: 0) {
                 // Price dropped here — it's already shown once, up in the
                 // hero card, and repeating it in both places was pure
@@ -328,6 +545,21 @@ struct AppDetailView: View {
                 if !meta.languageCodes.isEmpty { infoRow("Language", meta.languageNames) }
                 if !meta.ageRating.isEmpty { infoRow("Age Rating", meta.ageRating) }
                 if !meta.fileSizeMb.isEmpty { infoRow("Size", meta.fileSizeMb) }
+                // Apple's own `releaseDate`/`currentVersionReleaseDate` —
+                // both already came back in every lookup this page already
+                // makes, just never parsed or shown before. Placed last in
+                // this section, right before "What's New," since a "how
+                // long has this been out / how recently was it updated"
+                // sense fits naturally right ahead of the actual changelog
+                // text. Equal dates just mean the app hasn't been updated
+                // since it first launched — expected, not an error.
+                // Requested directly.
+                if let releaseDate = meta.releaseDate {
+                    infoRow("Released", Self.releaseDateText(releaseDate))
+                }
+                if let updatedDate = meta.currentVersionReleaseDate {
+                    infoRow("Last Updated", Self.releaseDateText(updatedDate))
+                }
             }
             .padding(.horizontal)
             .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
@@ -689,20 +921,62 @@ struct AppDetailView: View {
     private func load() async {
         isLoading = true; error = nil
         do {
-            detail = try await APIClient.shared.apps.detail(id: appId)
+            detail = try await APIClient.shared.apps.detail(id: appId, platform: platform)
             appleVisTitle = detail?.name
+            itunesMetadata = nil
+            appStoreLookupIssue = nil
+            developerApps = []
+            isMatchedNotConfirmed = false
             hasMoreReviews = (detail?.reviews.count ?? 0) < (detail?.reviewCount ?? 0)
             if hasMoreReviews {
                 Task { await loadMoreReviews() }
             }
             if let storeUrl = detail?.appStoreUrl, !storeUrl.isEmpty {
-                itunesMetadata = await ItunesAPI.fetchMetadata(appStoreUrl: storeUrl)
+                // Mac apps can be a genuine, separate Mac App Store listing
+                // or a Catalyst app sharing its iOS listing — `fetchMacMetadata`
+                // tries both (see `ItunesAPI.fetchMacMetadata`). Every
+                // other platform's stored link only ever needs the one
+                // fixed entity `fetchMetadata`'s default already uses.
+                let lookupResult = detail?.platform == .macos
+                    ? await ItunesAPI.lookupMacMetadata(appStoreUrl: storeUrl)
+                    : await ItunesAPI.lookupMetadata(appStoreUrl: storeUrl)
+                switch lookupResult {
+                case .found(let meta):
+                    itunesMetadata = meta
+                case .notFound:
+                    appStoreLookupIssue = .notFound
+                case .invalidLink:
+                    appStoreLookupIssue = .invalidLink
+                case .failed:
+                    appStoreLookupIssue = .failed
+                }
                 if let meta = itunesMetadata, let current = detail {
                     detail = current.enriched(with: meta)
                 }
                 if let artistId = itunesMetadata?.artistId, let appStoreId = itunesMetadata?.appStoreId {
                     developerApps = await ItunesAPI.fetchDeveloperApps(artistId: artistId, excluding: appStoreId)
                 }
+                // Supplementary, non-blocking: confirms whether this same,
+                // already-resolved App Store id also has a real Apple TV
+                // build, via a second lookup on the identical id (not a
+                // name guess — the id is already fixed) so the Devices row
+                // can show "Apple TV" when it's actually true. Backgrounded
+                // rather than awaited inline so a slow check can't delay
+                // the rest of the page. Reported directly: previously
+                // "Apple TV" could only ever come from AppleVis's own
+                // submitted device checkboxes, which don't even offer an
+                // Apple TV option on the live iOS submission form, so this
+                // could never actually fire from real data.
+                if let appStoreId = itunesMetadata?.appStoreId {
+                    Task { await confirmAppleTVSupport(for: appStoreId) }
+                }
+            } else if detail?.platform == .tvos {
+                // Apple TV directory entries store no App Store link at
+                // all — the live submission form never asks for one (see
+                // `Mappers.tvApp`). Backgrounded for the same reason as
+                // above: this is a multi-step, best-effort lookup, not
+                // something the rest of the page should wait on.
+                Task { await matchAppleTVEntryToAppStore() }
             }
             if let detail {
                 // Captured before stampItemVisit below overwrites it —
@@ -735,6 +1009,48 @@ struct AppDetailView: View {
         focusTitleAfterLoad()
     }
 
+    private func confirmAppleTVSupport(for appStoreId: String) async {
+        guard await ItunesAPI.fetchTvOSSupport(appStoreId: appStoreId) != nil,
+              let current = itunesMetadata
+        else { return }
+        itunesMetadata = current.addingDeviceFamily("Apple TV")
+    }
+
+    /// Apple TV directory entries store no App Store link at all — a
+    /// best-effort substitute for the enrichment iOS entries get from
+    /// their real, stored link. Searches for an app with this entry's
+    /// exact title, and only uses the result if there's exactly one
+    /// exact-title match AND that specific candidate is independently
+    /// confirmed — via `fetchTvOSSupport`, a real API check on that
+    /// candidate's own id, not a guess — to actually have an Apple TV
+    /// build. Deliberately never touches `detail` itself: AppleVis's own
+    /// curated name/category/price/usability/comments stay exactly as
+    /// submitted and reviewed; only supplementary display data (icon,
+    /// screenshots, version, size, "More by" apps) comes from this match,
+    /// and `isMatchedNotConfirmed` drives a visible caveat in
+    /// `appStoreInfoSection` so it's never presented as something AppleVis
+    /// itself verified. Discussed and confirmed directly — rejected doing
+    /// this via App Store scraping, and rejected a weaker "just take the
+    /// top search result" version of this same idea before this two-step
+    /// verification (confirmed-real-tvOS-app, not merely name-matched)
+    /// was worked out.
+    private func matchAppleTVEntryToAppStore() async {
+        guard let name = detail?.name, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let candidates = await ItunesAPI.searchTvOS(name, limit: 10)
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let exactMatches = candidates.filter {
+            $0.appName.trimmingCharacters(in: .whitespacesAndNewlines).localizedCaseInsensitiveCompare(trimmedName) == .orderedSame
+        }
+        guard exactMatches.count == 1, let match = exactMatches.first,
+              let meta = await ItunesAPI.fetchTvOSSupport(appStoreId: match.appStoreId)
+        else { return }
+        itunesMetadata = meta
+        isMatchedNotConfirmed = true
+        if let artistId = meta.artistId {
+            developerApps = await ItunesAPI.fetchDeveloperApps(artistId: artistId, excluding: meta.appStoreId)
+        }
+    }
+
     /// Loads every remaining page in one go instead of requiring a tap per
     /// page — same fix already applied to Forum/Blog/Guide/Podcast comments.
     /// Reviews previously had no pagination at all (not even manual "Load
@@ -743,7 +1059,7 @@ struct AppDetailView: View {
         isLoadingMoreReviews = true
         do {
             while let current = self.detail, current.reviews.count < current.reviewCount {
-                let more = try await APIClient.shared.apps.moreReviews(appId: current.id, offset: current.reviews.count)
+                let more = try await APIClient.shared.apps.moreReviews(appId: current.id, offset: current.reviews.count, platform: current.platform)
                 guard !more.isEmpty else { break }
                 self.detail?.reviews.append(contentsOf: more)
             }
@@ -754,9 +1070,38 @@ struct AppDetailView: View {
         isLoadingMoreReviews = false
     }
 
-    /// "Jump to Last Comment" link on the Community Discussion heading —
-    /// loads any not-yet-fetched reviews first so it always lands on the
-    /// true last one, then moves VoiceOver focus there.
+    /// Updates AppleVis's store-owned app fields from the confirmed App
+    /// Store listing while leaving community accessibility data untouched.
+    private func updateAppInformationFromStore() async {
+        guard let current = detail,
+              let metadata = itunesMetadata,
+              let user = auth.user,
+              user.isAdmin
+        else {
+            toast.error(String(localized: "You need to be signed in as an editor to update app information."))
+            return
+        }
+        guard !isMatchedNotConfirmed else {
+            toast.error(String(localized: "This App Store match is not confirmed, so AppleVis was not updated."))
+            return
+        }
+
+        isUpdatingAppInformation = true
+        defer { isUpdatingAppInformation = false }
+
+        do {
+            try await APIClient.shared.apps.updateAppInformation(detail: current, metadata: metadata, csrfToken: user.csrfToken)
+            toast.success(String(localized: "App information updated"))
+            await load()
+        } catch APIError.forbidden {
+            toast.error(String(localized: "You don't have permission to update this app."))
+        } catch APIError.unauthorized {
+            toast.error(String(localized: "Please sign in again to update this app."))
+        } catch {
+            toast.error(String(localized: "Couldn't update app information."))
+        }
+    }
+
     private func jumpToLastReview(proxy: ScrollViewProxy) async {
         if hasMoreReviews { await loadMoreReviews() }
         guard let lastId = self.detail?.reviews.last?.id else { return }
@@ -783,12 +1128,12 @@ struct AppDetailView: View {
     /// VoiceOver lands on the back button after push navigation by default;
     /// this moves it to the page heading instead, per
     /// docs/IMPLEMENTATION_NOTES.md's "VoiceOver Detail Page Navigation"
-    /// guidance. Delayed slightly since setting focus before the new content
-    /// has actually laid out is a common way for it to silently fail.
+    /// guidance. Retries at each delay rather than a single guessed one —
+    /// a single attempt could silently go nowhere on a slower device or
+    /// slower load. Reported directly.
     private func focusTitleAfterLoad() {
         Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            isTitleFocused = true
+            await retryAccessibilityFocus(into: $isTitleFocused)
         }
     }
 }
@@ -869,8 +1214,8 @@ struct AppReviewRow: View {
     var onEdit: ((String) -> Void)? = nil
     var onReplyTo: (() -> Void)? = nil
     var parentTitle: String = ""
-    /// Set by the parent when it supports "Jump to Last Comment" — lets
-    /// that action move VoiceOver focus here, not just scroll the viewport.
+    /// Optional review focus target used after jumping or posting so
+    /// VoiceOver focus lands here, not just scrolls the viewport.
     var focusBinding: AccessibilityFocusState<String?>.Binding? = nil
 
     @EnvironmentObject private var auth: AuthStore
@@ -1034,61 +1379,36 @@ struct AppReviewRow: View {
 
 // MARK: - Accessibility rating gauge
 
-/// AppleVis's VoiceOver Performance/Button Labelling/Usability fields are a
-/// fixed four-word vocabulary (Excellent/Good/Fair/Poor), not free text —
-/// confirmed by the old app's own accessibility-label construction, which
-/// runs each of these three fields through the same rating lookup. Swift
-/// previously rendered them as plain text (or, for Usability, as if it were
-/// an HTML free-text field), losing both the quick-scan visual gauge and
-/// the friendlier plain-language description sighted/low-vision users get
-/// from the old app.
-enum AppRatingLevel {
-    case excellent, good, fair, poor
+/// A rating's position within its field's real, fixed vocabulary
+/// (`AppAccessibilityRatings`) — index 0 is the best outcome in that
+/// field's own list, the last index the worst; the gauge's fill and color
+/// are derived from that position, generically, for any of the four rating
+/// fields (VoiceOver Performance, Button Labelling, iOS/macOS Usability,
+/// Apple TV Usability) rather than one hardcoded scale.
+///
+/// Previously this assumed every rating was one of four fixed words —
+/// "Excellent"/"Good"/"Fair"/"Poor" — a vocabulary that doesn't match a
+/// single value either content type actually stores (real values are full
+/// sentences, e.g. "VoiceOver reads most page elements." or "The app is
+/// totally inaccessible."). Every real rating silently fell back to the
+/// "unrecognized value" plain-text branch below, meaning the gauge itself
+/// never actually rendered for a real app entry. Reported directly.
+struct AppRatingLevel {
+    let position: Double // 0.0 (worst) ... 1.0 (best)
+    let color: Color
 
-    init?(text: String) {
-        switch text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-        case "excellent": self = .excellent
-        case "good": self = .good
-        case "fair": self = .fair
-        case "poor": self = .poor
-        default: return nil
-        }
+    init?(text: String, options: [String]) {
+        guard options.count > 1, let index = options.firstIndex(of: text) else { return nil }
+        position = Double(options.count - 1 - index) / Double(options.count - 1)
+        color = Self.color(for: position)
     }
 
-    var value: Double {
-        switch self {
-        case .excellent: return 1.0
-        case .good: return 0.75
-        case .fair: return 0.5
-        case .poor: return 0.25
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .excellent: return Color(red: 0.133, green: 0.773, blue: 0.369)
-        case .good: return Color(red: 0.518, green: 0.800, blue: 0.086)
-        case .fair: return Color(red: 0.961, green: 0.620, blue: 0.043)
-        case .poor: return Color(red: 0.937, green: 0.267, blue: 0.267)
-        }
-    }
-
-    enum Category { case voiceOver, buttonLabeling, usability }
-
-    func description(for category: Category) -> String {
-        switch (self, category) {
-        case (.excellent, .voiceOver):      return "Works flawlessly with VoiceOver. No workarounds needed."
-        case (.excellent, .buttonLabeling): return "All interactive elements are clearly and accurately labeled."
-        case (.excellent, .usability):      return "Smooth, intuitive experience for screen reader users."
-        case (.good, .voiceOver):           return "Works well with VoiceOver. Minor issues or inconsistencies."
-        case (.good, .buttonLabeling):      return "Most elements are labeled. Occasional unlabeled buttons."
-        case (.good, .usability):           return "Generally usable with minor friction points."
-        case (.fair, .voiceOver):           return "Partially accessible. Some features may require workarounds."
-        case (.fair, .buttonLabeling):      return "Many interactive elements have poor or missing labels."
-        case (.fair, .usability):           return "Usable but requires significant effort or workarounds."
-        case (.poor, .voiceOver):           return "Significant accessibility barriers. Most features are difficult or impossible to use with VoiceOver."
-        case (.poor, .buttonLabeling):      return "Most interactive elements are unlabeled or incorrectly labeled."
-        case (.poor, .usability):           return "Very difficult or unusable for screen reader users."
+    private static func color(for position: Double) -> Color {
+        switch position {
+        case 0.75...: return Color(red: 0.133, green: 0.773, blue: 0.369)
+        case 0.5..<0.75: return Color(red: 0.518, green: 0.800, blue: 0.086)
+        case 0.25..<0.5: return Color(red: 0.961, green: 0.620, blue: 0.043)
+        default: return Color(red: 0.937, green: 0.267, blue: 0.267)
         }
     }
 }
@@ -1096,35 +1416,43 @@ enum AppRatingLevel {
 struct RatingGaugeView: View {
     let label: String
     let ratingText: String
-    let category: AppRatingLevel.Category
+    /// The full option list for this field, ordered best (index 0) to
+    /// worst — e.g. `AppAccessibilityRatings.voiceOverPerformance.map(\.value)`.
+    /// Deliberately excludes "Not applicable for this app" (present on
+    /// VoiceOver/Labelling): that's not a point on a good-to-bad scale, so
+    /// it's shown as plain text via the "unrecognized value" branch below
+    /// rather than forced into a misleading position on the gauge.
+    let options: [String]
 
     var body: some View {
-        if let level = AppRatingLevel(text: ratingText) {
+        if let level = AppRatingLevel(text: ratingText, options: options) {
             VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(label.uppercased())
-                        .font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
-                    Spacer()
-                    Text(ratingText)
-                        .font(.caption).fontWeight(.heavy).foregroundStyle(level.color)
-                        .padding(.horizontal, 8).padding(.vertical, 2)
-                        .tintedBackground(level.color, opacity: 0.15, cornerRadius: 6)
-                }
+                Text(label.uppercased())
+                    .font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.secondary.opacity(0.2)).frame(height: 8)
-                        Capsule().fill(level.color).frame(width: geo.size.width * level.value, height: 8)
+                        Capsule().fill(level.color).frame(width: max(geo.size.width * level.position, 8), height: 8)
                     }
                 }
                 .frame(height: 8)
-                Text(level.description(for: category))
-                    .font(.caption).foregroundStyle(.secondary)
+                // The rating text itself is already a full, plain-language
+                // sentence — unlike the old fictional "Excellent"/"Good"
+                // words, it needs no separate paraphrased description
+                // underneath, just a color cue tying it to the gauge above.
+                HStack(alignment: .top, spacing: 6) {
+                    Circle().fill(level.color).frame(width: 8, height: 8)
+                        .padding(.top, 5)
+                        .accessibilityHidden(true)
+                    Text(ratingText).font(.subheadline)
+                }
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel(String(localized: "\(label): \(ratingText). \(level.description(for: category))"))
+            .accessibilityLabel(String(localized: "\(label): \(ratingText)"))
         } else {
-            // Unexpected value outside the known vocabulary — show as plain
-            // text rather than silently dropping it.
+            // Unrecognized value (or "Not applicable for this app") — shown
+            // as plain text rather than silently dropped or forced onto a
+            // misleading gauge position.
             VStack(alignment: .leading, spacing: 2) {
                 Text(label.uppercased()).font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
                 Text(ratingText).font(.subheadline)
@@ -1139,6 +1467,7 @@ struct ComposeAppReviewView: View {
     let appId: String
     let appName: String
     var quotedReview: AppReview? = nil
+    let platform: AppPlatform
     let onPosted: (AppReview) -> Void
 
     @State private var subject = ""
@@ -1152,10 +1481,11 @@ struct ComposeAppReviewView: View {
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
 
-    init(appId: String, appName: String, quotedReview: AppReview? = nil, onPosted: @escaping (AppReview) -> Void) {
+    init(appId: String, appName: String, quotedReview: AppReview? = nil, platform: AppPlatform, onPosted: @escaping (AppReview) -> Void) {
         self.appId = appId
         self.appName = appName
         self.quotedReview = quotedReview
+        self.platform = platform
         self.onPosted = onPosted
         if let quotedReview {
             _reviewText = State(initialValue: QuotedReply.prefix(authorName: quotedReview.authorName, body: quotedReview.body))
@@ -1239,8 +1569,7 @@ struct ComposeAppReviewView: View {
         guard let user = auth.user else { return }
         if let message = ContentSubmissionPolicy.blockingMessage(
             subject: subject,
-            body: reviewText,
-            detectNonEnglish: ContentSubmissionPolicy.shouldDetectNonEnglish
+            body: reviewText
         ) {
             submitError = message
             return
@@ -1248,7 +1577,7 @@ struct ComposeAppReviewView: View {
         isSubmitting = true; submitError = nil
         do {
             let review = try await APIClient.shared.apps.submitReview(
-                appId: appId, subject: subject, body: reviewText, csrfToken: user.csrfToken
+                appId: appId, subject: subject, body: reviewText, csrfToken: user.csrfToken, platform: platform
             )
             toast.success(String(localized: "Comment posted"))
             onPosted(review)

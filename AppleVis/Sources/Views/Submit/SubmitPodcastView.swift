@@ -35,13 +35,29 @@ struct SubmitPodcastView: View {
     @State private var submitted = false
     @State private var descriptionMinimumAnnounced = false
 
-    /// Set when opened from the Share Extension with a shared podcast URL.
-    /// This form needs an actual audio file upload — a shared link can't
-    /// satisfy that — so the URL is dropped into the description as context
-    /// rather than claimed as an attachment.
-    init(prefillSharedURL: String? = nil) {
+    /// Set when opened from the Share Extension with a shared podcast URL,
+    /// or with a shared audio file itself. This form needs an actual audio
+    /// file upload — a shared link can't satisfy that on its own — so a
+    /// shared URL is dropped into the description as context rather than
+    /// claimed as an attachment, while a shared audio file goes straight
+    /// into the same state a manual "Choose Audio File" pick would.
+    ///
+    /// A previous pass here added an editable "Your Email" field, on the
+    /// same reasoning that fixed Blog and Bug's genuinely-required email
+    /// fields — checked directly against this form's own live HTML and
+    /// that reasoning turns out not to apply: for a signed-in submitter,
+    /// the real form shows name and email as plain read-only text (Drupal
+    /// `item` elements, populated from the account), not editable inputs
+    /// at all — there's no `name="mail"` field on the real form to send in
+    /// the first place. Reverted; `DrupalFormClient.submitPodcast` no
+    /// longer takes an email parameter either. Reported directly.
+    init(prefillSharedURL: String? = nil, prefillAudioData: Data? = nil, prefillAudioFileName: String? = nil) {
         if let prefillSharedURL {
             _description = State(initialValue: "Shared from: \(prefillSharedURL)\n\n")
+        }
+        if let prefillAudioData, let prefillAudioFileName {
+            _audioFileData = State(initialValue: prefillAudioData)
+            _audioFileURL = State(initialValue: URL(fileURLWithPath: prefillAudioFileName))
         }
     }
 
@@ -319,10 +335,13 @@ struct SubmitPodcastView: View {
     }
 
     private func submit() async {
-        guard let user = auth.user else { return }
+        // The real form derives the submitter from the authenticated
+        // session server-side — no `name`/`mail` field to pass along (see
+        // `DrupalFormClient.submitPodcast`) — but this screen still
+        // shouldn't let a signed-out state reach the network call at all.
+        guard auth.isSignedIn else { return }
         if let message = ContentSubmissionPolicy.blockingMessage(
-            body: description,
-            detectNonEnglish: preferences.nonEnglishDetectionEnabled
+            body: description
         ) {
             error = message
             await announceWizardFailure(message, focus: $isErrorFocused)
@@ -330,7 +349,7 @@ struct SubmitPodcastView: View {
         }
         isSubmitting = true; error = nil
         let result = await DrupalFormClient.submitPodcast(
-            name: user.name, email: "", description: description,
+            description: description,
             audioFileName: audioFileURL?.lastPathComponent, audioFileData: audioFileData
         )
         switch result {

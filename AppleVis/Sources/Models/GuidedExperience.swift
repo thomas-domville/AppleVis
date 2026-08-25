@@ -65,7 +65,7 @@ enum GuidedExperienceRegistry {
         steps: [
             GuidedExperienceStep(
                 id: "welcome-intro", title: "Welcome to AppleVis", icon: "sparkles",
-                shortText: "AppleVis brings together community discussions, accessible app information, podcasts, guides, and Apple accessibility resources in one place.",
+                shortText: "AppleVis is the leading online destination for blind, DeafBlind, and low vision users of Apple products and services. AppleVis brings together community discussions, accessible app information, podcasts, guides, and Apple vision accessibility resources in one place.",
                 explainMoreText: "This quick tour will show you where to begin and where to find help when you need it."
             ),
             GuidedExperienceStep(

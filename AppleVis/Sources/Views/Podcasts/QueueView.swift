@@ -11,6 +11,7 @@ struct QueueView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @Environment(\.dismiss) private var dismiss
     @State private var showClearConfirm = false
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -21,6 +22,7 @@ struct QueueView: View {
                         systemImage: "list.number",
                         description: Text("Add episodes from the Podcasts tab or from any episode detail page.")
                     )
+                    .accessibilityFocused($isTitleFocused)
                 } else {
                     List {
                         Section {
@@ -57,6 +59,7 @@ struct QueueView: View {
                 }
             }
             .navigationTitle("Queue")
+            .task { await retryAccessibilityFocus(into: $isTitleFocused) }
             .toolbar {
                 if isModal {
                     ToolbarItem(placement: .confirmationAction) {
@@ -83,6 +86,7 @@ struct QueueView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .accessibilityAddTraits(.isHeader)
+            .accessibilityFocused($isTitleFocused)
             .accessibilityAction(named: Text("Queue summary")) {
                 let totalSeconds = player.queue.reduce(0.0) { $0 + ($1.duration ?? 0) }
                 let duration = totalSeconds > 0 ? ", about \(PodcastDuration.accessibilityLabel(totalSeconds))" : ""

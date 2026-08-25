@@ -10,6 +10,7 @@ struct ProfileView: View {
     @State private var showEditProfile = false
     @State private var showContact = false
     @State private var showWelcomeTour = false
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -26,6 +27,7 @@ struct ProfileView: View {
             .listStyle(.insetGrouped)
             .themedList(preferences.colors)
             .navigationTitle("Profile")
+            .task { await retryAccessibilityFocus(into: $isTitleFocused) }
         }
         .sheet(isPresented: $showSignIn) {
             SignInView()
@@ -57,6 +59,7 @@ struct ProfileView: View {
     @ViewBuilder
     private func signedInContent(_ user: AuthUser) -> some View {
         Section {
+            AccessibleScreenHeading(title: "Profile", isFocused: $isTitleFocused)
             HStack(spacing: 14) {
                 Circle()
                     .fill(Color.accentColor)
@@ -161,6 +164,7 @@ struct ProfileView: View {
 
     private var signedOutContent: some View {
         Section {
+            AccessibleScreenHeading(title: "Profile", isFocused: $isTitleFocused)
             VStack(alignment: .leading, spacing: 12) {
                 Text("Sign In")
                     .font(.headline)

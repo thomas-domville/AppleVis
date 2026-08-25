@@ -223,7 +223,7 @@ final class APIClient {
         headers: [String: String] = [:]
     ) async throws {
         let body = JsonApiWriteBody(type: type, id: id, attributes: attributes, relationships: relationships)
-        let _: EmptyJSONAPIResponse? = try? await postJsonAPIEnvelope(path, body: body, method: "PATCH", headers: headers)
+        let _: EmptyJSONAPIResponse = try await postJsonAPIEnvelope(path, body: body, method: "PATCH", headers: headers)
     }
 
     /// DELETE a JSON:API resource.
@@ -281,6 +281,9 @@ final class APIClient {
         do {
             let (data, response) = try await session.data(for: request)
             try validateStatus(response)
+            if data.isEmpty, let empty = EmptyJSONAPIResponse() as? T {
+                return empty
+            }
             return try rawDecoder.decode(T.self, from: data)
         } catch let apiError as APIError {
             throw apiError

@@ -37,8 +37,25 @@ struct SubmitBlogView: View {
     @State private var showSignIn = false
     @State private var title = ""
     @State private var category = ""
-    @State private var coverNote = ""
+    /// The live webform's actual required "Message" field — its own
+    /// description reads "Tell us a little about your blog post and why
+    /// you think it would be of interest and value to the AppleVis
+    /// community." Previously named `coverNote`, optional, and never
+    /// actually sent to that field at all — the real "Message" field was
+    /// silently filled with a mechanical "Blog Title: X\nCategory: Y"
+    /// summary instead of ever asking the submitter for this. Verified
+    /// live against the real form. Reported directly.
+    @State private var pitchMessage = ""
     @State private var blogDraft = ""
+    /// The live webform's `email` field is genuinely `required="required"`
+    /// — confirmed live, and confirmed pre-filled with the signed-in
+    /// user's real account email in a browser (a Drupal default-value
+    /// token, not something a raw POST inherits automatically). This was
+    /// previously hardcoded to an empty string at submit time, which a
+    /// server-required field would very likely reject outright. Reported
+    /// directly; the same fix is needed for Bug and Podcast submission,
+    /// which share the identical hardcoded-empty pattern.
+    @State private var email = ""
     @State private var isSubmitting = false
     @State private var error: String?
     @State private var showFileImporter = false
@@ -58,9 +75,12 @@ struct SubmitBlogView: View {
     private var blogDraftLength: Int { blogDraft.trimmingCharacters(in: .whitespacesAndNewlines).count }
 
     /// 50-char minimum matches legacy's `submit-blog/content.tsx`
-    /// `canContinue`, dropped in the native port (SUBMIT-012).
+    /// `canContinue`, dropped in the native port (SUBMIT-012). Now also
+    /// requires Email and the pitch message — both genuinely required on
+    /// the live form, previously not asked for (email) or not actually
+    /// sent to the field asking for it (pitch). Reported directly.
     private var contentValid: Bool {
-        blogDraftLength >= 50
+        blogDraftLength >= 50 && email.contains("@") && !pitchMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// Mirrors Contact's crossing-the-threshold announcement so VoiceOver
@@ -196,6 +216,14 @@ struct SubmitBlogView: View {
     private var contentSection: some View {
         Group {
             Section { WizardStepIndicator(step: 2, total: 3, title: "Your Content", isFocused: $isStepFocused) }
+            Section {
+                TextField("Your Email", text: $email)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .accessibilityHint(String(localized: "Required. The AppleVis editorial team may reply to follow up on your submission."))
+            } header: {
+                Text("Your Email")
+            }
             if intelligence.showTranslatePrompt {
                 Section {
                     TranslatePromptView(isProcessing: intelligence.isProcessing) {
@@ -229,10 +257,27 @@ struct SubmitBlogView: View {
                     )
                 }
             }
-            Section("Note to Editors") {
-                TextEditor(text: $coverNote)
+            // The live webform's actual required "Message" field — see the
+            // `pitchMessage` property's doc comment. Now gets the same
+            // live guideline/language checking as the draft itself, which
+            // the old optional "Note to Editors" never had at all.
+            Section {
+                TextEditor(text: $pitchMessage)
                     .frame(minHeight: 80)
-                    .accessibilityHint(String(localized: "A private note to the editorial team, not published."))
+                    .accessibilityLabel(String(localized: "Why this post would interest AppleVis readers"))
+                    .accessibilityHint(String(localized: "Required."))
+                    .onChange(of: pitchMessage) { _, newValue in
+                        guidelines.textChanged(newValue)
+                        intelligence.textChanged(
+                            newValue,
+                            translationEnabled: preferences.composeTranslationEnabled,
+                            detectionEnabled: preferences.nonEnglishDetectionEnabled
+                        )
+                    }
+            } header: {
+                Text("Why This Post Would Interest AppleVis Readers")
+            } footer: {
+                Text("Tell us a little about your blog post and why you think it would be of interest and value to the AppleVis community.")
             }
             Section {
                 HStack {
@@ -295,7 +340,7 @@ struct SubmitBlogView: View {
     /// already fixed for Submit App, now matched here.
     private func requestCancel() {
         let hasProgress = !title.trimmingCharacters(in: .whitespaces).isEmpty
-            || !coverNote.trimmingCharacters(in: .whitespaces).isEmpty
+            || !pitchMessage.trimmingCharacters(in: .whitespaces).isEmpty
             || !blogDraft.trimmingCharacters(in: .whitespaces).isEmpty
         if hasProgress {
             showDiscardConfirm = true
@@ -314,7 +359,7 @@ struct SubmitBlogView: View {
         case .success(let url):
             let didAccess = url.startAccessingSecurityScopedResource()
             defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
-            guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+            guard let text = Self.decodeTextFile(at: url) else {
                 toast.error(String(localized: "Couldn't read that file."))
                 return
             }
@@ -323,6 +368,22 @@ struct SubmitBlogView: View {
         case .failure:
             toast.error(String(localized: "Couldn't import that file."))
         }
+    }
+
+    /// `allowedContentTypes` on the file importer includes `.rtf`, but a
+    /// plain `String(contentsOf:encoding:.utf8)` read — which RTF's own
+    /// text-based markup doesn't fail on — produces raw `{\rtf1\ansi...}`
+    /// control-code text instead of the actual document content. Decodes
+    /// through `NSAttributedString` for `.rtf` specifically; every other
+    /// allowed type keeps the plain UTF-8 read. Reported directly.
+    static func decodeTextFile(at url: URL) -> String? {
+        if url.pathExtension.lowercased() == "rtf" {
+            guard let data = try? Data(contentsOf: url),
+                  let attributed = try? NSAttributedString(data: data, options: [.documentType: NSAttributedString.DocumentType.rtf], documentAttributes: nil)
+            else { return nil }
+            return attributed.string
+        }
+        return try? String(contentsOf: url, encoding: .utf8)
     }
 
     private func pasteFromClipboard() {
@@ -342,11 +403,12 @@ struct SubmitBlogView: View {
                 WizardReviewRow(label: "Category", value: category)
             }
             Section("Content") {
-                WizardReviewRow(label: "Note to Editors", value: coverNote)
+                WizardReviewRow(label: "Why This Post Would Interest AppleVis Readers", value: pitchMessage)
                 WizardReviewRow(label: "Blog Post Draft", value: blogDraft)
             }
             Section("From") {
                 WizardReviewRow(label: "Posting As", value: auth.user?.name ?? "")
+                WizardReviewRow(label: "Email", value: email)
             }
         }
     }
@@ -374,19 +436,36 @@ struct SubmitBlogView: View {
         guard let user = auth.user else { return }
         if let policyMessage = ContentSubmissionPolicy.blockingMessage(
             subject: title,
-            body: [coverNote, blogDraft].joined(separator: "\n\n"),
-            detectNonEnglish: preferences.nonEnglishDetectionEnabled
+            body: [pitchMessage, blogDraft].joined(separator: "\n\n")
         ) {
             error = policyMessage
             await announceWizardFailure(policyMessage, focus: $isErrorFocused)
             return
         }
         isSubmitting = true; error = nil
-        var message = "Blog Title: \(title)\nCategory: \(category)"
-        if !coverNote.trimmingCharacters(in: .whitespaces).isEmpty {
-            message += "\n\nNote to editors:\n\(coverNote)"
-        }
-        let result = await DrupalFormClient.submitBlog(name: user.name, email: "", message: message, blogDraft: blogDraft)
+        // The live "Message" field is what editors actually read as the
+        // submitter's pitch — sends the real pitch text now, with the
+        // category folded in as supplementary context rather than
+        // crowding it out, matching what the field is genuinely for
+        // (previously this field received a mechanical "Blog Title: X
+        // \nCategory: Y" summary instead, and the real pitch was never
+        // asked for at all). Reported directly.
+        let message = category.isEmpty
+            ? pitchMessage
+            : "\(pitchMessage)\n\n(Suggested category: \(category))"
+        // The live "Blog Post" field's own description says "Include your
+        // proposed title for the post" — there's no separate title field
+        // on the real form at all, so the title this wizard collects for
+        // a nicer editing experience is folded into the draft content
+        // itself at submit time, not just mentioned in a side field the
+        // real form doesn't read as the actual draft. Reported directly.
+        let draftWithTitle = "\(title)\n\n\(blogDraft)"
+        let result = await DrupalFormClient.submitBlog(
+            name: user.name,
+            email: email.trimmingCharacters(in: .whitespacesAndNewlines),
+            message: message,
+            blogDraft: draftWithTitle
+        )
         switch result {
         case .ok:
             SoundPlayer.shared.play(.success)

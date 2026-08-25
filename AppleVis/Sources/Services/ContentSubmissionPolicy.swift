@@ -7,11 +7,21 @@ enum ContentSubmissionPolicy {
         case high = 3
     }
 
+    /// Governs only the *live, as-you-type* translate-offer hint
+    /// (`ComposeIntelligenceState.textChanged`'s `detectionEnabled`) — a
+    /// personal convenience preference about whether to be proactively
+    /// nudged while composing. `blockingMessage` below no longer takes a
+    /// matching parameter: AppleVis's "must be in English" rule is a site
+    /// policy, not something an individual's Settings toggle should be able
+    /// to opt out of, and every one of this function's ~13 call sites was
+    /// wiring this exact preference straight into the enforcement gate —
+    /// turning off "nudge me while typing" silently turned off "actually
+    /// enforce English-only" too. Reported directly.
     static var shouldDetectNonEnglish: Bool {
         UserDefaults.standard.object(forKey: "intel.nonEnglish") as? Bool ?? true
     }
 
-    static func blockingMessage(subject: String? = nil, body: String, detectNonEnglish: Bool) -> String? {
+    static func blockingMessage(subject: String? = nil, body: String) -> String? {
         let text = policyText(subject: subject, body: body)
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
 
@@ -27,7 +37,12 @@ enum ContentSubmissionPolicy {
             return String(localized: "This draft may violate AppleVis guidelines on respectful community discussion. Please revise the tone before posting.")
         }
 
-        if detectNonEnglish && IntelligenceService.detectNonEnglish(text) {
+        // Unconditional — see shouldDetectNonEnglish's doc comment. Only
+        // runs where on-device language detection is actually available;
+        // there's currently no fallback check for devices/OS versions
+        // without it, so this can't be a true hard guarantee on every
+        // device from the client alone.
+        if IntelligenceService.detectNonEnglish(text) {
             return String(localized: "AppleVis posts must be in English. Please use Translate or edit your draft in English before posting.")
         }
 

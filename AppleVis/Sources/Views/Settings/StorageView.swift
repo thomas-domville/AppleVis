@@ -8,6 +8,7 @@ struct StorageView: View {
     @State private var showClearCache = false
     @State private var showClearAll = false
     @AppStorage("storage.cacheRetentionMonths") private var cacheRetentionMonths: Int = 6
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     private let retentionOptions: [(label: String, months: Int)] = [
         ("3 Months", 3), ("6 Months", 6), ("12 Months", 12), ("Keep Forever", 0)
@@ -18,6 +19,7 @@ struct StorageView: View {
     var body: some View {
         Form {
             Section("Usage") {
+                AccessibleScreenHeading(title: "Storage and Cache", isFocused: $isTitleFocused)
                 StorageRow(label: "Downloaded Episodes", value: downloadedMB, color: .blue)
                 StorageRow(label: "Cached Content", value: cachedMB, color: .green)
                 Divider()
@@ -92,6 +94,7 @@ struct StorageView: View {
         .navigationTitle("Storage & Cache")
         .navigationBarTitleDisplayMode(.inline)
         .task { await calculateUsage() }
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
     }
 
     private func calculateUsage() async {

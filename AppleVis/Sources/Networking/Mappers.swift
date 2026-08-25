@@ -218,6 +218,18 @@ enum Mappers {
         "field_directory_category", "field_ios_app_category",
         "field_app_store_category", "taxonomy_app_category", "taxonomy_categories",
     ]
+    // `node--tv_directory`'s real (and only) category relationship —
+    // confirmed live via `/jsonapi/node/tv_directory`, distinct from every
+    // iOS candidate above.
+    private static let tvAppCategoryRelationshipCandidates = ["field_category_tv"]
+    // `node--watch_directory`'s real (and only) category relationship —
+    // confirmed live via `/jsonapi/node/watch_directory`.
+    private static let watchAppCategoryRelationshipCandidates = ["field_category_watch"]
+    // `node--mac_app_directory`'s real (and only) category relationship —
+    // confirmed live via `/jsonapi/node/mac_app_directory`. The field's own
+    // machine name really is `taxonomy_vocabulary_16`, not a `field_category_*`
+    // pattern like the other three directories use.
+    private static let macAppCategoryRelationshipCandidates = ["taxonomy_vocabulary_16"]
 
     private static func relatedTermName(_ node: JsonApiNode, included: [JsonApiNode], candidates: [String]) -> String {
         for fieldName in candidates {
@@ -270,6 +282,152 @@ enum Mappers {
             price: a["field_cost"]?.stringValue ?? "",
             supportedDevices: supportedDevices,
             voiceOverPerformance: a["field_voiceover"]?.stringValue,
+            summary: a["body"]?.richTextSummary ?? a["body"]?.richTextValue ?? "",
+            url: url,
+            isSaved: PersistenceStore.shared.isSaved(id: node.id)
+        )
+    }
+
+    /// `node--tv_directory` — a genuinely separate Drupal content type from
+    /// `node--ios_app_directory`, not a variant of it (no App Store link,
+    /// Version, Device(s) Tested On, or separate VoiceOver/Labelling
+    /// fields). Field names verified live against `/jsonapi/node/tv_directory`:
+    /// `field_cost`, `field_usability_tv`, `field_comments`, `body`, and its
+    /// own `comment_node_tv_directory` computed comment-count field — same
+    /// shape as iOS's equivalents, just under TV-specific field names.
+    /// `appReview(_:included:)` below is shared as-is: the
+    /// `comment_node_tv_directory` bundle uses the identical `subject`/
+    /// `comment_body`/`uid` shape as `comment_node_ios_app_directory`,
+    /// confirmed live.
+    static func tvApp(_ node: JsonApiNode, included: [JsonApiNode] = []) -> AppListing {
+        let a = node.attributes
+        let uidId = node.relationshipId("uid")
+        let userNode = uidId.flatMap { id in included.first { $0.id == id } }
+        let submittedBy = userNode?.attributes["display_name"]?.stringValue ?? userNode?.attributes["name"]?.stringValue ?? ""
+
+        let category = relatedTermName(node, included: included, candidates: tvAppCategoryRelationshipCandidates)
+        let commentInfo = a["comment_node_tv_directory"]
+        let alias = a["path"]?.pathAlias
+        let url = alias.map { "\(base)\($0)" } ?? "\(base)/node/\(node.id)"
+        let lastCommentTs = commentInfo?["last_comment_timestamp"]?.doubleValue ?? 0
+
+        return AppListing(
+            id: node.id,
+            name: a["title"]?.stringValue ?? "",
+            developer: "",
+            platform: .tvos,
+            category: category,
+            categoryId: "",
+            reviewCount: commentInfo?["comment_count"]?.intValue ?? 0,
+            lastUpdatedAt: node.changedDate,
+            lastActivityAt: lastCommentTs > 0 ? Date(timeIntervalSince1970: lastCommentTs) : node.changedDate,
+            createdAt: node.createdDate,
+            submittedBy: submittedBy,
+            submitterUid: uidId ?? "",
+            // Apple TV entries have no App Store link field at all — verified
+            // against the live /node/add/tv_directory form.
+            appStoreUrl: nil,
+            iconUrl: nil,
+            price: a["field_cost"]?.stringValue ?? "",
+            supportedDevices: [],
+            voiceOverPerformance: nil,
+            summary: a["body"]?.richTextSummary ?? a["body"]?.richTextValue ?? "",
+            url: url,
+            isSaved: PersistenceStore.shared.isSaved(id: node.id)
+        )
+    }
+
+    /// `node--watch_directory` — another genuinely separate Drupal content
+    /// type, distinct from both `node--ios_app_directory` and
+    /// `node--tv_directory`. Unlike Apple TV, it's much closer in shape to
+    /// iOS: a real App Store link (`field_link2`/`field_link3`) and its own
+    /// `field_watchos_version`, but — like Apple TV — a single combined
+    /// `field_usability_watch` field instead of iOS's split VoiceOver
+    /// Performance/Button Labelling questions. Field names verified live
+    /// against `/jsonapi/node/watch_directory`. `appReview(_:included:)`
+    /// below is shared as-is: `comment_node_watch_directory` uses the same
+    /// `subject`/`comment_body`/`uid` shape as the other two, confirmed live.
+    static func watchApp(_ node: JsonApiNode, included: [JsonApiNode] = []) -> AppListing {
+        let a = node.attributes
+        let uidId = node.relationshipId("uid")
+        let userNode = uidId.flatMap { id in included.first { $0.id == id } }
+        let submittedBy = userNode?.attributes["display_name"]?.stringValue ?? userNode?.attributes["name"]?.stringValue ?? ""
+
+        let category = relatedTermName(node, included: included, candidates: watchAppCategoryRelationshipCandidates)
+        let commentInfo = a["comment_node_watch_directory"]
+        let alias = a["path"]?.pathAlias
+        let url = alias.map { "\(base)\($0)" } ?? "\(base)/node/\(node.id)"
+        let appStoreUrl = a["field_link2"]?["uri"]?.stringValue ?? a["field_link3"]?["uri"]?.stringValue ?? ""
+        let lastCommentTs = commentInfo?["last_comment_timestamp"]?.doubleValue ?? 0
+
+        return AppListing(
+            id: node.id,
+            name: a["title"]?.stringValue ?? "",
+            developer: "",
+            platform: .watchos,
+            category: category,
+            categoryId: "",
+            reviewCount: commentInfo?["comment_count"]?.intValue ?? 0,
+            lastUpdatedAt: node.changedDate,
+            lastActivityAt: lastCommentTs > 0 ? Date(timeIntervalSince1970: lastCommentTs) : node.changedDate,
+            createdAt: node.createdDate,
+            submittedBy: submittedBy,
+            submitterUid: uidId ?? "",
+            appStoreUrl: appStoreUrl.isEmpty ? nil : appStoreUrl,
+            iconUrl: nil,
+            price: a["field_cost"]?.stringValue ?? "",
+            supportedDevices: [],
+            voiceOverPerformance: nil,
+            summary: a["body"]?.richTextSummary ?? a["body"]?.richTextValue ?? "",
+            url: url,
+            isSaved: PersistenceStore.shared.isSaved(id: node.id)
+        )
+    }
+
+    /// `node--mac_app_directory` — the fourth and last of these genuinely
+    /// separate content types. Closest to iOS in some ways (its own
+    /// `field_version`/`field_osx_version`, and — unlike TV/Watch — the
+    /// full 8-option iOS Usability vocabulary as a single field, not the
+    /// simple 4-option scale), but its App Store link (`field_link2`) is
+    /// the only one of the four that's genuinely optional: a real, sizable
+    /// share of Mac apps aren't in the Mac App Store at all. Field names
+    /// verified live against `/jsonapi/node/mac_app_directory`.
+    /// `appReview(_:included:)` below is shared as-is: `comment_node_mac_app_directory`
+    /// uses the same subject/comment_body/uid shape as the other three.
+    static func macApp(_ node: JsonApiNode, included: [JsonApiNode] = []) -> AppListing {
+        let a = node.attributes
+        let uidId = node.relationshipId("uid")
+        let userNode = uidId.flatMap { id in included.first { $0.id == id } }
+        let submittedBy = userNode?.attributes["display_name"]?.stringValue ?? userNode?.attributes["name"]?.stringValue ?? ""
+
+        let category = relatedTermName(node, included: included, candidates: macAppCategoryRelationshipCandidates)
+        let commentInfo = a["comment_node_mac_app_directory"]
+        let alias = a["path"]?.pathAlias
+        let url = alias.map { "\(base)\($0)" } ?? "\(base)/node/\(node.id)"
+        // Unlike iOS, `field_link3` here is genuinely just "Developer's
+        // Website" — never a fallback App Store link — so it's not
+        // included in this fallback chain the way iOS's mapper includes it.
+        let appStoreUrl = a["field_link2"]?["uri"]?.stringValue ?? ""
+        let lastCommentTs = commentInfo?["last_comment_timestamp"]?.doubleValue ?? 0
+
+        return AppListing(
+            id: node.id,
+            name: a["title"]?.stringValue ?? "",
+            developer: "",
+            platform: .macos,
+            category: category,
+            categoryId: "",
+            reviewCount: commentInfo?["comment_count"]?.intValue ?? 0,
+            lastUpdatedAt: node.changedDate,
+            lastActivityAt: lastCommentTs > 0 ? Date(timeIntervalSince1970: lastCommentTs) : node.changedDate,
+            createdAt: node.createdDate,
+            submittedBy: submittedBy,
+            submitterUid: uidId ?? "",
+            appStoreUrl: appStoreUrl.isEmpty ? nil : appStoreUrl,
+            iconUrl: nil,
+            price: a["field_cost"]?.stringValue ?? "",
+            supportedDevices: [],
+            voiceOverPerformance: nil,
             summary: a["body"]?.richTextSummary ?? a["body"]?.richTextValue ?? "",
             url: url,
             isSaved: PersistenceStore.shared.isSaved(id: node.id)

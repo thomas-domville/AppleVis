@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Shown above stale content when the device has no network connection.
 struct OfflineBanner: View {
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var hasAnnounced = false
 
     // Deliberately avoids the word "saved" — this is about locally cached
@@ -15,11 +16,11 @@ struct OfflineBanner: View {
     var body: some View {
         Text(label)
             .font(.footnote)
-            .foregroundStyle(Color(red: 0.522, green: 0.267, blue: 0.016))
+            .foregroundStyle(preferences.colors.warning)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(red: 1.0, green: 0.973, blue: 0.882), in: RoundedRectangle(cornerRadius: 10))
+            .background(preferences.colors.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
             .accessibilityElement(children: .combine)
             .accessibilityLabel(label)
             .accessibilityAddTraits(.isStaticText)

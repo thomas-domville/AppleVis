@@ -27,8 +27,11 @@ struct ComposeTopicView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
-
-    var isValid: Bool { !title.trimmingCharacters(in: .whitespaces).isEmpty && !bodyText.trimmingCharacters(in: .whitespaces).isEmpty && selectedCategory != nil }
+    // Mirrors OnboardingView's SignInStep: this screen's primary action is
+    // typing into a field, so VoiceOver focus lands there directly rather
+    // than on a generic heading — otherwise, like every other pushed
+    // screen, it silently defaults to the back button after the push.
+    @AccessibilityFocusState private var isTitleFieldFocused: Bool
 
     /// RN confirmed before discarding a filled-out form; Cancel here
     /// previously dismissed immediately with no warning, silently losing a
@@ -53,6 +56,7 @@ struct ComposeTopicView: View {
                     Form {
                         Section("Title") {
                             TextField("Topic title", text: $title)
+                                .accessibilityFocused($isTitleFieldFocused)
                         }
                         Section("Category") {
                             Picker("Category", selection: $selectedCategory) {
@@ -119,6 +123,7 @@ struct ComposeTopicView: View {
             }
             .navigationTitle("New Topic")
             .navigationBarTitleDisplayMode(.inline)
+            .task { await retryAccessibilityFocus(into: $isTitleFieldFocused) }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { requestCancel() }
@@ -187,8 +192,7 @@ struct ComposeTopicView: View {
         guard let user = auth.user, let cat = selectedCategory else { return }
         if let message = ContentSubmissionPolicy.blockingMessage(
             subject: title,
-            body: bodyText,
-            detectNonEnglish: preferences.nonEnglishDetectionEnabled
+            body: bodyText
         ) {
             error = message
             return
@@ -226,6 +230,7 @@ struct ComposeReplyView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
+    @AccessibilityFocusState private var isHeaderFocused: Bool
 
     init(topicId: String, topicTitle: String, quotedReply: ForumReply? = nil, onPosted: @escaping (ForumReply) -> Void) {
         self.topicId = topicId
@@ -265,6 +270,8 @@ struct ComposeReplyView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding()
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($isHeaderFocused)
                 if intelligence.showTranslatePrompt {
                     TranslatePromptView(isProcessing: intelligence.isProcessing) {
                         Task {
@@ -313,6 +320,7 @@ struct ComposeReplyView: View {
             }
             .navigationTitle("Reply")
             .navigationBarTitleDisplayMode(.inline)
+            .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { requestCancel() } }
                 if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
@@ -349,8 +357,7 @@ struct ComposeReplyView: View {
     private func submit() async {
         guard let user = auth.user else { return }
         if let message = ContentSubmissionPolicy.blockingMessage(
-            body: bodyText,
-            detectNonEnglish: preferences.nonEnglishDetectionEnabled
+            body: bodyText
         ) {
             error = message
             return

@@ -2,10 +2,12 @@ import SwiftUI
 
 struct ForumSettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         Form {
             Section {
+                AccessibleScreenHeading(title: "Forums", isFocused: $isTitleFocused)
                 Text("Controls which content appears in the Home feed by default when you open the app.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -66,6 +68,7 @@ struct ForumSettingsView: View {
         .themedList(preferences.colors)
         .navigationTitle("Forums")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
     }
 
     private func filterSubtitle(_ filter: ForumFilter) -> String {

@@ -2,10 +2,12 @@ import SwiftUI
 
 struct AppearanceSettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         Form {
             Section {
+                AccessibleScreenHeading(title: "Appearance", isFocused: $isTitleFocused)
                 Text("Theme and colour scheme changes apply instantly throughout the app.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -71,5 +73,6 @@ struct AppearanceSettingsView: View {
         .themedList(preferences.colors)
         .navigationTitle("Appearance")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
     }
 }

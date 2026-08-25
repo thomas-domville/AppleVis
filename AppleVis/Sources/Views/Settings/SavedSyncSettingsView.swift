@@ -4,10 +4,12 @@ struct SavedSyncSettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var isSyncing = false
     @State private var lastSyncDate: Date? = UserDefaults.standard.object(forKey: "sync.lastSyncDate") as? Date
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         Form {
             Section {
+                AccessibleScreenHeading(title: "Saved and Sync", isFocused: $isTitleFocused)
                 Text("Keep your saved content, followed topics, podcast queue, listening progress, read history, and settings in sync across all your Apple devices using iCloud.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -131,6 +133,7 @@ struct SavedSyncSettingsView: View {
         .themedList(preferences.colors)
         .navigationTitle("Saved & Sync")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
     }
 
     private func triggerSync() {

@@ -87,8 +87,7 @@ struct EditContentSheet: View {
 
     private func save() async {
         if let message = ContentSubmissionPolicy.blockingMessage(
-            body: text,
-            detectNonEnglish: preferences.nonEnglishDetectionEnabled
+            body: text
         ) {
             error = message
             return

@@ -242,17 +242,8 @@ struct ForumTopicDetailView: View {
                                     }
                                     quotedReplyTarget = reply
                                 },
-                                onDelete: {
-                                    let replies = self.detail?.replies ?? []
-                                    guard let idx = replies.firstIndex(where: { $0.id == reply.id }) else { return }
-                                    // Next reply first — it slides into the deleted one's visual
-                                    // position, the most natural "stayed in place" focus target.
-                                    let neighborId: String? = idx + 1 < replies.count ? replies[idx + 1].id
-                                        : (idx > 0 ? replies[idx - 1].id : nil)
-                                    self.detail?.replies.remove(at: idx)
-                                    self.detail?.replyCount = max(0, (self.detail?.replyCount ?? 1) - 1)
-                                    focusAfterReplyDeletion(neighborId: neighborId)
-                                }, onEdit: { newBody in
+                                onDelete: { removeReplyLocally(reply, announcement: "Reply deleted.") },
+                                onEdit: { newBody in
                                     guard let idx = self.detail?.replies.firstIndex(where: { $0.id == reply.id }) else { return }
                                     self.detail?.replies[idx] = ForumReply(
                                         id: reply.id, subject: reply.subject, authorName: reply.authorName,
@@ -260,6 +251,7 @@ struct ForumTopicDetailView: View {
                                         loveCount: reply.loveCount, isNew: reply.isNew
                                     )
                                 },
+                                onUnpublish: { removeReplyLocally(reply, announcement: "Comment unpublished.") },
                                 focusBinding: $focusedReplyId
                             )
                             .id(reply.id)
@@ -443,12 +435,12 @@ struct ForumTopicDetailView: View {
     /// VoiceOver lands on the back button after push navigation by default;
     /// this moves it to the page heading instead, per
     /// docs/IMPLEMENTATION_NOTES.md's "VoiceOver Detail Page Navigation"
-    /// guidance. Delayed slightly since setting focus before the new content
-    /// has actually laid out is a common way for it to silently fail.
+    /// guidance. Retries at each delay rather than a single guessed one —
+    /// a single attempt could silently go nowhere on a slower device or
+    /// slower load. Reported directly.
     private func focusTitleAfterLoad() {
         Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            isTitleFocused = true
+            await retryAccessibilityFocus(into: $isTitleFocused)
         }
     }
 
@@ -606,8 +598,8 @@ struct ForumTopicDetailView: View {
     /// typically already visible right where the deleted reply was. Falls
     /// back to the topic title if the deleted reply had no neighbors (it
     /// was the only one left).
-    private func focusAfterReplyDeletion(neighborId: String?) {
-        UIAccessibility.post(notification: .announcement, argument: "Reply deleted.")
+    private func focusAfterReplyRemoval(neighborId: String?, announcement: String) {
+        UIAccessibility.post(notification: .announcement, argument: announcement)
         Task {
             try? await Task.sleep(for: .milliseconds(300))
             if let neighborId {
@@ -616,6 +608,20 @@ struct ForumTopicDetailView: View {
                 isTitleFocused = true
             }
         }
+    }
+
+    /// Shared by both Delete and admin Unpublish — either way, the comment
+    /// no longer belongs in the currently-loaded list, and the neighbor-
+    /// focus logic (next reply first, falling back to the topic title) is
+    /// identical regardless of which action removed it.
+    private func removeReplyLocally(_ reply: ForumReply, announcement: String) {
+        let replies = self.detail?.replies ?? []
+        guard let idx = replies.firstIndex(where: { $0.id == reply.id }) else { return }
+        let neighborId: String? = idx + 1 < replies.count ? replies[idx + 1].id
+            : (idx > 0 ? replies[idx - 1].id : nil)
+        self.detail?.replies.remove(at: idx)
+        self.detail?.replyCount = max(0, (self.detail?.replyCount ?? 1) - 1)
+        focusAfterReplyRemoval(neighborId: neighborId, announcement: announcement)
     }
 
     /// "Community Discussion - N comments - N new" — the app's own
@@ -738,6 +744,9 @@ struct ReplyView: View {
     var onReplyTo: (() -> Void)? = nil
     var onDelete: (() -> Void)? = nil
     var onEdit: ((String) -> Void)? = nil
+    /// Fired after an admin unpublish succeeds — like `onDelete`, lets the
+    /// parent remove the now-hidden comment from the loaded list.
+    var onUnpublish: (() -> Void)? = nil
     /// Set by the parent when it supports "Jump to Last Comment" — lets
     /// that action move VoiceOver focus here, not just scroll the viewport.
     var focusBinding: AccessibilityFocusState<String?>.Binding? = nil
@@ -745,16 +754,24 @@ struct ReplyView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @State private var showDeleteConfirm = false
+    @State private var showUnpublishConfirm = false
     @State private var showEditSheet = false
 
     private var isOriginalPoster: Bool {
         !topicAuthorId.isEmpty && topicAuthorId == reply.authorId
     }
 
-    private var canDelete: Bool {
+    private var isAdmin: Bool { auth.user?.isAdmin ?? false }
+
+    private var isOwnComment: Bool {
         guard let user = auth.user else { return false }
-        return user.isAdmin || (!reply.authorId.isEmpty && user.uuid == reply.authorId)
+        return !reply.authorId.isEmpty && user.uuid == reply.authorId
     }
+
+    /// Edit/Delete: author of the comment, or an admin. Unpublish is
+    /// admin-only, kept separate — mirrors the topic-level split between
+    /// owner actions and admin moderation actions.
+    private var canDelete: Bool { isAdmin || isOwnComment }
 
     /// "Comment 2 of 8. Jane Doe, Original Poster. 3 hours ago. Subject: ..."
     /// — mirrors the old app's per-comment header label so VoiceOver users
@@ -794,6 +811,7 @@ struct ReplyView: View {
                 toast.warning(String(localized: "Reporting is coming once the Drupal Flags API is confirmed."))
             }
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Edit Comment") { showEditSheet = true })
+            .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Unpublish Comment") { showUnpublishConfirm = true })
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Delete Comment") { showDeleteConfirm = true })
 
             SegmentedHTMLView(html: reply.body)
@@ -831,10 +849,23 @@ struct ReplyView: View {
                 Button { showEditSheet = true } label: {
                     Label("Edit Comment", systemImage: "pencil")
                 }
+            }
+            if isAdmin {
+                Button { showUnpublishConfirm = true } label: {
+                    Label("Unpublish Comment", systemImage: "eye.slash")
+                }
+            }
+            if canDelete {
                 Button(role: .destructive) { showDeleteConfirm = true } label: {
                     Label("Delete Comment", systemImage: "trash")
                 }
             }
+        }
+        .confirmationDialog("Unpublish this comment?", isPresented: $showUnpublishConfirm, titleVisibility: .visible) {
+            Button("Unpublish", role: .destructive) { Task { await unpublish() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This hides it from public view.")
         }
         .confirmationDialog("Delete this comment?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { Task { await delete() } }
@@ -873,6 +904,17 @@ struct ReplyView: View {
             .first { $0.isKeyWindow }?
             .rootViewController?
             .present(activityVC, animated: true)
+    }
+
+    private func unpublish() async {
+        guard let user = auth.user else { return }
+        do {
+            try await APIClient.shared.content.unpublishComment(commentType: "comment_forum", commentId: reply.id, csrfToken: user.csrfToken)
+            onUnpublish?()
+            toast.success(String(localized: "Comment unpublished"))
+        } catch {
+            toast.error(String(localized: "Couldn't unpublish comment."))
+        }
     }
 
     private func delete() async {

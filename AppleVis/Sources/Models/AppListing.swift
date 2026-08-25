@@ -59,6 +59,16 @@ nonisolated struct AppDetail: Identifiable, Codable, Sendable {
     let url: String
     var reviews: [AppReview]
     var isSaved: Bool
+    /// A MacUpdate.com link (`field_link_macupdate`) — only ever populated
+    /// for Mac App Directory entries, and only some of those: unlike every
+    /// other platform, a real, sizable share of real Mac entries have no
+    /// App Store link at all (confirmed live: VMware Fusion, Xcode,
+    /// 1Password, and others in AppleVis's own directory), since Mac apps
+    /// are commonly distributed outside the Mac App Store entirely.
+    /// MacUpdate is AppleVis's own fallback reference for exactly that
+    /// case. Defaulted so every other platform's `AppDetail(...)` call
+    /// site needs no change. Reported directly.
+    var macUpdateUrl: String? = nil
 }
 
 nonisolated struct AppReview: Identifiable, Codable, Sendable {

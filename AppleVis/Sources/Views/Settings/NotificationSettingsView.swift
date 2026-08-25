@@ -6,11 +6,13 @@ struct NotificationSettingsView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var systemAuthStatus: UNAuthorizationStatus = .notDetermined
     @State private var showPermissionAlert = false
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         Form {
             // iOS permission status
             Section("iOS Permission") {
+                AccessibleScreenHeading(title: "Notifications", isFocused: $isTitleFocused)
                 HStack {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
@@ -99,9 +101,12 @@ struct NotificationSettingsView: View {
                 Toggle("New Resources", isOn: $preferences.notifyNewResources)
                     .disabled(pushDenied)
                     .accessibilityHint(String(localized: "Get notified when new guides, tutorials, and tips are published."))
-                Toggle("Announcements", isOn: $preferences.notifyAnnouncements)
-                    .disabled(pushDenied)
-                    .accessibilityHint(String(localized: "Get notified about important AppleVis announcements."))
+                // "Announcements" hidden — AppleVis has no "announcement"
+                // content type yet (announcements currently post to Blog/
+                // Forum/Newsletter). The preference itself, push routing,
+                // and Focus Filter case are all kept intact for a possible
+                // future content type, just not offered as a visible
+                // toggle until that exists. Reported directly.
                 Toggle("New Comments", isOn: $preferences.notifyNewComments)
                     .disabled(pushDenied)
                     .accessibilityHint(String(localized: "Get notified about new comments on any forum topic, podcast episode, app entry, blog post, or guide — not just ones you follow. This can be frequent."))
@@ -152,6 +157,7 @@ struct NotificationSettingsView: View {
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
         .task { await checkPermission() }
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
     }
 
     // MARK: - Permission

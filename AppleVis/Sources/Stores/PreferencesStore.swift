@@ -101,7 +101,12 @@ final class PreferencesStore: ObservableObject {
     @AppStorage("a11y.helpfulTips")     var helpfulTipsEnabled = true
     @AppStorage("a11y.welcomeSummary")  var welcomeSummaryEnabled = true
     @AppStorage("a11y.homeStartup")     var homeStartupBehavior: HomeStartupBehavior = .helpful
-    @AppStorage("a11y.searchAutoFocus") var searchAutoFocusEnabled = true
+    // Defaults off — auto-raising the keyboard whenever Discover's Search
+    // tab is opened meant a VoiceOver user who just wanted to browse the
+    // hub grid had to dismiss the keyboard first every time. Reported
+    // directly. Still available as an opt-in for anyone who prefers landing
+    // straight in Search.
+    @AppStorage("a11y.searchAutoFocus") var searchAutoFocusEnabled = false
     @AppStorage("privacy.signedOutHistory") var rememberSignedOutHistory = true
 
     // MARK: - Forums
@@ -405,7 +410,7 @@ enum NotificationSound: String, CaseIterable, Identifiable {
         // nothing to preview in-app beforehand that's guaranteed to match
         // it. Reworded after a beta tester's preview played Tri-Tone while
         // their actual configured default was Rebound.
-        case .system:              return "Uses your device's own default alert tone when a notification arrives. Can't be previewed here — iOS doesn't allow apps to play back exactly which tone that is."
+        case .system:              return "Uses your device's own default alert tone when a notification arrives. Preview unavailable due to iOS system restrictions."
         }
     }
     /// Value stored server-side in `field_push_sound` so a push payload can

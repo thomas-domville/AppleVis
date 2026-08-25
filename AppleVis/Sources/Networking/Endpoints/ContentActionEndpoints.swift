@@ -31,6 +31,16 @@ struct ContentActionEndpoints {
         try await client.jsonAPIDelete("comment/\(commentType)/\(commentId)", headers: ["X-CSRF-Token": csrfToken])
     }
 
+    /// Mirrors `unpublishNode` — comments have their own `status` field,
+    /// separate from the node they're attached to. Admin-only, distinct
+    /// from delete: hides the comment from public view without removing it.
+    func unpublishComment(commentType: String, commentId: String, csrfToken: String) async throws {
+        try await client.jsonAPIUpdate(
+            "comment/\(commentType)/\(commentId)", type: "comment--\(commentType)", id: commentId,
+            attributes: ["status": AnyEncodable(false)], headers: ["X-CSRF-Token": csrfToken]
+        )
+    }
+
     func editForumPost(nodeId: String, title: String, body: String, csrfToken: String) async throws {
         try await editNode(nodeId: nodeId, nodeType: "forum", title: title, body: body, csrfToken: csrfToken)
     }

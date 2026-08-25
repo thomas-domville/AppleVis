@@ -7,10 +7,12 @@ import SwiftUI
 /// actually real, rather than claiming a haptics feature that isn't there.
 struct SoundsHapticsSettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         Form {
             Section("Sounds") {
+                AccessibleScreenHeading(title: "Sounds and Haptics", isFocused: $isTitleFocused)
                 Toggle("Confirmation Sounds", isOn: $preferences.confirmationSoundsEnabled)
                     .accessibilityHint(String(localized: "Plays a sound for notifications, saving, downloads finishing, and podcast play and pause."))
 
@@ -34,5 +36,6 @@ struct SoundsHapticsSettingsView: View {
         .themedList(preferences.colors)
         .navigationTitle("Sounds & Haptics")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
     }
 }

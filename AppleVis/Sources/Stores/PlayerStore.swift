@@ -207,6 +207,13 @@ final class PlayerStore: ObservableObject {
         duration = 0
         currentChapter = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        // saveLastPlayed() only ever writes/overwrites this key — nothing
+        // ever cleared it, so restoreLastPlayed() on the next launch kept
+        // resurrecting whatever episode was last playing even after the
+        // user explicitly dismissed the mini player here. Reported
+        // directly: the mini player reappeared every time the app was
+        // relaunched, no matter how many times it was dismissed.
+        UserDefaults.standard.removeObject(forKey: Self.lastPlayedKey)
         // Deliberately does NOT deactivate the shared AVAudioSession: doing
         // so broke every UI sound effect app-wide (SoundPlayer configures
         // its session once and never re-activates it, so once this

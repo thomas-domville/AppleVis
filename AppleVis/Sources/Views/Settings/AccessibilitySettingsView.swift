@@ -2,10 +2,12 @@ import SwiftUI
 
 struct AccessibilitySettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         Form {
             Section {
+                AccessibleScreenHeading(title: "Accessibility", isFocused: $isTitleFocused)
                 Text("AppleVis-specific accessibility controls. iOS system settings like VoiceOver, Dynamic Type, Reduce Motion, and Bold Text are followed automatically.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -85,7 +87,7 @@ struct AccessibilitySettingsView: View {
                 ResetToDefaultsButton {
                     preferences.helpfulTipsEnabled = true
                     preferences.welcomeSummaryEnabled = true
-                    preferences.searchAutoFocusEnabled = true
+                    preferences.searchAutoFocusEnabled = false
                     preferences.homeStartupBehavior = .helpful
                     preferences.announcementLevel = .normal
                 }
@@ -94,5 +96,6 @@ struct AccessibilitySettingsView: View {
         .themedList(preferences.colors)
         .navigationTitle("Accessibility")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
     }
 }

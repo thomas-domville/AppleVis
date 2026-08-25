@@ -3,10 +3,12 @@ import SwiftUI
 struct IntelligenceSettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var tips: TipStore
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         Form {
             Section {
+                AccessibleScreenHeading(title: "Intelligence", isFocused: $isTitleFocused)
                 Text("Smart features powered by Apple Intelligence run entirely on your device. Nothing is sent to external servers.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -99,6 +101,7 @@ struct IntelligenceSettingsView: View {
         .navigationTitle("Intelligence")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { tips.show(.settingsIntelligence) }
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
     }
 }
 

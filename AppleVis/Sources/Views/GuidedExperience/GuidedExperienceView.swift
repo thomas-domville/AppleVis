@@ -15,6 +15,7 @@ struct GuidedExperienceView: View {
     @State private var showExplainMore = false
     @State private var showHelpArticle: HelpArticle?
     @AccessibilityFocusState private var isHeadingFocused: Bool
+    @AccessibilityFocusState private var isExplainMoreFocused: Bool
     @State private var entranceVisible = false
 
     private var step: GuidedExperienceStep { experience.steps[stepIndex] }
@@ -67,9 +68,23 @@ struct GuidedExperienceView: View {
                                         .foregroundStyle(.secondary)
                                         .padding(.horizontal, 24)
                                         .transition(.opacity)
+                                        .accessibilityFocused($isExplainMoreFocused)
                                 }
                                 Button(showExplainMore ? "Show Less" : "Explain More") {
                                     withReduceMotionAwareAnimation { showExplainMore.toggle() }
+                                    // Only on expand — VoiceOver otherwise stays on
+                                    // this button and just re-announces its own
+                                    // updated label ("Show Less"), never actually
+                                    // reaching the explanation text it revealed.
+                                    // Collapsing back has no equivalent problem:
+                                    // staying on the button is exactly right there.
+                                    // Reported directly.
+                                    if showExplainMore {
+                                        Task {
+                                            try? await Task.sleep(for: .milliseconds(300))
+                                            isExplainMoreFocused = true
+                                        }
+                                    }
                                 }
                                 .font(.subheadline)
                             }
@@ -96,7 +111,12 @@ struct GuidedExperienceView: View {
         .onAppear {
             let progress = GuidedExperienceStore.getProgress(experience.id)
             if progress.dismissed {
-                stepIndex = min(progress.lastStepIndex, experience.steps.count - 1)
+                // Matches goToStep's own clamp below — nothing currently
+                // persists a negative lastStepIndex, but this was the one
+                // place in the file reading a saved index back without the
+                // same floor, and `experience.steps[stepIndex]` has no
+                // bounds check of its own.
+                stepIndex = max(0, min(progress.lastStepIndex, experience.steps.count - 1))
             }
             playEntranceAnimation()
             focusHeadingAfterTransition()

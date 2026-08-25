@@ -967,7 +967,6 @@ enum HelpContent {
                             "New podcast episodes.",
                             "App updates.",
                             "New resources.",
-                            "Announcements.",
                         ]),
                         .note("Some notification categories require signing in. iOS notification permission is still controlled by iPhone Settings."),
                     ]

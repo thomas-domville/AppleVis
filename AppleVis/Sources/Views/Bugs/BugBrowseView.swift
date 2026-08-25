@@ -13,6 +13,7 @@ struct BugBrowseView: View {
     @State private var searchText = ""
     @State private var isLoadingMore = false
     @ObservedObject private var networkStatus = NetworkStatusStore.shared
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         Group {
@@ -41,6 +42,7 @@ struct BugBrowseView: View {
             ToolbarItem(placement: .navigationBarTrailing) { filterMenu }
         }
         .task { await load(reset: true) }
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
         .refreshable { await load(reset: true); SoundPlayer.shared.play(.refresh) }
         .searchable(text: $searchText, prompt: "Search bug reports")
     }
@@ -52,6 +54,7 @@ struct BugBrowseView: View {
 
     private var bugList: some View {
         List {
+            AccessibleScreenHeading(title: platform == .ios ? "iOS Bug Tracker" : "macOS Bug Tracker", isFocused: $isTitleFocused)
             if networkStatus.degradedGroups.contains(.bugs) {
                 OfflineBanner()
                     .listRowSeparator(.hidden)

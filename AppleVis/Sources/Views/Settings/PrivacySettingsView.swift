@@ -5,10 +5,12 @@ struct PrivacySettingsView: View {
     @State private var showClearDataConfirmation = false
     @State private var showSignedOutHistoryConfirmation = false
     @State private var clearDataComplete = false
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         Form {
             Section {
+                AccessibleScreenHeading(title: "Privacy", isFocused: $isTitleFocused)
                 Text("AppleVis is built by and for the blindness and low-vision community. Your privacy is not a product. This section explains what we collect, what stays on your device, and gives you control over smart features.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -152,6 +154,7 @@ struct PrivacySettingsView: View {
         } message: {
             Text("All local data has been removed. The app will reload fresh content from the server.")
         }
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
     }
 
     /// Previously only cleared URLCache — everything else the confirmation

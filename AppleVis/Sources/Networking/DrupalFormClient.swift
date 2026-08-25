@@ -126,7 +126,11 @@ enum DrupalFormClient {
         let body = encodeFields([
             "name": name, "email": email, "message": message, "blog_draft": blogDraft,
             "form_build_id": tokens.formBuildId, "form_token": tokens.formToken,
-            "form_id": "webform_submission_blog_submission_add_form", "op": "Submit",
+            "form_id": "webform_submission_blog_submission_add_form",
+            // Verified live against the real submit button's value — was
+            // the generic "Submit" before, which doesn't match what the
+            // actual form sends. Reported directly.
+            "op": "Submit Blog Post",
         ])
         return await postForm(path: path, body: body, contentType: "application/x-www-form-urlencoded")
     }
@@ -155,7 +159,18 @@ enum DrupalFormClient {
 
     // MARK: - Podcast submission (/podcasts/upload) — multipart, includes an audio file
 
-    static func submitPodcast(name: String, email: String, description: String, audioFileName: String?, audioFileData: Data?) async -> FormResult {
+    /// Verified live against the real /podcasts/upload form: for a
+    /// signed-in submitter (the only way this screen is ever reached —
+    /// see `SubmitPodcastView`'s sign-in gate), "Your name" and "Your
+    /// email address" are rendered as plain read-only text (Drupal `item`
+    /// elements, populated from the account) with no `<input>` at all —
+    /// no `name="name"`/`name="mail"` field exists on the real form to
+    /// submit in the first place. A previous pass here added a `name`/
+    /// `email` parameter on the same reasoning that correctly fixed Blog
+    /// and Bug's genuinely-required email fields; checked directly against
+    /// this form's own live HTML and that reasoning doesn't apply here.
+    /// Reverted. Reported directly.
+    static func submitPodcast(description: String, audioFileName: String?, audioFileData: Data?) async -> FormResult {
         // The caller reads the file into memory itself (while its
         // security-scoped access is valid) and hands us bytes, not a URL —
         // this used to be `try? Data(contentsOf: audioFileURL)` here, which
@@ -178,8 +193,6 @@ enum DrupalFormClient {
             body.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".data(using: .utf8)!)
             body.append("\(value)\r\n".data(using: .utf8)!)
         }
-        appendField("name", name)
-        appendField("mail", email)
         appendField("field_description[0][value]", description)
         appendField("field_podcast_file[0][display]", "1")
         appendField("field_podcast_file[0][fids]", "")

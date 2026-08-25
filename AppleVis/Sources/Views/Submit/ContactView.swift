@@ -544,8 +544,7 @@ struct ContactView: View {
         guard canSend else { return }
         if let policyMessage = ContentSubmissionPolicy.blockingMessage(
             subject: effectiveType.subject,
-            body: message,
-            detectNonEnglish: preferences.nonEnglishDetectionEnabled
+            body: message
         ) {
             error = policyMessage
             await announceWizardFailure(policyMessage, focus: $isErrorFocused)

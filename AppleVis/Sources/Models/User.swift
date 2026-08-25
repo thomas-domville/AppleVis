@@ -7,7 +7,18 @@ struct AuthUser: Codable {
     let csrfToken: String
     let logoutToken: String
     let roles: [String]
-    var isAdmin: Bool { roles.contains("administrator") }
+    /// Confirmed directly by the site's Drupal developer: the site has no
+    /// "administrator" role at all — its two editorial roles are machine-
+    /// named `site_editor` and `site_admin` (the other three role machine
+    /// names, `anonymous`/`authenticated`/`moderated_user`, are ordinary
+    /// user-level roles, not editorial ones). `roles` here already carries
+    /// real machine names, not display labels — see
+    /// `AccountEndpoints.resolveRoles`'s `drupal_internal__target_id`
+    /// read — so this was previously checking for a role name that could
+    /// never actually appear, meaning Edit/Unpublish/Delete for
+    /// non-owned content silently never unlocked for anyone, regardless of
+    /// their real site role. Reported directly.
+    var isAdmin: Bool { roles.contains("site_editor") || roles.contains("site_admin") }
 }
 
 struct SavedItem: Identifiable, Codable {

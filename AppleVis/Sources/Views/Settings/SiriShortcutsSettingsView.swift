@@ -8,10 +8,12 @@ import SwiftUI
 /// "you can ask Siri to open AppleVis" line.
 struct SiriShortcutsSettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         Form {
             Section {
+                AccessibleScreenHeading(title: "Siri and Shortcuts", isFocused: $isTitleFocused)
                 Text("These AppleVis actions are available to Siri and the Shortcuts app. Add your own phrases for any of them from the Shortcuts app.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -72,5 +74,6 @@ struct SiriShortcutsSettingsView: View {
         .themedList(preferences.colors)
         .navigationTitle("Siri & Shortcuts")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
     }
 }

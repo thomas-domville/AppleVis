@@ -168,6 +168,9 @@ struct BlogDetailView: View {
                     onDelete: {
                         self.detail?.comments.removeAll { $0.id == comment.id }
                     },
+                    onUnpublish: {
+                        self.detail?.comments.removeAll { $0.id == comment.id }
+                    },
                     onEdit: { newText in
                         guard let idx = self.detail?.comments.firstIndex(where: { $0.id == comment.id }) else { return }
                         self.detail?.comments[idx] = BlogComment(id: comment.id, authorName: comment.authorName, authorId: comment.authorId, subject: comment.subject, body: newText, createdAt: comment.createdAt)
@@ -327,12 +330,12 @@ struct BlogDetailView: View {
     /// VoiceOver lands on the back button after push navigation by default;
     /// this moves it to the page heading instead, per
     /// docs/IMPLEMENTATION_NOTES.md's "VoiceOver Detail Page Navigation"
-    /// guidance. Delayed slightly since setting focus before the new content
-    /// has actually laid out is a common way for it to silently fail.
+    /// guidance. Retries at each delay rather than a single guessed one —
+    /// a single attempt could silently go nowhere on a slower device or
+    /// slower load. Reported directly.
     private func focusTitleAfterLoad() {
         Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            isTitleFocused = true
+            await retryAccessibilityFocus(into: $isTitleFocused)
         }
     }
 
@@ -475,8 +478,7 @@ struct ComposeBlogCommentView: View {
     private func submit() async {
         guard let user = auth.user else { return }
         if let message = ContentSubmissionPolicy.blockingMessage(
-            body: commentText,
-            detectNonEnglish: ContentSubmissionPolicy.shouldDetectNonEnglish
+            body: commentText
         ) {
             submitError = message
             return

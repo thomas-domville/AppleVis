@@ -11,6 +11,7 @@ import Foundation
 func fetchWithCache<T: Codable & Sendable>(
     group: ContentGroup,
     key: String,
+    forceRefresh: Bool = false,
     fetch: @MainActor () async throws -> T
 ) async throws -> T {
     if await !ApiHealthMonitor.shared.isAvailable(group) {
@@ -21,7 +22,12 @@ func fetchWithCache<T: Codable & Sendable>(
         throw APIError.offlineNoCache(group: group.rawValue)
     }
 
-    if let cached = await ContentCache.shared.get(T.self, key: key), cached.freshness == .fresh {
+    // forceRefresh skips straight to a live fetch even within the normal
+    // "fresh" window — a deliberate pull-to-refresh is the user explicitly
+    // asking "is there anything new," and silently replaying an
+    // hours-old cached response would defeat that. Doesn't apply above:
+    // if the circuit breaker's already down, there's no live fetch to force.
+    if !forceRefresh, let cached = await ContentCache.shared.get(T.self, key: key), cached.freshness == .fresh {
         return cached.data
     }
 
@@ -33,6 +39,17 @@ func fetchWithCache<T: Codable & Sendable>(
         return result
     } catch {
         if case APIError.unauthorized = error { throw error }
+        // .notFound means the item is confirmed gone (removed, unpublished,
+        // or moderated away) — not a network/availability problem. Falling
+        // through to the cache fallback below would silently resurrect a
+        // stale cached copy of exactly the content that was just deleted
+        // (e.g. a moderated spam post), and markDown would wrongly trip the
+        // whole content group's circuit breaker over one missing item.
+        // Evict the stale entry instead so it can't zombie back later either.
+        if case APIError.notFound = error {
+            ContentCache.shared.remove(key: key)
+            throw error
+        }
         await ApiHealthMonitor.shared.markDown(group)
         if let cached = await ContentCache.shared.get(T.self, key: key), cached.freshness != .expired {
             NetworkStatusStore.shared.markDegraded(group)

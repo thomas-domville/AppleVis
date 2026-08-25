@@ -22,6 +22,13 @@ enum AppleVisNotificationCategory: String, AppEnum {
     case announcement
 
     static var typeDisplayRepresentation: TypeDisplayRepresentation = "Notification Category"
+    // .announcement is deliberately absent here — this dictionary's key set
+    // is what iOS actually offers as pickable options in Settings > Focus >
+    // App Filters, so omitting it hides the case from that picker without
+    // removing it from the enum. AppleVis has no "announcement" content
+    // type yet; the case, its raw value, and PushNotificationManager's
+    // routing for it are kept intact for a possible future content type.
+    // Reported directly.
     static var caseDisplayRepresentations: [AppleVisNotificationCategory: DisplayRepresentation] = [
         .forumReply: "Forum Replies",
         .mention: "Mentions",
@@ -30,7 +37,6 @@ enum AppleVisNotificationCategory: String, AppEnum {
         .newEpisode: "New Episodes",
         .appUpdate: "App Updates",
         .newResource: "New Resources",
-        .announcement: "Announcements",
     ]
 }
 

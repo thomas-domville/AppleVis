@@ -83,19 +83,27 @@ struct OnboardingView: View {
     private func nextStep() {
         let next = step == 1 && auth.isSignedIn ? 3 : min(step + 1, totalSteps - 1)
         withReduceMotionAwareAnimation { step = next }
-        Task {
-            try? await Task.sleep(for: .milliseconds(350))
-            isStepHeaderFocused = true
-        }
+        // A single fixed-delay focus attempt is unreliable on slower
+        // devices/transitions — the shared retryAccessibilityFocus helper
+        // (AccessibilityFocusRetry.swift) exists specifically because of
+        // that, but this step-change path had never been switched over to
+        // it. Reported directly: after "Get Started," VoiceOver focus
+        // didn't move at all — swiping did nothing until the user found
+        // the new step by touch.
+        Task { await retryAccessibilityFocus(into: $isStepHeaderFocused) }
     }
 
     private func previousStep() {
-        let previous = step == 3 && auth.isSignedIn ? 1 : max(step - 1, 0)
+        // Mirrors nextStep()'s forward skip, but can't land back on step 1
+        // (SignIn) the way that skip's reverse would suggest: SignInStep's
+        // own onAppear immediately calls onNext() whenever already signed
+        // in, which just bounces straight back to step 3 — Back would
+        // silently do nothing. Step 2 (SignedOutHistoryStep) is equally
+        // inapplicable to a signed-in user, so Welcome is the nearest step
+        // that's actually a valid destination. Reported directly.
+        let previous = step == 3 && auth.isSignedIn ? 0 : max(step - 1, 0)
         withReduceMotionAwareAnimation { step = previous }
-        Task {
-            try? await Task.sleep(for: .milliseconds(350))
-            isStepHeaderFocused = true
-        }
+        Task { await retryAccessibilityFocus(into: $isStepHeaderFocused) }
     }
 
     private func finish() {
@@ -109,14 +117,21 @@ private struct WelcomeStep: View {
     let onNext: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
     var stepInfo: (current: Int, total: Int)? = nil
+    // Grows with Dynamic Type instead of staying pinned at 32pt while the
+    // adjacent title/description wraps across several lines at the largest
+    // accessibility text sizes.
+    @ScaledMetric(relativeTo: .body) private var featureIconWidth: CGFloat = 32
 
     private let features: [(icon: String, title: String, desc: String)] = [
-        // Was "Built for VoiceOver" — every app claims some variant of this
-        // wording now, so it reads as filler rather than a real signal.
-        // "Community-Driven" below already covers who makes AppleVis, so
-        // this one names something concrete instead: real testing, not a
-        // slogan. Reported by a beta tester.
-        ("voiceover",       "Tested, Not Just Labeled",    "Every screen is actually used and tested with VoiceOver, not just checked off against a guideline."),
+        // A prior pass replaced "Built for VoiceOver" with "Tested, Not
+        // Just Labeled" to sound like less of a generic accessibility
+        // slogan — a beta tester flagged that the replacement read as AI-
+        // generated boilerplate instead ("this is one of the first
+        // giveaways that AI was used to generate wording"), the exact
+        // thing it was trying to avoid. Removed outright rather than
+        // reworded again: the app's actual VoiceOver support should speak
+        // for itself through the experience, not through a claim about it
+        // here. Reported directly.
         ("person.3",        "Community-Driven",             "Tips, reviews, and guides contributed by blind and low-vision users."),
         ("newspaper",       "All the Content You Need",     "Forums, app comments, podcasts, tutorials, and news in one place."),
         // RN's welcome copy is concrete about how many themes and which
@@ -179,7 +194,7 @@ private struct WelcomeStep: View {
                             Image(systemName: feature.icon)
                                 .font(.title2)
                                 .foregroundStyle(Color.accentColor)
-                                .frame(width: 32)
+                                .frame(width: featureIconWidth)
                                 .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(feature.title)
@@ -214,6 +229,7 @@ private struct WelcomeStep: View {
 
 private struct SignInStep: View {
     @EnvironmentObject private var auth: AuthStore
+    @EnvironmentObject private var preferences: PreferencesStore
     let onNext: () -> Void
     let onSkip: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
@@ -231,7 +247,7 @@ private struct SignInStep: View {
                 OnboardingHeader(
                     icon: "person.crop.circle",
                     title: "Sign In",
-                    subtitle: "Sign in to post in forums, track saved items, and sync across devices. You can skip this and sign in later.",
+                    subtitle: "Sign in to post content, track saved items, and sync your activity between the AppleVis app and website. You can skip this and sign in later.",
                     headerFocus: headerFocus,
                     stepInfo: stepInfo
                 )
@@ -266,22 +282,31 @@ private struct SignInStep: View {
                     if let validationMessage {
                         Text(validationMessage)
                             .font(.caption)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(preferences.colors.error)
                             .accessibilityFocused($isErrorFocused)
                     } else if let error = auth.error {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(error)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                            Text("If you have forgotten your password, you can reset it on the AppleVis website.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            // The Link below is deliberately a sibling, not a
+                            // child, of this combined block — .combine would
+                            // otherwise swallow it into a single static
+                            // element, leaving VoiceOver/Switch Control users
+                            // with no way to reach or activate Reset Password
+                            // after a failed sign-in. Reported directly.
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundStyle(preferences.colors.error)
+                                Text("If you have forgotten your password, you can reset it on the AppleVis website.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel(String(localized: "Error: \(error). If you have forgotten your password, you can reset it on the AppleVis website."))
+                            .accessibilityFocused($isErrorFocused)
+
                             Link("Reset Password", destination: URL(string: "https://www.applevis.com/user/password")!)
                                 .font(.caption).fontWeight(.semibold)
                         }
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel(String(localized: "Error: \(error). If you have forgotten your password, you can reset it on the AppleVis website."))
-                        .accessibilityFocused($isErrorFocused)
                     }
 
                     HStack(spacing: 4) {
@@ -487,7 +512,7 @@ private struct ThemeStep: View {
                                             }
                                         }
                                         .padding(16)
-                                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                                        .background(preferences.colors.card, in: RoundedRectangle(cornerRadius: 12))
                                     }
                                     .accessibilityAddTraits(preferences.theme == theme ? [.isSelected] : [])
                                 }
@@ -555,7 +580,7 @@ private struct AnnouncementStep: View {
                                     .italic()
                             }
                             .padding(16)
-                            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                            .background(preferences.colors.card, in: RoundedRectangle(cornerRadius: 12))
                         }
                         // VoiceOver was auto-combining the displayName Text and the
                         // italic preview Text with no indication the second one was
@@ -606,12 +631,18 @@ private struct NotificationsStep: View {
                 )
 
                 VStack(spacing: 0) {
+                    // "Announcements" removed from onboarding — AppleVis has
+                    // no "announcement" content type of its own;
+                    // announcements are posted to the Blog, Forum, or
+                    // Newsletter, each already covered by its own category
+                    // here. (Settings > Notifications still has this toggle
+                    // too — flagged separately, not touched in this pass.)
+                    // Reported directly.
                     NotifToggle("New Forum Topics",  isOn: $preferences.notifyNewTopics)
                     NotifToggle("New Podcast Episodes", isOn: $preferences.notifyNewEpisodes)
-                    NotifToggle("Announcements",     isOn: $preferences.notifyAnnouncements)
                     NotifToggle("New App Directory Entries", isOn: $preferences.notifyAppUpdates)
                 }
-                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                .background(preferences.colors.card, in: RoundedRectangle(cornerRadius: 12))
                 .padding(.horizontal, 24)
 
                 // Sound picker
@@ -649,7 +680,7 @@ private struct NotificationsStep: View {
                             }
                         }
                     }
-                    .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                    .background(preferences.colors.card, in: RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal, 24)
                 }
 
@@ -728,12 +759,28 @@ private struct ReadyStep: View {
     let onFinish: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
     var stepInfo: (current: Int, total: Int)? = nil
+    // See WelcomeStep.featureIconWidth — same fixed-vs-scaling mismatch
+    // against the adjacent summary text.
+    @ScaledMetric(relativeTo: .body) private var summaryIconWidth: CGFloat = 28
 
     private var summaryItems: [(icon: String, text: String)] {
         var items: [(String, String)] = []
         items.append(("paintbrush", "Theme: \(preferences.theme.displayName)"))
         items.append(("speaker.wave.2", "VoiceOver: \(preferences.announcementLevel.displayName)"))
         if auth.isSignedIn { items.append(("person.crop.circle.fill", "Signed in as \(auth.user!.name)")) }
+        // The choices made on the Notifications step (categories, sound)
+        // never appeared anywhere in this summary — the only step in the
+        // whole wizard whose configuration wasn't reflected back to the
+        // user before finishing. Reported directly.
+        let enabledCategories = [
+            preferences.notifyNewTopics ? "New Forum Topics" : nil,
+            preferences.notifyNewEpisodes ? "New Podcast Episodes" : nil,
+            preferences.notifyAppUpdates ? "New App Directory Entries" : nil,
+        ].compactMap { $0 }
+        items.append(enabledCategories.isEmpty
+            ? ("bell.slash", "Notifications: Off")
+            : ("bell.badge", "Notifications: \(enabledCategories.joined(separator: ", "))")
+        )
         return items
     }
 
@@ -753,7 +800,7 @@ private struct ReadyStep: View {
                         HStack(spacing: 14) {
                             Image(systemName: item.icon)
                                 .foregroundStyle(Color.accentColor)
-                                .frame(width: 28)
+                                .frame(width: summaryIconWidth)
                                 .accessibilityHidden(true)
                             Text(item.text)
                                 .font(.subheadline)
