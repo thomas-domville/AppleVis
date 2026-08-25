@@ -286,6 +286,7 @@ final class PersistenceStore {
         defaults.removeObject(forKey: seenTopicsKey)
         defaults.removeObject(forKey: itemVisitsKey)
         defaults.removeObject(forKey: episodeAudioMetadataKey)
+        defaults.removeObject(forKey: mouseRecapDigestKey)
         defaults.removeObject(forKey: "applevis.forums.lastVisit")
         defaults.removeObject(forKey: "applevis.lastVisit")
         cache.removeAll()
@@ -327,6 +328,21 @@ final class PersistenceStore {
 
     private func audioMetadataCache() -> [String: EpisodeAudioMetadata] {
         load(key: episodeAudioMetadataKey) ?? [:]
+    }
+
+    // MARK: - Mouse Recap digest cache (display-only; loadMouseRecap always
+    // re-verifies against the API and overwrites this, so a stale cache can
+    // never mask something added or removed server-side — it only avoids a
+    // blank loading state on cold launch)
+
+    private let mouseRecapDigestKey = "applevis.home.mouseRecapDigest"
+
+    func cachedMouseRecapDigest() -> MouseRecapDigest? {
+        load(key: mouseRecapDigestKey)
+    }
+
+    func saveMouseRecapDigest(_ digest: MouseRecapDigest) {
+        persist(digest, key: mouseRecapDigestKey)
     }
 
     // MARK: - Storage

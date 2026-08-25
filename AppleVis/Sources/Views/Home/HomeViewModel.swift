@@ -14,6 +14,92 @@ final class HomeBadgeStore: ObservableObject {
     private init() {}
 }
 
+struct MouseRecapDigest: Codable {
+    let startDate: Date
+    let endDate: Date
+    let generatedAt: Date
+    let apps: [AppListing]
+    let podcasts: [PodcastEpisode]
+    let forums: [ForumTopic]
+    let resources: [Resource]
+    let blogs: [BlogPost]
+
+    var isEmpty: Bool {
+        apps.isEmpty && podcasts.isEmpty && forums.isEmpty && resources.isEmpty && blogs.isEmpty
+    }
+
+    var countSummary: String {
+        let parts = [
+            Self.countPart(apps.count, singular: "accessible app", plural: "accessible apps"),
+            Self.countPart(podcasts.count, singular: "podcast episode", plural: "podcast episodes"),
+            Self.countPart(forums.count, singular: "popular discussion", plural: "popular discussions"),
+            Self.countPart(resources.count, singular: "guide or tutorial", plural: "guides and tutorials"),
+            Self.countPart(blogs.count, singular: "blog post", plural: "blog posts"),
+        ].compactMap { $0 }
+        return parts.isEmpty ? "No recap items found for this period." : parts.joined(separator: " · ")
+    }
+
+    var dateRangeText: String {
+        let start = startDate.formatted(date: .abbreviated, time: .omitted)
+        let end = endDate.formatted(date: .abbreviated, time: .omitted)
+        return "\(start)-\(end)"
+    }
+
+    var shareText: String {
+        var lines = [
+            "Mouse Recap",
+            dateRangeText,
+            "",
+            countSummary,
+        ]
+        appendShareSection(title: "New Accessible Apps", items: apps.map { "\($0.name) - \($0.url)" }, to: &lines)
+        appendShareSection(title: "Podcast Episodes", items: podcasts.map { "\($0.title) - \($0.url)" }, to: &lines)
+        appendShareSection(title: "Popular Discussions", items: forums.map { "\($0.title) - \($0.url)" }, to: &lines)
+        appendShareSection(title: "Guides and Tutorials", items: resources.map { "\($0.title) - \($0.url)" }, to: &lines)
+        appendShareSection(title: "Blog Posts", items: blogs.map { "\($0.title) - \($0.url)" }, to: &lines)
+        return lines.joined(separator: "\n")
+    }
+
+    private static func countPart(_ count: Int, singular: String, plural: String) -> String? {
+        guard count > 0 else { return nil }
+        return "\(count) \(count == 1 ? singular : plural)"
+    }
+
+    private func appendShareSection(title: String, items: [String], to lines: inout [String]) {
+        guard !items.isEmpty else { return }
+        lines += ["", title]
+        lines += items.map { "- \($0)" }
+    }
+
+    /// Derives a narrower-window view (e.g. "past 7 days") from this digest
+    /// without a separate fetch — the fetch/cache always covers the widest
+    /// window Mouse Recap offers, and every narrower window is just a
+    /// client-side date filter over data already on hand. Each list stays in
+    /// its already-sorted order, so this is a pure truncation, not a re-rank.
+    ///
+    /// One accepted tradeoff: `forums` was already capped to the top
+    /// `mouseRecapForumLimit` topics for the WIDE window before this runs, so
+    /// scoping down can only ever narrow that set further (or leave it
+    /// unchanged) — it can't surface a topic that was popular specifically
+    /// within the narrow window but didn't make the wide window's top slice.
+    /// Simpler than re-fetching or re-ranking per window, and the cases it
+    /// misses are edge cases, not the common path.
+    func scoped(toLastDays days: Int) -> MouseRecapDigest {
+        let newStart = Calendar.current.date(byAdding: .day, value: -days, to: endDate) ?? endDate.addingTimeInterval(-TimeInterval(days) * 24 * 60 * 60)
+        guard newStart > startDate else { return self }
+        return MouseRecapDigest(
+            startDate: newStart,
+            endDate: endDate,
+            generatedAt: generatedAt,
+            apps: apps.filter { $0.createdAt >= newStart },
+            podcasts: podcasts.filter { $0.publishedAt >= newStart },
+            forums: forums.filter { $0.lastActivityAt >= newStart },
+            resources: resources.filter { $0.updatedAt >= newStart },
+            blogs: blogs.filter { $0.publishedAt >= newStart || $0.lastActivityAt >= newStart }
+        )
+    }
+}
+
 @MainActor
 final class HomeViewModel: ObservableObject {
     @Published private(set) var items: [FeedItem] = []
@@ -28,6 +114,10 @@ final class HomeViewModel: ObservableObject {
     /// ["Forums", "Podcasts"]. Non-empty alongside a populated `items` means
     /// a partial failure — some sources loaded fine, these didn't.
     @Published private(set) var failedSourceNames: [String] = []
+    @Published private(set) var mouseRecap: MouseRecapDigest?
+    @Published private(set) var isLoadingMouseRecap = false
+    @Published private(set) var mouseRecapError: String?
+    @Published private(set) var failedMouseRecapSourceNames: [String] = []
     /// Set only on a genuinely successful load — a failed attempt (e.g. no
     /// network) shouldn't count as "fresh" and block the next foreground
     /// retry within the staleness window. Backs HomeView's foreground
@@ -44,6 +134,18 @@ final class HomeViewModel: ObservableObject {
     /// window (`staleThreshold`), since both are answering the same
     /// underlying question with the same in-memory `lastLoadedAt`.
     private static let sittingGapThreshold: TimeInterval = 5 * 60
+    /// The widest window Mouse Recap fetches and caches — every narrower
+    /// window a user can select (see `MouseRecapWindow` in HomeView) is
+    /// derived client-side from this same fetch via
+    /// `MouseRecapDigest.scoped(toLastDays:)`, so there's only ever one
+    /// fetch/cache to keep fresh regardless of which window is on screen.
+    private static let mouseRecapMaxDays = 30
+    // Scaled up from the old 7-day window's 8-page bound to keep roughly the
+    // same per-day coverage headroom (8 * 30/7 ≈ 34, rounded down) rather
+    // than leaving a 30-day recap capped at the same page count a week-long
+    // one used.
+    private static let mouseRecapMaxPages = 24
+    private static let mouseRecapForumLimit = 5
     /// The boundary a never-individually-visited item is compared against
     /// — captured once per load() (see `advanceVisitBoundaryIfNeeded`) so
     /// it stays fixed for the whole current sitting rather than drifting
@@ -190,11 +292,53 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
+    func loadMouseRecap(force: Bool = false) async {
+        if !force, let mouseRecap, Date().timeIntervalSince(mouseRecap.generatedAt) < 10 * 60 {
+            return
+        }
+
+        // Show last session's digest immediately instead of a blank loading
+        // state — this is display-only, never a substitute for the API
+        // check below, which always runs and overwrites it with whatever
+        // Drupal currently reports (additions and removals both, since the
+        // digest is rebuilt from scratch each time rather than patched).
+        if mouseRecap == nil, let cached = PersistenceStore.shared.cachedMouseRecapDigest() {
+            mouseRecap = cached
+        }
+
+        isLoadingMouseRecap = true
+        mouseRecapError = nil
+        failedMouseRecapSourceNames = []
+
+        let endDate = Date()
+        let startDate = Calendar.current.date(byAdding: .day, value: -Self.mouseRecapMaxDays, to: endDate) ?? endDate.addingTimeInterval(-TimeInterval(Self.mouseRecapMaxDays) * 24 * 60 * 60)
+        let result = await fetchMouseRecapItems(since: startDate)
+
+        failedMouseRecapSourceNames = result.failedSources
+        if result.items.isEmpty && !result.failedSources.isEmpty {
+            // Fetch failed outright — leave the cached digest (if any) on
+            // screen rather than clearing it, same as Home's own failed-load
+            // handling.
+            mouseRecapError = "Couldn't load Mouse Recap. Pull to refresh."
+        } else {
+            let digest = Self.buildMouseRecap(from: result.items, startDate: startDate, endDate: endDate)
+            mouseRecap = digest
+            PersistenceStore.shared.saveMouseRecapDigest(digest)
+        }
+
+        isLoadingMouseRecap = false
+    }
+
     // MARK: - Private
 
     private struct SourceFetchResult {
         let items: [FeedItem]
         let failedName: String?
+    }
+
+    private struct MouseRecapFetchResult {
+        let items: [FeedItem]
+        let failedSources: [String]
     }
 
     /// Runs one source's fetch in isolation so a single failing source
@@ -258,6 +402,129 @@ final class HomeViewModel: ObservableObject {
             if let name = result.failedName { failed.append(name) }
         }
         return (combined, failed)
+    }
+
+    private func fetchMouseRecapItems(since startDate: Date) async -> MouseRecapFetchResult {
+        let showForums   = UserDefaults.standard.object(forKey: "feed.showForums")   as? Bool ?? true
+        let showPodcasts = UserDefaults.standard.object(forKey: "feed.showPodcasts") as? Bool ?? true
+        let showApps     = UserDefaults.standard.object(forKey: "feed.showApps")     as? Bool ?? true
+        let showGuides   = UserDefaults.standard.object(forKey: "feed.showGuides")   as? Bool ?? true
+        let showBlogs    = UserDefaults.standard.object(forKey: "feed.showBlogs")    as? Bool ?? true
+        let appleOnly    = UserDefaults.standard.object(forKey: "feed.appleOnly")    as? Bool ?? false
+
+        async let forums = showForums
+            ? fetchRecapPages(name: "Forums", since: startDate) { page in
+                let topics = try await APIClient.shared.forums.recent(page: page, appleOnly: appleOnly)
+                return (topics.map { FeedItem.forumTopic($0) }, topics.count >= APIPaging.pageSize)
+            }
+            : SourceFetchResult(items: [], failedName: nil)
+        async let podcasts = showPodcasts
+            ? fetchRecapPages(name: "Podcasts", since: startDate) { page in
+                let result = try await APIClient.shared.podcasts.episodes(page: page)
+                return (result.items.map { FeedItem.podcastEpisode($0) }, result.hasMore)
+            }
+            : SourceFetchResult(items: [], failedName: nil)
+        async let apps = showApps
+            ? fetchRecapPages(name: "Apps", since: startDate) { page in
+                let result = try await APIClient.shared.apps.list(page: page)
+                return (result.items.map { FeedItem.appListing($0) }, result.hasMore)
+            }
+            : SourceFetchResult(items: [], failedName: nil)
+        async let guides = showGuides
+            ? fetchRecapPages(name: "Guides", since: startDate) { page in
+                let result = try await APIClient.shared.resources.list(page: page)
+                return (result.items.map { FeedItem.resource($0) }, result.hasMore)
+            }
+            : SourceFetchResult(items: [], failedName: nil)
+        async let blogs = showBlogs
+            ? fetchRecapPages(name: "Blogs", since: startDate) { page in
+                let result = try await APIClient.shared.blogs.list(page: page)
+                return (result.items.map { FeedItem.blogPost($0) }, result.hasMore)
+            }
+            : SourceFetchResult(items: [], failedName: nil)
+
+        let results = await [forums, podcasts, apps, guides, blogs]
+        return MouseRecapFetchResult(
+            items: Self.deduplicated(results.flatMap(\.items)),
+            failedSources: results.compactMap(\.failedName)
+        )
+    }
+
+    private func fetchRecapPages(
+        name: String,
+        since startDate: Date,
+        fetch: @escaping @MainActor (_ page: Int) async throws -> (items: [FeedItem], hasMore: Bool)
+    ) async -> SourceFetchResult {
+        do {
+            var allItems: [FeedItem] = []
+            for page in 0..<Self.mouseRecapMaxPages {
+                let result = try await fetch(page)
+                let inRange = result.items.filter { $0.lastActivityAt >= startDate }
+                allItems += inRange
+                let reachedOlderItems = result.items.contains { $0.lastActivityAt < startDate }
+                if !result.hasMore || reachedOlderItems { break }
+            }
+            return SourceFetchResult(items: allItems, failedName: nil)
+        } catch {
+            return SourceFetchResult(items: [], failedName: name)
+        }
+    }
+
+    private static func buildMouseRecap(from items: [FeedItem], startDate: Date, endDate: Date) -> MouseRecapDigest {
+        let apps = items.compactMap { item -> AppListing? in
+            guard case .appListing(let app) = item,
+                  app.createdAt >= startDate,
+                  isStronglyAccessible(app)
+            else { return nil }
+            return app
+        }
+        .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+
+        let podcasts = items.compactMap { item -> PodcastEpisode? in
+            guard case .podcastEpisode(let episode) = item, episode.publishedAt >= startDate else { return nil }
+            return episode
+        }
+        .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+
+        let forums = items.compactMap { item -> ForumTopic? in
+            guard case .forumTopic(let topic) = item, topic.lastActivityAt >= startDate else { return nil }
+            return topic
+        }
+        .sorted {
+            if $0.replyCount != $1.replyCount { return $0.replyCount > $1.replyCount }
+            return $0.lastActivityAt > $1.lastActivityAt
+        }
+        .prefix(Self.mouseRecapForumLimit)
+
+        let resources = items.compactMap { item -> Resource? in
+            guard case .resource(let resource) = item, resource.updatedAt >= startDate else { return nil }
+            return resource
+        }
+        .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+
+        let blogs = items.compactMap { item -> BlogPost? in
+            guard case .blogPost(let post) = item, post.publishedAt >= startDate || post.lastActivityAt >= startDate else { return nil }
+            return post
+        }
+        .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+
+        return MouseRecapDigest(
+            startDate: startDate,
+            endDate: endDate,
+            generatedAt: Date(),
+            apps: apps,
+            podcasts: podcasts,
+            forums: Array(forums),
+            resources: resources,
+            blogs: blogs
+        )
+    }
+
+    private static func isStronglyAccessible(_ app: AppListing) -> Bool {
+        guard let rating = app.voiceOverPerformance?.lowercased(), !rating.isEmpty else { return false }
+        return rating.contains("reads all page elements")
+            || rating.contains("fully accessible")
+            || rating.contains("completely accessible")
     }
 
     private func buildNewActivitySummary() {

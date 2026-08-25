@@ -9,6 +9,18 @@ enum HomeFeedFilter: String, CaseIterable, Identifiable {
     var label: String { self == .all ? "All" : "New" }
 }
 
+/// How far back Mouse Recap looks — a client-side scope over the same
+/// always-30-day fetch/cache (`HomeViewModel.mouseRecapMaxDays`), not a
+/// separate fetch per window; see `MouseRecapDigest.scoped(toLastDays:)`.
+/// Defaults to the narrower 7-day option so a new user isn't handed a
+/// month of backlog to skim through on first look.
+enum MouseRecapWindow: Int, CaseIterable, Identifiable {
+    case week = 7
+    case month = 30
+    var id: Int { rawValue }
+    var label: String { self == .week ? "Past 7 Days" : "Past 30 Days" }
+}
+
 /// Where VoiceOver focus should land once Home finishes its initial load —
 /// docs/IMPLEMENTATION_NOTES.md: "VoiceOver focus should land on the
 /// summary before the first feed card." Falls back to the greeting when
@@ -57,6 +69,11 @@ struct HomeView: View {
     // directly: selecting "New" and relaunching the app always landed back
     // on "All" instead of remembering the choice.
     @AppStorage("home.feedFilter") private var homeFeedFilter: HomeFeedFilter = .all
+    // Shared key with MouseRecapView's own @AppStorage below — both read and
+    // write "home.mouseRecapWindow" so picking a window on the full recap
+    // screen is reflected back in the compact Home card too, without having
+    // to thread the value down as a binding.
+    @AppStorage("home.mouseRecapWindow") private var mouseRecapWindow: MouseRecapWindow = .week
     @State private var notificationHistory: [NotificationHistoryItem] = []
     @State private var showComposeTopic = false
     @State private var showSubmitApp = false
@@ -168,6 +185,7 @@ struct HomeView: View {
                 // found nothing new from one that silently failed.
                 let previousLoadedAt = vm.lastLoadedAt
                 await vm.load()
+                await vm.loadMouseRecap(force: true)
                 notificationHistory = PersistenceStore.shared.notificationHistory()
                 SoundPlayer.shared.play(.refresh)
 
@@ -205,7 +223,12 @@ struct HomeView: View {
                 Task { await vm.load() }
             }
             .overlay(alignment: .top) { ToastOverlay() }
-            .sheet(isPresented: $showCustomizeHome, onDismiss: { Task { await vm.load() } }) {
+            .sheet(isPresented: $showCustomizeHome, onDismiss: {
+                Task {
+                    await vm.load()
+                    await vm.loadMouseRecap(force: true)
+                }
+            }) {
                 CustomizeHomeView()
             }
             .sheet(isPresented: $showComposeTopic, onDismiss: { Task { await vm.load() } }) {
@@ -234,7 +257,10 @@ struct HomeView: View {
                 BlogDetailView(postId: post.id)
             }
         }
-        .task { await vm.load() }
+        .task {
+            await vm.load()
+            await vm.loadMouseRecap()
+        }
         .onAppear {
             notificationHistory = PersistenceStore.shared.notificationHistory()
         }
@@ -288,7 +314,6 @@ struct HomeView: View {
         let name = auth.user?.name ?? ""
         return Group {
             if !name.isEmpty {
-                let today = Date().formatted(date: .complete, time: .omitted)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(Greeting.text()),")
                         // CARD-11: fixed-point sizes didn't respond to the
@@ -299,9 +324,6 @@ struct HomeView: View {
                     Text(name)
                         .font(.title2.weight(.bold))
                         .foregroundStyle(Color.accentColor)
-                    Text(today)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -313,7 +335,7 @@ struct HomeView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 2))
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel(String(localized: "\(Greeting.text()), \(name). Today is \(today)."))
+                .accessibilityLabel(String(localized: "\(Greeting.text()), \(name)."))
                 .accessibilityFocused($focusTarget, equals: .greeting)
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
                 .listRowSeparator(.hidden)
@@ -384,6 +406,18 @@ struct HomeView: View {
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     .listRowSeparator(.hidden)
                 }
+
+                NavigationLink(destination: MouseRecapView(vm: vm)) {
+                    MouseRecapCard(
+                        digest: vm.mouseRecap?.scoped(toLastDays: mouseRecapWindow.rawValue),
+                        isLoading: vm.isLoadingMouseRecap,
+                        error: vm.mouseRecapError,
+                        failedSources: vm.failedMouseRecapSourceNames
+                    )
+                }
+                .accessibilityHint(String(localized: "Double-tap to review and share your AppleVis recap."))
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                .listRowSeparator(.hidden)
 
                 if (!networkMonitor.isConnected || isAnySourceDegraded) && !vm.items.isEmpty {
                     OfflineBanner()
@@ -595,6 +629,209 @@ struct CustomizeHomeView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Mouse Recap
+
+private struct MouseRecapCard: View {
+    let digest: MouseRecapDigest?
+    let isLoading: Bool
+    let error: String?
+    let failedSources: [String]
+    @EnvironmentObject private var preferences: PreferencesStore
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "sparkles")
+                .foregroundStyle(Color.accentColor)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Mouse Recap")
+                    .font(.subheadline.weight(.semibold))
+                if isLoading && digest == nil {
+                    Text("Building your recap...")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else if let error {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundStyle(preferences.colors.warning)
+                } else if let digest {
+                    Text(digest.countSummary)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                    if !failedSources.isEmpty {
+                        Text("Some sources could not be loaded.")
+                            .font(.caption)
+                            .foregroundStyle(preferences.colors.warning)
+                    }
+                } else {
+                    Text("A shareable summary of accessible apps, podcasts, discussions, guides, and blog posts.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 8)
+            if isLoading {
+                ProgressView()
+                    .controlSize(.small)
+            }
+        }
+        .padding(12)
+        .background(preferences.colors.card, in: RoundedRectangle(cornerRadius: 10))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var accessibilityLabel: String {
+        if isLoading && digest == nil { return "Mouse Recap. Building your recap." }
+        if let error { return "Mouse Recap. \(error)" }
+        if let digest { return "Mouse Recap. \(digest.countSummary)" }
+        return "Mouse Recap. Recent activity summary."
+    }
+}
+
+private struct MouseRecapView: View {
+    @ObservedObject var vm: HomeViewModel
+    @EnvironmentObject private var preferences: PreferencesStore
+    // Same UserDefaults key as HomeView's own @AppStorage — picking a window
+    // here is reflected back into the compact Home card automatically, with
+    // no binding to thread through.
+    @AppStorage("home.mouseRecapWindow") private var window: MouseRecapWindow = .week
+
+    var body: some View {
+        Group {
+            if vm.isLoadingMouseRecap && vm.mouseRecap == nil {
+                LoadingView(message: "Building Mouse Recap...")
+            } else if let error = vm.mouseRecapError, vm.mouseRecap == nil {
+                ErrorView(message: error) { await vm.loadMouseRecap(force: true) }
+            } else if let digest = vm.mouseRecap?.scoped(toLastDays: window.rawValue) {
+                List {
+                    Section {
+                        Picker("Recap Window", selection: $window) {
+                            ForEach(MouseRecapWindow.allCases) { option in
+                                Text(option.label).tag(option)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .accessibilityLabel(String(localized: "Recap window"))
+                        .accessibilityHint(String(localized: "Choose how far back Mouse Recap looks."))
+                    }
+                    .listRowSeparator(.hidden)
+
+                    Section {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(digest.dateRangeText)
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(Color.accentColor)
+                            Text(digest.countSummary)
+                                .font(.body)
+                            if digest.isEmpty {
+                                Text("No recap items were found for this period.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+
+                    if !vm.failedMouseRecapSourceNames.isEmpty {
+                        Section {
+                            SourceErrorBanner(failedSources: vm.failedMouseRecapSourceNames) {
+                                Task { await vm.loadMouseRecap(force: true) }
+                            }
+                        }
+                        .listRowSeparator(.hidden)
+                    }
+
+                    recapSection("New Accessible Apps", systemImage: "square.grid.2x2", items: digest.apps) { app in
+                        NavigationLink(value: app) {
+                            MouseRecapItemRow(title: app.name, subtitle: app.developer, date: app.createdAt)
+                        }
+                    }
+                    recapSection("Podcast Episodes", systemImage: "mic", items: digest.podcasts) { episode in
+                        NavigationLink(value: episode) {
+                            MouseRecapItemRow(title: episode.title, subtitle: episode.showTitle, date: episode.publishedAt)
+                        }
+                    }
+                    recapSection("Popular Discussions", systemImage: "bubble.left.and.bubble.right", items: digest.forums) { topic in
+                        NavigationLink(value: topic) {
+                            MouseRecapItemRow(title: topic.title, subtitle: "\(topic.replyCount) repl\(topic.replyCount == 1 ? "y" : "ies")", date: topic.lastActivityAt)
+                        }
+                    }
+                    recapSection("Guides and Tutorials", systemImage: "book", items: digest.resources) { resource in
+                        NavigationLink(value: resource) {
+                            MouseRecapItemRow(title: resource.title, subtitle: resource.kind.displayName, date: resource.updatedAt)
+                        }
+                    }
+                    recapSection("Blog Posts", systemImage: "newspaper", items: digest.blogs) { post in
+                        NavigationLink(value: post) {
+                            MouseRecapItemRow(title: post.title, subtitle: post.authorName, date: post.publishedAt)
+                        }
+                    }
+                }
+                .themedList(preferences.colors)
+                .refreshable { await vm.loadMouseRecap(force: true) }
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        ShareLink(item: digest.shareText, subject: Text("Mouse Recap")) {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                        .accessibilityLabel(String(localized: "Share Mouse Recap"))
+                    }
+                }
+            } else {
+                EmptyStateView(
+                    title: "Mouse Recap",
+                    message: "Pull to refresh your recap.",
+                    systemImage: "sparkles"
+                )
+            }
+        }
+        .navigationTitle("Mouse Recap")
+        .task { await vm.loadMouseRecap() }
+    }
+
+    @ViewBuilder
+    private func recapSection<Item: Identifiable, Row: View>(
+        _ title: String,
+        systemImage: String,
+        items: [Item],
+        @ViewBuilder row: (Item) -> Row
+    ) -> some View {
+        if !items.isEmpty {
+            Section {
+                ForEach(items) { item in
+                    row(item)
+                }
+            } header: {
+                Label(title, systemImage: systemImage)
+            }
+        }
+    }
+}
+
+private struct MouseRecapItemRow: View {
+    let title: String
+    let subtitle: String
+    let date: Date
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            HStack(spacing: 6) {
+                Text(subtitle)
+                Text("-")
+                    .accessibilityHidden(true)
+                RelativeDateLabel(date: date)
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

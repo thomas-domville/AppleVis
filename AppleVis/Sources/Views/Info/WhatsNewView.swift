@@ -37,7 +37,7 @@ struct WhatsNewView: View {
                 .tracking(0.8)
                 .accessibilityHidden(true)
 
-            Text("This update makes the App Directory more complete, adds clearer ways to open App Store and RSS links, shows when App Store listings may no longer be available, gives editors a safer way to refresh app information, improves submission forms, and smooths out VoiceOver focus across the app.")
+            Text("This update makes the App Directory more complete, adds Mouse Recap on Home, adds clearer ways to open App Store and RSS links, shows when App Store listings may no longer be available, gives editors a safer way to refresh app information, improves submission forms, and smooths out VoiceOver focus across the app.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -163,6 +163,12 @@ struct ChangeItem: Identifiable {
     static let currentVersion = "2026.0.23"
 
     static let current: [ChangeItem] = [
+        ChangeItem(
+            systemImage: "sparkles",
+            tag: .new,
+            title: "Mouse Recap on Home",
+            description: "Home now includes Mouse Recap, a shareable summary of new accessible apps, podcast episodes, popular discussions, guides and tutorials, and blog posts, over the past 7 or 30 days."
+        ),
         ChangeItem(
             systemImage: "arrow.up.forward.app",
             tag: .new,
