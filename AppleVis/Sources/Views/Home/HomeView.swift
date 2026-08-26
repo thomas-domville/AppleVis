@@ -827,7 +827,7 @@ private struct MouseRecapView: View {
         systemImage: String,
         description: String,
         items: [Item],
-        @ViewBuilder row: (Item) -> Row
+        @ViewBuilder row: @escaping (Item) -> Row
     ) -> some View {
         if !items.isEmpty {
             Section {

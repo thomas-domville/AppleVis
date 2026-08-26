@@ -33,6 +33,12 @@ struct ComposeTopicView: View {
     // screen, it silently defaults to the back button after the push.
     @AccessibilityFocusState private var isTitleFieldFocused: Bool
 
+    private var isValid: Bool {
+        !title.trimmingCharacters(in: .whitespaces).isEmpty
+            && !bodyText.trimmingCharacters(in: .whitespaces).isEmpty
+            && selectedCategory != nil
+    }
+
     /// RN confirmed before discarding a filled-out form; Cancel here
     /// previously dismissed immediately with no warning, silently losing a
     /// written topic with one accidental tap — same regression already

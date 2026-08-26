@@ -181,11 +181,11 @@ struct ResourceDetailView: View {
                     index: index, total: detail.comments.count,
                     subject: comment.subject, parentTitle: detail.title,
                     commentId: comment.id, authorId: comment.authorId, commentType: "comment_node_guides",
-                    onUnpublish: {
-                        self.detail?.comments.removeAll { $0.id == comment.id }
-                    },
                     supportsReport: false,
                     onDelete: {
+                        self.detail?.comments.removeAll { $0.id == comment.id }
+                    },
+                    onUnpublish: {
                         self.detail?.comments.removeAll { $0.id == comment.id }
                     },
                     onEdit: { newText in
