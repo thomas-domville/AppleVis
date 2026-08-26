@@ -42,22 +42,87 @@ struct MouseRecapDigest: Codable {
     var dateRangeText: String {
         let start = startDate.formatted(date: .abbreviated, time: .omitted)
         let end = endDate.formatted(date: .abbreviated, time: .omitted)
-        return "\(start)-\(end)"
+        return "\(start) through \(end)"
     }
 
-    var shareText: String {
+    func newsletterIntro(for periodName: String) -> String {
+        let period = periodName.lowercased()
+        let parts = [
+            Self.countPart(apps.count, singular: "accessible app", plural: "accessible apps"),
+            Self.countPart(podcasts.count, singular: "podcast episode", plural: "podcast episodes"),
+            Self.countPart(forums.count, singular: "popular discussion", plural: "popular discussions"),
+            Self.countPart(resources.count, singular: "guide or tutorial", plural: "guides and tutorials"),
+            Self.countPart(blogs.count, singular: "blog post", plural: "blog posts"),
+        ].compactMap { $0 }
+
+        guard !parts.isEmpty else {
+            return "No recap items were found for the \(period)."
+        }
+
+        return "Here's your AppleVis roundup from the \(period). \(editorialLead) Inside: \(Self.sentenceList(parts))."
+    }
+
+    func shareText(for periodName: String) -> String {
         var lines = [
             "Mouse Recap",
+            periodName,
             dateRangeText,
             "",
-            countSummary,
+            newsletterIntro(for: periodName),
         ]
-        appendShareSection(title: "New Accessible Apps", items: apps.map { "\($0.name) - \($0.url)" }, to: &lines)
-        appendShareSection(title: "Podcast Episodes", items: podcasts.map { "\($0.title) - \($0.url)" }, to: &lines)
-        appendShareSection(title: "Popular Discussions", items: forums.map { "\($0.title) - \($0.url)" }, to: &lines)
-        appendShareSection(title: "Guides and Tutorials", items: resources.map { "\($0.title) - \($0.url)" }, to: &lines)
-        appendShareSection(title: "Blog Posts", items: blogs.map { "\($0.title) - \($0.url)" }, to: &lines)
+        appendShareSection(
+            title: "New Accessible Apps",
+            description: "A quick look at the newest additions to the AppleVis App Directory.",
+            items: apps.map { "\($0.name) - \($0.url)" },
+            to: &lines
+        )
+        appendShareSection(
+            title: "Podcast Episodes",
+            description: "Recent audio walkthroughs, conversations, and practical tips.",
+            items: podcasts.map { "\($0.title) - \($0.url)" },
+            to: &lines
+        )
+        appendShareSection(
+            title: "Popular Discussions",
+            description: "Community conversations that have been drawing replies.",
+            items: forums.map { "\($0.title) - \($0.url)" },
+            to: &lines
+        )
+        appendShareSection(
+            title: "Guides and Tutorials",
+            description: "Hands-on help and explainers from the AppleVis community.",
+            items: resources.map { "\($0.title) - \($0.url)" },
+            to: &lines
+        )
+        appendShareSection(
+            title: "Blog Posts",
+            description: "News, updates, and editorial coverage from AppleVis.",
+            items: blogs.map { "\($0.title) - \($0.url)" },
+            to: &lines
+        )
         return lines.joined(separator: "\n")
+    }
+
+    private var editorialLead: String {
+        if !apps.isEmpty && !forums.isEmpty {
+            return "New app discoveries and community conversations led the way."
+        }
+        if !apps.isEmpty {
+            return "New app discoveries led the way."
+        }
+        if !forums.isEmpty {
+            return "Community conversations led the way."
+        }
+        if !podcasts.isEmpty {
+            return "Recent podcast episodes brought fresh walkthroughs and tips."
+        }
+        if !resources.isEmpty {
+            return "Fresh guides and tutorials brought practical help."
+        }
+        if !blogs.isEmpty {
+            return "AppleVis blog posts brought the latest news and perspective."
+        }
+        return "Check back soon for new apps, podcasts, discussions, guides, and blog posts."
     }
 
     private static func countPart(_ count: Int, singular: String, plural: String) -> String? {
@@ -65,9 +130,23 @@ struct MouseRecapDigest: Codable {
         return "\(count) \(count == 1 ? singular : plural)"
     }
 
-    private func appendShareSection(title: String, items: [String], to lines: inout [String]) {
+    private static func sentenceList(_ parts: [String]) -> String {
+        switch parts.count {
+        case 0:
+            return ""
+        case 1:
+            return parts[0]
+        case 2:
+            return parts.joined(separator: " and ")
+        default:
+            let initial = parts.dropLast().joined(separator: ", ")
+            return "\(initial), and \(parts[parts.count - 1])"
+        }
+    }
+
+    private func appendShareSection(title: String, description: String, items: [String], to lines: inout [String]) {
         guard !items.isEmpty else { return }
-        lines += ["", title]
+        lines += ["", title, description]
         lines += items.map { "- \($0)" }
     }
 

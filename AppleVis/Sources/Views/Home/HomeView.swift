@@ -18,7 +18,7 @@ enum MouseRecapWindow: Int, CaseIterable, Identifiable {
     case week = 7
     case month = 30
     var id: Int { rawValue }
-    var label: String { self == .week ? "Past 7 Days" : "Past 30 Days" }
+    var label: String { self == .week ? "Past Week" : "Past Month" }
 }
 
 /// Where VoiceOver focus should land once Home finishes its initial load —
@@ -726,15 +726,17 @@ private struct MouseRecapView: View {
                             Text(digest.dateRangeText)
                                 .font(.footnote.weight(.semibold))
                                 .foregroundStyle(Color.accentColor)
-                            Text(digest.countSummary)
+                            Text(digest.newsletterIntro(for: window.label))
                                 .font(.body)
                             if digest.isEmpty {
-                                Text("No recap items were found for this period.")
+                                Text(window == .week ? "Pull to refresh later, or try Past Month for a wider look." : "Pull to refresh later for a fresh look.")
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
                         }
                         .accessibilityElement(children: .combine)
+                    } header: {
+                        Text("In This Recap")
                     }
 
                     if !vm.failedMouseRecapSourceNames.isEmpty {
@@ -746,27 +748,52 @@ private struct MouseRecapView: View {
                         .listRowSeparator(.hidden)
                     }
 
-                    recapSection("New Accessible Apps", systemImage: "square.grid.2x2", items: digest.apps) { app in
+                    recapSection(
+                        "New Accessible Apps",
+                        systemImage: "square.grid.2x2",
+                        description: "A quick look at the newest additions to the AppleVis App Directory.",
+                        items: digest.apps
+                    ) { app in
                         NavigationLink(value: app) {
                             MouseRecapItemRow(title: app.name, subtitle: app.developer, date: app.createdAt)
                         }
                     }
-                    recapSection("Podcast Episodes", systemImage: "mic", items: digest.podcasts) { episode in
+                    recapSection(
+                        "Podcast Episodes",
+                        systemImage: "mic",
+                        description: "Recent audio walkthroughs, conversations, and practical tips.",
+                        items: digest.podcasts
+                    ) { episode in
                         NavigationLink(value: episode) {
                             MouseRecapItemRow(title: episode.title, subtitle: episode.showTitle, date: episode.publishedAt)
                         }
                     }
-                    recapSection("Popular Discussions", systemImage: "bubble.left.and.bubble.right", items: digest.forums) { topic in
+                    recapSection(
+                        "Popular Discussions",
+                        systemImage: "bubble.left.and.bubble.right",
+                        description: "Community conversations that have been drawing replies.",
+                        items: digest.forums
+                    ) { topic in
                         NavigationLink(value: topic) {
                             MouseRecapItemRow(title: topic.title, subtitle: "\(topic.replyCount) repl\(topic.replyCount == 1 ? "y" : "ies")", date: topic.lastActivityAt)
                         }
                     }
-                    recapSection("Guides and Tutorials", systemImage: "book", items: digest.resources) { resource in
+                    recapSection(
+                        "Guides and Tutorials",
+                        systemImage: "book",
+                        description: "Hands-on help and explainers from the AppleVis community.",
+                        items: digest.resources
+                    ) { resource in
                         NavigationLink(value: resource) {
                             MouseRecapItemRow(title: resource.title, subtitle: resource.kind.displayName, date: resource.updatedAt)
                         }
                     }
-                    recapSection("Blog Posts", systemImage: "newspaper", items: digest.blogs) { post in
+                    recapSection(
+                        "Blog Posts",
+                        systemImage: "newspaper",
+                        description: "News, updates, and editorial coverage from AppleVis.",
+                        items: digest.blogs
+                    ) { post in
                         NavigationLink(value: post) {
                             MouseRecapItemRow(title: post.title, subtitle: post.authorName, date: post.publishedAt)
                         }
@@ -776,7 +803,7 @@ private struct MouseRecapView: View {
                 .refreshable { await vm.loadMouseRecap(force: true) }
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        ShareLink(item: digest.shareText, subject: Text("Mouse Recap")) {
+                        ShareLink(item: digest.shareText(for: window.label), subject: Text("Mouse Recap")) {
                             Image(systemName: "square.and.arrow.up")
                         }
                         .accessibilityLabel(String(localized: "Share Mouse Recap"))
@@ -798,11 +825,15 @@ private struct MouseRecapView: View {
     private func recapSection<Item: Identifiable, Row: View>(
         _ title: String,
         systemImage: String,
+        description: String,
         items: [Item],
         @ViewBuilder row: (Item) -> Row
     ) -> some View {
         if !items.isEmpty {
             Section {
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 ForEach(items) { item in
                     row(item)
                 }

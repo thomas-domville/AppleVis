@@ -167,7 +167,7 @@ struct ChangeItem: Identifiable {
             systemImage: "sparkles",
             tag: .new,
             title: "Mouse Recap on Home",
-            description: "Home now includes Mouse Recap, a shareable summary of new accessible apps, podcast episodes, popular discussions, guides and tutorials, and blog posts, over the past 7 or 30 days."
+            description: "Home now includes Mouse Recap, a shareable summary of new accessible apps, podcast episodes, popular discussions, guides and tutorials, and blog posts from the past week or past month."
         ),
         ChangeItem(
             systemImage: "arrow.up.forward.app",

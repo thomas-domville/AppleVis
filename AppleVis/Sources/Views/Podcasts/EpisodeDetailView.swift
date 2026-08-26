@@ -793,10 +793,24 @@ struct EpisodeDetailView: View {
     private func transcriptHeadingIndex(in segments: [HTMLSegment]) -> Int? {
         segments.firstIndex { segment in
             guard segment.isHeading else { return false }
-            let text = segment.plainText.trimmingCharacters(in: .whitespacesAndNewlines)
-            return text.caseInsensitiveCompare("Transcript") == .orderedSame
-                || text.caseInsensitiveCompare("Transcription") == .orderedSame
+            return Self.isTranscriptHeading(segment.plainText)
         }
+    }
+
+    static func isTranscriptHeading(_ text: String) -> Bool {
+        let normalized = text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: ":.-"))
+            .lowercased()
+
+        return normalized == "transcript"
+            || normalized == "transcription"
+            || normalized == "episode transcript"
+            || normalized == "episode transcription"
+            || normalized == "podcast transcript"
+            || normalized == "podcast transcription"
+            || normalized == "audio transcript"
+            || normalized == "audio transcription"
     }
 
     @ViewBuilder
