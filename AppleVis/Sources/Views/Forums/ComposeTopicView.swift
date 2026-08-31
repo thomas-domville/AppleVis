@@ -9,6 +9,13 @@ struct ComposeTopicView: View {
     @State private var bodyText = ""
     @State private var selectedCategory: ForumCategory?
     @State private var categories: [ForumCategory] = []
+    /// Pre-checked rather than a separate post-submit prompt — almost
+    /// everyone posting a question wants to know when someone answers it,
+    /// so this costs the common case zero extra taps; anyone who doesn't
+    /// want it just switches it off before posting. Best-effort on submit
+    /// (see `submit()`) — a failed follow-along never blocks or reverts the
+    /// topic post itself.
+    @State private var followOnPost = true
     @State private var isSubmitting = false
     @State private var error: String?
     @State private var showDiscardConfirm = false
@@ -118,6 +125,12 @@ struct ComposeTopicView: View {
                                     )
                                 }
                         }
+                        Section {
+                            Toggle("Follow This Topic", isOn: $followOnPost)
+                                .accessibilityHint(String(localized: "Notifies you when someone replies. You can unfollow anytime from the topic itself."))
+                        } footer: {
+                            Text("Get notified when people reply to your topic.")
+                        }
                         if let error {
                             Section {
                                 Text(error).foregroundStyle(.red)
@@ -206,13 +219,33 @@ struct ComposeTopicView: View {
         isSubmitting = true
         error = nil
         do {
-            let posted = try await APIClient.shared.forums.submitTopic(title: title, body: bodyText, categoryTid: cat.tid, csrfToken: user.csrfToken)
+            var posted = try await APIClient.shared.forums.submitTopic(title: title, body: bodyText, categoryTid: cat.tid, csrfToken: user.csrfToken)
             toast.success(String(localized: "Topic posted"))
+            if followOnPost {
+                posted.isFollowing = await followNewTopic(posted, token: user.csrfToken)
+            }
             onPosted(posted)
             dismiss()
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Failed to post topic." }
+        } catch { self.error = "Couldn't post topic. Try again." }
         isSubmitting = false
+    }
+
+    /// Best-effort — the topic itself already posted successfully by the
+    /// time this runs, so a failed follow-along (network blip, etc.)
+    /// shouldn't block, revert, or alarm the user over it. They can always
+    /// follow manually from the topic itself if this quietly doesn't stick.
+    private func followNewTopic(_ topic: ForumTopic, token: String) async -> Bool {
+        do {
+            try await APIClient.shared.forums.follow(nodeUuid: topic.id, token: token)
+            PersistenceStore.shared.markFollowed(FollowedItem(
+                id: topic.id, kind: .forumTopic, nodeType: "node--forum",
+                title: topic.title, followedAt: Date(), lastActivityAt: topic.lastActivityAt, url: topic.url
+            ))
+            return true
+        } catch {
+            return false
+        }
     }
 }
 
@@ -377,7 +410,7 @@ struct ComposeReplyView: View {
             onPosted(reply)
             dismiss()
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Failed to post reply." }
+        } catch { self.error = "Couldn't post reply. Try again." }
         isSubmitting = false
     }
 }

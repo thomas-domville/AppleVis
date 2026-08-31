@@ -4,9 +4,15 @@ import SwiftUI
 /// last visit — distinct from "Customize Home," which controls which
 /// content types are fetched in the first place, not which of them show.
 enum HomeFeedFilter: String, CaseIterable, Identifiable {
-    case all, new
+    case all, new, mouseRecap
     var id: String { rawValue }
-    var label: String { self == .all ? "All" : "New" }
+    var label: String {
+        switch self {
+        case .all: return "All"
+        case .new: return "New"
+        case .mouseRecap: return "Mouse Recap"
+        }
+    }
 }
 
 /// How far back Mouse Recap looks — a client-side scope over the same
@@ -28,7 +34,6 @@ enum MouseRecapWindow: Int, CaseIterable, Identifiable {
 enum HomeFocusTarget: Hashable {
     case summary
     case greeting
-    case heading
     case item(String)
 }
 
@@ -60,8 +65,17 @@ struct HomeView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var networkMonitor: NetworkMonitor
     @EnvironmentObject private var keyCommands: KeyCommandRouter
+    @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @ObservedObject private var networkStatus = NetworkStatusStore.shared
     @State private var hasAnnouncedWelcome = false
+    /// Set by `announceWelcomeIfNeeded()` when there's no new activity to
+    /// summarize but there is a last-visited item to resume — read inside
+    /// `feedList`'s own `ScrollViewReader`, since `proxy` isn't reachable
+    /// from `announceWelcomeIfNeeded()` itself (it's local to that closure).
+    @State private var pendingResumeFocusItemId: String?
+    @State private var hasCheckedAnniversary = false
+    @State private var showAnniversary = false
+    @State private var anniversaryYears = 0
     @State private var showCustomizeHome = false
     // @AppStorage, not @State — plain @State reset to .all on every fresh
     // launch (TabView already keeps it alive across tab switches within a
@@ -92,7 +106,14 @@ struct HomeView: View {
     /// from the "Customize Home" menu, which controls which content TYPES
     /// are fetched at all, not which of the fetched items are shown.
     private var visibleItems: [FeedItem] {
-        homeFeedFilter == .new ? vm.newItems : vm.items
+        switch homeFeedFilter {
+        case .all:
+            return vm.items
+        case .new:
+            return vm.newItems
+        case .mouseRecap:
+            return []
+        }
     }
 
     /// O(1) lookup used by feedList to mark rows new — built once per body
@@ -204,7 +225,13 @@ struct HomeView: View {
                 // just explicitly took.
                 if !vm.newItems.isEmpty && !vm.isNewActivityDismissed {
                     UIAccessibility.post(notification: .announcement, argument: vm.newActivitySummary)
-                    Task { await retryAccessibilityFocus(.summary, into: $focusTarget) }
+                    // Welcome Summary being off hides the card this would
+                    // otherwise focus (see feedList below) — the spoken
+                    // announcement above still always fires for an
+                    // explicit user action like this, only the focus
+                    // target changes to something that actually exists.
+                    let focusAfterRefresh: HomeFocusTarget = preferences.welcomeSummaryEnabled ? .summary : .greeting
+                    Task { await retryAccessibilityFocus(focusAfterRefresh, into: $focusTarget) }
                 } else {
                     UIAccessibility.post(notification: .announcement, argument: String(localized: "No new activity since your last visit."))
                 }
@@ -237,9 +264,20 @@ struct HomeView: View {
             .sheet(isPresented: $showSubmitApp, onDismiss: { Task { await vm.load() } }) {
                 SubmitAppView()
             }
+            .sheet(isPresented: $showAnniversary) {
+                AnniversaryCelebrationView(years: anniversaryYears) {
+                    showAnniversary = false
+                }
+            }
             .onChange(of: vm.isLoading) { _, isLoading in
                 guard !isLoading else { return }
                 announceWelcomeIfNeeded()
+                Task { await checkAnniversary() }
+            }
+            .onChange(of: deepLinkRouter.pendingSpeakWhatsNew) { _, shouldSpeak in
+                guard shouldSpeak else { return }
+                deepLinkRouter.pendingSpeakWhatsNew = false
+                Task { await speakWhatsNewForSiri() }
             }
             .navigationDestination(for: ForumTopic.self) { topic in
                 ForumTopicDetailView(topicId: topic.id)
@@ -295,52 +333,103 @@ struct HomeView: View {
             UIAccessibility.post(notification: .announcement, argument: baseText)
         }
 
-        // Land VoiceOver focus on the summary (or greeting, if there's no
-        // new activity to summarize) instead of leaving it whereever it was
-        // before navigation/launch — a short delay because setting focus
-        // before the List has actually laid out the new content is a common
-        // way for it to silently fail. Previously fell through to no focus
-        // move at all for a signed-out user with no name to greet — the
-        // "Home" screen heading is always a valid fallback, so landing here
-        // should never be silent. Reported directly: Home had no heading
-        // announcing the screen name the way every other screen does.
-        let target: HomeFocusTarget = !vm.newItems.isEmpty && !vm.isNewActivityDismissed
-            ? .summary
-            : (auth.user?.name.isEmpty == false ? .greeting : .heading)
-        Task { await retryAccessibilityFocus(target, into: $focusTarget) }
+        // Land VoiceOver focus on the summary (or, failing that, the last
+        // item you actually visited, so you can pick up where you left off
+        // instead of always restarting at the greeting) rather than leaving
+        // it wherever it was before navigation/launch — a short delay
+        // because setting focus before the List has actually laid out the
+        // new content is a common way for it to silently fail. The greeting
+        // card now always renders (signed-in or not — see
+        // `greetingHeadline`), so this no longer needs a signed-out special
+        // case that fell through to no focus move at all. Requested
+        // directly.
+        if !vm.newItems.isEmpty && !vm.isNewActivityDismissed && preferences.welcomeSummaryEnabled {
+            Task { await retryAccessibilityFocus(.summary, into: $focusTarget) }
+        } else if let lastId = vm.lastVisitedItemId, homeFeedFilter == .all {
+            // Needs an actual scroll, not just a focus request — the row may
+            // not be laid out (or even instantiated, in a lazy List) yet.
+            // Handled by feedList's own ScrollViewReader, which has `proxy`
+            // in scope; this method doesn't.
+            pendingResumeFocusItemId = lastId
+        } else {
+            Task { await retryAccessibilityFocus(.greeting, into: $focusTarget) }
+        }
+    }
+
+    /// Answers the "What's New on AppleVis" Siri shortcut, once Home has
+    /// actually finished loading — a cold launch triggered by Siri lands
+    /// here before `vm.load()` has necessarily finished, so this can't just
+    /// read `newActivitySummary` immediately the way `announceWelcomeIfNeeded`
+    /// does (that one is only ever called from `.onChange(of: vm.isLoading)`
+    /// once loading is already known to be done). Not gated on Home Startup
+    /// Behavior/Welcome Summary — those govern *unprompted* speech on
+    /// opening Home; this is a direct answer to something the user asked
+    /// Siri for, so it always speaks.
+    private func speakWhatsNewForSiri() async {
+        var waited = 0
+        while vm.isLoading, waited < 4000 {
+            try? await Task.sleep(for: .milliseconds(200))
+            waited += 200
+        }
+        guard !vm.newActivitySummary.isEmpty else {
+            UIAccessibility.post(notification: .announcement, argument: "You're all caught up — nothing new since your last visit.")
+            return
+        }
+        let rawSummary = vm.newActivitySummary
+        let digest = await IntelligenceService.generateDigest(rawSummary)
+        UIAccessibility.post(notification: .announcement, argument: digest ?? rawSummary)
+    }
+
+    /// Once per session, same as the welcome announcement above — and
+    /// gated on the same "quiet" preference, since a full celebratory sheet
+    /// is an even bigger interruption than a spoken announcement for anyone
+    /// who's opted out of proactive Home greetings.
+    private func checkAnniversary() async {
+        guard !hasCheckedAnniversary, preferences.homeStartupBehavior != .quiet, let user = auth.user else { return }
+        hasCheckedAnniversary = true
+        guard let years = await AccountAnniversary.checkAndConsume(for: user) else { return }
+        anniversaryYears = years
+        showAnniversary = true
+    }
+
+    /// Signed-in users get their name; signed-out visitors previously got
+    /// nothing at all here (the card just didn't render) — now they get the
+    /// same warm two-line treatment, distinguishing a first-ever visit from
+    /// a returning one via `vm.isReturningVisit` (the same device-level
+    /// "has Home ever loaded before" flag the spoken welcome announcement
+    /// below already uses) instead of leaving the space blank.
+    private var greetingHeadline: String {
+        let name = auth.user?.name ?? ""
+        if !name.isEmpty { return name }
+        return vm.isReturningVisit ? "Welcome back" : "Welcome to AppleVis"
     }
 
     private var greetingCard: some View {
-        let name = auth.user?.name ?? ""
-        return Group {
-            if !name.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(Greeting.text()),")
-                        // CARD-11: fixed-point sizes didn't respond to the
-                        // system Dynamic Type setting at all — a user who'd
-                        // turned on a larger text size everywhere else in
-                        // iOS still got this card frozen at 20pt/26pt.
-                        .font(.title3.weight(.light))
-                    Text(name)
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(Color.accentColor)
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(preferences.colors.card, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(alignment: .leading) {
-                    Rectangle()
-                        .fill(Greeting.accentColor())
-                        .frame(width: 4)
-                        .clipShape(RoundedRectangle(cornerRadius: 2))
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(String(localized: "\(Greeting.text()), \(name)."))
-                .accessibilityFocused($focusTarget, equals: .greeting)
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
-                .listRowSeparator(.hidden)
-            }
+        VStack(alignment: .leading, spacing: 4) {
+            Text("\(Greeting.text()),")
+                // CARD-11: fixed-point sizes didn't respond to the
+                // system Dynamic Type setting at all — a user who'd
+                // turned on a larger text size everywhere else in
+                // iOS still got this card frozen at 20pt/26pt.
+                .font(.title3.weight(.light))
+            Text(greetingHeadline)
+                .font(.title2.weight(.bold))
+                .foregroundStyle(Color.accentColor)
         }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(preferences.colors.card, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(alignment: .leading) {
+            Rectangle()
+                .fill(Greeting.accentColor())
+                .frame(width: 4)
+                .clipShape(RoundedRectangle(cornerRadius: 2))
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(String(localized: "\(Greeting.text()), \(greetingHeadline)."))
+        .accessibilityFocused($focusTarget, equals: .greeting)
+        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+        .listRowSeparator(.hidden)
     }
 
     /// Forum topics new since the last Home visit — approximates the old
@@ -368,22 +457,6 @@ struct HomeView: View {
     private var feedList: some View {
         ScrollViewReader { proxy in
             List {
-                // Matches the setup wizard/Welcome Tour convention of a
-                // heading announcing the screen name — Home previously had
-                // only `.navigationTitle("Home")`, which VoiceOver doesn't
-                // reliably announce on tab arrival (same reason every
-                // pushed detail screen needs its own explicit focus-to-
-                // heading logic). Invisible to sighted users so it doesn't
-                // duplicate the nav bar title visually. Reported directly.
-                Color.clear
-                    .frame(width: 0, height: 0)
-                    .accessibilityElement()
-                    .accessibilityLabel("Home")
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityFocused($focusTarget, equals: .heading)
-                    .listRowInsets(EdgeInsets())
-                    .listRowSeparator(.hidden)
-
                 greetingCard
 
                 if !notificationHistory.isEmpty {
@@ -407,18 +480,6 @@ struct HomeView: View {
                     .listRowSeparator(.hidden)
                 }
 
-                NavigationLink(destination: MouseRecapView(vm: vm)) {
-                    MouseRecapCard(
-                        digest: vm.mouseRecap?.scoped(toLastDays: mouseRecapWindow.rawValue),
-                        isLoading: vm.isLoadingMouseRecap,
-                        error: vm.mouseRecapError,
-                        failedSources: vm.failedMouseRecapSourceNames
-                    )
-                }
-                .accessibilityHint(String(localized: "Double-tap to review and share your AppleVis recap."))
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                .listRowSeparator(.hidden)
-
                 if (!networkMonitor.isConnected || isAnySourceDegraded) && !vm.items.isEmpty {
                     OfflineBanner()
                         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
@@ -433,7 +494,14 @@ struct HomeView: View {
                     .listRowSeparator(.hidden)
                 }
 
-                if !vm.newItems.isEmpty && !vm.isNewActivityDismissed {
+                // Previously always shown whenever there was new activity,
+                // with no way to turn it off — welcomeSummaryEnabled was
+                // declared as a real setting and wired up in Settings, but
+                // nothing anywhere actually read it. Reported directly.
+                // Home Startup Behavior (spoken welcome) and this (visual
+                // summary card) are deliberately independent: you can want
+                // one without the other.
+                if !vm.newItems.isEmpty && !vm.isNewActivityDismissed && preferences.welcomeSummaryEnabled {
                     WhatsNewCard(
                         message: vm.newActivitySummary,
                         onTap: {
@@ -466,17 +534,37 @@ struct HomeView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                // Same swipe-up/down addition as the App Directory/For You
+                // pickers — moves to the next/previous segment in place.
+                .accessibilityAdjustableAction { direction in
+                    guard let idx = HomeFeedFilter.allCases.firstIndex(of: homeFeedFilter) else { return }
+                    switch direction {
+                    case .increment:
+                        homeFeedFilter = HomeFeedFilter.allCases[(idx + 1) % HomeFeedFilter.allCases.count]
+                    case .decrement:
+                        homeFeedFilter = HomeFeedFilter.allCases[(idx - 1 + HomeFeedFilter.allCases.count) % HomeFeedFilter.allCases.count]
+                    @unknown default: break
+                    }
+                }
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
                 .listRowSeparator(.hidden)
                 .onChange(of: homeFeedFilter) { _, filter in
                     SoundPlayer.shared.play(.pickerTick)
-                    let announcement = filter == .new
-                        ? "\(vm.newItems.count) new activity item\(vm.newItems.count == 1 ? "" : "s")."
-                        : "Showing all Home activity."
+                    let announcement: String
+                    switch filter {
+                    case .all:
+                        announcement = "Showing all Home activity."
+                    case .new:
+                        announcement = "\(vm.newItems.count) new activity item\(vm.newItems.count == 1 ? "" : "s")."
+                    case .mouseRecap:
+                        announcement = "Showing Mouse Recap."
+                    }
                     UIAccessibility.post(notification: .announcement, argument: announcement)
                 }
 
-                if homeFeedFilter == .new && visibleItems.isEmpty {
+                if homeFeedFilter == .mouseRecap {
+                    MouseRecapHomeContent(vm: vm, window: $mouseRecapWindow)
+                } else if homeFeedFilter == .new && visibleItems.isEmpty {
                     Text("No new activity since your last visit.")
                         .font(.subheadline).foregroundStyle(.secondary)
                         .listRowSeparator(.hidden)
@@ -567,6 +655,22 @@ struct HomeView: View {
             .accessibilityRotor("App Entries") { kindRotorContent(.appListing) }
             .accessibilityRotor("Guides") { kindRotorContent(.resource) }
             .accessibilityRotor("Blog Posts") { kindRotorContent(.blogPost) }
+            // "Pick up where you left off" — set by announceWelcomeIfNeeded()
+            // when there's no new activity to summarize but there is a
+            // last-visited item. That method can't reach `proxy` itself (it's
+            // local to this closure), so it hands off via this state var
+            // instead. Same scroll-then-retry-focus combo as WhatsNewCard's
+            // onTap just above, and the same reasoning: scrolling alone
+            // doesn't move VoiceOver's cursor, and a single fixed delay isn't
+            // reliable before the target row has actually laid out.
+            .onChange(of: pendingResumeFocusItemId) { _, id in
+                guard let id else { return }
+                pendingResumeFocusItemId = nil
+                withReduceMotionAwareAnimation { proxy.scrollTo(id, anchor: .top) }
+                Task {
+                    await retryAccessibilityFocus(.item(id), into: $focusTarget, delaysMs: [150, 350, 600, 900])
+                }
+            }
         }
     }
 
@@ -633,6 +737,410 @@ struct CustomizeHomeView: View {
 }
 
 // MARK: - Mouse Recap
+
+private struct MouseRecapHomeContent: View {
+    @ObservedObject var vm: HomeViewModel
+    @Binding var window: MouseRecapWindow
+    @EnvironmentObject private var preferences: PreferencesStore
+    @State private var aiBlurbs: [String: String] = [:]
+    @State private var aiWindow: MouseRecapWindow?
+
+    var body: some View {
+        Group {
+            if vm.isLoadingMouseRecap && vm.mouseRecap == nil {
+                HStack(spacing: 10) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Building Mouse Recap...")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .listRowSeparator(.hidden)
+            } else if let error = vm.mouseRecapError, vm.mouseRecap == nil {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Mouse Recap", systemImage: "sparkles")
+                        .font(.headline)
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundStyle(preferences.colors.warning)
+                    Button("Retry Now") {
+                        Task { await vm.loadMouseRecap(force: true) }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                .listRowSeparator(.hidden)
+            } else if let digest = vm.mouseRecap?.scoped(toLastDays: window.rawValue) {
+                newsletterContent(digest)
+
+                if !vm.failedMouseRecapSourceNames.isEmpty {
+                    Section {
+                        SourceErrorBanner(failedSources: vm.failedMouseRecapSourceNames) {
+                            Task { await vm.loadMouseRecap(force: true) }
+                        }
+                    }
+                    .listRowSeparator(.hidden)
+                }
+            } else {
+                Text("Pull to refresh your recap.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .listRowSeparator(.hidden)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func newsletterContent(_ digest: MouseRecapDigest) -> some View {
+        let limits = MouseRecapDigest.limits(for: window.label)
+        let apps = Array(digest.apps.prefix(limits.apps))
+        let podcasts = Array(digest.podcasts.prefix(limits.podcasts))
+        let blogs = Array(digest.standardBlogs.prefix(limits.blogs))
+        let resources = Array(digest.resources.prefix(limits.resources))
+        let forums = Array(digest.forums.prefix(limits.forums))
+
+        Section {
+            Picker("Recap Window", selection: $window) {
+                ForEach(MouseRecapWindow.allCases) { option in
+                    Text(option.label).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityLabel(String(localized: "Recap window"))
+            .accessibilityHint(String(localized: "Choose how far back Mouse Recap looks."))
+            // Same swipe-up/down addition as the other pickers in this
+            // session's pass — moves between Past Week/Past Month in place.
+            .accessibilityAdjustableAction { direction in
+                guard let idx = MouseRecapWindow.allCases.firstIndex(of: window) else { return }
+                switch direction {
+                case .increment:
+                    window = MouseRecapWindow.allCases[(idx + 1) % MouseRecapWindow.allCases.count]
+                case .decrement:
+                    window = MouseRecapWindow.allCases[(idx - 1 + MouseRecapWindow.allCases.count) % MouseRecapWindow.allCases.count]
+                @unknown default: break
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Mouse Recap")
+                    .font(.title3.weight(.bold))
+                    .accessibilityAddTraits(.isHeader)
+                Text(window.label)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+                Text(digest.dateRangeText)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
+        }
+        .listRowSeparator(.hidden)
+        .task(id: "\(window.rawValue)-\(digest.generatedAt.timeIntervalSince1970)") {
+            await generateAIBlurbs(for: digest)
+        }
+
+        Section {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("From the Mouse", systemImage: "sparkles")
+                    .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                Text(digest.newsletterIntro(for: window.label))
+                    .font(.body)
+                if digest.isEmpty {
+                    Text(window == .week ? "Pull to refresh later, or try Past Month for a wider look." : "Pull to refresh later for a fresh look.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .newsletterPanel(accent: Color.accentColor, colors: preferences.colors)
+
+            ShareLink(item: digest.shareText(for: window.label, aiBlurbs: aiBlurbs), subject: Text("Mouse Recap")) {
+                Label("Share Mouse Recap", systemImage: "square.and.arrow.up")
+            }
+        }
+        .listRowSeparator(.hidden)
+
+        if let spotlight = digest.appPickSpotlight {
+            Section {
+                newsletterCard(
+                    title: spotlight.title,
+                    kicker: "AnonyMouse's App Pick of the Month",
+                    details: digest.blogDetails(spotlight),
+                    body: aiBlurbs[spotlight.id] ?? digest.newsletterBody(for: spotlight),
+                    accent: ContentKind.blogPost.accentColor
+                ) {
+                    NavigationLink(value: spotlight) {
+                        Label("Read Spotlight", systemImage: "arrow.right.circle")
+                    }
+                }
+            } header: {
+                Label("Spotlight Feature", systemImage: "star.fill")
+            }
+            .listRowSeparator(.hidden)
+        }
+
+        Section {
+            ForEach(Array(digest.tableOfContents(periodName: window.label).enumerated()), id: \.offset) { index, item in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("\(index + 1).")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title)
+                            .font(.subheadline.weight(.semibold))
+                        Text(item.detail)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        } header: {
+            Text("In This Recap")
+        }
+
+        newsletterSection(
+            title: "New Accessible Apps",
+            systemImage: "square.grid.2x2",
+            intro: digest.appSectionIntro(periodName: window.label),
+            limitedMessage: limitedMessage(total: digest.apps.count, shown: apps.count, noun: "app"),
+            items: apps
+        ) { app in
+            newsletterCard(
+                title: app.name,
+                kicker: "New on the App Scene",
+                details: digest.appDetails(app),
+                body: aiBlurbs[app.id] ?? digest.newsletterBody(for: app),
+                accent: ContentKind.appListing.accentColor
+            ) {
+                NavigationLink(value: app) {
+                    Label("Read App Entry", systemImage: "arrow.right.circle")
+                }
+            }
+        }
+
+        newsletterSection(
+            title: digest.podcastSectionTitle(periodName: window.label),
+            systemImage: "mic",
+            intro: digest.podcastSectionIntro(periodName: window.label),
+            limitedMessage: limitedMessage(total: digest.podcasts.count, shown: podcasts.count, noun: "episode"),
+            items: podcasts
+        ) { episode in
+            newsletterCard(
+                title: episode.title,
+                kicker: "Podcast Episode",
+                details: digest.podcastDetails(episode),
+                body: aiBlurbs[episode.id] ?? digest.newsletterBody(for: episode),
+                accent: ContentKind.podcastEpisode.accentColor
+            ) {
+                NavigationLink(value: episode) {
+                    Label("Listen to Episode", systemImage: "play.circle")
+                }
+            }
+        }
+
+        newsletterSection(
+            title: "From the AppleVis Blog",
+            systemImage: "newspaper",
+            intro: digest.blogSectionIntro(periodName: window.label),
+            limitedMessage: limitedMessage(total: digest.standardBlogs.count, shown: blogs.count, noun: "post"),
+            items: blogs
+        ) { post in
+            newsletterCard(
+                title: post.title,
+                kicker: "Blog Post",
+                details: digest.blogDetails(post),
+                body: aiBlurbs[post.id] ?? digest.newsletterBody(for: post),
+                accent: ContentKind.blogPost.accentColor
+            ) {
+                NavigationLink(value: post) {
+                    Label("Read Blog Post", systemImage: "arrow.right.circle")
+                }
+            }
+        }
+
+        newsletterSection(
+            title: "How-To Corner",
+            systemImage: "book",
+            intro: digest.resourceSectionIntro(periodName: window.label),
+            limitedMessage: limitedMessage(total: digest.resources.count, shown: resources.count, noun: "guide or tutorial"),
+            items: resources
+        ) { resource in
+            newsletterCard(
+                title: resource.title,
+                kicker: resource.kind.displayName,
+                details: digest.resourceDetails(resource),
+                body: aiBlurbs[resource.id] ?? digest.newsletterBody(for: resource),
+                accent: ContentKind.resource.accentColor
+            ) {
+                NavigationLink(value: resource) {
+                    Label("Read Guide", systemImage: "arrow.right.circle")
+                }
+            }
+        }
+
+        newsletterSection(
+            title: "Community Voices",
+            systemImage: "bubble.left.and.bubble.right",
+            intro: digest.forumSectionIntro(periodName: window.label),
+            limitedMessage: limitedMessage(total: digest.forums.count, shown: forums.count, noun: "discussion"),
+            items: forums
+        ) { topic in
+            newsletterCard(
+                title: topic.title,
+                kicker: "Popular Discussion",
+                details: digest.forumDetails(topic),
+                body: aiBlurbs[topic.id] ?? digest.newsletterBody(for: topic),
+                accent: ContentKind.forumTopic.accentColor
+            ) {
+                NavigationLink(value: topic) {
+                    Label("Open Discussion", systemImage: "arrow.right.circle")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func newsletterSection<Item: Identifiable, Row: View>(
+        title: String,
+        systemImage: String,
+        intro: String,
+        limitedMessage: String?,
+        items: [Item],
+        @ViewBuilder row: @escaping (Item) -> Row
+    ) -> some View {
+        if !items.isEmpty {
+            Section {
+                Text(intro)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                ForEach(items) { item in
+                    row(item)
+                }
+                if let limitedMessage {
+                    Text(limitedMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Label(title, systemImage: systemImage)
+            }
+        }
+    }
+
+    private func newsletterCard<Action: View>(
+        title: String,
+        kicker: String,
+        details: [String],
+        body: String,
+        accent: Color,
+        @ViewBuilder action: () -> Action
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(kicker)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(accent)
+            Text(title)
+                .font(.headline)
+                .fixedSize(horizontal: false, vertical: true)
+            if !details.isEmpty {
+                FlowTextBadges(details: details, accent: accent)
+            }
+            Text(body)
+                .font(.body)
+                .fixedSize(horizontal: false, vertical: true)
+            action()
+                .font(.subheadline.weight(.semibold))
+        }
+        .newsletterPanel(accent: accent, colors: preferences.colors)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func limitedMessage(total: Int, shown: Int, noun: String) -> String? {
+        guard total > shown else { return nil }
+        let plural = noun == "guide or tutorial" ? "guides and tutorials" : "\(noun)s"
+        return "Showing the most relevant \(shown) \(shown == 1 ? noun : plural) from this period."
+    }
+
+    private func generateAIBlurbs(for digest: MouseRecapDigest) async {
+        guard preferences.aiSummariesEnabled, IntelligenceService.isAvailable, aiWindow != window else { return }
+        aiWindow = window
+        let limits = MouseRecapDigest.limits(for: window.label)
+        var candidates: [(id: String, title: String, kind: String, source: String)] = []
+        if let spotlight = digest.appPickSpotlight {
+            candidates.append((spotlight.id, spotlight.title, "spotlight feature", digest.newsletterBody(for: spotlight)))
+        }
+        candidates += digest.apps.prefix(limits.apps).map { ($0.id, $0.name, "app entry", digest.newsletterBody(for: $0)) }
+        candidates += digest.podcasts.prefix(limits.podcasts).map { ($0.id, $0.title, "podcast episode", digest.newsletterBody(for: $0)) }
+        candidates += digest.standardBlogs.prefix(limits.blogs).map { ($0.id, $0.title, "blog post", digest.newsletterBody(for: $0)) }
+        candidates += digest.resources.prefix(limits.resources).map { ($0.id, $0.title, "guide or tutorial", digest.newsletterBody(for: $0)) }
+        candidates += digest.forums.prefix(limits.forums).map { ($0.id, $0.title, "forum discussion", digest.newsletterBody(for: $0)) }
+
+        for candidate in candidates.prefix(16) where aiBlurbs[candidate.id] == nil {
+            if let blurb = await IntelligenceService.newsletterBlurb(title: candidate.title, kind: candidate.kind, sourceText: candidate.source) {
+                aiBlurbs[candidate.id] = blurb
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func recapSection<Item: Identifiable, Row: View>(
+        _ title: String,
+        systemImage: String,
+        description: String,
+        items: [Item],
+        @ViewBuilder row: @escaping (Item) -> Row
+    ) -> some View {
+        if !items.isEmpty {
+            Section {
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                ForEach(items) { item in
+                    row(item)
+                }
+            } header: {
+                Label(title, systemImage: systemImage)
+            }
+        }
+    }
+}
+
+private struct FlowTextBadges: View {
+    let details: [String]
+    let accent: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(details, id: \.self) { detail in
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private extension View {
+    func newsletterPanel(accent: Color, colors: ThemeColors) -> some View {
+        self
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(colors.card, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(alignment: .leading) {
+                Rectangle()
+                    .fill(accent)
+                    .frame(width: 4)
+                    .clipShape(RoundedRectangle(cornerRadius: 2))
+            }
+            .padding(.leading, 2)
+    }
+}
 
 private struct MouseRecapCard: View {
     let digest: MouseRecapDigest?
@@ -718,6 +1226,19 @@ private struct MouseRecapView: View {
                         .pickerStyle(.segmented)
                         .accessibilityLabel(String(localized: "Recap window"))
                         .accessibilityHint(String(localized: "Choose how far back Mouse Recap looks."))
+                        // Same swipe-up/down addition as the other pickers
+                        // in this session's pass — moves between Past
+                        // Week/Past Month in place.
+                        .accessibilityAdjustableAction { direction in
+                            guard let idx = MouseRecapWindow.allCases.firstIndex(of: window) else { return }
+                            switch direction {
+                            case .increment:
+                                window = MouseRecapWindow.allCases[(idx + 1) % MouseRecapWindow.allCases.count]
+                            case .decrement:
+                                window = MouseRecapWindow.allCases[(idx - 1 + MouseRecapWindow.allCases.count) % MouseRecapWindow.allCases.count]
+                            @unknown default: break
+                            }
+                        }
                     }
                     .listRowSeparator(.hidden)
 

@@ -28,8 +28,10 @@ struct SignInView: View {
                         HStack(spacing: 4) {
                             Text("Don't have an account?")
                                 .font(.subheadline).foregroundStyle(.secondary)
-                            Link("Sign up for free", destination: URL(string: "https://www.applevis.com/user/register")!)
-                                .font(.subheadline).fontWeight(.semibold)
+                            WebLink(destination: URL(string: "https://www.applevis.com/user/register")!) {
+                                Text("Sign up for free")
+                            }
+                            .font(.subheadline).fontWeight(.semibold)
                         }
                         .padding(.top, 4)
                     }
@@ -69,8 +71,10 @@ struct SignInView: View {
                                 HStack(spacing: 4) {
                                     Text("Forgot your password?")
                                         .font(.caption).foregroundStyle(.secondary)
-                                    Link("Reset it on the website", destination: URL(string: "https://www.applevis.com/user/password")!)
-                                        .font(.caption).fontWeight(.semibold)
+                                    WebLink(destination: URL(string: "https://www.applevis.com/user/password")!) {
+                                        Text("Reset it on the website")
+                                    }
+                                    .font(.caption).fontWeight(.semibold)
                                 }
                             }
                             .padding(12)
@@ -147,7 +151,7 @@ struct SignInView: View {
             toast.success(String(localized: "Signed in as \(auth.user?.name ?? name)"))
             dismiss()
         } else {
-            signInError = auth.error ?? "Sign in failed. Please try again."
+            signInError = auth.error ?? "Couldn't sign in. Try again."
             isErrorFocused = true
         }
     }

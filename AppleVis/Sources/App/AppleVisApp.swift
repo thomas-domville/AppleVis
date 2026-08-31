@@ -83,6 +83,7 @@ struct AppleVisApp: App {
                     ICloudSyncManager.shared.pushPlayedEpisodes()
                     ICloudSyncManager.shared.pushSettings()
                 } else if newPhase == .active {
+                    Task { await auth.refreshRoles() }
                     deepLinkRouter.checkPendingShareExtensionContent()
                     // Matches standard iOS badge behavior (and RN's own
                     // notifBadge description: "tap the app and the badge

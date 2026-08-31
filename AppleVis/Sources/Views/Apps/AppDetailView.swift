@@ -81,8 +81,7 @@ struct AppDetailView: View {
     @State private var hasMoreReviews = true
     @State private var newReviewCount = 0
     @State private var pendingFocusReviewId: String?
-    @State private var accessibilitySummary: String?
-    @State private var isSummarizingAccessibility = false
+    @State private var recommendationSummary: RecommendationSummary?
     @State private var reviewsSummary: String?
     @State private var isSummarizingReviews = false
     @State private var accessibilityConsensus: String?
@@ -120,6 +119,11 @@ struct AppDetailView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     heroCard(detail).padding()
                     appStoreAvailabilityNotice(detail)
+                    if let recommendationSummary, recommendationSummary.count > 0 {
+                        recommendationSummaryCard(recommendationSummary)
+                            .padding(.horizontal)
+                            .padding(.bottom, 16)
+                    }
 
                     // A second, earlier entry point to the same "Jump to
                     // First New Comment" the Community Discussion heading
@@ -177,7 +181,7 @@ struct AppDetailView: View {
                         developerAppsSection(detail)
                     }
 
-                    if preferences.aiSummariesEnabled && IntelligenceService.isAvailable {
+                    if preferences.aiSummariesEnabled && IntelligenceService.isAvailable && !detail.reviews.isEmpty {
                         aiSummarySection(detail)
                     }
 
@@ -240,6 +244,15 @@ struct AppDetailView: View {
                     .accessibilityHint(String(localized: "Updates the AppleVis app title, description, App Store link, and current version from the App Store listing."))
                 }
                 if let storeURL = detail.appStoreUrl.flatMap(URL.init) {
+                    // Deliberately a plain Link, not WebLink — an
+                    // apps.apple.com URL is a Universal Link that iOS hands
+                    // straight to the native App Store app when opened
+                    // externally; SFSafariViewController doesn't perform
+                    // that handoff, so routing this through the in-app
+                    // browser preference would trap "Open in App Store"
+                    // inside a web page instead of actually opening the App
+                    // Store. Downloads/purchases only work via the real
+                    // native app. Reported directly.
                     Link(destination: storeURL) {
                         Image(systemName: "arrow.up.right.square")
                     }
@@ -248,7 +261,7 @@ struct AppDetailView: View {
                     // Only ever reachable for a Mac entry with no App Store
                     // link at all — AppleVis's own fallback reference for
                     // apps not in the Mac App Store. Reported directly.
-                    Link(destination: macUpdateURL) {
+                    WebLink(destination: macUpdateURL) {
                         Image(systemName: "arrow.up.right.square")
                     }
                     .accessibilityLabel(String(localized: "Open on MacUpdate"))
@@ -256,14 +269,14 @@ struct AppDetailView: View {
             }
         }
         .confirmationDialog(
-            "Update App Information?",
+            "Update app information?",
             isPresented: $showUpdateAppInfoConfirm,
             titleVisibility: .visible
         ) {
             Button("Update App Information") { Task { await updateAppInformationFromStore() } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will replace the AppleVis title, description, App Store link, and current version with the current App Store listing. It will not change accessibility ratings, comments, reviews, category, price, or tested devices.")
+            Text("This will replace the AppleVis title, description, App Store link, and current version with the current App Store listing. It will not change accessibility ratings, accessibility comments, community comments, category, price, or tested devices.")
         }
         .safeAreaInset(edge: .bottom) {
             ContentDetailActions(
@@ -320,6 +333,31 @@ struct AppDetailView: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel(String(localized: "\(issue.title) \(issue.message)"))
         }
+    }
+
+    /// Mirrors the "Recommendations" block every app page on the site
+    /// already shows (count + "most recently recommended by") — confirmed
+    /// live against the Office 365 app page. Fixes the site's own singular/
+    /// plural grammar slip ("1 people have recommended") along the way.
+    private func recommendationSummaryCard(_ summary: RecommendationSummary) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(
+                summary.count == 1 ? "1 person has recommended this app" : "\(summary.count) people have recommended this app",
+                systemImage: "hand.thumbsup.fill"
+            )
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(Color.accentColor)
+
+            if let name = summary.mostRecentRecommenderName, let date = summary.mostRecentDate {
+                Text("Most recently recommended by \(name), \(date.formatted(.relative(presentation: .named)))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
@@ -415,6 +453,10 @@ struct AppDetailView: View {
     @ViewBuilder
     private func storeActionButton(_ detail: AppDetail) -> some View {
         if let storeURL = detail.appStoreUrl.flatMap(URL.init) {
+            // Deliberately a plain Link, not WebLink — see the identical
+            // reasoning on the toolbar App Store button above: this needs
+            // to always hand off to the native App Store app via Universal
+            // Link, which SFSafariViewController won't do.
             Link(destination: storeURL) {
                 storeActionLabel(
                     title: "Open in App Store",
@@ -427,7 +469,7 @@ struct AppDetailView: View {
             .accessibilityLabel(String(localized: "Open \(detail.name) in the App Store."))
             .accessibilityHint(String(localized: "Opens the App Store listing. Downloads and purchases are handled by Apple."))
         } else if let macUpdateURL = detail.macUpdateUrl.flatMap(URL.init) {
-            Link(destination: macUpdateURL) {
+            WebLink(destination: macUpdateURL) {
                 storeActionLabel(
                     title: "Open on MacUpdate",
                     caption: "Downloads and purchases are handled outside AppleVis.",
@@ -635,6 +677,9 @@ struct AppDetailView: View {
                 HStack(spacing: 14) {
                     ForEach(developerApps) { app in
                         if let url = URL(string: app.appStoreUrl) {
+                            // Plain Link, not WebLink — same App Store
+                            // Universal Link reasoning as the two buttons
+                            // above.
                             Link(destination: url) {
                                 VStack(spacing: 6) {
                                     AsyncImage(url: URL(string: app.artworkUrl)) { image in
@@ -663,50 +708,24 @@ struct AppDetailView: View {
         .padding(.bottom, 8)
     }
 
-    /// Two independent AI actions, matching the old app: one digests the
-    /// accessibility fields (VoiceOver Performance/Button Labelling/
-    /// Usability/Accessibility Comments) into a plain-language blurb, the
-    /// other digests the community reviews — previously AppDetailView had
-    /// no Apple Intelligence integration at all despite it being built into
-    /// Forums, Discover, and every compose screen elsewhere in the app.
+    /// Two independent AI actions, both built from community reviews (not
+    /// the app entry's own editorial fields — a prior "Summarize
+    /// Accessibility Notes" action that just restated the already-visible
+    /// VoiceOver Performance/Button Labelling/Usability/Accessibility
+    /// Comments fields was removed as redundant): Consensus distills the
+    /// accessibility verdict across reviews into one sentence, Community
+    /// Discussion Summary is a general recap of what reviewers said.
     @ViewBuilder
     private func aiSummarySection(_ detail: AppDetail) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            accessibilitySummaryRow(detail)
-            if !detail.reviews.isEmpty {
-                Divider()
-                accessibilityConsensusRow(detail)
-                Divider()
-                reviewsSummaryRow(detail)
-            }
+            accessibilityConsensusRow(detail)
+            Divider()
+            reviewsSummaryRow(detail)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .tintedBackground(Color.accentColor, opacity: 0.08, cornerRadius: 10)
         .padding(.horizontal)
-    }
-
-    @ViewBuilder
-    private func accessibilitySummaryRow(_ detail: AppDetail) -> some View {
-        if let accessibilitySummary {
-            VStack(alignment: .leading, spacing: 4) {
-                Label("Accessibility Summary", systemImage: "sparkles")
-                    .font(.caption).fontWeight(.bold).foregroundStyle(Color.accentColor)
-                Text(accessibilitySummary).font(.subheadline)
-            }
-        } else {
-            Button {
-                Task { await summarizeAccessibility(detail) }
-            } label: {
-                if isSummarizingAccessibility {
-                    HStack(spacing: 8) { ProgressView(); Text("Summarizing…") }
-                } else {
-                    Label("Summarize Accessibility Notes", systemImage: "sparkles")
-                }
-            }
-            .disabled(isSummarizingAccessibility)
-            .accessibilityLabel(String(localized: isSummarizingAccessibility ? "Summarizing accessibility notes, please wait" : "Summarize Accessibility Notes"))
-        }
     }
 
     /// RN's "Accessibility Consensus" — instant overview of how well an app
@@ -761,22 +780,21 @@ struct AppDetailView: View {
         }
     }
 
-    private func summarizeAccessibility(_ detail: AppDetail) async {
-        isSummarizingAccessibility = true
-        UIAccessibility.post(notification: .announcement, argument: "Summarizing accessibility notes. This may take a moment.")
-        var parts: [String] = []
-        if let vo = detail.voiceOverPerformance, !vo.isEmpty { parts.append("VoiceOver Performance: \(vo)") }
-        if let bl = detail.buttonLabelling, !bl.isEmpty { parts.append("Button Labelling: \(bl)") }
-        if let usability = detail.usabilityNotes, !usability.isEmpty { parts.append("Usability: \(usability)") }
-        if let acc = detail.accessibilityComments, !acc.isEmpty { parts.append(acc.strippingHTMLTags().prefix(2000).description) }
-        let input = "App: \(detail.name)\n\n\(parts.joined(separator: "\n"))"
-        if let summary = await IntelligenceService.summarize(input) {
-            accessibilitySummary = summary
-        } else {
-            toast.error(String(localized: "Couldn't generate an accessibility summary. Try again."))
-            UIAccessibility.post(notification: .announcement, argument: "Couldn't generate an accessibility summary.")
-        }
-        isSummarizingAccessibility = false
+    /// Both AI summary features previously fed the model a rigid "first 20
+    /// reviews" slice — `detail.reviews` is fetched `sort: -created`, so
+    /// this was already the 20 *newest* reviews, not oldest (recency was
+    /// never actually the gap). The real gap: no filtering by substance, so
+    /// a run of quick "Great app!" one-liners in the most recent 20 could
+    /// crowd out genuinely useful accessibility feedback sitting just past
+    /// that window, before the AI ever saw it. Widens the candidate window
+    /// to the newest `candidatePool` reviews, drops ones too short to carry
+    /// real signal, then takes the newest `limit` that remain — falling
+    /// back to the unfiltered pool if literally everything in it is short,
+    /// so a summary is still attempted rather than run on nothing.
+    private func substantiveReviews(_ reviews: [AppReview], limit: Int = 20, candidatePool: Int = 50, minLength: Int = 15) -> [AppReview] {
+        let pool = Array(reviews.prefix(candidatePool))
+        let substantive = pool.filter { $0.body.strippingHTMLTags().trimmingCharacters(in: .whitespacesAndNewlines).count >= minLength }
+        return Array((substantive.isEmpty ? pool : substantive).prefix(limit))
     }
 
     private func summarizeAccessibilityConsensus(_ detail: AppDetail) async {
@@ -786,7 +804,7 @@ struct AppDetailView: View {
         let maxPerReview = 220
         var parts: [String] = []
         var remaining = maxTotalCharacters
-        for review in detail.reviews.prefix(20) {
+        for review in substantiveReviews(detail.reviews) {
             guard remaining > 0 else { break }
             let body = review.body.strippingHTMLTags().prefix(maxPerReview)
             let part = "\(review.authorName): \(body)"
@@ -810,7 +828,7 @@ struct AppDetailView: View {
         let maxPerReview = 220
         var parts: [String] = []
         var remaining = maxTotalCharacters
-        for review in detail.reviews.prefix(20) {
+        for review in substantiveReviews(detail.reviews) {
             guard remaining > 0 else { break }
             let body = review.body.strippingHTMLTags().prefix(maxPerReview)
             let part = "\(review.authorName): \(body)"
@@ -883,6 +901,7 @@ struct AppDetailView: View {
                         quotedReview = review
                     },
                     parentTitle: detail.name,
+                    parentURL: detail.url,
                     focusBinding: $focusedReviewId
                 )
                 .id(review.id)
@@ -930,6 +949,11 @@ struct AppDetailView: View {
             hasMoreReviews = (detail?.reviews.count ?? 0) < (detail?.reviewCount ?? 0)
             if hasMoreReviews {
                 Task { await loadMoreReviews() }
+            }
+            // Backgrounded like confirmAppleTVSupport below — supplementary,
+            // shouldn't delay the rest of the page.
+            if let appId = detail?.id {
+                Task { recommendationSummary = try? await APIClient.shared.flags.recommendationSummary(appUuid: appId) }
             }
             if let storeUrl = detail?.appStoreUrl, !storeUrl.isEmpty {
                 // Mac apps can be a genuine, separate Mac App Store listing
@@ -1214,6 +1238,7 @@ struct AppReviewRow: View {
     var onEdit: ((String) -> Void)? = nil
     var onReplyTo: (() -> Void)? = nil
     var parentTitle: String = ""
+    var parentURL: String = ""
     /// Optional review focus target used after jumping or posting so
     /// VoiceOver focus lands here, not just scrolls the viewport.
     var focusBinding: AccessibilityFocusState<String?>.Binding? = nil
@@ -1222,6 +1247,17 @@ struct AppReviewRow: View {
     @EnvironmentObject private var toast: ToastStore
     @State private var showDeleteConfirm = false
     @State private var showEditSheet = false
+    @State private var showReportSheet = false
+
+    private var reportContext: ReportCommentContext {
+        ReportCommentContext(
+            authorName: review.authorName,
+            commentExcerpt: .excerpt(from: review.body),
+            commentDate: review.createdAt,
+            contentTitle: parentTitle,
+            contentURL: parentURL
+        )
+    }
 
     private var canDelete: Bool {
         guard let user = auth.user else { return false }
@@ -1261,12 +1297,11 @@ struct AppReviewRow: View {
             )
             .modifier(OptionalReplyFocus(binding: focusBinding, id: review.id))
             .readAloudAction(review.body.strippingHTMLTags())
-            // "Review" throughout, matching the toolbar/sheet/toast wording
-            // this whole feature already uses everywhere else — these 5
-            // actions previously said "Comment" (likely copied from the
-            // shared Forums/Blogs/Bugs comment-row pattern without
-            // adapting the wording), contradicting "Edit Review"/"Delete
-            // Review" in the exact same menu.
+            // "Comment" throughout, matching Forums/Blogs/Bugs' shared
+            // wording (and the rest of this feature, including Edit/Delete
+            // below) — app reviews are presented as comments everywhere in
+            // the UI now; "review"/"Review" only survives in internal type
+            // and property names (AppReview, detail.reviews).
             .modifier(ConditionalAccessibilityAction(isActive: onReplyTo != nil, name: "Reply to this Comment") { onReplyTo?() })
             .accessibilityAction(named: Text("Copy Comment Text")) { copyText() }
             .accessibilityAction(named: Text("Share Comment")) { presentShareSheet() }
@@ -1274,7 +1309,7 @@ struct AppReviewRow: View {
                 toast.warning(String(localized: "Helpful votes are coming once the Drupal Flags API is confirmed."))
             }
             .accessibilityAction(named: Text("Report Comment")) {
-                toast.warning(String(localized: "Reporting is coming once the Drupal Flags API is confirmed."))
+                showReportSheet = true
             }
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Edit Comment") { showEditSheet = true })
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Delete Comment") { showDeleteConfirm = true })
@@ -1315,7 +1350,7 @@ struct AppReviewRow: View {
             Button { toast.warning(String(localized: "Helpful votes are coming once the Drupal Flags API is confirmed.")) } label: {
                 Label("Mark as Helpful", systemImage: "hand.thumbsup")
             }
-            Button { toast.warning(String(localized: "Reporting is coming once the Drupal Flags API is confirmed.")) } label: {
+            Button { showReportSheet = true } label: {
                 Label("Report Comment", systemImage: "flag")
             }
             if canDelete {
@@ -1326,6 +1361,9 @@ struct AppReviewRow: View {
                     Label("Delete Comment", systemImage: "trash")
                 }
             }
+        }
+        .sheet(isPresented: $showReportSheet) {
+            ReportCommentWizard(context: reportContext)
         }
         .confirmationDialog("Delete this comment?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { Task { await delete() } }
@@ -1358,7 +1396,7 @@ struct AppReviewRow: View {
 
     private func copyText() {
         UIPasteboard.general.string = review.body.strippingHTMLTags()
-        toast.success(String(localized: "Comment text copied."))
+        toast.success(String(localized: "Comment text copied"))
     }
 
     private func presentShareSheet() {
@@ -1583,7 +1621,7 @@ struct ComposeAppReviewView: View {
             onPosted(review)
             dismiss()
         } catch let e as APIError { submitError = e.localizedDescription
-        } catch { submitError = "Failed to post comment." }
+        } catch { submitError = "Couldn't post comment. Try again." }
         isSubmitting = false
     }
 }

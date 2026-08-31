@@ -34,45 +34,45 @@ enum TipKey: String {
 enum Tips {
     static let content: [TipKey: TipContent] = [
         .forumRotorActions: TipContent(
-            title: "Community Comment Actions",
-            message: "In the Community Discussion section, each comment header has VoiceOver actions. Rotate two fingers to the Actions rotor, then flick up or down to choose options such as Reply to this Comment, Copy Comment Text, Share Comment, or Report Comment. This tip applies to the comment list, not the main topic text.",
+            title: "Getting Around Comments Faster",
+            message: "Here's a handy one: every comment header in Community Discussion has its own set of VoiceOver actions tucked away. Rotate two fingers to bring up the Actions rotor, then flick up or down to reach things like Reply to this Comment, Copy Comment Text, Share Comment, or Report Comment — no extra buttons to hunt for. This applies to the comment list itself, not the topic text up top.",
             icon: "list.bullet",
             screenReaderOnly: true
         ),
         .playerMagicTap: TipContent(
-            title: "Quick Play and Pause",
-            message: "Two-finger double-tap anywhere on the screen plays or pauses the current episode. This works from any screen in the app while an episode is loaded — you do not need to open the player first. This is called a Magic Tap and is available throughout AppleVis.",
+            title: "Quick Play and Pause, Anywhere",
+            message: "Don't want to leave what you're doing just to hit pause? A two-finger double-tap anywhere on the screen plays or pauses whatever episode is loaded — no need to open the player first. It's called a Magic Tap, and it works throughout AppleVis, so it's always within reach.",
             icon: "play.circle"
         ),
         .episodeChapters: TipContent(
-            title: "This Episode Has Chapters",
-            message: "This podcast includes chapter markers. In the Chapters section, activate any chapter to jump directly to that part of the episode. With VoiceOver, swipe through the chapter list and double-tap your chosen chapter.",
+            title: "This One Has Chapters!",
+            message: "Good news — this episode has chapter markers, so you don't have to scrub around to find the part you want. Head to the Chapters section and pick one to jump straight there. With VoiceOver, just swipe through the list and double-tap the chapter you're after.",
             icon: "bookmark"
         ),
         .savedSwipeActions: TipContent(
-            title: "Quick Actions on Episodes",
-            message: "In saved or downloaded episode lists, swipe left on an episode to reveal quick action buttons for deleting, sharing, or marking as played. You can also long-press an episode to open the full action menu.",
+            title: "Faster Episode Actions",
+            message: "A little shortcut for your Saved and Downloaded lists: swipe left on any episode to reveal quick actions for deleting, sharing, or marking it as played. Prefer the full picture? A long-press opens the complete action menu instead.",
             icon: "hand.point.left"
         ),
         .downloadsOffline: TipContent(
-            title: "Listening Without Internet",
-            message: "Downloaded episodes are stored on your device and play without an internet connection — perfect for flights, commutes, or areas with poor signal. Downloads stay on your device until you remove them.",
+            title: "Take It Offline",
+            message: "Downloaded episodes live right on your device, so they'll keep playing with no signal at all — great for flights, commutes, or that one spot with terrible reception. They're yours to keep until you decide to remove them.",
             icon: "arrow.down.circle"
         ),
         .reviewStarRating: TipContent(
             title: "Rating With VoiceOver",
-            message: "In the Write Comment form, the star rating control works like an adjustable slider. Flick up to increase the rating and flick down to decrease it. You can also use the VoiceOver rotor to choose Value, then flick up or down.",
+            message: "In the Write Comment form, the star rating works like an adjustable slider — flick up to raise it, flick down to lower it. Or bring up the VoiceOver rotor, choose Value, and flick from there instead.",
             icon: "star",
             screenReaderOnly: true
         ),
         .settingsIntelligence: TipContent(
-            title: "Apple Intelligence in AppleVis",
-            message: "On supported iPhone and iPad models, AppleVis works with Apple Intelligence. You can ask Siri to open topics, check the podcast feed, or look up app information using natural language. Enable features in Settings → Siri & Intelligence.",
+            title: "Ask Siri About AppleVis",
+            message: "On supported iPhone and iPad models, AppleVis plays nicely with Apple Intelligence — ask Siri to open a topic, check what's new in your podcast feed, or look up an app, all in plain language. You can turn this on in Settings → Siri & Intelligence.",
             icon: "cpu"
         ),
         .followTopicNotifications: TipContent(
-            title: "Managing Followed Topics",
-            message: "You are now following this topic and will be notified of new replies. To see all your followed topics or turn off notifications for specific ones, go to your Profile → Followed Topics, or adjust notification settings in Settings → Notifications.",
+            title: "You're Following This Topic",
+            message: "Nice — you'll hear about new replies here from now on. Want to see everything you're following, or unfollow something? Head to For You → Following. Notification preferences live in Settings → Notifications, whenever you want to fine-tune them.",
             icon: "bell"
         ),
     ]

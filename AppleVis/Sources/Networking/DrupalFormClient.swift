@@ -112,7 +112,7 @@ enum DrupalFormClient {
             return .failure("The submission was not accepted. Please check your content and try again.")
         } catch {
             AppLog.network.error("Form POST to \(path, privacy: .public) failed: \(error, privacy: .private)")
-            return .failure(error.localizedDescription)
+            return .failure("Couldn't reach AppleVis. Check your connection and try again.")
         }
     }
 
@@ -226,7 +226,7 @@ enum DrupalFormClient {
             return .failure("The submission was not accepted. Please check your content and try again.")
         } catch {
             AppLog.network.error("Podcast upload POST to \(path, privacy: .public) failed: \(error, privacy: .private)")
-            return .failure(error.localizedDescription)
+            return .failure("Couldn't reach AppleVis. Check your connection and try again.")
         }
     }
 
@@ -239,8 +239,25 @@ enum DrupalFormClient {
         }
     }
 
-    // MARK: - Contact form (/contact) — verified live; uses a captcha token instead of form_token
-
+    // MARK: - Contact form (/contact)
+    //
+    // The signed-in and signed-out renders of this form are not the same
+    // markup: a saved copy of the real page from an authenticated session
+    // (docs reference: "Contact AppleVis _ AppleVis.html") has a
+    // `form_token` hidden field and no CAPTCHA fields at all, while the
+    // "verified live" pass this was originally written against apparently
+    // saw the opposite — a `captcha_sid`/`captcha_token`/`captcha_response`
+    // triad and no `form_token`. Both are Drupal's normal behavior: an
+    // authenticated session is trusted and skips the bot-check challenge
+    // anonymous visitors get. Sending neither one when it's present makes
+    // Drupal's own CSRF/form-token validation reject the POST outright —
+    // this previously omitted `form_token` unconditionally, which would
+    // silently fail every submission from a signed-in user (the common
+    // case: ContactView skips straight to the signed-in flow, and
+    // ReportCommentWizard is signed-in-first too) while still "working"
+    // for the signed-out path this was tested against. Scraping and
+    // sending both, each defaulting to empty when absent, matches whichever
+    // variant the live session actually renders instead of assuming one.
     static func submitContact(name: String, email: String, subject: String, message: String) async -> FormResult {
         let path = "/contact"
         guard let url = URL(string: "\(base)\(path)") else { return .failure("Invalid form URL.") }
@@ -260,6 +277,7 @@ enum DrupalFormClient {
             AppLog.network.error("No form_build_id found scraping \(path, privacy: .public) — form markup may have changed")
             return .failure("Could not load the contact form. Check your connection and try again.")
         }
+        let formToken = firstMatch(#"name="form_token"\s+value="([^"]+)""#, in: html) ?? ""
         let captchaSid = firstMatch(#"name="captcha_sid"\s+value="([^"]+)""#, in: html) ?? ""
         let captchaToken = firstMatch(#"name="captcha_token"\s+value="([^"]+)""#, in: html) ?? ""
         let captchaResponse = firstMatch(#"name="captcha_response"\s+value="([^"]+)""#, in: html) ?? "Turnstile no captcha"
@@ -267,6 +285,7 @@ enum DrupalFormClient {
         let body = encodeFields([
             "i_understand_that_applevis_does_not_accept_sponsored_posts_conte": "1",
             "name": name, "email": email, "subject": subject, "message": message,
+            "form_token": formToken,
             "captcha_sid": captchaSid, "captcha_token": captchaToken,
             "captcha_response": captchaResponse, "captcha_cacheable": "1",
             "form_build_id": formBuildId, "form_id": "webform_submission_contact_node_25142_add_form",

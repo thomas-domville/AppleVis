@@ -192,14 +192,25 @@ struct ForumsBrowseView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack {
-                    if auth.isSignedIn {
-                        NavigationLink(destination: ComposeTopicView(onPosted: { topic in
-                            topics.insert(topic, at: 0)
-                            revealAndFocus(topic)
-                        })) {
-                            Image(systemName: "square.and.pencil")
-                        }
+                    // Matches Home's own "Add" entry point exactly — same
+                    // icon, same label, same always-visible-with-a-hint
+                    // reasoning (ComposeTopicView already shows its own
+                    // sign-in prompt when opened signed out, so hiding this
+                    // for a signed-out/VoiceOver user just hides that the
+                    // option exists at all). Previously gated on
+                    // auth.isSignedIn with no accessibility label at all —
+                    // a bare "square.and.pencil" icon has no useful default
+                    // VoiceOver reading. Reported directly.
+                    NavigationLink(destination: ComposeTopicView(onPosted: { topic in
+                        topics.insert(topic, at: 0)
+                        revealAndFocus(topic)
+                    })) {
+                        Image(systemName: "plus.circle")
                     }
+                    .accessibilityLabel(String(localized: "Add"))
+                    .accessibilityHint(auth.isSignedIn
+                        ? String(localized: "Create a new forum topic")
+                        : String(localized: "Sign in required to create a new forum topic"))
                     Button {
                         showFilterSheet = true
                     } label: {
@@ -361,19 +372,33 @@ struct ForumsBrowseView: View {
         focusOnTopic(topic.id)
     }
 
+    /// Routes through the server-side category endpoint once a specific
+    /// category is selected, instead of always paging the global "recent
+    /// activity" feed and filtering it client-side — see
+    /// `ForumEndpoints.categoryListing`'s doc comment for why that was
+    /// insufficient for a sparse category even with the auto-topup below.
+    private func fetchPage(_ pageToFetch: Int) async throws -> (items: [ForumTopic], hasMore: Bool) {
+        if let selectedCategory {
+            let result = try await APIClient.shared.forums.categoryListing(tid: selectedCategory.tid, page: pageToFetch)
+            return (result.items, result.hasMore)
+        }
+        let items = try await APIClient.shared.forums.recent(page: pageToFetch, appleOnly: appleTopicsFilter == .appleOnly)
+        return (items, items.count >= APIPaging.pageSize)
+    }
+
     private func load(reset: Bool) async {
         if reset { page = 0; topics = []; autoPaginateAttempts = 0 }
         isLoading = true
         error = nil
         do {
-            async let topicsResult = APIClient.shared.forums.recent(page: page, appleOnly: appleTopicsFilter == .appleOnly)
+            async let topicsResult = fetchPage(page)
             async let categoriesResult = categories.isEmpty ? APIClient.shared.forums.categories() : []
             let (fetched, cats) = try await (topicsResult, categoriesResult)
-            topics = applyRefinements(to: fetched)
+            topics = applyRefinements(to: fetched.items)
             if !cats.isEmpty { categories = cats }
-            hasMore = fetched.count >= APIPaging.pageSize
+            hasMore = fetched.hasMore
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Could not load topics" }
+        } catch { self.error = "Couldn't load topics." }
         isLoading = false
     }
 
@@ -415,10 +440,10 @@ struct ForumsBrowseView: View {
             // `page` only advances on success — a transient failure used to
             // still increment it, permanently skipping that page's content
             // once a later attempt succeeded.
-            let more = try await APIClient.shared.forums.recent(page: page + 1, appleOnly: appleTopicsFilter == .appleOnly)
+            let more = try await fetchPage(page + 1)
             page += 1
-            topics += applyRefinements(to: more)
-            hasMore = more.count >= APIPaging.pageSize
+            topics += applyRefinements(to: more.items)
+            hasMore = more.hasMore
         } catch {
             toast.error(String(localized: "Couldn't load more topics."))
         }

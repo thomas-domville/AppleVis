@@ -35,11 +35,15 @@ final class AuthStore: ObservableObject {
             let authUser = try await APIClient.shared.account.signIn(username: username, password: password)
             user = authUser
             saveToKeychain(authUser)
+            // Previously silent — every other confirmation moment (save,
+            // follow, submit) plays .success, but signing in itself never
+            // did. Reported directly.
+            SoundPlayer.shared.play(.success)
             Task { await PushNotificationManager.syncRegistration() }
         } catch let apiError as APIError {
             error = apiError.localizedDescription
         } catch {
-            self.error = "Sign in failed. Please try again."
+            self.error = "Couldn't sign in. Try again."
         }
         isLoading = false
     }
@@ -59,6 +63,7 @@ final class AuthStore: ObservableObject {
         // user's data. Same scoped clear Settings > Privacy's "Clear All
         // Local Data" button already used.
         PersistenceStore.shared.clearAllLocalData()
+        RecommendationStore.shared.reset()
     }
 
     /// Independent of whether the server-side logout call above succeeds —
@@ -88,7 +93,30 @@ final class AuthStore: ObservableObject {
         deleteFromKeychain()
         clearSessionCookies()
         PersistenceStore.shared.clearAllLocalData()
+        RecommendationStore.shared.reset()
         Task { await PushNotificationManager.clearRegistration() }
+    }
+
+    /// Re-fetches this user's current Drupal roles and updates the cached
+    /// AuthUser in place. Sign-in only resolves roles once (see
+    /// AccountEndpoints.signIn), so a role change made on the site — a
+    /// promotion, or just as importantly a demotion — never reaches an
+    /// already-signed-in device on its own. Called on foreground and after
+    /// a 403 (see APIClient.validateStatus) rather than on every request,
+    /// so a stale Edit/Unpublish/Delete button corrects itself within one
+    /// foreground cycle instead of requiring a full sign-out/sign-in.
+    func refreshRoles() async {
+        guard let current = user, !current.uuid.isEmpty else { return }
+        do {
+            let roles = try await APIClient.shared.account.resolveRoles(uuid: current.uuid, csrfToken: current.csrfToken)
+            guard roles != current.roles else { return }
+            var updated = current
+            updated.roles = roles
+            user = updated
+            saveToKeychain(updated)
+        } catch {
+            AppLog.auth.error("Role refresh failed: \(error, privacy: .private)")
+        }
     }
 
     func completeOnboarding() {

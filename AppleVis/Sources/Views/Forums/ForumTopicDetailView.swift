@@ -178,6 +178,17 @@ struct ForumTopicDetailView: View {
         }
     }
 
+    /// Matches WebLink's own in-app-vs-external branching so the "Browser"
+    /// bottom-bar action respects the same preference instead of always
+    /// forcing the in-app SafariView sheet.
+    private func openInBrowser() {
+        guard let detail, let shareURL = URL(string: detail.url) else { return }
+        switch preferences.webBrowsingMode {
+        case .inApp:    showBrowser = true
+        case .external: UIApplication.shared.open(shareURL)
+        }
+    }
+
     private func topicContent(_ detail: ForumTopicDetail) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -234,7 +245,7 @@ struct ForumTopicDetailView: View {
                         ForEach(Array(detail.replies.enumerated()), id: \.element.id) { index, reply in
                             ReplyView(
                                 reply: reply, index: index, total: detail.replies.count,
-                                topicAuthorId: detail.authorId, topicTitle: detail.title,
+                                topicAuthorId: detail.authorId, topicTitle: detail.title, topicURL: detail.url,
                                 onReplyTo: {
                                     guard auth.isSignedIn else {
                                         toast.warning(String(localized: "Sign in to reply to posts."))
@@ -534,7 +545,7 @@ struct ForumTopicDetailView: View {
         } catch let e as APIError {
             toast.error(e.localizedDescription)
         } catch {
-            toast.error(String(localized: isFollowing ? "Failed to unfollow topic." : "Failed to follow topic."))
+            toast.error(String(localized: isFollowing ? "Couldn't unfollow topic. Try again." : "Couldn't follow topic. Try again."))
         }
     }
 
@@ -708,11 +719,16 @@ struct ForumTopicDetailView: View {
                 accessibilityLabel: isSaved ? "Unsave Topic" : "Save Topic"
             ) { toggleSave() }
 
-            DetailActionButton(
-                systemImage: isFollowing ? "bell.fill" : "bell",
-                visualLabel: isFollowing ? "Unfollow" : "Follow",
-                accessibilityLabel: isFollowing ? "Unfollow Topic" : "Follow Topic"
-            ) { requestFollowToggle() }
+            // Follow is shelved (see ContentActions.swift's
+            // `followFeatureEnabled`) — hides starting a new follow, but
+            // never hides undoing one someone already has.
+            if followFeatureEnabled || isFollowing {
+                DetailActionButton(
+                    systemImage: isFollowing ? "bell.fill" : "bell",
+                    visualLabel: isFollowing ? "Unfollow" : "Follow",
+                    accessibilityLabel: isFollowing ? "Unfollow Topic" : "Follow Topic"
+                ) { requestFollowToggle() }
+            }
 
             if let shareURL = URL(string: detail.url) {
                 ShareLink(item: shareURL, subject: Text(detail.title)) {
@@ -721,7 +737,7 @@ struct ForumTopicDetailView: View {
                 .accessibilityLabel(String(localized: "Share topic"))
 
                 DetailActionButton(systemImage: "safari", visualLabel: "Browser", accessibilityLabel: "Open topic in browser") {
-                    showBrowser = true
+                    openInBrowser()
                 }
             }
 
@@ -741,6 +757,7 @@ struct ReplyView: View {
     var total: Int = 1
     var topicAuthorId: String = ""
     var topicTitle: String = ""
+    var topicURL: String = ""
     var onReplyTo: (() -> Void)? = nil
     var onDelete: (() -> Void)? = nil
     var onEdit: ((String) -> Void)? = nil
@@ -756,6 +773,17 @@ struct ReplyView: View {
     @State private var showDeleteConfirm = false
     @State private var showUnpublishConfirm = false
     @State private var showEditSheet = false
+    @State private var showReportSheet = false
+
+    private var reportContext: ReportCommentContext {
+        ReportCommentContext(
+            authorName: reply.authorName,
+            commentExcerpt: .excerpt(from: reply.body),
+            commentDate: reply.createdAt,
+            contentTitle: topicTitle,
+            contentURL: topicURL
+        )
+    }
 
     private var isOriginalPoster: Bool {
         !topicAuthorId.isEmpty && topicAuthorId == reply.authorId
@@ -808,7 +836,7 @@ struct ReplyView: View {
                 toast.warning(String(localized: "Helpful votes are coming once the Drupal Flags API is confirmed."))
             }
             .accessibilityAction(named: Text("Report Comment")) {
-                toast.warning(String(localized: "Reporting is coming once the Drupal Flags API is confirmed."))
+                showReportSheet = true
             }
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Edit Comment") { showEditSheet = true })
             .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Unpublish Comment") { showUnpublishConfirm = true })
@@ -819,6 +847,9 @@ struct ReplyView: View {
         .padding(.horizontal)
         .padding(.vertical, 8)
         .background(reply.isNew ? Color.accentColor.opacity(0.05) : .clear)
+        .sheet(isPresented: $showReportSheet) {
+            ReportCommentWizard(context: reportContext)
+        }
         .contextMenu {
             // Mirrors the accessibility actions above exactly — those used
             // to be VoiceOver-only, which meant a sighted or low-vision
@@ -837,7 +868,7 @@ struct ReplyView: View {
             Button { toast.warning(String(localized: "Helpful votes are coming once the Drupal Flags API is confirmed.")) } label: {
                 Label("Mark as Helpful", systemImage: "hand.thumbsup")
             }
-            Button { toast.warning(String(localized: "Reporting is coming once the Drupal Flags API is confirmed.")) } label: {
+            Button { showReportSheet = true } label: {
                 Label("Report Comment", systemImage: "flag")
             }
             // "Comment" throughout, matching the rest of this screen (the
@@ -885,7 +916,7 @@ struct ReplyView: View {
 
     private func copyText() {
         UIPasteboard.general.string = reply.body.strippingHTMLTags()
-        toast.success(String(localized: "Comment text copied."))
+        toast.success(String(localized: "Comment text copied"))
     }
 
     /// Mirrors the old app's "Share Comment" action — shares the comment as

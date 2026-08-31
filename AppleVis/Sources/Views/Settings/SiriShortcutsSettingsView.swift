@@ -13,10 +13,10 @@ struct SiriShortcutsSettingsView: View {
     var body: some View {
         Form {
             Section {
-                AccessibleScreenHeading(title: "Siri and Shortcuts", isFocused: $isTitleFocused)
                 Text("These AppleVis actions are available to Siri and the Shortcuts app. Add your own phrases for any of them from the Shortcuts app.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .accessibilityFocused($isTitleFocused)
             }
 
             Section("Available Shortcuts") {
@@ -67,6 +67,20 @@ struct SiriShortcutsSettingsView: View {
                     title: "Open AppleVis Saved Items",
                     subtitle: "\"Hey Siri, open AppleVis saved items\"",
                     detail: "Opens your saved items.",
+                    isSystemFeature: true
+                )
+                FeatureInfoRow(
+                    icon: "sparkles",
+                    title: "What's New on AppleVis",
+                    subtitle: "\"Hey Siri, what's new on AppleVis\"",
+                    detail: "Speaks a summary of what's new since your last visit.",
+                    isSystemFeature: true
+                )
+                FeatureInfoRow(
+                    icon: "ant",
+                    title: "Report an AppleVis Bug",
+                    subtitle: "\"Hey Siri, report a bug to AppleVis\"",
+                    detail: "Opens straight to the accessibility bug report form.",
                     isSystemFeature: true
                 )
             }

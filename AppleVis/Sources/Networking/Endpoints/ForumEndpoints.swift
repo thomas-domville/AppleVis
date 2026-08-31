@@ -26,6 +26,38 @@ struct ForumEndpoints {
         }
     }
 
+    /// Server-side category-filtered listing — used instead of client-side
+    /// filtering `recent()`'s global feed once a specific category is
+    /// selected. `recent()` is a "recent activity" feed, not an exhaustive
+    /// archive; a sparse category's (e.g. "Android") matches can sit
+    /// arbitrarily deep in its page history, so ForumsBrowseView's auto-
+    /// topup (`loadMoreUntilEnoughOrCap`) could burn through its whole
+    /// fetch-attempt cap wading through mostly-irrelevant recent topics
+    /// without ever finding enough of that one category, even when Drupal
+    /// actually has plenty more of it further back than "recent" reaches.
+    /// Reported directly: an already-existing topup mechanism still wasn't
+    /// enough for a sparse category. Filters `taxonomy_forums` the same way
+    /// `field_category_watch` is filtered in
+    /// `AppEndpoints.jsonAPIWatchCategoryListing` — same JSON:API pattern
+    /// already confirmed live for an equivalent taxonomy-reference field,
+    /// not separately re-verified against this specific relationship.
+    func categoryListing(tid: Int, page: Int, limit: Int = APIPaging.pageSize) async throws -> PagedListResult<ForumTopic> {
+        try await fetchWithCache(group: .forums, key: "forums:category:\(tid):\(page)") {
+            let response = try await client.jsonAPIList(
+                "node/forum",
+                query: [
+                    "filter[taxonomy_forums.drupal_internal__tid]": "\(tid)",
+                    "sort": "-changed",
+                    "page[limit]": "\(limit)",
+                    "page[offset]": "\(page * limit)",
+                    "include": "uid,taxonomy_forums",
+                ]
+            )
+            let items = response.data.map { Mappers.forum($0, included: response.included ?? []) }
+            return PagedListResult(items: items, hasMore: response.hasNextPage)
+        }
+    }
+
     func categories() async throws -> [ForumCategory] {
         let response = try await client.jsonAPIList(
             "taxonomy_term/forums",
@@ -67,12 +99,20 @@ struct ForumEndpoints {
             let alias = node.attributes["path"]?.pathAlias
             let url = alias.map { "https://www.applevis.com\($0)" } ?? "https://www.applevis.com/node/\(node.id)"
 
-            let replies: [ForumReply]
-            if let commentsResponse = try? await commentsRes {
-                replies = commentsResponse.data.map { Mappers.forumReply($0, included: commentsResponse.included ?? []) }
-            } else {
-                replies = []
-            }
+            // Previously `try?`-swallowed: a comments-fetch failure (network
+            // blip, timeout) looked identical to "genuinely zero comments,"
+            // silently hiding the whole Community Discussion section (see
+            // ForumTopicDetailView's `!detail.replies.isEmpty` guard) with no
+            // error and no retry — and since nothing ever threw, this
+            // half-broken result got cached by `fetchWithCache` as if it
+            // were a complete success, so it could keep looking broken on
+            // repeat visits too. Letting it propagate instead uses
+            // `fetchWithCache`'s own fallback (last good cached copy, or a
+            // proper retryable error) rather than bypassing it. Reported
+            // directly: a topic showing the correct reply count on its card
+            // had no Community Discussion section at all on its detail page.
+            let commentsResponse = try await commentsRes
+            let replies = commentsResponse.data.map { Mappers.forumReply($0, included: commentsResponse.included ?? []) }
 
             return ForumTopicDetail(
                 id: topic.id,

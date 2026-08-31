@@ -454,7 +454,7 @@ struct SubmitAppView: View {
                     body: "I am not the developer, publisher, or otherwise affiliated with this app. Developers may not submit their own apps per AppleVis guidelines."
                 )
 
-                Link(destination: URL(string: "https://www.applevis.com/submitting-app-applevis-community-app-directory-guidelines")!) {
+                WebLink(destination: URL(string: "https://www.applevis.com/submitting-app-applevis-community-app-directory-guidelines")!) {
                     Label("Read submission guidelines", systemImage: "arrow.up.forward.square")
                 }
                 .font(.subheadline).fontWeight(.semibold)
@@ -657,6 +657,19 @@ struct SubmitAppView: View {
                     Task { await search() }
                 }
                 .accessibilityHint(String(localized: "Which App Store this app is listed on. Changes what search looks up."))
+                // Same swipe-up/down addition as this session's other
+                // pickers — same on-screen order as the segments above.
+                .accessibilityAdjustableAction { direction in
+                    let options: [AppPlatform] = [.ios, .macos, .tvos, .watchos]
+                    guard let idx = options.firstIndex(of: platform) else { return }
+                    switch direction {
+                    case .increment:
+                        platform = options[(idx + 1) % options.count]
+                    case .decrement:
+                        platform = options[(idx - 1 + options.count) % options.count]
+                    @unknown default: break
+                    }
+                }
             }
             searchResultsSection
         }
@@ -1667,8 +1680,10 @@ struct SubmitAppView: View {
                                 Text(match.name)
                                     .font(.caption.weight(.medium))
                                 if let url = URL(string: match.url) {
-                                    Link("Open Existing Entry", destination: url)
-                                        .font(.caption)
+                                    WebLink(destination: url) {
+                                        Text("Open Existing Entry")
+                                    }
+                                    .font(.caption)
                                 }
                             }
                         }

@@ -89,9 +89,21 @@ struct UserEndpoints {
         let location: String
         let bio: String
         let website: String
+        let interests: String
+        let twitter: String
+        let mastodon: String
+        let facebook: String
+        /// "Apple Products Owned" on the site.
+        let owns: String
+        /// The site's "Personal contact form" setting — false means this
+        /// person has opted out of being contacted by other members.
+        let allowsContact: Bool
     }
 
-    /// Fetches a public user profile by JSON:API UUID.
+    /// Fetches a public user profile by JSON:API UUID. Field names below are
+    /// confirmed against the live account edit form's HTML (previously a
+    /// few of these guessed at several possible names since nothing had
+    /// verified them against the real site).
     func profile(uuid: String) async throws -> PublicProfile {
         let response = try await client.jsonAPISingle("user/user/\(uuid)")
         let a = response.data.attributes
@@ -103,9 +115,19 @@ struct UserEndpoints {
             memberSince: response.data.createdDate,
             numericUid: a["drupal_internal__uid"]?.intValue ?? 0,
             profileUrl: alias.map { "https://www.applevis.com\($0)" },
-            location: profileFieldText(a["field_location"]),
-            bio: profileFieldText(a["field_bio"] ?? a["field_about"] ?? a["field_profile_bio"] ?? a["field_description"]),
-            website: profileFieldText(a["field_website"] ?? a["field_url"] ?? a["field_homepage"])
+            location: profileFieldText(a["field_profile_location"]),
+            bio: profileFieldText(a["field_profile_bio"]),
+            website: profileFieldText(a["field_profile_homepage"]),
+            interests: profileFieldText(a["field_profile_interests"]),
+            twitter: profileFieldText(a["field_profile_twitter"]),
+            mastodon: profileFieldText(a["field_mastodon_username"]),
+            facebook: profileFieldText(a["field_profile_facebook"]),
+            owns: profileFieldText(a["field_profile_owns"]),
+            // Defaults to true (contactable) if this field isn't readable
+            // anonymously — the safe direction is showing the button and
+            // letting Drupal's own access check reject the send, not
+            // hiding a real contact option because a field came back empty.
+            allowsContact: a["contact"]?.boolValue ?? true
         )
     }
 
@@ -131,7 +153,7 @@ struct UserEndpoints {
             message: [.init(value: message)],
             recipient: [.init(targetId: numericUid)]
         )
-        let _: EmptyResponse? = try? await client.post(
+        let _: EmptyResponse = try await client.post(
             "contact_message", base: .root, query: ["_format": "json"], body: body, headers: ["X-CSRF-Token": csrfToken]
         )
     }

@@ -8,33 +8,59 @@ struct IntelligenceSettingsView: View {
     var body: some View {
         Form {
             Section {
-                AccessibleScreenHeading(title: "Intelligence", isFocused: $isTitleFocused)
                 Text("Smart features powered by Apple Intelligence run entirely on your device. Nothing is sent to external servers.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .accessibilityFocused($isTitleFocused)
             }
 
             Section("Apple Intelligence Features") {
-                Toggle("Non-English Content Detection", isOn: $preferences.nonEnglishDetectionEnabled)
-                    .accessibilityHint(String(localized: "Detects when you're viewing content in a language other than English and offers to translate it."))
+                // Previously described as noticing non-English content you're
+                // *reading* and offering to translate it — but AppleVis
+                // guidelines require posts to be in English, so nothing
+                // non-English should ever be sitting there to read in the
+                // first place. What this actually does is detect your OWN
+                // draft while you're writing a post, reply, or comment, and
+                // offer a live nudge to translate it before you submit —
+                // separate from and in addition to the always-on English-only
+                // check applied at submission itself (see
+                // `ContentSubmissionPolicy.blockingMessage`), which this
+                // toggle cannot turn off. Reported directly.
+                Toggle("Non-English Draft Detection", isOn: $preferences.nonEnglishDetectionEnabled)
+                    .accessibilityHint(String(localized: "While you're writing a post, reply, or comment, offers to translate your draft if it looks like it isn't in English."))
+                Text("AppleVis posts must be in English — that's always checked when you submit, no matter how this is set. This only controls whether you get a proactive nudge to translate while you're still typing, instead of finding out at submission.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 Toggle("Compose Rewrite", isOn: $preferences.composeRewriteEnabled)
                     .accessibilityHint(String(localized: "When writing a forum post or message, AI can suggest rewrites to improve clarity or tone."))
+                Text("Offers a polished rewrite while you're writing a post or message, without changing what you're trying to say.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 Toggle("Compose Translation", isOn: $preferences.composeTranslationEnabled)
                     .accessibilityHint(String(localized: "Translates your draft text so you can communicate in other languages."))
+                Text("Translates your own draft, so you can write in another language and still post it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 Toggle("Search Translation", isOn: $preferences.searchTranslationEnabled)
                     .accessibilityHint(String(localized: "When you search for terms in non-English, AI translates your query to find relevant results."))
+                Text("Translates a search typed in another language so you still find the right results.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 Toggle("AI Summaries", isOn: $preferences.aiSummariesEnabled)
                     .accessibilityHint(String(localized: "Generates concise summaries for long forum threads and articles so you can quickly decide whether to read more."))
+                Text("Boils down long threads and articles into a quick summary, so you can decide whether it's worth reading in full.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 FeatureInfoRow(
                     icon: "checkmark.bubble",
                     title: "Accessibility Consensus",
-                    subtitle: "On an app's page, under reviews",
-                    detail: "Aggregates an app's reviews into one sentence about how well it works with VoiceOver — an instant overview instead of reading every review yourself.",
+                    subtitle: "On an app's page, under comments",
+                    detail: "Aggregates an app's comments into one sentence about how well it works with VoiceOver — an instant overview instead of reading every comment yourself.",
                     isSystemFeature: false
                 )
             }

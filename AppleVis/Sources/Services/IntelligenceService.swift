@@ -163,6 +163,34 @@ enum IntelligenceService {
         }
     }
 
+    /// Turns a person's rough notes about themselves into a short first-
+    /// person AppleVis profile bio — for members who know roughly what they
+    /// want to say but find a blank bio field intimidating to start from
+    /// scratch. Never auto-applied: EditProfileView always shows the draft
+    /// for the person to accept, edit, or discard.
+    static func draftBio(from notes: String) async -> String? {
+        guard isAvailable else { return nil }
+        let trimmed = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return await cleanedResponse(
+            "Write a short, warm AppleVis member bio (2-4 sentences, first person) based on these rough " +
+            "notes about the person. The audience is the AppleVis accessibility community for blind and " +
+            "low vision Apple users. Keep it natural and friendly, do not invent facts not present in the " +
+            "notes, and do not include labels, headings, or quotation marks around the result.\n\nNotes:\n\(trimmed)"
+        )
+    }
+
+    static func newsletterBlurb(title: String, kind: String, sourceText: String) async -> String? {
+        guard isAvailable else { return nil }
+        let trimmed = sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return await cleanedResponse(
+            "Write a warm AppleVis newsletter-style blurb in 2-3 concise sentences for this \(kind). " +
+            "The audience is blind and low vision Apple users. Preserve facts from the source, do not invent details, " +
+            "and do not include headings, labels, markdown, or links.\n\nTitle: \(title)\n\nSource:\n\(trimmed)"
+        )
+    }
+
     // MARK: - Private
 
     private static func rawResponse(_ prompt: String) async -> String? {

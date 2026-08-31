@@ -19,10 +19,11 @@ struct StorageView: View {
     var body: some View {
         Form {
             Section("Usage") {
-                AccessibleScreenHeading(title: "Storage and Cache", isFocused: $isTitleFocused)
                 StorageRow(label: "Downloaded Episodes", value: downloadedMB, color: .blue)
+                    .accessibilityFocused($isTitleFocused)
                 StorageRow(label: "Cached Content", value: cachedMB, color: .green)
                 Divider()
+                    .accessibilityHidden(true)
                 StorageRow(label: "Total", value: totalMB, color: .primary, bold: true)
             }
 
@@ -33,6 +34,16 @@ struct StorageView: View {
                     }
                 }
                 .accessibilityHint(String(localized: "Cached articles and metadata older than this will be automatically removed."))
+                .accessibilityAdjustableAction { direction in
+                    guard let idx = retentionOptions.firstIndex(where: { $0.months == cacheRetentionMonths }) else { return }
+                    switch direction {
+                    case .increment:
+                        cacheRetentionMonths = retentionOptions[(idx + 1) % retentionOptions.count].months
+                    case .decrement:
+                        cacheRetentionMonths = retentionOptions[(idx - 1 + retentionOptions.count) % retentionOptions.count].months
+                    @unknown default: break
+                    }
+                }
 
                 Text("Cached content lets you re-open articles without waiting for a network request. Older content is cleared automatically based on this setting.")
                     .font(.caption)
@@ -46,7 +57,7 @@ struct StorageView: View {
                     Label("Clear Downloaded Episodes", systemImage: "trash")
                 }
                 .confirmationDialog(
-                    "Clear Downloads?",
+                    "Clear downloads?",
                     isPresented: $showClearDownloads,
                     titleVisibility: .visible
                 ) {
@@ -62,7 +73,7 @@ struct StorageView: View {
                     Label("Clear Cached Content", systemImage: "internaldrive.badge.minus")
                 }
                 .confirmationDialog(
-                    "Clear Cache?",
+                    "Clear cache?",
                     isPresented: $showClearCache,
                     titleVisibility: .visible
                 ) {
@@ -79,7 +90,7 @@ struct StorageView: View {
                         .foregroundStyle(.red)
                 }
                 .confirmationDialog(
-                    "Clear All Storage?",
+                    "Clear all storage?",
                     isPresented: $showClearAll,
                     titleVisibility: .visible
                 ) {
@@ -135,13 +146,21 @@ private struct StorageRow: View {
         HStack {
             Text(label)
                 .fontWeight(bold ? .semibold : .regular)
-                .foregroundStyle(color == .primary ? .primary : .primary)
+                // Was `color == .primary ? .primary : .primary` — always
+                // rendered plain primary regardless of the color passed in,
+                // silently dropping the blue/green category coding every
+                // call site actually specifies. Reported directly.
+                .foregroundStyle(color)
             Spacer()
             Text(displayText)
                 .foregroundStyle(bold ? .primary : .secondary)
                 .fontWeight(bold ? .semibold : .regular)
                 .monospacedDigit()
         }
+        // Two Texts with no grouping meant VoiceOver read both of them
+        // individually (label, then value) *and* the explicit label below —
+        // effectively hearing the row twice per swipe. Reported directly.
+        .accessibilityElement(children: .combine)
         .accessibilityLabel(String(localized: "\(label): \(displayText)"))
     }
 }

@@ -135,7 +135,7 @@ struct BugDetailView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
-                Link(destination: Self.feedbackAssistantURL) {
+                WebLink(destination: Self.feedbackAssistantURL) {
                     Image(systemName: "flag")
                 }
                 .accessibilityLabel(String(localized: "Report to Apple"))
@@ -166,7 +166,7 @@ struct BugDetailView: View {
     /// was already fetched (`field_apple_feedback_`) but never displayed or
     /// used anywhere.
     private func feedbackIdRow(_ feedbackId: String) -> some View {
-        Link(destination: Self.feedbackAssistantURL) {
+        WebLink(destination: Self.feedbackAssistantURL) {
             HStack {
                 Image(systemName: "exclamationmark.bubble").foregroundStyle(Color.accentColor)
                 VStack(alignment: .leading, spacing: 2) {
@@ -338,7 +338,7 @@ struct BugDetailView: View {
                 CommentRow(
                     authorName: comment.authorName, text: comment.body, date: comment.createdAt,
                     index: index, total: detail.comments.count,
-                    subject: comment.subject, parentTitle: detail.title,
+                    subject: comment.subject, parentTitle: detail.title, parentURL: detail.url,
                     commentId: comment.id, authorId: comment.authorId, commentType: bugCommentType(detail.platform),
                     onDelete: {
                         self.detail?.comments.removeAll { $0.id == comment.id }
@@ -609,7 +609,7 @@ struct ComposeBugCommentView: View {
             onPosted(comment)
             dismiss()
         } catch let e as APIError { submitError = e.localizedDescription
-        } catch { submitError = "Failed to post comment." }
+        } catch { submitError = "Couldn't post comment. Try again." }
         isSubmitting = false
     }
 }

@@ -20,6 +20,12 @@ final class PlayerStore: ObservableObject {
     @Published private(set) var errorMessage: String?
     @Published private(set) var sleepTimerRemaining: TimeInterval?
     @Published private(set) var sleepAtEndOfEpisode = false
+    /// The route picker tile on the episode detail page previously showed a
+    /// hardcoded "AirPlay" subtitle regardless of what was actually
+    /// connected — wrong (and confusing to read via VoiceOver) for the very
+    /// common case of playing through the built-in speaker, wired
+    /// headphones, or Bluetooth. Reported directly.
+    @Published private(set) var currentOutputName: String = PlayerStore.resolveOutputName()
     @Published var playbackSpeed: Float {
         didSet { didSetPlaybackSpeed(oldValue) }
     }
@@ -632,6 +638,7 @@ final class PlayerStore: ObservableObject {
     }
 
     private func handleRouteChange(_ note: Notification) {
+        currentOutputName = Self.resolveOutputName()
         guard let info = note.userInfo,
               let reasonValue = info[AVAudioSessionRouteChangeReasonKey] as? UInt,
               let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue)
@@ -639,6 +646,14 @@ final class PlayerStore: ObservableObject {
         if reason == .oldDeviceUnavailable, isPlaying {
             pause()
         }
+    }
+
+    /// Apple's own port names ("iPhone Speaker", "AirPods Pro", "TV" for
+    /// AirPlay to an Apple TV, etc.) — the same wording Control Center and
+    /// the system volume HUD use, so this reads as familiar rather than
+    /// inventing its own terminology for the same thing.
+    private static func resolveOutputName() -> String {
+        AVAudioSession.sharedInstance().currentRoute.outputs.first?.portName ?? "Speaker"
     }
 
     // MARK: - Persistence

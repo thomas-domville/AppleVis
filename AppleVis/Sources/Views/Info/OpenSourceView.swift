@@ -42,8 +42,10 @@ struct OpenSourceView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         if let url = URL(string: item.url) {
-                            Link("View on GitHub", destination: url)
-                                .font(.caption)
+                            WebLink(destination: url) {
+                                Text("View on GitHub")
+                            }
+                            .font(.caption)
                         }
                     }
                     .padding(.vertical, 4)

@@ -100,6 +100,34 @@ struct OpenSavedItemsIntent: AppIntent {
     }
 }
 
+struct WhatsNewOnAppleVisIntent: AppIntent {
+    static var title: LocalizedStringResource = "What's New on AppleVis"
+    static var description = IntentDescription(
+        "Speaks a summary of what's new on AppleVis since your last visit."
+    )
+    static var openAppWhenRun: Bool = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        _ = await UIApplication.shared.open(URL(string: "applevis://whats-new")!)
+        return .result()
+    }
+}
+
+struct ReportBugToAppleVisIntent: AppIntent {
+    static var title: LocalizedStringResource = "Report an AppleVis Bug"
+    static var description = IntentDescription(
+        "Opens AppleVis straight to the accessibility bug report form."
+    )
+    static var openAppWhenRun: Bool = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        _ = await UIApplication.shared.open(URL(string: "applevis://submit-bug")!)
+        return .result()
+    }
+}
+
 struct AppleVisShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -177,6 +205,26 @@ struct AppleVisShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Saved Items",
             systemImageName: "bookmark.fill"
+        )
+        AppShortcut(
+            intent: WhatsNewOnAppleVisIntent(),
+            phrases: [
+                "What's new on \(.applicationName)",
+                "Catch me up on \(.applicationName)",
+                "\(.applicationName) update",
+            ],
+            shortTitle: "What's New",
+            systemImageName: "sparkles"
+        )
+        AppShortcut(
+            intent: ReportBugToAppleVisIntent(),
+            phrases: [
+                "Report a bug to \(.applicationName)",
+                "Report an \(.applicationName) bug",
+                "File an \(.applicationName) accessibility bug",
+            ],
+            shortTitle: "Report a Bug",
+            systemImageName: "ant.fill"
         )
     }
 }

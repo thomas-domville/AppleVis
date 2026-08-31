@@ -21,7 +21,7 @@ struct GuideBrowseView: View {
             } else if let error, resources.isEmpty {
                 ErrorView(message: error) { await load(reset: true) }
             } else if resources.isEmpty {
-                EmptyStateView(title: "No resources yet", message: "Pull to refresh resources", systemImage: "book")
+                EmptyStateView(title: "No Resources Yet", message: "Pull to refresh resources", systemImage: "book")
             } else {
                 resourceList
             }
@@ -43,7 +43,6 @@ struct GuideBrowseView: View {
 
     private var resourceList: some View {
         List {
-            AccessibleScreenHeading(title: "Guides & Resources", isFocused: $isTitleFocused)
             if networkStatus.degradedGroups.contains(.resources) {
                 OfflineBanner()
                     .listRowSeparator(.hidden)
@@ -53,9 +52,14 @@ struct GuideBrowseView: View {
                     .listRowSeparator(.hidden)
             }
 
-            ForEach(visible) { resource in
-                ResourceRow(resource: resource, onDelete: { resources.removeAll { $0.id == resource.id } })
+            ForEach(Array(visible.enumerated()), id: \.element.id) { index, resource in
+                let row = ResourceRow(resource: resource, onDelete: { resources.removeAll { $0.id == resource.id } })
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                if index == 0 {
+                    row.accessibilityFocused($isTitleFocused)
+                } else {
+                    row
+                }
             }
 
             if hasMore && searchText.isEmpty {
@@ -104,7 +108,7 @@ struct GuideBrowseView: View {
             resources = fetched.items
             hasMore = fetched.hasMore
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Could not load resources" }
+        } catch { self.error = "Couldn't load resources." }
         isLoading = false
     }
 

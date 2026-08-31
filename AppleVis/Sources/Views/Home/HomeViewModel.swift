@@ -23,9 +23,57 @@ struct MouseRecapDigest: Codable {
     let forums: [ForumTopic]
     let resources: [Resource]
     let blogs: [BlogPost]
+    let forumExcerpts: [String: String]
+
+    init(
+        startDate: Date,
+        endDate: Date,
+        generatedAt: Date,
+        apps: [AppListing],
+        podcasts: [PodcastEpisode],
+        forums: [ForumTopic],
+        resources: [Resource],
+        blogs: [BlogPost],
+        forumExcerpts: [String: String] = [:]
+    ) {
+        self.startDate = startDate
+        self.endDate = endDate
+        self.generatedAt = generatedAt
+        self.apps = apps
+        self.podcasts = podcasts
+        self.forums = forums
+        self.resources = resources
+        self.blogs = blogs
+        self.forumExcerpts = forumExcerpts
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case startDate, endDate, generatedAt, apps, podcasts, forums, resources, blogs, forumExcerpts
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        startDate = try container.decode(Date.self, forKey: .startDate)
+        endDate = try container.decode(Date.self, forKey: .endDate)
+        generatedAt = try container.decode(Date.self, forKey: .generatedAt)
+        apps = try container.decode([AppListing].self, forKey: .apps)
+        podcasts = try container.decode([PodcastEpisode].self, forKey: .podcasts)
+        forums = try container.decode([ForumTopic].self, forKey: .forums)
+        resources = try container.decode([Resource].self, forKey: .resources)
+        blogs = try container.decode([BlogPost].self, forKey: .blogs)
+        forumExcerpts = try container.decodeIfPresent([String: String].self, forKey: .forumExcerpts) ?? [:]
+    }
 
     var isEmpty: Bool {
         apps.isEmpty && podcasts.isEmpty && forums.isEmpty && resources.isEmpty && blogs.isEmpty
+    }
+
+    var appPickSpotlight: BlogPost? {
+        blogs.first(where: Self.isAppPickSpotlight)
+    }
+
+    var standardBlogs: [BlogPost] {
+        blogs.filter { !Self.isAppPickSpotlight($0) }
     }
 
     var countSummary: String {
@@ -62,45 +110,227 @@ struct MouseRecapDigest: Codable {
         return "Here's your AppleVis roundup from the \(period). \(editorialLead) Inside: \(Self.sentenceList(parts))."
     }
 
-    func shareText(for periodName: String) -> String {
+    func shareText(for periodName: String, aiBlurbs: [String: String] = [:]) -> String {
+        let limits = Self.limits(for: periodName)
+        let visibleApps = Array(apps.prefix(limits.apps))
+        let visiblePodcasts = Array(podcasts.prefix(limits.podcasts))
+        let visibleBlogs = Array(standardBlogs.prefix(limits.blogs))
+        let visibleResources = Array(resources.prefix(limits.resources))
+        let visibleForums = Array(forums.prefix(limits.forums))
+
         var lines = [
             "Mouse Recap",
             periodName,
             dateRangeText,
             "",
+            "From the Mouse",
             newsletterIntro(for: periodName),
         ]
+
+        if let spotlight = appPickSpotlight {
+            appendShareSection(
+                title: "Spotlight Feature",
+                description: "AnonyMouse's App Pick of the Month",
+                items: [shareItem(
+                    title: spotlight.title,
+                    details: blogDetails(spotlight),
+                    body: aiBlurbs[spotlight.id] ?? newsletterBody(for: spotlight),
+                    url: spotlight.url
+                )],
+                to: &lines
+            )
+        }
+
+        appendShareSection(
+            title: "In This Recap",
+            description: "",
+            items: tableOfContents(periodName: periodName).map { "\($0.title): \($0.detail)" },
+            to: &lines
+        )
+
         appendShareSection(
             title: "New Accessible Apps",
-            description: "A quick look at the newest additions to the AppleVis App Directory.",
-            items: apps.map { "\($0.name) - \($0.url)" },
+            description: appSectionIntro(periodName: periodName),
+            items: visibleApps.map {
+                shareItem(title: $0.name, details: appDetails($0), body: aiBlurbs[$0.id] ?? newsletterBody(for: $0), url: $0.url)
+            },
             to: &lines
         )
         appendShareSection(
-            title: "Podcast Episodes",
-            description: "Recent audio walkthroughs, conversations, and practical tips.",
-            items: podcasts.map { "\($0.title) - \($0.url)" },
+            title: podcastSectionTitle(periodName: periodName),
+            description: podcastSectionIntro(periodName: periodName),
+            items: visiblePodcasts.map {
+                shareItem(title: $0.title, details: podcastDetails($0), body: aiBlurbs[$0.id] ?? newsletterBody(for: $0), url: $0.url)
+            },
             to: &lines
         )
         appendShareSection(
-            title: "Popular Discussions",
-            description: "Community conversations that have been drawing replies.",
-            items: forums.map { "\($0.title) - \($0.url)" },
+            title: "From the AppleVis Blog",
+            description: blogSectionIntro(periodName: periodName),
+            items: visibleBlogs.map {
+                shareItem(title: $0.title, details: blogDetails($0), body: aiBlurbs[$0.id] ?? newsletterBody(for: $0), url: $0.url)
+            },
             to: &lines
         )
         appendShareSection(
-            title: "Guides and Tutorials",
-            description: "Hands-on help and explainers from the AppleVis community.",
-            items: resources.map { "\($0.title) - \($0.url)" },
+            title: "How-To Corner",
+            description: resourceSectionIntro(periodName: periodName),
+            items: visibleResources.map {
+                shareItem(title: $0.title, details: resourceDetails($0), body: aiBlurbs[$0.id] ?? newsletterBody(for: $0), url: $0.url)
+            },
             to: &lines
         )
         appendShareSection(
-            title: "Blog Posts",
-            description: "News, updates, and editorial coverage from AppleVis.",
-            items: blogs.map { "\($0.title) - \($0.url)" },
+            title: "Community Voices",
+            description: forumSectionIntro(periodName: periodName),
+            items: visibleForums.map {
+                shareItem(title: $0.title, details: forumDetails($0), body: aiBlurbs[$0.id] ?? newsletterBody(for: $0), url: $0.url)
+            },
             to: &lines
         )
         return lines.joined(separator: "\n")
+    }
+
+    func tableOfContents(periodName: String) -> [(title: String, detail: String)] {
+        var items: [(String, String)] = []
+        if appPickSpotlight != nil { items.append(("Spotlight Feature", "AnonyMouse's App Pick of the Month")) }
+        if !apps.isEmpty { items.append(("New Accessible Apps", Self.countPart(apps.count, singular: "app", plural: "apps") ?? "")) }
+        if !podcasts.isEmpty { items.append((podcastSectionTitle(periodName: periodName), Self.countPart(podcasts.count, singular: "episode", plural: "episodes") ?? "")) }
+        if !standardBlogs.isEmpty { items.append(("From the AppleVis Blog", Self.countPart(standardBlogs.count, singular: "post", plural: "posts") ?? "")) }
+        if !resources.isEmpty { items.append(("How-To Corner", Self.countPart(resources.count, singular: "guide or tutorial", plural: "guides and tutorials") ?? "")) }
+        if !forums.isEmpty { items.append(("Community Voices", Self.countPart(forums.count, singular: "discussion", plural: "discussions") ?? "")) }
+        return items
+    }
+
+    func newsletterBody(for app: AppListing) -> String {
+        let fallback = "\(app.name) is a \(app.platform.displayName) app in \(app.category)."
+        return excerpt(from: app.summary, fallback: fallback)
+    }
+
+    func newsletterBody(for episode: PodcastEpisode) -> String {
+        excerpt(from: episode.description, fallback: "Listen to the full episode on AppleVis.")
+    }
+
+    func newsletterBody(for resource: Resource) -> String {
+        excerpt(from: resource.summary, fallback: "Read the full \(resource.kind.displayName.lowercased()) on AppleVis.")
+    }
+
+    func newsletterBody(for post: BlogPost) -> String {
+        excerpt(from: post.summary, fallback: "Read the full post on AppleVis.")
+    }
+
+    func newsletterBody(for topic: ForumTopic) -> String {
+        if let excerpt = forumExcerpts[topic.id], !excerpt.isEmpty {
+            return excerpt
+        }
+        let replyText = "\(topic.replyCount) comment\(topic.replyCount == 1 ? "" : "s")"
+        let kind = topic.category.isEmpty ? "discussion" : "\(topic.category) discussion"
+        return "This \(kind) has been active in the community, with \(replyText) so far."
+    }
+
+    func appDetails(_ app: AppListing) -> [String] {
+        [
+            app.developer.isEmpty ? "" : "Developer: \(app.developer)",
+            "Platform: \(app.platform.displayName)",
+            app.category.isEmpty ? "" : "Category: \(app.category)",
+            app.price.isEmpty ? "" : "Price: \(app.price)",
+        ].filter { !$0.isEmpty }
+    }
+
+    func podcastDetails(_ episode: PodcastEpisode) -> [String] {
+        [
+            episode.showTitle,
+            episode.authorName.isEmpty ? "" : "By \(episode.authorName)",
+            publishedText(episode.publishedAt),
+        ].filter { !$0.isEmpty }
+    }
+
+    func blogDetails(_ post: BlogPost) -> [String] {
+        [
+            post.authorName.isEmpty ? "" : "By \(post.authorName)",
+            publishedText(post.publishedAt),
+            "\(post.commentCount) comment\(post.commentCount == 1 ? "" : "s")",
+        ].filter { !$0.isEmpty }
+    }
+
+    func resourceDetails(_ resource: Resource) -> [String] {
+        [
+            resource.kind.displayName,
+            resource.authorName.isEmpty ? "" : "By \(resource.authorName)",
+            publishedText(resource.updatedAt),
+            "\(resource.commentCount) comment\(resource.commentCount == 1 ? "" : "s")",
+        ].filter { !$0.isEmpty }
+    }
+
+    func forumDetails(_ topic: ForumTopic) -> [String] {
+        [
+            topic.category.isEmpty ? "" : topic.category,
+            topic.authorName.isEmpty ? "" : "By \(topic.authorName)",
+            "\(topic.replyCount) comment\(topic.replyCount == 1 ? "" : "s")",
+            "Active \(topic.lastActivityAt.formatted(.relative(presentation: .named)))",
+        ].filter { !$0.isEmpty }
+    }
+
+    func appSectionIntro(periodName: String) -> String {
+        "A fresh batch of App Directory entries arrived in the \(periodName.lowercased()), with practical discoveries for blind and low vision Apple users."
+    }
+
+    func podcastSectionTitle(periodName: String) -> String {
+        periodName.localizedCaseInsensitiveContains("month") ? "This Month in Podcasts" : "This Week in Podcasts"
+    }
+
+    func podcastSectionIntro(periodName: String) -> String {
+        "Recent AppleVis audio brought walkthroughs, conversations, and tips worth catching."
+    }
+
+    func blogSectionIntro(periodName: String) -> String {
+        "News, updates, and editorial perspective from the AppleVis Blog."
+    }
+
+    func resourceSectionIntro(periodName: String) -> String {
+        "Hands-on help and explainers for making more of your Apple devices."
+    }
+
+    func forumSectionIntro(periodName: String) -> String {
+        "A curated look at active community conversations from the \(periodName.lowercased())."
+    }
+
+    static func limits(for periodName: String) -> (apps: Int, podcasts: Int, blogs: Int, resources: Int, forums: Int) {
+        if periodName.localizedCaseInsensitiveContains("month") {
+            return (apps: 12, podcasts: 5, blogs: 5, resources: 6, forums: 8)
+        }
+        return (apps: 8, podcasts: 5, blogs: 5, resources: 6, forums: 5)
+    }
+
+    static func isAppPickSpotlight(_ post: BlogPost) -> Bool {
+        let title = post.title.lowercased()
+        let url = post.url.lowercased()
+        return (title.contains("anonymous") && title.contains("app pick") && title.contains("month"))
+            || url.contains("anonymouses-app-pick-month")
+            || url.contains("anonymous-app-pick-month")
+    }
+
+    func excerpt(from text: String, fallback: String, maxLength: Int = 420) -> String {
+        let plain = HTMLText.plainText(fromHTML: text)
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\t", with: " ")
+            .split(separator: " ")
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !plain.isEmpty else { return fallback }
+        guard plain.count > maxLength else { return plain }
+        let cutoff = plain.index(plain.startIndex, offsetBy: maxLength)
+        let prefix = plain[..<cutoff]
+        if let sentenceEnd = prefix.lastIndex(where: { ".!?".contains($0) }) {
+            let sentence = plain.index(after: sentenceEnd)
+            let trimmed = String(plain[..<sentence]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        return "\(String(prefix).trimmingCharacters(in: .whitespacesAndNewlines))..."
+    }
+
+    private func publishedText(_ date: Date) -> String {
+        date.formatted(date: .abbreviated, time: .omitted)
     }
 
     private var editorialLead: String {
@@ -146,8 +376,16 @@ struct MouseRecapDigest: Codable {
 
     private func appendShareSection(title: String, description: String, items: [String], to lines: inout [String]) {
         guard !items.isEmpty else { return }
-        lines += ["", title, description]
-        lines += items.map { "- \($0)" }
+        lines += ["", title]
+        if !description.isEmpty { lines.append(description) }
+        lines += items
+    }
+
+    private func shareItem(title: String, details: [String], body: String, url: String) -> String {
+        var lines = [title]
+        if !details.isEmpty { lines += details }
+        lines += ["", body, "", "Read on AppleVis:", url]
+        return lines.joined(separator: "\n")
     }
 
     /// Derives a narrower-window view (e.g. "past 7 days") from this digest
@@ -174,7 +412,8 @@ struct MouseRecapDigest: Codable {
             podcasts: podcasts.filter { $0.publishedAt >= newStart },
             forums: forums.filter { $0.lastActivityAt >= newStart },
             resources: resources.filter { $0.updatedAt >= newStart },
-            blogs: blogs.filter { $0.publishedAt >= newStart || $0.lastActivityAt >= newStart }
+            blogs: blogs.filter { $0.publishedAt >= newStart || $0.lastActivityAt >= newStart },
+            forumExcerpts: forumExcerpts
         )
     }
 }
@@ -203,6 +442,15 @@ final class HomeViewModel: ObservableObject {
     /// auto-refresh (see its `.onChange(of: scenePhase)`).
     @Published private(set) var lastLoadedAt: Date?
 
+    /// The single most recently visited item, if it's still present in the
+    /// currently loaded feed — drives "pick up where you left off" Home
+    /// focus (HomeView.announceWelcomeIfNeeded) when there's no new activity
+    /// to summarize instead. Requested directly.
+    var lastVisitedItemId: String? {
+        guard let mostRecent = itemVisits.max(by: { $0.value.seenAt < $1.value.seenAt }) else { return nil }
+        return items.contains(where: { $0.id == mostRecent.key }) ? mostRecent.key : nil
+    }
+
     private let pageSize = 20
     private var page = 0
     private var itemVisits: [String: PersistenceStore.ItemVisit] = [:]
@@ -224,7 +472,11 @@ final class HomeViewModel: ObservableObject {
     // than leaving a 30-day recap capped at the same page count a week-long
     // one used.
     private static let mouseRecapMaxPages = 24
-    private static let mouseRecapForumLimit = 5
+    private static let mouseRecapAppLimit = 12
+    private static let mouseRecapPodcastLimit = 5
+    private static let mouseRecapBlogLimit = 6
+    private static let mouseRecapResourceLimit = 6
+    private static let mouseRecapForumLimit = 8
     /// The boundary a never-individually-visited item is compared against
     /// — captured once per load() (see `advanceVisitBoundaryIfNeeded`) so
     /// it stays fixed for the whole current sitting rather than drifting
@@ -400,12 +652,37 @@ final class HomeViewModel: ObservableObject {
             // handling.
             mouseRecapError = "Couldn't load Mouse Recap. Pull to refresh."
         } else {
-            let digest = Self.buildMouseRecap(from: result.items, startDate: startDate, endDate: endDate)
+            let digest = await enrichMouseRecap(Self.buildMouseRecap(from: result.items, startDate: startDate, endDate: endDate))
             mouseRecap = digest
             PersistenceStore.shared.saveMouseRecapDigest(digest)
         }
 
         isLoadingMouseRecap = false
+    }
+
+    private func enrichMouseRecap(_ digest: MouseRecapDigest) async -> MouseRecapDigest {
+        guard !digest.forums.isEmpty else { return digest }
+        var excerpts = digest.forumExcerpts
+
+        for topic in digest.forums.prefix(Self.mouseRecapForumLimit) where excerpts[topic.id] == nil {
+            guard let detail = try? await APIClient.shared.forums.topicDetail(id: topic.id) else { continue }
+            let excerpt = digest.excerpt(from: detail.body, fallback: "", maxLength: 420)
+            if !excerpt.isEmpty {
+                excerpts[topic.id] = excerpt
+            }
+        }
+
+        return MouseRecapDigest(
+            startDate: digest.startDate,
+            endDate: digest.endDate,
+            generatedAt: digest.generatedAt,
+            apps: digest.apps,
+            podcasts: digest.podcasts,
+            forums: digest.forums,
+            resources: digest.resources,
+            blogs: digest.blogs,
+            forumExcerpts: excerpts
+        )
     }
 
     // MARK: - Private
@@ -558,12 +835,14 @@ final class HomeViewModel: ObservableObject {
             return app
         }
         .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        .prefix(Self.mouseRecapAppLimit)
 
         let podcasts = items.compactMap { item -> PodcastEpisode? in
             guard case .podcastEpisode(let episode) = item, episode.publishedAt >= startDate else { return nil }
             return episode
         }
-        .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        .sorted { $0.publishedAt > $1.publishedAt }
+        .prefix(Self.mouseRecapPodcastLimit)
 
         let forums = items.compactMap { item -> ForumTopic? in
             guard case .forumTopic(let topic) = item, topic.lastActivityAt >= startDate else { return nil }
@@ -579,23 +858,30 @@ final class HomeViewModel: ObservableObject {
             guard case .resource(let resource) = item, resource.updatedAt >= startDate else { return nil }
             return resource
         }
-        .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        .sorted { $0.updatedAt > $1.updatedAt }
+        .prefix(Self.mouseRecapResourceLimit)
 
         let blogs = items.compactMap { item -> BlogPost? in
             guard case .blogPost(let post) = item, post.publishedAt >= startDate || post.lastActivityAt >= startDate else { return nil }
             return post
         }
-        .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        .sorted {
+            if MouseRecapDigest.isAppPickSpotlight($0) != MouseRecapDigest.isAppPickSpotlight($1) {
+                return MouseRecapDigest.isAppPickSpotlight($0)
+            }
+            return $0.publishedAt > $1.publishedAt
+        }
+        .prefix(Self.mouseRecapBlogLimit)
 
         return MouseRecapDigest(
             startDate: startDate,
             endDate: endDate,
             generatedAt: Date(),
-            apps: apps,
-            podcasts: podcasts,
+            apps: Array(apps),
+            podcasts: Array(podcasts),
             forums: Array(forums),
-            resources: resources,
-            blogs: blogs
+            resources: Array(resources),
+            blogs: Array(blogs)
         )
     }
 

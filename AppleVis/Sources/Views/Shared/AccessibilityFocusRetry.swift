@@ -76,28 +76,27 @@ func retryAccessibilityFocus(
     }
 }
 
-/// Gives a Form/List-based screen (Settings, Profile) the same "VoiceOver
-/// focus lands on the page heading after a push" behavior every custom
-/// content detail page already has. Those screens have a real, visible
-/// title `Text` to bind focus to; a `Form` relies on `.navigationTitle`
-/// instead, which isn't a view SwiftUI can attach `.accessibilityFocused`
-/// to — so without this, a pushed Settings/Profile screen silently defaults
-/// to focusing the back button, exactly the "nothing is spoken" behavior
-/// reported directly for the Settings and Profile screens. Zero-size and
-/// row-collapsed so it's invisible to sighted users while still a real,
-/// focusable accessibility element for VoiceOver.
-struct AccessibleScreenHeading: View {
-    let title: String
-    var isFocused: AccessibilityFocusState<Bool>.Binding
-
-    var body: some View {
-        Color.clear
-            .frame(width: 0, height: 0)
-            .accessibilityElement()
-            .accessibilityLabel(title)
-            .accessibilityAddTraits(.isHeader)
-            .accessibilityFocused(isFocused)
-            .listRowInsets(EdgeInsets())
-            .listRowSeparator(.hidden)
+/// Restores focus to the specific row a hub/list screen (Settings, Profile,
+/// Discover, About) was left from, instead of the system's default landing
+/// spot after a back-button pop. Call from `.onDisappear` on the *pushed
+/// destination* itself, not `.task`/`.onAppear` on the hub — a hub that is
+/// its own `NavigationStack` root (or reached only once per tab lifetime)
+/// never re-runs `.task`/`.onAppear` when a child it pushed is popped back
+/// to it, since the root view is never actually torn down (confirmed via
+/// `DiscoverView`'s own `.task`, which already documents running only once).
+/// The pushed child's `.onDisappear`, by contrast, fires reliably on every
+/// pop, since that instance really is being destroyed. Reported directly:
+/// back-navigation from Settings (and similar hub screens) left VoiceOver
+/// focus wherever iOS defaulted to, rather than on the row you'd tapped.
+@MainActor
+func retryAccessibilityFocus<T: Hashable>(
+    into binding: AccessibilityFocusState<T?>.Binding,
+    returningTo rowTarget: T,
+    delaysMs: [Int] = [300, 550, 850]
+) async {
+    for delayMs in delaysMs {
+        try? await Task.sleep(for: .milliseconds(delayMs))
+        binding.wrappedValue = nil
+        binding.wrappedValue = rowTarget
     }
 }

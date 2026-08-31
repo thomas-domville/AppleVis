@@ -179,7 +179,7 @@ struct ResourceDetailView: View {
                 CommentRow(
                     authorName: comment.authorName, text: comment.body, date: comment.createdAt,
                     index: index, total: detail.comments.count,
-                    subject: comment.subject, parentTitle: detail.title,
+                    subject: comment.subject, parentTitle: detail.title, parentURL: detail.url,
                     commentId: comment.id, authorId: comment.authorId, commentType: "comment_node_guides",
                     supportsReport: false,
                     onDelete: {
@@ -411,6 +411,7 @@ struct CommentRow: View {
     var total: Int = 1
     var subject: String = ""
     var parentTitle: String = ""
+    var parentURL: String = ""
     var commentId: String? = nil
     var authorId: String? = nil
     var commentType: String? = nil
@@ -436,6 +437,17 @@ struct CommentRow: View {
     @State private var showDeleteConfirm = false
     @State private var showUnpublishConfirm = false
     @State private var showEditSheet = false
+    @State private var showReportSheet = false
+
+    private var reportContext: ReportCommentContext {
+        ReportCommentContext(
+            authorName: authorName,
+            commentExcerpt: .excerpt(from: text),
+            commentDate: date,
+            contentTitle: parentTitle,
+            contentURL: parentURL
+        )
+    }
 
     private var canDelete: Bool {
         guard let user = auth.user, let authorId, commentId != nil, commentType != nil else { return false }
@@ -490,7 +502,7 @@ struct CommentRow: View {
             .accessibilityAction(named: Text("Copy Comment Text")) { copyText() }
             .accessibilityAction(named: Text("Share Comment")) { presentShareSheet() }
             .modifier(ConditionalAccessibilityAction(isActive: supportsReport, name: "Report Comment") {
-                toast.warning(String(localized: "Reporting is coming once the Drupal Flags API is confirmed."))
+                showReportSheet = true
             })
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Edit Comment") { showEditSheet = true })
             .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Unpublish Comment") { showUnpublishConfirm = true })
@@ -520,7 +532,7 @@ struct CommentRow: View {
                 Label("Share Comment", systemImage: "square.and.arrow.up")
             }
             if supportsReport {
-                Button { toast.warning(String(localized: "Reporting is coming once the Drupal Flags API is confirmed.")) } label: {
+                Button { showReportSheet = true } label: {
                     Label("Report Comment", systemImage: "flag")
                 }
             }
@@ -539,6 +551,9 @@ struct CommentRow: View {
                     Label("Delete Comment", systemImage: "trash")
                 }
             }
+        }
+        .sheet(isPresented: $showReportSheet) {
+            ReportCommentWizard(context: reportContext)
         }
         .confirmationDialog("Unpublish this comment?", isPresented: $showUnpublishConfirm, titleVisibility: .visible) {
             Button("Unpublish", role: .destructive) { Task { await unpublish() } }
@@ -564,7 +579,7 @@ struct CommentRow: View {
 
     private func copyText() {
         UIPasteboard.general.string = text.strippingHTMLTags()
-        toast.success(String(localized: "Comment text copied."))
+        toast.success(String(localized: "Comment text copied"))
     }
 
     private func presentShareSheet() {
@@ -712,7 +727,7 @@ struct ComposeResourceCommentView: View {
             onPosted(comment)
             dismiss()
         } catch let e as APIError { submitError = e.localizedDescription
-        } catch { submitError = "Failed to post comment." }
+        } catch { submitError = "Couldn't post comment. Try again." }
         isSubmitting = false
     }
 }

@@ -33,7 +33,7 @@ enum APIError: LocalizedError {
         case .server:        return "AppleVis is having trouble right now. Try again later."
         case .decoding: return "AppleVis sent back something this version of the app doesn't understand. Try updating the app."
         case .notFound: return "This item is no longer available. It may have been removed, moved, or is awaiting moderation."
-        case .unknown(let c): return "Unexpected error (HTTP \(c))."
+        case .unknown: return "AppleVis sent back something unexpected. Try again in a moment."
         case .offlineNoCache(let group): return "No saved \(group) content yet. Connect to the internet to load content for the first time."
         }
     }
@@ -310,7 +310,17 @@ final class APIClient {
                 Self.toastStore?.error(String(localized: "Your session expired. Please sign in again."))
             }
             throw APIError.unauthorized
-        case 403: throw APIError.forbidden
+        case 403:
+            // A 403 on an otherwise-valid session most often means the
+            // user's role changed server-side since we last resolved it
+            // (see AuthStore.refreshRoles) — re-sync so a since-demoted
+            // editor's Edit/Unpublish/Delete buttons disappear immediately
+            // instead of persisting until the next foreground/relaunch.
+            Task { @MainActor in
+                guard Self.authStore?.isSignedIn == true else { return }
+                await Self.authStore?.refreshRoles()
+            }
+            throw APIError.forbidden
         case 404: throw APIError.notFound
         case 429: throw APIError.rateLimited
         case 500...599:

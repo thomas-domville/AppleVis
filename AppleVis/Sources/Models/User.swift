@@ -6,7 +6,7 @@ struct AuthUser: Codable {
     let name: String
     let csrfToken: String
     let logoutToken: String
-    let roles: [String]
+    var roles: [String]
     /// Confirmed directly by the site's Drupal developer: the site has no
     /// "administrator" role at all — its two editorial roles are machine-
     /// named `site_editor` and `site_admin` (the other three role machine
@@ -105,6 +105,23 @@ enum ContentKind: String, Codable, CaseIterable {
         case .resource:       return "node--guides"
         case .blogPost:       return "node--blog2"
         case .bugReport:      return "node--ios_bug_report"
+        }
+    }
+
+    /// Reverse of `nodeType` — used to interpret a flagged/recommended
+    /// entity's own JSON:API `type` string back into a `ContentKind` when
+    /// reading a real server list (Following, Recommended). Apps map from
+    /// all four platform node types, even though the forward `nodeType`
+    /// above only ever produces the iOS one.
+    init?(nodeType: String) {
+        switch nodeType {
+        case "node--forum": self = .forumTopic
+        case "node--podcast": self = .podcastEpisode
+        case "node--ios_app_directory", "node--tv_directory", "node--watch_directory", "node--mac_app_directory": self = .appListing
+        case "node--guides": self = .resource
+        case "node--blog2": self = .blogPost
+        case "node--ios_bug_report", "node--os_x_bug_report": self = .bugReport
+        default: return nil
         }
     }
 

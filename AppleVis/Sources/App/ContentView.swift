@@ -5,54 +5,57 @@ struct ContentView: View {
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @EnvironmentObject private var keyCommands: KeyCommandRouter
     @EnvironmentObject private var auth: AuthStore
+    @EnvironmentObject private var preferences: PreferencesStore
     @ObservedObject private var homeBadge = HomeBadgeStore.shared
     @State private var showTourPrompt = false
     @State private var showWelcomeTourFromPrompt = false
 
     var body: some View {
-        ZStack {
-            TabView(selection: $keyCommands.selectedTab) {
-                HomeView()
-                    .tabItem { Label("Home", systemImage: "house") }
-                    .tag(0)
-                    .badge(homeBadge.unreadForumTopicCount)
+        TabView(selection: $keyCommands.selectedTab) {
+            HomeView()
+                .tabItem { Label("Home", systemImage: "house") }
+                .tag(0)
+                .badge(homeBadge.unreadForumTopicCount)
 
-                DiscoverView()
-                    .tabItem { Label("Discover", systemImage: "safari") }
-                    .tag(1)
+            DiscoverView()
+                .tabItem { Label("Discover", systemImage: "safari") }
+                .tag(1)
 
-                ForYouView()
-                    .tabItem { Label("For You", systemImage: "person.crop.circle") }
-                    .tag(2)
-            }
-            .onChange(of: keyCommands.selectedTab) { _, newTab in
-                SoundPlayer.shared.play(.tabChange)
-                // Double-tapping a tab bar item to switch to it doesn't
-                // reliably re-announce the new selected state on this SDK's
-                // TabView the way exploring back onto an already-selected
-                // tab by touch does (that read comes for free from the
-                // .isSelected trait; this doesn't). Reported directly: a
-                // VoiceOver user double-tapping Discover heard only the
-                // tab-change tone, with no confirmation it had switched.
-                UIAccessibility.post(notification: .announcement, argument: String(localized: "\(tabName(for: newTab)) tab, selected."))
-            }
-
-            // `ZStack(alignment: .bottom)` sizing the mini player off the
-            // TabView's own bounds was landing it at the top of the screen
-            // instead of just above the tab bar. GuidedExperienceResumeBanner
-            // pins its own floating bottom bar reliably with
-            // `VStack { Spacer(); content }` instead, which forces the
-            // container to full height and anchors content to the bottom
-            // itself rather than depending on ZStack's alignment computation
-            // against a sibling — matching that working pattern here.
-            // Reported directly.
-            VStack {
-                Spacer()
-                if player.currentEpisode != nil {
-                    MiniPlayerView()
-                        .transition(.move(edge: .bottom))
-                        .padding(.bottom, 49) // above tab bar
-                }
+            ForYouView()
+                .tabItem { Label("For You", systemImage: "person.crop.circle") }
+                .tag(2)
+        }
+        .onChange(of: keyCommands.selectedTab) { _, newTab in
+            SoundPlayer.shared.play(.tabChange)
+            // Double-tapping a tab bar item to switch to it doesn't
+            // reliably re-announce the new selected state on this SDK's
+            // TabView the way exploring back onto an already-selected
+            // tab by touch does (that read comes for free from the
+            // .isSelected trait; this doesn't). Reported directly: a
+            // VoiceOver user double-tapping Discover heard only the
+            // tab-change tone, with no confirmation it had switched.
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "\(tabName(for: newTab)) tab, selected."))
+        }
+        // Second attempt at this fix — the first (a `ZStack` sibling sized
+        // via `VStack { Spacer(); content }`, matching how
+        // GuidedExperienceResumeBanner pins its own floating bottom bar)
+        // still let the mini player end up pinned to the top after leaving
+        // a screen with its own `.safeAreaInset(edge: .bottom)`
+        // (EpisodeDetailView's playback bar) — a ZStack sibling's Spacer-
+        // based layout is computed independently of the TabView's actual
+        // frame, and can end up resolving against stale/incorrect geometry
+        // across a NavigationStack push/pop that changes the ambient safe
+        // area. `.overlay(alignment: .bottom)` binds the mini player
+        // directly to the TabView's own frame instead of to an independent
+        // sibling computation, which removes that whole failure mode rather
+        // than working around one specific trigger of it. Reported directly
+        // — confirmed still broken after the first fix, so re-diagnosed
+        // rather than assumed fixed.
+        .overlay(alignment: .bottom) {
+            if player.currentEpisode != nil {
+                MiniPlayerView()
+                    .transition(.move(edge: .bottom))
+                    .padding(.bottom, 49) // above tab bar
             }
         }
         .animation(UIAccessibility.isReduceMotionEnabled ? nil : .spring(duration: 0.3), value: player.currentEpisode != nil)
@@ -69,6 +72,17 @@ struct ContentView: View {
                         }
                     }
             }
+        }
+        // Externally-triggered web links (universal links, share-extension
+        // hand-offs) previously always opened in-app regardless of the Web
+        // Links preference — intercepted here before the sheet ever sees a
+        // value, rather than inside SafariView, since this is the one
+        // place a web link can arrive without going through WebLink at
+        // all. Reported directly.
+        .onChange(of: deepLinkRouter.pendingWebURL) { _, url in
+            guard let url, preferences.webBrowsingMode == .external else { return }
+            UIApplication.shared.open(url)
+            deepLinkRouter.pendingWebURL = nil
         }
         .sheet(item: Binding(
             get: { deepLinkRouter.pendingWebURL.map { IdentifiableURL(url: $0) } },
@@ -136,6 +150,7 @@ struct ContentView: View {
         case .blog(let text): SubmitBlogView(prefillText: text)
         case .podcast(let url): SubmitPodcastView(prefillSharedURL: url)
         case .podcastAudio(let data, let fileName): SubmitPodcastView(prefillAudioData: data, prefillAudioFileName: fileName)
+        case .bug: SubmitBugView()
         }
     }
 

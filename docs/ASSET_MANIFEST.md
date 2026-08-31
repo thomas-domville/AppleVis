@@ -30,6 +30,14 @@ Bundled in `AppleVis/Sources/Resources/Sounds/` and mirrored in `assets/sounds/`
 
 The app loads these through `SoundPlayer` and `NotificationSound.pushSoundFile`.
 
+### Retired sounds
+
+`assets/sounds/spare/` holds sounds swapped out of active use but kept in case they're wanted again — not part of the app's runtime asset source, not bundled by Xcode.
+
+- `spare_sound_1.wav` — the previous `welcome.wav`, replaced 2026-08-29.
+- `spare_sound_2.wav` — the previous `error.wav`, replaced 2026-08-29.
+- `spare_sound_3.wav` — the previous `refresh.wav`, replaced 2026-08-29.
+
 ## Icons
 
 Reference copies live in `assets/icons/`. The app icon catalog lives in `AppleVis/Assets.xcassets/`.

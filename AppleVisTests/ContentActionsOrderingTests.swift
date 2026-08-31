@@ -78,20 +78,29 @@ struct ContentActionsOrderingTests {
         }
     }
 
-    @Test("follow only appears when supported and signed in")
-    func followGatedOnSupportAndSignIn() {
-        #expect(ContentActionsModifier.canonicalActions(
+    @Test("starting a new follow tracks the followFeatureEnabled flag, independent of an existing follow")
+    func startingFollowTracksFeatureFlag() {
+        let startsNewFollow = ContentActionsModifier.canonicalActions(
             hasNewCount: false, supportsFollow: true, isSignedIn: true, hasUrl: false,
             isOwnTopic: false, isAdmin: false
+        ).contains(.follow)
+        #expect(startsNewFollow == followFeatureEnabled, "should track the flag exactly, whichever way it's currently set")
+    }
+
+    @Test("follow always appears to let someone undo an existing follow, regardless of followFeatureEnabled")
+    func followAlwaysOfferedWhenAlreadyFollowing() {
+        #expect(ContentActionsModifier.canonicalActions(
+            hasNewCount: false, supportsFollow: true, isSignedIn: true, hasUrl: false,
+            isOwnTopic: false, isAdmin: false, isFollowing: true
         ).contains(.follow))
         #expect(!ContentActionsModifier.canonicalActions(
             hasNewCount: false, supportsFollow: true, isSignedIn: false, hasUrl: false,
-            isOwnTopic: false, isAdmin: false
-        ).contains(.follow))
+            isOwnTopic: false, isAdmin: false, isFollowing: true
+        ).contains(.follow), "still requires sign-in even to unfollow")
         #expect(!ContentActionsModifier.canonicalActions(
             hasNewCount: false, supportsFollow: false, isSignedIn: true, hasUrl: false,
-            isOwnTopic: false, isAdmin: false
-        ).contains(.follow))
+            isOwnTopic: false, isAdmin: false, isFollowing: true
+        ).contains(.follow), "still requires the kind to support follow at all")
     }
 
     @Test("share and open-in-browser only appear together, and only with a url")

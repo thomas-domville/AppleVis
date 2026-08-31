@@ -49,7 +49,6 @@ struct BlogBrowseView: View {
 
     private var postList: some View {
         List {
-            AccessibleScreenHeading(title: "AppleVis Blog", isFocused: $isTitleFocused)
             if networkStatus.degradedGroups.contains(.blogs) {
                 OfflineBanner()
                     .listRowSeparator(.hidden)
@@ -63,9 +62,14 @@ struct BlogBrowseView: View {
                 .listRowSeparator(.hidden)
             }
 
-            ForEach(visible) { post in
-                BlogPostRow(post: post, onDelete: { posts.removeAll { $0.id == post.id } })
+            ForEach(Array(visible.enumerated()), id: \.element.id) { index, post in
+                let row = BlogPostRow(post: post, onDelete: { posts.removeAll { $0.id == post.id } })
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                if index == 0 {
+                    row.accessibilityFocused($isTitleFocused)
+                } else {
+                    row
+                }
             }
 
             if hasMore && searchText.isEmpty {

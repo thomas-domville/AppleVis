@@ -25,12 +25,22 @@ private struct SettingsSection: Identifiable {
 struct SettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var searchText = ""
-    @AccessibilityFocusState private var isTitleFocused: Bool
+    @AccessibilityFocusState private var focusTarget: AnyHashable?
+    private static let titleFocusID = AnyHashable("settings.title")
 
     private var sections: [SettingsSection] {
         [
+            // New home for AppleVis Tips, Welcome Summary, Auto-Focus
+            // Search Field, Home Startup Behavior, and Web Links — all
+            // moved out of Accessibility, where they'd accumulated despite
+            // none of them being accessibility-specific. Requested
+            // directly.
+            SettingsSection(title: "General", entries: [
+                SettingsEntry(icon: "slider.horizontal.3", label: "General", subtitle: "Home behavior, tips, and web links", color: .mint,
+                              destination: AnyView(GeneralSettingsView())),
+            ]),
             SettingsSection(title: "Customisation", entries: [
-                SettingsEntry(icon: "paintbrush", label: "Appearance", subtitle: "Theme", color: .purple,
+                SettingsEntry(icon: "paintbrush", label: "Appearance", subtitle: "Theme, colour, and card density", color: .purple,
                               destination: AnyView(AppearanceSettingsView())),
                 SettingsEntry(icon: "accessibility", label: "Accessibility", subtitle: "VoiceOver and low vision controls", color: .blue,
                               destination: AnyView(AccessibilitySettingsView())),
@@ -42,15 +52,15 @@ struct SettingsView: View {
                               destination: AnyView(SoundsHapticsSettingsView())),
             ]),
             SettingsSection(title: "Content", entries: [
-                SettingsEntry(icon: "bubble.left.and.bubble.right", label: "Forums", subtitle: "Home feed filter defaults", color: .green,
-                              destination: AnyView(ForumSettingsView())),
+                SettingsEntry(icon: "bubble.left.and.bubble.right", label: "Home Feed", subtitle: "What shows up in your Home feed", color: .green,
+                              destination: AnyView(HomeFeedSettingsView())),
                 SettingsEntry(icon: "headphones", label: "Podcasts", subtitle: "Playback and download defaults", color: .pink,
                               destination: AnyView(PodcastSettingsView())),
             ]),
             SettingsSection(title: "Data & Privacy", entries: [
                 SettingsEntry(icon: "icloud", label: "Saved & Sync", subtitle: "Saved items and iCloud sync", color: .blue,
                               destination: AnyView(SavedSyncSettingsView())),
-                SettingsEntry(icon: "hand.raised", label: "Privacy", subtitle: "Privacy and data handling", color: .teal,
+                SettingsEntry(icon: "hand.raised", label: "Privacy", subtitle: "What we collect, and how to clear your local data", color: .teal,
                               destination: AnyView(PrivacySettingsView())),
                 SettingsEntry(icon: "sparkles", label: "Intelligence", subtitle: "Smart features and AI controls", color: .indigo,
                               destination: AnyView(IntelligenceSettingsView())),
@@ -101,7 +111,6 @@ struct SettingsView: View {
             List {
                 if searchText.isEmpty {
                     Section {
-                        AccessibleScreenHeading(title: "Settings", isFocused: $isTitleFocused)
                         HStack(alignment: .top, spacing: 12) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 8)
@@ -130,6 +139,7 @@ struct SettingsView: View {
                         .padding(.leading, 4)
                         .accessibilityElement(children: .combine)
                         .accessibilityAction(named: Text("Read Settings Summary")) { announceSettingsSummary() }
+                        .accessibilityFocused($focusTarget, equals: Self.titleFocusID)
                     }
                 }
 
@@ -142,9 +152,13 @@ struct SettingsView: View {
                         ForEach(section.entries) { entry in
                             NavigationLink {
                                 entry.destination
+                                    .onDisappear {
+                                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable(entry.id)) }
+                                    }
                             } label: {
                                 SettingsRow(icon: entry.icon, label: entry.label, subtitle: entry.subtitle, color: entry.color)
                             }
+                            .accessibilityFocused($focusTarget, equals: AnyHashable(entry.id))
                         }
                     }
                 }
@@ -152,7 +166,7 @@ struct SettingsView: View {
             .themedList(preferences.colors)
             .navigationTitle("Settings")
             .searchable(text: $searchText, prompt: "Search Settings")
-            .task { await retryAccessibilityFocus(into: $isTitleFocused) }
+            .task { await retryAccessibilityFocus(into: $focusTarget, returningTo: Self.titleFocusID) }
         }
     }
 }

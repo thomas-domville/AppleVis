@@ -16,6 +16,16 @@ extension ContentKind {
     }
 }
 
+/// Whether Follow's UI shows up everywhere it normally would. Was briefly
+/// flipped off while Follow looked like it might be shelved, then flipped
+/// back on the same session once "Subscriptions" (`/user/{uid}/message-
+/// subscribe`) turned out to be the exact same `subscribe_node` flag —
+/// confirmed directly against that page's own unflag link, just labeled
+/// "Subscribe/Unsubscribe" there instead of "Follow/Unfollow." Kept as a
+/// single flag (rather than reverting the gating outright) since every call
+/// site already checks it — cheap to shelve again later if ever needed.
+let followFeatureEnabled = true
+
 /// Shared save/follow/share actions (swipe + context menu) for any content row
 /// or detail screen. Save is local-only (no server concept — see
 /// `PersistenceStore`); follow is server-backed via the generic JSON:API
@@ -59,8 +69,10 @@ struct ContentActionsModifier: ViewModifier {
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var tips: TipStore
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var isSaved = false
     @State private var isFollowing = false
+    @State private var isRecommended = false
     @State private var showBrowser = false
     @State private var editingNode: EditableNode?
     @State private var showUnpublishConfirm = false
@@ -81,6 +93,22 @@ struct ContentActionsModifier: ViewModifier {
     private var addCommentLabel: String { "Add Comment" }
 
     private var isAdmin: Bool { auth.user?.isAdmin ?? false }
+
+    /// `followFeatureEnabled` hides *starting* a new follow while it's
+    /// shelved, but never hides Unfollow for something already followed —
+    /// see that flag's doc comment.
+    private var canOfferFollow: Bool {
+        supportsFollow && auth.isSignedIn && (followFeatureEnabled || isFollowing)
+    }
+
+    /// Tied directly to `.appListing` rather than a separate opt-in flag —
+    /// "Recommend This App" (confirmed live against the site's own app
+    /// pages, which show a "Recommendations" count + "most recently
+    /// recommended by" credit) is inherently app-only, so there's no call
+    /// site that should ever need to remember to turn it on.
+    private var canOfferRecommend: Bool {
+        kind == .appListing && auth.isSignedIn
+    }
 
     private var isOwnTopic: Bool {
         guard kind == .forumTopic, let authorId, let user = auth.user else { return false }
@@ -108,13 +136,21 @@ struct ContentActionsModifier: ViewModifier {
                     }
                     .tint(.blue)
                 }
-                if supportsFollow && auth.isSignedIn {
+                if canOfferFollow {
                     Button {
                         Task { await toggleFollow() }
                     } label: {
                         Label(isFollowing ? "Unfollow" : "Follow", systemImage: isFollowing ? "bell.slash" : "bell")
                     }
                     .tint(.indigo)
+                }
+                if canOfferRecommend {
+                    Button {
+                        Task { await toggleRecommend() }
+                    } label: {
+                        Label(isRecommended ? "Unrecommend" : "Recommend", systemImage: isRecommended ? "hand.thumbsdown" : "hand.thumbsup")
+                    }
+                    .tint(.orange)
                 }
             }
             // Previously gated to `!UIAccessibility.isVoiceOverRunning` to
@@ -151,11 +187,19 @@ struct ContentActionsModifier: ViewModifier {
                     Label(isSaved ? "Unsave \(kind.saveActionNoun)" : "Save \(kind.saveActionNoun)", systemImage: isSaved ? "bookmark.slash" : "bookmark")
                 }
                 .accessibilityHidden(true)
-                if supportsFollow && auth.isSignedIn {
+                if canOfferFollow {
                     Button {
                         Task { await toggleFollow() }
                     } label: {
                         Label(isFollowing ? "Unfollow \(kind.displayName)" : "Follow \(kind.displayName)", systemImage: isFollowing ? "bell.slash" : "bell")
+                    }
+                    .accessibilityHidden(true)
+                }
+                if canOfferRecommend {
+                    Button {
+                        Task { await toggleRecommend() }
+                    } label: {
+                        Label(isRecommended ? "I No Longer Recommend This App" : "Recommend This App", systemImage: isRecommended ? "hand.thumbsdown" : "hand.thumbsup")
                     }
                     .accessibilityHidden(true)
                 }
@@ -166,7 +210,7 @@ struct ContentActionsModifier: ViewModifier {
                     .accessibilityHidden(true)
                 }
                 if url.flatMap(URL.init) != nil {
-                    Button { showBrowser = true } label: {
+                    Button { openInBrowser() } label: {
                         Label("Open \(kind.displayName) in Browser", systemImage: "safari")
                     }
                     .accessibilityHidden(true)
@@ -215,10 +259,16 @@ struct ContentActionsModifier: ViewModifier {
                 toggleSave()
             }
             .modifier(ConditionalAccessibilityAction(
-                isActive: supportsFollow && auth.isSignedIn,
+                isActive: canOfferFollow,
                 name: isFollowing ? "Unfollow \(kind.displayName)" : "Follow \(kind.displayName)"
             ) {
                 Task { await toggleFollow() }
+            })
+            .modifier(ConditionalAccessibilityAction(
+                isActive: canOfferRecommend,
+                name: isRecommended ? "I No Longer Recommend This App" : "Recommend This App"
+            ) {
+                Task { await toggleRecommend() }
             })
             .modifier(ConditionalAccessibilityAction(
                 isActive: url.flatMap(URL.init) != nil,
@@ -230,7 +280,7 @@ struct ContentActionsModifier: ViewModifier {
                 isActive: url.flatMap(URL.init) != nil,
                 name: "Open \(kind.displayName) in Browser"
             ) {
-                showBrowser = true
+                openInBrowser()
             })
             .accessibilityAction(named: Text(addCommentLabel)) { addComment() }
             .modifier(ConditionalAccessibilityAction(isActive: isOwnTopic && !isAdmin, name: "Edit Topic") { startEdit() })
@@ -267,6 +317,15 @@ struct ContentActionsModifier: ViewModifier {
             .onAppear {
                 isSaved = PersistenceStore.shared.isSaved(id: id)
                 isFollowing = PersistenceStore.shared.isFollowed(id: id)
+                if kind == .appListing {
+                    isRecommended = RecommendationStore.shared.isRecommended(id)
+                    if let user = auth.user {
+                        Task {
+                            await RecommendationStore.shared.loadIfNeeded(for: user)
+                            isRecommended = RecommendationStore.shared.isRecommended(id)
+                        }
+                    }
+                }
             }
     }
 
@@ -402,6 +461,17 @@ struct ContentActionsModifier: ViewModifier {
             .present(activityVC, animated: true)
     }
 
+    /// Matches WebLink's own in-app-vs-external branching so "Open ... in
+    /// Browser" respects the same preference instead of always forcing the
+    /// in-app SafariView sheet.
+    private func openInBrowser() {
+        guard let url, let shareURL = URL(string: url) else { return }
+        switch preferences.webBrowsingMode {
+        case .inApp:    showBrowser = true
+        case .external: UIApplication.shared.open(shareURL)
+        }
+    }
+
     private func toggleSave() {
         if isSaved {
             PersistenceStore.shared.unsave(id: id)
@@ -440,6 +510,28 @@ struct ContentActionsModifier: ViewModifier {
             toast.error(e.localizedDescription)
         } catch {
             toast.error(String(localized: "Couldn't update follow status."))
+        }
+    }
+
+    private func toggleRecommend() async {
+        guard let user = auth.user else { return }
+        do {
+            if isRecommended {
+                try await APIClient.shared.flags.unrecommend(nodeUuid: id, token: user.csrfToken)
+                RecommendationStore.shared.markNotRecommended(id)
+                isRecommended = false
+                toast.success(String(localized: "Removed from Recommendations"))
+            } else {
+                try await APIClient.shared.flags.recommend(nodeUuid: id, nodeType: kind.nodeType, token: user.csrfToken)
+                RecommendationStore.shared.markRecommended(id)
+                isRecommended = true
+                toast.success(String(localized: "You recommended this app!"))
+                SoundPlayer.shared.play(.bookmarkSaved)
+            }
+        } catch let e as APIError {
+            toast.error(e.localizedDescription)
+        } catch {
+            toast.error(String(localized: "Couldn't update your recommendation."))
         }
     }
 }
@@ -481,7 +573,11 @@ extension ContentActionsModifier {
         isSignedIn: Bool,
         hasUrl: Bool,
         isOwnTopic: Bool,
-        isAdmin: Bool
+        isAdmin: Bool,
+        // Defaulted so existing call sites/tests written before Follow was
+        // shelved keep compiling — mirrors `canOfferFollow`'s "hide
+        // starting a new follow, but never hide undoing an existing one."
+        isFollowing: Bool = false
     ) -> [ContentAction] {
         var actions: [ContentAction] = []
         if hasNewCount {
@@ -489,7 +585,7 @@ extension ContentActionsModifier {
             actions.append(.jumpToFirstNewComment)
         }
         actions.append(.save)
-        if supportsFollow && isSignedIn { actions.append(.follow) }
+        if (followFeatureEnabled || isFollowing) && supportsFollow && isSignedIn { actions.append(.follow) }
         actions.append(.addComment)
         if hasUrl { actions.append(.share) }
         if hasUrl { actions.append(.openInBrowser) }
@@ -768,13 +864,34 @@ struct ContentDetailActions: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var tips: TipStore
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var isSaved = false
     @State private var isFollowing = false
+    @State private var isRecommended = false
     @State private var showBrowser = false
 
     private var addCommentVisualLabel: String { "Comment" }
     private var addCommentAccessibilityLabel: String {
         String(localized: "Add Comment")
+    }
+
+    /// Same shelved-Follow gating as `ContentActionsModifier.canOfferFollow`
+    /// — hides starting a new follow, never hides undoing an existing one.
+    private var canOfferFollow: Bool {
+        supportsFollow && (followFeatureEnabled || isFollowing)
+    }
+
+    /// Same app-only gating as `ContentActionsModifier.canOfferRecommend`.
+    private var canOfferRecommend: Bool {
+        kind == .appListing
+    }
+
+    private func requestRecommendToggle() {
+        guard auth.isSignedIn else {
+            toast.warning(String(localized: "Sign in to recommend this app."))
+            return
+        }
+        Task { await toggleRecommend() }
     }
 
     private func requestAddComment() {
@@ -803,12 +920,20 @@ struct ContentDetailActions: View {
                 accessibilityLabel: isSaved ? String(localized: "Unsave \(kind.displayName)") : String(localized: "Save \(kind.displayName)")
             ) { toggleSave() }
 
-            if supportsFollow {
+            if canOfferFollow {
                 DetailActionButton(
                     systemImage: isFollowing ? "bell.fill" : "bell",
                     visualLabel: isFollowing ? "Unfollow" : "Follow",
                     accessibilityLabel: isFollowing ? String(localized: "Unfollow \(kind.displayName)") : String(localized: "Follow \(kind.displayName)")
                 ) { requestFollowToggle() }
+            }
+
+            if canOfferRecommend {
+                DetailActionButton(
+                    systemImage: isRecommended ? "hand.thumbsup.fill" : "hand.thumbsup",
+                    visualLabel: isRecommended ? "Recommended" : "Recommend",
+                    accessibilityLabel: isRecommended ? String(localized: "I No Longer Recommend This App") : String(localized: "Recommend This App")
+                ) { requestRecommendToggle() }
             }
 
             if let url, let shareURL = URL(string: url) {
@@ -818,7 +943,10 @@ struct ContentDetailActions: View {
                 .accessibilityLabel(String(localized: "Share \(kind.displayName)"))
 
                 DetailActionButton(systemImage: "safari", visualLabel: "Browser", accessibilityLabel: String(localized: "Open \(kind.displayName) in Browser")) {
-                    showBrowser = true
+                    switch preferences.webBrowsingMode {
+                    case .inApp:    showBrowser = true
+                    case .external: UIApplication.shared.open(shareURL)
+                    }
                 }
                 .sheet(isPresented: $showBrowser) {
                     SafariView(url: shareURL)
@@ -837,6 +965,15 @@ struct ContentDetailActions: View {
         .onAppear {
             isSaved = PersistenceStore.shared.isSaved(id: id)
             isFollowing = PersistenceStore.shared.isFollowed(id: id)
+            if canOfferRecommend {
+                isRecommended = RecommendationStore.shared.isRecommended(id)
+                if let user = auth.user {
+                    Task {
+                        await RecommendationStore.shared.loadIfNeeded(for: user)
+                        isRecommended = RecommendationStore.shared.isRecommended(id)
+                    }
+                }
+            }
         }
     }
 
@@ -875,6 +1012,28 @@ struct ContentDetailActions: View {
             toast.error(e.localizedDescription)
         } catch {
             toast.error(String(localized: "Couldn't update follow status."))
+        }
+    }
+
+    private func toggleRecommend() async {
+        guard let user = auth.user else { return }
+        do {
+            if isRecommended {
+                try await APIClient.shared.flags.unrecommend(nodeUuid: id, token: user.csrfToken)
+                RecommendationStore.shared.markNotRecommended(id)
+                isRecommended = false
+                toast.success(String(localized: "Removed from Recommendations"))
+            } else {
+                try await APIClient.shared.flags.recommend(nodeUuid: id, nodeType: kind.nodeType, token: user.csrfToken)
+                RecommendationStore.shared.markRecommended(id)
+                isRecommended = true
+                toast.success(String(localized: "You recommended this app!"))
+                SoundPlayer.shared.play(.bookmarkSaved)
+            }
+        } catch let e as APIError {
+            toast.error(e.localizedDescription)
+        } catch {
+            toast.error(String(localized: "Couldn't update your recommendation."))
         }
     }
 }

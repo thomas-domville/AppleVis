@@ -1,5 +1,6 @@
 import AVFoundation
 import AudioToolbox
+import UIKit
 
 /// UI feedback sounds bundled in Resources/Sounds. Filenames match the case names.
 enum AppSound: String {
@@ -48,6 +49,42 @@ enum AppSound: String {
             ? preferences.interfaceSoundsEnabled
             : preferences.confirmationSoundsEnabled
     }
+
+    /// The haptic paired with this sound, if any. Deliberately `nil` for
+    /// every `interfaceSounds` case (refresh, tab switching, picker ticks,
+    /// screen open/close, etc.) — those are frequent, low-stakes chrome
+    /// events, already off by default even for sound, and refresh
+    /// specifically would double up on the haptic iOS's own pull-to-refresh
+    /// control already fires at the pull-trigger point. Reserved for the
+    /// "something happened, worth confirming" tier instead, matching each
+    /// case's real-world weight rather than using one generic tap for all.
+    fileprivate var haptic: (() -> Void)? {
+        switch self {
+        case .success, .downloadComplete:
+            return { UINotificationFeedbackGenerator().notificationOccurred(.success) }
+        case .error:
+            return { UINotificationFeedbackGenerator().notificationOccurred(.error) }
+        case .offline:
+            return { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
+        case .bookmarkSaved, .reply, .podcastPlay, .podcastPause:
+            return { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+        case .tabChange, .articleOpen, .loadingStart, .pickerTick, .refresh,
+             .screenClose, .searchComplete, .syncComplete, .tipPopup, .welcome:
+            return nil
+        }
+    }
+
+    /// Same always-on/interface/confirmation split as `shouldPlay`, so
+    /// haptics and sound can never disagree about which tier a given case
+    /// belongs to — just gated on the separate `hapticsEnabled` toggle
+    /// instead of the sound ones, since someone may want one channel
+    /// without the other.
+    @MainActor
+    fileprivate var shouldPlayHaptic: Bool {
+        guard haptic != nil else { return false }
+        if Self.alwaysOn.contains(self) { return true }
+        return PreferencesStore.current?.hapticsEnabled ?? true
+    }
 }
 
 /// Plays short UI feedback sounds and notification-sound previews.
@@ -62,6 +99,9 @@ final class SoundPlayer {
     private init() {}
 
     func play(_ sound: AppSound) {
+        if sound.shouldPlayHaptic {
+            sound.haptic?()
+        }
         guard sound.shouldPlay else { return }
         play(filename: sound.rawValue, ext: "wav")
     }

@@ -32,6 +32,11 @@ struct MiniPlayerView: View {
 
                 Button {
                     player.togglePlayPause()
+                    // See EpisodeDetailView.playOrPause's identical fix —
+                    // the label updates reactively, but VoiceOver needs an
+                    // explicit announcement to actually speak the new state
+                    // right after the tap.
+                    UIAccessibility.post(notification: .announcement, argument: player.isPlaying ? String(localized: "Pause") : String(localized: "Play"))
                 } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .font(.title3)
@@ -239,6 +244,11 @@ struct FullPlayerView: View {
 
             Button {
                 player.togglePlayPause()
+                // See EpisodeDetailView.playOrPause's identical fix — the
+                // label updates reactively, but VoiceOver needs an explicit
+                // announcement to actually speak the new state right after
+                // the tap.
+                UIAccessibility.post(notification: .announcement, argument: player.isPlaying ? String(localized: "Pause") : String(localized: "Play"))
             } label: {
                 Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
                     .font(.system(size: 76))

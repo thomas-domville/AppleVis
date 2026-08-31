@@ -12,7 +12,6 @@ struct NotificationSettingsView: View {
         Form {
             // iOS permission status
             Section("iOS Permission") {
-                AccessibleScreenHeading(title: "Notifications", isFocused: $isTitleFocused)
                 HStack {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
@@ -36,6 +35,7 @@ struct NotificationSettingsView: View {
                     }
                 }
                 .accessibilityElement(children: .combine)
+                .accessibilityFocused($isTitleFocused)
             }
 
             // Sound
@@ -48,6 +48,16 @@ struct NotificationSettingsView: View {
                 .accessibilityHint(String(localized: "Choose the sound played for AppleVis notifications."))
                 .onChange(of: preferences.notificationSound) { _, newValue in
                     SoundPlayer.shared.playNotificationPreview(newValue)
+                }
+                .accessibilityAdjustableAction { direction in
+                    guard let idx = NotificationSound.allCases.firstIndex(of: preferences.notificationSound) else { return }
+                    switch direction {
+                    case .increment:
+                        preferences.notificationSound = NotificationSound.allCases[(idx + 1) % NotificationSound.allCases.count]
+                    case .decrement:
+                        preferences.notificationSound = NotificationSound.allCases[(idx - 1 + NotificationSound.allCases.count) % NotificationSound.allCases.count]
+                    @unknown default: break
+                    }
                 }
 
                 if let sound = NotificationSound.allCases.first(where: { $0 == preferences.notificationSound }) {
@@ -63,6 +73,9 @@ struct NotificationSettingsView: View {
                         UNUserNotificationCenter.current().setBadgeCount(0)
                         PushNotificationManager.resetBadgeCount()
                     }
+                Text("Shows a number on the AppleVis icon for unread notifications — opening the app clears it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } header: {
                 Text("Sound")
             }
@@ -73,12 +86,23 @@ struct NotificationSettingsView: View {
                     Toggle("Replies to My Posts", isOn: $preferences.notifyForumReplies)
                         .disabled(pushDenied)
                         .accessibilityHint(String(localized: "Get notified when someone replies to your forum topics."))
+                    Text("Notifies you when someone replies to a forum topic you started.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
                     Toggle("Mentions", isOn: $preferences.notifyMentions)
                         .disabled(pushDenied)
                         .accessibilityHint(String(localized: "Get notified when someone mentions you in a post or comment."))
+                    Text("Notifies you when someone mentions you by name in a post or comment.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
                     Toggle("Followed Topics", isOn: $preferences.notifyFollowedTopics)
                         .disabled(pushDenied)
                         .accessibilityHint(String(localized: "Get notified about activity in topics you follow."))
+                    Text("Notifies you about new activity in topics you're following.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 } header: {
                     Text("My Activity")
                 } footer: {
@@ -92,15 +116,30 @@ struct NotificationSettingsView: View {
                 Toggle("New Forum Topics", isOn: $preferences.notifyNewTopics)
                     .disabled(pushDenied)
                     .accessibilityHint(String(localized: "Get notified when new forum discussions are posted."))
+                Text("Notifies you when a new discussion is posted anywhere on AppleVis.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Toggle("New App Directory Entries", isOn: $preferences.notifyAppUpdates)
                     .disabled(pushDenied)
                     .accessibilityHint(String(localized: "Get notified when existing apps are updated or new accessible apps are added to the AppleVis App Directory."))
+                Text("Notifies you when an app is added to the directory, or an existing listing is updated.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Toggle("New Podcast Episodes", isOn: $preferences.notifyNewEpisodes)
                     .disabled(pushDenied)
                     .accessibilityHint(String(localized: "Get notified when new podcast episodes are published."))
+                Text("Notifies you when a new podcast episode is published.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Toggle("New Resources", isOn: $preferences.notifyNewResources)
                     .disabled(pushDenied)
                     .accessibilityHint(String(localized: "Get notified when new guides, tutorials, and tips are published."))
+                Text("Notifies you when a new guide, tutorial, or tip is published.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 // "Announcements" hidden — AppleVis has no "announcement"
                 // content type yet (announcements currently post to Blog/
                 // Forum/Newsletter). The preference itself, push routing,
@@ -110,6 +149,9 @@ struct NotificationSettingsView: View {
                 Toggle("New Comments", isOn: $preferences.notifyNewComments)
                     .disabled(pushDenied)
                     .accessibilityHint(String(localized: "Get notified about new comments on any forum topic, podcast episode, app entry, blog post, or guide — not just ones you follow. This can be frequent."))
+                Text("Notifies you about new comments anywhere on AppleVis, not just things you follow. This one can get chatty.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } header: {
                 Text("Community")
             } footer: {

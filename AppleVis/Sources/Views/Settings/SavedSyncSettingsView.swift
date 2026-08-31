@@ -3,21 +3,24 @@ import SwiftUI
 struct SavedSyncSettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var isSyncing = false
-    @State private var lastSyncDate: Date? = UserDefaults.standard.object(forKey: "sync.lastSyncDate") as? Date
+    @State private var lastSyncDate: Date? = UserDefaults.standard.object(forKey: ICloudSyncManager.lastSyncDateKey) as? Date
     @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
         Form {
             Section {
-                AccessibleScreenHeading(title: "Saved and Sync", isFocused: $isTitleFocused)
                 Text("Keep your saved content, followed topics, podcast queue, listening progress, read history, and settings in sync across all your Apple devices using iCloud.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .accessibilityFocused($isTitleFocused)
             }
 
             Section("iCloud Sync") {
                 Toggle("Enable iCloud Sync", isOn: $preferences.iCloudSync)
                     .accessibilityHint(String(localized: "Master switch for all AppleVis iCloud sync features."))
+                Text("The master switch for everything below — turn it off and none of your data syncs across devices, no matter how the individual toggles are set.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 if preferences.iCloudSync {
                     HStack {
@@ -145,9 +148,12 @@ struct SavedSyncSettingsView: View {
             ICloudSyncManager.shared.pushPlayedEpisodes()
             ICloudSyncManager.shared.pushSettings()
             ICloudSyncManager.shared.pullAll()
-            let now = Date()
-            lastSyncDate = now
-            UserDefaults.standard.set(now, forKey: "sync.lastSyncDate")
+            // Each push/pull above now stamps this itself (see
+            // `ICloudSyncManager.touchLastSyncDate`) — re-read rather than
+            // stamping "now" locally, so this stays the one shared value
+            // that also reflects sync triggered elsewhere in the app
+            // (saving an item, backgrounding, an external iCloud change).
+            lastSyncDate = UserDefaults.standard.object(forKey: ICloudSyncManager.lastSyncDateKey) as? Date
             isSyncing = false
         }
     }

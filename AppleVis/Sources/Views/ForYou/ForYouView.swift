@@ -4,8 +4,43 @@ struct ForYouView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var keyCommands: KeyCommandRouter
+    @ObservedObject private var downloads = DownloadManager.shared
     @State private var selectedTab: ForYouTab = .saved
+    // Following/Recommended are server-backed, so unlike Saved (a local
+    // read), Queue (PlayerStore, already observed above), and Downloads
+    // (DownloadManager, observed above), their counts aren't known ambiently
+    // — only once that section has actually loaded at least once this
+    // session (see FollowingView/RecommendedAppsView's `onLoaded`). nil
+    // means "not yet known," not "zero" — the picker shows the plain
+    // section name until then rather than a misleading "(0)".
+    @State private var followingCount: Int?
+    @State private var recommendedCount: Int?
     @AccessibilityFocusState private var isPickerFocused: Bool
+
+    /// "Saved (12)" once a count is known, otherwise just the plain name —
+    /// lets someone glance at what's inside each section without opening it,
+    /// which the single collapsed picker (chosen over 5 separate segments
+    /// for VoiceOver reasons — see the Picker's own comment below) otherwise
+    /// hides completely. Requested directly.
+    private func pickerLabel(_ tab: ForYouTab) -> String {
+        guard let count = itemCount(for: tab) else { return tab.displayName }
+        return "\(tab.displayName) (\(count))"
+    }
+
+    private func pickerAccessibilityLabel(_ tab: ForYouTab) -> String {
+        guard let count = itemCount(for: tab) else { return tab.accessibilityLabel }
+        return "\(tab.accessibilityLabel), \(count) item\(count == 1 ? "" : "s")"
+    }
+
+    private func itemCount(for tab: ForYouTab) -> Int? {
+        switch tab {
+        case .saved:       return PersistenceStore.shared.savedItems().count
+        case .following:   return followingCount
+        case .recommended: return recommendedCount
+        case .queue:       return player.queue.count
+        case .downloads:   return downloads.downloadedEpisodes.count
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -32,7 +67,7 @@ struct ForYouView: View {
                 // low-vision users who don't run VoiceOver still benefit
                 // from a plain-language explainer and an at-a-glance color
                 // cue for which section is active.
-                Text("Your personal AppleVis hub. Revisit saved items, keep up with content you follow, continue listening, and manage downloads.")
+                Text("Your personal AppleVis hub. Revisit saved items, keep up with content you follow, see apps you've recommended, continue listening, and manage downloads.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal)
@@ -49,13 +84,26 @@ struct ForYouView: View {
                 // Platform picker in App Directory. Reported directly.
                 Picker("Section", selection: $selectedTab) {
                     ForEach(ForYouTab.allCases) { tab in
-                        Text(tab.displayName)
+                        Text(pickerLabel(tab))
                             .tag(tab)
-                            .accessibilityLabel(Text(tab.accessibilityLabel))
+                            .accessibilityLabel(Text(pickerAccessibilityLabel(tab)))
                     }
                 }
                 .pickerStyle(.menu)
                 .accessibilityHint(String(localized: "Choose which For You section to view."))
+                // Adds swipe-up/down to move to the next/previous section
+                // without giving up the .menu style above — matches the
+                // identical addition on App Directory's Platform picker.
+                .accessibilityAdjustableAction { direction in
+                    guard let idx = ForYouTab.allCases.firstIndex(of: selectedTab) else { return }
+                    switch direction {
+                    case .increment:
+                        selectedTab = ForYouTab.allCases[(idx + 1) % ForYouTab.allCases.count]
+                    case .decrement:
+                        selectedTab = ForYouTab.allCases[(idx - 1 + ForYouTab.allCases.count) % ForYouTab.allCases.count]
+                    @unknown default: break
+                    }
+                }
                 .padding()
                 .onChange(of: selectedTab) { _, _ in
                     SoundPlayer.shared.play(.pickerTick)
@@ -72,10 +120,11 @@ struct ForYouView: View {
 
                 Group {
                     switch selectedTab {
-                    case .saved:     SavedItemsView()
-                    case .following: FollowingView()
-                    case .queue:     QueueView()
-                    case .downloads: DownloadsView()
+                    case .saved:       SavedItemsView()
+                    case .following:   FollowingView(onLoaded: { followingCount = $0 })
+                    case .recommended: RecommendedAppsView(onLoaded: { recommendedCount = $0 })
+                    case .queue:       QueueView()
+                    case .downloads:   DownloadsView()
                     }
                 }
             }
@@ -111,35 +160,38 @@ struct ForYouView: View {
 }
 
 enum ForYouTab: String, CaseIterable, Identifiable {
-    case saved, following, queue, downloads
+    case saved, following, recommended, queue, downloads
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .saved:     return "Saved"
-        case .following: return "Following"
-        case .queue:     return "Queue"
-        case .downloads: return "Downloads"
+        case .saved:       return "Saved"
+        case .following:   return "Following"
+        case .recommended: return "Recommended"
+        case .queue:       return "Queue"
+        case .downloads:   return "Downloads"
         }
     }
 
     var accessibilityLabel: String {
         switch self {
-        case .saved:     return "Saved Items"
-        case .queue:     return "Podcast Queue"
-        case .downloads: return "Podcast Downloads"
-        default:         return displayName
+        case .saved:       return "Saved Items"
+        case .recommended: return "Apps You've Recommended"
+        case .queue:       return "Podcast Queue"
+        case .downloads:   return "Podcast Downloads"
+        default:           return displayName
         }
     }
 
     /// Matches RN's `SECTION_ACCENT` palette (foryou.tsx).
     var accentColor: Color {
         switch self {
-        case .saved:     return Color(red: 0.388, green: 0.400, blue: 0.945) // indigo
-        case .following: return Color(red: 0.545, green: 0.361, blue: 0.965) // purple
-        case .queue:     return Color(red: 0.976, green: 0.451, blue: 0.086) // orange
-        case .downloads: return Color(red: 0.063, green: 0.725, blue: 0.506) // green
+        case .saved:       return Color(red: 0.388, green: 0.400, blue: 0.945) // indigo
+        case .following:   return Color(red: 0.545, green: 0.361, blue: 0.965) // purple
+        case .recommended: return Color(red: 0.976, green: 0.451, blue: 0.086) // orange
+        case .queue:       return Color(red: 0.961, green: 0.620, blue: 0.043) // amber
+        case .downloads:   return Color(red: 0.063, green: 0.725, blue: 0.506) // green
         }
     }
 }
@@ -246,17 +298,19 @@ struct DownloadsView: View {
     }
 
     private var downloadsSummaryHeader: some View {
-        Text("\(downloads.downloadedEpisodes.count) downloaded episode\(downloads.downloadedEpisodes.count == 1 ? "" : "s")")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .accessibilityAddTraits(.isHeader)
-            .accessibilityAction(named: Text("Downloads summary")) {
-                let total = downloads.downloadedEpisodes.count
+        let total = downloads.downloadedEpisodes.count
+        return CollectionSummaryHeader(
+            text: "\(total) downloaded episode\(total == 1 ? "" : "s")",
+            summaryActionName: "Downloads summary",
+            onSummaryAction: {
                 let totalBytes = downloads.downloadedEpisodes.reduce(0) { $0 + $1.fileSizeBytes }
                 UIAccessibility.post(notification: .announcement, argument: total == 0
                     ? "No downloaded episodes."
                     : "\(total) downloaded episode\(total == 1 ? "" : "s"), \(formattedSize(totalBytes)) total.")
-            }
+            },
+            bulkActionName: total == 0 ? nil : "Remove All Downloads",
+            onBulkAction: total == 0 ? nil : { showRemoveAllConfirm = true }
+        )
     }
 
     /// Tapping the title opens the episode's detail page (matches every
@@ -432,14 +486,10 @@ struct SavedItemsView: View {
                 savedList
             }
         }
-        .task { await load() }
-        // `.task` only (re-)runs on first appearance or a view-identity
-        // change — not on returning to this tab after saving something
-        // elsewhere in the app while this screen stayed in the background
-        // (FORYOU-05). `load()` is a cheap local read plus an idempotent
-        // enrichment fetch (guarded on ids not already cached), so
-        // re-running it on every reappearance is safe.
-        .onAppear { Task { await load() } }
+        // `load()` is a cheap local read plus an idempotent enrichment fetch
+        // (guarded on ids not already cached), so re-running it on every
+        // reappearance is safe.
+        .loadOnAppearAndTask(load)
     }
 
     private var savedList: some View {
@@ -523,16 +573,15 @@ struct SavedItemsView: View {
 
     private var summaryHeader: some View {
         let counts = Dictionary(grouping: items, by: { $0.kind }).mapValues(\.count)
-        return Text(filter == nil
-            ? "\(items.count) item\(items.count == 1 ? "" : "s")"
-            : "\(filtered.count) \(filter!.displayNamePlural(filtered.count))"
+        return CollectionSummaryHeader(
+            text: filter == nil
+                ? "\(items.count) item\(items.count == 1 ? "" : "s")"
+                : "\(filtered.count) \(filter!.displayNamePlural(filtered.count))",
+            summaryActionName: "Saved summary",
+            onSummaryAction: { announceSummary(counts: counts) },
+            bulkActionName: filtered.isEmpty ? nil : "Unsave All",
+            onBulkAction: filtered.isEmpty ? nil : { showUnsaveAllConfirm = true }
         )
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .accessibilityAddTraits(.isHeader)
-        .accessibilityAction(named: Text("Saved summary")) {
-            announceSummary(counts: counts)
-        }
     }
 
     private func announceSummary(counts: [ContentKind: Int]) {
@@ -563,6 +612,19 @@ struct SavedItemsView: View {
             }
             .pickerStyle(.menu)
             .accessibilityHint(String(localized: "Filters the saved items list by content type."))
+            // Same swipe-up/down addition as the Section/Platform pickers —
+            // moves to the next/previous filter without opening the menu.
+            .accessibilityAdjustableAction { direction in
+                let options: [ContentKind?] = [nil] + ContentKind.allCases
+                guard let idx = options.firstIndex(where: { $0 == filter }) else { return }
+                switch direction {
+                case .increment:
+                    filter = options[(idx + 1) % options.count]
+                case .decrement:
+                    filter = options[(idx - 1 + options.count) % options.count]
+                @unknown default: break
+                }
+            }
         }
     }
 
@@ -742,6 +804,12 @@ struct FollowingView: View {
     @State private var error: String?
     @State private var showBrowseForums = false
     @AccessibilityFocusState private var summaryFocused: Bool
+    /// Reports the loaded count back to ForYouView so its section picker
+    /// can show "Following (3)" once this section has been visited at
+    /// least once this session — Following is server-backed, so unlike
+    /// Saved/Queue/Downloads the count isn't known ambiently without a
+    /// fetch. Requested directly.
+    var onLoaded: ((Int) -> Void)? = nil
 
     var body: some View {
         Group {
@@ -774,11 +842,7 @@ struct FollowingView: View {
                 .themedList(preferences.colors)
             }
         }
-        .task { await load() }
-        // Same staleness gap as SavedItemsView (FORYOU-05): `.task` alone
-        // doesn't re-run when returning to this tab after following
-        // something elsewhere while this screen stayed in the background.
-        .onAppear { Task { await load() } }
+        .loadOnAppearAndTask(load)
     }
 
     private func row(for item: FollowedItem) -> some View {
@@ -828,16 +892,16 @@ struct FollowingView: View {
     }
 
     private var summaryHeader: some View {
-        Text("\(items.count) followed item\(items.count == 1 ? "" : "s")")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .accessibilityAddTraits(.isHeader)
-            .accessibilityAction(named: Text("Following summary")) {
+        CollectionSummaryHeader(
+            text: "\(items.count) followed item\(items.count == 1 ? "" : "s")",
+            summaryActionName: "Following summary",
+            onSummaryAction: {
                 UIAccessibility.post(
                     notification: .announcement,
                     argument: items.isEmpty ? "No followed items." : "\(items.count) followed item\(items.count == 1 ? "" : "s")."
                 )
             }
+        )
     }
 
     private func focusSummaryAfterDelay() {
@@ -846,9 +910,166 @@ struct FollowingView: View {
         }
     }
 
+    /// Confirmed against the site's own "Subscriptions" page: same
+    /// `subscribe_node` flag, so this is a real server fetch (not just
+    /// `PersistenceStore.followedItems()`, which only ever knew about
+    /// follows made inside this app) — otherwise anyone who followed
+    /// something on the website first would see an empty list here.
     private func load() async {
-        guard auth.isSignedIn else { return }
-        items = PersistenceStore.shared.followedItems()
+        guard auth.isSignedIn, let user = auth.user else { return }
+        isLoading = items.isEmpty
+        error = nil
+        do {
+            items = try await APIClient.shared.flags.followedItems(uid: user.uuid, csrfToken: user.csrfToken)
+        } catch let e as APIError {
+            // Falls back to whatever's cached locally rather than showing
+            // an empty/error state outright — still better than nothing if
+            // the server fetch fails.
+            let local = PersistenceStore.shared.followedItems()
+            if !local.isEmpty {
+                items = local
+            } else {
+                error = e.localizedDescription
+            }
+        } catch {
+            let local = PersistenceStore.shared.followedItems()
+            if !local.isEmpty {
+                items = local
+            } else {
+                self.error = "Couldn't load your followed items."
+            }
+        }
+        isLoading = false
+        if error == nil { onLoaded?(items.count) }
+    }
+}
+
+// MARK: - Recommended Apps
+
+/// Apps this person has recommended — a real server-backed list (see
+/// `FlagEndpoints.recommendedApps`), unlike Saved/Following which are
+/// tracked purely on-device: someone's recommendation history very likely
+/// predates ever installing this app, so a local-only cache would show
+/// nothing for an existing member.
+struct RecommendedAppsView: View {
+    @EnvironmentObject private var auth: AuthStore
+    @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var toast: ToastStore
+    @State private var apps: [RecommendedApp] = []
+    @State private var isLoading = false
+    @State private var error: String?
+    @State private var showBrowseApps = false
+    @AccessibilityFocusState private var summaryFocused: Bool
+    /// Same purpose as FollowingView's `onLoaded` — lets ForYouView's
+    /// section picker show "Recommended (5)" once this section has loaded
+    /// at least once this session.
+    var onLoaded: ((Int) -> Void)? = nil
+
+    var body: some View {
+        Group {
+            if !auth.isSignedIn {
+                EmptyStateView(title: "Sign In Required", message: "Sign in to view apps you've recommended.", systemImage: "hand.thumbsup")
+            } else if isLoading {
+                LoadingView()
+            } else if let error {
+                ErrorView(message: error) { await load() }
+            } else if apps.isEmpty {
+                EmptyStateView(
+                    title: "No Recommendations Yet",
+                    message: "When you recommend an app from its App Directory page, it shows up here.",
+                    systemImage: "hand.thumbsup",
+                    primaryActionLabel: "Browse App Directory",
+                    primaryAction: { showBrowseApps = true }
+                )
+                .sheet(isPresented: $showBrowseApps) {
+                    NavigationStack { AppBrowseView() }
+                }
+            } else {
+                List {
+                    summaryHeader
+                        .accessibilityFocused($summaryFocused)
+                    ForEach(apps) { app in
+                        row(for: app)
+                    }
+                }
+                .refreshable { await load(); SoundPlayer.shared.play(.refresh) }
+                .themedList(preferences.colors)
+            }
+        }
+        .loadOnAppearAndTask(load)
+    }
+
+    private func row(for app: RecommendedApp) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Label(app.platformLabel, systemImage: "square.grid.2x2")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(app.title)
+                RelativeDateLabel(date: app.recommendedAt)
+            }
+            Spacer()
+        }
+        .padding(.leading, 6)
+        .overlay(alignment: .leading) {
+            Rectangle().fill(ContentKind.appListing.accentColor).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            String(localized: "\(app.title). \(app.platformLabel). Recommended \(app.recommendedAt.formatted(.relative(presentation: .named))).")
+        )
+        .accessibilityAction(named: Text("I No Longer Recommend This App")) {
+            Task { await unrecommend(app) }
+        }
+        .voiceOverAwareSwipeActions {
+            Button(role: .destructive) {
+                Task { await unrecommend(app) }
+            } label: {
+                Label("Remove", systemImage: "hand.thumbsdown")
+            }
+        }
+    }
+
+    private var summaryHeader: some View {
+        CollectionSummaryHeader(
+            text: "\(apps.count) recommended app\(apps.count == 1 ? "" : "s")",
+            summaryActionName: "Recommendations summary",
+            onSummaryAction: {
+                UIAccessibility.post(
+                    notification: .announcement,
+                    argument: apps.isEmpty ? "No recommended apps." : "\(apps.count) recommended app\(apps.count == 1 ? "" : "s")."
+                )
+            }
+        )
+    }
+
+    private func load() async {
+        guard auth.isSignedIn, let user = auth.user else { return }
+        isLoading = apps.isEmpty
+        error = nil
+        do {
+            apps = try await APIClient.shared.flags.recommendedApps(uid: user.uuid, csrfToken: user.csrfToken)
+        } catch let e as APIError {
+            error = e.localizedDescription
+        } catch {
+            self.error = "Couldn't load your recommendations."
+        }
+        isLoading = false
+        if error == nil { onLoaded?(apps.count) }
+    }
+
+    private func unrecommend(_ app: RecommendedApp) async {
+        guard let user = auth.user else { return }
+        do {
+            try await APIClient.shared.flags.unrecommend(nodeUuid: app.id, token: user.csrfToken)
+            apps.removeAll { $0.id == app.id }
+            toast.success(String(localized: "Removed from Recommendations"))
+            UIAccessibility.post(notification: .announcement, argument: "Removed \(app.title) from your recommendations.")
+        } catch let e as APIError {
+            toast.error(e.localizedDescription)
+        } catch {
+            toast.error(String(localized: "Couldn't remove this recommendation."))
+        }
     }
 }
 

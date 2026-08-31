@@ -7,30 +7,17 @@ struct AccessibilitySettingsView: View {
     var body: some View {
         Form {
             Section {
-                AccessibleScreenHeading(title: "Accessibility", isFocused: $isTitleFocused)
                 Text("AppleVis-specific accessibility controls. iOS system settings like VoiceOver, Dynamic Type, Reduce Motion, and Bold Text are followed automatically.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .accessibilityFocused($isTitleFocused)
             }
 
-            Section("AppleVis Controls") {
-                Toggle("AppleVis Tips", isOn: $preferences.helpfulTipsEnabled)
-                    .accessibilityHint(String(localized: "Shows short contextual tips and friendly reminders where they can save time."))
-
-                Toggle("Welcome Summary", isOn: $preferences.welcomeSummaryEnabled)
-                    .accessibilityHint(String(localized: "Shows a brief Home update with new AppleVis activity since your last visit."))
-
-                Toggle("Auto-Focus Search Field", isOn: $preferences.searchAutoFocusEnabled)
-                    .accessibilityHint(String(localized: "Automatically focuses and raises the keyboard when you open Search."))
-
-                Picker("Home Startup Behavior", selection: $preferences.homeStartupBehavior) {
-                    ForEach(HomeStartupBehavior.allCases) { behavior in
-                        Text(behavior.displayName).tag(behavior)
-                    }
-                }
-                .accessibilityHint(String(localized: "Controls how much spoken announcement Home produces when you open or return to it."))
-            }
-
+            // AppleVis Tips, Welcome Summary, Auto-Focus Search Field, Home
+            // Startup Behavior, and Web Links all moved to a new General
+            // settings screen — none of them are actually about VoiceOver,
+            // Dynamic Type, or anything else accessibility-specific; they'd
+            // accumulated here by historical accident. Requested directly.
             Section("VoiceOver Detail Level") {
                 ForEach(AnnouncementLevel.allCases) { level in
                     Button {
@@ -48,10 +35,19 @@ struct AccessibilitySettingsView: View {
                                         .accessibilityHidden(true)
                                 }
                             }
+                            // Was spoken twice — once here as part of the
+                            // button's own auto-combined label, then again
+                            // via the accessibilityHint below repeating the
+                            // same text right after "Example of what
+                            // VoiceOver reads." Hidden here so the hint is
+                            // the one and only place it's spoken, in the
+                            // right order (framed by the explanation, not
+                            // duplicated ahead of it). Reported directly.
                             Text(level.preview)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .italic()
+                                .accessibilityHidden(true)
                         }
                         .padding(.vertical, 2)
                     }
@@ -85,10 +81,6 @@ struct AccessibilitySettingsView: View {
 
             Section {
                 ResetToDefaultsButton {
-                    preferences.helpfulTipsEnabled = true
-                    preferences.welcomeSummaryEnabled = true
-                    preferences.searchAutoFocusEnabled = false
-                    preferences.homeStartupBehavior = .helpful
                     preferences.announcementLevel = .normal
                 }
             }

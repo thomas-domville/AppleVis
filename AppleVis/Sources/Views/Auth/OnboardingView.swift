@@ -178,7 +178,7 @@ private struct WelcomeStep: View {
                     Label("Used AppleVis before?", systemImage: "arrow.triangle.2.circlepath")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color.accentColor)
-                    Text("This is a rebuilt version of the app. Your forum posts, reviews, and account are all still there on the website — just sign back in. Local settings like your saved episodes and preferences were reset and will need to be set up again.")
+                    Text("This is a rebuilt version of the app. Your forum posts, comments, and account are all still there on the website — just sign back in. Local settings like your saved episodes and preferences were reset and will need to be set up again.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -304,16 +304,20 @@ private struct SignInStep: View {
                             .accessibilityLabel(String(localized: "Error: \(error). If you have forgotten your password, you can reset it on the AppleVis website."))
                             .accessibilityFocused($isErrorFocused)
 
-                            Link("Reset Password", destination: URL(string: "https://www.applevis.com/user/password")!)
-                                .font(.caption).fontWeight(.semibold)
+                            WebLink(destination: URL(string: "https://www.applevis.com/user/password")!) {
+                                Text("Reset Password")
+                            }
+                            .font(.caption).fontWeight(.semibold)
                         }
                     }
 
                     HStack(spacing: 4) {
                         Text("Don't have an account?")
                             .font(.caption).foregroundStyle(.secondary)
-                        Link("Sign up for free", destination: URL(string: "https://www.applevis.com/user/register")!)
-                            .font(.caption).fontWeight(.semibold)
+                        WebLink(destination: URL(string: "https://www.applevis.com/user/register")!) {
+                            Text("Sign up for free")
+                        }
+                        .font(.caption).fontWeight(.semibold)
                     }
                 }
                 .padding(.horizontal, 24)

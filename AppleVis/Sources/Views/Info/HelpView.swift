@@ -53,10 +53,10 @@ struct HelpView: View {
             if filteredSections.isEmpty {
                 Section {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("No help articles found")
+                        Text("No Luck With That Search")
                             .font(.subheadline)
                             .fontWeight(.medium)
-                        Text("Try a different word, or contact app support from the bottom of this page.")
+                        Text("Try a different word, or reach out to us below — we're happy to help.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -89,7 +89,7 @@ struct HelpView: View {
                             .font(.subheadline)
                             .fontWeight(.medium)
                             .foregroundStyle(.primary)
-                        Text("Get in touch with the team for questions or feedback.")
+                        Text("Didn't find what you needed? Send us a note — we'd love to hear from you.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -118,9 +118,9 @@ struct HelpView: View {
                 .foregroundStyle(Color.accentColor)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Offline User Guide")
+                Text("Your Offline Guide")
                     .font(.headline)
-                Text("Tutorials, accessibility guidance, settings help, smart features, and troubleshooting for everyone.")
+                Text("Everything you need to feel at home in AppleVis — tutorials, accessibility tips, settings help, smart features, and troubleshooting, all saved right here so it works even without a connection.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

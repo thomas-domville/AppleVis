@@ -52,14 +52,14 @@ struct ResourceEndpoints {
             let resource = Mappers.resource(node, included: response.included ?? [])
             let body = node.attributes["body"]?.richTextValue ?? ""
 
-            let comments: [ResourceComment]
-            if let commentsResponse = try? await commentsRes {
-                comments = commentsResponse.data.map { n in
-                    let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
-                    return ResourceComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
-                }
-            } else {
-                comments = []
+            // See ForumEndpoints.topicDetail's identical fix for the full
+            // reasoning — a `try?`-swallowed comments failure previously
+            // looked identical to "genuinely zero comments" and got cached
+            // as a false success.
+            let commentsResponse = try await commentsRes
+            let comments = commentsResponse.data.map { n in
+                let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
+                return ResourceComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
             }
 
             return ResourceDetail(
@@ -143,14 +143,14 @@ struct BlogEndpoints {
             let post = Mappers.blog(node, included: response.included ?? [])
             let body = node.attributes["body"]?.richTextValue ?? ""
 
-            let comments: [BlogComment]
-            if let commentsResponse = try? await commentsRes {
-                comments = commentsResponse.data.map { n in
-                    let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
-                    return BlogComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
-                }
-            } else {
-                comments = []
+            // See ForumEndpoints.topicDetail's identical fix for the full
+            // reasoning — a `try?`-swallowed comments failure previously
+            // looked identical to "genuinely zero comments" and got cached
+            // as a false success.
+            let commentsResponse = try await commentsRes
+            let comments = commentsResponse.data.map { n in
+                let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
+                return BlogComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
             }
 
             return BlogPostDetail(
@@ -241,11 +241,14 @@ struct BugReportEndpoints {
                 throw APIError.notFound
             }
             var detail = Mappers.bugDetail(response.data, platform: platform)
-            if let commentsResponse = try? await commentsRes {
-                detail.comments = commentsResponse.data.map { n in
-                    let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
-                    return BugComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
-                }
+            // See ForumEndpoints.topicDetail's identical fix for the full
+            // reasoning — a `try?`-swallowed comments failure previously
+            // looked identical to "genuinely zero comments" and got cached
+            // as a false success.
+            let commentsResponse = try await commentsRes
+            detail.comments = commentsResponse.data.map { n in
+                let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
+                return BugComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
             }
             return detail
         }
@@ -398,6 +401,37 @@ struct FlagEndpoints {
         )
     }
 
+    /// Every item this person follows — confirmed against the site's own
+    /// `/user/{uid}/message-subscribe` ("Subscriptions") page: same
+    /// `subscribe_node` flag this app's Follow feature already uses, just
+    /// labeled "Subscribe/Unsubscribe" there instead of "Follow/Unfollow."
+    /// Like `recommendedApps`, this has to be a real server fetch —
+    /// `PersistenceStore.followedItems()` only ever knew about follows made
+    /// inside this app, so anyone who followed something on the website
+    /// first saw nothing here.
+    func followedItems(uid: String, csrfToken: String) async throws -> [FollowedItem] {
+        let response = try await client.jsonAPIList(
+            "flagging/subscribe_node",
+            query: ["filter[uid.id]": uid, "include": "flagged_entity", "sort": "-created"],
+            headers: ["X-CSRF-Token": csrfToken]
+        )
+        let included = response.included ?? []
+        return response.data.compactMap { flagging in
+            guard let entityId = flagging.relationshipId("flagged_entity"),
+                  let node = included.first(where: { $0.id == entityId }),
+                  let kind = ContentKind(nodeType: node.type) else { return nil }
+            return FollowedItem(
+                id: entityId,
+                kind: kind,
+                nodeType: node.type,
+                title: node.attributes["title"]?.stringValue ?? "",
+                followedAt: flagging.createdDate,
+                lastActivityAt: node.changedDate,
+                url: (node.attributes["path"]?.pathAlias).map { "https://www.applevis.com\($0)" } ?? ""
+            )
+        }
+    }
+
     /// Unfollow requires resolving the flagging entity's own id first, then deleting it.
     func unfollow(nodeUuid: String, token: String) async throws {
         let list = try await client.jsonAPIList(
@@ -407,5 +441,112 @@ struct FlagEndpoints {
         )
         guard let flagging = list.data.first else { return }
         try await client.jsonAPIDelete("flagging/subscribe_node/\(flagging.id)", headers: ["X-CSRF-Token": token])
+    }
+
+    /// "Recommend This App" — confirmed live against the site's own
+    /// `/user/{uid}/recommendations` page and its `flag-recommend` unflag
+    /// links: the flag machine name is `recommend`, same Flag module every
+    /// other flag on this site (including `subscribe_node` above) already
+    /// goes through, so it's exposed via JSON:API the identical way.
+    func recommend(nodeUuid: String, nodeType: String, token: String) async throws {
+        _ = try await client.jsonAPICreate(
+            "flagging/recommend",
+            type: "flagging--recommend",
+            relationships: ["flagged_entity": JsonApiRelationshipRef(type: nodeType, id: nodeUuid)],
+            headers: ["X-CSRF-Token": token]
+        )
+    }
+
+    func unrecommend(nodeUuid: String, token: String) async throws {
+        let list = try await client.jsonAPIList(
+            "flagging/recommend",
+            query: ["filter[flagged_entity.id]": nodeUuid],
+            headers: ["X-CSRF-Token": token]
+        )
+        guard let flagging = list.data.first else { return }
+        try await client.jsonAPIDelete("flagging/recommend/\(flagging.id)", headers: ["X-CSRF-Token": token])
+    }
+
+    /// Every app this person has recommended — unlike Follow/Save (tracked
+    /// purely on-device, see `PersistenceStore`), this has to be a real
+    /// server fetch: someone's recommendation history very likely predates
+    /// ever installing this app (confirmed directly — the reference account
+    /// checked against has recommendations dating back to 2019), so a
+    /// local-only cache would show nothing for any existing member.
+    func recommendedApps(uid: String, csrfToken: String) async throws -> [RecommendedApp] {
+        let response = try await client.jsonAPIList(
+            "flagging/recommend",
+            query: ["filter[uid.id]": uid, "include": "flagged_entity", "sort": "-created"],
+            headers: ["X-CSRF-Token": csrfToken]
+        )
+        let included = response.included ?? []
+        return response.data.compactMap { flagging in
+            guard let entityId = flagging.relationshipId("flagged_entity"),
+                  let node = included.first(where: { $0.id == entityId }) else { return nil }
+            return RecommendedApp(
+                id: entityId,
+                title: node.attributes["title"]?.stringValue ?? "",
+                platformLabel: RecommendedApp.platformLabel(forNodeType: node.type),
+                recommendedAt: flagging.createdDate,
+                url: (node.attributes["path"]?.pathAlias).map { "https://www.applevis.com\($0)" }
+            )
+        }
+    }
+
+    /// The "Recommendations" widget every app page shows — a count plus a
+    /// "most recently recommended by" credit. Confirmed live against the
+    /// Office 365 app page's own `view-recommendations-count` block. No
+    /// CSRF/auth needed — this is public info shown to signed-out visitors
+    /// on the website too. `page[limit]` caps at a generous 100 rather than
+    /// paginating fully, matching this codebase's existing convention for
+    /// "fetch everything reasonable" — the count could undercount for an
+    /// app with more than 100 recommendations, an edge case not worth the
+    /// extra pagination complexity here.
+    func recommendationSummary(appUuid: String) async throws -> RecommendationSummary {
+        let response = try await client.jsonAPIList(
+            "flagging/recommend",
+            query: ["filter[flagged_entity.id]": appUuid, "include": "uid", "sort": "-created", "page[limit]": "100"]
+        )
+        let included = response.included ?? []
+        let mostRecent = response.data.first
+        let recommenderName = mostRecent
+            .flatMap { $0.relationshipId("uid") }
+            .flatMap { recommenderId in included.first(where: { $0.id == recommenderId }) }
+            .flatMap { $0.attributes["display_name"]?.stringValue ?? $0.attributes["name"]?.stringValue }
+        return RecommendationSummary(
+            count: response.data.count,
+            mostRecentRecommenderName: recommenderName,
+            mostRecentDate: mostRecent?.createdDate
+        )
+    }
+}
+
+/// The public "Recommendations" widget on an app page — a count plus who
+/// most recently recommended it, mirroring the site's own block exactly.
+struct RecommendationSummary {
+    let count: Int
+    let mostRecentRecommenderName: String?
+    let mostRecentDate: Date?
+}
+
+/// A single row of "Apps I've Recommended" — deliberately lighter than the
+/// full per-platform `AppListing`/`TvAppListing`/etc. models, since the
+/// Recommendations list only ever needs a title, platform, date, and a link
+/// to open the real app page, not every detail field those carry.
+struct RecommendedApp: Identifiable {
+    let id: String
+    let title: String
+    let platformLabel: String
+    let recommendedAt: Date
+    let url: String?
+
+    static func platformLabel(forNodeType type: String) -> String {
+        switch type {
+        case "node--ios_app_directory":  return "iOS and iPadOS App Directory"
+        case "node--tv_directory":       return "Apple TV App Directory"
+        case "node--watch_directory":    return "Apple Watch App Directory"
+        case "node--mac_app_directory":  return "Mac App Directory"
+        default:                         return "App Directory"
+        }
     }
 }

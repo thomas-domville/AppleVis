@@ -94,9 +94,24 @@ private struct AuthorProfileSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var auth: AuthStore
     @State private var profile: UserEndpoints.PublicProfile?
     @State private var isLoading = false
     @State private var error: String?
+    @State private var showContactSheet = false
+
+    /// Contacting yourself makes no sense, and Drupal's Contact module needs
+    /// a real numeric uid to address the message to — a profile that failed
+    /// to resolve one (0 is `PublicProfile`'s "missing" default) has nothing
+    /// to send to. Also respects the site's own "Personal contact form"
+    /// checkbox (`field.allowsContact`) — someone who's turned that off
+    /// shouldn't see a Contact button here either.
+    private var canContact: Bool {
+        auth.isSignedIn
+            && authorId != (auth.user?.uuid ?? "")
+            && (profile?.numericUid ?? 0) != 0
+            && (profile?.allowsContact ?? true)
+    }
 
     var body: some View {
         NavigationStack {
@@ -123,45 +138,151 @@ private struct AuthorProfileSheet: View {
     private func content(_ profile: UserEndpoints.PublicProfile) -> some View {
         List {
             Section {
-                VStack(alignment: .leading, spacing: 6) {
-                    // docs/IMPLEMENTATION_NOTES.md requires the member name
-                    // be the heading here — was missing the trait entirely
-                    // (PROFILE-04).
-                    Text(profile.displayName).font(.title3).fontWeight(.semibold)
-                        .accessibilityAddTraits(.isHeader)
-                    // .distantPast is JsonApiNode.parseDrupalDate's sentinel
-                    // for a missing/malformed "created" field, not a real
-                    // date — rendering it unconditionally produced a
-                    // nonsensical "Member since January 1, 1" with no
-                    // visual "this looks wrong" cue for a VoiceOver user to
-                    // catch, contradicting IMPLEMENTATION_NOTES.md's own
-                    // rule to render this "only when the API returns them"
-                    // (PROFILE-03).
-                    if profile.memberSince != .distantPast {
-                        Text("Member since \(profile.memberSince.formatted(date: .abbreviated, time: .omitted))")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.vertical, 4)
+                headerCard(profile)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             }
             if !profile.location.isEmpty {
-                Section("Location") { Text(profile.location) }
+                Section("Location") {
+                    Label(profile.location, systemImage: "mappin.and.ellipse")
+                }
             }
             if !profile.bio.isEmpty {
-                Section("About") { Text(profile.bio) }
+                Section("About") {
+                    // Split into separate accessibility elements (one per
+                    // line the person actually typed) rather than one flat
+                    // block of Text — matches the same reasoning
+                    // SegmentedHTMLView/ReplyCard already apply to comment
+                    // bodies: a multi-paragraph bio flattened into a single
+                    // element is unpredictable to navigate cell-by-cell on
+                    // a Braille display.
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(Array(bioParagraphs(profile.bio).enumerated()), id: \.offset) { _, paragraph in
+                            Text(paragraph).lineSpacing(4)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
             }
             if !profile.website.isEmpty, let url = URL(string: profile.website) {
                 Section("Website") {
-                    Link(profile.website, destination: url)
+                    WebLink(destination: url) {
+                        Label(profile.website, systemImage: "link")
+                    }
+                }
+            }
+            if !profile.interests.isEmpty {
+                Section("Interests") {
+                    Label(profile.interests, systemImage: "star")
+                }
+            }
+            if !profile.owns.isEmpty {
+                Section("Apple Products Owned") {
+                    Label(profile.owns, systemImage: "apple.logo")
+                }
+            }
+            if !profile.twitter.isEmpty || !profile.mastodon.isEmpty || !profile.facebook.isEmpty {
+                Section("Elsewhere") {
+                    if !profile.twitter.isEmpty, let url = twitterURL(profile.twitter) {
+                        WebLink(destination: url) {
+                            Label("@\(handle(profile.twitter)) on X", systemImage: "at")
+                        }
+                    }
+                    if !profile.mastodon.isEmpty, let url = mastodonURL(profile.mastodon) {
+                        WebLink(destination: url) {
+                            Label("\(profile.mastodon) on Mastodon", systemImage: "at")
+                        }
+                    }
+                    if !profile.facebook.isEmpty, let url = URL(string: profile.facebook) {
+                        WebLink(destination: url) {
+                            Label("Facebook", systemImage: "person.2")
+                        }
+                    }
+                }
+            }
+            if canContact {
+                Section {
+                    Button {
+                        showContactSheet = true
+                    } label: {
+                        Label("Contact \(profile.displayName)", systemImage: "envelope")
+                    }
+                    .accessibilityHint(String(localized: "Sends a private message through AppleVis. Your email address is not shared unless they reply."))
                 }
             }
             if let profileUrl = profile.profileUrl, let url = URL(string: profileUrl) {
                 Section {
-                    Link("View Full Profile on AppleVis", destination: url)
+                    WebLink(destination: url) {
+                        Label("View Full Profile on AppleVis", systemImage: "arrow.up.right.square")
+                    }
                 }
             }
         }
         .themedList(preferences.colors)
+        .sheet(isPresented: $showContactSheet) {
+            ContactUserSheet(numericUid: profile.numericUid, recipientName: profile.displayName)
+        }
+    }
+
+    /// Warm header replacing the old plain-text name+date pair — a large
+    /// per-author-colored avatar (same hash/palette every comment row
+    /// already uses, so this person reads as the same color everywhere they
+    /// appear) over a soft tint of that same color.
+    private func headerCard(_ profile: UserEndpoints.PublicProfile) -> some View {
+        VStack(spacing: 10) {
+            AuthorAvatarView(name: profile.displayName, diameter: 72)
+            // docs/IMPLEMENTATION_NOTES.md requires the member name be the
+            // heading here — was missing the trait entirely (PROFILE-04).
+            Text(profile.displayName).font(.title2).fontWeight(.bold)
+                .accessibilityAddTraits(.isHeader)
+            // .distantPast is JsonApiNode.parseDrupalDate's sentinel for a
+            // missing/malformed "created" field, not a real date —
+            // rendering it unconditionally produced a nonsensical "Member
+            // since January 1, 1" with no visual "this looks wrong" cue for
+            // a VoiceOver user to catch, contradicting
+            // IMPLEMENTATION_NOTES.md's own rule to render this "only when
+            // the API returns them" (PROFILE-03).
+            if profile.memberSince != .distantPast {
+                Text("Member since \(profile.memberSince.formatted(date: .abbreviated, time: .omitted))")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+        .background(
+            LinearGradient(
+                colors: [AuthorAvatarColor.color(for: profile.displayName).opacity(0.18), Color.clear],
+                startPoint: .top, endPoint: .bottom
+            )
+        )
+        .accessibilityElement(children: .combine)
+    }
+
+    private func bioParagraphs(_ bio: String) -> [String] {
+        bio.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
+    private func handle(_ raw: String) -> String {
+        raw.hasPrefix("@") ? String(raw.dropFirst()) : raw
+    }
+
+    private func twitterURL(_ raw: String) -> URL? {
+        if raw.lowercased().hasPrefix("http") { return URL(string: raw) }
+        return URL(string: "https://x.com/\(handle(raw))")
+    }
+
+    /// `field_mastodon_username` stores "@user@instance.social" (or without
+    /// the leading @) — there's no single canonical Mastodon host, so the
+    /// profile URL has to be built from the instance domain embedded in the
+    /// handle itself.
+    private func mastodonURL(_ raw: String) -> URL? {
+        if raw.lowercased().hasPrefix("http") { return URL(string: raw) }
+        let parts = handle(raw).split(separator: "@")
+        guard parts.count == 2 else { return nil }
+        return URL(string: "https://\(parts[1])/@\(parts[0])")
     }
 
     private func load() async {
@@ -174,5 +295,98 @@ private struct AuthorProfileSheet: View {
             self.error = "Couldn't load profile."
         }
         isLoading = false
+    }
+}
+
+/// Sends a private message to another member via Drupal's Contact module
+/// (`UserEndpoints.sendContact`) — the recipient's email is never fetched or
+/// shown here; Drupal delivers the message using its own stored address, and
+/// the sender's address only reaches the recipient if they reply.
+private struct ContactUserSheet: View {
+    let numericUid: Int
+    let recipientName: String
+
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var auth: AuthStore
+
+    @State private var subject = ""
+    @State private var message = ""
+    @State private var isSending = false
+    @State private var error: String?
+    @AccessibilityFocusState private var isErrorFocused: Bool
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("Your message is sent through AppleVis. \(recipientName) will not see your email address unless they choose to reply.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Section("Subject") {
+                    TextField("What's this about?", text: $subject)
+                }
+                Section("Message") {
+                    TextEditor(text: $message)
+                        .frame(minHeight: 160)
+                        .accessibilityLabel(String(localized: "Message text editor"))
+                }
+                if let error {
+                    Section {
+                        Label(error, systemImage: "exclamationmark.circle")
+                            .foregroundStyle(.red)
+                            .accessibilityFocused($isErrorFocused)
+                    }
+                }
+            }
+            .themedList(preferences.colors)
+            .navigationTitle("Contact \(recipientName)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Send") { Task { await send() } }
+                        .disabled(isSending
+                            || subject.trimmingCharacters(in: .whitespaces).isEmpty
+                            || message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .disabled(isSending)
+            .overlay {
+                if isSending {
+                    ProgressView("Sending…")
+                        .padding(20)
+                        .adaptiveGlass(in: RoundedRectangle(cornerRadius: 12))
+                }
+            }
+        }
+    }
+
+    private func send() async {
+        if let blocking = ContentSubmissionPolicy.blockingMessage(subject: subject, body: message) {
+            error = blocking
+            isErrorFocused = true
+            return
+        }
+        guard let user = auth.user else { return }
+        isSending = true; error = nil
+        do {
+            try await APIClient.shared.users.sendContact(
+                numericUid: numericUid, subject: subject, message: message, csrfToken: user.csrfToken
+            )
+            toast.success(String(localized: "Message sent"))
+            dismiss()
+        } catch let e as APIError {
+            error = e.localizedDescription
+            isErrorFocused = true
+        } catch {
+            self.error = "Couldn't send your message. Please try again."
+            isErrorFocused = true
+        }
+        isSending = false
     }
 }

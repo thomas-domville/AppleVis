@@ -15,7 +15,8 @@ struct DiscoverView: View {
     @State private var lastAnnouncedResultCount: Int?
     @State private var lastAnnouncedMessage: String?
     @FocusState private var isSearchFieldFocused: Bool
-    @AccessibilityFocusState private var isHubFocused: Bool
+    @AccessibilityFocusState private var focusTarget: AnyHashable?
+    private static let titleFocusID = AnyHashable("discover.title")
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var toast: ToastStore
@@ -69,9 +70,14 @@ struct DiscoverView: View {
             .navigationTitle("Discover")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink(destination: ProfileView()) {
+                    NavigationLink(destination: ProfileView()
+                        .onDisappear {
+                            Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("profile")) }
+                        }
+                    ) {
                         Image(systemName: "person.circle")
                     }
+                    .accessibilityFocused($focusTarget, equals: AnyHashable("profile"))
                     .accessibilityLabel(String(localized: "Profile and Settings"))
                     .accessibilityHint(String(localized: "Sign in, manage your account, and access app settings."))
                 }
@@ -84,7 +90,7 @@ struct DiscoverView: View {
                 // opened via the "Search AppleVis" Siri intent) — kick it off
                 // manually in that case.
                 if !searchText.isEmpty, searchResults == nil { runSearch(searchText) }
-                // "Auto-Focus Search Field" (Settings > Accessibility) was
+                // "Auto-Focus Search Field" (Settings > General) was
                 // declared and shown in Settings but never actually
                 // consumed anywhere — this was the only missing piece. Only
                 // applies when landing here with no query already driving
@@ -116,7 +122,7 @@ struct DiscoverView: View {
                     return
                 }
                 guard searchText.trimmingCharacters(in: .whitespaces).count < 2 else { return }
-                Task { await retryAccessibilityFocus(into: $isHubFocused) }
+                Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: Self.titleFocusID) }
             }
             .navigationDestination(for: ForumTopic.self) { topic in
                 ForumTopicDetailView(topicId: topic.id)
@@ -246,36 +252,42 @@ struct DiscoverView: View {
                     .accessibilityElement()
                     .accessibilityLabel("Discover")
                     .accessibilityAddTraits(.isHeader)
-                    .accessibilityFocused($isHubFocused)
+                    .accessibilityFocused($focusTarget, equals: Self.titleFocusID)
 
                 hubSection(title: "App Directory", subtitle: "Browse accessible apps by platform and category.", accent: .green) {
-                    HubCard(title: "Apps", subtitle: "Apps by platform and category", systemImage: "square.grid.2x2", color: .green) {
+                    HubCard(title: "Apps", subtitle: "Apps by platform and category", systemImage: "square.grid.2x2", color: .green, focusID: AnyHashable("apps"), focusTarget: $focusTarget) {
                         AppBrowseView()
                     }
                 }
                 hubSection(title: "Community", subtitle: "Find discussions and recent posts from AppleVis members.", accent: .blue) {
-                    HubCard(title: "Forums", subtitle: "Discussion & help", systemImage: "bubble.left.and.bubble.right", color: .blue) {
+                    HubCard(title: "Forums", subtitle: "Discussion & help", systemImage: "bubble.left.and.bubble.right", color: .blue, focusID: AnyHashable("forums"), focusTarget: $focusTarget) {
                         ForumsBrowseView(showsPersonalFilters: false)
                     }
-                    HubCard(title: "Blogs", subtitle: "Articles & news", systemImage: "newspaper", color: .red) {
+                    HubCard(title: "Blogs", subtitle: "Articles & news", systemImage: "newspaper", color: .red, focusID: AnyHashable("blogs"), focusTarget: $focusTarget) {
                         BlogBrowseView()
                     }
                 }
                 hubSection(title: "Learn", subtitle: "Explore guides, podcast episodes, and practical accessibility resources.", accent: .orange) {
-                    HubCard(title: "Guides", subtitle: "Tutorials & resources", systemImage: "book", color: .orange) {
+                    HubCard(title: "Guides", subtitle: "Tutorials & resources", systemImage: "book", color: .orange, focusID: AnyHashable("guides"), focusTarget: $focusTarget) {
                         GuideBrowseView()
                     }
-                    HubCard(title: "Podcasts", subtitle: "Audio content", systemImage: "mic.fill", color: .purple) {
+                    HubCard(title: "Podcasts", subtitle: "Audio content", systemImage: "mic.fill", color: .purple, focusID: AnyHashable("podcasts"), focusTarget: $focusTarget) {
                         PodcastBrowseView()
                     }
                 }
                 hubSection(title: "Bug Tracker", subtitle: "Browse active accessibility bugs reported by the AppleVis community.", accent: .brown) {
-                    HubCard(title: "Bug Reports", subtitle: "Known accessibility bugs", systemImage: "ant", color: .brown) {
+                    // Card previously said "Bug Reports" — a real button,
+                    // just under a different name than the section heading
+                    // right above it ("Bug Tracker") and everywhere else in
+                    // the app (Help, What's New, the Community Bug
+                    // Program), which read as if the button itself were
+                    // missing. Reported directly.
+                    HubCard(title: "Bug Tracker", subtitle: "Known accessibility bugs", systemImage: "ant", color: .brown, focusID: AnyHashable("bugTracker"), focusTarget: $focusTarget) {
                         BugBrowseView()
                     }
                 }
                 hubSection(title: "Stay Updated", subtitle: "Subscribe to AppleVis updates outside the app.", accent: .cyan) {
-                    HubCard(title: "RSS Feeds", subtitle: "Copy or share feed links", systemImage: "dot.radiowaves.left.and.right", color: .cyan) {
+                    HubCard(title: "RSS Feeds", subtitle: "Copy or share feed links", systemImage: "dot.radiowaves.left.and.right", color: .cyan, focusID: AnyHashable("rssFeeds"), focusTarget: $focusTarget) {
                         RSSFeedsView()
                     }
                 }
@@ -438,9 +450,10 @@ struct DiscoverView: View {
             HubSectionHeader(title: "Connect", subtitle: "Follow AppleVis on social platforms.", accent: .cyan)
             HStack(spacing: 8) {
                 ForEach(Self.socialLinks) { link in
-                    Button {
-                        openURL(link.url)
-                    } label: {
+                    // WebLink, not a raw openURL Button — this grid was
+                    // always hardcoded to the external browser regardless
+                    // of the Web Links preference. Reported directly.
+                    WebLink(destination: link.url) {
                         VStack(spacing: 6) {
                             Image(systemName: link.systemImage)
                                 .font(.title3)
@@ -457,8 +470,8 @@ struct DiscoverView: View {
                         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(String(localized: "\(link.description). Opens in your browser."))
-                    .accessibilityHint(String(localized: "Double-tap to open in your browser."))
+                    .accessibilityLabel(String(localized: link.description))
+                    .accessibilityHint(String(localized: "Double-tap to open."))
                 }
             }
             .padding(.horizontal)
@@ -501,10 +514,19 @@ struct HubCard<Destination: View>: View {
     let subtitle: String
     let systemImage: String
     let color: Color
+    /// Identifies this card so VoiceOver focus can return to it specifically
+    /// when you come back from its destination via the system back button,
+    /// instead of landing wherever iOS defaults to. Reported directly.
+    let focusID: AnyHashable
+    let focusTarget: AccessibilityFocusState<AnyHashable?>.Binding
     let destination: () -> Destination
 
     var body: some View {
-        NavigationLink(destination: destination()) {
+        NavigationLink(destination: destination()
+            .onDisappear {
+                Task { await retryAccessibilityFocus(into: focusTarget, returningTo: focusID) }
+            }
+        ) {
             VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: systemImage)
                     .font(.title2)
@@ -523,6 +545,7 @@ struct HubCard<Destination: View>: View {
             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
+        .accessibilityFocused(focusTarget, equals: focusID)
     }
 }
 

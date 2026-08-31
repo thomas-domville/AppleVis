@@ -71,7 +71,7 @@ struct GuidelinesReminderView: View {
                 }
                 .accessibilityHint(String(localized: "Dismisses this reminder."))
 
-                Link(destination: Self.guidelinesURL) {
+                WebLink(destination: Self.guidelinesURL) {
                     Text("View Guidelines")
                         .fontWeight(.semibold)
                         .foregroundStyle(config.text)

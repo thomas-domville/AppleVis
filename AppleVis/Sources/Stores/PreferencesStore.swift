@@ -48,6 +48,7 @@ final class PreferencesStore: ObservableObject {
     var colors: ThemeColors { theme.colors(systemIsDark: systemIsDark) }
     var accentColor: Color { theme.accentColor(systemIsDark: systemIsDark) }
     @AppStorage("appearance.cardDensity") var cardDensity: CardDensity = .comfortable
+    @AppStorage("browsing.webMode") var webBrowsingMode: WebBrowsingMode = .inApp
 
     // MARK: - Home feed filters
     @AppStorage("feed.showForums")   var showForums   = true
@@ -120,6 +121,13 @@ final class PreferencesStore: ObservableObject {
     // keys directly (it has no environment access to this store).
     @AppStorage("sound.interface")    var interfaceSoundsEnabled = false
     @AppStorage("sound.confirmation") var confirmationSoundsEnabled = true
+    /// Mirrors `confirmationSoundsEnabled`'s scope exactly — only the same
+    /// "something happened, worth confirming" tier of sounds gets a paired
+    /// haptic (save, follow/recommend, submit success, sign in, errors);
+    /// the "interface" chrome tier (refresh, tab switching, picker ticks)
+    /// never does, matching how that tier is already off by default for
+    /// sound too. See `AppSound.shouldPlayHaptic`.
+    @AppStorage("sound.haptics") var hapticsEnabled = true
 
     // MARK: - Intelligence / Smart Features
     @AppStorage("intel.nonEnglish")         var nonEnglishDetectionEnabled = true
@@ -141,13 +149,18 @@ final class PreferencesStore: ObservableObject {
 // MARK: - Enums
 
 enum ThemeGroup: String, CaseIterable, Identifiable {
-    case standard, appleVis, accessibility
+    // Declaration order is display order (Appearance settings lists groups
+    // via ThemeGroup.allCases) — Accessibility leads since it's the most
+    // consequential choice for this app's audience, then AppleVis's own
+    // branded themes, then the plain iOS-standard ones last. Reordered
+    // directly per request.
+    case accessibility, appleVis, standard
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .standard:     return "Standard"
-        case .appleVis:     return "AppleVis"
         case .accessibility: return "Accessibility"
+        case .appleVis:     return "AppleVis"
+        case .standard:     return "Standard"
         }
     }
 }
@@ -294,6 +307,24 @@ enum CardDensity: String, CaseIterable, Identifiable {
     var verticalPadding: CGFloat { self == .compact ? 2 : 6 }
 }
 
+/// Every web link the app opens (App Store/social/legal links, "Open in
+/// Browser" actions, etc.) routes through `WebLink`/this preference instead
+/// of always launching the external browser the way a bare SwiftUI `Link`
+/// does — default is in-app so nobody leaves the app just to glance at a
+/// page, with an explicit opt-out for anyone who wants their regular
+/// browser's bookmarks, extensions, signed-in sessions, or Reader mode.
+/// Requested directly.
+enum WebBrowsingMode: String, CaseIterable, Identifiable {
+    case inApp, external
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .inApp:    return "In-App Browser"
+        case .external: return "Default Browser"
+        }
+    }
+}
+
 enum ForumFilter: String, CaseIterable, Identifiable {
     case recent, new, unread, sinceLastVisit, following, saved
     var id: String { rawValue }
@@ -332,11 +363,17 @@ enum AnnouncementLevel: String, CaseIterable, Identifiable {
         case .all:    return "All Details"
         }
     }
+    // Rewritten to match what a forum topic row actually says today (see
+    // ForumTopicRow.topicLabel / the shared detailLevelLabel helper in
+    // RowViews.swift) — the previous examples used a "Forum." sentence
+    // fragment and period-separated clauses that don't match the real,
+    // comma-joined format, and hadn't been updated as that format changed.
+    // Kept in sync going forward per the Help-content-upkeep rule.
     var preview: String {
         switch self {
-        case .simple: return "\"iOS 18 VoiceOver Tips. Forum.\""
-        case .normal: return "\"iOS 18 VoiceOver Tips. Forum. By JaneD. 14 comments.\""
-        case .all:    return "\"iOS 18 VoiceOver Tips. Forum. By JaneD. 14 comments. Posted 2 days ago.\""
+        case .simple: return "\"iOS 18 VoiceOver Tips, iOS and iPadOS topic.\""
+        case .normal: return "\"iOS 18 VoiceOver Tips, iOS and iPadOS topic, by JaneD, 14 comments.\""
+        case .all:    return "\"iOS 18 VoiceOver Tips, iOS and iPadOS topic, by JaneD, 14 comments, 2 days ago.\""
         }
     }
 }

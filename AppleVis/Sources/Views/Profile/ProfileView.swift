@@ -3,14 +3,15 @@ import SwiftUI
 struct ProfileView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
-    @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var showSignIn = false
     @State private var showSignOutConfirm = false
     @State private var showEditProfile = false
     @State private var showContact = false
     @State private var showWelcomeTour = false
-    @AccessibilityFocusState private var isTitleFocused: Bool
+    @State private var accountSecurityMode: AccountSecurityWizard.Mode?
+    @AccessibilityFocusState private var focusTarget: AnyHashable?
+    private static let titleFocusID = AnyHashable("profile.title")
 
     var body: some View {
         NavigationStack {
@@ -27,7 +28,7 @@ struct ProfileView: View {
             .listStyle(.insetGrouped)
             .themedList(preferences.colors)
             .navigationTitle("Profile")
-            .task { await retryAccessibilityFocus(into: $isTitleFocused) }
+            .task { await retryAccessibilityFocus(into: $focusTarget, returningTo: Self.titleFocusID) }
         }
         .sheet(isPresented: $showSignIn) {
             SignInView()
@@ -40,6 +41,9 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $showWelcomeTour) {
             GuidedExperienceView(experience: GuidedExperienceRegistry.welcome)
+        }
+        .sheet(item: $accountSecurityMode) { mode in
+            AccountSecurityWizard(mode: mode)
         }
         .confirmationDialog("Sign Out", isPresented: $showSignOutConfirm, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) {
@@ -59,7 +63,6 @@ struct ProfileView: View {
     @ViewBuilder
     private func signedInContent(_ user: AuthUser) -> some View {
         Section {
-            AccessibleScreenHeading(title: "Profile", isFocused: $isTitleFocused)
             HStack(spacing: 14) {
                 Circle()
                     .fill(Color.accentColor)
@@ -93,12 +96,7 @@ struct ProfileView: View {
             .padding(.vertical, 4)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(String(localized: "Signed in as \(user.name)\(user.isAdmin ? ", Administrator" : "")"))
-        }
-
-        Section("Saved Items") {
-            savedCountRow(kind: .forumTopic, icon: "bubble.left.and.bubble.right")
-            savedCountRow(kind: .appListing, icon: "square.grid.2x2")
-            savedCountRow(kind: .resource, icon: "book")
+            .accessibilityFocused($focusTarget, equals: Self.titleFocusID)
         }
 
         Section("Account") {
@@ -109,24 +107,42 @@ struct ProfileView: View {
             }
             .accessibilityLabel(String(localized: "Edit your public profile"))
 
+            Button {
+                accountSecurityMode = .password
+            } label: {
+                Label("Change Password", systemImage: "lock.rotation")
+            }
+            .accessibilityLabel(String(localized: "Change your account password"))
+
+            Button {
+                accountSecurityMode = .email
+            } label: {
+                Label("Change Email Address", systemImage: "envelope.badge")
+            }
+            .accessibilityLabel(String(localized: "Change your account email address"))
+
             if let username = auth.user?.name {
-                Link(destination: URL(string: "https://www.applevis.com/users/\(username)")!) {
+                WebLink(destination: URL(string: "https://www.applevis.com/users/\(username)")!) {
                     Label("View Full Profile on applevis.com", systemImage: "arrow.up.right.square")
                 }
                 .accessibilityLabel(String(localized: "View your full public profile on applevis.com, opens in browser"))
             }
 
-            Link(destination: URL(string: "https://www.applevis.com/user")!) {
-                Label("Account Settings on applevis.com", systemImage: "arrow.up.right.square")
+            WebLink(destination: URL(string: "https://www.applevis.com/user")!) {
+                Label("More Account Settings on applevis.com", systemImage: "arrow.up.right.square")
             }
-            .accessibilityLabel(String(localized: "Account Settings on applevis.com, opens in browser"))
+            .accessibilityLabel(String(localized: "More Account Settings on applevis.com, opens in browser"))
 
             NavigationLink {
                 DeleteAccountView()
+                    .onDisappear {
+                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("deleteAccount")) }
+                    }
             } label: {
                 Label("Delete Account", systemImage: "person.crop.circle.badge.minus")
                     .foregroundStyle(.red)
             }
+            .accessibilityFocused($focusTarget, equals: AnyHashable("deleteAccount"))
             .accessibilityLabel(String(localized: "Permanently delete your AppleVis account"))
 
             Button(role: .destructive) {
@@ -139,36 +155,15 @@ struct ProfileView: View {
         }
     }
 
-    /// RN's own Profile screen showed per-kind saved counts as tappable
-    /// rows that deep-link into For You's Saved tab pre-filtered by kind —
-    /// Swift's Profile had no Saved Items section at all (this is exactly
-    /// what the `SiriDestination.savedItems(filter:)` plumbing added
-    /// earlier this session was anticipating, previously unused anywhere).
-    /// RN only showed these 3 kinds, not all 6.
-    private func savedCountRow(kind: ContentKind, icon: String) -> some View {
-        let count = PersistenceStore.shared.savedItems().filter { $0.kind == kind }.count
-        return Button {
-            deepLinkRouter.pendingSiriDestination = .savedItems(filter: kind)
-        } label: {
-            HStack {
-                Label("Saved \(kind.displayNamePlural(2).capitalized)", systemImage: icon)
-                Spacer()
-                Text("\(count)").foregroundStyle(.secondary)
-            }
-        }
-        .accessibilityLabel(String(localized: "Saved \(kind.displayNamePlural(2)), \(count)"))
-        .accessibilityHint(String(localized: "Double-tap to view."))
-    }
-
     // MARK: - Signed-out content
 
     private var signedOutContent: some View {
         Section {
-            AccessibleScreenHeading(title: "Profile", isFocused: $isTitleFocused)
             VStack(alignment: .leading, spacing: 12) {
                 Text("Sign In")
                     .font(.headline)
                     .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($focusTarget, equals: Self.titleFocusID)
                 Text("Sign in to post in forums, follow topics, receive notifications, and sync your saved items.")
                     .font(.subheadline).foregroundStyle(.secondary)
                 Button("Sign in to AppleVis") {
@@ -187,9 +182,13 @@ struct ProfileView: View {
         Section("App") {
             NavigationLink {
                 SettingsView()
+                    .onDisappear {
+                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("settings")) }
+                    }
             } label: {
                 Label("Settings", systemImage: "gearshape")
             }
+            .accessibilityFocused($focusTarget, equals: AnyHashable("settings"))
             .accessibilityLabel(String(localized: "Open Settings"))
         }
     }
@@ -200,16 +199,24 @@ struct ProfileView: View {
         Section("About AppleVis") {
             NavigationLink {
                 WhatsNewView()
+                    .onDisappear {
+                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("whatsNew")) }
+                    }
             } label: {
                 Label("What's New", systemImage: "sparkles")
             }
+            .accessibilityFocused($focusTarget, equals: AnyHashable("whatsNew"))
             .accessibilityLabel(String(localized: "What's New in AppleVis"))
 
             NavigationLink {
                 AboutView()
+                    .onDisappear {
+                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("about")) }
+                    }
             } label: {
                 Label("About & Credits", systemImage: "info.circle")
             }
+            .accessibilityFocused($focusTarget, equals: AnyHashable("about"))
 
             Button {
                 // Force a true restart — without this, if the tour is
@@ -225,15 +232,10 @@ struct ProfileView: View {
             .accessibilityLabel(String(localized: "Replay Welcome Tour"))
             .accessibilityHint(String(localized: "Replays the short guided tour of Home, Discover, For You, Search, Profile, and Settings."))
 
-            Link(destination: URL(string: "https://www.applevis.com/privacy")!) {
-                Label("Privacy Policy", systemImage: "shield.checkmark")
-            }
-            .accessibilityLabel(String(localized: "Privacy Policy, opens in browser"))
-
-            Link(destination: URL(string: "https://www.applevis.com/terms")!) {
-                Label("Terms of Service", systemImage: "doc.text")
-            }
-            .accessibilityLabel(String(localized: "Terms of Service, opens in browser"))
+            // Privacy Policy and Terms of Service used to be repeated here
+            // directly, one tap away from the identical pair inside "About &
+            // Credits" right above — About & Credits is the one home for
+            // them now. Reported directly.
 
             Button {
                 showContact = true
@@ -258,6 +260,6 @@ struct ProfileView: View {
 
     private func signOut() async {
         await auth.signOut()
-        toast.success(String(localized: "Signed out."))
+        toast.success(String(localized: "Signed out"))
     }
 }

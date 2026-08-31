@@ -346,12 +346,12 @@ struct AppEndpoints {
             let a = node.attributes
             let listing = Mappers.app(node, included: appResponse.included ?? [])
 
-            let reviews: [AppReview]
-            if let reviewsResponse = try? await reviewsRes {
-                reviews = reviewsResponse.data.map { Mappers.appReview($0, included: reviewsResponse.included ?? []) }
-            } else {
-                reviews = []
-            }
+            // See ForumEndpoints.topicDetail's identical fix for the full
+            // reasoning — a `try?`-swallowed comments failure previously
+            // looked identical to "genuinely zero comments" and got cached
+            // as a false success.
+            let reviewsResponse = try await reviewsRes
+            let reviews = reviewsResponse.data.map { Mappers.appReview($0, included: reviewsResponse.included ?? []) }
 
             return AppDetail(
                 id: listing.id,
@@ -408,12 +408,12 @@ struct AppEndpoints {
             let a = node.attributes
             let listing = Mappers.tvApp(node, included: appResponse.included ?? [])
 
-            let reviews: [AppReview]
-            if let reviewsResponse = try? await reviewsRes {
-                reviews = reviewsResponse.data.map { Mappers.appReview($0, included: reviewsResponse.included ?? []) }
-            } else {
-                reviews = []
-            }
+            // See ForumEndpoints.topicDetail's identical fix for the full
+            // reasoning — a `try?`-swallowed comments failure previously
+            // looked identical to "genuinely zero comments" and got cached
+            // as a false success.
+            let reviewsResponse = try await reviewsRes
+            let reviews = reviewsResponse.data.map { Mappers.appReview($0, included: reviewsResponse.included ?? []) }
 
             return AppDetail(
                 id: listing.id,
@@ -471,12 +471,12 @@ struct AppEndpoints {
             let a = node.attributes
             let listing = Mappers.watchApp(node, included: appResponse.included ?? [])
 
-            let reviews: [AppReview]
-            if let reviewsResponse = try? await reviewsRes {
-                reviews = reviewsResponse.data.map { Mappers.appReview($0, included: reviewsResponse.included ?? []) }
-            } else {
-                reviews = []
-            }
+            // See ForumEndpoints.topicDetail's identical fix for the full
+            // reasoning — a `try?`-swallowed comments failure previously
+            // looked identical to "genuinely zero comments" and got cached
+            // as a false success.
+            let reviewsResponse = try await reviewsRes
+            let reviews = reviewsResponse.data.map { Mappers.appReview($0, included: reviewsResponse.included ?? []) }
 
             return AppDetail(
                 id: listing.id,
@@ -537,12 +537,12 @@ struct AppEndpoints {
             let a = node.attributes
             let listing = Mappers.macApp(node, included: appResponse.included ?? [])
 
-            let reviews: [AppReview]
-            if let reviewsResponse = try? await reviewsRes {
-                reviews = reviewsResponse.data.map { Mappers.appReview($0, included: reviewsResponse.included ?? []) }
-            } else {
-                reviews = []
-            }
+            // See ForumEndpoints.topicDetail's identical fix for the full
+            // reasoning — a `try?`-swallowed comments failure previously
+            // looked identical to "genuinely zero comments" and got cached
+            // as a false success.
+            let reviewsResponse = try await reviewsRes
+            let reviews = reviewsResponse.data.map { Mappers.appReview($0, included: reviewsResponse.included ?? []) }
 
             return AppDetail(
                 id: listing.id,

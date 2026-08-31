@@ -48,6 +48,19 @@ final class ICloudSyncManager {
         (UserDefaults.standard.object(forKey: subToggleKey) as? Bool ?? true)
     }
 
+    /// Settings → Saved & Sync's "Last Synced" row only ever reflected the
+    /// manual Sync Now button — every automatic push (saving/following an
+    /// item, a queue or position change, backgrounding the app) and every
+    /// pull never touched it, so a user who never taps that button sees
+    /// "Never" forever despite sync genuinely running continuously in the
+    /// background. Reported directly: called from every push/pull that
+    /// actually did something, not from ones that no-opped because their
+    /// toggle (or the master switch) is off.
+    static let lastSyncDateKey = "sync.lastSyncDate"
+    private func touchLastSyncDate() {
+        UserDefaults.standard.set(Date(), forKey: Self.lastSyncDateKey)
+    }
+
     // MARK: - Push (call after a local write)
 
     /// Previously a full-blob overwrite exactly like the settings bug fixed
@@ -57,6 +70,8 @@ final class ICloudSyncManager {
     /// merge strategy as `pushSettings`/`pullSettings`, applied to sets of
     /// ids instead of scalar values.
     func pushSavedItems() {
+        guard isSyncEnabled("sync.savedItems") || isSyncEnabled("sync.followedItems") else { return }
+        defer { touchLastSyncDate() }
         if isSyncEnabled("sync.savedItems") {
             let local = PersistenceStore.shared.savedItems()
             let shadow = readIdShadow(key: "icloud.saved.shadow")
@@ -86,12 +101,14 @@ final class ICloudSyncManager {
         guard isSyncEnabled("sync.podcastPosition") else { return }
         setJSON(positions, key: "icloud.podcastPositions")
         store.synchronize()
+        touchLastSyncDate()
     }
 
     func pushQueue(_ queue: [PodcastEpisode]) {
         guard isSyncEnabled("sync.queue") else { return }
         setJSON(queue, key: "icloud.queue")
         store.synchronize()
+        touchLastSyncDate()
     }
 
     func pushReadHistory() {
@@ -100,6 +117,7 @@ final class ICloudSyncManager {
         else { return }
         setJSON(snapshot, key: "icloud.readHistory")
         store.synchronize()
+        touchLastSyncDate()
     }
 
     func clearReadHistory() {
@@ -111,6 +129,7 @@ final class ICloudSyncManager {
         guard isSyncEnabled("sync.podcastPosition") else { return }
         setJSON(PersistenceStore.shared.playedEpisodeIdsSnapshot(), key: "icloud.playedEpisodes")
         store.synchronize()
+        touchLastSyncDate()
     }
 
     /// Pushing always sent every synced setting as one blob, even keys this
@@ -147,6 +166,7 @@ final class ICloudSyncManager {
         setJSON(merged, key: "icloud.settings")
         writeShadow(newShadow)
         store.synchronize()
+        touchLastSyncDate()
     }
 
     // MARK: - Pull
@@ -154,6 +174,7 @@ final class ICloudSyncManager {
     /// Call once at launch (after setting `player`) to adopt anything synced
     /// from another device.
     func pullAll() {
+        guard UserDefaults.standard.object(forKey: "sync.iCloud") as? Bool ?? true else { return }
         pullSavedItems()
         if let player {
             pullPodcastPositions { player.applyPulledPositions($0) }
@@ -162,6 +183,7 @@ final class ICloudSyncManager {
         pullReadHistory()
         pullPlayedEpisodes()
         pullSettings()
+        touchLastSyncDate()
     }
 
     /// Adopts cloud additions unconditionally (never a data-loss risk), but

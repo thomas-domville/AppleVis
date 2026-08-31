@@ -6,6 +6,7 @@ struct AboutView: View {
     @State private var copiedSupportInfo = false
     @State private var contactType: ContactView.ContactType?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @AccessibilityFocusState private var focusTarget: AnyHashable?
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
@@ -78,9 +79,15 @@ struct AboutView: View {
     var body: some View {
         Form {
             Section("App Information") {
-                NavigationLink { WhatsNewView() } label: {
+                NavigationLink {
+                    WhatsNewView()
+                        .onDisappear {
+                            Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("whatsNew")) }
+                        }
+                } label: {
                     Label("What's New", systemImage: "sparkles")
                 }
+                .accessibilityFocused($focusTarget, equals: AnyHashable("whatsNew"))
                 .accessibilityLabel(String(localized: "What's New in AppleVis"))
                 InfoRow(label: "Version", value: appVersion)
                 InfoRow(label: "Build",   value: buildNumber)
@@ -124,41 +131,50 @@ struct AboutView: View {
             }
 
             Section("Connect With Us") {
-                Link(destination: URL(string: "https://x.com/AppleVis")!) {
-                    Label("Follow AppleVis on X", systemImage: "at")
+                // Previously three separate Link rows — one button to a
+                // dedicated screen now, matching the same pattern Discover's
+                // RSS Feeds card already uses successfully. Requested
+                // directly.
+                NavigationLink {
+                    SocialLinksView()
+                        .onDisappear {
+                            Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("socialLinks")) }
+                        }
+                } label: {
+                    Label("Follow AppleVis on Social Media", systemImage: "person.2.wave.2")
                 }
-                .accessibilityLabel(String(localized: "Follow AppleVis on X"))
-                .accessibilityHint(String(localized: "Opens in Safari."))
+                .accessibilityFocused($focusTarget, equals: AnyHashable("socialLinks"))
+                .accessibilityHint(String(localized: "See ways to follow AppleVis on X, Facebook, and Mastodon."))
 
-                Link(destination: URL(string: "https://www.facebook.com/AppleVis")!) {
-                    Label("Follow AppleVis on Facebook", systemImage: "f.circle")
-                }
-                .accessibilityLabel(String(localized: "Follow AppleVis on Facebook"))
-                .accessibilityHint(String(localized: "Opens in Safari."))
-
-                Link(destination: URL(string: "https://mastodon.online/@AppleVis")!) {
-                    Label("Follow AppleVis on Mastodon", systemImage: "network")
-                }
-                .accessibilityLabel(String(localized: "Follow AppleVis on Mastodon"))
-                .accessibilityHint(String(localized: "Opens in Safari."))
-
-                Link(destination: URL(string: "https://www.applevis.com")!) {
+                WebLink(destination: URL(string: "https://www.applevis.com")!) {
                     Label("applevis.com", systemImage: "globe")
                 }
                 .accessibilityLabel(String(localized: "applevis.com website"))
             }
 
             Section("Legal & Credits") {
-                NavigationLink { CreditsView() } label: {
+                NavigationLink {
+                    CreditsView()
+                        .onDisappear {
+                            Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("credits")) }
+                        }
+                } label: {
                     Label("Credits", systemImage: "person.2")
                 }
-                NavigationLink { OpenSourceView() } label: {
+                .accessibilityFocused($focusTarget, equals: AnyHashable("credits"))
+                NavigationLink {
+                    OpenSourceView()
+                        .onDisappear {
+                            Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("openSource")) }
+                        }
+                } label: {
                     Label("Open Source Licences", systemImage: "doc.text")
                 }
-                Link(destination: URL(string: "https://www.applevis.com/privacy")!) {
+                .accessibilityFocused($focusTarget, equals: AnyHashable("openSource"))
+                WebLink(destination: URL(string: "https://www.applevis.com/privacy")!) {
                     Label("Privacy Policy", systemImage: "hand.raised")
                 }
-                Link(destination: URL(string: "https://www.applevis.com/terms")!) {
+                WebLink(destination: URL(string: "https://www.applevis.com/terms")!) {
                     Label("Terms of Service", systemImage: "doc.plaintext")
                 }
                 Button {

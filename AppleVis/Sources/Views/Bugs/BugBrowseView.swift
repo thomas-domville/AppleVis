@@ -54,7 +54,6 @@ struct BugBrowseView: View {
 
     private var bugList: some View {
         List {
-            AccessibleScreenHeading(title: platform == .ios ? "iOS Bug Tracker" : "macOS Bug Tracker", isFocused: $isTitleFocused)
             if networkStatus.degradedGroups.contains(.bugs) {
                 OfflineBanner()
                     .listRowSeparator(.hidden)
@@ -68,11 +67,16 @@ struct BugBrowseView: View {
                 .listRowSeparator(.hidden)
             }
 
-            ForEach(visible) { bug in
-                NavigationLink(value: bug) {
+            ForEach(Array(visible.enumerated()), id: \.element.id) { index, bug in
+                let row = NavigationLink(value: bug) {
                     BugReportRow(bug: bug, onDelete: { bugs.removeAll { $0.id == bug.id } })
                 }
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                if index == 0 {
+                    row.accessibilityFocused($isTitleFocused)
+                } else {
+                    row
+                }
             }
 
             if hasMore && searchText.isEmpty {

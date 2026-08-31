@@ -23,6 +23,12 @@ final class DeepLinkRouter: ObservableObject {
     @Published var pendingSubmit: PendingSubmit?
     @Published var pendingSiriDestination: SiriDestination?
     @Published var pendingPodcastAction: PodcastSiriAction?
+    /// Set by the "What's new on AppleVis" Siri shortcut — consumed by
+    /// HomeView once it's live (mirrors the podcast-action pattern above:
+    /// HomeViewModel is a `@StateObject` owned by HomeView, not a
+    /// cross-process-callable singleton, so the intent can't compute and
+    /// speak the summary itself — it just opens the app and asks Home to).
+    @Published var pendingSpeakWhatsNew = false
 
     func handleSpotlight(identifier: String) {
         guard let resolved = SpotlightIndexer.parse(identifier: identifier) else { return }
@@ -61,6 +67,10 @@ final class DeepLinkRouter: ObservableObject {
             if let (data, fileName) = AppShareConsumer.consumePendingPodcastAudio() {
                 pendingSubmit = .podcastAudio(data: data, fileName: fileName)
             }
+        case "submit-bug":
+            pendingSubmit = .bug
+        case "whats-new":
+            pendingSpeakWhatsNew = true
         case "forums":
             let filter = value("filter").flatMap(ForumFilter.init(rawValue:)) ?? .recent
             pendingSiriDestination = .forums(filter: filter)
@@ -108,6 +118,10 @@ enum PendingSubmit: Identifiable {
     /// slot a manual "Choose Audio File" pick would fill — see
     /// `AppShareConsumer.consumePendingPodcastAudio()`.
     case podcastAudio(data: Data, fileName: String)
+    /// The "Report an AppleVis bug" Siri shortcut — no pre-filled payload,
+    /// just opens straight to the blank wizard (which handles its own
+    /// sign-in gate if needed).
+    case bug
 
     var id: String {
         switch self {
@@ -115,6 +129,7 @@ enum PendingSubmit: Identifiable {
         case .blog(let text): return "blog:\(text.prefix(40))"
         case .podcast(let url): return "podcast:\(url)"
         case .podcastAudio(let data, let fileName): return "podcastAudio:\(fileName):\(data.count)"
+        case .bug: return "bug"
         }
     }
 }

@@ -10,10 +10,10 @@ struct PrivacySettingsView: View {
     var body: some View {
         Form {
             Section {
-                AccessibleScreenHeading(title: "Privacy", isFocused: $isTitleFocused)
                 Text("AppleVis is built by and for the blindness and low-vision community. Your privacy is not a product. This section explains what we collect, what stays on your device, and gives you control over smart features.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .accessibilityFocused($isTitleFocused)
             }
 
             Section("Privacy at a Glance") {
@@ -109,7 +109,7 @@ struct PrivacySettingsView: View {
                     Label("Manage Storage", systemImage: "internaldrive")
                 }
 
-                Link(destination: URL(string: "https://www.applevis.com/privacy-policy")!) {
+                WebLink(destination: URL(string: "https://www.applevis.com/privacy")!) {
                     Label("Privacy Policy", systemImage: "doc.text")
                 }
 
@@ -120,7 +120,7 @@ struct PrivacySettingsView: View {
                         .foregroundStyle(.red)
                 }
                 .confirmationDialog(
-                    "Clear All Local Data?",
+                    "Clear all local data?",
                     isPresented: $showClearDataConfirmation,
                     titleVisibility: .visible
                 ) {
@@ -132,7 +132,7 @@ struct PrivacySettingsView: View {
             }
         }
         .confirmationDialog(
-            "Turn Off Signed-Out Reading History?",
+            "Turn off signed-out reading history?",
             isPresented: $showSignedOutHistoryConfirmation,
             titleVisibility: .visible
         ) {
@@ -149,7 +149,7 @@ struct PrivacySettingsView: View {
         .themedList(preferences.colors)
         .navigationTitle("Privacy")
         .navigationBarTitleDisplayMode(.inline)
-        .alert("Local Data Cleared", isPresented: $clearDataComplete) {
+        .alert("Local data cleared", isPresented: $clearDataComplete) {
             Button("OK", role: .cancel) {}
         } message: {
             Text("All local data has been removed. The app will reload fresh content from the server.")

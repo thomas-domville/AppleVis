@@ -162,7 +162,7 @@ struct BlogDetailView: View {
                 CommentRow(
                     authorName: comment.authorName, text: comment.body, date: comment.createdAt,
                     index: index, total: detail.comments.count,
-                    subject: comment.subject, parentTitle: detail.title,
+                    subject: comment.subject, parentTitle: detail.title, parentURL: detail.url,
                     commentId: comment.id, authorId: comment.authorId, commentType: "comment_node_blog2",
                     supportsReport: false,
                     onDelete: {
@@ -492,7 +492,7 @@ struct ComposeBlogCommentView: View {
             onPosted(comment)
             dismiss()
         } catch let e as APIError { submitError = e.localizedDescription
-        } catch { submitError = "Failed to post comment." }
+        } catch { submitError = "Couldn't post comment. Try again." }
         isSubmitting = false
     }
 }

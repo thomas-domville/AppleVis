@@ -37,7 +37,7 @@ struct WhatsNewView: View {
                 .tracking(0.8)
                 .accessibilityHidden(true)
 
-            Text("This update makes the App Directory more complete, adds Mouse Recap on Home, adds clearer ways to open App Store and RSS links, shows when App Store listings may no longer be available, gives editors a safer way to refresh app information, improves submission forms, and smooths out VoiceOver focus across the app.")
+            Text("This release is just getting started. Fixes and improvements will appear here as they land.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -160,86 +160,122 @@ struct ChangeItem: Identifiable {
     let title: String
     let description: String
 
-    static let currentVersion = "2026.0.23"
+    static let currentVersion = "2026.0.12"
 
     static let current: [ChangeItem] = [
         ChangeItem(
+            systemImage: "flag",
+            tag: .new,
+            title: "Report a Comment",
+            description: "See something that shouldn't be there? Report any comment or reply with a quick, guided form — it goes straight to the editorial team."
+        ),
+        ChangeItem(
+            systemImage: "hand.tap.fill",
+            tag: .new,
+            title: "Haptic Feedback",
+            description: "AppleVis can now vibrate for the same moments it plays a sound for — saving, signing in, errors, and more. Turn it on or off in Settings > Sounds & Haptics."
+        ),
+        ChangeItem(
+            systemImage: "app.badge",
+            tag: .improved,
+            title: "Refreshed App Icon and Launch Screen",
+            description: "AppleVis now opens with its own mark front and center, matching the icon on your Home Screen."
+        ),
+        ChangeItem(
+            systemImage: "hand.wave",
+            tag: .improved,
+            title: "A Warmer Home Greeting",
+            description: "Home now greets you whether or not you're signed in, with a friendly welcome back for returning visitors."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.shield",
+            tag: .fixed,
+            title: "Contact and Report Forms Submit More Reliably",
+            description: "Messages sent through Contact AppleVis, bug reports, feedback, and suggestions from a signed-in account now go through correctly every time."
+        ),
+        ChangeItem(
+            systemImage: "person.crop.circle",
+            tag: .improved,
+            title: "Simpler Profile",
+            description: "Profile no longer duplicates Saved Items — view and manage everything you've saved from For You."
+        ),
+        ChangeItem(
+            systemImage: "person.text.rectangle",
+            tag: .improved,
+            title: "Warmer Member Profiles",
+            description: "Profiles now show a colorful avatar, your interests, Apple products you use, and your social links, styled to match the rest of the app."
+        ),
+        ChangeItem(
+            systemImage: "envelope",
+            tag: .new,
+            title: "Message Other Members Privately",
+            description: "Send a private message to another AppleVis member from their profile. Your email address stays hidden unless they choose to reply."
+        ),
+        ChangeItem(
+            systemImage: "hand.thumbsup.fill",
+            tag: .new,
+            title: "Recommend Apps You Love",
+            description: "Recommend an app from its App Directory page, an app card's swipe actions, or the long-press menu. See everything you've recommended in For You."
+        ),
+        ChangeItem(
+            systemImage: "lock.rotation",
+            tag: .new,
+            title: "Change Your Password or Email in the App",
+            description: "A short, guided flow lets you update your account password or email address without leaving AppleVis or visiting the website."
+        ),
+        ChangeItem(
             systemImage: "sparkles",
             tag: .new,
-            title: "Mouse Recap on Home",
-            description: "Home now includes Mouse Recap, a shareable summary of new accessible apps, podcast episodes, popular discussions, guides and tutorials, and blog posts from the past week or past month."
+            title: "Help Writing Your Bio",
+            description: "Not sure what to write? Answer a couple of quick questions and get a friendly draft bio you can edit or use as-is."
         ),
         ChangeItem(
-            systemImage: "arrow.up.forward.app",
+            systemImage: "globe",
+            tag: .improved,
+            title: "Easier Location and Time Zone",
+            description: "Location is now a simple country picker instead of free text, and Time Zone can be set in one tap using your device's own time zone."
+        ),
+        ChangeItem(
+            systemImage: "apple.logo",
             tag: .new,
-            title: "Clearer App Store Button on App Pages",
-            description: "App pages now include a large Open in App Store button near the top. The button makes clear that downloads and purchases are handled by Apple, not inside AppleVis."
+            title: "Apple Products Owned",
+            description: "Add the Apple devices you use to your profile with a simple checklist, shown to other members on your profile."
         ),
         ChangeItem(
-            systemImage: "dot.radiowaves.left.and.right",
+            systemImage: "hand.raised",
             tag: .new,
-            title: "RSS Feeds in Discover",
-            description: "Discover now includes an RSS Feeds page. You can copy or share links for the main AppleVis feed, apps, blogs, guides, reviews, forums, Apple-only forum posts, and podcasts."
+            title: "Control Who Can Contact You",
+            description: "A new Profile setting lets you turn off private messages from other members at any time."
         ),
         ChangeItem(
-            systemImage: "macbook.and.iphone",
+            systemImage: "party.popper.fill",
             tag: .new,
-            title: "More Complete App Directory",
-            description: "Mac, Apple Watch, and Apple TV app entries now work more consistently across submitting, browsing, search, app pages, and comments."
+            title: "Account Anniversary Celebration",
+            description: "AppleVis now marks your join-date anniversary with a little confetti, a friendly message, and an option to share the moment."
         ),
         ChangeItem(
-            systemImage: "calendar.badge.clock",
-            tag: .new,
-            title: "More App Store Details",
-            description: "App pages can now show release and update dates, better device support, ratings, screenshots, version details, and other App Store information when available."
-        ),
-        ChangeItem(
-            systemImage: "arrow.triangle.2.circlepath",
-            tag: .new,
-            title: "Editors Can Refresh App Information",
-            description: "When signed in, AppleVis editors can update an app page from its App Store listing. This refreshes the title, description, App Store link, and current version without changing accessibility ratings, comments, reviews, category, price, or tested devices."
-        ),
-        ChangeItem(
-            systemImage: "exclamationmark.triangle",
-            tag: .new,
-            title: "App Store Availability Notices",
-            description: "If an AppleVis app entry has an App Store link that no longer works, the app page now lets you know that the listing may no longer be available."
-        ),
-        ChangeItem(
-            systemImage: "gauge.with.needle",
+            systemImage: "bell",
             tag: .fixed,
-            title: "Accessibility Ratings Are Easier to Scan",
-            description: "VoiceOver, button labelling, and usability ratings on app pages now show the intended color gauge when the rating matches AppleVis's wording."
+            title: "Following Now Shows Everything You Follow",
+            description: "The Following tab previously only showed items followed from inside the app. It now shows your complete list, including anything followed on the website."
         ),
         ChangeItem(
-            systemImage: "waveform.badge.plus",
-            tag: .new,
-            title: "Share Audio Into Podcast Submissions",
-            description: "Share an MP3, M4A, or WAV file from Files or another app, choose AppleVis, and the podcast submission form opens with the audio already attached."
-        ),
-        ChangeItem(
-            systemImage: "square.and.pencil",
+            systemImage: "at",
             tag: .fixed,
-            title: "Better Submission Forms",
-            description: "Bug reports, blog posts, podcasts, and app submissions now better match what AppleVis needs, with clearer required fields and fewer surprises at the end."
+            title: "Mastodon Handle Now Saves Correctly",
+            description: "Your Mastodon handle previously failed to save due to a naming mismatch behind the scenes. It now saves and loads correctly."
         ),
         ChangeItem(
-            systemImage: "hand.point.up.left",
+            systemImage: "house",
             tag: .fixed,
-            title: "Smoother VoiceOver Focus",
-            description: "Many screens now move VoiceOver focus to the new page or field as soon as it opens, including Settings, Profile, Discover sections, app pages, podcasts, forums, and first-time setup."
+            title: "Smoother Home Tab for VoiceOver",
+            description: "Home no longer announces its own name twice when swiping through the screen."
         ),
         ChangeItem(
-            systemImage: "paintbrush",
-            tag: .fixed,
-            title: "Theme and Text Size Polish",
-            description: "More screens, banners, cards, and setup steps now follow your selected theme and text size settings."
-        ),
-        ChangeItem(
-            systemImage: "eye.slash",
-            tag: .fixed,
-            title: "More Editorial Tools",
-            description: "AppleVis editors can now see the right edit, unpublish, and delete actions in more places when signed in."
+            systemImage: "person.badge.shield.checkmark",
+            tag: .improved,
+            title: "Editor Permissions Stay Up To Date",
+            description: "If your AppleVis role changes, the app now notices automatically instead of requiring a full sign-out and sign-in."
         ),
     ]
 
@@ -251,6 +287,86 @@ struct HistorySection: Identifiable {
     let items: [ChangeItem]
 
     static let all: [HistorySection] = [
+        HistorySection(title: "Also in 2026.0.11", items: [
+            ChangeItem(
+                systemImage: "sparkles",
+                tag: .new,
+                title: "Mouse Recap on Home",
+                description: "Home now includes Mouse Recap, a shareable summary of new accessible apps, podcast episodes, popular discussions, guides and tutorials, and blog posts from the past week or past month."
+            ),
+            ChangeItem(
+                systemImage: "arrow.up.forward.app",
+                tag: .new,
+                title: "Clearer App Store Button on App Pages",
+                description: "App pages now include a large Open in App Store button near the top. The button makes clear that downloads and purchases are handled by Apple, not inside AppleVis."
+            ),
+            ChangeItem(
+                systemImage: "dot.radiowaves.left.and.right",
+                tag: .new,
+                title: "RSS Feeds in Discover",
+                description: "Discover now includes an RSS Feeds page. You can copy or share links for the main AppleVis feed, apps, blogs, guides, reviews, forums, Apple-only forum posts, and podcasts."
+            ),
+            ChangeItem(
+                systemImage: "macbook.and.iphone",
+                tag: .new,
+                title: "More Complete App Directory",
+                description: "Mac, Apple Watch, and Apple TV app entries now work more consistently across submitting, browsing, search, app pages, and comments."
+            ),
+            ChangeItem(
+                systemImage: "calendar.badge.clock",
+                tag: .new,
+                title: "More App Store Details",
+                description: "App pages can now show release and update dates, better device support, ratings, screenshots, version details, and other App Store information when available."
+            ),
+            ChangeItem(
+                systemImage: "arrow.triangle.2.circlepath",
+                tag: .new,
+                title: "Editors Can Refresh App Information",
+                description: "When signed in, AppleVis editors can update an app page from its App Store listing. This refreshes the title, description, App Store link, and current version without changing accessibility ratings, comments, reviews, category, price, or tested devices."
+            ),
+            ChangeItem(
+                systemImage: "exclamationmark.triangle",
+                tag: .new,
+                title: "App Store Availability Notices",
+                description: "If an AppleVis app entry has an App Store link that no longer works, the app page now lets you know that the listing may no longer be available."
+            ),
+            ChangeItem(
+                systemImage: "gauge.with.needle",
+                tag: .fixed,
+                title: "Accessibility Ratings Are Easier to Scan",
+                description: "VoiceOver, button labelling, and usability ratings on app pages now show the intended color gauge when the rating matches AppleVis's wording."
+            ),
+            ChangeItem(
+                systemImage: "waveform.badge.plus",
+                tag: .new,
+                title: "Share Audio Into Podcast Submissions",
+                description: "Share an MP3, M4A, or WAV file from Files or another app, choose AppleVis, and the podcast submission form opens with the audio already attached."
+            ),
+            ChangeItem(
+                systemImage: "square.and.pencil",
+                tag: .fixed,
+                title: "Better Submission Forms",
+                description: "Bug reports, blog posts, podcasts, and app submissions now better match what AppleVis needs, with clearer required fields and fewer surprises at the end."
+            ),
+            ChangeItem(
+                systemImage: "hand.point.up.left",
+                tag: .fixed,
+                title: "Smoother VoiceOver Focus",
+                description: "Many screens now move VoiceOver focus to the new page or field as soon as it opens, including Settings, Profile, Discover sections, app pages, podcasts, forums, and first-time setup."
+            ),
+            ChangeItem(
+                systemImage: "paintbrush",
+                tag: .fixed,
+                title: "Theme and Text Size Polish",
+                description: "More screens, banners, cards, and setup steps now follow your selected theme and text size settings."
+            ),
+            ChangeItem(
+                systemImage: "eye.slash",
+                tag: .fixed,
+                title: "More Editorial Tools",
+                description: "AppleVis editors can now see the right edit, unpublish, and delete actions in more places when signed in."
+            ),
+        ]),
         HistorySection(title: "Also in 2026.0.10 - 2026.0.9", items: [
             ChangeItem(
                 systemImage: "person.crop.circle",

@@ -85,6 +85,13 @@ struct AppBrowseView: View {
         }
     }
 
+    /// `.pickerStyle(.menu)`, not `.segmented` — see ForYouView's identical
+    /// picker for the direct report explaining why (segmented reads as a
+    /// row of same-sounding "button"s with no indication they're one
+    /// connected control). Adding a swipe-up/down adjustable action on top
+    /// gives the "swipe to move to the next platform" gesture without
+    /// reverting to that already-reported problem — double-tap still opens
+    /// the menu to jump straight to a specific platform.
     private var platformPicker: some View {
         Picker("Platform", selection: $platform) {
             ForEach(AppPlatform.allCases) { p in
@@ -93,16 +100,26 @@ struct AppBrowseView: View {
         }
         .pickerStyle(.menu)
         .accessibilityHint(String(localized: "Choose which App Directory platform to browse."))
+        .accessibilityAdjustableAction { direction in
+            guard let idx = AppPlatform.allCases.firstIndex(of: platform) else { return }
+            switch direction {
+            case .increment:
+                platform = AppPlatform.allCases[(idx + 1) % AppPlatform.allCases.count]
+            case .decrement:
+                platform = AppPlatform.allCases[(idx - 1 + AppPlatform.allCases.count) % AppPlatform.allCases.count]
+            @unknown default: break
+            }
+        }
     }
 
     private var categoryList: some View {
         List {
             Section("Platform") {
-                AccessibleScreenHeading(title: "App Directory", isFocused: $isTitleFocused)
                 platformPicker
+                    .accessibilityFocused($isTitleFocused)
             }
             ForEach(groupedCategories, id: \.letter) { group in
-                Section(group.letter) {
+                Section {
                     ForEach(group.categories) { category in
                         NavigationLink(value: AppCategoryDestination(platform: platform, category: category)) {
                             HStack {
@@ -127,6 +144,15 @@ struct AppBrowseView: View {
                             ? String(localized: "\(category.name), \(category.count) apps")
                             : category.name)
                     }
+                } header: {
+                    // Bare "B" reads ambiguously to VoiceOver landing on it
+                    // mid-swipe — sounds like it could be a category itself
+                    // rather than an alphabetical divider. Kept visually
+                    // compact (matches the familiar Contacts-style index
+                    // look for sighted users) while making what it actually
+                    // means explicit for VoiceOver. Reported directly.
+                    Text(group.letter)
+                        .accessibilityLabel(String(localized: "Categories starting with \(group.letter)"))
                 }
             }
         }
@@ -186,7 +212,7 @@ struct AppCategoryView: View {
                 ErrorView(message: error) { await load(reset: true) }
             } else if apps.isEmpty {
                 EmptyStateView(
-                    title: "No apps yet",
+                    title: "No Apps Yet",
                     message: "No \(destination.platform.displayName) apps loaded for \(destination.category.name). Pull to refresh.",
                     systemImage: "square.grid.2x2"
                 )
@@ -293,7 +319,7 @@ struct AppCategoryView: View {
             }
             apps = alphabetized(allItems)
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Could not load apps" }
+        } catch { self.error = "Couldn't load apps." }
         isLoading = false
     }
 

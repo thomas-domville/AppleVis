@@ -7,10 +7,10 @@ struct AppearanceSettingsView: View {
     var body: some View {
         Form {
             Section {
-                AccessibleScreenHeading(title: "Appearance", isFocused: $isTitleFocused)
                 Text("Theme and colour scheme changes apply instantly throughout the app.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .accessibilityFocused($isTitleFocused)
             }
 
             ForEach(ThemeGroup.allCases) { group in
@@ -41,6 +41,9 @@ struct AppearanceSettingsView: View {
             }
 
             Section("Card Density") {
+                Text("Controls how much space each item takes up in lists — Comfortable gives every card room to breathe, Compact tightens the spacing so more fit on screen at once.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 Picker("Card Density", selection: $preferences.cardDensity) {
                     ForEach(CardDensity.allCases) { density in
                         Text(density.displayName).tag(density)
@@ -48,6 +51,18 @@ struct AppearanceSettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 .accessibilityHint(String(localized: "Compact reduces spacing between items in lists."))
+                // Same swipe-up/down addition as this session's other
+                // pickers — toggles Comfortable/Compact in place.
+                .accessibilityAdjustableAction { direction in
+                    guard let idx = CardDensity.allCases.firstIndex(of: preferences.cardDensity) else { return }
+                    switch direction {
+                    case .increment:
+                        preferences.cardDensity = CardDensity.allCases[(idx + 1) % CardDensity.allCases.count]
+                    case .decrement:
+                        preferences.cardDensity = CardDensity.allCases[(idx - 1 + CardDensity.allCases.count) % CardDensity.allCases.count]
+                    @unknown default: break
+                    }
+                }
             }
 
             Section {

@@ -378,6 +378,14 @@ struct EpisodeDetailView: View {
     private func playOrPause(_ episode: PodcastEpisode) {
         if isCurrentEpisode(episode) {
             player.togglePlayPause()
+            // The button's own accessibilityLabel already updates reactively
+            // (playAccessibilityLabel(for:) reads player.isPlaying), but
+            // VoiceOver doesn't reliably re-speak a focused element's label
+            // just because it changed underneath — an explicit announcement
+            // is what actually makes the new "Pause"/"Resume" state audible
+            // right after the double-tap, not just discoverable on the next
+            // swipe past it. Reported directly.
+            UIAccessibility.post(notification: .announcement, argument: playAccessibilityLabel(for: episode))
         } else {
             Task { await player.load(episode) }
         }
@@ -462,15 +470,25 @@ struct EpisodeDetailView: View {
         .accessibilityValue(sleepTimerAccessibilityStatus)
     }
 
+    /// Previously three separate, uncombined VoiceOver stops (the route
+    /// picker button's own "Audio Output" label, then the visible "Output"
+    /// caption, then a hardcoded "AirPlay" subtitle read as its own
+    /// element) — confusing to swipe through with no indication they were
+    /// one control. Matches the Sleep Timer/Speed tiles right next to it:
+    /// one combined element with a single clear label, backed by the live
+    /// output name (see `PlayerStore.currentOutputName`) instead of a
+    /// hardcoded "AirPlay" that was wrong whenever playback was actually
+    /// going through the speaker, headphones, or Bluetooth. Reported
+    /// directly.
     private var routePickerTile: some View {
         VStack(spacing: 5) {
             RoutePickerView()
                 .frame(width: 28, height: 28)
-                .accessibilityLabel(String(localized: "Audio Output"))
+                .accessibilityHidden(true)
             Text("Output")
                 .font(.caption2)
                 .fontWeight(.semibold)
-            Text("AirPlay")
+            Text(player.currentOutputName)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -478,6 +496,11 @@ struct EpisodeDetailView: View {
         .frame(maxWidth: .infinity, minHeight: 72)
         .padding(.vertical, 8)
         .background(Color(.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(String(localized: "Audio Output"))
+        .accessibilityValue(player.currentOutputName)
+        .accessibilityHint(String(localized: "Double-tap to choose a different output."))
     }
 
     private var sleepTimerStatus: String {
@@ -832,7 +855,7 @@ struct EpisodeDetailView: View {
                 CommentRow(
                     authorName: comment.authorName, text: comment.body, date: comment.createdAt,
                     index: index, total: comments.count,
-                    subject: comment.subject, parentTitle: episode.title,
+                    subject: comment.subject, parentTitle: episode.title, parentURL: episode.url,
                     commentId: comment.id, authorId: comment.authorId, commentType: "comment_node_podcast",
                     onDelete: {
                         comments.removeAll { $0.id == comment.id }
@@ -1076,6 +1099,16 @@ private struct AudioEnhancementsSheet: View {
                         }
                     }
                     .accessibilityHint(String(localized: "Adjusts the audio frequency balance. Speech Clarity is usually best for spoken-word podcasts."))
+                    .accessibilityAdjustableAction { direction in
+                        guard let idx = PodcastEQ.allCases.firstIndex(of: preferences.podcastEQ) else { return }
+                        switch direction {
+                        case .increment:
+                            preferences.podcastEQ = PodcastEQ.allCases[(idx + 1) % PodcastEQ.allCases.count]
+                        case .decrement:
+                            preferences.podcastEQ = PodcastEQ.allCases[(idx - 1 + PodcastEQ.allCases.count) % PodcastEQ.allCases.count]
+                        @unknown default: break
+                        }
+                    }
                 }
 
                 Section("Pitch Correction") {
@@ -1209,7 +1242,7 @@ struct ComposePodcastCommentView: View {
             onPosted(comment)
             dismiss()
         } catch let e as APIError { submitError = e.localizedDescription
-        } catch { submitError = "Failed to post comment." }
+        } catch { submitError = "Couldn't post comment. Try again." }
         isSubmitting = false
     }
 }

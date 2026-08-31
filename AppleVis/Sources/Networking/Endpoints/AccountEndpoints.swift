@@ -41,9 +41,19 @@ struct AccountEndpoints {
 
         var uuid = ""
         var roles: [String] = []
-        if let resolvedUuid = try? await resolveUuid(csrfToken: response.csrfToken) {
-            uuid = resolvedUuid
-            roles = (try? await resolveRoles(uuid: resolvedUuid, csrfToken: response.csrfToken)) ?? []
+        do {
+            uuid = try await resolveUuid(csrfToken: response.csrfToken) ?? ""
+            if !uuid.isEmpty {
+                do {
+                    roles = try await resolveRoles(uuid: uuid, csrfToken: response.csrfToken)
+                } catch {
+                    AppLog.auth.error("resolveRoles failed for uuid \(uuid, privacy: .private): \(error, privacy: .private)")
+                }
+            } else {
+                AppLog.auth.error("resolveUuid returned no \"me\" link — roles cannot be resolved")
+            }
+        } catch {
+            AppLog.auth.error("resolveUuid failed: \(error, privacy: .private)")
         }
 
         return AuthUser(
@@ -53,6 +63,48 @@ struct AccountEndpoints {
             csrfToken: response.csrfToken,
             logoutToken: response.logoutToken,
             roles: roles
+        )
+    }
+
+    /// Confirms `password` really is the signed-in user's *current* password
+    /// by attempting a fresh login with it — the only reliable check
+    /// available from the app's side, since a JSON:API PATCH to `user--user`
+    /// has no built-in current-password requirement of its own (that
+    /// enforcement lives only in the website's account edit form, which
+    /// this app doesn't go through). Returns the fresh CSRF token from that
+    /// login on success, valid for the change that follows; returns nil for
+    /// a plain wrong-password rejection so the caller can show a specific
+    /// "incorrect password" message instead of a generic one — any other
+    /// failure (network, decoding) still throws.
+    func verifyCurrentPassword(username: String, password: String) async throws -> String? {
+        struct Body: Encodable { let name: String; let pass: String }
+        do {
+            let response = try await login(body: Body(name: username, pass: password))
+            return response.csrfToken
+        } catch APIError.forbidden, APIError.unauthorized {
+            return nil
+        }
+    }
+
+    /// Changes the signed-in user's password. Call only after
+    /// `verifyCurrentPassword` has confirmed their current password, using
+    /// the fresh CSRF token it returned.
+    func changePassword(uuid: String, csrfToken: String, newPassword: String) async throws {
+        try await client.jsonAPIUpdate(
+            "user/user/\(uuid)", type: "user--user", id: uuid,
+            attributes: ["pass": AnyEncodable(newPassword)],
+            headers: ["X-CSRF-Token": csrfToken]
+        )
+    }
+
+    /// Changes the signed-in user's account email address. Call only after
+    /// `verifyCurrentPassword` has confirmed their current password, using
+    /// the fresh CSRF token it returned.
+    func changeEmail(uuid: String, csrfToken: String, newEmail: String) async throws {
+        try await client.jsonAPIUpdate(
+            "user/user/\(uuid)", type: "user--user", id: uuid,
+            attributes: ["mail": AnyEncodable(newEmail)],
+            headers: ["X-CSRF-Token": csrfToken]
         )
     }
 
@@ -129,7 +181,18 @@ struct AccountEndpoints {
         if let v = fields.homepage { attributes["field_profile_homepage"] = AnyEncodable(v) }
         if let v = fields.twitter { attributes["field_profile_twitter"] = AnyEncodable(v) }
         if let v = fields.facebook { attributes["field_profile_facebook"] = AnyEncodable(v) }
-        if let v = fields.mastodon { attributes["field_profile_mastodon"] = AnyEncodable(v) }
+        // Confirmed against the live account edit form's HTML: this field's
+        // real machine name is `field_mastodon_username`, not
+        // `field_profile_mastodon` (every other social field follows the
+        // `field_profile_*` convention, but this one doesn't) — Mastodon has
+        // been silently failing to save/load ever since it was added.
+        if let v = fields.mastodon { attributes["field_mastodon_username"] = AnyEncodable(v) }
+        if let v = fields.owns { attributes["field_profile_owns"] = AnyEncodable(v) }
+        // Core Drupal user fields, not `field_profile_*` custom fields —
+        // confirmed against the live account edit form's "Locale settings"
+        // (`timezone`) and "Contact settings" (`contact`) sections.
+        if let v = fields.timezone { attributes["timezone"] = AnyEncodable(v) }
+        if let v = fields.allowsContact { attributes["contact"] = AnyEncodable(v) }
         try await client.jsonAPIUpdate("user/user/\(uuid)", type: "user--user", id: uuid, attributes: attributes, headers: ["X-CSRF-Token": csrfToken])
     }
 
@@ -155,7 +218,12 @@ struct AccountEndpoints {
             homepage: text("field_profile_homepage"),
             twitter: text("field_profile_twitter"),
             facebook: text("field_profile_facebook"),
-            mastodon: text("field_profile_mastodon")
+            mastodon: text("field_mastodon_username"),
+            owns: text("field_profile_owns"),
+            timezone: text("timezone"),
+            // Defaults to true (contactable) when missing, matching
+            // Drupal's own default-enabled behavior for this checkbox.
+            allowsContact: a["contact"]?.boolValue ?? true
         )
     }
 }
@@ -169,6 +237,19 @@ struct ProfileUpdateFields {
     var twitter: String?
     var facebook: String?
     var mastodon: String?
+    /// "Apple Products Owned" on the site (`field_profile_owns`) — a plain
+    /// text field, even though the app presents it as checkboxes; see
+    /// `DevicesPickerSheet` for the serialize/parse round-trip.
+    var owns: String?
+    /// Core Drupal field (`timezone`), an IANA identifier like
+    /// "America/New_York" — not a `field_profile_*` custom field.
+    var timezone: String?
+    /// Core Drupal field (`contact`) — the site's "Personal contact form"
+    /// checkbox. When false, other members should not see a Contact button
+    /// on this person's public profile (site admins can still reach them
+    /// through other means, per the site's own description of this
+    /// setting).
+    var allowsContact: Bool?
 }
 
 private struct EmptyEncodable: Encodable {}

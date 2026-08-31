@@ -477,7 +477,12 @@ struct PodcastEpisodeRow: View {
             contentType: podcastContentType(showTitle: episode.showTitle),
             authorAndCount: authorAndCount,
             date: episode.publishedAt.formatted(.relative(presentation: .named)),
-            alwaysAppend: "\(savedQueuedLabel)\(downloadedLabel)\(newLabel)"
+            // Paused/remaining position moved ahead of the Saved/Queued/
+            // Downloaded/New badge info instead of tacked onto the very end
+            // of the whole label — reported directly: remaining time was
+            // being spoken last, after badges that have nothing to do with
+            // playback position.
+            alwaysAppend: "\(progressAccessibilityText)\(savedQueuedLabel)\(downloadedLabel)\(newLabel)"
         )
         // The visible NowPlayingWaveform and play/pause icon are both
         // .accessibilityHidden — nothing else here ever spoke playing state,
@@ -488,7 +493,7 @@ struct PodcastEpisodeRow: View {
         if isCurrentlyPlaying {
             return String(localized: "Now playing. \(base)")
         }
-        return "\(base)\(progressAccessibilityText)"
+        return base
     }
 
     // Mirrors ForumTopicRow's savedFollowingLabel — episode.isSaved existed
@@ -581,6 +586,12 @@ struct AppListingRow: View {
         ) {
             // Matches the explicit .accessibilityAction above — hidden so
             // VoiceOver doesn't announce "Open in App Store" a second time.
+            // Plain Link, not WebLink — an apps.apple.com URL is a
+            // Universal Link that only hands off to the native App Store
+            // app when opened externally; SFSafariViewController won't do
+            // that handoff, so this needs to stay outside the in-app-
+            // browser preference. Matches AppDetailView's own App Store
+            // buttons.
             if let appStoreURL {
                 Link(destination: appStoreURL) {
                     Label("Open in App Store", systemImage: "arrow.up.forward.app")

@@ -22,7 +22,7 @@ struct PodcastBrowseView: View {
             } else if let error, episodes.isEmpty {
                 ErrorView(message: error) { await load(reset: true) }
             } else if episodes.isEmpty {
-                EmptyStateView(title: "No episodes yet", message: "Pull to refresh podcast episodes", systemImage: "mic")
+                EmptyStateView(title: "No Episodes Yet", message: "Pull to refresh podcast episodes", systemImage: "mic")
             } else {
                 episodeList
             }
@@ -54,13 +54,17 @@ struct PodcastBrowseView: View {
 
     private var episodeList: some View {
         List {
-            AccessibleScreenHeading(title: "Podcasts", isFocused: $isTitleFocused)
             if networkStatus.degradedGroups.contains(.podcasts) {
                 OfflineBanner()
                     .listRowSeparator(.hidden)
             }
-            ForEach(episodes) { episode in
-                PodcastEpisodeRow(episode: episode, onDelete: { episodes.removeAll { $0.id == episode.id } })
+            ForEach(Array(episodes.enumerated()), id: \.element.id) { index, episode in
+                let row = PodcastEpisodeRow(episode: episode, onDelete: { episodes.removeAll { $0.id == episode.id } })
+                if index == 0 {
+                    row.accessibilityFocused($isTitleFocused)
+                } else {
+                    row
+                }
             }
             if hasMore {
                 ProgressView().frame(maxWidth: .infinity).accessibilityLabel(String(localized: "Loading more…"))
