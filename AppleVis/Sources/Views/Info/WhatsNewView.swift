@@ -277,6 +277,84 @@ struct ChangeItem: Identifiable {
             title: "Editor Permissions Stay Up To Date",
             description: "If your AppleVis role changes, the app now notices automatically instead of requiring a full sign-out and sign-in."
         ),
+        ChangeItem(
+            systemImage: "mic",
+            tag: .new,
+            title: "Two New Siri Shortcuts",
+            description: "Ask Siri \"What's new on AppleVis\" for a spoken catch-up, or \"Report a bug to AppleVis\" to open straight to the bug report form."
+        ),
+        ChangeItem(
+            systemImage: "arrow.uturn.backward",
+            tag: .improved,
+            title: "Home Picks Up Where You Left Off",
+            description: "When there's nothing new to catch up on, Home now returns VoiceOver focus to the last item you visited instead of starting over at the greeting."
+        ),
+        ChangeItem(
+            systemImage: "slider.horizontal.3",
+            tag: .new,
+            title: "New General Settings",
+            description: "AppleVis Tips, Home Startup Behavior, Welcome Summary, Auto-Focus Search Field, and Web Links now live together in a new Settings > General screen."
+        ),
+        ChangeItem(
+            systemImage: "sparkles",
+            tag: .fixed,
+            title: "Welcome Summary Setting Actually Works Now",
+            description: "The Welcome Summary toggle in Settings previously did nothing. It now correctly controls whether Home shows its new-activity card."
+        ),
+        ChangeItem(
+            systemImage: "bubble.left.and.bubble.right",
+            tag: .improved,
+            title: "Clearer Home Feed Settings",
+            description: "The Forums settings screen is now called Home Feed, with clearer wording distinguishing its forum-topic filter from Home's own All/New/Mouse Recap switcher."
+        ),
+        ChangeItem(
+            systemImage: "hand.draw",
+            tag: .improved,
+            title: "Swipe to Adjust More Settings",
+            description: "Podcast, Notification, and Storage settings, and the Episode Detail equalizer, now support swiping up or down to change the value, in addition to double-tapping to choose from the list."
+        ),
+        ChangeItem(
+            systemImage: "hand.raised",
+            tag: .fixed,
+            title: "Correct Privacy Policy Link",
+            description: "The Privacy Policy link in Settings pointed to a page that no longer exists. It now opens the real page."
+        ),
+        ChangeItem(
+            systemImage: "internaldrive",
+            tag: .fixed,
+            title: "Storage & Cache VoiceOver Fixes",
+            description: "Storage rows no longer read twice, a silent stop between Cached Content and Total is gone, and the Downloaded Episodes/Cached Content color coding works again."
+        ),
+        ChangeItem(
+            systemImage: "icloud",
+            tag: .fixed,
+            title: "Accurate iCloud \"Last Synced\" Time",
+            description: "Last Synced in Settings > Saved & Sync previously only updated when you tapped Sync Now. It now reflects sync that happens automatically in the background too."
+        ),
+        ChangeItem(
+            systemImage: "info.circle",
+            tag: .improved,
+            title: "Streamlined Profile Legal Links",
+            description: "Privacy Policy and Terms of Service no longer appear twice in Profile — they're one tap away in About & Credits."
+        ),
+        ChangeItem(
+            systemImage: "bookmark.slash",
+            tag: .improved,
+            title: "Faster Access to Bulk Actions in For You",
+            description: "Unsave All and Remove All Downloads are now reachable as VoiceOver actions right on the summary at the top of the list, not just as a button after every item."
+        ),
+        ChangeItem(
+            systemImage: "list.bullet",
+            tag: .improved,
+            title: "For You Section Picker Shows Counts",
+            description: "The Saved/Following/Recommended/Queue/Downloads picker in For You now shows how many items are in each section."
+        ),
+        ChangeItem(
+            systemImage: "arrow.left.circle",
+            tag: .fixed,
+            title: "Back Button Returns VoiceOver Focus",
+            description: "Coming back from a Settings, Profile, Discover, or About screen now lands VoiceOver focus on the row you tapped, instead of somewhere unrelated."
+        ),
     ]
 
 }
