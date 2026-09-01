@@ -15,7 +15,7 @@ struct ReportCommentContext {
     let contentURL: String
 }
 
-extension ReportCommentContext {
+extension String {
     /// Strips HTML and truncates a raw comment body down to something
     /// short enough to quote in a report without dumping the whole thread
     /// post into an email.

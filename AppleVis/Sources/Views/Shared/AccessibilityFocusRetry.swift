@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Reusable "Reset to Defaults" action for a settings screen — scoped to
 /// only that screen's own settings, per screen (SETTINGS-04: no reset
@@ -50,8 +51,22 @@ func retryAccessibilityFocus<T: Hashable>(
     into binding: AccessibilityFocusState<T?>.Binding,
     delaysMs: [Int] = [300, 550, 850]
 ) async {
+    // No-op with VoiceOver off: an AccessibilityFocusState reassignment has
+    // no visible effect for sighted/mouse interaction, but the repeated
+    // state mutation still forces SwiftUI to re-diff the screen — which, in
+    // testing, was found to race with a concurrent tap/gesture landing in
+    // that same ~850ms window. Skipping entirely when there's no assistive
+    // tech to benefit removes that race with zero accessibility regression.
+    guard UIAccessibility.isVoiceOverRunning else { return }
     for delayMs in delaysMs {
         try? await Task.sleep(for: .milliseconds(delayMs))
+        // If VoiceOver focus is already on something other than our target,
+        // the user has moved on and is exploring elsewhere — forcing focus
+        // back mid-interaction is exactly what let a double-tap gesture
+        // land on a stale target instead of whatever the user was actually
+        // on (the reported "double-stacked"/wrong-item navigation). Once
+        // that happens, stop fighting the user for it.
+        if let current = binding.wrappedValue, current != target { return }
         binding.wrappedValue = nil
         binding.wrappedValue = target
     }
@@ -69,10 +84,21 @@ func retryAccessibilityFocus(
     into binding: AccessibilityFocusState<Bool>.Binding,
     delaysMs: [Int] = [300, 550, 850]
 ) async {
+    // See the generic overload above: skipped entirely without VoiceOver,
+    // since the repeated state mutation has no benefit for sighted/mouse
+    // interaction but can race with a concurrent tap.
+    guard UIAccessibility.isVoiceOverRunning else { return }
+    var everFocused = false
     for delayMs in delaysMs {
         try? await Task.sleep(for: .milliseconds(delayMs))
+        // Once we've successfully focused this element, a later `false`
+        // means the user/VoiceOver moved away on their own — stop
+        // re-forcing focus back onto it mid-interaction (see the generic
+        // overload above for why that's disruptive).
+        if everFocused && !binding.wrappedValue { return }
         binding.wrappedValue = false
         binding.wrappedValue = true
+        everFocused = true
     }
 }
 
@@ -94,8 +120,15 @@ func retryAccessibilityFocus<T: Hashable>(
     returningTo rowTarget: T,
     delaysMs: [Int] = [300, 550, 850]
 ) async {
+    // See the generic overload above: skipped entirely without VoiceOver,
+    // since the repeated state mutation has no benefit for sighted/mouse
+    // interaction but can race with a concurrent tap.
+    guard UIAccessibility.isVoiceOverRunning else { return }
     for delayMs in delaysMs {
         try? await Task.sleep(for: .milliseconds(delayMs))
+        // See the generic overload above: back off once the user has
+        // moved focus elsewhere on their own instead of re-forcing it.
+        if let current = binding.wrappedValue, current != rowTarget { return }
         binding.wrappedValue = nil
         binding.wrappedValue = rowTarget
     }

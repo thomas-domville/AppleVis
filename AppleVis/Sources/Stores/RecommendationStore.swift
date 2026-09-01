@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 /// Client-side cache of which apps the signed-in user has recommended.

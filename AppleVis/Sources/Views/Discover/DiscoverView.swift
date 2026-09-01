@@ -470,7 +470,7 @@ struct DiscoverView: View {
                         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(String(localized: link.description))
+                    .accessibilityLabel(link.description)
                     .accessibilityHint(String(localized: "Double-tap to open."))
                 }
             }

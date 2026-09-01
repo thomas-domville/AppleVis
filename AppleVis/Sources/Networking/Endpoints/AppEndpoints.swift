@@ -1085,7 +1085,8 @@ private struct RichTextBodyValue: Encodable {
 /// mapDirectoryApiListing in the RN reference client).
 private func mapDirectoryListing(_ item: JSONValue, platform: AppPlatform) -> AppListing {
     let id = item["id"]?.stringValue ?? item["uuid"]?.stringValue ?? item["nid"]?.stringValue ?? UUID().uuidString
-    let name = item["name"]?.stringValue ?? item["title"]?.stringValue ?? ""
+    let rawName = item["name"]?.stringValue ?? item["title"]?.stringValue ?? ""
+    let name = HTMLText.plainText(fromHTML: rawName)
     let rawSummary = item["summary"]?.stringValue ?? item["body"]?.stringValue ?? ""
     let url = item["url"]?.stringValue ?? item["path"]?.stringValue ?? ""
     let changedRaw = item["lastUpdatedAt"]?.stringValue ?? item["last_updated_at"]?.stringValue
@@ -1100,7 +1101,11 @@ private func mapDirectoryListing(_ item: JSONValue, platform: AppPlatform) -> Ap
         reviewCount: item["reviewCount"]?.intValue ?? item["review_count"]?.intValue
             ?? item["commentCount"]?.intValue ?? item["comment_count"]?.intValue ?? 0,
         lastUpdatedAt: changedRaw.flatMap(parseFlexibleDate) ?? .distantPast,
-        lastActivityAt: .distantPast,
+        // This endpoint has no separate "last activity" field distinct from
+        // "last updated" — reusing changedRaw here instead of .distantPast
+        // avoids every category-listing row reading "2,026 years ago"
+        // (RelativeDateLabel formats .distantPast relative to today).
+        lastActivityAt: changedRaw.flatMap(parseFlexibleDate) ?? .distantPast,
         createdAt: .distantPast,
         submittedBy: "",
         submitterUid: "",
