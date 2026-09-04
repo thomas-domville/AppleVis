@@ -1,5 +1,27 @@
 import SwiftUI
 
+private enum DiscoverHubDestination: Hashable {
+    case apps
+    case forums
+    case blogs
+    case guides
+    case podcasts
+    case bugTracker
+    case rssFeeds
+
+    var focusID: AnyHashable {
+        switch self {
+        case .apps: return AnyHashable("apps")
+        case .forums: return AnyHashable("forums")
+        case .blogs: return AnyHashable("blogs")
+        case .guides: return AnyHashable("guides")
+        case .podcasts: return AnyHashable("podcasts")
+        case .bugTracker: return AnyHashable("bugTracker")
+        case .rssFeeds: return AnyHashable("rssFeeds")
+        }
+    }
+}
+
 struct DiscoverView: View {
     @State private var searchText = ""
     @State private var searchResults: SearchResults?
@@ -34,9 +56,9 @@ struct DiscoverView: View {
     }
 
     private static let socialLinks: [SocialLink] = [
-        SocialLink(id: "x", label: "X", url: URL(string: "https://x.com/AppleVis")!, systemImage: "at"),
-        SocialLink(id: "facebook", label: "Facebook", url: URL(string: "https://www.facebook.com/AppleVis")!, systemImage: "person.3.fill"),
         SocialLink(id: "mastodon", label: "Mastodon", url: URL(string: "https://mastodon.online/@AppleVis")!, systemImage: "network"),
+        SocialLink(id: "facebook", label: "Facebook", url: URL(string: "https://www.facebook.com/AppleVis")!, systemImage: "person.3.fill"),
+        SocialLink(id: "x", label: "X", url: URL(string: "https://x.com/AppleVis")!, systemImage: "at"),
     ]
 
     init(initialSearchQuery: String? = nil) {
@@ -124,6 +146,9 @@ struct DiscoverView: View {
                 guard searchText.trimmingCharacters(in: .whitespaces).count < 2 else { return }
                 Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: Self.titleFocusID) }
             }
+            .navigationDestination(for: DiscoverHubDestination.self) { destination in
+                hubDestination(for: destination)
+            }
             .navigationDestination(for: ForumTopic.self) { topic in
                 ForumTopicDetailView(topicId: topic.id)
             }
@@ -163,6 +188,37 @@ struct DiscoverView: View {
         }
     }
 
+    @ViewBuilder
+    private func hubDestination(for destination: DiscoverHubDestination) -> some View {
+        switch destination {
+        case .apps:
+            AppBrowseView()
+                .onDisappear { restoreFocus(to: destination.focusID) }
+        case .forums:
+            ForumsBrowseView(showsPersonalFilters: false)
+                .onDisappear { restoreFocus(to: destination.focusID) }
+        case .blogs:
+            BlogBrowseView()
+                .onDisappear { restoreFocus(to: destination.focusID) }
+        case .guides:
+            GuideBrowseView()
+                .onDisappear { restoreFocus(to: destination.focusID) }
+        case .podcasts:
+            PodcastBrowseView()
+                .onDisappear { restoreFocus(to: destination.focusID) }
+        case .bugTracker:
+            BugBrowseView()
+                .onDisappear { restoreFocus(to: destination.focusID) }
+        case .rssFeeds:
+            RSSFeedsView()
+                .onDisappear { restoreFocus(to: destination.focusID) }
+        }
+    }
+
+    private func restoreFocus(to focusID: AnyHashable) {
+        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: focusID) }
+    }
+
     private func runSearch(_ query: String) {
         searchTask?.cancel()
         // Matches the old RN app's minimum: below 2 characters is too broad
@@ -185,8 +241,15 @@ struct DiscoverView: View {
             searchResults = try? await APIClient.shared.search.query(query)
             isSearching = false
             announceSearchResults()
-            showTranslateSearchPrompt = preferences.searchTranslationEnabled && IntelligenceService.isAvailable
-                && IntelligenceService.detectNonEnglish(query)
+            // Previously gated on IntelligenceService.isAvailable alone —
+            // that's the narrow, Apple Intelligence hardware-gated path
+            // (newer iPhones + iOS 26 only), so a non-English query on any
+            // other device silently found nothing with no explanation why.
+            // detectNonEnglish itself has no hardware gate; the prompt now
+            // also offers to translate via the broader-reach Translation
+            // framework when FoundationModels isn't available. See
+            // translateAndResearch() for which path actually runs.
+            showTranslateSearchPrompt = preferences.searchTranslationEnabled && IntelligenceService.detectNonEnglish(query)
         }
     }
 
@@ -224,7 +287,19 @@ struct DiscoverView: View {
     private func translateAndResearch() async {
         isTranslatingSearch = true
         defer { isTranslatingSearch = false }
-        guard let translated = await IntelligenceService.translateSearchQuery(searchText) else {
+        // Tries the existing FoundationModels path first where the device
+        // supports it (LLM-quality, handles idiomatic phrasing well), and
+        // falls back to Apple's Translation framework — which reaches every
+        // device back to iOS 17.4, not just newer Apple Intelligence
+        // hardware — so non-English search actually works for everyone,
+        // not just people with the newest iPhones.
+        let translated: String?
+        if IntelligenceService.isAvailable {
+            translated = await IntelligenceService.translateSearchQuery(searchText)
+        } else {
+            translated = await TranslationCoordinator.shared.translateToEnglish(searchText)
+        }
+        guard let translated else {
             toast.error(String(localized: "Couldn't translate this search. Try again."))
             return
         }
@@ -255,25 +330,15 @@ struct DiscoverView: View {
                     .accessibilityFocused($focusTarget, equals: Self.titleFocusID)
 
                 hubSection(title: "App Directory", subtitle: "Browse accessible apps by platform and category.", accent: .green) {
-                    HubCard(title: "Apps", subtitle: "Apps by platform and category", systemImage: "square.grid.2x2", color: .green, focusID: AnyHashable("apps"), focusTarget: $focusTarget) {
-                        AppBrowseView()
-                    }
+                    HubCard(title: "Apps", subtitle: "Apps by platform and category", systemImage: "square.grid.2x2", color: .green, destination: .apps, focusTarget: $focusTarget)
                 }
                 hubSection(title: "Community", subtitle: "Find discussions and recent posts from AppleVis members.", accent: .blue) {
-                    HubCard(title: "Forums", subtitle: "Discussion & help", systemImage: "bubble.left.and.bubble.right", color: .blue, focusID: AnyHashable("forums"), focusTarget: $focusTarget) {
-                        ForumsBrowseView(showsPersonalFilters: false)
-                    }
-                    HubCard(title: "Blogs", subtitle: "Articles & news", systemImage: "newspaper", color: .red, focusID: AnyHashable("blogs"), focusTarget: $focusTarget) {
-                        BlogBrowseView()
-                    }
+                    HubCard(title: "Forums", subtitle: "Discussion & help", systemImage: "bubble.left.and.bubble.right", color: .blue, destination: .forums, focusTarget: $focusTarget)
+                    HubCard(title: "Blogs", subtitle: "Articles & news", systemImage: "newspaper", color: .red, destination: .blogs, focusTarget: $focusTarget)
                 }
                 hubSection(title: "Learn", subtitle: "Explore guides, podcast episodes, and practical accessibility resources.", accent: .orange) {
-                    HubCard(title: "Guides", subtitle: "Tutorials & resources", systemImage: "book", color: .orange, focusID: AnyHashable("guides"), focusTarget: $focusTarget) {
-                        GuideBrowseView()
-                    }
-                    HubCard(title: "Podcasts", subtitle: "Audio content", systemImage: "mic.fill", color: .purple, focusID: AnyHashable("podcasts"), focusTarget: $focusTarget) {
-                        PodcastBrowseView()
-                    }
+                    HubCard(title: "Guides", subtitle: "Tutorials & resources", systemImage: "book", color: .orange, destination: .guides, focusTarget: $focusTarget)
+                    HubCard(title: "Podcasts", subtitle: "Audio content", systemImage: "mic.fill", color: .purple, destination: .podcasts, focusTarget: $focusTarget)
                 }
                 hubSection(title: "Bug Tracker", subtitle: "Browse active accessibility bugs reported by the AppleVis community.", accent: .brown) {
                     // Card previously said "Bug Reports" — a real button,
@@ -282,19 +347,15 @@ struct DiscoverView: View {
                     // the app (Help, What's New, the Community Bug
                     // Program), which read as if the button itself were
                     // missing. Reported directly.
-                    HubCard(title: "Bug Tracker", subtitle: "Known accessibility bugs", systemImage: "ant", color: .brown, focusID: AnyHashable("bugTracker"), focusTarget: $focusTarget) {
-                        BugBrowseView()
-                    }
+                    HubCard(title: "Bug Tracker", subtitle: "Known accessibility bugs", systemImage: "ant", color: .brown, destination: .bugTracker, focusTarget: $focusTarget)
                 }
-                hubSection(title: "Stay Updated", subtitle: "Subscribe to AppleVis updates outside the app.", accent: .cyan) {
-                    HubCard(title: "RSS Feeds", subtitle: "Copy or share feed links", systemImage: "dot.radiowaves.left.and.right", color: .cyan, focusID: AnyHashable("rssFeeds"), focusTarget: $focusTarget) {
-                        RSSFeedsView()
-                    }
+                hubSection(title: "Stay Updated", subtitle: "Subscribe to AppleVis updates or follow us on social media.", accent: .cyan) {
+                    HubCard(title: "RSS Feeds", subtitle: "Copy or share feed links", systemImage: "dot.radiowaves.left.and.right", color: .cyan, destination: .rssFeeds, focusTarget: $focusTarget)
+                    socialFollowLinks
                 }
 
                 friendsOfAppleVisSection
                 contributeSection
-                connectSection
             }
             .padding(.top, 12)
         }
@@ -374,7 +435,13 @@ struct DiscoverView: View {
         }
         .padding()
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "\(title), Friend of AppleVis. \(subtitle)"))
+        // Was "\(title), Friend of AppleVis. \(subtitle)" — the section
+        // header directly above already says "Friends of AppleVis", so this
+        // row repeated it right back a swipe later for no reason, and
+        // inconsistently with its own sibling rows (Call a Volunteer/Be My
+        // AI/Service Directory), which just say "Title. Subtitle." Reported
+        // directly.
+        .accessibilityLabel(String(localized: "\(title). \(subtitle)"))
     }
 
     private func externalAppRow(_ title: String, subtitle: String, icon: String, action: @escaping () -> Void) -> some View {
@@ -443,40 +510,32 @@ struct DiscoverView: View {
         .padding(.bottom, 22)
     }
 
-    // MARK: - Connect
+    private var socialFollowLinks: some View {
+        ForEach(Self.socialLinks) { link in
+            // WebLink, not a raw openURL Button: these links honor the Web
+            // Links preference instead of always forcing the external browser.
+            WebLink(destination: link.url) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Image(systemName: link.systemImage)
+                        .font(.title2)
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Color.cyan, in: RoundedRectangle(cornerRadius: 10))
 
-    private var connectSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HubSectionHeader(title: "Connect", subtitle: "Follow AppleVis on social platforms.", accent: .cyan)
-            HStack(spacing: 8) {
-                ForEach(Self.socialLinks) { link in
-                    // WebLink, not a raw openURL Button — this grid was
-                    // always hardcoded to the external browser regardless
-                    // of the Web Links preference. Reported directly.
-                    WebLink(destination: link.url) {
-                        VStack(spacing: 6) {
-                            Image(systemName: link.systemImage)
-                                .font(.title3)
-                                .accessibilityHidden(true)
-                            Text(link.label)
-                                .font(.caption).fontWeight(.semibold)
-                            Image(systemName: "arrow.up.forward.square")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                                .accessibilityHidden(true)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 76)
-                        .padding(.vertical, 10)
-                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(link.description)
-                    .accessibilityHint(String(localized: "Double-tap to open."))
+                    Text("Follow on \(link.label)")
+                        .font(.headline)
+                    Text("Open AppleVis on \(link.label)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
+                .frame(maxWidth: .infinity, minHeight: 132, alignment: .leading)
+                .padding()
+                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
             }
-            .padding(.horizontal)
+            .buttonStyle(.plain)
+            .accessibilityLabel(link.description)
+            .accessibilityHint(String(localized: "Double-tap to open."))
         }
-        .padding(.bottom, 24)
     }
 
     private func contributeRow(_ title: String, icon: String, requiresSignIn: Bool, action: @escaping () -> Void) -> some View {
@@ -509,24 +568,16 @@ extension View {
     }
 }
 
-struct HubCard<Destination: View>: View {
+private struct HubCard: View {
     let title: String
     let subtitle: String
     let systemImage: String
     let color: Color
-    /// Identifies this card so VoiceOver focus can return to it specifically
-    /// when you come back from its destination via the system back button,
-    /// instead of landing wherever iOS defaults to. Reported directly.
-    let focusID: AnyHashable
+    let destination: DiscoverHubDestination
     let focusTarget: AccessibilityFocusState<AnyHashable?>.Binding
-    let destination: () -> Destination
 
     var body: some View {
-        NavigationLink(destination: destination()
-            .onDisappear {
-                Task { await retryAccessibilityFocus(into: focusTarget, returningTo: focusID) }
-            }
-        ) {
+        NavigationLink(value: destination) {
             VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: systemImage)
                     .font(.title2)
@@ -545,7 +596,7 @@ struct HubCard<Destination: View>: View {
             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
-        .accessibilityFocused(focusTarget, equals: focusID)
+        .accessibilityFocused(focusTarget, equals: destination.focusID)
     }
 }
 

@@ -14,6 +14,12 @@ struct EditContentSheet: View {
     @EnvironmentObject private var toast: ToastStore
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
+    /// Had no focus management at all — focuses the text editor itself
+    /// rather than a separate heading, matching ComposeTopicView's identical
+    /// reasoning for a single-field edit form: otherwise it silently
+    /// defaults to the back button. Full app-wide focus audit, requested
+    /// directly.
+    @AccessibilityFocusState private var isTextEditorFocused: Bool
 
     init(title: String, initialText: String, onSave: @escaping (String) async throws -> Void) {
         self.title = title
@@ -59,6 +65,7 @@ struct EditContentSheet: View {
                 }
                 TextEditor(text: $text)
                     .padding()
+                    .accessibilityFocused($isTextEditorFocused)
                     .onChange(of: text) { _, newValue in
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
@@ -82,6 +89,7 @@ struct EditContentSheet: View {
                         .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving || text == initialText)
                 }
             }
+            .task { await retryAccessibilityFocus(into: $isTextEditorFocused) }
         }
     }
 

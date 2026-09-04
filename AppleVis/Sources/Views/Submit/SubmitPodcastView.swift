@@ -89,8 +89,8 @@ struct SubmitPodcastView: View {
                 if submitted {
                     ThankYouView(
                         icon: "mic",
-                        heading: "Podcast submitted!",
-                        message: "Thanks for sharing your podcast. The AppleVis team will review it before it appears in the directory.",
+                        heading: "You did it — thanks!",
+                        message: "Your podcast is now in front of our team. We genuinely appreciate you taking the time to share it, and we'll be in touch once it's ready to appear in the directory.",
                         doneLabel: "Done",
                         onDone: { dismiss() }
                     )
@@ -118,14 +118,14 @@ struct SubmitPodcastView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if !submitted {
+                // Previously showed "Back" (not "Cancel") on Review, leaving
+                // no way to actually leave the wizard from that step without
+                // stepping backward first. Cancel now stays put regardless
+                // of step; step-backward navigation moved to its own
+                // in-content button below, matching Submit App/Blog/Bug's
+                // existing convention. Reported directly.
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(step == .audio ? "Cancel" : "Back") {
-                        if step == .audio {
-                            requestCancel()
-                        } else {
-                            goBack()
-                        }
-                    }
+                    Button("Cancel") { requestCancel() }
                 }
                 if auth.isSignedIn {
                     if step == .audio && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
@@ -168,6 +168,11 @@ struct SubmitPodcastView: View {
         } message: {
             Text("Your progress will be discarded.")
         }
+        // Step 1 previously got no explicit focus at all — only
+        // goNext()/goBack() ever called focusStepAfterTransition(), so
+        // opening this wizard left VoiceOver focus on system default
+        // (typically Cancel). Full app-wide focus audit, requested directly.
+        .task { focusStepAfterTransition() }
     }
 
     /// RN confirmed before discarding a filled-out form; Cancel here
@@ -280,7 +285,7 @@ struct SubmitPodcastView: View {
                 TextEditor(text: $description)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Episode Description"))
-                    .accessibilityHint(String(localized: "Required. Minimum 20 characters."))
+                    .accessibilityHint(String(localized: "Required, minimum 20 characters. Tell listeners what this episode covers — the topics, guests, or themes — so they know what to expect before pressing play."))
                     .onChange(of: description) { _, newValue in
                         handleDescriptionChange(newValue)
                         guidelines.textChanged(newValue)
@@ -290,6 +295,9 @@ struct SubmitPodcastView: View {
                             detectionEnabled: preferences.nonEnglishDetectionEnabled
                         )
                     }
+                Text("Tell listeners what this episode covers — the topics, guests, or themes — so they know what to expect before pressing play.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section("Audio File") {
                 Button {
@@ -304,7 +312,10 @@ struct SubmitPodcastView: View {
 
     private var reviewSection: some View {
         Group {
-            Section { WizardStepIndicator(step: 2, total: 2, title: "Review & Submit", isFocused: $isStepFocused) }
+            Section {
+                WizardStepIndicator(step: 2, total: 2, title: "Review & Submit", isFocused: $isStepFocused)
+                backButton
+            }
             Section("From") {
                 WizardReviewRow(label: "Posting As", value: auth.user?.name ?? "")
             }
@@ -327,10 +338,20 @@ struct SubmitPodcastView: View {
         focusStepAfterTransition()
     }
 
+    /// Was a single guessed 300ms delay — see SubmitAppView's identical fix
+    /// for the full reasoning. Full app-wide focus audit, requested
+    /// directly.
     private func focusStepAfterTransition() {
-        Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            isStepFocused = true
+        Task { await retryAccessibilityFocus(into: $isStepFocused) }
+    }
+
+    /// Step-backward navigation, separated from the toolbar's Cancel button
+    /// so a user can discard the submission from any step.
+    private var backButton: some View {
+        Button {
+            goBack()
+        } label: {
+            Label("Back", systemImage: "chevron.backward")
         }
     }
 

@@ -6,6 +6,9 @@ import SwiftUI
 /// Feeds already uses. Requested directly.
 struct SocialLinksView: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    /// Had no focus management at all. Full app-wide focus audit,
+    /// requested directly.
+    @AccessibilityFocusState private var isIntroFocused: Bool
 
     private struct SocialPlatform: Identifiable {
         let id: String
@@ -26,6 +29,7 @@ struct SocialLinksView: View {
                 Text("Follow AppleVis wherever you already hang out online, for updates outside the app.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .accessibilityFocused($isIntroFocused)
             }
             Section {
                 ForEach(platforms) { platform in
@@ -40,5 +44,6 @@ struct SocialLinksView: View {
         .themedList(preferences.colors)
         .navigationTitle("Social Media")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await retryAccessibilityFocus(into: $isIntroFocused) }
     }
 }

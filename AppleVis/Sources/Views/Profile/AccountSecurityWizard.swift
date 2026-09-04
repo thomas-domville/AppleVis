@@ -103,13 +103,16 @@ struct AccountSecurityWizard: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if !submitted {
+                    // Previously showed "Back" (not "Cancel") on every step
+                    // past Confirm Your Password, leaving no way to actually
+                    // leave the wizard from New Value or Review without
+                    // stepping backward first. Cancel now stays put
+                    // regardless of step; step-backward navigation moved to
+                    // its own in-content button below, matching every other
+                    // wizard's convention. Reported directly.
                     ToolbarItem(placement: .cancellationAction) {
-                        Button(step == .verify ? "Cancel" : "Back") {
-                            if step == .verify { requestCancel() } else { goBack() }
-                        }
-                        .accessibilityHint(step == .verify
-                            ? String(localized: "Cancels and closes this form.")
-                            : String(localized: "Returns to the previous step."))
+                        Button("Cancel") { requestCancel() }
+                            .accessibilityHint(String(localized: "Cancels and closes this form."))
                     }
                     ToolbarItem(placement: .confirmationAction) {
                         if step == .review {
@@ -131,6 +134,12 @@ struct AccountSecurityWizard: View {
             } message: {
                 Text(mode == .password ? "Your password change will be discarded." : "Your email change will be discarded.")
             }
+            // Step 1 previously got no explicit focus at all — only
+            // goNext()/goBack() ever called focusStepAfterTransition(), so
+            // opening this wizard left VoiceOver focus on system default
+            // (typically Cancel). Full app-wide focus audit, requested
+            // directly.
+            .task { focusStepAfterTransition() }
         }
     }
 
@@ -161,6 +170,7 @@ struct AccountSecurityWizard: View {
                     title: mode == .password ? "Choose a New Password" : "Enter Your New Email",
                     isFocused: $isStepFocused, accentColor: mode.color
                 )
+                backButton
             }
             if mode == .password {
                 Section("New Password") {
@@ -200,6 +210,7 @@ struct AccountSecurityWizard: View {
         Group {
             Section {
                 WizardStepIndicator(step: 3, total: totalSteps, title: "Review and Save", isFocused: $isStepFocused, accentColor: mode.color)
+                backButton
             }
             Section {
                 if mode == .password {
@@ -241,10 +252,20 @@ struct AccountSecurityWizard: View {
         }
     }
 
+    /// Was a single guessed 300ms delay — see SubmitAppView's identical fix
+    /// for the full reasoning. Full app-wide focus audit, requested
+    /// directly.
     private func focusStepAfterTransition() {
-        Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            isStepFocused = true
+        Task { await retryAccessibilityFocus(into: $isStepFocused) }
+    }
+
+    /// Step-backward navigation, separated from the toolbar's Cancel button
+    /// so a user can discard the change from any step.
+    private var backButton: some View {
+        Button {
+            goBack()
+        } label: {
+            Label("Back", systemImage: "chevron.backward")
         }
     }
 

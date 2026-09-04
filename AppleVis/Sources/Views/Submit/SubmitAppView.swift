@@ -325,8 +325,8 @@ struct SubmitAppView: View {
                 if submitted {
                     ThankYouView(
                         icon: "app.badge",
-                        heading: "App submitted!",
-                        message: "Thanks for documenting this app's accessibility. The AppleVis team will review your submission before it appears in the directory.",
+                        heading: "You did it — thanks!",
+                        message: "Your submission is now in front of our team. We genuinely appreciate you taking the time to document this app's accessibility, and we'll be in touch once it's ready to appear in the directory.",
                         doneLabel: "Done",
                         onDone: { dismiss() }
                     )
@@ -386,7 +386,7 @@ struct SubmitAppView: View {
                             Button("Submit") { Task { await submit() } }
                                 .disabled(!isValid || isSubmitting || !exactDuplicateMatches.isEmpty)
                         } else if step == .details {
-                            Button("Review") { goNext() }
+                            Button("Review & Submit") { goNext() }
                                 .disabled(!isValid)
                         }
                     }
@@ -404,7 +404,16 @@ struct SubmitAppView: View {
             }
         }
         .sheet(isPresented: $showSignIn) { SignInView() }
-        .task { await applyPrefillIfNeeded() }
+        .task {
+            await applyPrefillIfNeeded()
+            // Step 1 previously got no explicit focus at all — only
+            // goNext()/goBack() ever called focusStepAfterTransition(), so
+            // opening this wizard left VoiceOver focus on system default
+            // (typically Cancel). After prefill, in case that resolved
+            // straight to a later step. Full app-wide focus audit,
+            // requested directly.
+            focusStepAfterTransition()
+        }
     }
 
     /// RN showed a full-screen "Sign In Required" blocker before any
@@ -778,6 +787,7 @@ struct SubmitAppView: View {
                         .textInputAutocapitalization(.never)
                         .accessibilityHint(String(localized: "Required."))
                     TextField("Version", text: $payload.appVersion)
+                        .accessibilityHint(String(localized: "The version number shown on the App Store listing."))
                     Picker("Category", selection: $payload.category) {
                         Text("Choose…").tag("")
                         ForEach(categories, id: \.self) { Text($0).tag($0) }
@@ -830,7 +840,7 @@ struct SubmitAppView: View {
             Section {
                 if isMetadataFromAppStore {
                     WizardReviewRow(
-                        label: "Device(s) Tested On",
+                        label: "App Supports",
                         value: deviceOptions.filter { payload.supportedDevices.contains($0.value) }.map(\.label).joined(separator: ", ")
                     )
                 } else {
@@ -850,12 +860,12 @@ struct SubmitAppView: View {
                     }
                 }
             } header: {
-                Text("Device(s) Tested On")
+                Text("App Supports")
             } footer: {
                 if isMetadataFromAppStore {
                     Text("Taken from the devices this app supports on the App Store.")
                 } else {
-                    Text("Required. Select every device you tested this app on.")
+                    Text("Required. Select every device this app supports.")
                 }
             }
 
@@ -870,7 +880,7 @@ struct SubmitAppView: View {
                     TextEditor(text: $payload.appStoreDescription)
                         .frame(minHeight: 100)
                         .accessibilityLabel(String(localized: "Description of App"))
-                        .accessibilityHint(String(localized: "Required."))
+                        .accessibilityHint(String(localized: "Required. A short description of what this app does, similar to what you'd read on its own App Store listing."))
                 }
             } header: {
                 Text("Description of App")
@@ -953,7 +963,7 @@ struct SubmitAppView: View {
                 TextEditor(text: $payload.accessibilityComments)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
-                    .accessibilityHint(String(localized: "Required. Minimum 20 characters."))
+                    .accessibilityHint(String(localized: "Required, minimum 20 characters. Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it."))
                     .onChange(of: payload.accessibilityComments) { _, newValue in
                         handleAccessibilityCommentsChange(newValue)
                         guidelines.textChanged(newValue)
@@ -964,24 +974,9 @@ struct SubmitAppView: View {
                         )
                     }
                 rewriteButton(text: $payload.accessibilityComments)
-            }
-
-            Section("Short Summary") {
-                TextField("One-line summary for the directory listing", text: $payload.shortSummary)
-                    .accessibilityHint(String(localized: "Shown in the app directory list view, not the full review."))
-                    // Non-English detection only, not the full guideline/tone
-                    // checker — this is a single line with its own length
-                    // gate that a short summary often won't clear anyway,
-                    // and a translate offer is the part that actually
-                    // matters before it hits the hard block at Submit.
-                    // Reported directly.
-                    .onChange(of: payload.shortSummary) { _, newValue in
-                        intelligence.textChanged(
-                            newValue,
-                            translationEnabled: preferences.composeTranslationEnabled,
-                            detectionEnabled: preferences.nonEnglishDetectionEnabled
-                        )
-                    }
+                Text("Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             // Was entirely unchecked before — no live guideline/language
@@ -990,6 +985,8 @@ struct SubmitAppView: View {
             Section("Additional Comments (optional)") {
                 TextEditor(text: $payload.otherComments)
                     .frame(minHeight: 80)
+                    .accessibilityLabel(String(localized: "Additional Comments"))
+                    .accessibilityHint(String(localized: "Optional. Anything else about this app worth mentioning that didn't fit above."))
                     .onChange(of: payload.otherComments) { _, newValue in
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
@@ -1052,7 +1049,7 @@ struct SubmitAppView: View {
                     TextEditor(text: $tvPayload.appDescription)
                         .frame(minHeight: 100)
                         .accessibilityLabel(String(localized: "Description of App"))
-                        .accessibilityHint(String(localized: "Required."))
+                        .accessibilityHint(String(localized: "Required. A short description of what this app does, similar to what you'd read on its own App Store listing."))
                 }
             } header: {
                 Text("Description of App")
@@ -1116,7 +1113,7 @@ struct SubmitAppView: View {
                 TextEditor(text: $tvPayload.accessibilityComments)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
-                    .accessibilityHint(String(localized: "Required. Minimum 20 characters."))
+                    .accessibilityHint(String(localized: "Required, minimum 20 characters. Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it."))
                     .onChange(of: tvPayload.accessibilityComments) { _, newValue in
                         handleTvAccessibilityCommentsChange(newValue)
                         guidelines.textChanged(newValue)
@@ -1127,11 +1124,16 @@ struct SubmitAppView: View {
                         )
                     }
                 rewriteButton(text: $tvPayload.accessibilityComments)
+                Text("Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Other Comments (optional)") {
                 TextEditor(text: $tvPayload.otherComments)
                     .frame(minHeight: 80)
+                    .accessibilityLabel(String(localized: "Other Comments"))
+                    .accessibilityHint(String(localized: "Optional. Anything else about this app worth mentioning that didn't fit above."))
                     .onChange(of: tvPayload.otherComments) { _, newValue in
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
@@ -1169,6 +1171,7 @@ struct SubmitAppView: View {
                         .textInputAutocapitalization(.never)
                         .accessibilityHint(String(localized: "Required."))
                     TextField("Version", text: $watchPayload.appVersion)
+                        .accessibilityHint(String(localized: "The version number shown on the App Store listing."))
                 }
                 Picker("Category", selection: $watchPayload.category) {
                     Text("Choose…").tag("")
@@ -1210,7 +1213,7 @@ struct SubmitAppView: View {
                     TextEditor(text: $watchPayload.appDescription)
                         .frame(minHeight: 100)
                         .accessibilityLabel(String(localized: "Description of App"))
-                        .accessibilityHint(String(localized: "Required."))
+                        .accessibilityHint(String(localized: "Required. A short description of what this app does, similar to what you'd read on its own App Store listing."))
                 }
             } header: {
                 Text("Description of App")
@@ -1283,7 +1286,7 @@ struct SubmitAppView: View {
                 TextEditor(text: $watchPayload.accessibilityComments)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
-                    .accessibilityHint(String(localized: "Required. Minimum 20 characters."))
+                    .accessibilityHint(String(localized: "Required, minimum 20 characters. Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it."))
                     .onChange(of: watchPayload.accessibilityComments) { _, newValue in
                         handleWatchAccessibilityCommentsChange(newValue)
                         guidelines.textChanged(newValue)
@@ -1294,11 +1297,16 @@ struct SubmitAppView: View {
                         )
                     }
                 rewriteButton(text: $watchPayload.accessibilityComments)
+                Text("Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Other Comments (optional)") {
                 TextEditor(text: $watchPayload.otherComments)
                     .frame(minHeight: 80)
+                    .accessibilityLabel(String(localized: "Other Comments"))
+                    .accessibilityHint(String(localized: "Optional. Anything else about this app worth mentioning that didn't fit above."))
                     .onChange(of: watchPayload.otherComments) { _, newValue in
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
@@ -1340,7 +1348,7 @@ struct SubmitAppView: View {
                         .textInputAutocapitalization(.never)
                         .accessibilityHint(String(localized: "Optional. Leave blank if this app isn't in the Mac App Store."))
                     TextField("Version", text: $macPayload.appVersion)
-                        .accessibilityHint(String(localized: "Required."))
+                        .accessibilityHint(String(localized: "Required. The version number shown on the App Store listing."))
                 }
                 Picker("Category", selection: $macPayload.category) {
                     Text("Choose…").tag("")
@@ -1393,7 +1401,7 @@ struct SubmitAppView: View {
                     TextEditor(text: $macPayload.appDescription)
                         .frame(minHeight: 100)
                         .accessibilityLabel(String(localized: "Description of App"))
-                        .accessibilityHint(String(localized: "Required."))
+                        .accessibilityHint(String(localized: "Required. A short description of what this app does, similar to what you'd read on its own App Store listing."))
                 }
             } header: {
                 Text("Description of App")
@@ -1466,7 +1474,7 @@ struct SubmitAppView: View {
                 TextEditor(text: $macPayload.accessibilityComments)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
-                    .accessibilityHint(String(localized: "Required. Minimum 20 characters."))
+                    .accessibilityHint(String(localized: "Required, minimum 20 characters. Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it."))
                     .onChange(of: macPayload.accessibilityComments) { _, newValue in
                         handleMacAccessibilityCommentsChange(newValue)
                         guidelines.textChanged(newValue)
@@ -1477,11 +1485,16 @@ struct SubmitAppView: View {
                         )
                     }
                 rewriteButton(text: $macPayload.accessibilityComments)
+                Text("Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Other Comments (optional)") {
                 TextEditor(text: $macPayload.otherComments)
                     .frame(minHeight: 80)
+                    .accessibilityLabel(String(localized: "Other Comments"))
+                    .accessibilityHint(String(localized: "Optional. Anything else about this app worth mentioning that didn't fit above."))
                     .onChange(of: macPayload.otherComments) { _, newValue in
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
@@ -1625,11 +1638,14 @@ struct SubmitAppView: View {
         }
     }
 
+    /// Was a single guessed 300ms delay, the same unreliable-on-slower-
+    /// devices pattern the detail-screen title-focus convention was built to
+    /// eliminate (see AccessibilityFocusRetry.swift) — regrown here (and in
+    /// every other multi-step wizard) as a copy-pasted local reimplementation
+    /// instead of reusing that shared helper. Full app-wide focus audit,
+    /// requested directly.
     private func focusStepAfterTransition() {
-        Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            isStepFocused = true
-        }
+        Task { await retryAccessibilityFocus(into: $isStepFocused) }
     }
 
     /// Title-contains lookup against the existing directory before this
@@ -1724,7 +1740,7 @@ struct SubmitAppView: View {
                 WizardReviewRow(label: "Category", value: payload.category)
                 WizardReviewRow(label: "Minimum OS Version", value: payload.osVersion)
                 WizardReviewRow(
-                    label: "Device(s) Tested On",
+                    label: "App Supports",
                     value: deviceOptions.filter { payload.supportedDevices.contains($0.value) }.map(\.label).joined(separator: ", ")
                 )
                 WizardReviewRow(label: "Description of App", value: payload.appStoreDescription)
@@ -1738,9 +1754,10 @@ struct SubmitAppView: View {
                 WizardReviewRow(label: "Usability", value: payload.usabilityNotes)
                 WizardReviewRow(label: "Accessibility Comments", value: payload.accessibilityComments)
             }
-            Section("Additional") {
-                WizardReviewRow(label: "Short Summary", value: payload.shortSummary)
-                WizardReviewRow(label: "Additional Comments", value: payload.otherComments)
+            if !payload.otherComments.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Section("Additional") {
+                    WizardReviewRow(label: "Additional Comments", value: payload.otherComments)
+                }
             }
         }
     }
@@ -1872,14 +1889,13 @@ struct SubmitAppView: View {
             await announceWizardFailure(message, focus: $isErrorFocused)
             return
         }
-        // Previously only Accessibility Comments + Additional Comments —
-        // Short Summary and a manually-typed Description of App are just
-        // as user-authored, and neither was covered at all, live or at
-        // Submit. A description pulled from the App Store isn't included
-        // even now: that's Apple's own text, not something being asked of
-        // the submitter, so it isn't fair to hold it to this policy.
+        // The visible user-authored text is checked here. The Drupal body
+        // summary/teaser is generated internally during submit, matching the
+        // website form's normally-hidden optional summary field. A description
+        // pulled from the App Store is Apple's own text, not something being
+        // asked of the submitter, so it is not held to this policy.
         // Reported directly.
-        var policyParts = [payload.accessibilityComments, payload.otherComments, payload.shortSummary]
+        var policyParts = [payload.accessibilityComments, payload.otherComments]
         if !isMetadataFromAppStore {
             policyParts.append(payload.appStoreDescription)
         }

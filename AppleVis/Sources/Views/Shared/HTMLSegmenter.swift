@@ -157,10 +157,70 @@ nonisolated enum HTMLSegmenter {
         return (rows, hasHeaderRow)
     }
 
+    /// One prose segment per paragraph instead of one flattened block for
+    /// however many paragraphs sat between the surrounding headings/quotes/
+    /// code/tables (or the whole body, for the common case of a post with no
+    /// heading structure at all) — matches the same reasoning
+    /// `AuthorProfileButton`'s bio splitting already applies: a long
+    /// multi-paragraph block flattened into a single accessibility element
+    /// reads (or Braille-pans) as one undifferentiated stream, with no way
+    /// to stop, re-read, or skip to a specific paragraph. Requested
+    /// directly.
     private static func appendProse(_ html: String, to segments: inout [HTMLSegment]) {
-        let plain = html.strippingHTMLTags().trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !plain.isEmpty else { return }
-        segments.append(HTMLSegment(kind: .prose, html: html, plainText: plain))
+        for paragraphHTML in splitIntoParagraphs(html) {
+            let plain = paragraphHTML.strippingHTMLTags().trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !plain.isEmpty else { continue }
+            segments.append(HTMLSegment(kind: .prose, html: paragraphHTML, plainText: plain))
+        }
+    }
+
+    /// Splits a prose chunk into individual paragraphs, same tiered fallback
+    /// TranscriptView already uses for a structureless plain-text
+    /// transcript, adapted for HTML: `<p>` tags first (Drupal's rich-text
+    /// editor's normal output), then runs of 2+ `<br>` tags (the next most
+    /// common paragraph-separation convention in older/pasted content that
+    /// skipped `<p>` wrapping), then single `<br>` tags (a speaker-turn-per-
+    /// line convention, matching TranscriptView's own line-based tier).
+    /// Content with none of those falls back to `TextSegmentation`'s
+    /// sentence-grouping — but ONLY when the chunk has no HTML markup at
+    /// all (Drupal occasionally leaves a stray blob of plain text
+    /// unwrapped): re-grouping by stripped-text sentence boundaries would
+    /// silently drop any inline markup (links, bold, etc.) a chunk that
+    /// still contains tags actually has, so that case stays a single piece
+    /// instead — the same graceful degradation already accepted for a body
+    /// with no heading structure at all.
+    private static func splitIntoParagraphs(_ html: String) -> [String] {
+        if let pieces = splitOnMatches(of: #"(?is)<p\b[^>]*>.*?</p>"#, in: html, keepMatchedText: true) { return pieces }
+        if let pieces = splitOnMatches(of: #"(?is)(?:<br\s*/?>\s*){2,}"#, in: html) { return pieces }
+        if let pieces = splitOnMatches(of: #"(?is)<br\s*/?>"#, in: html) { return pieces }
+        if !html.contains("<") {
+            let groups = TextSegmentation.sentenceGroups(html)
+            if groups.count > 1 { return groups }
+        }
+        return [html]
+    }
+
+    /// Two different splitting jobs above this line: `<p>` tags become the
+    /// pieces *between and including* each match; `<br>` tags are pure
+    /// separators, discarded, keeping only the text *between* matches. Both
+    /// share this helper's match-finding; each caller decides which via
+    /// `keepMatchedText`.
+    private static func splitOnMatches(of pattern: String, in html: String, keepMatchedText: Bool = false) -> [String]? {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let ns = html as NSString
+        let matches = regex.matches(in: html, range: NSRange(location: 0, length: ns.length))
+        guard !matches.isEmpty else { return nil }
+        if keepMatchedText {
+            return matches.map { ns.substring(with: $0.range) }
+        }
+        var pieces: [String] = []
+        var cursor = 0
+        for match in matches {
+            pieces.append(ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor)))
+            cursor = match.range.location + match.range.length
+        }
+        pieces.append(ns.substring(from: cursor))
+        return pieces
     }
 }
 
@@ -180,8 +240,35 @@ struct SegmentedHTMLView: View {
     /// When true, headings before the first shown segment get a
     /// jump-to-heading table of contents above the content.
     var showTableOfContents = false
+    /// Identifies this body for the reading-side translation cache
+    /// (`PersistenceStore.cachedTranslation`/`cacheTranslation`) — all three
+    /// left `nil` (the default) means this instance behaves exactly as
+    /// before, untranslated. `kind` is a plain string, not `ContentKind`,
+    /// so comments/replies and Help articles (not valid top-level
+    /// `ContentKind` cases) can use this same path. `field` distinguishes
+    /// multiple translatable bodies on one piece of content — Bug's
+    /// description/steps/workaround, App's about/accessibility-comments —
+    /// so they don't collide in the cache.
+    var contentKind: String? = nil
+    var contentId: String? = nil
+    var field: String = "body"
 
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var expanded = false
+    /// Defaults to showing the translation (not the original) once one
+    /// exists — matches the whole point of turning auto-translate on.
+    /// Persistent for the life of this view, no dismiss button, same as
+    /// Safari's own translate banner.
+    @State private var showOriginal = false
+    @State private var resolvedContent: [UUID: ResolvedSegmentContent] = [:]
+
+    private enum ResolvedSegmentContent {
+        case plain(String)
+        /// Used only for segments containing at least one link — preserves
+        /// the link as a real, tappable, VoiceOver-actionable run instead of
+        /// flattening it to inert text. See `LinkSplitter`.
+        case attributed(AttributedString)
+    }
 
     private var allSegments: [HTMLSegment] { HTMLSegmenter.segment(html) }
 
@@ -195,6 +282,9 @@ struct SegmentedHTMLView: View {
             if showTableOfContents && headings.count > 1 {
                 TableOfContentsView(headings: headings)
             }
+            if hasActiveTranslation {
+                TranslationBanner(showOriginal: $showOriginal)
+            }
             ForEach(visible) { segment in
                 segmentView(segment)
                     .id(segment.id)
@@ -205,20 +295,168 @@ struct SegmentedHTMLView: View {
             }
         }
         .accessibilityElement(children: .contain)
+        .task(id: translationTaskId) { await resolveTranslationIfNeeded() }
+    }
+
+    private var hasActiveTranslation: Bool {
+        contentId != nil && preferences.effectiveContentLanguage != nil && !resolvedContent.isEmpty
+    }
+
+    private var translationTaskId: String {
+        "\(html)|\(preferences.effectiveContentLanguage ?? "")|\(contentId ?? "")"
+    }
+
+    /// Not translated (nil `contentId`, translation off, or `showOriginal`
+    /// tapped) shows exactly what always rendered here — zero behavior
+    /// change for every call site that hasn't opted in. Tables are
+    /// deliberately excluded (stay English-only for v1 — see `allSegments`
+    /// filtering below); cell-by-cell translation of a grid wasn't judged
+    /// worth the added complexity for how rarely guides use tables.
+    private func isTranslated(_ segment: HTMLSegment) -> Bool {
+        !showOriginal && resolvedContent[segment.id] != nil
+    }
+
+    @ViewBuilder
+    private func segmentContent(_ segment: HTMLSegment) -> some View {
+        if !showOriginal, let resolved = resolvedContent[segment.id] {
+            switch resolved {
+            case .plain(let text): Text(text)
+            case .attributed(let attributed): Text(attributed)
+            }
+        } else {
+            HTMLTextView(html: segment.html)
+        }
+    }
+
+    /// Plain-text stand-in for a segment's current content, translated or
+    /// not — used to build accessibility labels without needing a second
+    /// switch over `ResolvedSegmentContent`.
+    private func accessibilityText(for segment: HTMLSegment) -> String {
+        guard !showOriginal, let resolved = resolvedContent[segment.id] else { return segment.plainText }
+        switch resolved {
+        case .plain(let text): return text
+        case .attributed(let attributed): return String(attributed.characters)
+        }
+    }
+
+    /// Batches every translatable segment's text into as few
+    /// `TranslationCoordinator.translateBatch` calls as possible (one for
+    /// plain segments, one for every link-containing segment's pieces
+    /// combined) rather than awaiting per-segment. Plain segments are
+    /// cached in `PersistenceStore` keyed per-segment (an edit to one
+    /// paragraph only invalidates that paragraph); segments containing a
+    /// link are deliberately NOT persisted — reassembling a cached
+    /// `AttributedString`'s link attribute correctly would need a small
+    /// serialization format `PersistenceStore.CachedTranslation`'s plain
+    /// `String` doesn't have, and links are the minority case, so those
+    /// re-translate (still on-device, still batched) each time the screen
+    /// loads rather than adding that schema complexity now.
+    private func resolveTranslationIfNeeded() async {
+        guard let contentId, let targetLanguage = preferences.effectiveContentLanguage else {
+            resolvedContent = [:]
+            return
+        }
+        let kind = contentKind ?? "content"
+        let translatableSegments = allSegments.filter {
+            if case .table = $0.kind { return false }
+            return true
+        }
+
+        var plainItems: [(segment: HTMLSegment, cacheField: String)] = []
+        var linkItems: [(segment: HTMLSegment, pieces: [LinkSplitter.Piece])] = []
+        for segment in translatableSegments {
+            let pieces = LinkSplitter.split(segment.html)
+            let hasLink = pieces.contains { if case .link = $0 { return true } else { return false } }
+            if hasLink {
+                linkItems.append((segment, pieces))
+            } else {
+                plainItems.append((segment, "\(field).segment.\(segment.id)"))
+            }
+        }
+
+        var newResolved: [UUID: ResolvedSegmentContent] = [:]
+
+        if !plainItems.isEmpty {
+            var results = [String?](repeating: nil, count: plainItems.count)
+            var toTranslateIndices: [Int] = []
+            for (index, item) in plainItems.enumerated() {
+                if let cached = PersistenceStore.shared.cachedTranslation(
+                    kind: kind, id: contentId, field: item.cacheField, targetLanguage: targetLanguage, sourceText: item.segment.plainText
+                ) {
+                    results[index] = cached
+                } else {
+                    toTranslateIndices.append(index)
+                }
+            }
+            if !toTranslateIndices.isEmpty {
+                let translated = await TranslationCoordinator.shared.translateBatch(
+                    toTranslateIndices.map { plainItems[$0].segment.plainText }, to: targetLanguage
+                )
+                for (offset, index) in toTranslateIndices.enumerated() {
+                    guard let text = translated[offset] else { continue }
+                    results[index] = text
+                    PersistenceStore.shared.cacheTranslation(
+                        kind: kind, id: contentId, field: plainItems[index].cacheField, targetLanguage: targetLanguage,
+                        sourceText: plainItems[index].segment.plainText, translatedText: text
+                    )
+                }
+            }
+            for (index, item) in plainItems.enumerated() {
+                if let text = results[index] { newResolved[item.segment.id] = .plain(text) }
+            }
+        }
+
+        if !linkItems.isEmpty {
+            struct Unit { let segmentId: UUID; let pieceIndex: Int; let text: String }
+            var units: [Unit] = []
+            for item in linkItems {
+                for (pieceIndex, piece) in item.pieces.enumerated() {
+                    switch piece {
+                    case .text(let text): units.append(Unit(segmentId: item.segment.id, pieceIndex: pieceIndex, text: text))
+                    case .link(let label, _): units.append(Unit(segmentId: item.segment.id, pieceIndex: pieceIndex, text: label))
+                    }
+                }
+            }
+            let translatedUnits = await TranslationCoordinator.shared.translateBatch(units.map(\.text), to: targetLanguage)
+            var translatedByKey: [String: String] = [:]
+            for (unit, result) in zip(units, translatedUnits) {
+                guard let result else { continue }
+                translatedByKey["\(unit.segmentId)#\(unit.pieceIndex)"] = result
+            }
+            for item in linkItems {
+                var attributed = AttributedString()
+                for (pieceIndex, piece) in item.pieces.enumerated() {
+                    if pieceIndex > 0 { attributed += AttributedString(" ") }
+                    let key = "\(item.segment.id)#\(pieceIndex)"
+                    switch piece {
+                    case .text(let original):
+                        attributed += AttributedString(translatedByKey[key] ?? original)
+                    case .link(let label, let href):
+                        var run = AttributedString(translatedByKey[key] ?? label)
+                        run.link = URL(string: href)
+                        attributed += run
+                    }
+                }
+                newResolved[item.segment.id] = .attributed(attributed)
+            }
+        }
+
+        resolvedContent = newResolved
     }
 
     @ViewBuilder
     private func segmentView(_ segment: HTMLSegment) -> some View {
         switch segment.kind {
         case .heading(let level):
-            HTMLTextView(html: segment.html)
+            segmentContent(segment)
                 .font(level <= 2 ? .title3.weight(.semibold) : .headline)
                 .accessibilityAddTraits(.isHeader)
+                .modifier(TranslatedAccessibilityLabel(isTranslated: isTranslated(segment), text: accessibilityText(for: segment)))
         case .quote:
             // Matches RN's quote styling (amber border + tinted background,
             // topic/[id].tsx) — Swift's was a plain gray border with no
             // background tint, much less visually distinct from prose.
-            HTMLTextView(html: segment.html)
+            segmentContent(segment)
                 .padding(.leading, 12)
                 .padding(.vertical, 6)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -227,25 +465,30 @@ struct SegmentedHTMLView: View {
                     Rectangle().fill(Color(red: 0xf5 / 255, green: 0x9e / 255, blue: 0x0b / 255)).frame(width: 3)
                 }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(String(localized: "Quoted: \(segment.plainText)"))
+                .accessibilityLabel(String(localized: isTranslated(segment)
+                    ? "Translated quote: \(accessibilityText(for: segment))"
+                    : "Quoted: \(segment.plainText)"))
         case .code:
             VStack(alignment: .leading, spacing: 4) {
                 Text("CODE")
                     .font(.caption2).fontWeight(.bold)
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
-                HTMLTextView(html: segment.html)
+                segmentContent(segment)
                     .font(.system(.footnote, design: .monospaced))
             }
             .padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 6))
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(String(localized: "Code: \(segment.plainText)"))
+            .accessibilityLabel(String(localized: isTranslated(segment)
+                ? "Translated code: \(accessibilityText(for: segment))"
+                : "Code: \(segment.plainText)"))
         case .table(let rows, let hasHeaderRow):
             tableView(rows: rows, hasHeaderRow: hasHeaderRow)
         case .prose:
-            HTMLTextView(html: segment.html)
+            segmentContent(segment)
+                .modifier(TranslatedAccessibilityLabel(isTranslated: isTranslated(segment), text: accessibilityText(for: segment)))
         }
     }
 
@@ -289,6 +532,72 @@ struct SegmentedHTMLView: View {
         return cellText.isEmpty
             ? String(localized: "\(headerText): blank")
             : String(localized: "\(headerText): \(cellText)")
+    }
+}
+
+/// Applies a "Translated: " prefix to a segment's spoken label only when
+/// it's actually showing translated content — a visual translation badge
+/// alone (see `TranslationBanner`) would leave VoiceOver users, a large
+/// share of this app's audience, as the one group never told they're
+/// reading a machine translation instead of the author's own words.
+/// Leaves the view's default accessibility behavior completely untouched
+/// when not translated, so nothing changes for the vastly more common
+/// untranslated case.
+private struct TranslatedAccessibilityLabel: ViewModifier {
+    let isTranslated: Bool
+    let text: String
+
+    func body(content: Content) -> some View {
+        if isTranslated {
+            content.accessibilityLabel(String(localized: "Translated: \(text)"))
+        } else {
+            content
+        }
+    }
+}
+
+/// Splits a segment's HTML at each `<a href="...">` boundary into alternating
+/// plain-text and link pieces, so translation can process the surrounding
+/// text and a link's label independently — the `href` itself is never
+/// touched, and the label piece keeps its link attribute once reassembled
+/// into an `AttributedString` (see `SegmentedHTMLView.resolveTranslationIfNeeded`).
+/// Text outside a link still loses any other inline HTML (bold, italic) it
+/// had, same as the "plain text except links" trade-off applied everywhere
+/// else translated content renders — only the link itself is protected,
+/// since losing emphasis is cosmetic but a dead link would defeat the point
+/// of, say, a developer's "please test my app" post.
+private enum LinkSplitter {
+    enum Piece {
+        case text(String)
+        case link(label: String, href: String)
+    }
+
+    static func split(_ html: String) -> [Piece] {
+        guard let regex = try? NSRegularExpression(pattern: #"(?is)<a\b[^>]*?\bhref\s*=\s*"([^"]*)"[^>]*>(.*?)</a>"#) else {
+            return [.text(html.strippingHTMLTags())]
+        }
+        let ns = html as NSString
+        let matches = regex.matches(in: html, range: NSRange(location: 0, length: ns.length))
+        guard !matches.isEmpty else { return [.text(html.strippingHTMLTags())] }
+
+        var pieces: [Piece] = []
+        var cursor = 0
+        for match in matches {
+            if match.range.location > cursor {
+                let before = ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+                    .strippingHTMLTags().trimmingCharacters(in: .whitespacesAndNewlines)
+                if !before.isEmpty { pieces.append(.text(before)) }
+            }
+            let href = ns.substring(with: match.range(at: 1))
+            let label = ns.substring(with: match.range(at: 2)).strippingHTMLTags().trimmingCharacters(in: .whitespacesAndNewlines)
+            if !label.isEmpty { pieces.append(.link(label: label, href: href)) }
+            cursor = match.range.location + match.range.length
+        }
+        if cursor < ns.length {
+            let after = ns.substring(from: cursor).strippingHTMLTags().trimmingCharacters(in: .whitespacesAndNewlines)
+            if !after.isEmpty { pieces.append(.text(after)) }
+        }
+        return pieces
     }
 }
 

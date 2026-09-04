@@ -4,6 +4,9 @@ struct HelpView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var showContact = false
     @State private var query = ""
+    /// Had no focus management at all. Full app-wide focus audit,
+    /// requested directly.
+    @AccessibilityFocusState private var isIntroFocused: Bool
 
     private var filteredSections: [HelpSection] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -107,6 +110,7 @@ struct HelpView: View {
         .sheet(isPresented: $showContact) {
             ContactView()
         }
+        .task { await retryAccessibilityFocus(into: $isIntroFocused) }
     }
 
     // MARK: - Intro card
@@ -127,6 +131,7 @@ struct HelpView: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+        .accessibilityFocused($isIntroFocused)
         .accessibilityAction(named: Text("Read Help Summary")) {
             UIAccessibility.post(notification: .announcement, argument: helpSummary)
         }

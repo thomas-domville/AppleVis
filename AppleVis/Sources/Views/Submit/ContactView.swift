@@ -136,7 +136,7 @@ struct ContactView: View {
                     ThankYouView(
                         icon: "envelope",
                         heading: "Message sent!",
-                        message: "The AppleVis team has received your message. We typically reply to urgent issues as soon as possible and routine enquiries within one business day.",
+                        message: "Thanks for reaching out — we've received your message. We typically reply to urgent issues as soon as possible and routine enquiries within one business day.",
                         doneLabel: "Back to Profile",
                         onDone: { dismiss() }
                     )
@@ -159,15 +159,17 @@ struct ContactView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if !submitted {
+                    // Previously showed "Back" (not "Cancel") on every step
+                    // past Contact Type, leaving no way to actually leave
+                    // the form from Details, Message, or Review without
+                    // stepping backward through every screen first. Cancel
+                    // now stays put regardless of step; step-backward
+                    // navigation moved to its own in-content button below,
+                    // matching Submit App/Blog/Bug/Podcast's existing
+                    // convention. Reported directly.
                     ToolbarItem(placement: .cancellationAction) {
-                        Button(step == .type ? "Cancel" : "Back") {
-                            if step == .type {
-                                requestCancel()
-                            } else {
-                                goBack()
-                            }
-                        }
-                        .accessibilityHint(step == .type ? String(localized: "Cancels and closes this form.") : String(localized: "Returns to the previous step."))
+                        Button("Cancel") { requestCancel() }
+                            .accessibilityHint(String(localized: "Cancels and closes this form."))
                     }
                     if step == .message && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
                         ToolbarItem(placement: .secondaryAction) {
@@ -210,6 +212,12 @@ struct ContactView: View {
             .onAppear {
                 if name.isEmpty { name = auth.user?.name ?? "" }
                 if contactType == nil { contactType = initialType }
+                // Step 1 previously got no explicit focus at all — only
+                // goNext()/goBack() ever called focusStepAfterTransition(),
+                // so opening this wizard left VoiceOver focus on system
+                // default (typically Cancel). Full app-wide focus audit,
+                // requested directly.
+                focusStepAfterTransition()
             }
         }
     }
@@ -280,6 +288,7 @@ struct ContactView: View {
         Group {
             Section {
                 WizardStepIndicator(step: stepNumber(.details), total: totalSteps, title: "Your Details", isFocused: $isStepFocused, accentColor: effectiveType.color)
+                backButton
                 Text("We need your name and email address so we can reply to you.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -306,6 +315,7 @@ struct ContactView: View {
         Group {
             Section {
                 WizardStepIndicator(step: stepNumber(.message), total: totalSteps, title: "Write your message", isFocused: $isStepFocused, accentColor: effectiveType.color)
+                backButton
                 Text("You're sending a \(effectiveType.label). Write as much detail as you like.")
                     .font(.subheadline).foregroundStyle(.secondary)
                 HStack {
@@ -419,6 +429,7 @@ struct ContactView: View {
         Group {
             Section {
                 WizardStepIndicator(step: stepNumber(.review), total: totalSteps, title: "Review and send", isFocused: $isStepFocused, accentColor: effectiveType.color)
+                backButton
                 Text("Check your message, then tap Send Message.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -533,10 +544,20 @@ struct ContactView: View {
     /// controls with nothing announcing the step actually changed. Delayed
     /// since setting focus before the new section has laid out is a common
     /// way for it to silently fail.
+    /// Was a single guessed 300ms delay — see SubmitAppView's identical fix
+    /// for the full reasoning. Full app-wide focus audit, requested
+    /// directly.
     private func focusStepAfterTransition() {
-        Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            isStepFocused = true
+        Task { await retryAccessibilityFocus(into: $isStepFocused) }
+    }
+
+    /// Step-backward navigation, separated from the toolbar's Cancel button
+    /// so a user can discard the message from any step.
+    private var backButton: some View {
+        Button {
+            goBack()
+        } label: {
+            Label("Back", systemImage: "chevron.backward")
         }
     }
 

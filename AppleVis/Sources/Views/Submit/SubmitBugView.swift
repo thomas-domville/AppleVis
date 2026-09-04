@@ -97,8 +97,8 @@ struct SubmitBugView: View {
                 if submitted {
                     ThankYouView(
                         icon: "ladybug",
-                        heading: "Bug report submitted!",
-                        message: "Thanks for helping improve accessibility. The AppleVis team will review your report.",
+                        heading: "You did it — thanks!",
+                        message: "Your report is now in front of our team. We genuinely appreciate you taking the time to help make apps more accessible for everyone.",
                         doneLabel: "Done",
                         onDone: { dismiss() }
                     )
@@ -127,14 +127,15 @@ struct SubmitBugView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if !submitted {
+                // Previously showed "Back" (not "Cancel") on every step past
+                // Describe the Bug, leaving no way to actually leave the
+                // wizard from Environment or Review without stepping
+                // backward through every screen first. Cancel now stays put
+                // regardless of step; step-backward navigation moved to its
+                // own in-content button below, matching Submit App/Blog's
+                // existing convention. Reported directly.
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(step == .description ? "Cancel" : "Back") {
-                        if step == .description {
-                            requestCancel()
-                        } else {
-                            goBack()
-                        }
-                    }
+                    Button("Cancel") { requestCancel() }
                 }
                 if auth.isSignedIn {
                     if step == .description && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
@@ -177,6 +178,11 @@ struct SubmitBugView: View {
         } message: {
             Text("Your progress will be discarded.")
         }
+        // Step 1 previously got no explicit focus at all — only
+        // goNext()/goBack() ever called focusStepAfterTransition(), so
+        // opening this wizard left VoiceOver focus on system default
+        // (typically Cancel). Full app-wide focus audit, requested directly.
+        .task { focusStepAfterTransition() }
     }
 
     /// RN confirmed before discarding a filled-out form; Cancel here
@@ -290,7 +296,7 @@ struct SubmitBugView: View {
                 TextEditor(text: $description)
                     .frame(minHeight: 160)
                     .accessibilityLabel(String(localized: "Description"))
-                    .accessibilityHint(String(localized: "Required. Minimum 30 characters."))
+                    .accessibilityHint(String(localized: "Required, minimum 30 characters. The more detail you can share — what happened, what you expected instead, and the exact steps to get there — the easier it is for us to reproduce and track down."))
                     .onChange(of: description) { _, newValue in
                         handleDescriptionChange(newValue)
                         guidelines.textChanged(newValue)
@@ -300,13 +306,19 @@ struct SubmitBugView: View {
                             detectionEnabled: preferences.nonEnglishDetectionEnabled
                         )
                     }
+                Text("The more detail you can share — what happened, what you expected instead, and the exact steps to get there — the easier it is for us to reproduce and track down.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
 
     private var bugInfoSection: some View {
         Group {
-            Section { WizardStepIndicator(step: 2, total: 3, title: "Environment", isFocused: $isStepFocused) }
+            Section {
+                WizardStepIndicator(step: 2, total: 3, title: "Environment", isFocused: $isStepFocused)
+                backButton
+            }
             Section("Where It Happens") {
                 Picker("Platform", selection: $platform) {
                     ForEach(platforms, id: \.self) { Text($0) }
@@ -348,7 +360,10 @@ struct SubmitBugView: View {
 
     private var reviewSection: some View {
         Group {
-            Section { WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused) }
+            Section {
+                WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused)
+                backButton
+            }
             Section("From") {
                 WizardReviewRow(label: "Posting As", value: auth.user?.name ?? "")
             }
@@ -379,10 +394,20 @@ struct SubmitBugView: View {
         focusStepAfterTransition()
     }
 
+    /// Was a single guessed 300ms delay — see SubmitAppView's identical fix
+    /// for the full reasoning. Full app-wide focus audit, requested
+    /// directly.
     private func focusStepAfterTransition() {
-        Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            isStepFocused = true
+        Task { await retryAccessibilityFocus(into: $isStepFocused) }
+    }
+
+    /// Step-backward navigation, separated from the toolbar's Cancel button
+    /// so a user can discard the submission from any step.
+    private var backButton: some View {
+        Button {
+            goBack()
+        } label: {
+            Label("Back", systemImage: "chevron.backward")
         }
     }
 

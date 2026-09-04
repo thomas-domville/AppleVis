@@ -136,6 +136,33 @@ final class PreferencesStore: ObservableObject {
     @AppStorage("intel.searchTranslation")  var searchTranslationEnabled = true
     @AppStorage("intel.aiSummaries")        var aiSummariesEnabled = true
 
+    // MARK: - Content Translation
+    // Reading-side translation (blog/forum/app/podcast/guide/bug content,
+    // comments, and Help articles, via Apple's on-device Translation
+    // framework) — separate from the "Intelligence" block above, which is
+    // the opposite-direction, hardware-gated "translate my draft to English
+    // before I post" feature. This one has no hardware requirement, so it
+    // gets its own explicit opt-in rather than living under Intelligence,
+    // where it would misleadingly imply the same Apple Intelligence gate.
+    /// Off by default — opt-in via the launch prompt or Settings, never on
+    /// without the user having chosen it.
+    @AppStorage("content.autoTranslateEnabled")  var autoTranslateEnabled = false
+    /// BCP-47 language code (e.g. "fr"); empty means "not yet chosen." Kept
+    /// independent of the device's system language so a multilingual reader
+    /// can pick a different content language than their UI language.
+    @AppStorage("content.translationLanguage")   var contentLanguageCode = ""
+    /// One-time gate for the launch-time opt-in prompt — set on either
+    /// "Turn On Auto-Translate" or "Not Now" so it's never asked twice;
+    /// Settings remains the permanent way to turn this on/off afterward.
+    @AppStorage("content.launchPromptShown")     var contentTranslationPromptShown = false
+
+    /// The single value every translation call site should branch on,
+    /// collapsing "auto-translate is off" and "no language chosen yet" into
+    /// one nil-check instead of two independently-duplicated conditions.
+    var effectiveContentLanguage: String? {
+        autoTranslateEnabled && !contentLanguageCode.isEmpty ? contentLanguageCode : nil
+    }
+
     // MARK: - iCloud Sync
     @AppStorage("sync.iCloud")          var iCloudSync = true
     @AppStorage("sync.savedItems")      var savedItemsSync = true

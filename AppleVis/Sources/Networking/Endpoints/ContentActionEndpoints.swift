@@ -10,14 +10,6 @@ extension APIClient {
 struct ContentActionEndpoints {
     let client: APIClient
 
-    /// Fetches a comment's raw body + text format (needed before a PATCH, to
-    /// preserve the existing format code).
-    func fetchRawComment(commentType: String, commentId: String, csrfToken: String) async throws -> (rawValue: String, format: String) {
-        let response = try await client.jsonAPISingle("comment/\(commentType)/\(commentId)", headers: ["X-CSRF-Token": csrfToken])
-        let body = response.data.attributes["comment_body"]
-        return (body?.richTextValue ?? "", body?["format"]?.stringValue ?? "basic_html")
-    }
-
     func editComment(commentType: String, commentId: String, newBody: String, format: String, csrfToken: String) async throws {
         try await client.jsonAPIUpdate(
             "comment/\(commentType)/\(commentId)",
@@ -39,14 +31,6 @@ struct ContentActionEndpoints {
             "comment/\(commentType)/\(commentId)", type: "comment--\(commentType)", id: commentId,
             attributes: ["status": AnyEncodable(false)], headers: ["X-CSRF-Token": csrfToken]
         )
-    }
-
-    func editForumPost(nodeId: String, title: String, body: String, csrfToken: String) async throws {
-        try await editNode(nodeId: nodeId, nodeType: "forum", title: title, body: body, csrfToken: csrfToken)
-    }
-
-    func deleteForumPost(nodeId: String, csrfToken: String) async throws {
-        try await deleteNode(nodeId: nodeId, nodeType: "forum", csrfToken: csrfToken)
     }
 
     /// Generic node DELETE — `nodeType` is the JSON:API type suffix

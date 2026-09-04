@@ -15,6 +15,11 @@ struct ResourceDetailView: View {
     @State private var quotedComment: ResourceComment?
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
+    // Mirrors ForumTopicDetailView.loadAllRepliesTask — prevents load()'s
+    // background drain-all and "Jump to First New Comment"/"Jump to Last
+    // Comment" from both starting their own concurrent loadMoreComments()
+    // loop, which raced on comments.count and duplicated pages.
+    @State private var loadAllCommentsTask: Task<Void, Never>?
     @State private var newCommentCount = 0
     @State private var pendingFocusCommentId: String?
     @State private var discussionSummary: String?
@@ -79,16 +84,24 @@ struct ResourceDetailView: View {
                     Divider()
 
                     // Long guides get a jump-to-heading table of contents
-                    // and collapse behind "Show Full Guide" past 6 segments
+                    // and collapse behind "Show Full Guide" past N segments
                     // — matches the old app, which only showed either
                     // control when there was actually enough content to
                     // need it, rather than making every guide scroll past
-                    // controls that don't do anything.
+                    // controls that don't do anything. Raised from 6 to 14
+                    // now that HTMLSegmenter splits prose into one segment
+                    // per paragraph instead of one flattened block per
+                    // section — the same 6-segment cutoff would now collapse
+                    // after only a couple of paragraphs and a heading or
+                    // two, well short of what "6" meant before this change.
                     SegmentedHTMLView(
                         html: detail.body,
-                        collapsedSegmentLimit: 6,
+                        collapsedSegmentLimit: 14,
                         expandLabel: "Show Full Guide",
-                        showTableOfContents: true
+                        showTableOfContents: true,
+                        contentKind: "resource",
+                        contentId: detail.id,
+                        field: "body"
                     )
                     .environment(\.contentScrollProxy, proxy)
                     .padding(.horizontal)
@@ -211,7 +224,7 @@ struct ResourceDetailView: View {
                 } else {
                     let remaining = detail.commentCount - detail.comments.count
                     Button(remaining > 0 ? "Load \(remaining) More Comments" : "Load More Comments") {
-                        Task { await loadMoreComments() }
+                        Task { await ensureAllCommentsLoaded() }
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -313,7 +326,7 @@ struct ResourceDetailView: View {
             // (commentCount), so leaving the rest behind a manual tap just
             // contradicted what the count said was there.
             if hasMoreComments {
-                Task { await loadMoreComments() }
+                Task { await ensureAllCommentsLoaded() }
             }
             if let detail {
                 // Captured before stampItemVisit below overwrites it (ALL-01).
@@ -374,12 +387,25 @@ struct ResourceDetailView: View {
         isLoadingMoreComments = false
     }
 
+    /// Single-flight wrapper around loadMoreComments() — see
+    /// loadAllCommentsTask's doc comment for why this exists.
+    private func ensureAllCommentsLoaded() async {
+        if let existing = loadAllCommentsTask {
+            await existing.value
+            return
+        }
+        let task = Task { await loadMoreComments() }
+        loadAllCommentsTask = task
+        await task.value
+        loadAllCommentsTask = nil
+    }
+
     /// "Jump to Last Comment" custom action on the Community Discussion
     /// heading — loads any not-yet-fetched comments first so it always
     /// lands on the true last one, then moves VoiceOver focus there (a
     /// scroll alone doesn't relocate the VoiceOver cursor).
     private func jumpToLastComment(proxy: ScrollViewProxy) async {
-        if hasMoreComments { await loadMoreComments() }
+        if hasMoreComments { await ensureAllCommentsLoaded() }
         guard let lastId = self.detail?.comments.last?.id else { return }
         withReduceMotionAwareAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
         try? await Task.sleep(for: .milliseconds(400))
@@ -390,7 +416,7 @@ struct ResourceDetailView: View {
     /// oldest-first, so the first of the `newCommentCount` most recently
     /// posted comments sits at `comments.count - newCommentCount`.
     private func jumpToFirstNewComment(proxy: ScrollViewProxy) async {
-        if hasMoreComments { await loadMoreComments() }
+        if hasMoreComments { await ensureAllCommentsLoaded() }
         let comments = self.detail?.comments ?? []
         let targetIndex = comments.count - newCommentCount
         guard newCommentCount > 0, targetIndex >= 0, targetIndex < comments.count else { return }
@@ -512,7 +538,7 @@ struct CommentRow: View {
                 Text(displaySubject).font(.subheadline).fontWeight(.medium)
             }
 
-            SegmentedHTMLView(html: text)
+            SegmentedHTMLView(html: text, contentKind: "comment", contentId: commentId, field: "body")
         }
         .padding(.horizontal)
         .padding(.vertical, 8)

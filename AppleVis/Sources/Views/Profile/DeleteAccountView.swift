@@ -10,6 +10,9 @@ struct DeleteAccountView: View {
     @State private var errorMessage: String?
     @State private var showFinalConfirm = false
     @AccessibilityFocusState private var isErrorFocused: Bool
+    /// Had no initial-load focus at all. Full app-wide focus audit,
+    /// requested directly.
+    @AccessibilityFocusState private var isHeaderFocused: Bool
 
     var body: some View {
         Form {
@@ -19,6 +22,7 @@ struct DeleteAccountView: View {
                         .font(.headline)
                         .foregroundStyle(.red)
                         .accessibilityAddTraits(.isHeader)
+                        .accessibilityFocused($isHeaderFocused)
 
                     Text("Deleting your account will permanently remove:")
                         .font(.subheadline)
@@ -101,6 +105,7 @@ struct DeleteAccountView: View {
         } message: {
             Text("This cannot be undone.")
         }
+        .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
     }
 
     private func deleteAccount() {

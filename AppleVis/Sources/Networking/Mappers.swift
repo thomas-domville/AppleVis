@@ -33,6 +33,7 @@ enum Mappers {
 
         return ForumTopic(
             id: node.id,
+            nid: a["drupal_internal__nid"]?.intValue,
             title: a["title"]?.stringValue ?? "",
             authorName: authorName,
             authorId: uidId ?? "",
@@ -86,6 +87,7 @@ enum Mappers {
         guard isForumURL(urlPath) else { return nil }
         return ForumTopic(
             id: uuid,
+            nid: item["nid"]?.intValue ?? item["node_id"]?.intValue,
             title: item["title"]?.stringValue ?? "",
             authorName: "",
             authorId: "",
@@ -207,10 +209,6 @@ enum Mappers {
         )
     }
 
-    private static func fileURI(_ drupalURI: String) -> String {
-        drupalURI.replacingOccurrences(of: "public://", with: "\(base)/sites/default/files/")
-    }
-
     // MARK: - Apps
 
     private static let appCategoryRelationshipCandidates = [
@@ -266,6 +264,7 @@ enum Mappers {
 
         return AppListing(
             id: node.id,
+            nid: a["drupal_internal__nid"]?.intValue,
             name: a["title"]?.stringValue ?? "",
             developer: "",
             platform: .ios,
@@ -313,6 +312,7 @@ enum Mappers {
 
         return AppListing(
             id: node.id,
+            nid: a["drupal_internal__nid"]?.intValue,
             name: a["title"]?.stringValue ?? "",
             developer: "",
             platform: .tvos,
@@ -362,6 +362,7 @@ enum Mappers {
 
         return AppListing(
             id: node.id,
+            nid: a["drupal_internal__nid"]?.intValue,
             name: a["title"]?.stringValue ?? "",
             developer: "",
             platform: .watchos,
@@ -412,6 +413,7 @@ enum Mappers {
 
         return AppListing(
             id: node.id,
+            nid: a["drupal_internal__nid"]?.intValue,
             name: a["title"]?.stringValue ?? "",
             developer: "",
             platform: .macos,
@@ -463,6 +465,7 @@ enum Mappers {
         let url = alias.map { "\(base)\($0)" } ?? "\(base)/node/\(node.id)"
         return BlogPost(
             id: node.id,
+            nid: a["drupal_internal__nid"]?.intValue,
             title: a["title"]?.stringValue ?? "",
             authorName: authorName,
             authorId: uidId ?? "",
@@ -508,6 +511,7 @@ enum Mappers {
 
         return Resource(
             id: node.id,
+            nid: a["drupal_internal__nid"]?.intValue,
             title: a["title"]?.stringValue ?? "",
             kind: .guide,
             authorName: authorName,

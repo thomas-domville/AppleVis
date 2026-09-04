@@ -80,7 +80,17 @@ struct SubmitBlogView: View {
     /// the live form, previously not asked for (email) or not actually
     /// sent to the field asking for it (pitch). Reported directly.
     private var contentValid: Bool {
-        blogDraftLength >= 50 && email.contains("@") && !pitchMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        blogDraftLength >= 50 && emailValid && !pitchMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var emailValid: Bool {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count <= 254 else { return false }
+        let parts = trimmed.split(separator: "@", omittingEmptySubsequences: false)
+        guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else { return false }
+        guard parts[1].contains(".") else { return false }
+        guard !trimmed.contains(" ") else { return false }
+        return true
     }
 
     /// Mirrors Contact's crossing-the-threshold announcement so VoiceOver
@@ -102,8 +112,8 @@ struct SubmitBlogView: View {
                 if submitted {
                     ThankYouView(
                         icon: "doc.text",
-                        heading: "Blog post submitted!",
-                        message: "Thanks for your submission. The AppleVis editorial team will review your draft and follow up.",
+                        heading: "You did it — thanks!",
+                        message: "Your draft is now in front of our editorial team. We genuinely appreciate you taking the time to write for AppleVis, and we'll be in touch soon with our decision.",
                         doneLabel: "Done",
                         onDone: { dismiss() }
                     )
@@ -133,29 +143,9 @@ struct SubmitBlogView: View {
             .toolbar {
                 if !submitted {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(step == .details ? "Cancel" : "Back") {
-                        if step == .details {
-                            requestCancel()
-                        } else {
-                            goBack()
-                        }
-                    }
+                    Button("Cancel") { requestCancel() }
                 }
                 if auth.isSignedIn {
-                    if step == .content && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
-                        ToolbarItem(placement: .secondaryAction) {
-                            Button("Rewrite") {
-                                Task {
-                                    if let result = await intelligence.rewrite(subject: nil, body: blogDraft, isTopic: false) {
-                                        blogDraft = result.body
-                                    } else {
-                                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
-                                    }
-                                }
-                            }
-                            .disabled(blogDraft.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
-                        }
-                    }
                     ToolbarItem(placement: .confirmationAction) {
                         if step == .review {
                             Button("Submit") { Task { await submit() } }
@@ -172,6 +162,11 @@ struct SubmitBlogView: View {
         .sheet(isPresented: $showSignIn) {
             SignInView()
         }
+        // Step 1 previously got no explicit focus at all — only
+        // goNext()/goBack() ever called focusStepAfterTransition(), so
+        // opening this wizard left VoiceOver focus on system default
+        // (typically Cancel). Full app-wide focus audit, requested directly.
+        .task { focusStepAfterTransition() }
     }
 
     private var signInRequiredView: some View {
@@ -215,7 +210,10 @@ struct SubmitBlogView: View {
 
     private var contentSection: some View {
         Group {
-            Section { WizardStepIndicator(step: 2, total: 3, title: "Your Content", isFocused: $isStepFocused) }
+            Section {
+                WizardStepIndicator(step: 2, total: 3, title: "Your Content", isFocused: $isStepFocused)
+                backButton
+            }
             Section {
                 TextField("Your Email", text: $email)
                     .keyboardType(.emailAddress)
@@ -223,6 +221,11 @@ struct SubmitBlogView: View {
                     .accessibilityHint(String(localized: "Required. The AppleVis editorial team may reply to follow up on your submission."))
             } header: {
                 Text("Your Email")
+            } footer: {
+                if !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !emailValid {
+                    Text("Enter a valid email address.")
+                        .foregroundStyle(.red)
+                }
             }
             if intelligence.showTranslatePrompt {
                 Section {
@@ -265,7 +268,7 @@ struct SubmitBlogView: View {
                 TextEditor(text: $pitchMessage)
                     .frame(minHeight: 80)
                     .accessibilityLabel(String(localized: "Why this post would interest AppleVis readers"))
-                    .accessibilityHint(String(localized: "Required."))
+                    .accessibilityHint(String(localized: "Required. Tell us a little about your blog post and why you think it would be of interest and value to the AppleVis community."))
                     .onChange(of: pitchMessage) { _, newValue in
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
@@ -397,7 +400,10 @@ struct SubmitBlogView: View {
 
     private var reviewSection: some View {
         Group {
-            Section { WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused) }
+            Section {
+                WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused)
+                backButton
+            }
             Section("Blog Post") {
                 WizardReviewRow(label: "Title", value: title)
                 WizardReviewRow(label: "Category", value: category)
@@ -425,11 +431,22 @@ struct SubmitBlogView: View {
         focusStepAfterTransition()
     }
 
-    private func focusStepAfterTransition() {
-        Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            isStepFocused = true
+    /// Step-backward navigation, separated from the toolbar's Cancel button
+    /// so a user can discard the submission from any step.
+    private var backButton: some View {
+        Button {
+            goBack()
+        } label: {
+            Label("Back", systemImage: "chevron.backward")
         }
+    }
+
+    /// Was a single guessed 300ms delay — see SubmitAppView's identical fix
+    /// for the full reasoning (this pattern was independently copy-pasted
+    /// across every multi-step wizard). Full app-wide focus audit,
+    /// requested directly.
+    private func focusStepAfterTransition() {
+        Task { await retryAccessibilityFocus(into: $isStepFocused) }
     }
 
     private func submit() async {

@@ -863,15 +863,18 @@ private struct MouseRecapHomeContent: View {
 
         if let spotlight = digest.appPickSpotlight {
             Section {
-                newsletterCard(
-                    title: spotlight.title,
-                    kicker: "AnonyMouse's App Pick of the Month",
-                    details: digest.blogDetails(spotlight),
-                    body: aiBlurbs[spotlight.id] ?? digest.newsletterBody(for: spotlight),
-                    accent: ContentKind.blogPost.accentColor
-                ) {
-                    NavigationLink(value: spotlight) {
-                        Label("Read Spotlight", systemImage: "arrow.right.circle")
+                TranslatedMouseRecapTitle(kind: "blogPost", id: spotlight.id, title: spotlight.title) { resolvedTitle, wasTranslated in
+                    newsletterCard(
+                        title: resolvedTitle,
+                        kicker: "AnonyMouse's App Pick of the Month",
+                        details: digest.blogDetails(spotlight),
+                        body: aiBlurbs[spotlight.id] ?? digest.newsletterBody(for: spotlight),
+                        accent: ContentKind.blogPost.accentColor,
+                        wasTranslated: wasTranslated
+                    ) {
+                        NavigationLink(value: spotlight) {
+                            Label("Read Spotlight", systemImage: "arrow.right.circle")
+                        }
                     }
                 }
             } header: {
@@ -906,15 +909,18 @@ private struct MouseRecapHomeContent: View {
             limitedMessage: limitedMessage(total: digest.apps.count, shown: apps.count, noun: "app"),
             items: apps
         ) { app in
-            newsletterCard(
-                title: app.name,
-                kicker: "New on the App Scene",
-                details: digest.appDetails(app),
-                body: aiBlurbs[app.id] ?? digest.newsletterBody(for: app),
-                accent: ContentKind.appListing.accentColor
-            ) {
-                NavigationLink(value: app) {
-                    Label("Read App Entry", systemImage: "arrow.right.circle")
+            TranslatedMouseRecapTitle(kind: "appListing", id: app.id, title: app.name) { resolvedTitle, wasTranslated in
+                newsletterCard(
+                    title: resolvedTitle,
+                    kicker: "New on the App Scene",
+                    details: digest.appDetails(app),
+                    body: aiBlurbs[app.id] ?? digest.newsletterBody(for: app),
+                    accent: ContentKind.appListing.accentColor,
+                    wasTranslated: wasTranslated
+                ) {
+                    NavigationLink(value: app) {
+                        Label("Read App Entry", systemImage: "arrow.right.circle")
+                    }
                 }
             }
         }
@@ -926,15 +932,18 @@ private struct MouseRecapHomeContent: View {
             limitedMessage: limitedMessage(total: digest.podcasts.count, shown: podcasts.count, noun: "episode"),
             items: podcasts
         ) { episode in
-            newsletterCard(
-                title: episode.title,
-                kicker: "Podcast Episode",
-                details: digest.podcastDetails(episode),
-                body: aiBlurbs[episode.id] ?? digest.newsletterBody(for: episode),
-                accent: ContentKind.podcastEpisode.accentColor
-            ) {
-                NavigationLink(value: episode) {
-                    Label("Listen to Episode", systemImage: "play.circle")
+            TranslatedMouseRecapTitle(kind: "podcastEpisode", id: episode.id, title: episode.title) { resolvedTitle, wasTranslated in
+                newsletterCard(
+                    title: resolvedTitle,
+                    kicker: "Podcast Episode",
+                    details: digest.podcastDetails(episode),
+                    body: aiBlurbs[episode.id] ?? digest.newsletterBody(for: episode),
+                    accent: ContentKind.podcastEpisode.accentColor,
+                    wasTranslated: wasTranslated
+                ) {
+                    NavigationLink(value: episode) {
+                        Label("Listen to Episode", systemImage: "play.circle")
+                    }
                 }
             }
         }
@@ -946,15 +955,18 @@ private struct MouseRecapHomeContent: View {
             limitedMessage: limitedMessage(total: digest.standardBlogs.count, shown: blogs.count, noun: "post"),
             items: blogs
         ) { post in
-            newsletterCard(
-                title: post.title,
-                kicker: "Blog Post",
-                details: digest.blogDetails(post),
-                body: aiBlurbs[post.id] ?? digest.newsletterBody(for: post),
-                accent: ContentKind.blogPost.accentColor
-            ) {
-                NavigationLink(value: post) {
-                    Label("Read Blog Post", systemImage: "arrow.right.circle")
+            TranslatedMouseRecapTitle(kind: "blogPost", id: post.id, title: post.title) { resolvedTitle, wasTranslated in
+                newsletterCard(
+                    title: resolvedTitle,
+                    kicker: "Blog Post",
+                    details: digest.blogDetails(post),
+                    body: aiBlurbs[post.id] ?? digest.newsletterBody(for: post),
+                    accent: ContentKind.blogPost.accentColor,
+                    wasTranslated: wasTranslated
+                ) {
+                    NavigationLink(value: post) {
+                        Label("Read Blog Post", systemImage: "arrow.right.circle")
+                    }
                 }
             }
         }
@@ -966,15 +978,18 @@ private struct MouseRecapHomeContent: View {
             limitedMessage: limitedMessage(total: digest.resources.count, shown: resources.count, noun: "guide or tutorial"),
             items: resources
         ) { resource in
-            newsletterCard(
-                title: resource.title,
-                kicker: resource.kind.displayName,
-                details: digest.resourceDetails(resource),
-                body: aiBlurbs[resource.id] ?? digest.newsletterBody(for: resource),
-                accent: ContentKind.resource.accentColor
-            ) {
-                NavigationLink(value: resource) {
-                    Label("Read Guide", systemImage: "arrow.right.circle")
+            TranslatedMouseRecapTitle(kind: "resource", id: resource.id, title: resource.title) { resolvedTitle, wasTranslated in
+                newsletterCard(
+                    title: resolvedTitle,
+                    kicker: resource.kind.displayName,
+                    details: digest.resourceDetails(resource),
+                    body: aiBlurbs[resource.id] ?? digest.newsletterBody(for: resource),
+                    accent: ContentKind.resource.accentColor,
+                    wasTranslated: wasTranslated
+                ) {
+                    NavigationLink(value: resource) {
+                        Label("Read Guide", systemImage: "arrow.right.circle")
+                    }
                 }
             }
         }
@@ -986,15 +1001,18 @@ private struct MouseRecapHomeContent: View {
             limitedMessage: limitedMessage(total: digest.forums.count, shown: forums.count, noun: "discussion"),
             items: forums
         ) { topic in
-            newsletterCard(
-                title: topic.title,
-                kicker: "Popular Discussion",
-                details: digest.forumDetails(topic),
-                body: aiBlurbs[topic.id] ?? digest.newsletterBody(for: topic),
-                accent: ContentKind.forumTopic.accentColor
-            ) {
-                NavigationLink(value: topic) {
-                    Label("Open Discussion", systemImage: "arrow.right.circle")
+            TranslatedMouseRecapTitle(kind: "forumTopic", id: topic.id, title: topic.title) { resolvedTitle, wasTranslated in
+                newsletterCard(
+                    title: resolvedTitle,
+                    kicker: "Popular Discussion",
+                    details: digest.forumDetails(topic),
+                    body: aiBlurbs[topic.id] ?? digest.newsletterBody(for: topic),
+                    accent: ContentKind.forumTopic.accentColor,
+                    wasTranslated: wasTranslated
+                ) {
+                    NavigationLink(value: topic) {
+                        Label("Open Discussion", systemImage: "arrow.right.circle")
+                    }
                 }
             }
         }
@@ -1034,15 +1052,20 @@ private struct MouseRecapHomeContent: View {
         details: [String],
         body: String,
         accent: Color,
+        wasTranslated: Bool = false,
         @ViewBuilder action: () -> Action
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(kicker)
                 .font(.caption.weight(.bold))
                 .foregroundStyle(accent)
-            Text(title)
-                .font(.headline)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel(wasTranslated ? String(localized: "Translated: \(title)") : title)
+                if wasTranslated { TranslatedTitleBadge() }
+            }
             if !details.isEmpty {
                 FlowTextBadges(details: details, accent: accent)
             }
@@ -1276,7 +1299,9 @@ private struct MouseRecapView: View {
                         items: digest.apps
                     ) { app in
                         NavigationLink(value: app) {
-                            MouseRecapItemRow(title: app.name, subtitle: app.developer, date: app.createdAt)
+                            TranslatedMouseRecapTitle(kind: "appListing", id: app.id, title: app.name) { resolvedTitle, wasTranslated in
+                                MouseRecapItemRow(title: resolvedTitle, subtitle: app.developer, date: app.createdAt, wasTranslated: wasTranslated)
+                            }
                         }
                     }
                     recapSection(
@@ -1286,7 +1311,9 @@ private struct MouseRecapView: View {
                         items: digest.podcasts
                     ) { episode in
                         NavigationLink(value: episode) {
-                            MouseRecapItemRow(title: episode.title, subtitle: episode.showTitle, date: episode.publishedAt)
+                            TranslatedMouseRecapTitle(kind: "podcastEpisode", id: episode.id, title: episode.title) { resolvedTitle, wasTranslated in
+                                MouseRecapItemRow(title: resolvedTitle, subtitle: episode.showTitle, date: episode.publishedAt, wasTranslated: wasTranslated)
+                            }
                         }
                     }
                     recapSection(
@@ -1296,7 +1323,14 @@ private struct MouseRecapView: View {
                         items: digest.forums
                     ) { topic in
                         NavigationLink(value: topic) {
-                            MouseRecapItemRow(title: topic.title, subtitle: "\(topic.replyCount) repl\(topic.replyCount == 1 ? "y" : "ies")", date: topic.lastActivityAt)
+                            TranslatedMouseRecapTitle(kind: "forumTopic", id: topic.id, title: topic.title) { resolvedTitle, wasTranslated in
+                                MouseRecapItemRow(
+                                    title: resolvedTitle,
+                                    subtitle: "\(topic.replyCount) repl\(topic.replyCount == 1 ? "y" : "ies")",
+                                    date: topic.lastActivityAt,
+                                    wasTranslated: wasTranslated
+                                )
+                            }
                         }
                     }
                     recapSection(
@@ -1306,7 +1340,9 @@ private struct MouseRecapView: View {
                         items: digest.resources
                     ) { resource in
                         NavigationLink(value: resource) {
-                            MouseRecapItemRow(title: resource.title, subtitle: resource.kind.displayName, date: resource.updatedAt)
+                            TranslatedMouseRecapTitle(kind: "resource", id: resource.id, title: resource.title) { resolvedTitle, wasTranslated in
+                                MouseRecapItemRow(title: resolvedTitle, subtitle: resource.kind.displayName, date: resource.updatedAt, wasTranslated: wasTranslated)
+                            }
                         }
                     }
                     recapSection(
@@ -1316,7 +1352,9 @@ private struct MouseRecapView: View {
                         items: digest.blogs
                     ) { post in
                         NavigationLink(value: post) {
-                            MouseRecapItemRow(title: post.title, subtitle: post.authorName, date: post.publishedAt)
+                            TranslatedMouseRecapTitle(kind: "blogPost", id: post.id, title: post.title) { resolvedTitle, wasTranslated in
+                                MouseRecapItemRow(title: resolvedTitle, subtitle: post.authorName, date: post.publishedAt, wasTranslated: wasTranslated)
+                            }
                         }
                     }
                 }
@@ -1369,11 +1407,16 @@ private struct MouseRecapItemRow: View {
     let title: String
     let subtitle: String
     let date: Date
+    var wasTranslated: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityLabel(wasTranslated ? String(localized: "Translated: \(title)") : title)
+                if wasTranslated { TranslatedTitleBadge() }
+            }
             HStack(spacing: 6) {
                 Text(subtitle)
                 Text("-")
@@ -1384,6 +1427,31 @@ private struct MouseRecapItemRow: View {
             .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Resolves a Mouse Recap card's title translation once per (kind, id,
+/// title, language) combination and hands the result to its content closure
+/// — `newsletterCard`/`MouseRecapItemRow` are plain helper functions/struct
+/// properties, not owners of per-item state, so a small wrapper view carries
+/// the `@State` that per-row `.task(id:)` resolution needs (same reasoning
+/// as the equivalent wrappers added to `RowViews.swift`'s row structs).
+private struct TranslatedMouseRecapTitle<Content: View>: View {
+    let kind: String
+    let id: String
+    let title: String
+    @ViewBuilder let content: (_ resolvedTitle: String, _ wasTranslated: Bool) -> Content
+
+    @EnvironmentObject private var preferences: PreferencesStore
+    @State private var translatedTitle: String?
+
+    var body: some View {
+        content(translatedTitle ?? title, translatedTitle != nil)
+            .task(id: ContentTranslation.taskId(title: title, targetLanguage: preferences.effectiveContentLanguage)) {
+                translatedTitle = await ContentTranslation.resolvedTitle(
+                    kind: kind, id: id, originalTitle: title, targetLanguage: preferences.effectiveContentLanguage
+                )
+            }
     }
 }
 

@@ -19,6 +19,16 @@ struct EpisodeDetailView: View {
     @State private var showAudioEnhancements = false
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
+    // Mirrors ForumTopicDetailView.loadAllRepliesTask — load() kicks off
+    // loadMoreComments()'s drain-everything loop in the background, and
+    // "Jump to First New Comment"/"Jump to Last Comment" previously called
+    // it again themselves if that background load hadn't finished, racing
+    // two loops that both read comments.count before either appended and
+    // so both fetched (and appended) the same page twice. Tracking the
+    // in-flight Task lets every caller await the one already running.
+    // Reported directly: "jump to newest/first new comment" not landing on
+    // the right comment.
+    @State private var loadAllCommentsTask: Task<Void, Never>?
     @State private var newCommentCount = 0
     @State private var pendingFocusCommentId: String?
     @State private var artworkDescription: String?
@@ -99,7 +109,7 @@ struct EpisodeDetailView: View {
                     // Description
                     if !notesWithoutTranscript(episode).isEmpty {
                         sectionHeading("Episode Notes")
-                        SegmentedHTMLView(html: notesWithoutTranscript(episode))
+                        SegmentedHTMLView(html: notesWithoutTranscript(episode), contentKind: "podcastEpisode", contentId: episode.id, field: "body")
                             .padding(.horizontal).padding(.bottom, 16)
                     }
 
@@ -156,71 +166,6 @@ struct EpisodeDetailView: View {
                 }
             }
         }
-        #if false
-        .toolbar {
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
-                Menu {
-                    // Speed, Sleep Timer, Voice Boost, Trim Silence, and
-                    // AirPlay all exist already — on FullPlayerView (speed/
-                    // sleep timer/AirPlay) and in Settings → Podcasts (all
-                    // of them) — but this detail page had no path to either
-                    // one at all unless something was already playing,
-                    // since the only way to reach FullPlayerView anywhere
-                    // in the app was tapping the mini-player bar, which
-                    // doesn't exist until playback has started. Loads this
-                    // episode first if it isn't already the current one, so
-                    // the controls that open always have something to act on.
-                    Button {
-                        // `load()` does real async setup (audio session,
-                        // AVPlayerItem construction) before it sets
-                        // `currentEpisode` — presenting the sheet before
-                        // that finishes would show FullPlayerView with
-                        // `player.currentEpisode` still nil, which renders
-                        // as a blank sheet (there's no "nothing playing"
-                        // fallback there). Awaiting inside the same Task
-                        // guarantees the episode is already current by the
-                        // time the sheet appears.
-                        Task {
-                            if player.currentEpisode?.id != episode.id {
-                                await player.load(episode)
-                            }
-                            showFullPlayer = true
-                        }
-                    } label: {
-                        Label("Player Controls", systemImage: "slider.horizontal.3")
-                    }
-                    Button {
-                        if isQueued(episode) {
-                            player.removeFromQueue(id: episode.id)
-                        } else {
-                            player.enqueue(episode)
-                        }
-                    } label: {
-                        Label(isQueued(episode) ? "Remove from Queue" : "Add to Queue", systemImage: isQueued(episode) ? "text.badge.minus" : "text.badge.plus")
-                    }
-                    Button {
-                        player.playNext(episode)
-                        toast.success(String(localized: "Playing next"))
-                    } label: {
-                        Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
-                    }
-                    if PersistenceStore.shared.isEpisodePlayed(episode.id) {
-                        Label("Played", systemImage: "checkmark.circle.fill")
-                    } else {
-                        Button {
-                            PersistenceStore.shared.markEpisodePlayed(episode.id)
-                            toast.success(String(localized: "Marked as played"))
-                        } label: {
-                            Label("Mark as Played", systemImage: "checkmark.circle")
-                        }
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-                .accessibilityLabel(String(localized: "More episode actions"))
-            }
-        }
-        #endif
         .safeAreaInset(edge: .bottom) {
             ContentDetailActions(
                 id: episode.id, kind: .podcastEpisode, title: episode.title, lastActivityAt: episode.lastActivityAt, url: episode.url,
@@ -240,7 +185,7 @@ struct EpisodeDetailView: View {
             }
         }
         .sheet(isPresented: $showTranscript) {
-            TranscriptView(episodeId: episode.id, episodeTitle: episode.title, embeddedTranscript: embeddedTranscript)
+            TranscriptView(episodeId: episode.id, episodeTitle: episode.title, episodeURL: episode.url, embeddedTranscript: embeddedTranscript)
         }
         .sheet(isPresented: $showFullPlayer) {
             FullPlayerView()
@@ -739,39 +684,6 @@ struct EpisodeDetailView: View {
             (artworkDescription.map { String(localized: ". Artwork \($0)") } ?? "")
     }
 
-    @ViewBuilder
-    private func downloadButton(_ episode: PodcastEpisode) -> some View {
-        if downloads.isDownloaded(episode.id) {
-            Button {
-                downloads.delete(episode.id)
-            } label: {
-                Image(systemName: "arrow.down.circle.fill")
-            }
-            .accessibilityLabel(String(localized: "Downloaded"))
-            .accessibilityHint(String(localized: "Double-tap to remove download."))
-        } else if downloads.activeDownloads.contains(episode.id) {
-            // Previously a bare, non-interactive ProgressView — DownloadManager.
-            // cancelDownload(_:) existed but nothing in the app ever called
-            // it, so no one (sighted or VoiceOver) had any way to stop an
-            // unwanted or mistaken download (PODCAST-03).
-            Button {
-                downloads.cancelDownload(episode.id)
-            } label: {
-                ProgressView(value: downloads.progress[episode.id] ?? 0)
-                    .progressViewStyle(.circular)
-            }
-            .accessibilityLabel(String(localized: "Downloading, \(Int((downloads.progress[episode.id] ?? 0) * 100)) percent"))
-            .accessibilityHint(String(localized: "Double-tap to cancel."))
-        } else {
-            Button {
-                downloads.download(episode)
-            } label: {
-                Image(systemName: "arrow.down.circle")
-            }
-            .accessibilityLabel(String(localized: "Download for offline playback"))
-        }
-    }
-
     private func sectionHeading(_ text: String) -> some View {
         Text(text).font(.headline)
             .padding(.horizontal)
@@ -886,7 +798,7 @@ struct EpisodeDetailView: View {
                 } else {
                     let remaining = episode.commentCount - comments.count
                     Button(remaining > 0 ? "Load \(remaining) More Comments" : "Load More Comments") {
-                        Task { await loadMoreComments() }
+                        Task { await ensureAllCommentsLoaded() }
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -946,7 +858,7 @@ struct EpisodeDetailView: View {
             // (commentCount), so leaving the rest behind a manual tap just
             // contradicted what the count said was there.
             if hasMoreComments {
-                Task { await loadMoreComments() }
+                Task { await ensureAllCommentsLoaded() }
             }
             SpotlightIndexer.index(fetchedEp)
         } catch let e as APIError { error = e.localizedDescription
@@ -1016,11 +928,24 @@ struct EpisodeDetailView: View {
         isLoadingMoreComments = false
     }
 
+    /// Single-flight wrapper around loadMoreComments() — see
+    /// loadAllCommentsTask's doc comment for why this exists.
+    private func ensureAllCommentsLoaded() async {
+        if let existing = loadAllCommentsTask {
+            await existing.value
+            return
+        }
+        let task = Task { await loadMoreComments() }
+        loadAllCommentsTask = task
+        await task.value
+        loadAllCommentsTask = nil
+    }
+
     /// "Jump to Last Comment" custom action on the Community Discussion
     /// heading — loads any not-yet-fetched comments first so it always
     /// lands on the true last one, then moves VoiceOver focus there.
     private func jumpToLastComment(proxy: ScrollViewProxy) async {
-        if hasMoreComments { await loadMoreComments() }
+        if hasMoreComments { await ensureAllCommentsLoaded() }
         guard let lastId = comments.last?.id else { return }
         withReduceMotionAwareAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
         try? await Task.sleep(for: .milliseconds(400))
@@ -1032,7 +957,7 @@ struct EpisodeDetailView: View {
     /// for the most recent), so the first of the `newCommentCount` most
     /// recently posted comments sits at `comments.count - newCommentCount`.
     private func jumpToFirstNewComment(proxy: ScrollViewProxy) async {
-        if hasMoreComments { await loadMoreComments() }
+        if hasMoreComments { await ensureAllCommentsLoaded() }
         let targetIndex = comments.count - newCommentCount
         guard newCommentCount > 0, targetIndex >= 0, targetIndex < comments.count else { return }
         let targetId = comments[targetIndex].id

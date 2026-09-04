@@ -681,6 +681,10 @@ struct AppEndpoints {
     /// ("Developer's Website") existed on the form but was never submitted
     /// at all. Reported directly.
     func submitApp(payload: SubmitAppPayload, csrfToken: String) async throws -> (nid: Int, nodeUrl: String) {
+        let bodySummary = await Self.bodySummary(
+            appName: payload.appName,
+            description: payload.appStoreDescription
+        )
         var attributes: [String: AnyEncodable] = [
             "title": AnyEncodable(payload.appName),
             "status": AnyEncodable(true),
@@ -693,7 +697,7 @@ struct AppEndpoints {
             "field_labelling": AnyEncodable(payload.buttonLabelling),
             "field_usability": AnyEncodable(payload.usabilityNotes),
             "field_comments": AnyEncodable(RichTextValue(value: payload.accessibilityComments, format: "basic_html")),
-            "body": AnyEncodable(RichTextBodyValue(value: payload.appStoreDescription, summary: payload.shortSummary, format: "basic_html")),
+            "body": AnyEncodable(RichTextBodyValue(value: payload.appStoreDescription, summary: bodySummary, format: "basic_html")),
         ]
         if !payload.otherComments.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             attributes["field_other_comments"] = AnyEncodable(RichTextValue(value: payload.otherComments, format: "basic_html"))
@@ -719,6 +723,51 @@ struct AppEndpoints {
         let alias = a["path"]?.pathAlias
         let nodeUrl = alias.map { "https://www.applevis.com\($0)" } ?? "https://www.applevis.com/node/\(nid)"
         return (nid, nodeUrl)
+    }
+
+    private static func bodySummary(appName: String, description: String) async -> String {
+        let trimmed = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+
+        if let aiSummary = await IntelligenceService.appDirectoryTeaser(appName: appName, description: trimmed) {
+            let cleaned = cleanBodySummary(aiSummary)
+            if !cleaned.isEmpty { return cleaned }
+        }
+
+        return fallbackBodySummary(from: trimmed)
+    }
+
+    private static func fallbackBodySummary(from description: String) -> String {
+        let normalized = description
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return "" }
+
+        if let punctuationIndex = normalized.firstIndex(where: { ".!?".contains($0) }) {
+            let end = normalized.index(after: punctuationIndex)
+            return cleanBodySummary(String(normalized[..<end]))
+        }
+        return cleanBodySummary(normalized)
+    }
+
+    private static func cleanBodySummary(_ text: String) -> String {
+        var cleaned = text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+        cleaned = cleaned
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        guard cleaned.count > 220 else { return cleaned }
+
+        let hardEnd = cleaned.index(cleaned.startIndex, offsetBy: 220)
+        var shortened = String(cleaned[..<hardEnd]).trimmingCharacters(in: .whitespacesAndNewlines)
+        if let lastSpace = shortened.lastIndex(of: " ") {
+            shortened = String(shortened[..<lastSpace])
+        }
+        return shortened
     }
 
     /// Submits a standalone Apple TV app directory entry — a genuinely
@@ -1010,7 +1059,6 @@ struct SubmitAppPayload {
     var usabilityNotes = ""
     var accessibilityComments = ""
     var otherComments = ""
-    var shortSummary = ""
 }
 
 /// Separate from `SubmitAppPayload` because the two content types genuinely
@@ -1093,6 +1141,7 @@ private func mapDirectoryListing(_ item: JSONValue, platform: AppPlatform) -> Ap
         ?? item["changed"]?.stringValue ?? item["updated"]?.stringValue
     return AppListing(
         id: id,
+        nid: item["nid"]?.intValue ?? item["node_id"]?.intValue,
         name: name,
         developer: item["developer"]?.stringValue ?? "",
         platform: platform,

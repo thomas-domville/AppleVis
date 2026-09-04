@@ -12,6 +12,11 @@ struct BugDetailView: View {
     @State private var error: String?
     @State private var isLoadingMoreComments = false
     @State private var hasMoreComments = true
+    // Mirrors ForumTopicDetailView.loadAllRepliesTask — prevents load()'s
+    // background drain-all and "Jump to First New Comment"/"Jump to Last
+    // Comment" from both starting their own concurrent loadMoreComments()
+    // loop, which raced on comments.count and duplicated pages.
+    @State private var loadAllCommentsTask: Task<Void, Never>?
     @State private var newCommentCount = 0
     @State private var pendingFocusCommentId: String?
     @State private var showCompose = false
@@ -73,17 +78,17 @@ struct BugDetailView: View {
                     // Description
                     if !detail.body.isEmpty {
                         sectionHeading("Description")
-                        SegmentedHTMLView(html: detail.body).padding(.horizontal)
+                        SegmentedHTMLView(html: detail.body, contentKind: "bugReport", contentId: detail.id, field: "description").padding(.horizontal)
                     }
 
                     if let steps = detail.stepsToReproduce, !steps.isEmpty {
                         sectionHeading("Steps to Reproduce")
-                        SegmentedHTMLView(html: steps).padding(.horizontal)
+                        SegmentedHTMLView(html: steps, contentKind: "bugReport", contentId: detail.id, field: "steps").padding(.horizontal)
                     }
 
                     if let workaround = detail.workaround, !workaround.isEmpty {
                         sectionHeading("Workaround")
-                        SegmentedHTMLView(html: workaround).padding(.horizontal)
+                        SegmentedHTMLView(html: workaround, contentKind: "bugReport", contentId: detail.id, field: "workaround").padding(.horizontal)
                     }
 
                     Divider()
@@ -372,7 +377,7 @@ struct BugDetailView: View {
                 } else {
                     let remaining = detail.commentCount - detail.comments.count
                     Button(remaining > 0 ? "Load \(remaining) More Comments" : "Load More Comments") {
-                        Task { await loadMoreComments() }
+                        Task { await ensureAllCommentsLoaded() }
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -404,7 +409,7 @@ struct BugDetailView: View {
             // the same fix for the same reason: the heading shows the true
             // total, so leaving the rest behind a manual tap read as broken.
             if hasMoreComments {
-                Task { await loadMoreComments() }
+                Task { await ensureAllCommentsLoaded() }
             }
             if let detail {
                 // BugDetailView never called stampItemVisit at all — meaning
@@ -470,11 +475,24 @@ struct BugDetailView: View {
         isLoadingMoreComments = false
     }
 
+    /// Single-flight wrapper around loadMoreComments() — see
+    /// loadAllCommentsTask's doc comment for why this exists.
+    private func ensureAllCommentsLoaded() async {
+        if let existing = loadAllCommentsTask {
+            await existing.value
+            return
+        }
+        let task = Task { await loadMoreComments() }
+        loadAllCommentsTask = task
+        await task.value
+        loadAllCommentsTask = nil
+    }
+
     /// "Jump to Last Comment" link on the Community Discussion heading —
     /// loads any not-yet-fetched comments first so it always lands on the
     /// true last one, then moves VoiceOver focus there.
     private func jumpToLastComment(proxy: ScrollViewProxy) async {
-        if hasMoreComments { await loadMoreComments() }
+        if hasMoreComments { await ensureAllCommentsLoaded() }
         guard let lastId = self.detail?.comments.last?.id else { return }
         withReduceMotionAwareAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
         try? await Task.sleep(for: .milliseconds(400))
@@ -485,7 +503,7 @@ struct BugDetailView: View {
     /// oldest-first, so the first of the `newCommentCount` most recently
     /// posted comments sits at `comments.count - newCommentCount`.
     private func jumpToFirstNewComment(proxy: ScrollViewProxy) async {
-        if hasMoreComments { await loadMoreComments() }
+        if hasMoreComments { await ensureAllCommentsLoaded() }
         let comments = self.detail?.comments ?? []
         let targetIndex = comments.count - newCommentCount
         guard newCommentCount > 0, targetIndex >= 0, targetIndex < comments.count else { return }

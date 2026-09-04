@@ -464,6 +464,7 @@ enum HelpContent {
                             "Bug Tracker — active and resolved accessibility bugs reported by the community.",
                             "Be My Eyes — launch Call a Volunteer, Be My AI, or the Service Directory without leaving the app.",
                             "RSS Feeds — copy or share feed links to follow AppleVis outside the app.",
+                            "Social links — follow AppleVis on Mastodon, Facebook, or X from the Stay Updated section.",
                             "Search — site-wide search that can even translate a non-English query for you.",
                             "Contribute — submit a bug, blog post, podcast, or app entry, whenever you've got something to share.",
                         ]),
@@ -654,8 +655,9 @@ enum HelpContent {
                 HelpArticle(
                     id: "community-writing-tools",
                     title: "Writing Help and Translation",
-                    summary: "Rewrite, translate to English, and friendly guideline reminders.",
+                    summary: "Rewrite, translate to English, guideline reminders, and reading content in your own language.",
                     content: [
+                        .heading("Writing in English"),
                         .body("Before you post a topic, reply, or comment, AppleVis can lend a hand — smoothing out your tone, translating a draft that isn't in English, or gently flagging something the guidelines checker thinks might cause trouble."),
                         .bullets([
                             "Rewrite polishes your draft's clarity and tone, without changing what you're actually trying to say.",
@@ -663,6 +665,14 @@ enum HelpContent {
                             "The guidelines checker is purely advisory — it never blocks you from posting.",
                             "If AI helped you write something, a quick note saying so is appreciated by the community.",
                         ]),
+                        .heading("Reading AppleVis in your own language"),
+                        .body("AppleVis is written and moderated entirely in English — it's the one shared language that lets our whole community read and reply to each other in the same place, and lets our editorial team review everything that's posted. But you don't have to read it in English: turn on Auto-Translate in Settings, and blog posts, forum topics, app entries, podcast episodes, guides, bug reports, comments, and this Help section itself can all be translated into your language automatically, right on your device."),
+                        .bullets([
+                            "Translation happens on your iPhone — nothing you read is sent to an outside server.",
+                            "It's automatic, but never perfect — look for the small \"Translated\" note, and tap Show Original any time to see the exact English text.",
+                            "Links inside translated text still go exactly where they're supposed to.",
+                        ]),
+                        .tip("If you use VoiceOver, translated text is automatically spoken in the correct voice and pronunciation for that language — you don't need to change your VoiceOver language setting yourself just to read translated AppleVis content."),
                     ]
                 ),
                 HelpArticle(
@@ -771,16 +781,16 @@ enum HelpContent {
                         ]),
                         .heading("Step 2 — Your Content"),
                         .steps([
-                            "Enter your email address — the editorial team may reply to follow up.",
+                            "Enter a valid email address — the editorial team may reply to follow up.",
                             "Write a few sentences on why this post would interest AppleVis readers — this one's required; it's how editors get a feel for your pitch.",
                             "Write, import, or paste your actual draft — minimum 50 characters.",
                             "Use Import File to pull in a text or Markdown file from Files or iCloud Drive, or Paste to grab whatever's already on your clipboard.",
-                            "Tap Rewrite if you'd like a hand polishing the draft.",
                             "Tap Continue.",
                         ]),
                         .heading("Step 3 — Review and Submit"),
                         .body("Check everything over — title, category, your pitch, and your draft — then tap Submit. A thank-you screen confirms it's on its way, and the editorial team will follow up with their decision."),
                         .note("The AppleVis Editorial Team reviews every submission and decides whether it gets published — they'll reach out either way."),
+                        .tip("Cancel is available from any step if you decide not to submit. On step 2 or the review screen, use Back to return to the previous step without discarding your draft."),
                         .tip("You can also share text straight into AppleVis from almost any other app. Select some text, tap Share, choose AppleVis, and the blog wizard opens with it already loaded."),
                     ]
                 ),
@@ -827,7 +837,7 @@ enum HelpContent {
                         .heading("Step 2 — App Details"),
                         .body("What you'll fill in here depends on the platform. Confirm the details pulled from the App Store, then share your accessibility assessment."),
                         .bullets([
-                            "For iPhone and iPad apps: separate ratings for VoiceOver Performance, Button Labelling, and Usability, plus a short one-line summary for the directory listing.",
+                            "For iPhone and iPad apps: separate ratings for VoiceOver Performance, Button Labelling, and Usability, plus the devices the app supports.",
                             "For Mac, Apple Watch, and Apple TV apps: a single combined Usability rating.",
                             "Every platform asks for detailed Accessibility Comments — twenty characters minimum, but the more you share, the more useful it is to the next person reading it.",
                         ]),
@@ -1167,7 +1177,7 @@ enum HelpContent {
                             "Tap Share and choose AppleVis.",
                             "The podcast submission wizard opens with what you shared already attached.",
                         ]),
-                        .note("You'll need AppleVis installed for it to appear in your share sheet. Sharing opens AppleVis and dismisses the share sheet automatically."),
+                        .note("You'll need AppleVis installed for it to appear in your share sheet. Sharing usually switches straight to AppleVis with the right wizard already open — but a few apps (including the App Store) don't hand off automatically. If that happens, you'll see a quick confirmation instead, and your share will be waiting the next time you open AppleVis yourself."),
                         .tip("If AppleVis isn't showing up in your share sheet, scroll to the end of the app row and tap More to find and enable it."),
                     ]
                 ),

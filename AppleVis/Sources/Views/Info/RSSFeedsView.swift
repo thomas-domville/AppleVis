@@ -10,6 +10,9 @@ import SwiftUI
 struct RSSFeedsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var toast: ToastStore
+    /// Had no focus management at all. Full app-wide focus audit,
+    /// requested directly.
+    @AccessibilityFocusState private var isIntroFocused: Bool
 
     private struct RSSFeed: Identifiable {
         let id: String
@@ -67,6 +70,7 @@ struct RSSFeedsView: View {
                 Text("Subscribe to any of these feeds in your preferred RSS reader to get AppleVis updates automatically, without checking the app or site.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .accessibilityFocused($isIntroFocused)
             }
             Section("Feeds") {
                 ForEach(feeds) { feed in
@@ -77,6 +81,7 @@ struct RSSFeedsView: View {
         .themedList(preferences.colors)
         .navigationTitle("RSS Feeds")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await retryAccessibilityFocus(into: $isIntroFocused) }
     }
 
     /// Title/description are combined into one non-interactive VoiceOver

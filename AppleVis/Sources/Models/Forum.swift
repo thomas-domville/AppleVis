@@ -2,6 +2,7 @@ import Foundation
 
 nonisolated struct ForumTopic: Identifiable, Codable, Hashable, Sendable {
     let id: String
+    var nid: Int? = nil
     let title: String
     let authorName: String
     let authorId: String

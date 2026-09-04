@@ -207,6 +207,13 @@ struct AboutView: View {
         .sheet(item: $contactType) { type in
             ContactView(initialType: type)
         }
+        // Missing the initial title-focus `.task` its sibling hub screens
+        // (SettingsView, ProfileView) both have — reuses the "whatsNew"
+        // target already wired to the first row below, the same way
+        // ProfileView reuses its own titleFocusID for both initial focus
+        // and returning-from-a-subscreen focus. Full app-wide focus audit,
+        // requested directly.
+        .task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("whatsNew")) }
     }
 }
 

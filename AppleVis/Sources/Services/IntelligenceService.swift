@@ -114,6 +114,19 @@ enum IntelligenceService {
         return await cleanedResponse("Summarise the following in 2-3 sentences:\n\n\(text)")
     }
 
+    static func appDirectoryTeaser(appName: String, description: String) async -> String? {
+        guard isAvailable else { return nil }
+        let trimmedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedDescription.isEmpty else { return nil }
+        let trimmedName = appName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let nameClause = trimmedName.isEmpty ? "this app" : "\"\(trimmedName)\""
+        return await cleanedResponse(
+            "Write one plain-language sentence for an AppleVis app directory listing preview for \(nameClause). " +
+            "Base it only on the App Store description below. Do not mention accessibility unless the description does. " +
+            "Keep it under 180 characters. Return only the sentence.\n\n\(trimmedDescription)"
+        )
+    }
+
     /// RN's "Accessibility Consensus" (settingsData.ts) — aggregates app
     /// reviews into one verdict sentence about how well the app actually
     /// works with VoiceOver, e.g. "Most reviewers say this app works well

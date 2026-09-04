@@ -17,4 +17,5 @@ enum AppLog {
     // token miss or an unexpected non-2xx/non-redirect response had no
     // trace to debug from beyond the generic user-facing error string.
     static let network = Logger(subsystem: "com.applevis.AppleVisSwift", category: "network")
+    static let translation = Logger(subsystem: "com.applevis.AppleVisSwift", category: "translation")
 }

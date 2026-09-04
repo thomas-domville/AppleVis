@@ -79,6 +79,11 @@ struct AppDetailView: View {
     @State private var developerApps: [ItunesDeveloperApp] = []
     @State private var isLoadingMoreReviews = false
     @State private var hasMoreReviews = true
+    // Mirrors ForumTopicDetailView.loadAllRepliesTask — prevents load()'s
+    // background drain-all and "Jump to First New Comment"/"Jump to Last
+    // Comment" from both starting their own concurrent loadMoreReviews()
+    // loop, which raced on reviews.count and duplicated pages.
+    @State private var loadAllReviewsTask: Task<Void, Never>?
     @State private var newReviewCount = 0
     @State private var pendingFocusReviewId: String?
     @State private var recommendationSummary: RecommendationSummary?
@@ -144,7 +149,7 @@ struct AppDetailView: View {
                                 .padding(.horizontal)
                                 .padding(.bottom, 4)
                         }
-                        SegmentedHTMLView(html: aboutHTML(for: detail))
+                        SegmentedHTMLView(html: aboutHTML(for: detail), contentKind: "appListing", contentId: detail.id, field: "about")
                             .padding(.horizontal)
                             .padding(.bottom, 16)
                     }
@@ -169,7 +174,7 @@ struct AppDetailView: View {
                     }
                     if let acc = detail.accessibilityComments, !acc.isEmpty {
                         sectionHeading("Accessibility Comments")
-                        SegmentedHTMLView(html: acc)
+                        SegmentedHTMLView(html: acc, contentKind: "appListing", contentId: detail.id, field: "accessibilityComments")
                             .padding(.horizontal).padding(.bottom, 8)
                     }
 
@@ -916,7 +921,7 @@ struct AppDetailView: View {
                 } else {
                     let remaining = detail.reviewCount - detail.reviews.count
                     Button(remaining > 0 ? "Load \(remaining) More Comments" : "Load More Comments") {
-                        Task { await loadMoreReviews() }
+                        Task { await ensureAllReviewsLoaded() }
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -948,7 +953,7 @@ struct AppDetailView: View {
             isMatchedNotConfirmed = false
             hasMoreReviews = (detail?.reviews.count ?? 0) < (detail?.reviewCount ?? 0)
             if hasMoreReviews {
-                Task { await loadMoreReviews() }
+                Task { await ensureAllReviewsLoaded() }
             }
             // Backgrounded like confirmAppleTVSupport below — supplementary,
             // shouldn't delay the rest of the page.
@@ -1094,6 +1099,19 @@ struct AppDetailView: View {
         isLoadingMoreReviews = false
     }
 
+    /// Single-flight wrapper around loadMoreReviews() — see
+    /// loadAllReviewsTask's doc comment for why this exists.
+    private func ensureAllReviewsLoaded() async {
+        if let existing = loadAllReviewsTask {
+            await existing.value
+            return
+        }
+        let task = Task { await loadMoreReviews() }
+        loadAllReviewsTask = task
+        await task.value
+        loadAllReviewsTask = nil
+    }
+
     /// Updates AppleVis's store-owned app fields from the confirmed App
     /// Store listing while leaving community accessibility data untouched.
     private func updateAppInformationFromStore() async {
@@ -1127,7 +1145,7 @@ struct AppDetailView: View {
     }
 
     private func jumpToLastReview(proxy: ScrollViewProxy) async {
-        if hasMoreReviews { await loadMoreReviews() }
+        if hasMoreReviews { await ensureAllReviewsLoaded() }
         guard let lastId = self.detail?.reviews.last?.id else { return }
         withReduceMotionAwareAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
         try? await Task.sleep(for: .milliseconds(400))
@@ -1139,7 +1157,7 @@ struct AppDetailView: View {
     /// first of the `newReviewCount` most recently posted reviews sits at
     /// `reviews.count - newReviewCount`.
     private func jumpToFirstNewReview(proxy: ScrollViewProxy) async {
-        if hasMoreReviews { await loadMoreReviews() }
+        if hasMoreReviews { await ensureAllReviewsLoaded() }
         let reviews = self.detail?.reviews ?? []
         let targetIndex = reviews.count - newReviewCount
         guard newReviewCount > 0, targetIndex >= 0, targetIndex < reviews.count else { return }
@@ -1329,7 +1347,7 @@ struct AppReviewRow: View {
                 .accessibilityHidden(true)
             }
 
-            SegmentedHTMLView(html: review.body)
+            SegmentedHTMLView(html: review.body, contentKind: "review", contentId: review.id, field: "body")
         }
         .padding()
         .contextMenu {
@@ -1518,6 +1536,10 @@ struct ComposeAppReviewView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
+    /// Unlike its sibling compose sheets (New Topic, Reply), this one had no
+    /// focus management at all — opening it left VoiceOver focus on system
+    /// default. Full app-wide focus audit, requested directly.
+    @AccessibilityFocusState private var isHeaderFocused: Bool
 
     init(appId: String, appName: String, quotedReview: AppReview? = nil, platform: AppPlatform, onPosted: @escaping (AppReview) -> Void) {
         self.appId = appId
@@ -1541,6 +1563,8 @@ struct ComposeAppReviewView: View {
                 Text(quotedReview != nil ? "Replying to \(quotedReview!.authorName) — Commenting on: \(appName)" : "Commenting on: \(appName)")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .padding(.horizontal).padding(.top)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($isHeaderFocused)
                 TextField("Subject (optional)", text: $subject)
                     .textFieldStyle(.roundedBorder)
                     .padding()
@@ -1600,6 +1624,7 @@ struct ComposeAppReviewView: View {
                         .disabled(reviewText.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
                 }
             }
+            .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
         }
     }
 

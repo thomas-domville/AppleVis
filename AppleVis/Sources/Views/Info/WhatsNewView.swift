@@ -2,12 +2,16 @@ import SwiftUI
 
 struct WhatsNewView: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    /// Had no focus management at all. Full app-wide focus audit,
+    /// requested directly.
+    @AccessibilityFocusState private var isHeaderFocused: Bool
 
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
                 versionHeader
                     .padding()
+                    .accessibilityFocused($isHeaderFocused)
 
                 ForEach(ChangeItem.current) { item in
                     ChangeCard(item: item)
@@ -26,6 +30,7 @@ struct WhatsNewView: View {
         .background(preferences.colors.background)
         .navigationTitle("What's New")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
     }
 
     private var versionHeader: some View {
@@ -160,9 +165,27 @@ struct ChangeItem: Identifiable {
     let title: String
     let description: String
 
-    static let currentVersion = "2026.0.12"
+    static let currentVersion = "2026.0.13"
 
     static let current: [ChangeItem] = [
+        ChangeItem(
+            systemImage: "text.bubble",
+            tag: .improved,
+            title: "Clearer Guidance on Submission Forms",
+            description: "Fields like a bug report's description or an app's accessibility comments now explain what actually makes a helpful answer, instead of just a character minimum."
+        ),
+        ChangeItem(
+            systemImage: "xmark.circle",
+            tag: .fixed,
+            title: "Cancel Works From Any Step",
+            description: "Submitting a blog post, bug report, app, podcast, contact message, comment report, or changing your password/email now lets you cancel out from any step, not just the first."
+        ),
+        ChangeItem(
+            systemImage: "heart.text.square",
+            tag: .improved,
+            title: "Warmer Thank-You Messages",
+            description: "The confirmation screen after submitting a blog post, bug report, app, podcast, or contact message now sounds like us — genuine thanks, not just a status update."
+        ),
         ChangeItem(
             systemImage: "flag",
             tag: .new,
@@ -355,6 +378,90 @@ struct ChangeItem: Identifiable {
             title: "Back Button Returns VoiceOver Focus",
             description: "Coming back from a Settings, Profile, Discover, or About screen now lands VoiceOver focus on the row you tapped, instead of somewhere unrelated."
         ),
+        ChangeItem(
+            systemImage: "arrow.down.to.line",
+            tag: .fixed,
+            title: "\"Jump to First New Comment\" Lands in the Right Place",
+            description: "On a long thread, review list, or comment section, jumping to the newest or first new comment could land VoiceOver focus on the wrong entry instead of the actual new one. It now reliably lands on the right comment every time."
+        ),
+        ChangeItem(
+            systemImage: "square.and.arrow.up",
+            tag: .improved,
+            title: "Clearer Confirmation When Sharing to AppleVis",
+            description: "Sharing an app, podcast, or article to AppleVis from another app (like the App Store) now shows a quick confirmation if that app doesn't switch to AppleVis automatically, instead of appearing to do nothing. Either way, your share is waiting the next time you open AppleVis."
+        ),
+        ChangeItem(
+            systemImage: "list.bullet.rectangle",
+            tag: .fixed,
+            title: "Mouse Recap's Table of Contents, Simplified",
+            description: "\"In This Recap\" was a numbered list where each entry took three separate swipes (the number, the title, then the count), for a number that was never a meaningful order. It's now a single plain-language sentence, like \"This recap covers 1 new accessible app and 2 blog posts.\""
+        ),
+        ChangeItem(
+            systemImage: "text.badge.checkmark",
+            tag: .improved,
+            title: "Jump Straight to a Mouse Recap Section",
+            description: "Mouse Recap's section titles (New Accessible Apps, Community Voices, and the rest) are now real VoiceOver headings, so the Headings rotor jumps straight to one instead of swiping through everything ahead of it. Each card's repeated section label (like \"Popular Discussion\" on every discussion) no longer reads out again for every single item."
+        ),
+        ChangeItem(
+            systemImage: "flame",
+            tag: .improved,
+            title: "Popular Discussions Reflect What's Actually Active",
+            description: "Community Voices used to rank and describe topics by their all-time comment count, so a 130-comment topic with only 3 new replies this week could out-rank one that's genuinely buzzing right now. It's now ranked by comments posted within the recap window, and each card says how many of its comments are new (e.g. \"8 new in the past week\") alongside the lifetime total."
+        ),
+        ChangeItem(
+            systemImage: "person.2",
+            tag: .fixed,
+            title: "Friends of AppleVis, Read Once",
+            description: "Be My Eyes' row in Discover's Friends of AppleVis section said \"Friend of AppleVis\" a second time, right after the section header already said it. It's just the name and description now."
+        ),
+        ChangeItem(
+            systemImage: "sun.max",
+            tag: .new,
+            title: "A Daily Welcome Back",
+            description: "Signed in and opening AppleVis for the first time today? Home's greeting now adds a quiet \"Welcome back\" underneath, once per day — it won't repeat if you check back again later the same day."
+        ),
+        ChangeItem(
+            systemImage: "hand.wave.fill",
+            tag: .improved,
+            title: "Home Always Greets You First",
+            description: "Opening Home with new activity or a reading position to resume used to skip straight past the greeting. VoiceOver focus now always lands on the greeting first, with What's New announced right after — instead of two separate \"welcome\" messages competing with each other."
+        ),
+        ChangeItem(
+            systemImage: "arrow.clockwise",
+            tag: .fixed,
+            title: "Pull to Refresh No Longer Repeats Itself",
+            description: "Pulling to refresh Home and finding something new used to announce the summary, then say the exact same sentence again a moment later when focus landed on the What's New card. It's said once now."
+        ),
+        ChangeItem(
+            systemImage: "scope",
+            tag: .fixed,
+            title: "VoiceOver Focus, Cleaned Up Across the App",
+            description: "A full pass on where VoiceOver focus lands when a screen opens: the Now Playing screen, Forums, Write a Review, and several account screens (sign in, edit profile, delete account, member profiles, contact a member) now focus something meaningful instead of nothing. Every multi-step wizard (Submit App/Blog/Bug/Podcast, Contact, Change Password/Email, Report a Comment) now focuses its first step reliably and re-checks focus a few times after each Next/Back, instead of a single guess that could go silent on a slower moment. Podcast and Storage settings no longer jump straight to a control."
+        ),
+        ChangeItem(
+            systemImage: "text.alignleft",
+            tag: .improved,
+            title: "Long Posts Now Read Paragraph by Paragraph",
+            description: "Forum topics, replies, blog posts, bug reports, app descriptions, and podcast show notes previously read (or Braille-panned) as one long, undifferentiated block when there was no heading structure to break it up. Each paragraph is now its own stop, so you can pause, re-read, or skip to a specific one — reading everything continuously still works exactly the same as before."
+        ),
+        ChangeItem(
+            systemImage: "text.quote",
+            tag: .fixed,
+            title: "Podcast Transcripts Show Up Again",
+            description: "Recent episodes' Transcript button wasn't appearing, and the raw transcript text stayed mixed into the show notes instead of being pulled into its own section — recent AppleVis Extra episodes store their notes in a different format behind the scenes, which the app wasn't reading correctly. Transcripts are detected properly again."
+        ),
+        ChangeItem(
+            systemImage: "square.and.arrow.up",
+            tag: .new,
+            title: "Share a Transcript",
+            description: "The Transcript screen now has a Share action of its own, so you can send or quote the actual words instead of only a link back to the episode."
+        ),
+        ChangeItem(
+            systemImage: "scope",
+            tag: .improved,
+            title: "More VoiceOver Focus Fixes",
+            description: "Continuing the focus pass from the last update: About, What's New, Help, RSS Feeds, Credits, Social Media, Open Source Licences, the Transcript screen, Customize Home, editing a topic/post, and For You's Saved/Following/Recommended/Downloads sections all focus something meaningful on their first appearance now instead of leaving VoiceOver wherever it happened to land."
+        ),
     ]
 
 }
@@ -424,13 +531,25 @@ struct HistorySection: Identifiable {
                 systemImage: "square.and.pencil",
                 tag: .fixed,
                 title: "Better Submission Forms",
-                description: "Bug reports, blog posts, podcasts, and app submissions now better match what AppleVis needs, with clearer required fields and fewer surprises at the end."
+                description: "Bug reports, blog posts, podcasts, and app submissions now better match what AppleVis needs, with clearer required fields and fewer surprises at the end. Submit App no longer asks for Drupal's hidden short summary, shows supported devices more clearly, and uses Review & Submit before the final submit. Submit Blog now validates email addresses, keeps Cancel available on every step, and leaves blog drafts in the author's own voice."
             ),
             ChangeItem(
                 systemImage: "hand.point.up.left",
                 tag: .fixed,
                 title: "Smoother VoiceOver Focus",
                 description: "Many screens now move VoiceOver focus to the new page or field as soon as it opens, including Settings, Profile, Discover sections, app pages, podcasts, forums, and first-time setup."
+            ),
+            ChangeItem(
+                systemImage: "safari",
+                tag: .fixed,
+                title: "Discover Opens Details Reliably",
+                description: "Opening blogs, guides, and other Discover lists now uses the same navigation path as Home, so a detail page appears immediately instead of seeming to stay on the list until Back is pressed."
+            ),
+            ChangeItem(
+                systemImage: "dot.radiowaves.left.and.right",
+                tag: .improved,
+                title: "Stay Updated Is Easier to Find",
+                description: "RSS feeds and social follow links now live together in Discover's Stay Updated section, with RSS first, followed by Mastodon, Facebook, and X."
             ),
             ChangeItem(
                 systemImage: "paintbrush",

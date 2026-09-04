@@ -132,12 +132,17 @@ final class AuthStore: ObservableObject {
             AppLog.auth.error("Failed to encode AuthUser for Keychain save")
             return
         }
+        let deleteQuery: [String: Any] = [
+            kSecClass as String:       kSecClassGenericPassword,
+            kSecAttrAccount as String: keychainKey,
+        ]
         let query: [String: Any] = [
             kSecClass as String:       kSecClassGenericPassword,
             kSecAttrAccount as String: keychainKey,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
             kSecValueData as String:   data,
         ]
-        SecItemDelete(query as CFDictionary)
+        SecItemDelete(deleteQuery as CFDictionary)
         let status = SecItemAdd(query as CFDictionary, nil)
         if status != errSecSuccess {
             AppLog.auth.error("Keychain save failed: OSStatus \(status)")

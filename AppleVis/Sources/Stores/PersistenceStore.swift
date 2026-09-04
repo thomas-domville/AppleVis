@@ -188,10 +188,10 @@ final class PersistenceStore {
         return load(key: itemVisitsKey) ?? [:]
     }
 
-    func stampItemVisit(id: String, commentCount: Int) {
+    func stampItemVisit(id: String, commentCount: Int, seenAt: Date = Date()) {
         guard isReadHistoryTrackingEnabled else { return }
         var visits = allItemVisits()
-        visits[id] = ItemVisit(seenAt: Date(), commentCount: commentCount)
+        visits[id] = ItemVisit(seenAt: seenAt, commentCount: commentCount)
         persist(visits, key: itemVisitsKey)
         Task { @MainActor in ICloudSyncManager.shared.pushReadHistory() }
     }
@@ -287,6 +287,7 @@ final class PersistenceStore {
         defaults.removeObject(forKey: itemVisitsKey)
         defaults.removeObject(forKey: episodeAudioMetadataKey)
         defaults.removeObject(forKey: mouseRecapDigestKey)
+        defaults.removeObject(forKey: translationCacheKey)
         defaults.removeObject(forKey: "applevis.forums.lastVisit")
         defaults.removeObject(forKey: "applevis.lastVisit")
         cache.removeAll()
@@ -343,6 +344,77 @@ final class PersistenceStore {
 
     func saveMouseRecapDigest(_ digest: MouseRecapDigest) {
         persist(digest, key: mouseRecapDigestKey)
+    }
+
+    // MARK: - Reading-side content translation cache. Keyed by a composite
+    // string (kind:id:field:targetLanguage) rather than id alone, since one
+    // piece of content can have several translatable fields (a bug report's
+    // description/steps/workaround, a title vs. a body paragraph) and a
+    // device could switch content languages over its lifetime. `kind` is a
+    // plain string rather than `ContentKind` since comments/replies and
+    // Help articles need their own values ("forumReply", "helpArticle")
+    // that aren't valid top-level `ContentKind` cases.
+    //
+    // Edit-invalidation: most content models here (forum topics/replies)
+    // have no per-item edit timestamp at all, so this validates a content
+    // hash on every read instead — unchanged source text still hits cache;
+    // an editor changing so much as a character makes the hash miss and
+    // silently triggers a fresh translation, no explicit invalidation pass
+    // needed. `hash(_:)` is a stable content fingerprint, not a security
+    // boundary, and deliberately isn't `String.hashValue`/`Hasher`, which
+    // Swift randomizes per process — a persisted cache keyed on that would
+    // miss everything after every single relaunch.
+
+    private let translationCacheKey = "applevis.content.translationCache.v1"
+    private let translationCacheMaxEntries = 500
+
+    struct CachedTranslation: Codable {
+        var sourceHash: String
+        var targetLanguage: String
+        var translatedText: String
+    }
+
+    func cachedTranslation(kind: String, id: String, field: String, targetLanguage: String, sourceText: String) -> String? {
+        guard let entry = translationCache()[translationCacheEntryKey(kind: kind, id: id, field: field, targetLanguage: targetLanguage)],
+              entry.sourceHash == Self.hash(sourceText)
+        else { return nil }
+        return entry.translatedText
+    }
+
+    func cacheTranslation(kind: String, id: String, field: String, targetLanguage: String, sourceText: String, translatedText: String) {
+        var all = translationCache()
+        if all.count >= translationCacheMaxEntries {
+            // Soft cap, not true LRU — dictionary iteration order is
+            // unspecified anyway, so evicting an arbitrary handful once the
+            // cap is hit is no worse than tracking real recency for what's
+            // just a local performance/storage bound.
+            for key in all.keys.prefix(all.count - translationCacheMaxEntries + 1) {
+                all.removeValue(forKey: key)
+            }
+        }
+        all[translationCacheEntryKey(kind: kind, id: id, field: field, targetLanguage: targetLanguage)] = CachedTranslation(
+            sourceHash: Self.hash(sourceText), targetLanguage: targetLanguage, translatedText: translatedText
+        )
+        persist(all, key: translationCacheKey)
+    }
+
+    private func translationCache() -> [String: CachedTranslation] {
+        load(key: translationCacheKey) ?? [:]
+    }
+
+    private func translationCacheEntryKey(kind: String, id: String, field: String, targetLanguage: String) -> String {
+        "\(kind):\(id):\(field):\(targetLanguage)"
+    }
+
+    /// FNV-1a — fast, stable across launches/devices/OS versions (unlike
+    /// Hasher), which is all a cache-freshness fingerprint needs.
+    private static func hash(_ text: String) -> String {
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in text.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 0x100000001b3
+        }
+        return String(hash, radix: 16)
     }
 
     // MARK: - Storage

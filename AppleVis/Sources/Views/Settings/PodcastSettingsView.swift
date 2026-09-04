@@ -23,7 +23,6 @@ struct PodcastSettingsView: View {
                     }
                 }
                 .accessibilityHint(String(localized: "Controls how fast episodes play. 1× is normal speed."))
-                .accessibilityFocused($isTitleFocused)
                 .accessibilityAdjustableAction { direction in
                     guard let idx = speedOptions.firstIndex(of: preferences.playbackSpeed) else { return }
                     switch direction {
@@ -34,9 +33,15 @@ struct PodcastSettingsView: View {
                     @unknown default: break
                     }
                 }
+                // Was focused on the Speed picker control itself — the
+                // literal "jump straight to a control" pattern this app's
+                // focus convention exists to avoid; every sibling Settings
+                // screen focuses descriptive text instead. Full app-wide
+                // focus audit, requested directly.
                 Text("Controls how fast episodes play — higher gets through more in less time, lower gives you more breathing room.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .accessibilityFocused($isTitleFocused)
 
                 Picker("Skip Back", selection: $preferences.skipBackInterval) {
                     ForEach(skipBackOptions, id: \.self) { s in

@@ -5,6 +5,15 @@ struct HelpArticleDetailView: View {
 
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var showWelcomeTour = false
+    /// Structurally this screen is a title + body article, just like the
+    /// six content detail screens (Forum/Podcast/App/Blog/Bug/Guide) — but
+    /// unlike them, it was never brought into their title-focus convention;
+    /// the article's title only ever appears in the navigation bar, with no
+    /// in-content focus target at all. Focuses the summary instead, the
+    /// first substantial content a reader reaches, matching how Settings
+    /// screens focus their own intro description. Full app-wide focus
+    /// audit, requested directly.
+    @AccessibilityFocusState private var isSummaryFocused: Bool
 
     /// Matches RN's "Read Article Summary" accessibility action format:
     /// "{title}. {summary}. {N} section headings. {M} steps."
@@ -45,12 +54,14 @@ struct HelpArticleDetailView: View {
                     .padding(.horizontal)
                     .padding(.top, 4)
                     .padding(.bottom, 12)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($isSummaryFocused)
                     .accessibilityAction(named: Text("Read Article Summary")) {
                         UIAccessibility.post(notification: .announcement, argument: articleSummary)
                     }
 
                 ForEach(article.content) { block in
-                    HelpBlockView(block: block)
+                    HelpBlockView(block: block, articleId: article.id)
                         .padding(.horizontal)
                 }
 
@@ -68,6 +79,7 @@ struct HelpArticleDetailView: View {
         .sheet(isPresented: $showWelcomeTour) {
             GuidedExperienceView(experience: GuidedExperienceRegistry.welcome)
         }
+        .task { await retryAccessibilityFocus(into: $isSummaryFocused) }
     }
 
     // MARK: - Related links
@@ -152,66 +164,153 @@ struct HelpArticleDetailView: View {
 
 struct HelpBlockView: View {
     let block: HelpContentBlock
+    /// Help articles are simpler to translate than HTML bodies elsewhere —
+    /// already broken into discrete blocks, no HTML parsing needed. `field`
+    /// keys are derived from `block.id` (itself content-derived, see
+    /// `HelpContentBlock.id`) plus a sub-index for blocks holding several
+    /// strings (bullets, steps, FAQ), so each string has its own stable
+    /// cache entry under this article's id.
+    let articleId: String
+
+    @EnvironmentObject private var preferences: PreferencesStore
+    @State private var translated: [String: String] = [:]
+
+    /// Every translatable string in this block, keyed by its own field id.
+    private var translatableTexts: [(field: String, text: String)] {
+        switch block {
+        case .heading(let text), .body(let text), .tip(let text), .note(let text), .warning(let text):
+            return [(block.id, text)]
+        case .bullets(let items), .steps(let items):
+            return items.enumerated().map { ("\(block.id).\($0.offset)", $0.element) }
+        case .faq(let question, let answer):
+            return [("\(block.id).q", question), ("\(block.id).a", answer)]
+        }
+    }
+
+    private func text(_ field: String, _ original: String) -> String {
+        translated[field] ?? original
+    }
 
     var body: some View {
-        switch block {
-        case .heading(let text):
-            Text(text)
-                .font(.headline)
-                .padding(.top, 8).padding(.bottom, 2)
-                .accessibilityAddTraits(.isHeader)
+        Group {
+            switch block {
+            case .heading(let originalText):
+                Text(text(block.id, originalText))
+                    .font(.headline)
+                    .padding(.top, 8).padding(.bottom, 2)
+                    .accessibilityAddTraits(.isHeader)
+                    .modifier(TranslatedAccessibilityLabel(isTranslated: translated[block.id] != nil, text: text(block.id, originalText)))
 
-        case .body(let text):
-            Text(text)
-                .font(.body)
-                .padding(.bottom, 6)
+            case .body(let originalText):
+                Text(text(block.id, originalText))
+                    .font(.body)
+                    .padding(.bottom, 6)
+                    .modifier(TranslatedAccessibilityLabel(isTranslated: translated[block.id] != nil, text: text(block.id, originalText)))
 
-        case .bullets(let items):
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(items, id: \.self) { item in
-                    HStack(alignment: .top, spacing: 8) {
-                        Text("•").foregroundStyle(Color.accentColor)
-                        Text(item)
+            case .bullets(let items):
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                        let field = "\(block.id).\(index)"
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("•").foregroundStyle(Color.accentColor)
+                            Text(text(field, item))
+                        }
+                        .modifier(TranslatedAccessibilityLabel(isTranslated: translated[field] != nil, text: text(field, item)))
                     }
                 }
-            }
-            .padding(.bottom, 8)
+                .padding(.bottom, 8)
 
-        case .steps(let items):
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                    HStack(alignment: .top, spacing: 12) {
-                        Text("\(index + 1)")
-                            .font(.caption).fontWeight(.bold)
-                            .frame(minWidth: 22, minHeight: 22)
-                            .fixedSize()
-                            .padding(4)
-                            .background(Color.accentColor, in: Circle())
-                            .foregroundStyle(.white)
-                        Text(item)
+            case .steps(let items):
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                        let field = "\(block.id).\(index)"
+                        let displayText = text(field, item)
+                        HStack(alignment: .top, spacing: 12) {
+                            Text("\(index + 1)")
+                                .font(.caption).fontWeight(.bold)
+                                .frame(minWidth: 22, minHeight: 22)
+                                .fixedSize()
+                                .padding(4)
+                                .background(Color.accentColor, in: Circle())
+                                .foregroundStyle(.white)
+                            Text(displayText)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(String(localized: translated[field] != nil
+                            ? "Step \(index + 1). Translated: \(displayText)"
+                            : "Step \(index + 1). \(displayText)"))
                     }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel(String(localized: "Step \(index + 1). \(item)"))
                 }
-            }
-            .padding(.bottom, 8)
+                .padding(.bottom, 8)
 
-        case .tip(let text):
-            Callout(label: "Tip", text: text, color: .green)
-        case .note(let text):
-            Callout(label: "Note", text: text, color: .blue)
-        case .warning(let text):
-            Callout(label: "Important", text: text, color: .orange)
+            case .tip(let originalText):
+                Callout(label: "Tip", text: text(block.id, originalText), color: .green, isTranslated: translated[block.id] != nil)
+            case .note(let originalText):
+                Callout(label: "Note", text: text(block.id, originalText), color: .blue, isTranslated: translated[block.id] != nil)
+            case .warning(let originalText):
+                Callout(label: "Important", text: text(block.id, originalText), color: .orange, isTranslated: translated[block.id] != nil)
 
-        case .faq(let question, let answer):
-            VStack(alignment: .leading, spacing: 4) {
-                Text(question).font(.body).fontWeight(.semibold)
-                Text(answer).font(.subheadline).foregroundStyle(.secondary)
+            case .faq(let question, let answer):
+                let qField = "\(block.id).q"
+                let aField = "\(block.id).a"
+                let qText = text(qField, question)
+                let aText = text(aField, answer)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(qText).font(.body).fontWeight(.semibold)
+                    Text(aText).font(.subheadline).foregroundStyle(.secondary)
+                }
+                .padding(.bottom, 10)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(String(localized: (translated[qField] != nil || translated[aField] != nil)
+                    ? "Question: \(qText). Answer: \(aText). Translated from English."
+                    : "Question: \(qText). Answer: \(aText)"))
             }
-            .padding(.bottom, 10)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(String(localized: "Question: \(question). Answer: \(answer)"))
         }
+        .task(id: taskIdKey) { await resolveIfNeeded() }
+    }
+
+    private var taskIdKey: String {
+        let joined = translatableTexts.map(\.text).joined(separator: "|")
+        return ContentTranslation.taskId(field: block.id, text: joined, targetLanguage: preferences.effectiveContentLanguage)
+    }
+
+    private func resolveIfNeeded() async {
+        guard let targetLanguage = preferences.effectiveContentLanguage else {
+            translated = [:]
+            return
+        }
+        let items = translatableTexts
+        guard !items.isEmpty else { return }
+
+        var resolved = [String?](repeating: nil, count: items.count)
+        var toTranslateIndices: [Int] = []
+        for (index, item) in items.enumerated() {
+            if let cached = PersistenceStore.shared.cachedTranslation(
+                kind: "helpArticle", id: articleId, field: item.field, targetLanguage: targetLanguage, sourceText: item.text
+            ) {
+                resolved[index] = cached
+            } else {
+                toTranslateIndices.append(index)
+            }
+        }
+        if !toTranslateIndices.isEmpty {
+            let translatedBatch = await TranslationCoordinator.shared.translateBatch(
+                toTranslateIndices.map { items[$0].text }, to: targetLanguage
+            )
+            for (offset, index) in toTranslateIndices.enumerated() {
+                guard let text = translatedBatch[offset] else { continue }
+                resolved[index] = text
+                PersistenceStore.shared.cacheTranslation(
+                    kind: "helpArticle", id: articleId, field: items[index].field, targetLanguage: targetLanguage,
+                    sourceText: items[index].text, translatedText: text
+                )
+            }
+        }
+        var results: [String: String] = [:]
+        for (index, item) in items.enumerated() {
+            if let value = resolved[index] { results[item.field] = value }
+        }
+        translated = results
     }
 }
 
@@ -219,6 +318,7 @@ private struct Callout: View {
     let label: String
     let text: String
     let color: Color
+    var isTranslated: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -237,6 +337,6 @@ private struct Callout: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .padding(.bottom, 8)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "\(label). \(text)"))
+        .accessibilityLabel(String(localized: isTranslated ? "\(label). Translated: \(text)" : "\(label). \(text)"))
     }
 }

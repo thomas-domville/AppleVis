@@ -2,6 +2,7 @@ import Foundation
 
 nonisolated struct Resource: Identifiable, Codable, Hashable, Sendable {
     let id: String
+    var nid: Int? = nil
     let title: String
     let kind: ResourceKind
     let authorName: String

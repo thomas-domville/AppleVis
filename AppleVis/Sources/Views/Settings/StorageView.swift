@@ -19,8 +19,16 @@ struct StorageView: View {
     var body: some View {
         Form {
             Section("Usage") {
-                StorageRow(label: "Downloaded Episodes", value: downloadedMB, color: .blue)
+                // Was focused on the "Downloaded Episodes" row itself — the
+                // literal "jump straight to a control/row" pattern this
+                // app's focus convention exists to avoid; every sibling
+                // Settings screen focuses descriptive text instead. Full
+                // app-wide focus audit, requested directly.
+                Text("Shows how much space AppleVis is using on this device, split between downloaded episodes and cached content.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                     .accessibilityFocused($isTitleFocused)
+                StorageRow(label: "Downloaded Episodes", value: downloadedMB, color: .blue)
                 StorageRow(label: "Cached Content", value: cachedMB, color: .green)
                 Divider()
                     .accessibilityHidden(true)

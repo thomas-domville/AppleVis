@@ -80,18 +80,23 @@ struct ThankYouView: View {
                 .background(Color.accentColor.opacity(0.15), in: Circle())
                 .accessibilityHidden(true)
 
-            Text(heading)
+            // `Text(String)`/`Button(String)` resolve to the verbatim
+            // initializer, not the LocalizedStringKey one, so a plain
+            // `Text(heading)` here would silently skip the string catalog
+            // no matter how the caller wrote its literal — wrapping in
+            // LocalizedStringKey restores the lookup by content.
+            Text(LocalizedStringKey(heading))
                 .font(.title.bold())
                 .multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityFocused($isHeadingFocused)
 
-            Text(message)
+            Text(LocalizedStringKey(message))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            Button(doneLabel, action: onDone)
+            Button(LocalizedStringKey(doneLabel), action: onDone)
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
 

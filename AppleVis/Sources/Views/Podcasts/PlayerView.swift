@@ -95,6 +95,11 @@ struct FullPlayerView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @Environment(\.dismiss) private var dismiss
     @State private var showQueue = false
+    /// One of the most-opened sheets in the app (every mini-player tap) had
+    /// no VoiceOver focus management at all — opening it left focus on
+    /// system default (typically Done). Full app-wide focus audit,
+    /// requested directly.
+    @AccessibilityFocusState private var isTitleFocused: Bool
 
     private let speedOptions: [Float] = PodcastSpeedOptions.all.map(Float.init)
 
@@ -128,6 +133,8 @@ struct FullPlayerView: View {
                                 .font(.title3).fontWeight(.bold)
                                 .multilineTextAlignment(.center)
                                 .lineLimit(3)
+                                .accessibilityAddTraits(.isHeader)
+                                .accessibilityFocused($isTitleFocused)
                             Text(episode.showTitle)
                                 .font(.subheadline).foregroundStyle(.secondary)
                             if let chapter = player.currentChapter, let index = episode.chapters.firstIndex(where: { $0.id == chapter.id }) {
@@ -208,6 +215,7 @@ struct FullPlayerView: View {
                 .sheet(isPresented: $showQueue) {
                     QueueView(isModal: true)
                 }
+                .task { await retryAccessibilityFocus(into: $isTitleFocused) }
             }
         }
         // Keyboard shortcuts — useful with a hardware keyboard (iPad/Mac Catalyst).

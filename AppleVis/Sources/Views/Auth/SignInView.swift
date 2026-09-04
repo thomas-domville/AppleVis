@@ -11,6 +11,9 @@ struct SignInView: View {
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
     @AccessibilityFocusState private var isErrorFocused: Bool
+    /// Had no initial-load focus at all. Full app-wide focus audit,
+    /// requested directly.
+    @AccessibilityFocusState private var isIntroFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -20,6 +23,8 @@ struct SignInView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("With a free AppleVis account you can:")
                             .font(.headline)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityFocused($isIntroFocused)
                         benefitRow("Post and reply in the forums")
                         benefitRow("Follow topics and get notified of replies")
                         benefitRow("Save items and sync across devices")
@@ -112,6 +117,7 @@ struct SignInView: View {
                     Button("Cancel") { dismiss() }
                 }
             }
+            .task { await retryAccessibilityFocus(into: $isIntroFocused) }
         }
     }
 

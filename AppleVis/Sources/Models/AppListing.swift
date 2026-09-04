@@ -2,6 +2,7 @@ import Foundation
 
 nonisolated struct AppListing: Identifiable, Codable, Hashable, Sendable {
     let id: String
+    var nid: Int? = nil
     let name: String
     let developer: String
     let platform: AppPlatform

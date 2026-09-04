@@ -26,6 +26,9 @@ struct EditProfileView: View {
     @State private var showDevicesPicker = false
     @State private var showTimeZonePicker = false
     @AccessibilityFocusState private var isErrorFocused: Bool
+    /// Had no initial-load focus at all. Full app-wide focus audit,
+    /// requested directly.
+    @AccessibilityFocusState private var isIntroFocused: Bool
 
     /// Same gate ContactView's Rewrite button uses — bio-drafting is the
     /// same category of "AI helps with what you're writing" feature, not a
@@ -41,6 +44,8 @@ struct EditProfileView: View {
                     Text("Profile information is public. Your username and AppleVis ID cannot be changed here.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityFocused($isIntroFocused)
                 }
 
                 Section("Public Identity") {
@@ -208,7 +213,10 @@ struct EditProfileView: View {
                 }
             }
         }
-        .task { await loadCurrentProfile() }
+        .task {
+            await loadCurrentProfile()
+            await retryAccessibilityFocus(into: $isIntroFocused)
+        }
         .sheet(isPresented: $showCountryPicker) {
             CountryPickerSheet(selection: $location)
         }

@@ -141,13 +141,16 @@ struct ReportCommentWizard: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if !submitted {
+                    // Previously showed "Back" (not "Cancel") on every step
+                    // past Reason, leaving no way to actually leave the
+                    // wizard from Details or Review without stepping
+                    // backward first. Cancel now stays put regardless of
+                    // step; step-backward navigation moved to its own
+                    // in-content button below, matching every other
+                    // wizard's convention. Reported directly.
                     ToolbarItem(placement: .cancellationAction) {
-                        Button(step == .reason ? "Cancel" : "Back") {
-                            if step == .reason { requestCancel() } else { goBack() }
-                        }
-                        .accessibilityHint(step == .reason
-                            ? String(localized: "Cancels and closes this report.")
-                            : String(localized: "Returns to the previous step."))
+                        Button("Cancel") { requestCancel() }
+                            .accessibilityHint(String(localized: "Cancels and closes this report."))
                     }
                     ToolbarItem(placement: .confirmationAction) {
                         if step == .review {
@@ -171,6 +174,12 @@ struct ReportCommentWizard: View {
             }
             .onAppear {
                 if name.isEmpty { name = auth.user?.name ?? "" }
+                // Step 1 previously got no explicit focus at all — only
+                // goNext()/goBack() ever called focusStepAfterTransition(),
+                // so opening this wizard left VoiceOver focus on system
+                // default (typically Cancel). Full app-wide focus audit,
+                // requested directly.
+                focusStepAfterTransition()
             }
         }
     }
@@ -242,6 +251,7 @@ struct ReportCommentWizard: View {
         Group {
             Section {
                 WizardStepIndicator(step: stepNumber(.details), total: totalSteps, title: "Add any details", isFocused: $isStepFocused, accentColor: .red)
+                backButton
                 Text("Anything else that would help the editorial team review this is optional but appreciated.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -249,7 +259,7 @@ struct ReportCommentWizard: View {
                 TextEditor(text: $details)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Additional details"))
-                    .accessibilityHint(String(localized: "Optional."))
+                    .accessibilityHint(String(localized: "Optional. Anything that would help our editorial team understand what's wrong here — extra context is always appreciated, but never required."))
             }
             if !isSignedIn {
                 Section("Your Name") {
@@ -272,6 +282,7 @@ struct ReportCommentWizard: View {
         Group {
             Section {
                 WizardStepIndicator(step: stepNumber(.review), total: totalSteps, title: "Review and send", isFocused: $isStepFocused, accentColor: .red)
+                backButton
                 Text("Check your report, then tap Send Report.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -332,10 +343,20 @@ struct ReportCommentWizard: View {
         }
     }
 
+    /// Was a single guessed 300ms delay — see SubmitAppView's identical fix
+    /// for the full reasoning. Full app-wide focus audit, requested
+    /// directly.
     private func focusStepAfterTransition() {
-        Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            isStepFocused = true
+        Task { await retryAccessibilityFocus(into: $isStepFocused) }
+    }
+
+    /// Step-backward navigation, separated from the toolbar's Cancel button
+    /// so a user can discard the report from any step.
+    private var backButton: some View {
+        Button {
+            goBack()
+        } label: {
+            Label("Back", systemImage: "chevron.backward")
         }
     }
 

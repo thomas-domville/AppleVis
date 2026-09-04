@@ -240,14 +240,6 @@ final class PlayerStore: ObservableObject {
         await seek(to: target)
     }
 
-    func setPlaybackSpeed(_ speed: Float) {
-        playbackSpeed = speed
-    }
-
-    func setVolume(_ v: Float) {
-        volume = max(0, min(1, v))
-    }
-
     func savedPosition(for episodeId: String) -> TimeInterval? {
         if currentEpisode?.id == episodeId, position > 0 { return position }
         guard let saved = positions[episodeId], saved > 0 else { return nil }

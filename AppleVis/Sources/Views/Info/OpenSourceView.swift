@@ -2,6 +2,9 @@ import SwiftUI
 
 struct OpenSourceView: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    /// Had no focus management at all. Full app-wide focus audit,
+    /// requested directly.
+    @AccessibilityFocusState private var isIntroFocused: Bool
 
     // This app has no third-party Swift Package Manager dependencies — every
     // import (Foundation, SwiftUI, AVFoundation, MediaPlayer, Combine,
@@ -22,6 +25,7 @@ struct OpenSourceView: View {
                 Text("AppleVis is built entirely on Apple's native frameworks — SwiftUI, AVFoundation, Combine, and the rest of the system SDK. It has no third-party Swift package dependencies.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .accessibilityFocused($isIntroFocused)
             }
 
             Section("Licences") {
@@ -62,6 +66,7 @@ struct OpenSourceView: View {
         .themedList(preferences.colors)
         .navigationTitle("Open Source Licences")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await retryAccessibilityFocus(into: $isIntroFocused) }
     }
 }
 

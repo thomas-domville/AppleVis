@@ -18,6 +18,18 @@ struct ForumTopicDetailView: View {
     @State private var quotedReplyTarget: ForumReply?
     @State private var isLoadingMoreReplies = false
     @State private var hasMoreReplies = true
+    // load() kicks off loadAllRemainingReplies() in the background as soon
+    // as a topic opens; "Jump to First New Comment"/"Jump to Last Comment"
+    // also need every page loaded before they can resolve a target, and
+    // previously called loadAllRemainingReplies() again themselves whenever
+    // that background load hadn't finished yet — two concurrent drain loops
+    // both reading replies.count before either had appended, so both fetched
+    // the same offset and the second one's results landed as duplicates,
+    // breaking ForEach identity and scrollTo(_:). Tracking the in-flight
+    // Task here lets every caller await the one drain that's actually
+    // running instead of starting a second. Reported directly: "jump to
+    // newest/first new comment" not landing on the right reply.
+    @State private var loadAllRepliesTask: Task<Void, Never>?
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
@@ -222,7 +234,7 @@ struct ForumTopicDetailView: View {
                     Divider()
 
                     // Body
-                    SegmentedHTMLView(html: detail.body)
+                    SegmentedHTMLView(html: detail.body, contentKind: "forumTopic", contentId: detail.id, field: "body")
                         .padding(.horizontal)
 
                     Divider()
@@ -509,7 +521,7 @@ struct ForumTopicDetailView: View {
             // shows the true total (replyCount), so leaving the rest behind
             // a manual tap just contradicted what the count said was there.
             if hasMoreReplies {
-                Task { await loadAllRemainingReplies() }
+                Task { await ensureAllRepliesLoaded() }
             }
             if let detail {
                 SpotlightIndexer.index(ForumTopic(
@@ -597,6 +609,19 @@ struct ForumTopicDetailView: View {
         isLoadingMoreReplies = false
     }
 
+    /// Single-flight wrapper around loadAllRemainingReplies() — see
+    /// loadAllRepliesTask's doc comment for why this exists.
+    private func ensureAllRepliesLoaded() async {
+        if let existing = loadAllRepliesTask {
+            await existing.value
+            return
+        }
+        let task = Task { await loadAllRemainingReplies() }
+        loadAllRepliesTask = task
+        await task.value
+        loadAllRepliesTask = nil
+    }
+
     /// "Jump to Last Comment" custom action on the Community Discussion
     /// heading — mirrors the existing jump-to-first-new-item pattern
     /// elsewhere in the app (e.g. Home's What's New card), requested
@@ -649,7 +674,7 @@ struct ForumTopicDetailView: View {
     /// the earliest reply posted since the previous visit instead of the
     /// thread's very end.
     private func jumpToFirstNewReply(proxy: ScrollViewProxy) async {
-        if hasMoreReplies { await loadAllRemainingReplies() }
+        if hasMoreReplies { await ensureAllRepliesLoaded() }
         guard let firstNew = detail?.replies.first(where: { $0.isNew }) else { return }
         withReduceMotionAwareAnimation { proxy.scrollTo(firstNew.id, anchor: .top) }
         try? await Task.sleep(for: .milliseconds(400))
@@ -657,7 +682,7 @@ struct ForumTopicDetailView: View {
     }
 
     private func jumpToLastReply(proxy: ScrollViewProxy) async {
-        if hasMoreReplies { await loadAllRemainingReplies() }
+        if hasMoreReplies { await ensureAllRepliesLoaded() }
         guard let lastId = self.detail?.replies.last?.id else { return }
         withReduceMotionAwareAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
         // Scrolling the viewport doesn't move VoiceOver's focus on its own —
@@ -832,9 +857,10 @@ struct ReplyView: View {
             .accessibilityAction(named: Text("Reply to this Comment")) { onReplyTo?() }
             .accessibilityAction(named: Text("Copy Comment Text")) { copyText() }
             .accessibilityAction(named: Text("Share Comment")) { presentShareSheet() }
-            .accessibilityAction(named: Text("Mark as Helpful")) {
-                toast.warning(String(localized: "Helpful votes are coming once the Drupal Flags API is confirmed."))
-            }
+            // "Mark as Helpful" removed for now — it only ever showed a
+            // "coming once the Drupal Flags API is confirmed" toast, no
+            // real functionality yet. Revisit once that backend work is
+            // done. Requested directly.
             .accessibilityAction(named: Text("Report Comment")) {
                 showReportSheet = true
             }
@@ -842,7 +868,7 @@ struct ReplyView: View {
             .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Unpublish Comment") { showUnpublishConfirm = true })
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Delete Comment") { showDeleteConfirm = true })
 
-            SegmentedHTMLView(html: reply.body)
+            SegmentedHTMLView(html: reply.body, contentKind: "forumReply", contentId: reply.id, field: "body")
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
@@ -865,14 +891,11 @@ struct ReplyView: View {
             Button { presentShareSheet() } label: {
                 Label("Share Comment", systemImage: "square.and.arrow.up")
             }
-            Button { toast.warning(String(localized: "Helpful votes are coming once the Drupal Flags API is confirmed.")) } label: {
-                Label("Mark as Helpful", systemImage: "hand.thumbsup")
-            }
             Button { showReportSheet = true } label: {
                 Label("Report Comment", systemImage: "flag")
             }
             // "Comment" throughout, matching the rest of this screen (the
-            // header label, Reply/Copy/Share/Helpful/Report actions above,
+            // header label, Reply/Copy/Share/Report actions above,
             // and the "Comment text copied" toast) — this pair previously
             // said "Reply" here despite VoiceOver already calling the exact
             // same actions "Edit Comment"/"Delete Comment".

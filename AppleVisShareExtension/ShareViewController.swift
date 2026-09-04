@@ -6,15 +6,31 @@
 //   • Podcast URLs (Apple Podcasts, Spotify, etc.) → applevis://submit-podcast?url=…
 //   • Audio files (.mp3/.m4a/.wav)  → applevis://submit-podcast-audio
 //
-// No UI is shown — the extension deep-links into the main app and dismisses
-// immediately. AppShareConsumer (main app target) reads the values this
-// writes to the shared App Group on next foreground. Audio is the one
-// exception to "values" — it's too large for UserDefaults, so the file
-// itself is copied into the shared App Group *container* instead (a
+// No UI is shown when the deep-link hand-off succeeds — the extension opens
+// AppleVis and dismisses immediately, so the host app's own switch is the
+// only thing the user sees. AppShareConsumer (main app target) reads the
+// values this writes to the shared App Group on next foreground. Audio is
+// the one exception to "values" — it's too large for UserDefaults, so the
+// file itself is copied into the shared App Group *container* instead (a
 // disk-to-disk copy, not loaded into this extension's own memory, which
 // stays well under the process's tight memory ceiling even for the real
 // form's 200 MB limit); only the original filename goes into UserDefaults.
 // Reported directly.
+//
+// `NSExtensionContext.open(_:completionHandler:)` is the sanctioned way for
+// an extension to ask iOS to switch to its containing app — but whether that
+// switch actually happens is entirely up to the *host* app presenting the
+// share sheet, not this extension. Most hosts (Safari, Messages, Notes,
+// Photos) honor it; the App Store app has been reported to not — it
+// silently keeps itself in the foreground and just dismisses the share
+// sheet, with no error surfaced to the extension beyond `success == false`
+// on the completion handler. There's no supported API to force a foreground
+// switch a host has declined. DeepLinkRouter.checkPendingShareExtensionContent()
+// already covers the underlying data loss (the App Group write happens
+// before the open() attempt either way, so the share is never actually
+// lost) — what was still missing was any *feedback* in that case, since
+// this view is otherwise blank: a user sharing from a host that declines
+// the switch saw nothing happen at all. Reported directly.
 
 import UIKit
 import UniformTypeIdentifiers
@@ -239,8 +255,66 @@ final class ShareViewController: UIViewController {
             return
         }
 
-        extensionContext?.open(url, completionHandler: { [weak self] _ in
-            self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+        extensionContext?.open(url, completionHandler: { [weak self] success in
+            guard let self else { return }
+            if success {
+                self.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+            } else {
+                // The host declined to switch to AppleVis (see the file-level
+                // comment above) — the share itself already made it into the
+                // App Group either way, so this is purely reassurance that
+                // something happened, not a retry of anything.
+                self.showConfirmationThenComplete()
+            }
         })
+    }
+
+    /// Shown only when the host didn't honor the auto-switch to AppleVis.
+    /// Kept intentionally brief and undismissable — there's nothing for the
+    /// user to act on here beyond noting it and opening AppleVis themselves.
+    private func showConfirmationThenComplete() {
+        let message = String(localized: "Added to AppleVis. Open AppleVis to finish.")
+
+        let icon = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
+        icon.tintColor = .systemGreen
+        icon.contentMode = .scaleAspectFit
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        icon.isAccessibilityElement = false
+
+        let label = UILabel()
+        label.text = message
+        label.font = .preferredFont(forTextStyle: .body)
+        label.adjustsFontForContentSizeCategory = true
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+
+        let stack = UIStackView(arrangedSubviews: [icon, label])
+        stack.axis = .vertical
+        stack.spacing = 12
+        stack.alignment = .center
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        view.backgroundColor = .systemBackground
+        view.addSubview(stack)
+        NSLayoutConstraint.activate([
+            icon.widthAnchor.constraint(equalToConstant: 44),
+            icon.heightAnchor.constraint(equalToConstant: 44),
+            stack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            stack.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 32),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -32),
+        ])
+
+        // Posted rather than left to the default "screen changed" behavior —
+        // VoiceOver has nothing to land on by default in an extension whose
+        // view was blank a moment ago, so without this the message would be
+        // shown but never spoken.
+        UIAccessibility.post(notification: .screenChanged, argument: label)
+
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(1600))
+            self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+        }
     }
 }

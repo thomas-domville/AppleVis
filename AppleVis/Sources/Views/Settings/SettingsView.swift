@@ -64,6 +64,12 @@ struct SettingsView: View {
                               destination: AnyView(PrivacySettingsView())),
                 SettingsEntry(icon: "sparkles", label: "Intelligence", subtitle: "Smart features and AI controls", color: .indigo,
                               destination: AnyView(IntelligenceSettingsView())),
+                // Deliberately not nested inside Intelligence above — unlike
+                // every toggle there, this has no Apple Intelligence
+                // hardware/OS-26 gate, and grouping it in would misleadingly
+                // imply the same requirement.
+                SettingsEntry(icon: "globe", label: "Content Translation", subtitle: "Read AppleVis in your own language", color: .cyan,
+                              destination: AnyView(ContentTranslationSettingsView())),
                 SettingsEntry(icon: "waveform", label: "Siri & Shortcuts", subtitle: "Voice commands and Shortcuts app actions", color: .indigo,
                               destination: AnyView(SiriShortcutsSettingsView())),
             ]),

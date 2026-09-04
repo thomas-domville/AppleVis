@@ -2,6 +2,7 @@ import SwiftUI
 import CoreSpotlight
 import Combine
 import UserNotifications
+import Translation
 
 @main
 struct AppleVisApp: App {
@@ -15,6 +16,7 @@ struct AppleVisApp: App {
     @StateObject private var networkMonitor = NetworkMonitor.shared
     @StateObject private var keyCommands = KeyCommandRouter()
     @StateObject private var guidedExperiencePause = GuidedExperiencePauseStore()
+    @StateObject private var translationCoordinator = TranslationCoordinator.shared
 
     init() {
         BackgroundDownloadTask.register()
@@ -60,6 +62,33 @@ struct AppleVisApp: App {
             .tint(preferences.accentColor)
             .overlay { TipOverlay(tips: tips) }
             .overlay { GuidedExperienceResumeBanner(pauseStore: guidedExperiencePause, preferences: preferences, keyCommands: keyCommands) }
+            // Keeps one long-lived TranslationSession available to the whole
+            // app via TranslationCoordinator — Apple's Translation framework
+            // only ever hands out a session through this modifier, so
+            // reading-side content/card-title translation (unlike the
+            // stateless, hardware-gated IntelligenceService) needs this
+            // mount point to exist regardless of which tab is active. The
+            // closure just holds the session open until `configuration`
+            // changes (a different content language chosen) or the app
+            // backgrounds long enough to tear the task down; either way
+            // SwiftUI cancels this task and re-invokes with a fresh session.
+            .translationTask(translationCoordinator.configuration) { session in
+                translationCoordinator.bind(session: session)
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(3600))
+                }
+                translationCoordinator.unbind()
+            }
+            // Second, independent session for the one reverse-direction
+            // need — translating a search query into English (see
+            // `TranslationCoordinator.translateToEnglish`).
+            .translationTask(translationCoordinator.reverseConfiguration) { session in
+                translationCoordinator.bindReverse(session: session)
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(3600))
+                }
+                translationCoordinator.unbindReverse()
+            }
             .accessibilityAction(.magicTap) {
                 guard player.currentEpisode != nil else { return }
                 player.togglePlayPause()

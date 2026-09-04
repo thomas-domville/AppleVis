@@ -131,7 +131,9 @@ struct ForumTopicRow: View {
     let topic: ForumTopic
     var isNew: Bool = false
     var onDelete: (() -> Void)? = nil
+    @EnvironmentObject private var preferences: PreferencesStore
     @State private var showComposeReply = false
+    @State private var translatedTitle: String?
 
     /// Was previously computed but never surfaced anywhere — a VoiceOver
     /// user browsing a list had no way to tell they'd already saved or
@@ -171,9 +173,12 @@ struct ForumTopicRow: View {
                     }
                     RelativeDateLabel(date: topic.lastActivityAt)
                 }
-                Text(topic.title)
-                    .font(.body)
-                    .lineLimit(2)
+                HStack(spacing: 4) {
+                    Text(translatedTitle ?? topic.title)
+                        .font(.body)
+                        .lineLimit(2)
+                    if translatedTitle != nil { TranslatedTitleBadge() }
+                }
                 HStack {
                     if !topic.authorName.isEmpty {
                         Text("by \(topic.authorName)")
@@ -202,6 +207,11 @@ struct ForumTopicRow: View {
         .sheet(isPresented: $showComposeReply) {
             ComposeReplyView(topicId: topic.id, topicTitle: topic.title) { _ in }
         }
+        .task(id: ContentTranslation.taskId(title: topic.title, targetLanguage: preferences.effectiveContentLanguage)) {
+            translatedTitle = await ContentTranslation.resolvedTitle(
+                kind: "forumTopic", id: topic.id, originalTitle: topic.title, targetLanguage: preferences.effectiveContentLanguage
+            )
+        }
     }
 
     private var topicLabel: String {
@@ -214,7 +224,7 @@ struct ForumTopicRow: View {
         // directly.
         let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
         return detailLevelLabel(
-            title: topic.title,
+            title: ContentTranslation.accessibilityTitle(original: topic.title, translated: translatedTitle),
             // Previously just the category ("iOS/iPadOS Gaming"), with
             // nothing anywhere in the label saying this was a forum topic
             // at all — inconsistent with Podcast rows, which always say
@@ -236,8 +246,10 @@ struct PodcastEpisodeRow: View {
     var isNew: Bool = false
     var onDelete: (() -> Void)? = nil
     @EnvironmentObject private var player: PlayerStore
+    @EnvironmentObject private var preferences: PreferencesStore
     @ObservedObject private var downloads = DownloadManager.shared
     @State private var showComposeComment = false
+    @State private var translatedTitle: String?
     // Grows moderately with Dynamic Type instead of staying pinned at 48pt
     // while the adjacent title (unbounded, .lineLimit(2)) wraps across
     // several lines at the largest accessibility text sizes.
@@ -267,9 +279,12 @@ struct PodcastEpisodeRow: View {
                     Text(episode.showTitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(episode.title)
-                        .font(.body)
-                        .lineLimit(2)
+                    HStack(spacing: 4) {
+                        Text(translatedTitle ?? episode.title)
+                            .font(.body)
+                            .lineLimit(2)
+                        if translatedTitle != nil { TranslatedTitleBadge() }
+                    }
                     HStack {
                         if isCurrentlyPlaying {
                             NowPlayingWaveform()
@@ -370,6 +385,11 @@ struct PodcastEpisodeRow: View {
         }
         .cardDensityPadding()
         .task { await resolveDurationIfNeeded() }
+        .task(id: ContentTranslation.taskId(title: episode.title, targetLanguage: preferences.effectiveContentLanguage)) {
+            translatedTitle = await ContentTranslation.resolvedTitle(
+                kind: "podcastEpisode", id: episode.id, originalTitle: episode.title, targetLanguage: preferences.effectiveContentLanguage
+            )
+        }
         .sheet(isPresented: $showComposeComment) {
             ComposePodcastCommentView(episodeId: episode.id, title: episode.title) { _ in }
         }
@@ -473,7 +493,7 @@ struct PodcastEpisodeRow: View {
         let countText = episode.commentCount > 0 ? "\(episode.commentCount) comment\(episode.commentCount == 1 ? "" : "s")" : ""
         let authorAndCount = [durationText, countText].filter { !$0.isEmpty }.joined(separator: ", ")
         let base = detailLevelLabel(
-            title: episode.title,
+            title: ContentTranslation.accessibilityTitle(original: episode.title, translated: translatedTitle),
             contentType: podcastContentType(showTitle: episode.showTitle),
             authorAndCount: authorAndCount,
             date: episode.publishedAt.formatted(.relative(presentation: .named)),
@@ -516,9 +536,11 @@ struct AppListingRow: View {
     let app: AppListing
     var isNew: Bool = false
     var onDelete: (() -> Void)? = nil
+    @EnvironmentObject private var preferences: PreferencesStore
     // See PodcastEpisodeRow.artworkSize — same fixed-vs-scaling mismatch
     // against the adjacent, unbounded app name.
     @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 48
+    @State private var translatedTitle: String?
 
     var body: some View {
         NavigationLink(value: app) {
@@ -534,8 +556,11 @@ struct AppListingRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(app.name)
-                        .font(.body)
+                    HStack(spacing: 4) {
+                        Text(translatedTitle ?? app.name)
+                            .font(.body)
+                        if translatedTitle != nil { TranslatedTitleBadge() }
+                    }
                     if !app.developer.isEmpty {
                         Text(app.developer)
                             .font(.caption)
@@ -600,6 +625,11 @@ struct AppListingRow: View {
             }
         }
         .cardDensityPadding()
+        .task(id: ContentTranslation.taskId(title: app.name, targetLanguage: preferences.effectiveContentLanguage)) {
+            translatedTitle = await ContentTranslation.resolvedTitle(
+                kind: "appListing", id: app.id, originalTitle: app.name, targetLanguage: preferences.effectiveContentLanguage
+            )
+        }
     }
 
     private var appStoreURL: URL? {
@@ -613,7 +643,7 @@ struct AppListingRow: View {
     private var appLabel: String {
         let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
         return detailLevelLabel(
-            title: app.name,
+            title: ContentTranslation.accessibilityTitle(original: app.name, translated: translatedTitle),
             // Previously just the category ("Games"), with nothing in the
             // label saying this was an app listing at all — see the same
             // fix on ForumTopicRow's contentType for the full reasoning.
@@ -636,6 +666,8 @@ struct ResourceRow: View {
     let resource: Resource
     var isNew: Bool = false
     var onDelete: (() -> Void)? = nil
+    @EnvironmentObject private var preferences: PreferencesStore
+    @State private var translatedTitle: String?
 
     var body: some View {
         NavigationLink(value: resource) {
@@ -655,9 +687,12 @@ struct ResourceRow: View {
                     }
                     RelativeDateLabel(date: resource.updatedAt)
                 }
-                Text(resource.title)
-                    .font(.body)
-                    .lineLimit(2)
+                HStack(spacing: 4) {
+                    Text(translatedTitle ?? resource.title)
+                        .font(.body)
+                        .lineLimit(2)
+                    if translatedTitle != nil { TranslatedTitleBadge() }
+                }
                 if !resource.authorName.isEmpty {
                     Text("by \(resource.authorName)")
                         .font(.caption)
@@ -677,6 +712,11 @@ struct ResourceRow: View {
             currentCommentCount: resource.commentCount, onContentDeleted: onDelete
         )
         .cardDensityPadding()
+        .task(id: ContentTranslation.taskId(title: resource.title, targetLanguage: preferences.effectiveContentLanguage)) {
+            translatedTitle = await ContentTranslation.resolvedTitle(
+                kind: "resource", id: resource.id, originalTitle: resource.title, targetLanguage: preferences.effectiveContentLanguage
+            )
+        }
     }
 
     private var newCount: Int {
@@ -686,7 +726,7 @@ struct ResourceRow: View {
     private var resourceLabel: String {
         let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
         return detailLevelLabel(
-            title: resource.title,
+            title: ContentTranslation.accessibilityTitle(original: resource.title, translated: translatedTitle),
             contentType: resource.kind.displayName,
             authorAndCount: byAuthorAndCount(resource.authorName, "\(resource.commentCount) comment\(resource.commentCount == 1 ? "" : "s")"),
             date: resource.updatedAt.formatted(.relative(presentation: .named)),
@@ -701,6 +741,8 @@ struct BlogPostRow: View {
     let post: BlogPost
     var isNew: Bool = false
     var onDelete: (() -> Void)? = nil
+    @EnvironmentObject private var preferences: PreferencesStore
+    @State private var translatedTitle: String?
 
     var body: some View {
         NavigationLink(value: post) {
@@ -720,9 +762,12 @@ struct BlogPostRow: View {
                     }
                     RelativeDateLabel(date: post.lastActivityAt)
                 }
-                Text(post.title)
-                    .font(.body)
-                    .lineLimit(2)
+                HStack(spacing: 4) {
+                    Text(translatedTitle ?? post.title)
+                        .font(.body)
+                        .lineLimit(2)
+                    if translatedTitle != nil { TranslatedTitleBadge() }
+                }
                 HStack {
                     if !post.authorName.isEmpty {
                         Text("by \(post.authorName)")
@@ -746,6 +791,11 @@ struct BlogPostRow: View {
             currentCommentCount: post.commentCount, onContentDeleted: onDelete
         )
         .cardDensityPadding()
+        .task(id: ContentTranslation.taskId(title: post.title, targetLanguage: preferences.effectiveContentLanguage)) {
+            translatedTitle = await ContentTranslation.resolvedTitle(
+                kind: "blogPost", id: post.id, originalTitle: post.title, targetLanguage: preferences.effectiveContentLanguage
+            )
+        }
     }
 
     private var newCount: Int {
@@ -755,7 +805,7 @@ struct BlogPostRow: View {
     private var postLabel: String {
         let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
         return detailLevelLabel(
-            title: post.title,
+            title: ContentTranslation.accessibilityTitle(original: post.title, translated: translatedTitle),
             contentType: "Blog post",
             authorAndCount: byAuthorAndCount(post.authorName, "\(post.commentCount) comment\(post.commentCount == 1 ? "" : "s")"),
             date: post.lastActivityAt.formatted(.relative(presentation: .named)),

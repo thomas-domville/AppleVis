@@ -180,6 +180,7 @@ struct BugReportRow: View {
     let bug: BugReport
     var onDelete: (() -> Void)? = nil
     @EnvironmentObject private var preferences: PreferencesStore
+    @State private var translatedTitle: String?
 
     // BUGS-06: maps severity to a theme-consistent semantic color rather
     // than a fixed system color, so it stays readable/distinct across all
@@ -218,8 +219,11 @@ struct BugReportRow: View {
                 }
                 RelativeDateLabel(date: bug.changedAt)
             }
-            Text(bug.title)
-                .font(.body).lineLimit(2)
+            HStack(spacing: 4) {
+                Text(translatedTitle ?? bug.title)
+                    .font(.body).lineLimit(2)
+                if translatedTitle != nil { TranslatedTitleBadge() }
+            }
             HStack {
                 if let fixedIn = bug.fixedIn {
                     Text("Fixed in \(fixedIn)")
@@ -246,6 +250,11 @@ struct BugReportRow: View {
             currentCommentCount: bug.commentCount, onContentDeleted: onDelete
         )
         .cardDensityPadding()
+        .task(id: ContentTranslation.taskId(title: bug.title, targetLanguage: preferences.effectiveContentLanguage)) {
+            translatedTitle = await ContentTranslation.resolvedTitle(
+                kind: "bugReport", id: bug.id, originalTitle: bug.title, targetLanguage: preferences.effectiveContentLanguage
+            )
+        }
     }
 
     private var newCount: Int {
@@ -255,7 +264,7 @@ struct BugReportRow: View {
     private var bugLabel: String {
         let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")." : ""
         return detailLevelLabel(
-            title: bug.title,
+            title: ContentTranslation.accessibilityTitle(original: bug.title, translated: translatedTitle),
             contentType: "\(bug.status.displayName), \(bug.severity.displayName) severity",
             authorAndCount: "\(bug.commentCount) comment\(bug.commentCount == 1 ? "" : "s")",
             date: bug.changedAt.formatted(.relative(presentation: .named)),

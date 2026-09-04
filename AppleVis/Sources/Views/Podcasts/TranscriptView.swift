@@ -7,6 +7,7 @@ import SwiftUI
 struct TranscriptView: View {
     let episodeId: String
     let episodeTitle: String
+    var episodeURL: String? = nil
     var embeddedTranscript: String? = nil
 
     @State private var transcript: String?
@@ -14,6 +15,18 @@ struct TranscriptView: View {
     @State private var error: String?
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var preferences: PreferencesStore
+    /// Had no focus management at all — full app-wide focus audit,
+    /// requested directly.
+    @AccessibilityFocusState private var isFirstSegmentFocused: Bool
+    @AccessibilityFocusState private var isEmptyStateFocused: Bool
+
+    private var shareText: String {
+        var lines = ["\(episodeTitle) — Transcript", "", transcript ?? ""]
+        if let episodeURL, !episodeURL.isEmpty {
+            lines += ["", "Listen on AppleVis: \(episodeURL)"]
+        }
+        return lines.joined(separator: "\n")
+    }
 
     var body: some View {
         NavigationStack {
@@ -33,11 +46,16 @@ struct TranscriptView: View {
                     // tag-based one.
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
-                            ForEach(Self.segmentTranscript(transcript)) { segment in
-                                Text(segment.text)
+                            ForEach(Array(Self.segmentTranscript(transcript).enumerated()), id: \.element.id) { index, segment in
+                                let row = Text(segment.text)
                                     .font(.body)
                                     .textSelection(.enabled)
                                     .frame(maxWidth: .infinity, alignment: .leading)
+                                if index == 0 {
+                                    row.accessibilityFocused($isFirstSegmentFocused)
+                                } else {
+                                    row
+                                }
                             }
                         }
                         .padding()
@@ -50,14 +68,34 @@ struct TranscriptView: View {
                         message: "A transcript isn't available for this episode yet.",
                         systemImage: "text.quote"
                     )
+                    .accessibilityFocused($isEmptyStateFocused)
                 }
             }
             .navigationTitle("Transcript")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+                // Sharing the episode's own "Share Episode" action only ever
+                // shared a link back to its web page — useful for the
+                // episode itself, but not for the actual words someone
+                // might want to quote or send from a transcript. Requested
+                // directly.
+                if let transcript, !transcript.isEmpty {
+                    ToolbarItem(placement: .primaryAction) {
+                        ShareLink(item: shareText) {
+                            Label("Share Transcript", systemImage: "square.and.arrow.up")
+                        }
+                    }
+                }
             }
-            .task { await load() }
+            .task {
+                await load()
+                if let transcript, !transcript.isEmpty {
+                    await retryAccessibilityFocus(into: $isFirstSegmentFocused)
+                } else {
+                    await retryAccessibilityFocus(into: $isEmptyStateFocused)
+                }
+            }
         }
     }
 
@@ -97,20 +135,7 @@ struct TranscriptView: View {
         let byLine = nonEmptyTrimmedPieces(text.components(separatedBy: "\n"))
         if byLine.count > 1 { return byLine.map(TranscriptSegment.init) }
 
-        var sentences: [String] = []
-        text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: .bySentences) { substring, _, _, _ in
-            if let s = substring?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty {
-                sentences.append(s)
-            }
-        }
-        guard sentences.count > 1 else {
-            return [TranscriptSegment(text: text.trimmingCharacters(in: .whitespacesAndNewlines))]
-        }
-        let groupSize = 4
-        return stride(from: 0, to: sentences.count, by: groupSize).map { start in
-            let end = min(start + groupSize, sentences.count)
-            return TranscriptSegment(text: sentences[start..<end].joined(separator: " "))
-        }
+        return TextSegmentation.sentenceGroups(text).map(TranscriptSegment.init)
     }
 
     private static func nonEmptyTrimmedPieces(_ pieces: [String]) -> [String] {

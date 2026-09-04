@@ -80,10 +80,7 @@ struct GuidedExperienceView: View {
                                     // staying on the button is exactly right there.
                                     // Reported directly.
                                     if showExplainMore {
-                                        Task {
-                                            try? await Task.sleep(for: .milliseconds(300))
-                                            isExplainMoreFocused = true
-                                        }
+                                        Task { await retryAccessibilityFocus(into: $isExplainMoreFocused) }
                                     }
                                 }
                                 .font(.subheadline)
@@ -208,11 +205,13 @@ struct GuidedExperienceView: View {
         }
     }
 
+    /// Was a single guessed 350ms delay — see SubmitAppView's identical fix
+    /// (same pattern, independently copy-pasted here too) for the full
+    /// reasoning. Step 1's own initial focus already worked correctly here
+    /// (called from `.onAppear` above) — only the retry logic itself needed
+    /// fixing. Full app-wide focus audit, requested directly.
     private func focusHeadingAfterTransition() {
-        Task {
-            try? await Task.sleep(for: .milliseconds(350))
-            isHeadingFocused = true
-        }
+        Task { await retryAccessibilityFocus(into: $isHeadingFocused) }
     }
 
     private func skip() {

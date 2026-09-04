@@ -43,6 +43,21 @@ enum FeedItem: Identifiable {
         }
     }
 
+    var nid: Int? {
+        switch self {
+        case .forumTopic(let t):
+            return t.nid
+        case .podcastEpisode(let e):
+            return e.nid > 0 ? e.nid : nil
+        case .appListing(let a):
+            return a.nid
+        case .resource(let r):
+            return r.nid
+        case .blogPost(let b):
+            return b.nid
+        }
+    }
+
     var lastActivityAt: Date {
         switch self {
         case .forumTopic(let t):     return t.lastActivityAt

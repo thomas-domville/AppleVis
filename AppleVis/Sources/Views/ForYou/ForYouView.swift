@@ -199,14 +199,17 @@ enum ForYouTab: String, CaseIterable, Identifiable {
 // MARK: - Downloads
 
 struct DownloadsView: View {
-    @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var tips: TipStore
-    @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
     @ObservedObject private var downloads = DownloadManager.shared
     @State private var showRemoveAllConfirm = false
     @State private var showBrowsePodcasts = false
+    /// Had no focus management at all, unlike its Saved/Following/
+    /// Recommended siblings — noticed while wiring translation into this
+    /// view's rows and fixed alongside it, matching the same pattern
+    /// already used in the other three ForYou sections.
+    @AccessibilityFocusState private var summaryFocused: Bool
 
     var body: some View {
         Group {
@@ -261,8 +264,9 @@ struct DownloadsView: View {
                     }
                     Section {
                         downloadsSummaryHeader
+                            .accessibilityFocused($summaryFocused)
                         ForEach(downloads.downloadedEpisodes, id: \.id) { meta in
-                            downloadRow(meta)
+                            DownloadedEpisodeRow(meta: meta)
                         }
                     }
                     if !downloads.downloadedEpisodes.isEmpty {
@@ -271,6 +275,7 @@ struct DownloadsView: View {
                     }
                 }
                 .onAppear { tips.show(.downloadsOffline) }
+                .task { await retryAccessibilityFocus(into: $summaryFocused) }
                 .confirmationDialog(
                     "Remove all \(downloads.downloadedEpisodes.count) downloaded episode\(downloads.downloadedEpisodes.count == 1 ? "" : "s")?",
                     isPresented: $showRemoveAllConfirm, titleVisibility: .visible
@@ -313,22 +318,63 @@ struct DownloadsView: View {
         )
     }
 
-    /// Tapping the title opens the episode's detail page (matches every
-    /// other row type in this tab). Play/Queue are also visible icon
-    /// buttons now, not just VoiceOver custom actions — RN showed them as
-    /// on-screen pill buttons (foryou.tsx ~499-528), so a sighted user could
-    /// use them without opening the episode first, which the Swift version
-    /// previously couldn't do.
-    private func downloadRow(_ meta: DownloadedEpisodeMeta) -> some View {
-        let isQueued = player.queue.contains { $0.id == meta.id }
-        let isCurrentlyPlaying = player.currentEpisode?.id == meta.id && player.isPlaying
+    private func formattedSize(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+}
 
-        return HStack(spacing: 12) {
+/// Shared by `DownloadsView` (its summary header) and `DownloadedEpisodeRow`
+/// below — factored out to file scope (rather than duplicated, or left as
+/// `DownloadsView` instance methods `DownloadedEpisodeRow` can't reach) once
+/// the row itself needed extracting into its own View struct for
+/// per-row `@State`.
+fileprivate func downloadedEpisodePlaceholder(for meta: DownloadedEpisodeMeta) -> PodcastEpisode {
+    PodcastEpisode(
+        id: meta.id, nid: 0, title: meta.title, showTitle: meta.showTitle, audioUrl: "",
+        duration: nil, publishedAt: meta.downloadedAt, lastActivityAt: meta.downloadedAt,
+        description: "", artworkUrl: nil, transcriptUrl: nil, chapters: [], tags: [],
+        commentCount: 0, authorName: "", url: "", isSaved: false, isDownloaded: true, downloadProgress: nil
+    )
+}
+
+/// Tapping the title opens the episode's detail page (matches every other
+/// row type in this tab). Play/Queue are also visible icon buttons, not
+/// just VoiceOver custom actions — RN showed them as on-screen pill buttons
+/// (foryou.tsx ~499-528), so a sighted user could use them without opening
+/// the episode first.
+///
+/// Extracted out of `DownloadsView.downloadRow(_:)` — same reasoning as
+/// `GenericSavedItemRow`/`FollowedItemRow`/`RecommendedAppRow`:
+/// `translatedTitle` needs its own per-row `@State`. `kind: "podcastEpisode"`
+/// (not a distinct "downloadedEpisode" kind) deliberately reuses
+/// `PodcastEpisodeRow`'s cache namespace — `DownloadedEpisodeMeta.id` is set
+/// straight from `episode.id` at download time (`DownloadManager.download`),
+/// so this is genuinely the same episode id space, not a coincidental match.
+private struct DownloadedEpisodeRow: View {
+    let meta: DownloadedEpisodeMeta
+    @EnvironmentObject private var player: PlayerStore
+    @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+    @EnvironmentObject private var preferences: PreferencesStore
+    @ObservedObject private var downloads = DownloadManager.shared
+    @State private var translatedTitle: String?
+
+    private var isQueued: Bool {
+        player.queue.contains { $0.id == meta.id }
+    }
+    private var isCurrentlyPlaying: Bool {
+        player.currentEpisode?.id == meta.id && player.isPlaying
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
             Button {
                 deepLinkRouter.pendingContent = (kind: .podcastEpisode, id: meta.id)
             } label: {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(meta.title).foregroundStyle(.primary)
+                    HStack(spacing: 4) {
+                        Text(translatedTitle ?? meta.title).foregroundStyle(.primary)
+                        if translatedTitle != nil { TranslatedTitleBadge() }
+                    }
                     Text(formattedSize(meta.fileSizeBytes))
                         .font(.caption).foregroundStyle(.secondary)
                 }
@@ -338,7 +384,7 @@ struct DownloadsView: View {
             Spacer(minLength: 0)
 
             Button {
-                Task { await playDownloaded(meta) }
+                Task { await playOrToggle() }
             } label: {
                 Image(systemName: isCurrentlyPlaying ? "pause.circle.fill" : "play.circle.fill")
                     .font(.title2)
@@ -351,7 +397,7 @@ struct DownloadsView: View {
                 if isQueued {
                     player.removeFromQueue(id: meta.id)
                 } else {
-                    player.enqueue(episode(for: meta))
+                    player.enqueue(downloadedEpisodePlaceholder(for: meta))
                 }
             } label: {
                 Image(systemName: isQueued ? "text.badge.minus" : "text.badge.plus")
@@ -362,17 +408,17 @@ struct DownloadsView: View {
             .accessibilityHidden(true)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "\(meta.title). Downloaded. \(formattedSize(meta.fileSizeBytes))."))
+        .accessibilityLabel(String(localized: "\(ContentTranslation.accessibilityTitle(original: meta.title, translated: translatedTitle)). Downloaded. \(formattedSize(meta.fileSizeBytes))."))
         .accessibilityHint(String(localized: "Double-tap to open episode details."))
-        .readAloudAction(meta.title)
+        .readAloudAction(ContentTranslation.accessibilityTitle(original: meta.title, translated: translatedTitle))
         .accessibilityAction(named: Text(isCurrentlyPlaying ? "Pause" : "Play")) {
-            Task { await playDownloaded(meta) }
+            Task { await playOrToggle() }
         }
         .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to Queue")) {
             if isQueued {
                 player.removeFromQueue(id: meta.id)
             } else {
-                player.enqueue(episode(for: meta))
+                player.enqueue(downloadedEpisodePlaceholder(for: meta))
             }
         }
         .accessibilityAction(named: Text("Remove Download")) {
@@ -388,15 +434,11 @@ struct DownloadsView: View {
         .voiceOverAwareSwipeActions {
             Button("Remove", role: .destructive) { downloads.delete(meta.id) }
         }
-    }
-
-    private func episode(for meta: DownloadedEpisodeMeta) -> PodcastEpisode {
-        PodcastEpisode(
-            id: meta.id, nid: 0, title: meta.title, showTitle: meta.showTitle, audioUrl: "",
-            duration: nil, publishedAt: meta.downloadedAt, lastActivityAt: meta.downloadedAt,
-            description: "", artworkUrl: nil, transcriptUrl: nil, chapters: [], tags: [],
-            commentCount: 0, authorName: "", url: "", isSaved: false, isDownloaded: true, downloadProgress: nil
-        )
+        .task(id: ContentTranslation.taskId(title: meta.title, targetLanguage: preferences.effectiveContentLanguage)) {
+            translatedTitle = await ContentTranslation.resolvedTitle(
+                kind: "podcastEpisode", id: meta.id, originalTitle: meta.title, targetLanguage: preferences.effectiveContentLanguage
+            )
+        }
     }
 
     /// The play/pause button and its matching VoiceOver action both showed
@@ -404,11 +446,11 @@ struct DownloadsView: View {
     /// playing, but both always called `load()` — `load()`'s own guard
     /// only resumes if `!isPlaying`, so tapping "Pause" while playing was a
     /// complete no-op, both for sighted taps and VoiceOver's action.
-    private func playDownloaded(_ meta: DownloadedEpisodeMeta) async {
-        if player.currentEpisode?.id == meta.id && player.isPlaying {
+    private func playOrToggle() async {
+        if isCurrentlyPlaying {
             player.togglePlayPause()
         } else {
-            await player.load(episode(for: meta))
+            await player.load(downloadedEpisodePlaceholder(for: meta))
         }
     }
 
@@ -421,7 +463,6 @@ struct DownloadsView: View {
 
 struct SavedItemsView: View {
     @EnvironmentObject private var tips: TipStore
-    @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var items: [SavedItem] = []
@@ -490,6 +531,14 @@ struct SavedItemsView: View {
         // (guarded on ids not already cached), so re-running it on every
         // reappearance is safe.
         .loadOnAppearAndTask(load)
+        // Previously only focused the summary after a delete/remove action
+        // — the section's own initial appearance (switching to Saved for
+        // the first time) got no explicit focus at all. A plain `.task`
+        // (not `.onAppear`) only fires once per view identity, unlike
+        // `loadOnAppearAndTask` above, so this doesn't re-focus on every
+        // return to an already-loaded section. Noticed while wiring
+        // translation into this section's rows and fixed alongside it.
+        .task { await retryAccessibilityFocus(into: $summaryFocused) }
     }
 
     private var savedList: some View {
@@ -526,49 +575,10 @@ struct SavedItemsView: View {
                 removeFromList(item)
             }
         } else {
-            genericRow(item)
-        }
-    }
-
-    private func genericRow(_ item: SavedItem) -> some View {
-        Button {
-            deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
-        } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label(item.kind.displayName, systemImage: item.kind.systemImage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(item.title)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
-            }
-        }
-        .buttonStyle(.plain)
-        .overlay(alignment: .leading) {
-            Rectangle().fill(item.kind.accentColor).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
-        }
-        .padding(.leading, 6)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            String(localized: "\(item.title). \(item.kind.displayName). Saved \(item.savedAt.formatted(.relative(presentation: .named))).")
-        )
-        .accessibilityHint(String(localized: "Double-tap to open."))
-        .readAloudAction(item.title)
-        .accessibilityAction(named: Text("Open \(item.kind.displayName)")) {
-            deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
-        }
-        .contentActions(
-            id: item.id, kind: item.kind, title: item.title, lastActivityAt: item.lastActivityAt,
-            onSaveToggle: { isSaved in
-                guard !isSaved else { return }
+            GenericSavedItemRow(item: item) {
                 removeFromList(item)
             }
-        )
+        }
     }
 
     private var summaryHeader: some View {
@@ -675,6 +685,68 @@ struct SavedItemsView: View {
     }
 }
 
+/// Non-podcast (and not-yet-enriched podcast) saved rows — extracted out of
+/// `SavedItemsView.rowView(for:)` into its own struct (mirroring
+/// `SavedPodcastEpisodeCard` below) so `translatedTitle` gets its own
+/// per-row `@State` storage; a plain helper function can't own `@State`
+/// distinct per call, only a View struct's own stored properties can.
+private struct GenericSavedItemRow: View {
+    let item: SavedItem
+    let onUnsave: () -> Void
+    @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+    @EnvironmentObject private var preferences: PreferencesStore
+    @State private var translatedTitle: String?
+
+    var body: some View {
+        Button {
+            deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(item.kind.displayName, systemImage: item.kind.systemImage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        Text(translatedTitle ?? item.title)
+                        if translatedTitle != nil { TranslatedTitleBadge() }
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .leading) {
+            Rectangle().fill(item.kind.accentColor).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
+        }
+        .padding(.leading, 6)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            String(localized: "\(ContentTranslation.accessibilityTitle(original: item.title, translated: translatedTitle)). \(item.kind.displayName). Saved \(item.savedAt.formatted(.relative(presentation: .named))).")
+        )
+        .accessibilityHint(String(localized: "Double-tap to open."))
+        .readAloudAction(ContentTranslation.accessibilityTitle(original: item.title, translated: translatedTitle))
+        .accessibilityAction(named: Text("Open \(item.kind.displayName)")) {
+            deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
+        }
+        .contentActions(
+            id: item.id, kind: item.kind, title: item.title, lastActivityAt: item.lastActivityAt,
+            onSaveToggle: { isSaved in
+                guard !isSaved else { return }
+                onUnsave()
+            }
+        )
+        .task(id: ContentTranslation.taskId(title: item.title, targetLanguage: preferences.effectiveContentLanguage)) {
+            translatedTitle = await ContentTranslation.resolvedTitle(
+                kind: item.kind.rawValue, id: item.id, originalTitle: item.title, targetLanguage: preferences.effectiveContentLanguage
+            )
+        }
+    }
+}
+
 /// Richer saved-podcast card with artwork, duration, and visible Play/Queue
 /// buttons — matches RN's SavedSection treatment for saved episodes
 /// (foryou.tsx ~707-825), which every other saved kind doesn't have enough
@@ -686,6 +758,8 @@ private struct SavedPodcastEpisodeCard: View {
 
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+    @EnvironmentObject private var preferences: PreferencesStore
+    @State private var translatedTitle: String?
 
     private var isCurrentlyPlaying: Bool {
         player.currentEpisode?.id == episode.id && player.isPlaying
@@ -733,7 +807,10 @@ private struct SavedPodcastEpisodeCard: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(episode.showTitle).font(.caption).foregroundStyle(.secondary)
-                        Text(episode.title).font(.body).lineLimit(2)
+                        HStack(spacing: 4) {
+                            Text(translatedTitle ?? episode.title).font(.body).lineLimit(2)
+                            if translatedTitle != nil { TranslatedTitleBadge() }
+                        }
                         if let duration = displayDuration {
                             Text(PodcastDuration.abbreviated(duration))
                                 .font(.caption2).foregroundStyle(.secondary)
@@ -771,11 +848,11 @@ private struct SavedPodcastEpisodeCard: View {
         .padding(.leading, 6)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            String(localized: "\(episode.title), \(episode.showTitle) podcast") +
+            String(localized: "\(ContentTranslation.accessibilityTitle(original: episode.title, translated: translatedTitle)), \(episode.showTitle) podcast") +
             (displayDuration.map { String(localized: ", \(PodcastDuration.accessibilityLabel($0))") } ?? "") +
             String(localized: ", saved \(savedItem.savedAt.formatted(.relative(presentation: .named))).")
         )
-        .readAloudAction(episode.title)
+        .readAloudAction(ContentTranslation.accessibilityTitle(original: episode.title, translated: translatedTitle))
         .accessibilityAction(named: Text(isCurrentlyPlaying ? "Pause" : "Play")) {
             Task { await playOrToggle() }
         }
@@ -790,6 +867,11 @@ private struct SavedPodcastEpisodeCard: View {
                 onUnsave()
             }
         )
+        .task(id: ContentTranslation.taskId(title: episode.title, targetLanguage: preferences.effectiveContentLanguage)) {
+            translatedTitle = await ContentTranslation.resolvedTitle(
+                kind: "podcastEpisode", id: episode.id, originalTitle: episode.title, targetLanguage: preferences.effectiveContentLanguage
+            )
+        }
     }
 }
 
@@ -797,7 +879,6 @@ private struct SavedPodcastEpisodeCard: View {
 
 struct FollowingView: View {
     @EnvironmentObject private var auth: AuthStore
-    @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var items: [FollowedItem] = []
     @State private var isLoading = false
@@ -835,7 +916,10 @@ struct FollowingView: View {
                     summaryHeader
                         .accessibilityFocused($summaryFocused)
                     ForEach(items) { item in
-                        row(for: item)
+                        FollowedItemRow(item: item) {
+                            items.removeAll { $0.id == item.id }
+                            focusSummaryAfterDelay()
+                        }
                     }
                 }
                 .refreshable { await load(); SoundPlayer.shared.play(.refresh) }
@@ -843,52 +927,12 @@ struct FollowingView: View {
             }
         }
         .loadOnAppearAndTask(load)
-    }
-
-    private func row(for item: FollowedItem) -> some View {
-        Button {
-            deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
-        } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label(item.kind.displayName, systemImage: item.kind.systemImage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(item.title)
-                    if let activity = item.lastActivityAt {
-                        RelativeDateLabel(date: activity)
-                    }
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
-            }
-        }
-        .buttonStyle(.plain)
-        .overlay(alignment: .leading) {
-            Rectangle().fill(item.kind.accentColor).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
-        }
-        .padding(.leading, 6)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            String(localized: "\(item.title). \(item.kind.displayName). Following.") +
-            (item.lastActivityAt.map { String(localized: ", last activity \($0.formatted(.relative(presentation: .named))).") } ?? "")
-        )
-        .accessibilityHint(String(localized: "Double-tap to open."))
-        .readAloudAction(item.title)
-        .accessibilityAction(named: Text("Open \(item.kind.displayName)")) {
-            deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
-        }
-        .contentActions(
-            id: item.id, kind: item.kind, title: item.title, lastActivityAt: item.lastActivityAt, url: item.url,
-            onFollowToggle: { isFollowing in
-                guard !isFollowing else { return }
-                items.removeAll { $0.id == item.id }
-                focusSummaryAfterDelay()
-            }
-        )
+        // A plain `.task` (not `.onAppear`) only fires once per view
+        // identity, unlike `loadOnAppearAndTask` above, so this doesn't
+        // re-focus on every return to an already-loaded section. Full
+        // noticed while wiring translation into this section's rows and
+        // fixed alongside it.
+        .task { await retryAccessibilityFocus(into: $summaryFocused) }
     }
 
     private var summaryHeader: some View {
@@ -944,6 +988,70 @@ struct FollowingView: View {
     }
 }
 
+/// Extracted out of `FollowingView.row(for:)` the same way `GenericSavedItemRow`
+/// was extracted out of Saved's `genericRow` — a plain helper function can't
+/// own per-call `@State`, so `translatedTitle` needs its own View struct.
+private struct FollowedItemRow: View {
+    let item: FollowedItem
+    let onUnfollow: () -> Void
+    @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+    @EnvironmentObject private var preferences: PreferencesStore
+    @State private var translatedTitle: String?
+
+    var body: some View {
+        Button {
+            deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(item.kind.displayName, systemImage: item.kind.systemImage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        Text(translatedTitle ?? item.title)
+                        if translatedTitle != nil { TranslatedTitleBadge() }
+                    }
+                    if let activity = item.lastActivityAt {
+                        RelativeDateLabel(date: activity)
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .leading) {
+            Rectangle().fill(item.kind.accentColor).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
+        }
+        .padding(.leading, 6)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            String(localized: "\(ContentTranslation.accessibilityTitle(original: item.title, translated: translatedTitle)). \(item.kind.displayName). Following.") +
+            (item.lastActivityAt.map { String(localized: ", last activity \($0.formatted(.relative(presentation: .named))).") } ?? "")
+        )
+        .accessibilityHint(String(localized: "Double-tap to open."))
+        .readAloudAction(ContentTranslation.accessibilityTitle(original: item.title, translated: translatedTitle))
+        .accessibilityAction(named: Text("Open \(item.kind.displayName)")) {
+            deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
+        }
+        .contentActions(
+            id: item.id, kind: item.kind, title: item.title, lastActivityAt: item.lastActivityAt, url: item.url,
+            onFollowToggle: { isFollowing in
+                guard !isFollowing else { return }
+                onUnfollow()
+            }
+        )
+        .task(id: ContentTranslation.taskId(title: item.title, targetLanguage: preferences.effectiveContentLanguage)) {
+            translatedTitle = await ContentTranslation.resolvedTitle(
+                kind: item.kind.rawValue, id: item.id, originalTitle: item.title, targetLanguage: preferences.effectiveContentLanguage
+            )
+        }
+    }
+}
+
 // MARK: - Recommended Apps
 
 /// Apps this person has recommended — a real server-backed list (see
@@ -989,7 +1097,9 @@ struct RecommendedAppsView: View {
                     summaryHeader
                         .accessibilityFocused($summaryFocused)
                     ForEach(apps) { app in
-                        row(for: app)
+                        RecommendedAppRow(app: app) {
+                            Task { await unrecommend(app) }
+                        }
                     }
                 }
                 .refreshable { await load(); SoundPlayer.shared.play(.refresh) }
@@ -997,37 +1107,12 @@ struct RecommendedAppsView: View {
             }
         }
         .loadOnAppearAndTask(load)
-    }
-
-    private func row(for app: RecommendedApp) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Label(app.platformLabel, systemImage: "square.grid.2x2")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(app.title)
-                RelativeDateLabel(date: app.recommendedAt)
-            }
-            Spacer()
-        }
-        .padding(.leading, 6)
-        .overlay(alignment: .leading) {
-            Rectangle().fill(ContentKind.appListing.accentColor).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            String(localized: "\(app.title). \(app.platformLabel). Recommended \(app.recommendedAt.formatted(.relative(presentation: .named))).")
-        )
-        .accessibilityAction(named: Text("I No Longer Recommend This App")) {
-            Task { await unrecommend(app) }
-        }
-        .voiceOverAwareSwipeActions {
-            Button(role: .destructive) {
-                Task { await unrecommend(app) }
-            } label: {
-                Label("Remove", systemImage: "hand.thumbsdown")
-            }
-        }
+        // A plain `.task` (not `.onAppear`) only fires once per view
+        // identity, unlike `loadOnAppearAndTask` above, so this doesn't
+        // re-focus on every return to an already-loaded section. Full
+        // noticed while wiring translation into this section's rows and
+        // fixed alongside it.
+        .task { await retryAccessibilityFocus(into: $summaryFocused) }
     }
 
     private var summaryHeader: some View {
@@ -1069,6 +1154,61 @@ struct RecommendedAppsView: View {
             toast.error(e.localizedDescription)
         } catch {
             toast.error(String(localized: "Couldn't remove this recommendation."))
+        }
+    }
+}
+
+/// Extracted out of `RecommendedAppsView.row(for:)` — same reasoning as
+/// `GenericSavedItemRow`/`FollowedItemRow`: `translatedTitle` needs its own
+/// per-row `@State`, which only a View struct's stored property can provide.
+/// `kind: "appListing"` (not a distinct "recommendedApp" kind) deliberately
+/// reuses `AppListingRow`'s cache namespace — `RecommendedApp.id` is the same
+/// JSON:API node UUID `AppListing.id` uses (both come straight off
+/// `flagged_entity`/`node.id`, see `ContentEndpoints.recommendedApps` and
+/// `Mappers.swift`'s `AppListing(id: node.id, ...)`), so an app already
+/// translated on a browse/detail screen is a free cache hit here too.
+private struct RecommendedAppRow: View {
+    let app: RecommendedApp
+    let onUnrecommend: () -> Void
+    @EnvironmentObject private var preferences: PreferencesStore
+    @State private var translatedTitle: String?
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Label(app.platformLabel, systemImage: "square.grid.2x2")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Text(translatedTitle ?? app.title)
+                    if translatedTitle != nil { TranslatedTitleBadge() }
+                }
+                RelativeDateLabel(date: app.recommendedAt)
+            }
+            Spacer()
+        }
+        .padding(.leading, 6)
+        .overlay(alignment: .leading) {
+            Rectangle().fill(ContentKind.appListing.accentColor).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            String(localized: "\(ContentTranslation.accessibilityTitle(original: app.title, translated: translatedTitle)). \(app.platformLabel). Recommended \(app.recommendedAt.formatted(.relative(presentation: .named))).")
+        )
+        .accessibilityAction(named: Text("I No Longer Recommend This App")) {
+            onUnrecommend()
+        }
+        .voiceOverAwareSwipeActions {
+            Button(role: .destructive) {
+                onUnrecommend()
+            } label: {
+                Label("Remove", systemImage: "hand.thumbsdown")
+            }
+        }
+        .task(id: ContentTranslation.taskId(title: app.title, targetLanguage: preferences.effectiveContentLanguage)) {
+            translatedTitle = await ContentTranslation.resolvedTitle(
+                kind: "appListing", id: app.id, originalTitle: app.title, targetLanguage: preferences.effectiveContentLanguage
+            )
         }
     }
 }

@@ -9,6 +9,8 @@ struct ContentView: View {
     @ObservedObject private var homeBadge = HomeBadgeStore.shared
     @State private var showTourPrompt = false
     @State private var showWelcomeTourFromPrompt = false
+    @State private var showTranslatePrompt = false
+    @State private var detectedLanguageCode: String?
 
     var body: some View {
         TabView(selection: $keyCommands.selectedTab) {
@@ -109,7 +111,34 @@ struct ContentView: View {
         } message: {
             Text("See a short, skippable walkthrough of Home, Discover, For You, Search, Profile, and Settings.")
         }
-        .onAppear { offerWelcomeTourIfNeeded() }
+        .alert(
+            "AppleVis is written in English",
+            isPresented: $showTranslatePrompt
+        ) {
+            Button("Turn On Auto-Translate") {
+                guard let detectedLanguageCode else { return }
+                preferences.autoTranslateEnabled = true
+                preferences.contentLanguageCode = detectedLanguageCode
+                preferences.contentTranslationPromptShown = true
+                Task { await TranslationCoordinator.shared.prepareLanguagePack(for: detectedLanguageCode) }
+            }
+            Button("Not Now", role: .cancel) {
+                preferences.contentTranslationPromptShown = true
+            }
+        } message: {
+            Text("Our community spans people from all over the world, speaking many different languages — so we use English as AppleVis's one shared language, to keep everyone reading and talking together in the same place. It looks like your device is set to \(detectedLanguageDisplayName). Want AppleVis to automatically translate posts into \(detectedLanguageDisplayName) as you browse? You can turn this off anytime in Settings.")
+        }
+        .onAppear {
+            offerWelcomeTourIfNeeded()
+            offerContentTranslationPromptIfNeeded()
+        }
+    }
+
+    private var detectedLanguageDisplayName: String {
+        guard let detectedLanguageCode, let name = Locale.current.localizedString(forLanguageCode: detectedLanguageCode) else {
+            return String(localized: "your language")
+        }
+        return name.localizedCapitalized
     }
 
     /// Mirrors the `.tabItem` labels above — kept as a plain switch rather
@@ -135,6 +164,30 @@ struct ContentView: View {
         Task {
             try? await Task.sleep(for: .seconds(2.5))
             showTourPrompt = true
+        }
+    }
+
+    /// One-time, on-device check: does this device's preferred language
+    /// differ from English, and can Apple's Translation framework actually
+    /// do something about it? If so, offer auto-translate once — declining
+    /// just marks it shown; Settings > Content Translation remains the
+    /// permanent way to turn it on later. Guarded against firing in the
+    /// same moment as the tour prompt (`auth.justCompletedOnboarding`,
+    /// checked by `offerWelcomeTourIfNeeded()` above) since both are
+    /// otherwise reachable from the same brand-new-user, non-English-device
+    /// first launch.
+    private func offerContentTranslationPromptIfNeeded() {
+        guard !preferences.contentTranslationPromptShown,
+              !preferences.autoTranslateEnabled,
+              !auth.justCompletedOnboarding
+        else { return }
+        let languageCode = Locale.current.language.languageCode?.identifier ?? "en"
+        guard languageCode != "en" else { return }
+        Task {
+            guard await TranslationCoordinator.availability(for: languageCode) != .unsupported else { return }
+            try? await Task.sleep(for: .seconds(5))
+            detectedLanguageCode = languageCode
+            showTranslatePrompt = true
         }
     }
 

@@ -77,9 +77,24 @@ nonisolated enum JSONValue: Decodable, Sendable {
     }
 
     /// Drupal text fields are typically `{ value, format }` or `{ value, summary, format }`.
-    /// Returns `.value`, falling back to `.processed` (some REST responses use that key instead).
+    /// Returns `.processed` — Drupal's own server-side rendering of `.value`
+    /// through whichever text format was actually chosen when the content
+    /// was written — falling back to `.value` only if `.processed` is
+    /// missing (a sparse fieldset response that didn't request it).
+    /// Previously preferred `.value` first, which is only safe to treat as
+    /// HTML when the source format actually is HTML. Confirmed against a
+    /// live episode: recent AppleVis Extra podcast bodies use a Markdown
+    /// text format (`format: 7`) — `.value` is literal Markdown ("###
+    /// Transcript", "* [link](url)"), which every `<h1-6>`/`<blockquote>`/
+    /// `<pre>`/`<table>` regex scan in the app (HTMLSegmenter's transcript-
+    /// heading detection among them) silently found nothing in, since none
+    /// of those are real HTML tags — `.processed` correctly renders the
+    /// same content as `<h3>Transcript</h3>`, etc. This is why recent
+    /// episodes' Transcript button never appeared and the raw "###
+    /// Transcript" text stayed inline in the show notes instead of being
+    /// extracted. Reported directly.
     var richTextValue: String? {
-        (self["value"]?.stringValue) ?? (self["processed"]?.stringValue)
+        (self["processed"]?.stringValue) ?? (self["value"]?.stringValue)
     }
 
     var richTextSummary: String? {

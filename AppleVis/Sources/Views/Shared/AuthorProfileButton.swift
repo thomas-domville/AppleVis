@@ -99,6 +99,10 @@ private struct AuthorProfileSheet: View {
     @State private var isLoading = false
     @State private var error: String?
     @State private var showContactSheet = false
+    /// This sheet — reachable from any author-name tap across the app — had
+    /// no focus management at all. Full app-wide focus audit, requested
+    /// directly.
+    @AccessibilityFocusState private var isHeaderFocused: Bool
 
     /// Contacting yourself makes no sense, and Drupal's Contact module needs
     /// a real numeric uid to address the message to — a profile that failed
@@ -132,7 +136,10 @@ private struct AuthorProfileSheet: View {
                 }
             }
         }
-        .task { await load() }
+        .task {
+            await load()
+            await retryAccessibilityFocus(into: $isHeaderFocused)
+        }
     }
 
     private func content(_ profile: UserEndpoints.PublicProfile) -> some View {
@@ -236,6 +243,7 @@ private struct AuthorProfileSheet: View {
             // heading here — was missing the trait entirely (PROFILE-04).
             Text(profile.displayName).font(.title2).fontWeight(.bold)
                 .accessibilityAddTraits(.isHeader)
+                .accessibilityFocused($isHeaderFocused)
             // .distantPast is JsonApiNode.parseDrupalDate's sentinel for a
             // missing/malformed "created" field, not a real date —
             // rendering it unconditionally produced a nonsensical "Member
@@ -316,6 +324,9 @@ private struct ContactUserSheet: View {
     @State private var isSending = false
     @State private var error: String?
     @AccessibilityFocusState private var isErrorFocused: Bool
+    /// Had no initial-load focus at all. Full app-wide focus audit,
+    /// requested directly.
+    @AccessibilityFocusState private var isIntroFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -324,6 +335,8 @@ private struct ContactUserSheet: View {
                     Text("Your message is sent through AppleVis. \(recipientName) will not see your email address unless they choose to reply.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityFocused($isIntroFocused)
                 }
                 Section("Subject") {
                     TextField("What's this about?", text: $subject)
@@ -363,6 +376,7 @@ private struct ContactUserSheet: View {
                         .adaptiveGlass(in: RoundedRectangle(cornerRadius: 12))
                 }
             }
+            .task { await retryAccessibilityFocus(into: $isIntroFocused) }
         }
     }
 

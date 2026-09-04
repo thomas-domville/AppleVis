@@ -628,6 +628,12 @@ struct EditNodeSheet: View {
     @EnvironmentObject private var toast: ToastStore
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
+    /// Had no focus management at all — focuses the title field itself
+    /// rather than a separate heading, matching ComposeTopicView's identical
+    /// reasoning for a single-field-first edit form: otherwise it silently
+    /// defaults to the back button. Full app-wide focus audit, requested
+    /// directly.
+    @AccessibilityFocusState private var isTitleFieldFocused: Bool
 
     init(initialTitle: String, initialBody: String, onSave: @escaping (String, String) async throws -> Void) {
         self.onSave = onSave
@@ -640,6 +646,7 @@ struct EditNodeSheet: View {
             Form {
                 Section("Title") {
                     TextField("Title", text: $title)
+                        .accessibilityFocused($isTitleFieldFocused)
                 }
                 Section("Body") {
                     if intelligence.showTranslatePrompt {
@@ -697,6 +704,7 @@ struct EditNodeSheet: View {
                         .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
                 }
             }
+            .task { await retryAccessibilityFocus(into: $isTitleFieldFocused) }
         }
     }
 
@@ -787,13 +795,6 @@ extension View {
         @ViewBuilder trailing: @escaping () -> Trailing
     ) -> some View {
         modifier(VoiceOverAwareSwipeActions(leading: { EmptyView() }, trailing: trailing))
-    }
-
-    func voiceOverAwareSwipeActions<Leading: View, Trailing: View>(
-        @ViewBuilder leading: @escaping () -> Leading,
-        @ViewBuilder trailing: @escaping () -> Trailing
-    ) -> some View {
-        modifier(VoiceOverAwareSwipeActions(leading: leading, trailing: trailing))
     }
 }
 
