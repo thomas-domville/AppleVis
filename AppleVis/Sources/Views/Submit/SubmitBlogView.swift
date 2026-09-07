@@ -27,6 +27,7 @@ struct SubmitBlogView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var networkMonitor: NetworkMonitor
     @Environment(\.dismiss) private var dismiss
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
@@ -149,7 +150,8 @@ struct SubmitBlogView: View {
                     ToolbarItem(placement: .confirmationAction) {
                         if step == .review {
                             Button("Submit") { Task { await submit() } }
-                                .disabled(isSubmitting)
+                                .disabled(isSubmitting || !networkMonitor.isConnected)
+                                .accessibilityHint(networkMonitor.isConnected ? "" : String(localized: "You're offline. Reconnect to submit this."))
                         } else {
                             Button("Next") { goNext() }
                                 .disabled(step == .details ? !detailsValid : !contentValid)
@@ -415,6 +417,12 @@ struct SubmitBlogView: View {
             Section("From") {
                 WizardReviewRow(label: "Posting As", value: auth.user?.name ?? "")
                 WizardReviewRow(label: "Email", value: email)
+            }
+            if !networkMonitor.isConnected {
+                Section {
+                    OfflineComposeNotice()
+                }
+                .listRowSeparator(.hidden)
             }
         }
     }

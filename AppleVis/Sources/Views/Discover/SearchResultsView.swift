@@ -2,10 +2,17 @@ import SwiftUI
 
 struct SearchResultsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var networkMonitor: NetworkMonitor
     let results: SearchResults?
     let isSearching: Bool
     let onRetry: () -> Void
     let onClearSearch: () -> Void
+
+    private var offlineOrFallbackMessage: String {
+        networkMonitor.isConnected
+            ? "Some results may be missing. AppleVis search is using the available fallback sources."
+            : "You're offline, so search can't reach AppleVis right now. Reconnect and try again."
+    }
 
     var body: some View {
         Group {
@@ -29,7 +36,7 @@ struct SearchResultsView: View {
             // network failure rendered the exact same "No Results" empty
             // state as an actual search with nothing matching, giving no
             // indication anything was wrong or worth retrying.
-            ErrorView(message: "Some results may be missing. AppleVis search is using the available fallback sources.") {
+            ErrorView(message: offlineOrFallbackMessage) {
                 onRetry()
             }
         } else if isEmpty {

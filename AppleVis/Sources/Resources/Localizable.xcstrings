@@ -77883,6 +77883,143 @@
         }
       }
     },
+    "I confirm this is a genuine message — not sponsored content, advertising, an SEO submission, or any other paid proposal." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أؤكد أن هذه رسالة حقيقية — وليست محتوى مدعومًا أو إعلانًا أو مشاركة لتحسين محركات البحث (SEO) أو أي اقتراح آخر مدفوع الأجر."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich bestätige, dass dies eine echte Nachricht ist — kein gesponserter Inhalt, keine Werbung, kein SEO-Beitrag und kein anderweitiger bezahlter Vorschlag."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Επιβεβαιώνω ότι αυτό είναι ένα γνήσιο μήνυμα — όχι χορηγούμενο περιεχόμενο, διαφήμιση, υποβολή SEO ή οποιαδήποτε άλλη επί πληρωμή πρόταση."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmo que este es un mensaje genuino — no contenido patrocinado, publicidad, una propuesta de SEO ni ninguna otra propuesta pagada."
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تأیید می‌کنم که این پیام واقعی است — نه محتوای اسپانسرشده، تبلیغات، ارسال سئو یا هر پیشنهاد پولی دیگری."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je confirme qu'il s'agit d'un message authentique — pas d'un contenu sponsorisé, d'une publicité, d'une soumission SEO ou de toute autre proposition payante."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "אני מאשר שזוהי הודעה אמיתית — לא תוכן ממומן, פרסום, הגשת SEO או כל הצעה בתשלום אחרת."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "मैं पुष्टि करता हूं कि यह एक वास्तविक संदेश है — न कि प्रायोजित सामग्री, विज्ञापन, SEO सबमिशन या कोई अन्य भुगतान प्रस्ताव।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saya mengonfirmasi bahwa ini adalah pesan asli — bukan konten bersponsor, iklan, kiriman SEO, atau proposal berbayar lainnya."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confermo che questo è un messaggio genuino — non contenuto sponsorizzato, pubblicità, un invio SEO o qualsiasi altra proposta a pagamento."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "これは正真正銘のメッセージであることを確認します。スポンサー付きコンテンツ、広告、SEO目的の投稿、その他の有料提案ではありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이것이 진짜 메시지임을 확인합니다 — 스폰서 콘텐츠, 광고, SEO 제출물 또는 기타 유료 제안이 아닙니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ik bevestig dat dit een oprecht bericht is — geen gesponsorde inhoud, advertentie, SEO-inzending of ander betaald voorstel."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Potwierdzam, że to autentyczna wiadomość — a nie sponsorowana treść, reklama, zgłoszenie SEO ani żadna inna płatna propozycja."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmo que esta é uma mensagem genuína — não conteúdo patrocinado, publicidade, uma submissão de SEO ou qualquer outra proposta paga."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подтверждаю, что это подлинное сообщение — а не спонсируемый контент, реклама, SEO-заявка или любое другое платное предложение."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jag bekräftar att detta är ett äkta meddelande — inte sponsrat innehåll, annonsering, en SEO-inlämning eller något annat betalt förslag."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ฉันยืนยันว่านี่คือข้อความที่แท้จริง ไม่ใช่เนื้อหาที่ได้รับการสนับสนุน โฆษณา การส่ง SEO หรือข้อเสนอแบบชำระเงินอื่นใด"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bunun gerçek bir mesaj olduğunu onaylıyorum — sponsorlu içerik, reklam, SEO gönderisi veya başka herhangi bir ücretli teklif değil."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Підтверджую, що це справжнє повідомлення — а не спонсорований контент, реклама, SEO-подання чи будь-яка інша платна пропозиція."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tôi xác nhận đây là một tin nhắn chân thực — không phải nội dung được tài trợ, quảng cáo, bài gửi SEO hay bất kỳ đề xuất trả phí nào khác."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我确认这是一条真实的消息——不是赞助内容、广告、SEO 投稿或任何其他付费提案。"
+          }
+        }
+      }
+    },
     "https://" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -78155,6 +78292,143 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "我不再推荐此应用"
+          }
+        }
+      }
+    },
+    "I confirm this is a genuine message, not sponsored content, advertising, an SEO submission, or any other paid proposal." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أؤكد أن هذه رسالة حقيقية، وليست محتوى مدعومًا أو إعلانًا أو مشاركة لتحسين محركات البحث (SEO) أو أي اقتراح آخر مدفوع الأجر."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich bestätige, dass dies eine echte Nachricht ist, kein gesponserter Inhalt, keine Werbung, kein SEO-Beitrag und kein anderweitiger bezahlter Vorschlag."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Επιβεβαιώνω ότι αυτό είναι ένα γνήσιο μήνυμα, όχι χορηγούμενο περιεχόμενο, διαφήμιση, υποβολή SEO ή οποιαδήποτε άλλη επί πληρωμή πρόταση."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmo que este es un mensaje genuino, no contenido patrocinado, publicidad, una propuesta de SEO ni ninguna otra propuesta pagada."
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تأیید می‌کنم که این پیام واقعی است، نه محتوای اسپانسرشده، تبلیغات، ارسال سئو یا هر پیشنهاد پولی دیگری."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je confirme qu'il s'agit d'un message authentique, pas d'un contenu sponsorisé, d'une publicité, d'une soumission SEO ou de toute autre proposition payante."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "אני מאשר שזוהי הודעה אמיתית, לא תוכן ממומן, פרסום, הגשת SEO או כל הצעה בתשלום אחרת."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "मैं पुष्टि करता हूं कि यह एक वास्तविक संदेश है, न कि प्रायोजित सामग्री, विज्ञापन, SEO सबमिशन या कोई अन्य भुगतान प्रस्ताव।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saya mengonfirmasi bahwa ini adalah pesan asli, bukan konten bersponsor, iklan, kiriman SEO, atau proposal berbayar lainnya."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confermo che questo è un messaggio genuino, non contenuto sponsorizzato, pubblicità, un invio SEO o qualsiasi altra proposta a pagamento."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "これは正真正銘のメッセージであることを確認します。スポンサー付きコンテンツ、広告、SEO目的の投稿、その他の有料提案ではありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이것이 진짜 메시지임을 확인합니다. 스폰서 콘텐츠, 광고, SEO 제출물 또는 기타 유료 제안이 아닙니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ik bevestig dat dit een oprecht bericht is, geen gesponsorde inhoud, advertentie, SEO-inzending of ander betaald voorstel."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Potwierdzam, że to autentyczna wiadomość, a nie sponsorowana treść, reklama, zgłoszenie SEO ani żadna inna płatna propozycja."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmo que esta é uma mensagem genuína, não conteúdo patrocinado, publicidade, uma submissão de SEO ou qualquer outra proposta paga."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подтверждаю, что это подлинное сообщение, а не спонсируемый контент, реклама, SEO-заявка или любое другое платное предложение."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jag bekräftar att detta är ett äkta meddelande, inte sponsrat innehåll, annonsering, en SEO-inlämning eller något annat betalt förslag."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ฉันยืนยันว่านี่คือข้อความที่แท้จริง ไม่ใช่เนื้อหาที่ได้รับการสนับสนุน โฆษณา การส่ง SEO หรือข้อเสนอแบบชำระเงินอื่นใด"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bunun gerçek bir mesaj olduğunu onaylıyorum, sponsorlu içerik, reklam, SEO gönderisi veya başka herhangi bir ücretli teklif değil."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Підтверджую, що це справжнє повідомлення, а не спонсорований контент, реклама, SEO-подання чи будь-яка інша платна пропозиція."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tôi xác nhận đây là một tin nhắn chân thực, không phải nội dung được tài trợ, quảng cáo, bài gửi SEO hay bất kỳ đề xuất trả phí nào khác."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我确认这是一条真实的消息,不是赞助内容、广告、SEO 投稿或任何其他付费提案。"
           }
         }
       }
@@ -90434,6 +90708,143 @@
         }
       }
     },
+    "My Account" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حسابي"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mein Konto"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ο Λογαριασμός μου"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mi Cuenta"
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حساب من"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mon compte"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "החשבון שלי"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "मेरा खाता"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Akun Saya"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il Mio Account"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マイアカウント"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "내 계정"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mijn Account"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moje Konto"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Minha Conta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мой аккаунт"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mitt Konto"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "บัญชีของฉัน"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hesabım"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мій обліковий запис"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tài Khoản Của Tôi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我的账户"
+          }
+        }
+      }
+    },
     "My Activity" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -102689,6 +103100,143 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开 Feedback Assistant 直接向 Apple 提交。"
+          }
+        }
+      }
+    },
+    "Opens My Account for profile, password, email, and sign out options." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يفتح «حسابي» لخيارات الملف الشخصي وكلمة المرور والبريد الإلكتروني وتسجيل الخروج."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öffnet „Mein Konto“ mit Optionen für Profil, Passwort, E-Mail und Abmelden."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ανοίγει το «Ο Λογαριασμός μου» με επιλογές για προφίλ, κωδικό πρόσβασης, email και αποσύνδεση."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre Mi Cuenta con opciones de perfil, contraseña, correo electrónico y cierre de sesión."
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«حساب من» را برای گزینه‌های نمایه، رمز عبور، ایمیل و خروج باز می‌کند."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre Mon compte avec les options de profil, mot de passe, e-mail et déconnexion."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "פותח את החשבון שלי עם אפשרויות לפרופיל, סיסמה, אימייל והתנתקות."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "प्रोफ़ाइल, पासवर्ड, ईमेल और साइन आउट विकल्पों के लिए मेरा खाता खोलता है।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membuka Akun Saya untuk opsi profil, kata sandi, email, dan keluar."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apre Il Mio Account con le opzioni di profilo, password, email e disconnessione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マイアカウントを開き、プロフィール、パスワード、メール、サインアウトのオプションを表示します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로필, 비밀번호, 이메일, 로그아웃 옵션을 위한 내 계정을 엽니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opent Mijn Account met opties voor profiel, wachtwoord, e-mail en uitloggen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otwiera Moje Konto z opcjami profilu, hasła, e-maila i wylogowania."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre Minha Conta com opções de perfil, senha, e-mail e sair."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открывает «Мой аккаунт» с параметрами профиля, пароля, электронной почты и выхода."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öppnar Mitt Konto med alternativ för profil, lösenord, e-post och utloggning."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เปิดบัญชีของฉันสำหรับตัวเลือกโปรไฟล์ รหัสผ่าน อีเมล และออกจากระบบ"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profil, şifre, e-posta ve oturumu kapatma seçenekleri için Hesabım'ı açar."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкриває «Мій обліковий запис» із параметрами профілю, пароля, електронної пошти та виходу."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở Tài Khoản Của Tôi với các tùy chọn hồ sơ, mật khẩu, email và đăng xuất."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开“我的账户”,提供个人资料、密码、电子邮件和退出登录选项。"
           }
         }
       }
@@ -176467,6 +177015,280 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "您已推荐此应用！"
+          }
+        }
+      }
+    },
+    "You're offline. Reconnect to send this." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أنت غير متصل بالإنترنت. أعد الاتصال لإرسال هذا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du bist offline. Verbinde dich erneut, um dies zu senden."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Είστε εκτός σύνδεσης. Συνδεθείτε ξανά για να το στείλετε."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estás sin conexión. Vuelve a conectarte para enviar esto."
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "شما آفلاین هستید. برای ارسال این، دوباره متصل شوید."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous êtes hors ligne. Reconnectez-vous pour envoyer ceci."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "אתה במצב לא מקוון. התחבר מחדש כדי לשלוח את זה."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "आप ऑफ़लाइन हैं। इसे भेजने के लिए दोबारा कनेक्ट करें।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anda sedang offline. Sambungkan kembali untuk mengirim ini."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sei offline. Riconnettiti per inviare questo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフラインです。これを送信するには再接続してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오프라인 상태입니다. 이것을 보내려면 다시 연결하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je bent offline. Maak opnieuw verbinding om dit te verzenden."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jesteś offline. Połącz się ponownie, aby to wysłać."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você está offline. Reconecte-se para enviar isto."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вы не в сети. Переподключитесь, чтобы отправить это."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du är offline. Anslut igen för att skicka detta."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "คุณออฟไลน์อยู่ เชื่อมต่ออีกครั้งเพื่อส่งข้อมูลนี้"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Çevrimdışısınız. Bunu göndermek için yeniden bağlanın."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ви офлайн. Підключіться знову, щоб надіслати це."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bạn đang ngoại tuyến. Kết nối lại để gửi nội dung này."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你当前离线。请重新连接以发送此内容。"
+          }
+        }
+      }
+    },
+    "You're offline. Reconnect to submit this." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أنت غير متصل بالإنترنت. أعد الاتصال لتقديم هذا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du bist offline. Verbinde dich erneut, um dies einzureichen."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Είστε εκτός σύνδεσης. Συνδεθείτε ξανά για να το υποβάλετε."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estás sin conexión. Vuelve a conectarte para enviar esto."
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "شما آفلاین هستید. برای ارسال این، دوباره متصل شوید."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous êtes hors ligne. Reconnectez-vous pour soumettre ceci."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "אתה במצב לא מקוון. התחבר מחדש כדי לשלוח את זה."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "आप ऑफ़लाइन हैं। इसे सबमिट करने के लिए दोबारा कनेक्ट करें।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anda sedang offline. Sambungkan kembali untuk mengirimkan ini."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sei offline. Riconnettiti per inviare questo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフラインです。これを送信するには再接続してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오프라인 상태입니다. 이것을 제출하려면 다시 연결하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je bent offline. Maak opnieuw verbinding om dit in te dienen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jesteś offline. Połącz się ponownie, aby to przesłać."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você está offline. Reconecte-se para enviar isto."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вы не в сети. Переподключитесь, чтобы отправить это."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du är offline. Anslut igen för att skicka in detta."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "คุณออฟไลน์อยู่ เชื่อมต่ออีกครั้งเพื่อส่งข้อมูลนี้"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Çevrimdışısınız. Bunu göndermek için yeniden bağlanın."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ви офлайн. Підключіться знову, щоб надіслати це."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bạn đang ngoại tuyến. Kết nối lại để gửi nội dung này."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你当前离线。请重新连接以提交此内容。"
           }
         }
       }

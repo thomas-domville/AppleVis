@@ -169,6 +169,42 @@ struct ChangeItem: Identifiable {
 
     static let current: [ChangeItem] = [
         ChangeItem(
+            systemImage: "wifi.slash",
+            tag: .new,
+            title: "Friendlier Offline Messages",
+            description: "AppleVis now lets you know, in plain and friendly language, when you're offline — in Following and Recommended (For You), in search, and before you try to send a message. Contact Us and every Submit wizard now gently hold the Send/Submit button until you're back online, so nothing gets lost typing into thin air."
+        ),
+        ChangeItem(
+            systemImage: "heart.text.square",
+            tag: .improved,
+            title: "Warmer Wording in Contact Us",
+            description: "The declaration you check before sending a message now sounds like us — a genuine confirmation instead of a stiff \"I understand that AppleVis does not accept…\" disclaimer."
+        ),
+        ChangeItem(
+            systemImage: "arrow.right.circle",
+            tag: .improved,
+            title: "Clearer Navigation in Contact Us",
+            description: "The message step's Next button no longer reads \"Continue to Review\" — it's Next everywhere now, like every other wizard in the app. The redundant Change button next to your message type is also gone for signed-in users, since Back already takes you straight there; guests still see it, since it skips a step."
+        ),
+        ChangeItem(
+            systemImage: "wand.and.stars",
+            tag: .improved,
+            title: "Rewrite Buttons Moved Out of the Overflow Menu",
+            description: "Contact Us, Submit a Bug Report, Submit a Podcast, and the forum's New Topic/Reply screens now show their Apple Intelligence Rewrite button directly under the text field it rewrites, instead of hidden behind the toolbar's overflow \"More\" button — matching Submit App and Submit Blog."
+        ),
+        ChangeItem(
+            systemImage: "questionmark.circle",
+            tag: .improved,
+            title: "General Enquiries in Contact Us",
+            description: "The fourth message type in the Contact Us wizard is now General Enquiry — for questions and concerns — instead of Recommendation, which overlapped with the dedicated Submit App/Blog/Podcast wizards."
+        ),
+        ChangeItem(
+            systemImage: "person.crop.circle",
+            tag: .improved,
+            title: "A Shorter Profile Screen",
+            description: "Your profile card now opens a dedicated My Account screen for editing your profile, password, email, and signing out — so the main Profile tab is a quick, three-stop list instead of a long one."
+        ),
+        ChangeItem(
             systemImage: "text.bubble",
             tag: .improved,
             title: "Clearer Guidance on Submission Forms",

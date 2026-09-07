@@ -880,6 +880,7 @@ private struct SavedPodcastEpisodeCard: View {
 struct FollowingView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var networkMonitor: NetworkMonitor
     @State private var items: [FollowedItem] = []
     @State private var isLoading = false
     @State private var error: String?
@@ -913,6 +914,10 @@ struct FollowingView: View {
                 }
             } else {
                 List {
+                    if !networkMonitor.isConnected {
+                        OfflineBanner()
+                            .listRowSeparator(.hidden)
+                    }
                     summaryHeader
                         .accessibilityFocused($summaryFocused)
                     ForEach(items) { item in
@@ -973,14 +978,14 @@ struct FollowingView: View {
             if !local.isEmpty {
                 items = local
             } else {
-                error = e.localizedDescription
+                error = networkMonitor.isConnected ? e.localizedDescription : "You're offline. Connect to Wi-Fi or cellular to see what you're following."
             }
         } catch {
             let local = PersistenceStore.shared.followedItems()
             if !local.isEmpty {
                 items = local
             } else {
-                self.error = "Couldn't load your followed items."
+                self.error = networkMonitor.isConnected ? "Couldn't load your followed items." : "You're offline. Connect to Wi-Fi or cellular to see what you're following."
             }
         }
         isLoading = false
@@ -1063,6 +1068,7 @@ struct RecommendedAppsView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var toast: ToastStore
+    @EnvironmentObject private var networkMonitor: NetworkMonitor
     @State private var apps: [RecommendedApp] = []
     @State private var isLoading = false
     @State private var error: String?
@@ -1135,9 +1141,9 @@ struct RecommendedAppsView: View {
         do {
             apps = try await APIClient.shared.flags.recommendedApps(uid: user.uuid, csrfToken: user.csrfToken)
         } catch let e as APIError {
-            error = e.localizedDescription
+            error = networkMonitor.isConnected ? e.localizedDescription : "You're offline. Connect to Wi-Fi or cellular to see your recommendations."
         } catch {
-            self.error = "Couldn't load your recommendations."
+            self.error = networkMonitor.isConnected ? "Couldn't load your recommendations." : "You're offline. Connect to Wi-Fi or cellular to see your recommendations."
         }
         isLoading = false
         if error == nil { onLoaded?(apps.count) }

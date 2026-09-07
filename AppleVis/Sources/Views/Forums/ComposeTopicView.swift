@@ -124,6 +124,7 @@ struct ComposeTopicView: View {
                                         detectionEnabled: preferences.nonEnglishDetectionEnabled
                                     )
                                 }
+                            rewriteButton
                         }
                         Section {
                             Toggle("Follow This Topic", isOn: $followOnPost)
@@ -148,21 +149,6 @@ struct ComposeTopicView: View {
                     Button("Cancel") { requestCancel() }
                 }
                 if auth.isSignedIn {
-                    if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
-                        ToolbarItem(placement: .secondaryAction) {
-                            Button("Rewrite") {
-                                Task {
-                                    if let result = await intelligence.rewrite(subject: title, body: bodyText, isTopic: true) {
-                                        title = result.subject ?? title
-                                        bodyText = result.body
-                                    } else {
-                                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
-                                    }
-                                }
-                            }
-                            .disabled(bodyText.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
-                        }
-                    }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Post") { Task { await submit() } }
                             .disabled(!isValid || isSubmitting)
@@ -201,6 +187,30 @@ struct ComposeTopicView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Was a toolbar button under the overflow "More" menu — easy to miss,
+    /// and its scope wasn't obvious from a generic toolbar label. Now sits
+    /// directly under the field it rewrites, matching Submit App/Blog's
+    /// existing pattern. Reported directly.
+    @ViewBuilder
+    private var rewriteButton: some View {
+        if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+            Button {
+                Task {
+                    if let result = await intelligence.rewrite(subject: title, body: bodyText, isTopic: true) {
+                        title = result.subject ?? title
+                        bodyText = result.body
+                    } else {
+                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
+                    }
+                }
+            } label: {
+                Label("Rewrite", systemImage: "wand.and.stars")
+            }
+            .disabled(bodyText.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+            .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
+        }
     }
 
     private func loadCategories() async {
@@ -353,6 +363,9 @@ struct ComposeReplyView: View {
                             detectionEnabled: preferences.nonEnglishDetectionEnabled
                         )
                     }
+                rewriteButton
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
                 if let error {
                     Text(error).foregroundStyle(.red).padding()
                 }
@@ -362,20 +375,6 @@ struct ComposeReplyView: View {
             .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { requestCancel() } }
-                if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
-                    ToolbarItem(placement: .secondaryAction) {
-                        Button("Rewrite") {
-                            Task {
-                                if let result = await intelligence.rewrite(subject: nil, body: bodyText, isTopic: false) {
-                                    bodyText = result.body
-                                } else {
-                                    toast.error(String(localized: "Couldn't rewrite this. Try again."))
-                                }
-                            }
-                        }
-                        .disabled(bodyText.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
-                    }
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Post") { Task { await submit() } }
                         .disabled(bodyText.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
@@ -390,6 +389,29 @@ struct ComposeReplyView: View {
             } message: {
                 Text("Your progress will be discarded.")
             }
+        }
+    }
+
+    /// Was a toolbar button under the overflow "More" menu — easy to miss,
+    /// and its scope wasn't obvious from a generic toolbar label. Now sits
+    /// directly under the field it rewrites, matching Submit App/Blog's
+    /// existing pattern. Reported directly.
+    @ViewBuilder
+    private var rewriteButton: some View {
+        if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+            Button {
+                Task {
+                    if let result = await intelligence.rewrite(subject: nil, body: bodyText, isTopic: false) {
+                        bodyText = result.body
+                    } else {
+                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
+                    }
+                }
+            } label: {
+                Label("Rewrite", systemImage: "wand.and.stars")
+            }
+            .disabled(bodyText.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+            .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
         }
     }
 

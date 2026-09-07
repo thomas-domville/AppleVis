@@ -2,14 +2,10 @@ import SwiftUI
 
 struct ProfileView: View {
     @EnvironmentObject private var auth: AuthStore
-    @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var showSignIn = false
-    @State private var showSignOutConfirm = false
-    @State private var showEditProfile = false
     @State private var showContact = false
     @State private var showWelcomeTour = false
-    @State private var accountSecurityMode: AccountSecurityWizard.Mode?
     @AccessibilityFocusState private var focusTarget: AnyHashable?
     private static let titleFocusID = AnyHashable("profile.title")
 
@@ -33,28 +29,11 @@ struct ProfileView: View {
         .sheet(isPresented: $showSignIn) {
             SignInView()
         }
-        .sheet(isPresented: $showEditProfile) {
-            EditProfileView()
-        }
         .sheet(isPresented: $showContact) {
             ContactView()
         }
         .sheet(isPresented: $showWelcomeTour) {
             GuidedExperienceView(experience: GuidedExperienceRegistry.welcome)
-        }
-        .sheet(item: $accountSecurityMode) { mode in
-            AccountSecurityWizard(mode: mode)
-        }
-        .confirmationDialog("Sign Out", isPresented: $showSignOutConfirm, titleVisibility: .visible) {
-            Button("Sign Out", role: .destructive) {
-                Task { await signOut() }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            // RN's wording is precise that this is local-only, so it isn't
-            // confused with the (much more serious) Delete Account option
-            // right above it in the same section.
-            Text("Removes your account session from this device only. You'll need to sign in again to post or access saved items.")
         }
     }
 
@@ -63,95 +42,48 @@ struct ProfileView: View {
     @ViewBuilder
     private func signedInContent(_ user: AuthUser) -> some View {
         Section {
-            HStack(spacing: 14) {
-                Circle()
-                    .fill(Color.accentColor)
-                    .frame(width: 52, height: 52)
-                    .overlay(
-                        Text(String(user.name.prefix(1)).uppercased())
-                            .font(.title2).fontWeight(.bold).foregroundStyle(.white)
-                    )
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(user.name).font(.headline)
-                    if user.isAdmin {
-                        Label("Administrator", systemImage: "star.fill")
-                            .font(.caption).foregroundStyle(.secondary)
+            NavigationLink {
+                AccountDetailView(user: user)
+                    .onDisappear {
+                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: Self.titleFocusID) }
                     }
+            } label: {
+                HStack(spacing: 14) {
+                    Circle()
+                        .fill(Color.accentColor)
+                        .frame(width: 52, height: 52)
+                        .overlay(
+                            Text(String(user.name.prefix(1)).uppercased())
+                                .font(.title2).fontWeight(.bold).foregroundStyle(.white)
+                        )
+                        .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(user.name).font(.headline)
+                        if user.isAdmin {
+                            Label("Administrator", systemImage: "star.fill")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    // Purely a visual state indicator — the accessible text is
+                    // already covered by this card's combined accessibility
+                    // label below.
+                    Text("Signed In")
+                        .font(.caption2).fontWeight(.bold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(Color.green, in: Capsule())
+                        .accessibilityHidden(true)
                 }
-
-                Spacer()
-
-                // Purely a visual state indicator — the accessible text is
-                // already covered by this card's combined accessibility
-                // label below.
-                Text("Signed In")
-                    .font(.caption2).fontWeight(.bold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(Color.green, in: Capsule())
-                    .accessibilityHidden(true)
+                .padding(.vertical, 4)
             }
-            .padding(.vertical, 4)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(String(localized: "Signed in as \(user.name)\(user.isAdmin ? ", Administrator" : "")"))
+            .accessibilityHint(String(localized: "Opens My Account for profile, password, email, and sign out options."))
             .accessibilityFocused($focusTarget, equals: Self.titleFocusID)
-        }
-
-        Section("Account") {
-            Button {
-                showEditProfile = true
-            } label: {
-                Label("Edit Profile", systemImage: "person.crop.circle.badge.pencil")
-            }
-            .accessibilityLabel(String(localized: "Edit your public profile"))
-
-            Button {
-                accountSecurityMode = .password
-            } label: {
-                Label("Change Password", systemImage: "lock.rotation")
-            }
-            .accessibilityLabel(String(localized: "Change your account password"))
-
-            Button {
-                accountSecurityMode = .email
-            } label: {
-                Label("Change Email Address", systemImage: "envelope.badge")
-            }
-            .accessibilityLabel(String(localized: "Change your account email address"))
-
-            if let username = auth.user?.name {
-                WebLink(destination: URL(string: "https://www.applevis.com/users/\(username)")!) {
-                    Label("View Full Profile on applevis.com", systemImage: "arrow.up.right.square")
-                }
-                .accessibilityLabel(String(localized: "View your full public profile on applevis.com, opens in browser"))
-            }
-
-            WebLink(destination: URL(string: "https://www.applevis.com/user")!) {
-                Label("More Account Settings on applevis.com", systemImage: "arrow.up.right.square")
-            }
-            .accessibilityLabel(String(localized: "More Account Settings on applevis.com, opens in browser"))
-
-            NavigationLink {
-                DeleteAccountView()
-                    .onDisappear {
-                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("deleteAccount")) }
-                    }
-            } label: {
-                Label("Delete Account", systemImage: "person.crop.circle.badge.minus")
-                    .foregroundStyle(.red)
-            }
-            .accessibilityFocused($focusTarget, equals: AnyHashable("deleteAccount"))
-            .accessibilityLabel(String(localized: "Permanently delete your AppleVis account"))
-
-            Button(role: .destructive) {
-                showSignOutConfirm = true
-            } label: {
-                Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
-                    .foregroundStyle(.red)
-            }
-            .accessibilityLabel(String(localized: "Sign out of your AppleVis account"))
         }
     }
 
@@ -256,10 +188,5 @@ struct ProfileView: View {
                 String(localized: "Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown")")
             )
         }
-    }
-
-    private func signOut() async {
-        await auth.signOut()
-        toast.success(String(localized: "Signed out"))
     }
 }

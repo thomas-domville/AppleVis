@@ -9,7 +9,7 @@ import SwiftUI
 /// guests see all four.
 struct ContactView: View {
     enum ContactType: String, CaseIterable, Identifiable {
-        case bug, feedback, suggestion, recommendation
+        case bug, feedback, suggestion, general
         var id: String { rawValue }
 
         var label: String {
@@ -17,7 +17,7 @@ struct ContactView: View {
             case .bug: return "Bug Report"
             case .feedback: return "Feedback"
             case .suggestion: return "Suggestion"
-            case .recommendation: return "Recommendation"
+            case .general: return "General Enquiry"
             }
         }
 
@@ -26,7 +26,7 @@ struct ContactView: View {
             case .bug: return "App Bug Report"
             case .feedback: return "App Feedback"
             case .suggestion: return "App Suggestion"
-            case .recommendation: return "App Recommendation"
+            case .general: return "App Enquiry"
             }
         }
 
@@ -35,7 +35,7 @@ struct ContactView: View {
             case .bug: return "Something in the app is broken or not working as expected."
             case .feedback: return "Share your thoughts, reactions, or general impressions about the app."
             case .suggestion: return "An idea to make the app better — a feature, improvement, or change."
-            case .recommendation: return "Suggest a resource, podcast, app entry, blog topic, or piece of content."
+            case .general: return "Ask a question, raise a concern, or get in touch about anything else."
             }
         }
 
@@ -44,7 +44,7 @@ struct ContactView: View {
             case .bug: return "Report a technical problem with the AppleVis app."
             case .feedback: return "Tell us what you think about the app."
             case .suggestion: return "Suggest a new feature or improvement."
-            case .recommendation: return "Recommend content or resources for the AppleVis community."
+            case .general: return "Ask a general question or share a concern about AppleVis."
             }
         }
 
@@ -53,7 +53,7 @@ struct ContactView: View {
             case .bug: return "Describe what happened, what you expected, and the steps to reproduce it…"
             case .feedback: return "Share your thoughts about the AppleVis app…"
             case .suggestion: return "Describe your idea and why it would improve the app…"
-            case .recommendation: return "Tell us what you would like to see in AppleVis…"
+            case .general: return "Tell us what's on your mind…"
             }
         }
 
@@ -62,7 +62,7 @@ struct ContactView: View {
             case .bug: return "ladybug"
             case .feedback: return "ellipsis.bubble"
             case .suggestion: return "lightbulb"
-            case .recommendation: return "star"
+            case .general: return "questionmark.circle"
             }
         }
 
@@ -71,7 +71,7 @@ struct ContactView: View {
             case .bug: return Color(red: 0.937, green: 0.267, blue: 0.267)
             case .feedback: return Color(red: 0.039, green: 0.518, blue: 1.0)
             case .suggestion: return Color(red: 0.063, green: 0.725, blue: 0.506)
-            case .recommendation: return Color(red: 0.961, green: 0.620, blue: 0.043)
+            case .general: return Color(red: 0.961, green: 0.620, blue: 0.043)
             }
         }
     }
@@ -81,6 +81,7 @@ struct ContactView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var networkMonitor: NetworkMonitor
     @Environment(\.dismiss) private var dismiss
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
@@ -126,7 +127,7 @@ struct ContactView: View {
     private var messageValid: Bool { messageLength >= 20 }
     private var canSend: Bool {
         !displayName.trimmingCharacters(in: .whitespaces).isEmpty &&
-        email.contains("@") && declarationAgreed && !isSubmitting
+        email.contains("@") && declarationAgreed && !isSubmitting && networkMonitor.isConnected
     }
 
     var body: some View {
@@ -171,26 +172,13 @@ struct ContactView: View {
                         Button("Cancel") { requestCancel() }
                             .accessibilityHint(String(localized: "Cancels and closes this form."))
                     }
-                    if step == .message && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
-                        ToolbarItem(placement: .secondaryAction) {
-                            Button("Rewrite") {
-                                Task {
-                                    if let result = await intelligence.rewrite(subject: effectiveType.subject, body: message, isTopic: false) {
-                                        message = result.body
-                                    } else {
-                                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
-                                    }
-                                }
-                            }
-                            .disabled(message.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
-                        }
-                    }
                     ToolbarItem(placement: .confirmationAction) {
                         if step == .review {
                             Button(isSubmitting ? "Sending…" : "Send Message") { Task { await submit() } }
                                 .disabled(!canSend)
+                                .accessibilityHint(networkMonitor.isConnected ? "" : String(localized: "You're offline. Reconnect to send this."))
                         } else {
-                            Button(step == .message ? "Continue to Review" : "Next") { goNext() }
+                            Button("Next") { goNext() }
                                 .disabled(!canGoNext)
                         }
                     }
@@ -322,11 +310,19 @@ struct ContactView: View {
                     Label(effectiveType.label, systemImage: effectiveType.icon)
                         .foregroundStyle(effectiveType.color)
                         .font(.subheadline.bold())
-                    Spacer()
-                    Button("Change") { step = .type }
-                        .font(.caption)
-                        .accessibilityLabel(String(localized: "Change contact type"))
-                        .accessibilityHint(String(localized: "Goes back to step 1 to change your selection."))
+                    // Signed-in users skip straight from Type to Message, so
+                    // Back already lands on Type — this button would be an
+                    // exact duplicate there. Guests have a Details step in
+                    // between, where Back only goes one step at a time; this
+                    // is the only way to reach Type without a second tap.
+                    // Reported directly.
+                    if !isSignedIn {
+                        Spacer()
+                        Button("Change") { step = .type }
+                            .font(.caption)
+                            .accessibilityLabel(String(localized: "Change contact type"))
+                            .accessibilityHint(String(localized: "Goes back to step 1 to change your selection."))
+                    }
                 }
             }
             if intelligence.showTranslatePrompt {
@@ -384,6 +380,7 @@ struct ContactView: View {
                             detectionEnabled: preferences.nonEnglishDetectionEnabled
                         )
                     }
+                rewriteButton
             }
             if effectiveType == .bug {
                 Section {
@@ -413,6 +410,29 @@ struct ContactView: View {
     /// Mirrors RN's crossing-the-threshold announcement so VoiceOver users
     /// learn the moment they can continue, not just via the Next button's
     /// disabled state.
+    /// Was a toolbar button under the overflow "More" menu — easy to miss,
+    /// and its scope wasn't obvious from a generic toolbar label. Now sits
+    /// directly under the field it rewrites, matching Submit App/Blog's
+    /// existing pattern. Reported directly.
+    @ViewBuilder
+    private var rewriteButton: some View {
+        if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+            Button {
+                Task {
+                    if let result = await intelligence.rewrite(subject: effectiveType.subject, body: message, isTopic: false) {
+                        message = result.body
+                    } else {
+                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
+                    }
+                }
+            } label: {
+                Label("Rewrite", systemImage: "wand.and.stars")
+            }
+            .disabled(message.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+            .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
+        }
+    }
+
     private func handleMessageChange(_ newValue: String) {
         let length = newValue.trimmingCharacters(in: .whitespacesAndNewlines).count
         if !messageMinimumAnnounced && length >= 20 {
@@ -432,6 +452,12 @@ struct ContactView: View {
                 backButton
                 Text("Check your message, then tap Send Message.")
                     .font(.subheadline).foregroundStyle(.secondary)
+            }
+            if !networkMonitor.isConnected {
+                Section {
+                    OfflineComposeNotice()
+                }
+                .listRowSeparator(.hidden)
             }
             Section {
                 HStack {
@@ -486,7 +512,7 @@ struct ContactView: View {
                     HStack(alignment: .top, spacing: 12) {
                         Image(systemName: declarationAgreed ? "checkmark.square.fill" : "square")
                             .foregroundStyle(declarationAgreed ? effectiveType.color : .secondary)
-                        Text("I understand that AppleVis does not accept sponsored posts/content, advertising, SEO, or any other type of paid proposals.")
+                        Text("I confirm this is a genuine message — not sponsored content, advertising, an SEO submission, or any other paid proposal.")
                             .font(.footnote)
                             .foregroundStyle(.primary)
                             .multilineTextAlignment(.leading)
@@ -496,7 +522,7 @@ struct ContactView: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityAddTraits(.isButton)
                 .accessibilityLabel(String(localized: "Declaration"))
-                .accessibilityHint(String(localized: "I understand that AppleVis does not accept sponsored posts or content, advertising, SEO, or any other type of paid proposals."))
+                .accessibilityHint(String(localized: "I confirm this is a genuine message, not sponsored content, advertising, an SEO submission, or any other paid proposal."))
                 .accessibilityValue(declarationAgreed ? "Checked" : "Unchecked")
             }
         }

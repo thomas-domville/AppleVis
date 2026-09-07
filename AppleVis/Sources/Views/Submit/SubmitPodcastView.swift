@@ -17,6 +17,7 @@ struct SubmitPodcastView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var networkMonitor: NetworkMonitor
     @Environment(\.dismiss) private var dismiss
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
@@ -128,24 +129,11 @@ struct SubmitPodcastView: View {
                     Button("Cancel") { requestCancel() }
                 }
                 if auth.isSignedIn {
-                    if step == .audio && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
-                        ToolbarItem(placement: .secondaryAction) {
-                            Button("Rewrite") {
-                                Task {
-                                    if let result = await intelligence.rewrite(subject: nil, body: description, isTopic: false) {
-                                        description = result.body
-                                    } else {
-                                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
-                                    }
-                                }
-                            }
-                            .disabled(description.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
-                        }
-                    }
                     ToolbarItem(placement: .confirmationAction) {
                         if step == .review {
                             Button("Submit") { Task { await submit() } }
-                                .disabled(isSubmitting)
+                                .disabled(isSubmitting || !networkMonitor.isConnected)
+                                .accessibilityHint(networkMonitor.isConnected ? "" : String(localized: "You're offline. Reconnect to submit this."))
                         } else {
                             Button("Next") { goNext() }
                                 .disabled(!audioValid)
@@ -298,6 +286,7 @@ struct SubmitPodcastView: View {
                 Text("Tell listeners what this episode covers — the topics, guests, or themes — so they know what to expect before pressing play.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                rewriteButton
             }
             Section("Audio File") {
                 Button {
@@ -307,6 +296,29 @@ struct SubmitPodcastView: View {
                 }
                 .accessibilityHint(String(localized: "Opens the Files app to pick an audio file for this episode."))
             }
+        }
+    }
+
+    /// Was a toolbar button under the overflow "More" menu — easy to miss,
+    /// and its scope wasn't obvious from a generic toolbar label. Now sits
+    /// directly under the field it rewrites, matching Submit App/Blog's
+    /// existing pattern. Reported directly.
+    @ViewBuilder
+    private var rewriteButton: some View {
+        if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+            Button {
+                Task {
+                    if let result = await intelligence.rewrite(subject: nil, body: description, isTopic: false) {
+                        description = result.body
+                    } else {
+                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
+                    }
+                }
+            } label: {
+                Label("Rewrite", systemImage: "wand.and.stars")
+            }
+            .disabled(description.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+            .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
         }
     }
 
@@ -322,6 +334,12 @@ struct SubmitPodcastView: View {
             Section("Episode") {
                 WizardReviewRow(label: "Description", value: description)
                 WizardReviewRow(label: "Audio File", value: audioFileURL?.lastPathComponent ?? "")
+            }
+            if !networkMonitor.isConnected {
+                Section {
+                    OfflineComposeNotice()
+                }
+                .listRowSeparator(.hidden)
             }
         }
     }

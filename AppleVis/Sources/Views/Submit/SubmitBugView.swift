@@ -16,6 +16,7 @@ struct SubmitBugView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var networkMonitor: NetworkMonitor
     @Environment(\.dismiss) private var dismiss
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
@@ -138,25 +139,11 @@ struct SubmitBugView: View {
                     Button("Cancel") { requestCancel() }
                 }
                 if auth.isSignedIn {
-                    if step == .description && preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
-                        ToolbarItem(placement: .secondaryAction) {
-                            Button("Rewrite") {
-                                Task {
-                                    if let result = await intelligence.rewrite(subject: title, body: description, isTopic: true) {
-                                        title = result.subject ?? title
-                                        description = result.body
-                                    } else {
-                                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
-                                    }
-                                }
-                            }
-                            .disabled(description.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
-                        }
-                    }
                     ToolbarItem(placement: .confirmationAction) {
                         if step == .review {
                             Button("Submit") { Task { await submit() } }
-                                .disabled(isSubmitting)
+                                .disabled(isSubmitting || !networkMonitor.isConnected)
+                                .accessibilityHint(networkMonitor.isConnected ? "" : String(localized: "You're offline. Reconnect to submit this."))
                         } else {
                             Button("Next") { goNext() }
                                 .disabled(step == .description ? !descriptionValid : !bugInfoValid)
@@ -309,7 +296,32 @@ struct SubmitBugView: View {
                 Text("The more detail you can share — what happened, what you expected instead, and the exact steps to get there — the easier it is for us to reproduce and track down.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                rewriteButton
             }
+        }
+    }
+
+    /// Was a toolbar button under the overflow "More" menu — easy to miss,
+    /// and its scope wasn't obvious from a generic toolbar label. Now sits
+    /// directly under the field it rewrites, matching Submit App/Blog's
+    /// existing pattern. Reported directly.
+    @ViewBuilder
+    private var rewriteButton: some View {
+        if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+            Button {
+                Task {
+                    if let result = await intelligence.rewrite(subject: title, body: description, isTopic: true) {
+                        title = result.subject ?? title
+                        description = result.body
+                    } else {
+                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
+                    }
+                }
+            } label: {
+                Label("Rewrite", systemImage: "wand.and.stars")
+            }
+            .disabled(description.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+            .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
         }
     }
 
@@ -378,6 +390,12 @@ struct SubmitBugView: View {
                 WizardReviewRow(label: "Apple Feedback ID", value: appleFeedbackId)
                 WizardReviewRow(label: "Can Reproduce", value: canReproduce)
                 WizardReviewRow(label: "Recognition", value: recognition)
+            }
+            if !networkMonitor.isConnected {
+                Section {
+                    OfflineComposeNotice()
+                }
+                .listRowSeparator(.hidden)
             }
         }
     }

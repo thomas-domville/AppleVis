@@ -15,6 +15,7 @@ struct SubmitAppView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var networkMonitor: NetworkMonitor
     @Environment(\.dismiss) private var dismiss
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
@@ -353,6 +354,12 @@ struct SubmitAppView: View {
                             case .macos:   macReviewSection
                             case .ios:     reviewSection
                             }
+                            if !networkMonitor.isConnected {
+                                Section {
+                                    OfflineComposeNotice()
+                                }
+                                .listRowSeparator(.hidden)
+                            }
                         }
                         if let error {
                             Section {
@@ -384,7 +391,8 @@ struct SubmitAppView: View {
                     ToolbarItem(placement: .confirmationAction) {
                         if step == .review {
                             Button("Submit") { Task { await submit() } }
-                                .disabled(!isValid || isSubmitting || !exactDuplicateMatches.isEmpty)
+                                .disabled(!isValid || isSubmitting || !exactDuplicateMatches.isEmpty || !networkMonitor.isConnected)
+                                .accessibilityHint(networkMonitor.isConnected ? "" : String(localized: "You're offline. Reconnect to submit this."))
                         } else if step == .details {
                             Button("Review & Submit") { goNext() }
                                 .disabled(!isValid)

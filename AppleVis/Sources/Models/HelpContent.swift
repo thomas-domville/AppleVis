@@ -1259,13 +1259,13 @@ enum HelpContent {
                 HelpArticle(
                     id: "trouble-contact",
                     title: "Contact App Support",
-                    summary: "Send bugs, feedback, suggestions, and recommendations using the in-app contact wizard.",
+                    summary: "Send bugs, feedback, suggestions, and general enquiries using the in-app contact wizard.",
                     content: [
                         .body("The in-app contact wizard sends your message straight to the AppleVis team — no email app needed. Reach it from Profile or from Help. It's three steps when you're signed in, or four when you're not."),
                         .heading("Step 1 — Choose a type"),
                         .steps([
                             "Open Profile and tap Contact AppleVis, or open Help and scroll to the Contact section.",
-                            "Choose what kind of message you're sending: App Bug Report, App Feedback, App Suggestion, or App Recommendation.",
+                            "Choose what kind of message you're sending: App Bug Report, App Feedback, App Suggestion, or App Enquiry.",
                             "Tap the card for your chosen type — the subject fills in automatically.",
                             "Tap Continue.",
                         ]),
