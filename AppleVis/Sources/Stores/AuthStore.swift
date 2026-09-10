@@ -105,12 +105,24 @@ final class AuthStore: ObservableObject {
     /// a 403 (see APIClient.validateStatus) rather than on every request,
     /// so a stale Edit/Unpublish/Delete button corrects itself within one
     /// foreground cycle instead of requiring a full sign-out/sign-in.
+    ///
+    /// Also re-attempts uuid resolution when it's still empty: the old
+    /// resolveUuid() (before it was fixed to filter on the known numeric
+    /// uid — see AccountEndpoints.resolveUuid) always failed, so any account
+    /// signed in before that fix has "" cached here permanently. Without
+    /// this, such a session could never self-heal — it would guard-return
+    /// below forever and require a manual sign-out/sign-in even after the
+    /// underlying bug was fixed. Reported directly.
     func refreshRoles() async {
-        guard let current = user, !current.uuid.isEmpty else { return }
+        guard let current = user else { return }
         do {
-            let roles = try await APIClient.shared.account.resolveRoles(uuid: current.uuid, csrfToken: current.csrfToken)
-            guard roles != current.roles else { return }
             var updated = current
+            if updated.uuid.isEmpty {
+                updated.uuid = try await APIClient.shared.account.resolveUuid(uid: current.uid, csrfToken: current.csrfToken) ?? ""
+            }
+            guard !updated.uuid.isEmpty else { return }
+            let roles = try await APIClient.shared.account.resolveRoles(uuid: updated.uuid, csrfToken: current.csrfToken)
+            guard roles != current.roles || updated.uuid != current.uuid else { return }
             updated.roles = roles
             user = updated
             saveToKeychain(updated)

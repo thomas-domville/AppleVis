@@ -43,7 +43,7 @@ struct AccountEndpoints {
         var uuid = ""
         var roles: [String] = []
         do {
-            uuid = try await resolveUuid(csrfToken: response.csrfToken) ?? ""
+            uuid = try await resolveUuid(uid: response.currentUser.uid, csrfToken: response.csrfToken) ?? ""
             if !uuid.isEmpty {
                 do {
                     roles = try await resolveRoles(uuid: uuid, csrfToken: response.csrfToken)
@@ -51,7 +51,7 @@ struct AccountEndpoints {
                     AppLog.auth.error("resolveRoles failed for uuid \(uuid, privacy: .private): \(error, privacy: .private)")
                 }
             } else {
-                AppLog.auth.error("resolveUuid returned no \"me\" link — roles cannot be resolved")
+                AppLog.auth.error("resolveUuid found no user--user resource for uid \(response.currentUser.uid, privacy: .private) — roles cannot be resolved")
             }
         } catch {
             AppLog.auth.error("resolveUuid failed: \(error, privacy: .private)")
@@ -153,11 +153,23 @@ struct AccountEndpoints {
         )
     }
 
-    /// Resolves the signed-in user's JSON:API UUID via the collection endpoint's
-    /// `meta.links.me` self-reference.
-    func resolveUuid(csrfToken: String) async throws -> String? {
-        let response = try await client.jsonAPIList("", headers: ["X-CSRF-Token": csrfToken])
-        return response.links?["me"]?["meta"]?["id"]?.stringValue
+    /// Resolves the signed-in user's JSON:API UUID by filtering the user
+    /// collection on their known internal numeric uid (`response.currentUser.uid`
+    /// from the login response). The root `/jsonapi` resource's `links` is
+    /// just Drupal core's standard directory of every resource-type
+    /// collection (`"node--forum"`, `"user--user"`, etc, plus `"self"`) —
+    /// confirmed live against this site — not a `links.me` self-reference to
+    /// the current user; that's not a stock Drupal JSON:API feature, so the
+    /// previous implementation based on it always returned nil for every
+    /// account, silently leaving `roles` empty and `isAdmin` false for
+    /// everyone regardless of their real site role. Reported directly.
+    func resolveUuid(uid: String, csrfToken: String) async throws -> String? {
+        let response = try await client.jsonAPIList(
+            "user/user",
+            query: ["filter[drupal_internal__uid]": uid],
+            headers: ["X-CSRF-Token": csrfToken]
+        )
+        return response.data.first?.id
     }
 
     /// Returns all Drupal role machine names assigned to this user. The

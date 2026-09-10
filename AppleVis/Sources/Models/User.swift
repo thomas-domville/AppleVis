@@ -2,7 +2,7 @@ import Foundation
 
 struct AuthUser: Codable {
     let uid: String
-    let uuid: String
+    var uuid: String
     let name: String
     let csrfToken: String
     let logoutToken: String
