@@ -796,6 +796,14 @@ extension View {
     ) -> some View {
         modifier(VoiceOverAwareSwipeActions(leading: { EmptyView() }, trailing: trailing))
     }
+
+    /// Two-sided variant for rows that also need a leading swipe (e.g. Save).
+    func voiceOverAwareSwipeActions<Leading: View, Trailing: View>(
+        @ViewBuilder leading: @escaping () -> Leading,
+        @ViewBuilder trailing: @escaping () -> Trailing
+    ) -> some View {
+        modifier(VoiceOverAwareSwipeActions(leading: leading, trailing: trailing))
+    }
 }
 
 private struct CardDensityPaddingModifier: ViewModifier {

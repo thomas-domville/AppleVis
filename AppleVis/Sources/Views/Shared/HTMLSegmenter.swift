@@ -543,7 +543,7 @@ struct SegmentedHTMLView: View {
 /// Leaves the view's default accessibility behavior completely untouched
 /// when not translated, so nothing changes for the vastly more common
 /// untranslated case.
-private struct TranslatedAccessibilityLabel: ViewModifier {
+struct TranslatedAccessibilityLabel: ViewModifier {
     let isTranslated: Bool
     let text: String
 

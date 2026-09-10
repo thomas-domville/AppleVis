@@ -67,28 +67,12 @@ struct AppleVisApp: App {
             // only ever hands out a session through this modifier, so
             // reading-side content/card-title translation (unlike the
             // stateless, hardware-gated IntelligenceService) needs this
-            // mount point to exist regardless of which tab is active. The
-            // closure just holds the session open until `configuration`
-            // changes (a different content language chosen) or the app
-            // backgrounds long enough to tear the task down; either way
-            // SwiftUI cancels this task and re-invokes with a fresh session.
-            .translationTask(translationCoordinator.configuration) { session in
-                translationCoordinator.bind(session: session)
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(3600))
-                }
-                translationCoordinator.unbind()
-            }
-            // Second, independent session for the one reverse-direction
-            // need — translating a search query into English (see
-            // `TranslationCoordinator.translateToEnglish`).
-            .translationTask(translationCoordinator.reverseConfiguration) { session in
-                translationCoordinator.bindReverse(session: session)
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(3600))
-                }
-                translationCoordinator.unbindReverse()
-            }
+            // mount point to exist regardless of which tab is active.
+            // `TranslationSession`/`.translationTask` require iOS 18 in this
+            // SDK while the app's deployment target is 17.0, so the whole
+            // mount point is behind `#available` — see
+            // `translationSessions(_:)` below.
+            .translationSessions(translationCoordinator)
             .accessibilityAction(.magicTap) {
                 guard player.currentEpisode != nil else { return }
                 player.togglePlayPause()
@@ -180,6 +164,38 @@ struct AppleVisApp: App {
         case .playLatest:
             guard let latest = try? await APIClient.shared.podcasts.episodes().items.first else { return }
             await player.load(latest)
+        }
+    }
+}
+
+private extension View {
+    /// Mounts the two `.translationTask` sessions `TranslationCoordinator`
+    /// needs — forward (English → reader's language) and reverse (search
+    /// query → English) — gated behind iOS 18 since neither
+    /// `TranslationSession` nor `.translationTask` exist below it in this
+    /// SDK, while the app's deployment target stays 17.0. On iOS 17 this is
+    /// a no-op and translation behaves as unavailable, same as Apple
+    /// Intelligence features today.
+    @ViewBuilder
+    func translationSessions(_ coordinator: TranslationCoordinator) -> some View {
+        if #available(iOS 18.0, *) {
+            self
+                .translationTask(coordinator.configuration) { session in
+                    coordinator.bind(session: session)
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: .seconds(3600))
+                    }
+                    coordinator.unbind()
+                }
+                .translationTask(coordinator.reverseConfiguration) { session in
+                    coordinator.bindReverse(session: session)
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: .seconds(3600))
+                    }
+                    coordinator.unbindReverse()
+                }
+        } else {
+            self
         }
     }
 }
