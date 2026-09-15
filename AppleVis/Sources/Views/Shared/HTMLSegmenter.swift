@@ -320,23 +320,46 @@ struct SegmentedHTMLView: View {
     private func segmentContent(_ segment: HTMLSegment) -> some View {
         if !showOriginal, let resolved = resolvedContent[segment.id] {
             switch resolved {
-            case .plain(let text): Text(text)
+            // Link-containing translated segments aren't masked yet — doing
+            // so would need to mask matched text while preserving the
+            // AttributedString's per-run link attribute, materially more
+            // work for what's already the minority case among translated
+            // segments (see resolveTranslationIfNeeded's doc comment).
+            case .plain(let text): Text(preferences.filterProfanity ? ProfanityFilter.maskForDisplay(html: text) : text)
             case .attributed(let attributed): Text(attributed)
             }
         } else {
-            HTMLTextView(html: segment.html)
+            HTMLTextView(html: preferences.filterProfanity ? ProfanityFilter.maskForDisplay(html: segment.html) : segment.html)
         }
     }
 
     /// Plain-text stand-in for a segment's current content, translated or
     /// not — used to build accessibility labels without needing a second
-    /// switch over `ResolvedSegmentContent`.
+    /// switch over `ResolvedSegmentContent`. When profanity filtering is on,
+    /// this is also where masked words get their spoken form ("s star star
+    /// star") built explicitly, rather than relying on VoiceOver's own
+    /// unreliable reading of the literal asterisks `segmentContent` shows
+    /// visually — see `ProfanityFilter.accessiblePlaceholder`'s doc comment.
     private func accessibilityText(for segment: HTMLSegment) -> String {
-        guard !showOriginal, let resolved = resolvedContent[segment.id] else { return segment.plainText }
-        switch resolved {
-        case .plain(let text): return text
-        case .attributed(let attributed): return String(attributed.characters)
+        let base: String
+        if !showOriginal, let resolved = resolvedContent[segment.id] {
+            switch resolved {
+            case .plain(let text): base = text
+            case .attributed(let attributed): base = String(attributed.characters)
+            }
+        } else {
+            base = segment.plainText
         }
+        return preferences.filterProfanity ? ProfanityFilter.accessiblePlaceholder(for: base) : base
+    }
+
+    /// Whether a segment needs its accessibility label explicitly set at
+    /// all — translation already required this; filtering adds a second
+    /// reason, but only for segments that actually contain something to
+    /// mask, so the vastly more common case (no profanity present) keeps
+    /// inheriting its label from the rendered text itself, unchanged.
+    private func needsAccessibilityOverride(_ segment: HTMLSegment) -> Bool {
+        isTranslated(segment) || (preferences.filterProfanity && ProfanityFilter.containsProfanity(segment.plainText))
     }
 
     /// Batches every translatable segment's text into as few
@@ -451,7 +474,9 @@ struct SegmentedHTMLView: View {
             segmentContent(segment)
                 .font(level <= 2 ? .title3.weight(.semibold) : .headline)
                 .accessibilityAddTraits(.isHeader)
-                .modifier(TranslatedAccessibilityLabel(isTranslated: isTranslated(segment), text: accessibilityText(for: segment)))
+                .modifier(ContentAccessibilityLabel(
+                    isOverridden: needsAccessibilityOverride(segment), isTranslated: isTranslated(segment), text: accessibilityText(for: segment)
+                ))
         case .quote:
             // Matches RN's quote styling (amber border + tinted background,
             // topic/[id].tsx) — Swift's was a plain gray border with no
@@ -467,7 +492,7 @@ struct SegmentedHTMLView: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(String(localized: isTranslated(segment)
                     ? "Translated quote: \(accessibilityText(for: segment))"
-                    : "Quoted: \(segment.plainText)"))
+                    : "Quoted: \(accessibilityText(for: segment))"))
         case .code:
             VStack(alignment: .leading, spacing: 4) {
                 Text("CODE")
@@ -483,12 +508,14 @@ struct SegmentedHTMLView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(String(localized: isTranslated(segment)
                 ? "Translated code: \(accessibilityText(for: segment))"
-                : "Code: \(segment.plainText)"))
+                : "Code: \(accessibilityText(for: segment))"))
         case .table(let rows, let hasHeaderRow):
             tableView(rows: rows, hasHeaderRow: hasHeaderRow)
         case .prose:
             segmentContent(segment)
-                .modifier(TranslatedAccessibilityLabel(isTranslated: isTranslated(segment), text: accessibilityText(for: segment)))
+                .modifier(ContentAccessibilityLabel(
+                    isOverridden: needsAccessibilityOverride(segment), isTranslated: isTranslated(segment), text: accessibilityText(for: segment)
+                ))
         }
     }
 
@@ -543,13 +570,24 @@ struct SegmentedHTMLView: View {
 /// Leaves the view's default accessibility behavior completely untouched
 /// when not translated, so nothing changes for the vastly more common
 /// untranslated case.
-struct TranslatedAccessibilityLabel: ViewModifier {
+struct ContentAccessibilityLabel: ViewModifier {
+    /// Whether this segment needs an explicit label at all — false for the
+    /// common case (untranslated, nothing to mask), which leaves the
+    /// view's default accessibility behavior completely untouched. Defaults
+    /// false so existing translation-only call sites (HelpArticleDetailView,
+    /// which has no profanity-filtering concern — it's curated staff
+    /// content, not user-generated) don't need to change.
+    let isOverridden: Bool = false
     let isTranslated: Bool
+    /// Already fully resolved: translated and/or profanity-masked as
+    /// needed, via `SegmentedHTMLView.accessibilityText(for:)`.
     let text: String
 
     func body(content: Content) -> some View {
         if isTranslated {
             content.accessibilityLabel(String(localized: "Translated: \(text)"))
+        } else if isOverridden {
+            content.accessibilityLabel(text)
         } else {
             content
         }

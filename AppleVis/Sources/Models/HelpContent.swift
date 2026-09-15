@@ -137,7 +137,7 @@ enum HelpContent {
                         .heading("For You"),
                         .body("For You is your own corner of the app — nothing shows up here unless you put it there. Saved items, things you follow, apps you've recommended, your podcast queue, and your downloads all live in one place, split across five simple sections."),
                         .heading("Profile and Settings"),
-                        .body("Profile is home base for your account: sign in, edit your public profile, change your password or email, message another member, or reach the AppleVis team if you need a hand. It doesn't duplicate anything from For You — your saved items live there, not here. Settings is where you shape how AppleVis looks, sounds, and behaves: appearance, accessibility, sounds and haptics, notifications, podcasts, privacy, intelligence, and more."),
+                        .body("Profile and Settings aren't a tab of their own — look for the Profile and Settings icon in the toolbar, available from Home, Discover, and For You alike. My Account is home base for your sign-in: edit your profile and bio, change your password or email, or sign out. Settings is where you shape how AppleVis looks, sounds, and behaves — appearance, accessibility, sounds and haptics, notifications, podcasts, privacy, intelligence, and more — with Help and Contact AppleVis tucked inside too. Want to message another member directly? That happens from their own profile, not yours."),
                     ]
                 ),
                 HelpArticle(
@@ -330,15 +330,15 @@ enum HelpContent {
                 HelpArticle(
                     id: "tutorial-replay-welcome-tour",
                     title: "Replay the Welcome Tour",
-                    summary: "Revisit the short guided tour of Home, Discover, For You, Search, Profile, and Settings.",
+                    summary: "Revisit the guided tour of Home, Discover, For You, and Profile & Settings, organized chapter by chapter.",
                     content: [
-                        .body("The Welcome Tour is a short, optional walkthrough shown after setup. You can replay it whenever you like — it never repeats on its own once you've seen it."),
+                        .body("The Welcome Tour is an optional, chapter-by-chapter walkthrough shown after setup — one chapter per tab, each short enough to finish on its own. You can replay it whenever you like — it never repeats on its own once you've seen it."),
                         .steps([
-                            "Open Profile.",
+                            "Open Profile and Settings.",
                             "Scroll to Replay Welcome Tour and tap it.",
                             "The tour starts fresh from the beginning. Use Skip Tour to leave at any point, or Back to revisit a step.",
                         ]),
-                        .tip("Choose Explore This Screen on any tour step to pause and try the real screen for yourself — a Resume Tour button appears so you can pick up right where you left off."),
+                        .tip("At the end of each chapter, an Explore option takes you to the real screen, and Pause Tour stops without going anywhere — either way, a Resume Tour button appears so you can pick up right where you left off."),
                     ],
                     contentType: .tutorial,
                     relatedLinks: [
@@ -363,6 +363,13 @@ enum HelpContent {
                         .body("Most Help articles describe the general action first, and add extra detail only where an access method genuinely needs it — a note like \"VoiceOver users can...\" or \"Low-vision users may prefer...\" so the guide stays useful for everyone, not just one group."),
                         .heading("AppleVis's own accessibility controls"),
                         .body("Beyond what iOS already gives you, Settings > Accessibility has VoiceOver Detail Level — how much AppleVis announces as you navigate forum topics, apps, and podcast episodes. Everyday behavior settings that aren't specific to any access method — tips, Home's startup behavior, search auto-focus, and how web links open — moved to Settings > General, since a sighted user is just as likely to want those adjusted."),
+                        .heading("A few purely visual touches"),
+                        .body("A handful of small animations exist only for sighted and low-vision users glancing at the screen — nothing about them changes what VoiceOver, Switch Control, or a braille display report, and all of them turn off automatically if Reduce Motion is on. If you notice one of these and wondered whether something glitched, it didn't:"),
+                        .bullets([
+                            "The Save, Follow, and Recommend icons at the bottom of a topic, app, episode, or post give a small bounce the moment you tap them, alongside the confirmation sound.",
+                            "Switching themes — in Settings > Appearance, or during setup — crossfades between color schemes instead of snapping instantly.",
+                            "A small \"NEW\" or \"N NEW\" badge on a card pops in with a little spring as you scroll to it, rather than just appearing flat.",
+                        ]),
                     ],
                     contentType: .accessibilityLesson
                 ),
@@ -688,6 +695,31 @@ enum HelpContent {
                             "Disclose conflicts of interest and any AI assistance.",
                             "Avoid duplicate posts and one-word replies.",
                         ]),
+                    ]
+                ),
+                HelpArticle(
+                    id: "community-language-filter",
+                    title: "Filtering Language You See",
+                    summary: "Why some words show up masked, what always gets blocked from posting, and how to turn it off.",
+                    content: [
+                        .heading("Two separate things"),
+                        .body("AppleVis has two separate systems for keeping the community welcoming: one controls what you're allowed to post, the other controls what you see. They work independently — changing one never changes the other."),
+                        .heading("What you can post"),
+                        .body("Strong or explicit language is never allowed in anything you post through the app — a comment, a reply, a topic, a review, a message, anything. That's true for everyone, all the time, and it isn't something Settings can turn off."),
+                        .heading("What you see"),
+                        .body("Settings > Privacy has a Filter Profanity toggle, on by default. When it's on, a wider range of language — including milder words the site itself allows — shows up masked, like \"s***\", instead of spelled out. Turn it off any time if you'd rather see everything exactly as written."),
+                        .note("Turning this off only changes what you see. It never changes what you're allowed to post — that rule applies no matter what."),
+                        .heading("Why this exists"),
+                        .body("Partly, it's simply about keeping AppleVis feeling welcoming, since this community spans a wide range of ages and comfort levels. But there's a bigger reason too: Apple sets specific rules about how much strong language an app can contain for the age rating it's listed under, and filtering by default helps AppleVis stay compliant with those rules as the community keeps growing — not something we want to take a chance on."),
+                        .heading("If something slips through"),
+                        .body("No automatic filter catches everything perfectly. If you ever come across language that shouldn't be there, use Report on that comment or post to let our editorial team know — that's exactly what it's there for."),
+                        .faq(
+                            question: "Does turning the filter off let me post anything I want?",
+                            answer: "No. Posting rules never change based on this setting — it only affects what you see from other people, never what you're allowed to write yourself."
+                        ),
+                    ],
+                    relatedLinks: [
+                        RelatedLink(label: "Community Guidelines", type: .guide, destination: .article("community-guidelines")),
                     ]
                 ),
                 HelpArticle(
@@ -1028,7 +1060,7 @@ enum HelpContent {
                         .bullets([
                             "Saved & Sync controls what travels through iCloud: Saved Items, Following, Podcast Position, Podcast Queue, Read History, and Settings & Preferences — each is an independent toggle.",
                             "Privacy walks through exactly what AppleVis collects (just your email, username, and a push token), how your session is secured, and confirms there's no ad tracking.",
-                            "Remember Reading History While Signed Out controls whether AppleVis tracks what you open on this device before you sign in — turning it off clears what's already there.",
+                            "Show What's New on Home controls whether Home displays a New view, a quick summary, and new-activity badges — reading history itself is always tracked on-device, so turning this off just keeps Home quieter without erasing anything.",
                             "Clear All Local Data wipes cached content, downloads, saved items, and local read history from this device — your account, cloud data, and app preferences aren't affected.",
                         ]),
                         .note("Apple Intelligence features process everything on-device — no post, comment, or search text is ever sent to a server."),
@@ -1274,7 +1306,7 @@ enum HelpContent {
                         .heading("Step 2 (signed in) or Step 3 (not signed in) — Write your message"),
                         .steps([
                             "Type your message in the text area.",
-                            "If you chose Bug Report, a toggle appears to include system information — turn it on to append your app version and iOS version automatically.",
+                            "If you chose Bug Report, a toggle appears to include app and device info — turn it on to append your app version, device model, and accessibility settings like VoiceOver automatically.",
                             "Tap Continue.",
                         ]),
                         .heading("Final step — Review and send"),

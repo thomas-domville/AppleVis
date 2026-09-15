@@ -199,13 +199,13 @@ struct HelpBlockView: View {
                     .font(.headline)
                     .padding(.top, 8).padding(.bottom, 2)
                     .accessibilityAddTraits(.isHeader)
-                    .modifier(TranslatedAccessibilityLabel(isTranslated: translated[block.id] != nil, text: text(block.id, originalText)))
+                    .modifier(ContentAccessibilityLabel(isTranslated: translated[block.id] != nil, text: text(block.id, originalText)))
 
             case .body(let originalText):
                 Text(text(block.id, originalText))
                     .font(.body)
                     .padding(.bottom, 6)
-                    .modifier(TranslatedAccessibilityLabel(isTranslated: translated[block.id] != nil, text: text(block.id, originalText)))
+                    .modifier(ContentAccessibilityLabel(isTranslated: translated[block.id] != nil, text: text(block.id, originalText)))
 
             case .bullets(let items):
                 VStack(alignment: .leading, spacing: 6) {
@@ -215,7 +215,7 @@ struct HelpBlockView: View {
                             Text("•").foregroundStyle(Color.accentColor)
                             Text(text(field, item))
                         }
-                        .modifier(TranslatedAccessibilityLabel(isTranslated: translated[field] != nil, text: text(field, item)))
+                        .modifier(ContentAccessibilityLabel(isTranslated: translated[field] != nil, text: text(field, item)))
                     }
                 }
                 .padding(.bottom, 8)

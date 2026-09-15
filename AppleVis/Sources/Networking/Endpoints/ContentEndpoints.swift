@@ -76,16 +76,16 @@ struct ResourceEndpoints {
 
     @discardableResult
     func submitComment(resourceId: String, body: String, csrfToken: String) async throws -> ResourceComment {
+        var attributes = CommentBundle.guide.baseAttributes
+        attributes["subject"] = AnyEncodable("Comment")
+        attributes["comment_body"] = AnyEncodable(RichTextValue(value: body, format: drupalDefaultTextFormat))
         let response = try await client.jsonAPICreate(
             "comment/comment_node_guides",
             type: "comment--comment_node_guides",
-            attributes: [
-                "subject": AnyEncodable("Comment"),
-                "comment_body": AnyEncodable(RichTextValue(value: body, format: "basic_html")),
-            ],
+            attributes: attributes,
             relationships: [
                 "entity_id": JsonApiRelationshipRef(type: "node--guides", id: resourceId),
-                "comment_type": JsonApiRelationshipRef(type: "comment_type--comment_type", id: "comment_node_guides"),
+                "comment_type": CommentBundle.guide.commentTypeRelationship,
             ],
             headers: ["X-CSRF-Token": csrfToken]
         )
@@ -164,16 +164,16 @@ struct BlogEndpoints {
 
     @discardableResult
     func submitComment(blogId: String, body: String, csrfToken: String) async throws -> BlogComment {
+        var attributes = CommentBundle.blogPost.baseAttributes
+        attributes["subject"] = AnyEncodable("Comment")
+        attributes["comment_body"] = AnyEncodable(RichTextValue(value: body, format: drupalDefaultTextFormat))
         let response = try await client.jsonAPICreate(
             "comment/comment_node_\(Self.contentType)",
             type: "comment--comment_node_\(Self.contentType)",
-            attributes: [
-                "subject": AnyEncodable("Comment"),
-                "comment_body": AnyEncodable(RichTextValue(value: body, format: "basic_html")),
-            ],
+            attributes: attributes,
             relationships: [
                 "entity_id": JsonApiRelationshipRef(type: "node--\(Self.contentType)", id: blogId),
-                "comment_type": JsonApiRelationshipRef(type: "comment_type--comment_type", id: "comment_node_\(Self.contentType)"),
+                "comment_type": CommentBundle.blogPost.commentTypeRelationship,
             ],
             headers: ["X-CSRF-Token": csrfToken]
         )
@@ -271,22 +271,26 @@ struct BugReportEndpoints {
     /// unlike every other content type's comment thread.
     @discardableResult
     func submitComment(platform: BugPlatform, bugId: String, body: String, csrfToken: String) async throws -> BugComment {
-        let bundle = commentBundle(for: platform)
+        let bundle = commentBundleId(for: platform)
+        var attributes = bundle.baseAttributes
+        attributes["subject"] = AnyEncodable("Comment")
+        attributes["comment_body"] = AnyEncodable(RichTextValue(value: body, format: drupalDefaultTextFormat))
         let response = try await client.jsonAPICreate(
-            "comment/\(bundle)",
-            type: "comment--\(bundle)",
-            attributes: [
-                "subject": AnyEncodable("Comment"),
-                "comment_body": AnyEncodable(RichTextValue(value: body, format: "basic_html")),
-            ],
+            "comment/\(bundle.rawValue)",
+            type: "comment--\(bundle.rawValue)",
+            attributes: attributes,
             relationships: [
                 "entity_id": JsonApiRelationshipRef(type: "node--\(nodeType(for: platform))", id: bugId),
-                "comment_type": JsonApiRelationshipRef(type: "comment_type--comment_type", id: bundle),
+                "comment_type": bundle.commentTypeRelationship,
             ],
             headers: ["X-CSRF-Token": csrfToken]
         )
         let c = Mappers.genericComment(response.data, included: response.included ?? [])
         return BugComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
+    }
+
+    private func commentBundleId(for platform: BugPlatform) -> CommentBundle {
+        platform == .ios ? .iosBugReport : .macBugReport
     }
 
     private func commentBundle(for platform: BugPlatform) -> String {
@@ -392,10 +396,28 @@ struct FlagEndpoints {
     let client: APIClient
 
     /// Flag machine name confirmed live: subscribe_node.
-    func follow(nodeUuid: String, nodeType: String, token: String) async throws {
+    ///
+    /// `entityType`/`entityId` are required base fields on the `flagging`
+    /// entity itself — separate from, and in addition to, the
+    /// `flagged_entity` dynamic entity reference below. Missing either one
+    /// isn't rejected with a clean validation error; Drupal accepts the
+    /// write, tries to resolve the target from a blank `entity_id`, and
+    /// blows up server-side ("The '' entity type does not exist." with
+    /// neither field set, or "Call to a member function getEntityTypeId()
+    /// on null" with only `entityType` set) — confirmed live 2026-09-14
+    /// against two different real forum topics with a test account, after a
+    /// beta tester and the developer both hit "You don't have permission to
+    /// do that" trying to follow a topic in the app while the same account
+    /// could subscribe to the same topic fine on the website (whose classic
+    /// Flag-module link populates these fields server-side, so it never
+    /// needed them from the client). `entityId` is the target's *internal*
+    /// numeric Drupal ID (nid), not its JSON:API UUID — confirmed against a
+    /// real flagging record's own `attributes.entity_id`.
+    func follow(nodeUuid: String, nodeType: String, entityId: Int, token: String) async throws {
         _ = try await client.jsonAPICreate(
             "flagging/subscribe_node",
             type: "flagging--subscribe_node",
+            attributes: ["entity_type": AnyEncodable("node"), "entity_id": AnyEncodable(String(entityId))],
             relationships: ["flagged_entity": JsonApiRelationshipRef(type: nodeType, id: nodeUuid)],
             headers: ["X-CSRF-Token": token]
         )
@@ -448,10 +470,14 @@ struct FlagEndpoints {
     /// links: the flag machine name is `recommend`, same Flag module every
     /// other flag on this site (including `subscribe_node` above) already
     /// goes through, so it's exposed via JSON:API the identical way.
-    func recommend(nodeUuid: String, nodeType: String, token: String) async throws {
+    /// Same required `entity_type`/`entity_id` base fields as `follow`
+    /// above — every flag on this Flag-module install needs them, not just
+    /// `subscribe_node`.
+    func recommend(nodeUuid: String, nodeType: String, entityId: Int, token: String) async throws {
         _ = try await client.jsonAPICreate(
             "flagging/recommend",
             type: "flagging--recommend",
+            attributes: ["entity_type": AnyEncodable("node"), "entity_id": AnyEncodable(String(entityId))],
             relationships: ["flagged_entity": JsonApiRelationshipRef(type: nodeType, id: nodeUuid)],
             headers: ["X-CSRF-Token": token]
         )

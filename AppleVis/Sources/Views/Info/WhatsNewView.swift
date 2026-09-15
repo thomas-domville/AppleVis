@@ -60,6 +60,16 @@ struct WhatsNewView: View {
 private struct ChangeCard: View {
     let item: ChangeItem
 
+    // `item.title`/`item.description` are String values, not string
+    // literals — Text(_ content: String) treats a String argument as
+    // already-resolved display text and skips catalog lookup entirely, so
+    // every What's New entry (this release and every History section) was
+    // silently never being translated, catalog entries or not. Same fix as
+    // OnboardingHeader in OnboardingView.swift for the identical problem.
+    private var localizedTitle: String { String(localized: String.LocalizationValue(item.title)) }
+    private var localizedDescription: String { String(localized: String.LocalizationValue(item.description)) }
+    private var localizedTag: String { String(localized: String.LocalizationValue(item.tag.rawValue)) }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
@@ -72,11 +82,11 @@ private struct ChangeCard: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
-                        Text(item.title)
+                        Text(LocalizedStringKey(item.title))
                             .font(.body).fontWeight(.bold)
                         TagBadge(tag: item.tag)
                     }
-                    Text(item.description)
+                    Text(LocalizedStringKey(item.description))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .lineSpacing(3)
@@ -86,7 +96,7 @@ private struct ChangeCard: View {
         }
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "\(item.tag.rawValue): \(item.title). \(item.description)"))
+        .accessibilityLabel(String(localized: "\(localizedTag): \(localizedTitle). \(localizedDescription)"))
     }
 }
 
@@ -96,7 +106,7 @@ private struct TagBadge: View {
     let tag: ChangeTag
 
     var body: some View {
-        Text(tag.rawValue)
+        Text(LocalizedStringKey(tag.rawValue))
             .font(.caption2).fontWeight(.bold)
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
@@ -113,7 +123,7 @@ private struct HistorySectionView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(section.title)
+            Text(LocalizedStringKey(section.title))
                 .font(.caption).fontWeight(.bold)
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
@@ -130,7 +140,7 @@ private struct HistorySectionView: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(section.title)
+        .accessibilityLabel(String(localized: String.LocalizationValue(section.title)))
     }
 }
 
@@ -165,9 +175,230 @@ struct ChangeItem: Identifiable {
     let title: String
     let description: String
 
-    static let currentVersion = "2026.0.13"
+    static let currentVersion = "2026.14"
 
     static let current: [ChangeItem] = [
+        ChangeItem(
+            systemImage: "sparkles",
+            tag: .improved,
+            title: "A Few Small Visual Touches",
+            description: "For sighted and low-vision users: the Save, Follow, and Recommend icons give a small bounce the moment you tap them, switching themes now crossfades between color schemes instead of snapping instantly, and \"NEW\" badges pop in with a little spring as you scroll to them instead of just appearing flat. Purely visual — nothing changes for VoiceOver, Switch Control, or braille, and all of it turns off automatically under Reduce Motion."
+        ),
+        ChangeItem(
+            systemImage: "wrench.and.screwdriver",
+            tag: .improved,
+            title: "A Tidier About Screen",
+            description: "About had grown ten-plus flat rows of device and accessibility info before anyone had asked for it, on top of a Report a Bug/Send Feedback pair that just duplicated Contact AppleVis, already reachable from Profile and Discover. Device details, accessibility status, and Copy Support Info now live behind a single Diagnostic Info button, the redundant duplicate contact buttons are gone, and the confusing \"Type: iPhone\" row (identical to the Device row above it) is gone too — the device's raw hardware identifier now sits next to its name instead of floating on its own. Discover's social media links also now share the same list as About's, instead of a second, independently-maintained copy that had already drifted out of sync."
+        ),
+        ChangeItem(
+            systemImage: "text.badge.checkmark",
+            tag: .new,
+            title: "Filter the Language You See",
+            description: "AppleVis has always blocked strong or explicit language from anything posted through the app — that never changes. New: Settings > Privacy (and a new setup step) can now also mask milder language, which the site otherwise allows, so it shows up as \"s***\" instead of spelled out. On by default, to help AppleVis stay welcoming and stay within Apple's guidelines for our age rating — turn it off anytime if you'd rather see everything exactly as written."
+        ),
+        ChangeItem(
+            systemImage: "flag",
+            tag: .new,
+            title: "Report a Topic, Entry, or Episode Itself",
+            description: "Report has always worked on individual comments and replies, but not on the thing they're replying to — a forum topic's original post, or an app, blog, guide, bug report, or episode entry had no way to flag. Every detail screen's actions menu (top-right corner) now offers Report there too, alongside the existing Save/Follow/Share options."
+        ),
+        ChangeItem(
+            systemImage: "bell.badge",
+            tag: .improved,
+            title: "A Clearer Choice for What's New on Home",
+            description: "Setup used to ask whether to remember your reading history — but that mixed up two separate things: AppleVis always needs to track what you've read for All/New/Recap to work, which is harmless and never leaves your device while signed out, so there was never a good reason to turn it off. What actually varies is whether you want to see it. Setup and Settings > Privacy now ask that directly instead — a New view, a quick summary, and small new-activity badges — and it now applies the same way whether you're signed in or out, not just for guests."
+        ),
+        ChangeItem(
+            systemImage: "exclamationmark.bubble",
+            tag: .fixed,
+            title: "Posting a Comment, Reply, or Review Works Again",
+            description: "Something changed recently on AppleVis's own side that broke posting any new comment, forum reply, app review, or bug report comment from the app — along with creating a new forum topic or submitting a new app, blog post, or podcast. Found and fixed: a text format the app used for every new post stopped being valid on the site, and a couple of fields the site now requires weren't being sent. If posting anything felt broken recently, this is why — it's fixed now."
+        ),
+        ChangeItem(
+            systemImage: "arrowshape.turn.up.left",
+            tag: .new,
+            title: "Reply to a Specific Comment, For Real This Time",
+            description: "AppleVis's website just added its own way to reply to one specific comment instead of the whole thread — a genuine link back to that comment, not just quoted text pasted in. Reply to this Comment in the app now uses that same real connection, so a reply made in the app or on the website shows up correctly in both places, with a Replying to [name] link above it that jumps straight to the original."
+        ),
+        ChangeItem(
+            systemImage: "bell.badge",
+            tag: .fixed,
+            title: "Follow Syncs With the Website Everywhere, Not Just in For You",
+            description: "For You > Following already reflected topics, apps, and episodes followed on the website — but the Follow/Unfollow button on an individual page, and Home's bell badge on forum topic cards, only ever checked what was followed inside this app itself. Follow something on the website (or a second signed-in device) and both now catch up correctly, the same way Recommend's button state already did."
+        ),
+        ChangeItem(
+            systemImage: "map",
+            tag: .improved,
+            title: "The Welcome Tour Got a Lot Bigger",
+            description: "Beta feedback said the Welcome Tour felt too high-level, so it's been rebuilt from a flat set of steps into six chapters — Welcome, Home, Discover, For You, Profile & Settings, and a closing chapter — each covering real depth instead of a single sentence per tab, in wording that works whether you use VoiceOver or not. Home, Discover, and For You each end with a checkpoint offering a chance to explore that screen for real or pause the tour and pick it up again later. Finish the whole thing and you'll get a little confetti to mark it, turned off automatically under Reduce Motion — and you can replay the tour anytime from Profile."
+        ),
+        ChangeItem(
+            systemImage: "party.popper.fill",
+            tag: .new,
+            title: "A Little Celebration When You Finish",
+            description: "Contact Us, Submit Bug Report, Submit Blog, Submit an App, Submit a Podcast, Report a Comment, and Change Password/Email now give their thank-you screen's icon a small bounce on the way in. Submitting a new app to the directory, and reaching You're All Set at the end of setup, go a little further with a brief burst of confetti — genuine milestones, not just routine completions. All of it is purely decorative: nothing changes for VoiceOver, and Reduce Motion turns it off automatically."
+        ),
+        ChangeItem(
+            systemImage: "bell.badge",
+            tag: .fixed,
+            title: "Follow (and Recommend) Actually Works Now",
+            description: "A beta tester and some careful follow-up testing (thank you both) turned up a real bug: tapping Follow on a topic — anywhere in the app — failed with \"You don't have permission to do that.\" It wasn't a permissions problem at all: the request that creates a follow was missing a piece of information the server requires, and it silently accepted the request anyway before failing deep inside itself. Fixed for Follow across every content type, and Recommend This App, which shared the exact same gap."
+        ),
+        ChangeItem(
+            systemImage: "hand.point.left",
+            tag: .fixed,
+            title: "A Saved-List Tip That Actually Matches What You Saved",
+            description: "Another beta-tester catch: saving a forum topic used to trigger a one-time tip titled \"Faster Episode Actions,\" describing swipe-to-delete and mark-as-played — neither of which exists on a saved topic. The tip now matches whatever you actually saved, and VoiceOver users get an accurate version pointing to the Actions rotor instead of a swipe-left instruction that, under VoiceOver, just moves focus to the previous item rather than doing anything useful."
+        ),
+        ChangeItem(
+            systemImage: "bookmark",
+            tag: .fixed,
+            title: "A Clearer Nudge for Saving Your First Item",
+            description: "The empty For You > Saved screen used to say \"Tap the bookmark icon on any item to save it\" — a beta tester pointed out that VoiceOver never actually says the word \"bookmark\" anywhere in the app, since every Save button and menu item is labeled Save. It now says to save a topic, app, guide, blog post, or episode, matching what every Save control is actually called for every user."
+        ),
+        ChangeItem(
+            systemImage: "globe",
+            tag: .fixed,
+            title: "Onboarding and What's New Now Actually Translate",
+            description: "Every onboarding step's heading and description, and every What's New entry — this release and all of history — were being built from a code pattern that silently skipped the translation catalog, so non-English speakers saw English text there no matter how many translations already existed. Both are fixed, and the onboarding strings that had never been translatable in the first place are now translated into all 22 supported languages."
+        ),
+        ChangeItem(
+            systemImage: "text.line.first.and.arrowtriangle.forward",
+            tag: .improved,
+            title: "Fewer Swipes on Minimum-Length Fields",
+            description: "Description, Message, Blog Post Draft, Episode Description, and Accessibility Comments — every field with a character minimum — now combine their label and live counter into a single VoiceOver stop instead of two, and no longer repeat the same requirement a third time in a separate caption below the field."
+        ),
+        ChangeItem(
+            systemImage: "lock.shield",
+            tag: .improved,
+            title: "Stronger Password Requirements, With a Nudge",
+            description: "Changing your AppleVis password now requires at least 8 characters, one number, and one special character — stated right in the field's own label instead of a separate warning line that only appeared after typing too little. A new strength meter (Weak to Very Strong) offers a nudge toward an even harder-to-guess password, but meeting the minimum is still all that's required."
+        ),
+        ChangeItem(
+            systemImage: "arrow.down.to.line",
+            tag: .new,
+            title: "A Way Forward at the Bottom of Every Step",
+            description: "Contact Us, Submit Bug Report, Submit Blog, Submit an App, Submit a Podcast, Report a Comment, and Change Password/Email now have a Next/Submit button at the bottom of every step, matching setup's wizard — not just the top-right corner. A beta tester's own experience prompted this: swiping to the end of a list of choices, as VoiceOver naturally does, used to land on nothing actionable. When a step isn't ready to continue, a short note now explains exactly what's still needed — a specific field, a minimum length, an unchecked box — instead of a silently disabled button."
+        ),
+        ChangeItem(
+            systemImage: "text.below.photo",
+            tag: .improved,
+            title: "Every Wizard Step Now Explains Itself",
+            description: "Contact Us, Submit Bug Report, Submit Blog, Submit an App, Submit a Podcast, and Change Password/Email now show a short description under every step's heading — matching setup's wizard — so VoiceOver users hear what a step wants before reaching its fields. The Sign In Required screen on every Submit wizard, and Submit App's Before You Begin screen, now properly focus their heading too, instead of leaving VoiceOver wherever it last was."
+        ),
+        ChangeItem(
+            systemImage: "envelope.arrow.triangle.branch",
+            tag: .new,
+            title: "An Easy Way to Update Your Account Email",
+            description: "If you're signed in and send a message from a different address than your account email — Contact Us, Submit Bug Report, Submit Blog, or Report a Comment — the thank-you screen now offers a dismissible, opt-in way to update your account email to match. It's only ever a suggestion: dismissing it does nothing, and updating still requires confirming your current password, same as Change Email Address always has."
+        ),
+        ChangeItem(
+            systemImage: "network.badge.shield.half.filled",
+            tag: .new,
+            title: "A Heads-Up for Made-Up Email Domains",
+            description: "Contact Us, Submit Bug Report, Submit Blog, Report a Comment, and Change Email Address now quietly check whether the domain you typed (the part after the @) actually exists on the internet, and show a gentle \"check for a typo?\" note if it doesn't — entirely on-device, nothing about your address is sent anywhere to check it. It's a hint, not a lock: a slow or unusual network never blocks Send, and it can't confirm a specific inbox exists, only that the domain itself is real."
+        ),
+        ChangeItem(
+            systemImage: "envelope.badge.person.crop",
+            tag: .new,
+            title: "Less Retyping Your Email in Wizards",
+            description: "Contact Us, Submit Bug Report, Submit Blog, and Report a Comment now fill in your email automatically when you're signed in, using your account's email instead of asking you to type it again. If you're signed out, your last-typed email is remembered locally on this device for next time. All four also now check for a properly formatted address before letting you continue."
+        ),
+        ChangeItem(
+            systemImage: "waveform.badge.plus",
+            tag: .new,
+            title: "Clearer Sound Previews for VoiceOver",
+            description: "Double-tapping a notification sound to select it also played a preview right away, but VoiceOver's own selection announcement could talk over the clip because of audio ducking, making it hard to actually hear. A new Preview action, in the rotor's Actions category, is now available on both the setup sound picker and Settings > Notifications — it plays the sound on its own, without changing the selection or triggering that announcement."
+        ),
+        ChangeItem(
+            systemImage: "apps.iphone",
+            tag: .new,
+            title: "Apple Topics or Everything?",
+            description: "Setup now asks whether Home and Forums should focus on Apple only or also include other tech topics, like Windows, Android, and assistive technology discussions. Apple-only is the new default — change it from this new setup step, Customize Home, or Settings > Home Feed anytime."
+        ),
+        ChangeItem(
+            systemImage: "checklist",
+            tag: .fixed,
+            title: "No More Skipped Setup Step",
+            description: "Signing in during setup used to silently skip the Reading History step, jumping straight from \"Step 2\" to \"Step 4\" — a gap a beta tester found confusing for VoiceOver users, since the step count had already promised more steps than they got. Every setup step now shows for everyone; ones that only fully apply in certain situations, like Reading History if you ever sign out or VoiceOver Detail Level if you turn VoiceOver on later, explain themselves accordingly instead of disappearing."
+        ),
+        ChangeItem(
+            systemImage: "person.crop.circle",
+            tag: .fixed,
+            title: "Sign In Focuses Properly During Setup",
+            description: "The Sign In step of setup used to send VoiceOver focus straight to the Username field, skipping past the step's own heading and explanation entirely. It now focuses the heading first, like every other setup step."
+        ),
+        ChangeItem(
+            systemImage: "arrow.triangle.2.circlepath",
+            tag: .improved,
+            title: "A Smarter Refresh for App Details",
+            description: "Editors refreshing an app entry from its App Store listing now see exactly what changed — title, description, App Store link, and version — and can leave off anything they don't want touched. Anything that already matches the App Store listing is shown as already matching, instead of being overwritten every time."
+        ),
+        ChangeItem(
+            systemImage: "ellipsis.circle",
+            tag: .new,
+            title: "A Consistent Actions Menu, Everywhere",
+            description: "Every detail page — App Entry, Episode, Blog Post, Guide, and Bug Report, alongside Forum Topic's existing one — now has its own actions menu in the top-right corner, offering a second way to Save, Follow, Comment, Share, and open in your browser. The person who originally posted something can also edit or delete it from there, and editors get the same options plus Unpublish."
+        ),
+        ChangeItem(
+            systemImage: "text.bubble",
+            tag: .fixed,
+            title: "Consistent Wording on App Entry Pages",
+            description: "The line under an app's title used to say \"last reviewed,\" while everywhere else on the same page — the Community Discussion heading, Load More Comments, the Thread overview — already said \"comment.\" It now says \"most recent comment\" too."
+        ),
+        ChangeItem(
+            systemImage: "sparkles",
+            tag: .improved,
+            title: "A Tidier Mouse Recap",
+            description: "Mouse Recap dropped \"In This Recap,\" which just repeated the same counts already in the greeting above it, and every section (Spotlight Feature, New Accessible Apps, Podcasts, Blog, and more) is now a real heading you can jump straight to with VoiceOver's Headings rotor. New app blurbs also stop re-announcing \"In this new app...\" for every single one — something the section header and its intro sentence already say once."
+        ),
+        ChangeItem(
+            systemImage: "text.quote",
+            tag: .fixed,
+            title: "Read Transcript Works More Reliably",
+            description: "Some episodes showed a Read Transcript button that led to \"This item is no longer available\" instead of the actual transcript. It now only appears when there's really a transcript to show, loads it instantly instead of a failed network check first, and returns VoiceOver focus to the button you tapped instead of the top of the page when you're done reading."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.circle",
+            tag: .improved,
+            title: "Mark as Listened, Not Read",
+            description: "Episode Tools now says Mark Listened / Listened instead of the ambiguous Mark Played / Played, and you can tap it again to undo — previously there was no way back once marked, whether by mistake or from iCloud sync. Marking an episode listened also clears its saved resume point, so it won't offer to pick back up partway through something you just said you were done with."
+        ),
+        ChangeItem(
+            systemImage: "hand.draw",
+            tag: .fixed,
+            title: "Swipeable Pickers Announce What You Picked",
+            description: "Swiping up or down on a picker — For You's section switcher, Home Feed, App Directory's platform filter, and every swipeable setting in Podcasts, Notifications, Storage, and Appearance — previously played only a plain \"value changed\" sound with nothing spoken. VoiceOver now announces the actual selection, like \"Following\" or \"1.5 times,\" every time."
+        ),
+        ChangeItem(
+            systemImage: "scope",
+            tag: .fixed,
+            title: "Discover Focus Fixed After Switching Tabs",
+            description: "Switching away from Discover while inside a section like Podcasts, then switching back without going all the way out first, used to yank VoiceOver focus up to the Discover heading instead of leaving it where you actually were. It now only refocuses the heading when you're really back at the Discover hub."
+        ),
+        ChangeItem(
+            systemImage: "ladybug",
+            tag: .improved,
+            title: "More Useful Bug Reports",
+            description: "Contact Us's \"Include app and device info\" toggle for bug reports used to append only your app version and iOS version. It now includes everything About > Support already offers — device model, build number, theme, locale, every accessibility setting like VoiceOver, Reduce Motion, and Dynamic Type, and whether you were signed in and with which role — since so many real bugs turn out to be specific to an assistive technology being on or off, or to being signed out or on a member vs. editor account."
+        ),
+        ChangeItem(
+            systemImage: "text.badge.checkmark",
+            tag: .fixed,
+            title: "New Comment Count Announced in the Right Place",
+            description: "On Forum, Podcast, App, Guide, Blog Post, and Bug Report cards, VoiceOver used to announce \"N new comments\" dead last — after the comment count, the date, and any Saved/Following status — making it easy to lose track of which number it belonged to. It's now spoken right next to the comment count it's describing, with the date and status following after."
+        ),
+    ]
+
+}
+
+struct HistorySection: Identifiable {
+    let id = UUID()
+    let title: String
+    let items: [ChangeItem]
+
+    static let all: [HistorySection] = [
+        HistorySection(title: "Also in 2026.13", items: [
         ChangeItem(
             systemImage: "wifi.slash",
             tag: .new,
@@ -498,17 +729,8 @@ struct ChangeItem: Identifiable {
             title: "More VoiceOver Focus Fixes",
             description: "Continuing the focus pass from the last update: About, What's New, Help, RSS Feeds, Credits, Social Media, Open Source Licences, the Transcript screen, Customize Home, editing a topic/post, and For You's Saved/Following/Recommended/Downloads sections all focus something meaningful on their first appearance now instead of leaving VoiceOver wherever it happened to land."
         ),
-    ]
-
-}
-
-struct HistorySection: Identifiable {
-    let id = UUID()
-    let title: String
-    let items: [ChangeItem]
-
-    static let all: [HistorySection] = [
-        HistorySection(title: "Also in 2026.0.11", items: [
+        ]),
+        HistorySection(title: "Also in 2026.11", items: [
             ChangeItem(
                 systemImage: "sparkles",
                 tag: .new,
@@ -600,7 +822,7 @@ struct HistorySection: Identifiable {
                 description: "AppleVis editors can now see the right edit, unpublish, and delete actions in more places when signed in."
             ),
         ]),
-        HistorySection(title: "Also in 2026.0.10 - 2026.0.9", items: [
+        HistorySection(title: "Also in 2026.10 - 2026.9", items: [
             ChangeItem(
                 systemImage: "person.crop.circle",
                 tag: .improved,
@@ -656,7 +878,7 @@ struct HistorySection: Identifiable {
                 description: "This release fixed repeated VoiceOver card actions, stale sign-in sessions, a duplicate Now Playing card, and a System theme flicker."
             ),
         ]),
-        HistorySection(title: "Also in 2026.0.8 - 2026.0.7", items: [
+        HistorySection(title: "Also in 2026.8 - 2026.7", items: [
             ChangeItem(
                 systemImage: "square.and.arrow.up",
                 tag: .new,
@@ -688,7 +910,7 @@ struct HistorySection: Identifiable {
                 description: "AppleVis notification categories now appear in iOS Focus settings."
             ),
         ]),
-        HistorySection(title: "Also in 2026.0.6", items: [
+        HistorySection(title: "Also in 2026.6", items: [
             ChangeItem(
                 systemImage: "envelope",
                 tag: .new,
@@ -720,7 +942,7 @@ struct HistorySection: Identifiable {
                 description: "The Help Centre was refreshed, and the app icon can adapt to your Home Screen style on supported iOS versions."
             ),
         ]),
-        HistorySection(title: "Also in 2026.0.5", items: [
+        HistorySection(title: "Also in 2026.5", items: [
             ChangeItem(
                 systemImage: "ant",
                 tag: .new,
@@ -758,7 +980,7 @@ struct HistorySection: Identifiable {
                 description: "The Help Centre gained guides for submission wizards, and the app sounds were refreshed."
             ),
         ]),
-        HistorySection(title: "Also in 2026.0.4 - 2026.0.3", items: [
+        HistorySection(title: "Also in 2026.4 - 2026.3", items: [
             ChangeItem(
                 systemImage: "pencil",
                 tag: .new,
@@ -790,7 +1012,7 @@ struct HistorySection: Identifiable {
                 description: "The Home welcome flow was redesigned to restore focus and return you to your last-read position."
             ),
         ]),
-        HistorySection(title: "Also in 2026.0.2", items: [
+        HistorySection(title: "Also in 2026.2", items: [
             ChangeItem(
                 systemImage: "speaker.wave.2",
                 tag: .new,

@@ -51,6 +51,11 @@ struct AppearanceSettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 .accessibilityHint(String(localized: "Compact reduces spacing between items in lists."))
+                // Explicit value — without it, swiping up/down only played
+                // the "value changed" tone with no spoken density name. Same
+                // fix as PlayerView's playback-speed control (PODCAST-06).
+                // Reported directly.
+                .accessibilityValue(Text(preferences.cardDensity.displayName))
                 // Same swipe-up/down addition as this session's other
                 // pickers — toggles Comfortable/Compact in place.
                 .accessibilityAdjustableAction { direction in

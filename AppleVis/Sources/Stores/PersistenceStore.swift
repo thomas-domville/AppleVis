@@ -26,9 +26,24 @@ final class PersistenceStore {
 
     private init() {}
 
-    var isReadHistoryTrackingEnabled: Bool {
-        if AuthStore.current?.isSignedIn == true { return true }
-        return UserDefaults.standard.object(forKey: "privacy.signedOutHistory") as? Bool ?? true
+    /// Whether "New" indicators (Home's What's New card, the New/Recap
+    /// picker, and per-row "N new" badges everywhere) should actually be
+    /// shown — not whether read/visit history gets *tracked*, which now
+    /// always happens unconditionally regardless of sign-in state (see the
+    /// functions below). Previously this same preference gated both at
+    /// once: turning off "remember signed-out history" silently broke All/
+    /// New/Recap for anyone who opted out, since without tracking there was
+    /// nothing to compute "new" from. Splitting the two means someone who
+    /// finds new-activity indicators distracting can turn just those off —
+    /// the display, not the underlying (harmless, on-device-only, never
+    /// transmitted while signed out) tracking a feature they might still
+    /// want later depends on. Requested directly. Same key as before
+    /// (`privacy.signedOutHistory`) so an existing "off" choice carries
+    /// forward as "hide indicators" rather than resetting silently; applies
+    /// to signed-in users too now, since wanting a quieter Home isn't
+    /// specific to being signed out.
+    var showsNewActivityIndicators: Bool {
+        UserDefaults.standard.object(forKey: "privacy.signedOutHistory") as? Bool ?? true
     }
 
     // MARK: - Saved items
@@ -106,12 +121,10 @@ final class PersistenceStore {
     private let seenTopicsKey = "applevis.forums.seenTopics"
 
     func isTopicSeen(id: String) -> Bool {
-        guard isReadHistoryTrackingEnabled else { return false }
-        return seenTopicIds().contains(id)
+        seenTopicIds().contains(id)
     }
 
     func markTopicSeen(id: String) {
-        guard isReadHistoryTrackingEnabled else { return }
         var ids = seenTopicIds()
         guard ids.insert(id).inserted else { return }
         persist(Array(ids), key: seenTopicsKey)
@@ -165,6 +178,17 @@ final class PersistenceStore {
         Task { @MainActor in ICloudSyncManager.shared.pushPlayedEpisodes() }
     }
 
+    /// Previously marking an episode listened was a one-way door — the
+    /// Episode Tools grid switched to a plain, non-interactive "Played"
+    /// label with no way back, whether you tapped it by mistake or it
+    /// arrived via iCloud sync from another device. Requested directly.
+    func unmarkEpisodePlayed(_ id: String) {
+        var ids = playedEpisodeIds()
+        guard ids.remove(id) != nil else { return }
+        defaults.set(Array(ids), forKey: playedEpisodesKey)
+        Task { @MainActor in ICloudSyncManager.shared.pushPlayedEpisodes() }
+    }
+
     private func playedEpisodeIds() -> Set<String> {
         Set(defaults.stringArray(forKey: playedEpisodesKey) ?? [])
     }
@@ -184,12 +208,10 @@ final class PersistenceStore {
     }
 
     func allItemVisits() -> [String: ItemVisit] {
-        guard isReadHistoryTrackingEnabled else { return [:] }
-        return load(key: itemVisitsKey) ?? [:]
+        load(key: itemVisitsKey) ?? [:]
     }
 
     func stampItemVisit(id: String, commentCount: Int, seenAt: Date = Date()) {
-        guard isReadHistoryTrackingEnabled else { return }
         var visits = allItemVisits()
         visits[id] = ItemVisit(seenAt: seenAt, commentCount: commentCount)
         persist(visits, key: itemVisitsKey)
@@ -204,7 +226,6 @@ final class PersistenceStore {
     }
 
     func readHistorySnapshot() -> ReadHistorySnapshot? {
-        guard isReadHistoryTrackingEnabled else { return nil }
         let forumsLastVisit = defaults.object(forKey: "applevis.forums.lastVisit") == nil ? nil : self.forumsLastVisit
         let homeFirstVisit = defaults.object(forKey: "applevis.lastVisit").map { _ in
             Date(timeIntervalSince1970: defaults.double(forKey: "applevis.lastVisit"))
@@ -218,7 +239,6 @@ final class PersistenceStore {
     }
 
     func applyReadHistorySnapshot(_ snapshot: ReadHistorySnapshot) {
-        guard isReadHistoryTrackingEnabled else { return }
         let mergedSeen = seenTopicIds().union(snapshot.seenTopicIds)
         persist(Array(mergedSeen), key: seenTopicsKey)
 
@@ -261,19 +281,9 @@ final class PersistenceStore {
     /// per-item "N new" signal Home already has, instead of only Home
     /// knowing about it.
     func newReplyCount(kind: ContentKind, id: String, currentCount: Int) -> Int {
-        guard isReadHistoryTrackingEnabled else { return 0 }
+        guard showsNewActivityIndicators else { return 0 }
         guard let visit = allItemVisits()[FeedItem.visitKey(kind: kind, contentId: id)] else { return 0 }
         return max(0, currentCount - visit.commentCount)
-    }
-
-    func clearLocalReadHistory() {
-        defaults.removeObject(forKey: seenTopicsKey)
-        defaults.removeObject(forKey: itemVisitsKey)
-        defaults.removeObject(forKey: "applevis.forums.lastVisit")
-        defaults.removeObject(forKey: "applevis.lastVisit")
-        cache.removeValue(forKey: seenTopicsKey)
-        cache.removeValue(forKey: itemVisitsKey)
-        Task { @MainActor in ICloudSyncManager.shared.clearReadHistory() }
     }
 
     /// Backs Settings > Privacy > "Clear All Local Data" — previously that

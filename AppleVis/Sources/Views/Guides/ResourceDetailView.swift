@@ -24,11 +24,21 @@ struct ResourceDetailView: View {
     @State private var pendingFocusCommentId: String?
     @State private var discussionSummary: String?
     @State private var isSummarizingDiscussion = false
+    // Guide-level moderation — mirrors ForumTopicDetailView's own
+    // Edit/Unpublish/Delete via DetailActionsMenu; the original author gets
+    // Edit + Delete, an admin/editor gets Edit + Unpublish + Delete.
+    @State private var editingResourceNode: EditableNode?
+    @Environment(\.dismiss) private var dismiss
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedCommentId: String?
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
+
+    private func isOwnResource(_ detail: ResourceDetail) -> Bool {
+        guard let user = auth.user else { return false }
+        return !detail.authorId.isEmpty && user.uuid == detail.authorId
+    }
 
     var body: some View {
         Group {
@@ -153,9 +163,27 @@ struct ResourceDetailView: View {
                 }
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                DetailActionsMenu(
+                    id: detail.id, entityId: detail.nid, kind: .resource, title: detail.title, lastActivityAt: detail.updatedAt, url: detail.url,
+                    authorName: detail.authorName, excerpt: .excerpt(from: detail.body),
+                    isOwnContent: isOwnResource(detail),
+                    onAddComment: { showCompose = true },
+                    onEdit: { startEditResource(detail) },
+                    onUnpublish: { await unpublishResource(detail) },
+                    onDelete: { await deleteResource(detail) }
+                )
+            }
+        }
+        .sheet(item: $editingResourceNode) { node in
+            EditNodeSheet(initialTitle: node.title, initialBody: node.body) { newTitle, newBody in
+                try await saveResourceEdit(nodeTypeSuffix: node.nodeTypeSuffix, title: newTitle, body: newBody)
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             ContentDetailActions(
-                id: detail.id, kind: .resource, title: detail.title, lastActivityAt: detail.updatedAt, url: detail.url,
+                id: detail.id, entityId: detail.nid, kind: .resource, title: detail.title, lastActivityAt: detail.updatedAt, url: detail.url,
                 onAddComment: { showCompose = true }
             )
         }
@@ -194,7 +222,6 @@ struct ResourceDetailView: View {
                     index: index, total: detail.comments.count,
                     subject: comment.subject, parentTitle: detail.title, parentURL: detail.url,
                     commentId: comment.id, authorId: comment.authorId, commentType: "comment_node_guides",
-                    supportsReport: false,
                     onDelete: {
                         self.detail?.comments.removeAll { $0.id == comment.id }
                     },
@@ -309,6 +336,41 @@ struct ResourceDetailView: View {
         }
         summary += " Original post by \(detail.authorName)."
         UIAccessibility.post(notification: .announcement, argument: summary)
+    }
+
+    private func startEditResource(_ detail: ResourceDetail) {
+        editingResourceNode = EditableNode(title: detail.title, body: detail.body, nodeTypeSuffix: "guides")
+    }
+
+    private func saveResourceEdit(nodeTypeSuffix: String, title: String, body: String) async throws {
+        guard let user = auth.user, let detail else { return }
+        try await APIClient.shared.content.editNode(nodeId: detail.id, nodeType: nodeTypeSuffix, title: title, body: body, csrfToken: user.csrfToken)
+        toast.success(String(localized: "Guide updated"))
+        await load()
+    }
+
+    private func unpublishResource(_ detail: ResourceDetail) async {
+        guard let user = auth.user else { return }
+        do {
+            try await APIClient.shared.content.unpublishNode(nodeId: detail.id, nodeType: "guides", csrfToken: user.csrfToken)
+            toast.success(String(localized: "Guide unpublished"))
+        } catch {
+            toast.error(String(localized: "Couldn't unpublish."))
+        }
+    }
+
+    /// Deletes the guide currently being viewed — unlike row-level deletion
+    /// elsewhere, there's no list to prune; the only sensible next step is
+    /// leaving the screen, matching ForumTopicDetailView.deleteTopic().
+    private func deleteResource(_ detail: ResourceDetail) async {
+        guard let user = auth.user else { return }
+        do {
+            try await APIClient.shared.content.deleteNode(nodeId: detail.id, nodeType: "guides", csrfToken: user.csrfToken)
+            toast.success(String(localized: "Guide deleted"))
+            dismiss()
+        } catch {
+            toast.error(String(localized: "Couldn't delete."))
+        }
     }
 
     private func load() async {
@@ -441,10 +503,6 @@ struct CommentRow: View {
     var commentId: String? = nil
     var authorId: String? = nil
     var commentType: String? = nil
-    /// RN never had a "Report" action on Guide/Blog comments — only on
-    /// Podcast episode comments (`app/episode/[id].tsx`). Bug Report
-    /// comments have no RN precedent at all; kept enabled there by default
-    /// since it's already-shipped functionality, not a regression.
     var supportsReport: Bool = true
     var onDelete: (() -> Void)? = nil
     /// Mirrors `onDelete` exactly — unpublishing, like deleting, means this
@@ -595,7 +653,7 @@ struct CommentRow: View {
             EditContentSheet(title: "Edit Comment", initialText: text) { newText in
                 guard let user = auth.user, let commentId, let commentType else { return }
                 try await APIClient.shared.content.editComment(
-                    commentType: commentType, commentId: commentId, newBody: newText, format: "basic_html", csrfToken: user.csrfToken
+                    commentType: commentType, commentId: commentId, newBody: newText, format: drupalDefaultTextFormat, csrfToken: user.csrfToken
                 )
                 onEdit?(newText)
                 toast.success(String(localized: "Comment updated"))

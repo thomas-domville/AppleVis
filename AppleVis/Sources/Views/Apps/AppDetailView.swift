@@ -91,8 +91,16 @@ struct AppDetailView: View {
     @State private var isSummarizingReviews = false
     @State private var accessibilityConsensus: String?
     @State private var isSummarizingConsensus = false
-    @State private var showUpdateAppInfoConfirm = false
+    @State private var showUpdateAppInfoSheet = false
+    @State private var appInfoDiffs: [AppInfoFieldDiff] = []
+    @State private var selectedAppInfoFieldIDs: Set<String> = []
     @State private var isUpdatingAppInformation = false
+    // App-level moderation — mirrors ForumTopicDetailView's own
+    // Edit/Unpublish/Delete, generalized to every content kind via
+    // DetailActionsMenu. Previously the App Entry page had no such controls
+    // at all, only comment-level moderation.
+    @State private var editingAppNode: EditableNode?
+    @Environment(\.dismiss) private var dismiss
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedReviewId: String?
     @EnvironmentObject private var auth: AuthStore
@@ -234,20 +242,6 @@ struct AppDetailView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
-                if canUpdateAppInformation(detail) {
-                    Button {
-                        showUpdateAppInfoConfirm = true
-                    } label: {
-                        if isUpdatingAppInformation {
-                            ProgressView()
-                        } else {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                        }
-                    }
-                    .disabled(isUpdatingAppInformation)
-                    .accessibilityLabel(String(localized: "Update App Information"))
-                    .accessibilityHint(String(localized: "Updates the AppleVis app title, description, App Store link, and current version from the App Store listing."))
-                }
                 if let storeURL = detail.appStoreUrl.flatMap(URL.init) {
                     // Deliberately a plain Link, not WebLink — an
                     // apps.apple.com URL is a Universal Link that iOS hands
@@ -257,7 +251,10 @@ struct AppDetailView: View {
                     // browser preference would trap "Open in App Store"
                     // inside a web page instead of actually opening the App
                     // Store. Downloads/purchases only work via the real
-                    // native app. Reported directly.
+                    // native app. Reported directly. Kept as its own
+                    // dedicated icon rather than folded into the actions
+                    // menu below — it's this page's primary purpose, not a
+                    // secondary action worth an extra tap to reach.
                     Link(destination: storeURL) {
                         Image(systemName: "arrow.up.right.square")
                     }
@@ -271,21 +268,34 @@ struct AppDetailView: View {
                     }
                     .accessibilityLabel(String(localized: "Open on MacUpdate"))
                 }
+                DetailActionsMenu(
+                    id: detail.id, entityId: detail.nid, kind: .appListing, title: detail.name, lastActivityAt: detail.lastUpdatedAt, url: detail.url,
+                    authorName: detail.authorName, excerpt: .excerpt(from: detail.body),
+                    isOwnContent: isOwnAppEntry(detail),
+                    onAddComment: { showReviewCompose = true },
+                    onEdit: { startEditApp(detail) },
+                    onUnpublish: { await unpublishApp(detail) },
+                    onDelete: { await deleteApp(detail) },
+                    adminExtras: AnyView(refreshAppDetailsMenuItem(detail))
+                )
             }
         }
-        .confirmationDialog(
-            "Update app information?",
-            isPresented: $showUpdateAppInfoConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("Update App Information") { Task { await updateAppInformationFromStore() } }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This will replace the AppleVis title, description, App Store link, and current version with the current App Store listing. It will not change accessibility ratings, accessibility comments, community comments, category, price, or tested devices.")
+        .sheet(isPresented: $showUpdateAppInfoSheet) {
+            UpdateAppInfoSheet(
+                diffs: appInfoDiffs,
+                selectedFieldIDs: $selectedAppInfoFieldIDs,
+                isUpdating: isUpdatingAppInformation,
+                onConfirm: { Task { await updateAppInformationFromStore() } }
+            )
+        }
+        .sheet(item: $editingAppNode) { node in
+            EditNodeSheet(initialTitle: node.title, initialBody: node.body) { newTitle, newBody in
+                try await saveAppEdit(nodeTypeSuffix: node.nodeTypeSuffix, title: newTitle, body: newBody)
+            }
         }
         .safeAreaInset(edge: .bottom) {
             ContentDetailActions(
-                id: detail.id, kind: .appListing, title: detail.name, lastActivityAt: detail.lastUpdatedAt, url: detail.url,
+                id: detail.id, entityId: detail.nid, kind: .appListing, title: detail.name, lastActivityAt: detail.lastUpdatedAt, url: detail.url,
                 onAddComment: { showReviewCompose = true }
             )
         }
@@ -310,6 +320,73 @@ struct AppDetailView: View {
               !(detail.appStoreUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else { return false }
         return detail.platform != .tvos
+    }
+
+    @ViewBuilder
+    private func refreshAppDetailsMenuItem(_ detail: AppDetail) -> some View {
+        if canUpdateAppInformation(detail), let itunesMetadata {
+            Button {
+                appInfoDiffs = AppInfoFieldDiff.build(detail: detail, metadata: itunesMetadata)
+                selectedAppInfoFieldIDs = Set(appInfoDiffs.filter(\.changed).map(\.id))
+                showUpdateAppInfoSheet = true
+            } label: {
+                Label(
+                    isUpdatingAppInformation ? String(localized: "Refreshing App Details…") : String(localized: "Refresh App Details"),
+                    systemImage: "arrow.triangle.2.circlepath"
+                )
+            }
+            .disabled(isUpdatingAppInformation)
+        }
+    }
+
+    private func isOwnAppEntry(_ detail: AppDetail) -> Bool {
+        guard let user = auth.user else { return false }
+        return !detail.submitterUid.isEmpty && user.uuid == detail.submitterUid
+    }
+
+    private func appNodeTypeSuffix(for platform: AppPlatform) -> String {
+        switch platform {
+        case .tvos:    return "tv_directory"
+        case .watchos: return "watch_directory"
+        case .macos:   return "mac_app_directory"
+        case .ios:     return "ios_app_directory"
+        }
+    }
+
+    private func startEditApp(_ detail: AppDetail) {
+        editingAppNode = EditableNode(title: detail.name, body: detail.body, nodeTypeSuffix: appNodeTypeSuffix(for: detail.platform))
+    }
+
+    private func saveAppEdit(nodeTypeSuffix: String, title: String, body: String) async throws {
+        guard let user = auth.user, let detail else { return }
+        try await APIClient.shared.content.editNode(nodeId: detail.id, nodeType: nodeTypeSuffix, title: title, body: body, csrfToken: user.csrfToken)
+        toast.success(String(localized: "App Entry updated"))
+        await load()
+    }
+
+    private func unpublishApp(_ detail: AppDetail) async {
+        guard let user = auth.user else { return }
+        do {
+            try await APIClient.shared.content.unpublishNode(nodeId: detail.id, nodeType: appNodeTypeSuffix(for: detail.platform), csrfToken: user.csrfToken)
+            toast.success(String(localized: "App Entry unpublished"))
+        } catch {
+            toast.error(String(localized: "Couldn't unpublish."))
+        }
+    }
+
+    /// Deletes the app entry the user is currently viewing — unlike
+    /// row-level deletion elsewhere, there's no list to prune; the only
+    /// sensible next step is leaving the screen, matching
+    /// ForumTopicDetailView.deleteTopic()'s identical reasoning.
+    private func deleteApp(_ detail: AppDetail) async {
+        guard let user = auth.user else { return }
+        do {
+            try await APIClient.shared.content.deleteNode(nodeId: detail.id, nodeType: appNodeTypeSuffix(for: detail.platform), csrfToken: user.csrfToken)
+            toast.success(String(localized: "App Entry deleted"))
+            dismiss()
+        } catch {
+            toast.error(String(localized: "Couldn't delete."))
+        }
     }
 
     @ViewBuilder
@@ -427,12 +504,12 @@ struct AppDetailView: View {
                     if !detail.category.isEmpty {
                         Text(detail.category).font(.subheadline).foregroundStyle(.secondary)
                     }
-                    Text(submittedAndReviewedText(detail))
+                    Text(submittedAndCommentedText(detail))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel(String(localized: "\(detail.name), \(detail.category), \(submittedAndReviewedText(detail))"))
+            .accessibilityLabel(String(localized: "\(detail.name), \(detail.category), \(submittedAndCommentedText(detail))"))
             .accessibilityAddTraits(.isHeader)
             .accessibilityFocused($isTitleFocused)
 
@@ -534,17 +611,27 @@ struct AppDetailView: View {
         return families.joined(separator: ", ")
     }
 
-    // A submission from 4 months ago and one reviewed 3 minutes ago looked
-    // identical here — nothing distinguished a stale listing from an
+    // A submission from 4 months ago and one commented on 3 minutes ago
+    // looked identical here — nothing distinguished a stale listing from an
     // actively-discussed one. Reported directly.
-    private func submittedAndReviewedText(_ detail: AppDetail) -> String {
-        let submitted = "Submitted \(detail.createdAt.formatted(.relative(presentation: .named)))"
-        guard detail.reviewCount > 0 else { return submitted }
-        return "\(submitted), last reviewed \(detail.lastUpdatedAt.formatted(.relative(presentation: .named)))"
+    //
+    // "Most recent comment" deliberately matches announceThreadOverview's
+    // exact wording below rather than the earlier "last reviewed" — every
+    // other place on this page (the Community Discussion heading, "Load
+    // More Comments," the Thread overview announcement) already calls these
+    // "comments," and "reviewed" was the one leftover from AppReview/
+    // reviewCount's internal naming. Requested directly, for consistency.
+    private func submittedAndCommentedText(_ detail: AppDetail) -> String {
+        let submittedDate = detail.createdAt.formatted(.relative(presentation: .named))
+        guard detail.reviewCount > 0 else {
+            return String(localized: "Submitted \(submittedDate)")
+        }
+        let commentDate = detail.lastUpdatedAt.formatted(.relative(presentation: .named))
+        return String(localized: "Submitted \(submittedDate), most recent comment \(commentDate)")
     }
 
     /// "Nov 11, 2019 (6 years ago)" — the absolute date plus the same kind
-    /// of relative "ago" wording `submittedAndReviewedText` above already
+    /// of relative "ago" wording `submittedAndCommentedText` above already
     /// uses elsewhere on this page, so both read consistently.
     private static func releaseDateText(_ date: Date) -> String {
         "\(date.formatted(date: .abbreviated, time: .omitted)) (\(date.formatted(.relative(presentation: .named))))"
@@ -1120,27 +1207,31 @@ struct AppDetailView: View {
               let user = auth.user,
               user.isAdmin
         else {
-            toast.error(String(localized: "You need to be signed in as an editor to update app information."))
+            toast.error(String(localized: "You need to be signed in as an editor to refresh app details."))
             return
         }
         guard !isMatchedNotConfirmed else {
             toast.error(String(localized: "This App Store match is not confirmed, so AppleVis was not updated."))
             return
         }
+        guard !selectedAppInfoFieldIDs.isEmpty else { return }
 
         isUpdatingAppInformation = true
         defer { isUpdatingAppInformation = false }
 
         do {
-            try await APIClient.shared.apps.updateAppInformation(detail: current, metadata: metadata, csrfToken: user.csrfToken)
-            toast.success(String(localized: "App information updated"))
+            try await APIClient.shared.apps.updateAppInformation(
+                detail: current, metadata: metadata, includedFields: selectedAppInfoFieldIDs, csrfToken: user.csrfToken
+            )
+            toast.success(String(localized: "App details refreshed"))
+            showUpdateAppInfoSheet = false
             await load()
         } catch APIError.forbidden {
-            toast.error(String(localized: "You don't have permission to update this app."))
+            toast.error(String(localized: "You don't have permission to refresh this app."))
         } catch APIError.unauthorized {
-            toast.error(String(localized: "Please sign in again to update this app."))
+            toast.error(String(localized: "Please sign in again to refresh this app."))
         } catch {
-            toast.error(String(localized: "Couldn't update app information."))
+            toast.error(String(localized: "We couldn't refresh the app details."))
         }
     }
 
@@ -1391,7 +1482,7 @@ struct AppReviewRow: View {
             EditContentSheet(title: "Edit Comment", initialText: review.body) { newText in
                 guard let user = auth.user else { return }
                 try await APIClient.shared.content.editComment(
-                    commentType: "comment_node_ios_app_directory", commentId: review.id, newBody: newText, format: "basic_html", csrfToken: user.csrfToken
+                    commentType: "comment_node_ios_app_directory", commentId: review.id, newBody: newText, format: drupalDefaultTextFormat, csrfToken: user.csrfToken
                 )
                 onEdit?(newText)
                 toast.success(String(localized: "Comment updated"))

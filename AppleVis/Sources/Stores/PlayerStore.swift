@@ -246,6 +246,25 @@ final class PlayerStore: ObservableObject {
         return saved
     }
 
+    /// Clears any saved resume point for an episode — called whenever it's
+    /// marked listened, manually or via natural playback completion below,
+    /// since a still-recorded "Resume from 12:34" contradicts having just
+    /// declared the episode done. If it's the episode currently loaded in
+    /// the player, routes through `seek(to:)` so the live `position` and the
+    /// persisted/synced dictionary both reset together instead of drifting
+    /// apart. Requested directly.
+    func clearSavedPosition(for episodeId: String) {
+        if currentEpisode?.id == episodeId {
+            Task { await seek(to: 0) }
+            return
+        }
+        guard positions.removeValue(forKey: episodeId) != nil else { return }
+        if let data = try? JSONEncoder().encode(positions) {
+            UserDefaults.standard.set(data, forKey: Self.positionsKey)
+        }
+        ICloudSyncManager.shared.pushPodcastPositions(positions)
+    }
+
     // MARK: - Queue
 
     func enqueue(_ episode: PodcastEpisode) {
@@ -488,6 +507,7 @@ final class PlayerStore: ObservableObject {
                 if let episode = self.currentEpisode {
                     DownloadManager.shared.markPlayCompleted(episode.id)
                     PersistenceStore.shared.markEpisodePlayed(episode.id)
+                    self.clearSavedPosition(for: episode.id)
                 }
                 if self.sleepAtEndOfEpisode {
                     self.pause()

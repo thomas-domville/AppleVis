@@ -42,6 +42,11 @@ struct StorageView: View {
                     }
                 }
                 .accessibilityHint(String(localized: "Cached articles and metadata older than this will be automatically removed."))
+                // Explicit value — without it, swiping up/down only played
+                // the "value changed" tone with no spoken option. Same fix
+                // as PlayerView's playback-speed control (PODCAST-06).
+                // Reported directly.
+                .accessibilityValue(Text(retentionOptions.first { $0.months == cacheRetentionMonths }?.label ?? ""))
                 .accessibilityAdjustableAction { direction in
                     guard let idx = retentionOptions.firstIndex(where: { $0.months == cacheRetentionMonths }) else { return }
                     switch direction {

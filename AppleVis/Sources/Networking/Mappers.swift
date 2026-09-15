@@ -44,7 +44,7 @@ enum Mappers {
             categoryId: taxId ?? "",
             url: url,
             isUnread: false,
-            isFollowing: PersistenceStore.shared.isFollowed(id: node.id),
+            isFollowing: PersistenceStore.shared.isFollowed(id: node.id) || FollowStore.shared.isFollowed(node.id),
             isSaved: PersistenceStore.shared.isSaved(id: node.id)
         )
     }
@@ -98,7 +98,7 @@ enum Mappers {
             categoryId: "",
             url: urlPath,
             isUnread: false,
-            isFollowing: PersistenceStore.shared.isFollowed(id: uuid),
+            isFollowing: PersistenceStore.shared.isFollowed(id: uuid) || FollowStore.shared.isFollowed(uuid),
             isSaved: PersistenceStore.shared.isSaved(id: uuid)
         )
     }
@@ -138,7 +138,8 @@ enum Mappers {
             body: a["comment_body"]?.richTextValue ?? "",
             createdAt: node.createdDate,
             loveCount: 0,
-            isNew: false
+            isNew: false,
+            parentId: node.relationshipId("pid")
         )
     }
 
@@ -588,6 +589,7 @@ enum Mappers {
             firstSeen: base.firstSeen,
             fixedIn: base.fixedIn,
             feedbackId: base.feedbackId,
+            authorId: node.relationshipId("uid") ?? "",
             body: HTMLText.plainText(fromHTML: a["body"]?.richTextValue ?? ""),
             stepsToReproduce: a["field_steps_to_reproduce"]?.richTextValue.map { HTMLText.plainText(fromHTML: $0) },
             workaround: a["field_workaround"]?.richTextValue.map { HTMLText.plainText(fromHTML: $0) },

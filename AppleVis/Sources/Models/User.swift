@@ -7,13 +7,23 @@ struct AuthUser: Codable {
     let csrfToken: String
     let logoutToken: String
     var roles: [String]
+    /// The account's email on the AppleVis website, resolved from the same
+    /// `user--user` JSON:API resource `resolveAccountDetails` already reads
+    /// roles from. Nil for any session cached before this field existed
+    /// (Codable's synthesized decoder treats a missing key as nil for an
+    /// Optional, so old Keychain entries decode fine) until the next sign-in
+    /// or `AuthStore.refreshRoles()` call fills it in. Lets wizards that ask
+    /// for an email (Contact Us, Submit Bug/Blog, Report a Comment) prefill
+    /// or skip the field for a signed-in user instead of asking them to
+    /// retype an address the account already has.
+    var email: String?
     /// Confirmed directly by the site's Drupal developer: the site has no
     /// "administrator" role at all — its two editorial roles are machine-
     /// named `site_editor` and `site_admin` (the other three role machine
     /// names, `anonymous`/`authenticated`/`moderated_user`, are ordinary
     /// user-level roles, not editorial ones). `roles` here already carries
     /// real machine names, not display labels — see
-    /// `AccountEndpoints.resolveRoles`'s `drupal_internal__target_id`
+    /// `AccountEndpoints.resolveAccountDetails`'s `drupal_internal__target_id`
     /// read — so this was previously checking for a role name that could
     /// never actually appear, meaning Edit/Unpublish/Delete for
     /// non-owned content silently never unlocked for anyone, regardless of

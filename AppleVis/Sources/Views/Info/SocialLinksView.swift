@@ -10,19 +10,6 @@ struct SocialLinksView: View {
     /// requested directly.
     @AccessibilityFocusState private var isIntroFocused: Bool
 
-    private struct SocialPlatform: Identifiable {
-        let id: String
-        let name: String
-        let icon: String
-        let url: URL
-    }
-
-    private let platforms: [SocialPlatform] = [
-        SocialPlatform(id: "x", name: "X", icon: "at", url: URL(string: "https://x.com/AppleVis")!),
-        SocialPlatform(id: "facebook", name: "Facebook", icon: "f.circle", url: URL(string: "https://www.facebook.com/AppleVis")!),
-        SocialPlatform(id: "mastodon", name: "Mastodon", icon: "network", url: URL(string: "https://mastodon.online/@AppleVis")!),
-    ]
-
     var body: some View {
         Form {
             Section {
@@ -32,7 +19,7 @@ struct SocialLinksView: View {
                     .accessibilityFocused($isIntroFocused)
             }
             Section {
-                ForEach(platforms) { platform in
+                ForEach(AppleVisSocial.platforms) { platform in
                     WebLink(destination: platform.url) {
                         Label("Follow AppleVis on \(platform.name)", systemImage: platform.icon)
                     }

@@ -491,6 +491,18 @@ final class HomeViewModel: ObservableObject {
         let hadNoItems = items.isEmpty
         if hadNoItems { error = nil }
         page = 0
+        // Home's forum topic cards bake their bell-badge state in at mapping
+        // time (`Mappers.forum`/`forumFromRecent`), unlike Following/
+        // Recommended's own tabs which check a store live — so unless this
+        // finishes before `fetchPage` maps the forums source below, a topic
+        // followed on the website (or a second device) would still show a
+        // plain, un-badged card here on this device's first load after
+        // sign-in. A cheap no-op every load after the first. Requested
+        // directly, as the Home-tab half of the same website-sync gap
+        // Recommend's button state never had.
+        if let user = AuthStore.current?.user {
+            await FollowStore.shared.loadIfNeeded(for: user)
+        }
         isReturningVisit = UserDefaults.standard.object(forKey: "applevis.lastVisit") != nil
         // Stamped exactly once, ever, purely to distinguish "first launch
         // of this install" (don't flood a brand-new user with everything
@@ -917,7 +929,7 @@ final class HomeViewModel: ObservableObject {
     }
 
     private func recomputeNewActivity() {
-        guard PersistenceStore.shared.isReadHistoryTrackingEnabled else {
+        guard PersistenceStore.shared.showsNewActivityIndicators else {
             newItems = []
             newActivitySummary = ""
             HomeBadgeStore.shared.unreadForumTopicCount = 0

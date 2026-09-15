@@ -230,8 +230,18 @@ enum ItunesAPI {
               let results = json["results"] as? [[String: Any]]
         else { return .failed }
         guard resultCount > 0, let r = results.first else { return .notFound }
+        return .found(parseMetadata(r, fallbackId: id, entity: entity, fallbackAppStoreUrl: fallbackAppStoreUrl))
+    }
 
+    /// Shared per-result parsing, factored out of the single-app lookup
+    /// above so `batchLookup` below (App Directory Health Check's bulk
+    /// delisting/title-change scan) can reuse it exactly rather than
+    /// duplicating this field mapping. `fallbackId` is only used if the
+    /// result itself has no `trackId` (shouldn't happen in practice, but
+    /// matches the single-lookup path's own fallback-id behavior).
+    private static func parseMetadata(_ r: [String: Any], fallbackId: String, entity: String, fallbackAppStoreUrl: String) -> ItunesMetadata {
         func str(_ key: String) -> String { (r[key] as? String) ?? "" }
+        let id = (r["trackId"] as? NSNumber).map { "\($0.intValue)" } ?? fallbackId
 
         let numericPrice = r["price"] as? Double
         let price: String
@@ -259,7 +269,7 @@ enum ItunesAPI {
         let releaseDate = (r["releaseDate"] as? String).flatMap(parseISO8601)
         let currentVersionReleaseDate = (r["currentVersionReleaseDate"] as? String).flatMap(parseISO8601)
 
-        return .found(ItunesMetadata(
+        return ItunesMetadata(
             appStoreId: id,
             artistId: r["artistId"] as? Int,
             appName: str("trackName"),
@@ -282,7 +292,39 @@ enum ItunesAPI {
             releaseDate: releaseDate,
             currentVersionReleaseDate: currentVersionReleaseDate,
             deviceFamilies: deviceFamilies(supportedDevices: rawSupportedDevices, features: features)
-        ))
+        )
+    }
+
+    /// Looks up many apps in one request instead of one request per app —
+    /// the iTunes Lookup API accepts a comma-separated id list. Built for
+    /// the App Directory Health Check's bulk delisting/title-change scan,
+    /// where checking every iOS app one at a time could mean hundreds of
+    /// requests and risk Apple's (undocumented but real) rate limit. An id
+    /// missing from the returned dictionary means Apple's lookup didn't
+    /// return a match for it — i.e. that app is no longer on the App
+    /// Store. Chunked by the caller (`AppEntryHealthScanner`), not here —
+    /// this makes exactly one request per call, whatever the id count.
+    static func batchLookup(appStoreIds: [String], entity: String = "software") async -> [String: ItunesMetadata] {
+        guard !appStoreIds.isEmpty,
+              let url = URL(string: "https://itunes.apple.com/lookup?id=\(appStoreIds.joined(separator: ","))&entity=\(entity)")
+        else { return [:] }
+
+        var request = URLRequest(url: url)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = json["results"] as? [[String: Any]]
+        else { return [:] }
+
+        var byId: [String: ItunesMetadata] = [:]
+        for r in results {
+            let metadata = parseMetadata(r, fallbackId: "", entity: entity, fallbackAppStoreUrl: "")
+            guard !metadata.appStoreId.isEmpty else { continue }
+            byId[metadata.appStoreId] = metadata
+        }
+        return byId
     }
 
     /// iTunes's date fields (`releaseDate`, `currentVersionReleaseDate`)

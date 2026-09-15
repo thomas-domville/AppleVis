@@ -17,6 +17,7 @@ struct SubmitAppView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var networkMonitor: NetworkMonitor
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
     @AccessibilityFocusState private var isStepFocused: Bool
@@ -324,6 +325,11 @@ struct SubmitAppView: View {
         NavigationStack {
             Group {
                 if submitted {
+                    // Of the seven ThankYouView completions, this is the one
+                    // genuine milestone — a new listing headed for the
+                    // directory, not a routine message send — so it's the
+                    // only one that earns the bigger confetti flourish on
+                    // top of the shared bounce every wizard now gets.
                     ThankYouView(
                         icon: "app.badge",
                         heading: "You did it — thanks!",
@@ -331,6 +337,11 @@ struct SubmitAppView: View {
                         doneLabel: "Done",
                         onDone: { dismiss() }
                     )
+                    .overlay {
+                        if !reduceMotion {
+                            ConfettiView()
+                        }
+                    }
                 } else if !auth.isSignedIn {
                     signInRequiredView
                 } else if !hasAgreedToBeforeYouBegin {
@@ -438,6 +449,7 @@ struct SubmitAppView: View {
             Text("Sign In Required")
                 .font(.headline)
                 .accessibilityAddTraits(.isHeader)
+                .accessibilityFocused($isStepFocused)
             Text("You need to be signed in to your AppleVis account to submit an app.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -456,6 +468,14 @@ struct SubmitAppView: View {
     private var beforeYouBeginView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                // Previously opened straight into the body paragraph below
+                // with no heading at all — the only gate screen among this
+                // wizard's group with nothing for VoiceOver focus to land
+                // on. Full app-wide focus audit, requested directly.
+                Text("Before You Begin")
+                    .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($isStepFocused)
                 Text("The AppleVis App Directory is a community resource. Please read and confirm the following before adding an app.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -663,7 +683,11 @@ struct SubmitAppView: View {
 
     private var searchSection: some View {
         Group {
-            Section { WizardStepIndicator(step: 1, total: 3, title: "Find the App", isFocused: $isStepFocused) }
+            Section {
+                WizardStepIndicator(step: 1, total: 3, title: "Find the App", isFocused: $isStepFocused)
+                Text("Search the App Store for the app you want to add, or enter its details manually if you can't find it.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
             Section("Platform") {
                 Picker("Platform", selection: $platform) {
                     ForEach([AppPlatform.ios, .macos, .tvos, .watchos]) { Text($0.displayName).tag($0) }
@@ -674,6 +698,11 @@ struct SubmitAppView: View {
                     Task { await search() }
                 }
                 .accessibilityHint(String(localized: "Which App Store this app is listed on. Changes what search looks up."))
+                // Explicit value — without it, swiping up/down only played
+                // the "value changed" tone with no spoken platform name.
+                // Same fix as PlayerView's playback-speed control
+                // (PODCAST-06). Reported directly.
+                .accessibilityValue(Text(platform.displayName))
                 // Same swipe-up/down addition as this session's other
                 // pickers — same on-screen order as the segments above.
                 .accessibilityAdjustableAction { direction in
@@ -773,6 +802,8 @@ struct SubmitAppView: View {
             Section {
                 WizardStepIndicator(step: 2, total: 3, title: "App Details", isFocused: $isStepFocused)
                 backButton
+                Text("Confirm the app's basic details, then describe its accessibility for AppleVis members.")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             Section {
                 if isMetadataFromAppStore {
@@ -959,6 +990,11 @@ struct SubmitAppView: View {
             }
 
             Section {
+                // Combined label+counter into one live-updating swipe-stop,
+                // and hid the trailing caption from VoiceOver — it repeats
+                // text already in the field's own hint above. Same fix
+                // applied to every minimum-length field across every
+                // wizard. Reported directly.
                 HStack {
                     Text("Accessibility Comments").font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -966,8 +1002,10 @@ struct SubmitAppView: View {
                         .font(.caption)
                         .fontWeight(accessibilityCommentsLength < 20 ? .bold : .regular)
                         .foregroundStyle(accessibilityCommentsLength < 20 ? .red : .secondary)
-                        .accessibilityLabel(accessibilityCommentsLength < 20 ? String(localized: "\(accessibilityCommentsLength) of 20 minimum characters") : String(localized: "\(accessibilityCommentsLength) characters"))
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(accessibilityCommentsLength < 20 ? String(localized: "Accessibility Comments: \(accessibilityCommentsLength) of 20 minimum characters") : String(localized: "Accessibility Comments: \(accessibilityCommentsLength) characters"))
+                .accessibilityAddTraits(.updatesFrequently)
                 TextEditor(text: $payload.accessibilityComments)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
@@ -985,6 +1023,7 @@ struct SubmitAppView: View {
                 Text("Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
             }
 
             // Was entirely unchecked before — no live guideline/language
@@ -1005,7 +1044,46 @@ struct SubmitAppView: View {
                     }
                 rewriteButton(text: $payload.otherComments)
             }
+            Section {
+                WizardBlockingNote(reasons: iosDetailsBlockingReasons)
+                WizardBottomButton(String(localized: "Review & Submit"), isEnabled: isIosValid, action: goNext)
+            }
         }
+    }
+
+    private var iosDetailsBlockingReasons: [String] {
+        var reasons: [String] = []
+        if payload.appName.trimmingCharacters(in: .whitespaces).isEmpty {
+            reasons.append(String(localized: "Enter the app name to continue."))
+        }
+        if payload.appStoreUrl.trimmingCharacters(in: .whitespaces).isEmpty {
+            reasons.append(String(localized: "Enter the App Store URL to continue."))
+        }
+        if payload.category.isEmpty {
+            reasons.append(String(localized: "Choose a category to continue."))
+        }
+        if payload.osVersion.trimmingCharacters(in: .whitespaces).isEmpty {
+            reasons.append(String(localized: "Enter the minimum iOS version to continue."))
+        }
+        if payload.appStoreDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            reasons.append(String(localized: "Enter the app's description to continue."))
+        }
+        if payload.supportedDevices.isEmpty {
+            reasons.append(String(localized: "Choose at least one device you tested on to continue."))
+        }
+        if payload.voiceOverPerformance.isEmpty {
+            reasons.append(String(localized: "Rate VoiceOver performance to continue."))
+        }
+        if payload.buttonLabelling.isEmpty {
+            reasons.append(String(localized: "Rate button labelling to continue."))
+        }
+        if payload.usabilityNotes.isEmpty {
+            reasons.append(String(localized: "Rate overall usability to continue."))
+        }
+        if accessibilityCommentsLength < 20 {
+            reasons.append(String(localized: "Write at least \(20 - accessibilityCommentsLength) more character\(20 - accessibilityCommentsLength == 1 ? "" : "s") describing accessibility to continue."))
+        }
+        return reasons
     }
 
     /// Apple TV's own details form — verified directly against the live
@@ -1019,6 +1097,8 @@ struct SubmitAppView: View {
             Section {
                 WizardStepIndicator(step: 2, total: 3, title: "App Details", isFocused: $isStepFocused)
                 backButton
+                Text("Confirm the app's basic details, then describe its accessibility for AppleVis members.")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             Section {
                 if isMetadataFromAppStore {
@@ -1109,6 +1189,11 @@ struct SubmitAppView: View {
             }
 
             Section {
+                // Combined label+counter into one live-updating swipe-stop,
+                // and hid the trailing caption from VoiceOver — it repeats
+                // text already in the field's own hint above. Same fix
+                // applied to every minimum-length field across every
+                // wizard. Reported directly.
                 HStack {
                     Text("Accessibility Comments").font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -1116,8 +1201,10 @@ struct SubmitAppView: View {
                         .font(.caption)
                         .fontWeight(tvAccessibilityCommentsLength < 20 ? .bold : .regular)
                         .foregroundStyle(tvAccessibilityCommentsLength < 20 ? .red : .secondary)
-                        .accessibilityLabel(tvAccessibilityCommentsLength < 20 ? String(localized: "\(tvAccessibilityCommentsLength) of 20 minimum characters") : String(localized: "\(tvAccessibilityCommentsLength) characters"))
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(tvAccessibilityCommentsLength < 20 ? String(localized: "Accessibility Comments: \(tvAccessibilityCommentsLength) of 20 minimum characters") : String(localized: "Accessibility Comments: \(tvAccessibilityCommentsLength) characters"))
+                .accessibilityAddTraits(.updatesFrequently)
                 TextEditor(text: $tvPayload.accessibilityComments)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
@@ -1135,6 +1222,7 @@ struct SubmitAppView: View {
                 Text("Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
             }
 
             Section("Other Comments (optional)") {
@@ -1152,7 +1240,34 @@ struct SubmitAppView: View {
                     }
                 rewriteButton(text: $tvPayload.otherComments)
             }
+            Section {
+                WizardBlockingNote(reasons: tvDetailsBlockingReasons)
+                WizardBottomButton(String(localized: "Review & Submit"), isEnabled: isTvValid, action: goNext)
+            }
         }
+    }
+
+    private var tvDetailsBlockingReasons: [String] {
+        var reasons: [String] = []
+        if tvPayload.appName.trimmingCharacters(in: .whitespaces).isEmpty {
+            reasons.append(String(localized: "Enter the app name to continue."))
+        }
+        if tvPayload.category.isEmpty {
+            reasons.append(String(localized: "Choose a category to continue."))
+        }
+        if tvPayload.appDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            reasons.append(String(localized: "Enter the app's description to continue."))
+        }
+        if tvPayload.price.isEmpty {
+            reasons.append(String(localized: "Choose a price to continue."))
+        }
+        if tvPayload.usability.isEmpty {
+            reasons.append(String(localized: "Rate overall usability to continue."))
+        }
+        if tvAccessibilityCommentsLength < 20 {
+            reasons.append(String(localized: "Write at least \(20 - tvAccessibilityCommentsLength) more character\(20 - tvAccessibilityCommentsLength == 1 ? "" : "s") describing accessibility to continue."))
+        }
+        return reasons
     }
 
     /// Apple Watch's own details form — verified directly against the live
@@ -1165,6 +1280,8 @@ struct SubmitAppView: View {
             Section {
                 WizardStepIndicator(step: 2, total: 3, title: "App Details", isFocused: $isStepFocused)
                 backButton
+                Text("Confirm the app's basic details, then describe its accessibility for AppleVis members.")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             Section {
                 if isMetadataFromAppStore {
@@ -1282,6 +1399,11 @@ struct SubmitAppView: View {
             }
 
             Section {
+                // Combined label+counter into one live-updating swipe-stop,
+                // and hid the trailing caption from VoiceOver — it repeats
+                // text already in the field's own hint above. Same fix
+                // applied to every minimum-length field across every
+                // wizard. Reported directly.
                 HStack {
                     Text("Accessibility Comments").font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -1289,8 +1411,10 @@ struct SubmitAppView: View {
                         .font(.caption)
                         .fontWeight(watchAccessibilityCommentsLength < 20 ? .bold : .regular)
                         .foregroundStyle(watchAccessibilityCommentsLength < 20 ? .red : .secondary)
-                        .accessibilityLabel(watchAccessibilityCommentsLength < 20 ? String(localized: "\(watchAccessibilityCommentsLength) of 20 minimum characters") : String(localized: "\(watchAccessibilityCommentsLength) characters"))
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(watchAccessibilityCommentsLength < 20 ? String(localized: "Accessibility Comments: \(watchAccessibilityCommentsLength) of 20 minimum characters") : String(localized: "Accessibility Comments: \(watchAccessibilityCommentsLength) characters"))
+                .accessibilityAddTraits(.updatesFrequently)
                 TextEditor(text: $watchPayload.accessibilityComments)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
@@ -1308,6 +1432,7 @@ struct SubmitAppView: View {
                 Text("Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
             }
 
             Section("Other Comments (optional)") {
@@ -1325,7 +1450,40 @@ struct SubmitAppView: View {
                     }
                 rewriteButton(text: $watchPayload.otherComments)
             }
+            Section {
+                WizardBlockingNote(reasons: watchDetailsBlockingReasons)
+                WizardBottomButton(String(localized: "Review & Submit"), isEnabled: isWatchValid, action: goNext)
+            }
         }
+    }
+
+    private var watchDetailsBlockingReasons: [String] {
+        var reasons: [String] = []
+        if watchPayload.appName.trimmingCharacters(in: .whitespaces).isEmpty {
+            reasons.append(String(localized: "Enter the app name to continue."))
+        }
+        if watchPayload.appStoreUrl.trimmingCharacters(in: .whitespaces).isEmpty {
+            reasons.append(String(localized: "Enter the App Store URL to continue."))
+        }
+        if watchPayload.category.isEmpty {
+            reasons.append(String(localized: "Choose a category to continue."))
+        }
+        if watchPayload.watchosVersion.trimmingCharacters(in: .whitespaces).isEmpty {
+            reasons.append(String(localized: "Enter the minimum watchOS version to continue."))
+        }
+        if watchPayload.appDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            reasons.append(String(localized: "Enter the app's description to continue."))
+        }
+        if watchPayload.price.isEmpty {
+            reasons.append(String(localized: "Choose a price to continue."))
+        }
+        if watchPayload.usability.isEmpty {
+            reasons.append(String(localized: "Rate overall usability to continue."))
+        }
+        if watchAccessibilityCommentsLength < 20 {
+            reasons.append(String(localized: "Write at least \(20 - watchAccessibilityCommentsLength) more character\(20 - watchAccessibilityCommentsLength == 1 ? "" : "s") describing accessibility to continue."))
+        }
+        return reasons
     }
 
     /// Mac's own details form — verified directly against the live
@@ -1342,6 +1500,8 @@ struct SubmitAppView: View {
             Section {
                 WizardStepIndicator(step: 2, total: 3, title: "App Details", isFocused: $isStepFocused)
                 backButton
+                Text("Confirm the app's basic details, then describe its accessibility for AppleVis members.")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             Section {
                 if isMetadataFromAppStore {
@@ -1470,6 +1630,11 @@ struct SubmitAppView: View {
             }
 
             Section {
+                // Combined label+counter into one live-updating swipe-stop,
+                // and hid the trailing caption from VoiceOver — it repeats
+                // text already in the field's own hint above. Same fix
+                // applied to every minimum-length field across every
+                // wizard. Reported directly.
                 HStack {
                     Text("Accessibility Comments").font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -1477,8 +1642,10 @@ struct SubmitAppView: View {
                         .font(.caption)
                         .fontWeight(macAccessibilityCommentsLength < 20 ? .bold : .regular)
                         .foregroundStyle(macAccessibilityCommentsLength < 20 ? .red : .secondary)
-                        .accessibilityLabel(macAccessibilityCommentsLength < 20 ? String(localized: "\(macAccessibilityCommentsLength) of 20 minimum characters") : String(localized: "\(macAccessibilityCommentsLength) characters"))
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(macAccessibilityCommentsLength < 20 ? String(localized: "Accessibility Comments: \(macAccessibilityCommentsLength) of 20 minimum characters") : String(localized: "Accessibility Comments: \(macAccessibilityCommentsLength) characters"))
+                .accessibilityAddTraits(.updatesFrequently)
                 TextEditor(text: $macPayload.accessibilityComments)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
@@ -1496,6 +1663,7 @@ struct SubmitAppView: View {
                 Text("Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
             }
 
             Section("Other Comments (optional)") {
@@ -1513,7 +1681,40 @@ struct SubmitAppView: View {
                     }
                 rewriteButton(text: $macPayload.otherComments)
             }
+            Section {
+                WizardBlockingNote(reasons: macDetailsBlockingReasons)
+                WizardBottomButton(String(localized: "Review & Submit"), isEnabled: isMacValid, action: goNext)
+            }
         }
+    }
+
+    private var macDetailsBlockingReasons: [String] {
+        var reasons: [String] = []
+        if macPayload.appName.trimmingCharacters(in: .whitespaces).isEmpty {
+            reasons.append(String(localized: "Enter the app name to continue."))
+        }
+        if macPayload.category.isEmpty {
+            reasons.append(String(localized: "Choose a category to continue."))
+        }
+        if macPayload.appVersion.trimmingCharacters(in: .whitespaces).isEmpty {
+            reasons.append(String(localized: "Enter the app version to continue."))
+        }
+        if macPayload.osxVersionTested.trimmingCharacters(in: .whitespaces).isEmpty {
+            reasons.append(String(localized: "Enter the version of macOS tested to continue."))
+        }
+        if macPayload.appDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            reasons.append(String(localized: "Enter the app's description to continue."))
+        }
+        if macPayload.price.isEmpty {
+            reasons.append(String(localized: "Choose a price to continue."))
+        }
+        if macPayload.usability.isEmpty {
+            reasons.append(String(localized: "Rate overall usability to continue."))
+        }
+        if macAccessibilityCommentsLength < 20 {
+            reasons.append(String(localized: "Write at least \(20 - macAccessibilityCommentsLength) more character\(20 - macAccessibilityCommentsLength == 1 ? "" : "s") describing accessibility to continue."))
+        }
+        return reasons
     }
 
     /// Was a toolbar button under the overflow "More" menu, scoped only to
@@ -1681,6 +1882,8 @@ struct SubmitAppView: View {
             Section {
                 WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused)
                 backButton
+                Text("Check your details, then tap Submit.")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             if isCheckingDuplicates {
                 Section {
@@ -1767,7 +1970,27 @@ struct SubmitAppView: View {
                     WizardReviewRow(label: "Additional Comments", value: payload.otherComments)
                 }
             }
+            Section {
+                WizardBlockingNote(reasons: reviewBlockingReasons)
+                WizardBottomButton(
+                    String(localized: "Submit"),
+                    isEnabled: isValid && !isSubmitting && exactDuplicateMatches.isEmpty && networkMonitor.isConnected
+                ) { Task { await submit() } }
+            }
         }
+    }
+
+    private var reviewBlockingReasons: [String] {
+        var reasons: [String] = []
+        if !exactDuplicateMatches.isEmpty {
+            reasons.append(String(localized: "Choose a different app to continue — this one is already in the App Directory."))
+        } else if !duplicateMatches.isEmpty && !acknowledgedDuplicate {
+            reasons.append(String(localized: "Confirm this is a different app to continue."))
+        }
+        if !networkMonitor.isConnected {
+            reasons.append(String(localized: "You're offline. Reconnect to continue."))
+        }
+        return reasons
     }
 
     private var tvReviewSection: some View {
@@ -1775,6 +1998,8 @@ struct SubmitAppView: View {
             Section {
                 WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused)
                 backButton
+                Text("Check your details, then tap Submit.")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             // No duplicate check runs for tvOS submissions (see `goNext()`)
             // — the endpoint it would call can't search Apple TV entries.
@@ -1797,6 +2022,13 @@ struct SubmitAppView: View {
                     WizardReviewRow(label: "Other Comments", value: tvPayload.otherComments)
                 }
             }
+            Section {
+                WizardBlockingNote(reasons: networkMonitor.isConnected ? [] : [String(localized: "You're offline. Reconnect to continue.")])
+                WizardBottomButton(
+                    String(localized: "Submit"),
+                    isEnabled: isValid && !isSubmitting && networkMonitor.isConnected
+                ) { Task { await submit() } }
+            }
         }
     }
 
@@ -1805,6 +2037,8 @@ struct SubmitAppView: View {
             Section {
                 WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused)
                 backButton
+                Text("Check your details, then tap Submit.")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             // No duplicate check runs for watchOS submissions (see
             // `goNext()`) — the endpoint it would call can't search Apple
@@ -1834,6 +2068,13 @@ struct SubmitAppView: View {
                     WizardReviewRow(label: "Other Comments", value: watchPayload.otherComments)
                 }
             }
+            Section {
+                WizardBlockingNote(reasons: networkMonitor.isConnected ? [] : [String(localized: "You're offline. Reconnect to continue.")])
+                WizardBottomButton(
+                    String(localized: "Submit"),
+                    isEnabled: isValid && !isSubmitting && networkMonitor.isConnected
+                ) { Task { await submit() } }
+            }
         }
     }
 
@@ -1842,6 +2083,8 @@ struct SubmitAppView: View {
             Section {
                 WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused)
                 backButton
+                Text("Check your details, then tap Submit.")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             // No duplicate check runs for Mac submissions (see `goNext()`)
             // — the endpoint it would call can't search Mac entries.
@@ -1873,6 +2116,13 @@ struct SubmitAppView: View {
                 Section("Additional") {
                     WizardReviewRow(label: "Other Comments", value: macPayload.otherComments)
                 }
+            }
+            Section {
+                WizardBlockingNote(reasons: networkMonitor.isConnected ? [] : [String(localized: "You're offline. Reconnect to continue.")])
+                WizardBottomButton(
+                    String(localized: "Submit"),
+                    isEnabled: isValid && !isSubmitting && networkMonitor.isConnected
+                ) { Task { await submit() } }
             }
         }
     }

@@ -42,13 +42,16 @@ struct AccountEndpoints {
 
         var uuid = ""
         var roles: [String] = []
+        var email: String?
         do {
             uuid = try await resolveUuid(uid: response.currentUser.uid, csrfToken: response.csrfToken) ?? ""
             if !uuid.isEmpty {
                 do {
-                    roles = try await resolveRoles(uuid: uuid, csrfToken: response.csrfToken)
+                    let details = try await resolveAccountDetails(uuid: uuid, csrfToken: response.csrfToken)
+                    roles = details.roles
+                    email = details.email
                 } catch {
-                    AppLog.auth.error("resolveRoles failed for uuid \(uuid, privacy: .private): \(error, privacy: .private)")
+                    AppLog.auth.error("resolveAccountDetails failed for uuid \(uuid, privacy: .private): \(error, privacy: .private)")
                 }
             } else {
                 AppLog.auth.error("resolveUuid found no user--user resource for uid \(response.currentUser.uid, privacy: .private) — roles cannot be resolved")
@@ -63,7 +66,8 @@ struct AccountEndpoints {
             name: response.currentUser.name,
             csrfToken: response.csrfToken,
             logoutToken: response.logoutToken,
-            roles: roles
+            roles: roles,
+            email: email
         )
     }
 
@@ -172,13 +176,18 @@ struct AccountEndpoints {
         return response.data.first?.id
     }
 
-    /// Returns all Drupal role machine names assigned to this user. The
-    /// relationship's `id` is always a role UUID; the machine name is exposed
-    /// separately via `meta.drupal_internal__target_id`.
-    func resolveRoles(uuid: String, csrfToken: String) async throws -> [String] {
+    /// Returns all Drupal role machine names assigned to this user, plus
+    /// their account email — both come off the same `user--user` resource
+    /// `changeEmail` above already proves carries a `mail` attribute, so one
+    /// request covers both instead of a second round trip just for email.
+    /// The role relationship's `id` is always a role UUID; the machine name
+    /// is exposed separately via `meta.drupal_internal__target_id`.
+    func resolveAccountDetails(uuid: String, csrfToken: String) async throws -> (roles: [String], email: String?) {
         let response = try await client.jsonAPISingle("user/user/\(uuid)", headers: ["X-CSRF-Token": csrfToken])
         let roleRefs = response.data.relationships["roles"]?["data"]?.arrayValue ?? []
-        return roleRefs.compactMap { $0["meta"]?["drupal_internal__target_id"]?.stringValue }
+        let roles = roleRefs.compactMap { $0["meta"]?["drupal_internal__target_id"]?.stringValue }
+        let email = response.data.attributes["mail"]?.stringValue
+        return (roles, email)
     }
 
     func deleteAccount(uuid: String, csrfToken: String) async throws {

@@ -83,8 +83,10 @@ struct ContactView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var networkMonitor: NetworkMonitor
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
+    @StateObject private var domainChecker = EmailDomainChecker()
     @AccessibilityFocusState private var isStepFocused: Bool
     @AccessibilityFocusState private var isErrorFocused: Bool
 
@@ -105,6 +107,8 @@ struct ContactView: View {
     @State private var error: String?
     @State private var showDiscardConfirm = false
     @State private var messageMinimumAnnounced = false
+    @State private var showAccountEmailChange = false
+    @State private var emailSuggestionDismissed = false
 
     private var isSignedIn: Bool { auth.isSignedIn }
     private var totalSteps: Int { isSignedIn ? 3 : 4 }
@@ -122,12 +126,12 @@ struct ContactView: View {
 
     private var messageLength: Int { message.trimmingCharacters(in: .whitespacesAndNewlines).count }
     private var detailsValid: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty && email.contains("@")
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && email.isValidEmailFormat
     }
     private var messageValid: Bool { messageLength >= 20 }
     private var canSend: Bool {
         !displayName.trimmingCharacters(in: .whitespaces).isEmpty &&
-        email.contains("@") && declarationAgreed && !isSubmitting && networkMonitor.isConnected
+        email.isValidEmailFormat && declarationAgreed && !isSubmitting && networkMonitor.isConnected
     }
 
     var body: some View {
@@ -140,7 +144,12 @@ struct ContactView: View {
                         message: "Thanks for reaching out — we've received your message. We typically reply to urgent issues as soon as possible and routine enquiries within one business day.",
                         doneLabel: "Back to Profile",
                         onDone: { dismiss() }
-                    )
+                    ) {
+                        if isSignedIn, !emailSuggestionDismissed,
+                           AccountEmailUpdateSuggestion.applies(usedEmail: email, accountEmail: auth.user?.email) {
+                            AccountEmailUpdateSuggestion(isDismissed: $emailSuggestionDismissed, showEmailChangeWizard: $showAccountEmailChange)
+                        }
+                    }
                 } else {
                     Form {
                         switch step {
@@ -197,8 +206,23 @@ struct ContactView: View {
             } message: {
                 Text(step == .type ? "Your selections will be discarded." : "Your contact support message will be discarded.")
             }
+            .sheet(isPresented: $showAccountEmailChange) {
+                AccountSecurityWizard(mode: .email, initialEmail: email)
+            }
             .onAppear {
                 if name.isEmpty { name = auth.user?.name ?? "" }
+                // A signed-in user's account email is already known
+                // (AuthUser.email) — no reason to make them retype it. A
+                // signed-out guest gets their last-typed email back instead,
+                // saved in submit() below, so returning guests don't have to
+                // retype it either. Reported directly.
+                if email.isEmpty {
+                    if isSignedIn {
+                        email = auth.user?.email ?? ""
+                    } else {
+                        email = preferences.lastGuestEmail
+                    }
+                }
                 if contactType == nil { contactType = initialType }
                 // Step 1 previously got no explicit focus at all — only
                 // goNext()/goBack() ever called focusStepAfterTransition(),
@@ -237,6 +261,10 @@ struct ContactView: View {
                 ForEach(ContactType.allCases) { type in
                     typeCard(type)
                 }
+            }
+            Section {
+                WizardBlockingNote(reasons: contactType == nil ? [String(localized: "Choose a contact type to continue.")] : [])
+                WizardBottomButton(String(localized: "Next"), isEnabled: contactType != nil, action: goNext)
             }
         }
     }
@@ -280,13 +308,22 @@ struct ContactView: View {
                 Text("We need your name and email address so we can reply to you.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
-            Section("Your Details") {
+            Section {
                 TextField("Full Name or Username", text: $name)
                     .accessibilityHint(String(localized: "Required. Used to address our reply."))
                 TextField("Email", text: $email)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
                     .accessibilityHint(String(localized: "Required. Used to send you a reply."))
+                    .onChange(of: email) { _, newValue in domainChecker.check(email: newValue) }
+            } header: {
+                Text("Your Details")
+            } footer: {
+                if !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !email.isValidEmailFormat {
+                    Text("Enter a valid email address.")
+                } else {
+                    EmailDomainWarning(checker: domainChecker)
+                }
             }
             Section {
                 Text("We only use your email to reply to this message and will not add you to any mailing list.")
@@ -294,7 +331,22 @@ struct ContactView: View {
                 Text("Your details are only used to reply to this message. AppleVis does not sell or share your personal information.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            Section {
+                WizardBlockingNote(reasons: detailsBlockingReasons)
+                WizardBottomButton(String(localized: "Next"), isEnabled: detailsValid, action: goNext)
+            }
         }
+    }
+
+    private var detailsBlockingReasons: [String] {
+        var reasons: [String] = []
+        if name.trimmingCharacters(in: .whitespaces).isEmpty {
+            reasons.append(String(localized: "Enter your name to continue."))
+        }
+        if !email.isValidEmailFormat {
+            reasons.append(String(localized: "Enter a valid email address to continue."))
+        }
+        return reasons
     }
 
     // MARK: - Step 2/3: Write your message
@@ -358,6 +410,14 @@ struct ContactView: View {
                 }
             }
             Section {
+                // Previously two separate swipe-stops ("Message", then the
+                // counter) ahead of the field itself, on top of the same
+                // "minimum 20 characters" already spoken as part of the
+                // field's own hint below — three announcements for one
+                // fact. Combined into a single live-updating stop here;
+                // same fix applied to every other minimum-length field
+                // (Description, Blog Draft, Accessibility Comments, etc.)
+                // across every wizard. Reported directly.
                 HStack {
                     Text("Message").font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -365,8 +425,10 @@ struct ContactView: View {
                         .font(.caption)
                         .fontWeight(messageLength < 20 ? .bold : .regular)
                         .foregroundStyle(messageLength < 20 ? .red : .secondary)
-                        .accessibilityLabel(messageLength < 20 ? String(localized: "\(messageLength) of 20 minimum characters") : String(localized: "\(messageLength) characters"))
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(messageLength < 20 ? String(localized: "Message: \(messageLength) of 20 minimum characters") : String(localized: "Message: \(messageLength) characters"))
+                .accessibilityAddTraits(.updatesFrequently)
                 TextEditor(text: $message)
                     .frame(minHeight: 160)
                     .accessibilityLabel(String(localized: "Message"))
@@ -384,14 +446,24 @@ struct ContactView: View {
             }
             if effectiveType == .bug {
                 Section {
+                    // Previously appended just two lines (app version, iOS
+                    // version) despite the toggle's own label promising
+                    // "device info" it never actually sent. Now shares
+                    // DiagnosticInfo with About's "Copy Support Info" —
+                    // device model, build number, theme, locale, network,
+                    // and every accessibility setting (VoiceOver, Reduce
+                    // Motion, Dynamic Type, etc.), which matters more here
+                    // than almost anywhere else in the app given how many
+                    // real bugs are specific to an assistive technology
+                    // being on or off. Requested directly.
                     Toggle(isOn: $includeSysInfo) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Include app and device info").font(.subheadline.bold())
-                            Text("Appends your app version and iOS version to help diagnose the issue.")
+                            Text("Appends your app version, device, and accessibility settings (like VoiceOver) to help diagnose the issue.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                    .accessibilityHint(String(localized: "Automatically appends your app version and iOS version to help diagnose the issue."))
+                    .accessibilityHint(String(localized: "Automatically appends your app version, device, and accessibility settings to help diagnose the issue."))
                 }
                 Section {
                     Label("Tips for a helpful bug report", systemImage: "lightbulb")
@@ -403,6 +475,10 @@ struct ContactView: View {
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel(String(localized: "Tips for a helpful bug report: describe the exact steps to reproduce the issue, what you expected to happen, and what actually happened. Turn on Include app and device info above to automatically attach your version details."))
+            }
+            Section {
+                WizardBlockingNote(reasons: messageValid ? [] : [String(localized: "Write at least \(20 - messageLength) more character\(20 - messageLength == 1 ? "" : "s") to continue.")])
+                WizardBottomButton(String(localized: "Next"), isEnabled: messageValid, action: goNext)
             }
         }
     }
@@ -494,11 +570,22 @@ struct ContactView: View {
             Section("From") {
                 if isSignedIn {
                     WizardReviewRow(label: "Name", value: displayName + " (from account)")
+                    // Prefilled from AuthUser.email in onAppear above, but
+                    // kept editable unlike Name above — a reply email is far
+                    // more likely than a display name to be something
+                    // someone wants to swap (a personal address instead of
+                    // the account's), so locking it read-only the way Name
+                    // is would remove a choice with no real benefit. Matches
+                    // the same editable-after-prefill pattern already used
+                    // in Submit Bug Report, Submit Blog, and Report a
+                    // Comment. Reported directly.
                     TextField("Email", text: $email)
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
                         .accessibilityLabel(String(localized: "Email address"))
                         .accessibilityHint(String(localized: "Required. We will use this address to reply to you."))
+                        .onChange(of: email) { _, newValue in domainChecker.check(email: newValue) }
+                    EmailDomainWarning(checker: domainChecker)
                 } else {
                     WizardReviewRow(label: "Name", value: name.isEmpty ? "No name entered" : name)
                     WizardReviewRow(label: "Email", value: email.isEmpty ? "No email entered" : email)
@@ -525,7 +612,25 @@ struct ContactView: View {
                 .accessibilityHint(String(localized: "I confirm this is a genuine message, not sponsored content, advertising, an SEO submission, or any other paid proposal."))
                 .accessibilityValue(declarationAgreed ? "Checked" : "Unchecked")
             }
+            Section {
+                WizardBlockingNote(reasons: reviewBlockingReasons)
+                WizardBottomButton(
+                    isSubmitting ? String(localized: "Sending…") : String(localized: "Send Message"),
+                    isEnabled: canSend
+                ) { Task { await submit() } }
+            }
         }
+    }
+
+    private var reviewBlockingReasons: [String] {
+        var reasons: [String] = []
+        if !email.isValidEmailFormat {
+            reasons.append(String(localized: "Enter a valid email address to continue."))
+        }
+        if !declarationAgreed {
+            reasons.append(String(localized: "Confirm the declaration above to continue."))
+        }
+        return reasons
     }
 
     private var previewMessage: String {
@@ -602,8 +707,13 @@ struct ContactView: View {
 
         var finalMessage = message
         if includeSysInfo && effectiveType == .bug {
-            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
-            finalMessage += "\n\n--- App Info ---\nApp Version: AppleVis \(version)\nPlatform: iOS \(UIDevice.current.systemVersion)"
+            finalMessage += "\n\n" + DiagnosticInfo.report(
+                themeDisplayName: preferences.theme.displayName,
+                isConnected: networkMonitor.isConnected,
+                dynamicTypeSize: dynamicTypeSize,
+                isSignedIn: auth.isSignedIn,
+                isEditor: auth.user?.isAdmin ?? false
+            )
         }
 
         let result = await DrupalFormClient.submitContact(
@@ -616,6 +726,9 @@ struct ContactView: View {
         case .ok:
             SoundPlayer.shared.play(.success)
             UIAccessibility.post(notification: .announcement, argument: "Message sent successfully.")
+            if !isSignedIn {
+                preferences.lastGuestEmail = email.trimmingCharacters(in: .whitespaces)
+            }
             submitted = true
         case .failure(let message):
             error = message + "\n\nYou can also contact us at applevis.com/contact."

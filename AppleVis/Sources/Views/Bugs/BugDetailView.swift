@@ -23,6 +23,12 @@ struct BugDetailView: View {
     @State private var quotedComment: BugComment?
     @State private var discussionSummary: String?
     @State private var isSummarizingDiscussion = false
+    // Bug report-level moderation — mirrors ForumTopicDetailView's own
+    // Edit/Unpublish/Delete via DetailActionsMenu; the original reporter
+    // gets Edit + Delete, an admin/editor gets Edit + Unpublish + Delete.
+    // Previously bug reports had no owner or admin moderation at all.
+    @State private var editingBugNode: EditableNode?
+    @Environment(\.dismiss) private var dismiss
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedCommentId: String?
     @EnvironmentObject private var auth: AuthStore
@@ -32,6 +38,15 @@ struct BugDetailView: View {
     /// Matches the old app's exact "Report to Apple" / "Apple Feedback ID"
     /// destination.
     private static let feedbackAssistantURL = URL(string: "https://feedbackassistant.apple.com/")!
+
+    private func isOwnBugReport(_ detail: BugReportDetail) -> Bool {
+        guard let user = auth.user else { return false }
+        return !detail.authorId.isEmpty && user.uuid == detail.authorId
+    }
+
+    private func bugNodeTypeSuffix(for platform: BugPlatform) -> String {
+        platform == .ios ? "ios_bug_report" : "os_x_bug_report"
+    }
 
     var body: some View {
         Group {
@@ -140,16 +155,35 @@ struct BugDetailView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
+                // Kept as its own dedicated icon rather than folded into
+                // the actions menu below — filing with Apple directly is
+                // this page's primary purpose, not a secondary action worth
+                // an extra tap to reach, same reasoning as App Entry's
+                // "Open in App Store."
                 WebLink(destination: Self.feedbackAssistantURL) {
                     Image(systemName: "flag")
                 }
                 .accessibilityLabel(String(localized: "Report to Apple"))
                 .accessibilityHint(String(localized: "Opens Feedback Assistant to file this with Apple directly."))
+                DetailActionsMenu(
+                    id: detail.id, entityId: detail.nid, kind: .bugReport, title: detail.title, lastActivityAt: detail.changedAt, url: detail.url,
+                    excerpt: .excerpt(from: detail.body),
+                    isOwnContent: isOwnBugReport(detail),
+                    onAddComment: { showCompose = true },
+                    onEdit: { startEditBugReport(detail) },
+                    onUnpublish: { await unpublishBugReport(detail) },
+                    onDelete: { await deleteBugReport(detail) }
+                )
+            }
+        }
+        .sheet(item: $editingBugNode) { node in
+            EditNodeSheet(initialTitle: node.title, initialBody: node.body) { newTitle, newBody in
+                try await saveBugReportEdit(nodeTypeSuffix: node.nodeTypeSuffix, title: newTitle, body: newBody)
             }
         }
         .safeAreaInset(edge: .bottom) {
             ContentDetailActions(
-                id: detail.id, kind: .bugReport, title: detail.title, lastActivityAt: detail.changedAt, url: detail.url,
+                id: detail.id, entityId: detail.nid, kind: .bugReport, title: detail.title, lastActivityAt: detail.changedAt, url: detail.url,
                 onAddComment: { showCompose = true }
             )
         }
@@ -397,6 +431,41 @@ struct BugDetailView: View {
             summary += " Most recent comment by \(mostRecent.authorName), \(mostRecent.createdAt.formatted(.relative(presentation: .named)))."
         }
         UIAccessibility.post(notification: .announcement, argument: summary)
+    }
+
+    private func startEditBugReport(_ detail: BugReportDetail) {
+        editingBugNode = EditableNode(title: detail.title, body: detail.body, nodeTypeSuffix: bugNodeTypeSuffix(for: detail.platform))
+    }
+
+    private func saveBugReportEdit(nodeTypeSuffix: String, title: String, body: String) async throws {
+        guard let user = auth.user, let detail else { return }
+        try await APIClient.shared.content.editNode(nodeId: detail.id, nodeType: nodeTypeSuffix, title: title, body: body, csrfToken: user.csrfToken)
+        toast.success(String(localized: "Bug Report updated"))
+        await load()
+    }
+
+    private func unpublishBugReport(_ detail: BugReportDetail) async {
+        guard let user = auth.user else { return }
+        do {
+            try await APIClient.shared.content.unpublishNode(nodeId: detail.id, nodeType: bugNodeTypeSuffix(for: detail.platform), csrfToken: user.csrfToken)
+            toast.success(String(localized: "Bug Report unpublished"))
+        } catch {
+            toast.error(String(localized: "Couldn't unpublish."))
+        }
+    }
+
+    /// Deletes the bug report currently being viewed — unlike row-level
+    /// deletion elsewhere, there's no list to prune; the only sensible next
+    /// step is leaving the screen, matching ForumTopicDetailView.deleteTopic().
+    private func deleteBugReport(_ detail: BugReportDetail) async {
+        guard let user = auth.user else { return }
+        do {
+            try await APIClient.shared.content.deleteNode(nodeId: detail.id, nodeType: bugNodeTypeSuffix(for: detail.platform), csrfToken: user.csrfToken)
+            toast.success(String(localized: "Bug Report deleted"))
+            dismiss()
+        } catch {
+            toast.error(String(localized: "Couldn't delete."))
+        }
     }
 
     private func load() async {

@@ -109,7 +109,7 @@ struct ContentView: View {
             Button("Maybe Later", role: .cancel) {}
             Button("No Thanks") { GuidedExperienceStore.disableAutoPrompt() }
         } message: {
-            Text("See a short, skippable walkthrough of Home, Discover, For You, Search, Profile, and Settings.")
+            Text("A tab-by-tab walkthrough of Home, Discover, For You, and Profile & Settings — go at your own pace, and skip or pause anytime.")
         }
         .alert(
             "AppleVis is written in English",

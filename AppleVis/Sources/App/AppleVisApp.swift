@@ -59,6 +59,14 @@ struct AppleVisApp: App {
             .environmentObject(keyCommands)
             .environmentObject(guidedExperiencePause)
             .preferredColorScheme(preferences.colorScheme)
+            // Switching themes (Settings, Appearance, or onboarding) used
+            // to snap instantly between color schemes — a genuinely
+            // jarring full-screen flash. A brief crossfade softens it
+            // without adding perceptible lag. Sighted-only in effect
+            // (VoiceOver has nothing to announce either way); respects
+            // Reduce Motion like every other explicit animation in the
+            // app. Requested directly.
+            .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut(duration: 0.3), value: preferences.theme)
             .tint(preferences.accentColor)
             .overlay { TipOverlay(tips: tips) }
             .overlay { GuidedExperienceResumeBanner(pauseStore: guidedExperiencePause, preferences: preferences, keyCommands: keyCommands) }

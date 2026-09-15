@@ -597,6 +597,15 @@ struct AppEndpoints {
         }
     }
 
+    private static func commentBundleId(for platform: AppPlatform) -> CommentBundle {
+        switch platform {
+        case .tvos:    return .tvApp
+        case .watchos: return .watchApp
+        case .macos:   return .macApp
+        case .ios:     return .iosApp
+        }
+    }
+
     private static func nodeType(for platform: AppPlatform) -> String {
         switch platform {
         case .tvos:    return "tv_directory"
@@ -606,28 +615,45 @@ struct AppEndpoints {
         }
     }
 
-    func updateAppInformation(detail: AppDetail, metadata: ItunesMetadata, csrfToken: String) async throws {
+    /// `includedFields` are `AppInfoFieldDiff.id`s ("title", "description",
+    /// "link", "version") the editor left switched on in `UpdateAppInfoSheet`
+    /// — only those attributes are sent, so a field the editor deselected
+    /// (or one that already matched the App Store listing) is left
+    /// completely untouched rather than silently rewritten with the same
+    /// value. Requested directly, replacing the old all-or-nothing update.
+    func updateAppInformation(detail: AppDetail, metadata: ItunesMetadata, includedFields: Set<String>, csrfToken: String) async throws {
         let nodeType = Self.nodeType(for: detail.platform)
-        let title = metadata.appName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? detail.name : metadata.appName
-        let description = metadata.appStoreDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? detail.body
-            : metadata.appStoreDescription
+        var attributes: [String: AnyEncodable] = [:]
 
-        var attributes: [String: AnyEncodable] = [
-            "title": AnyEncodable(title),
-            "body": AnyEncodable(RichTextBodyValue(value: description, summary: "", format: "basic_html")),
-        ]
-
-        if detail.platform != .tvos {
-            let appStoreUrl = metadata.appStoreUrl.trimmingCharacters(in: .whitespacesAndNewlines)
-            let version = metadata.version.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !appStoreUrl.isEmpty {
-                attributes["field_link2"] = AnyEncodable(LinkValue(uri: appStoreUrl, title: ""))
-            }
-            if !version.isEmpty {
-                attributes["field_version"] = AnyEncodable(version)
+        if includedFields.contains("title") {
+            let title = metadata.appName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !title.isEmpty {
+                attributes["title"] = AnyEncodable(title)
             }
         }
+        if includedFields.contains("description") {
+            let description = metadata.appStoreDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !description.isEmpty {
+                attributes["body"] = AnyEncodable(RichTextBodyValue(value: description, summary: "", format: drupalDefaultTextFormat))
+            }
+        }
+
+        if detail.platform != .tvos {
+            if includedFields.contains("link") {
+                let appStoreUrl = metadata.appStoreUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !appStoreUrl.isEmpty {
+                    attributes["field_link2"] = AnyEncodable(LinkValue(uri: appStoreUrl, title: ""))
+                }
+            }
+            if includedFields.contains("version") {
+                let version = metadata.version.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !version.isEmpty {
+                    attributes["field_version"] = AnyEncodable(version)
+                }
+            }
+        }
+
+        guard !attributes.isEmpty else { return }
 
         try await client.jsonAPIUpdate(
             "node/\(nodeType)/\(detail.id)",
@@ -653,16 +679,17 @@ struct AppEndpoints {
     func submitReview(appId: String, subject: String = "Review", body: String, csrfToken: String, platform: AppPlatform) async throws -> AppReview {
         let nodeType = Self.nodeType(for: platform)
         let commentBundle = Self.commentBundle(for: platform)
+        let bundleId = Self.commentBundleId(for: platform)
+        var attributes = bundleId.baseAttributes
+        attributes["subject"] = AnyEncodable(subject.isEmpty ? "Review" : subject)
+        attributes["comment_body"] = AnyEncodable(RichTextValue(value: body, format: drupalDefaultTextFormat))
         let response = try await client.jsonAPICreate(
             "comment/\(commentBundle)",
             type: "comment--\(commentBundle)",
-            attributes: [
-                "subject": AnyEncodable(subject.isEmpty ? "Review" : subject),
-                "comment_body": AnyEncodable(RichTextValue(value: body, format: "basic_html")),
-            ],
+            attributes: attributes,
             relationships: [
                 "entity_id": JsonApiRelationshipRef(type: "node--\(nodeType)", id: appId),
-                "comment_type": JsonApiRelationshipRef(type: "comment_type--comment_type", id: commentBundle),
+                "comment_type": bundleId.commentTypeRelationship,
             ],
             headers: ["X-CSRF-Token": csrfToken]
         )
@@ -696,11 +723,11 @@ struct AppEndpoints {
             "field_voiceover": AnyEncodable(payload.voiceOverPerformance),
             "field_labelling": AnyEncodable(payload.buttonLabelling),
             "field_usability": AnyEncodable(payload.usabilityNotes),
-            "field_comments": AnyEncodable(RichTextValue(value: payload.accessibilityComments, format: "basic_html")),
-            "body": AnyEncodable(RichTextBodyValue(value: payload.appStoreDescription, summary: bodySummary, format: "basic_html")),
+            "field_comments": AnyEncodable(RichTextValue(value: payload.accessibilityComments, format: drupalDefaultTextFormat)),
+            "body": AnyEncodable(RichTextBodyValue(value: payload.appStoreDescription, summary: bodySummary, format: drupalDefaultTextFormat)),
         ]
         if !payload.otherComments.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            attributes["field_other_comments"] = AnyEncodable(RichTextValue(value: payload.otherComments, format: "basic_html"))
+            attributes["field_other_comments"] = AnyEncodable(RichTextValue(value: payload.otherComments, format: drupalDefaultTextFormat))
         }
         if !payload.developerWebsite.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             attributes["field_link3"] = AnyEncodable(LinkValue(uri: payload.developerWebsite, title: ""))
@@ -795,11 +822,11 @@ struct AppEndpoints {
             "status": AnyEncodable(true),
             "field_cost": AnyEncodable(payload.price),
             "field_usability_tv": AnyEncodable(payload.usability),
-            "field_comments": AnyEncodable(RichTextValue(value: payload.accessibilityComments, format: "basic_html")),
-            "body": AnyEncodable(RichTextBodyValue(value: payload.appDescription, summary: "", format: "basic_html")),
+            "field_comments": AnyEncodable(RichTextValue(value: payload.accessibilityComments, format: drupalDefaultTextFormat)),
+            "body": AnyEncodable(RichTextBodyValue(value: payload.appDescription, summary: "", format: drupalDefaultTextFormat)),
         ]
         if !payload.otherComments.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            attributes["field_other_comments"] = AnyEncodable(RichTextValue(value: payload.otherComments, format: "basic_html"))
+            attributes["field_other_comments"] = AnyEncodable(RichTextValue(value: payload.otherComments, format: drupalDefaultTextFormat))
         }
 
         var relationships: [String: JsonApiRelationshipRef] = [:]
@@ -845,11 +872,11 @@ struct AppEndpoints {
             "field_cost": AnyEncodable(payload.price),
             "field_watchos_version": AnyEncodable(payload.watchosVersion),
             "field_usability_watch": AnyEncodable(payload.usability),
-            "field_comments": AnyEncodable(RichTextValue(value: payload.accessibilityComments, format: "basic_html")),
-            "body": AnyEncodable(RichTextBodyValue(value: payload.appDescription, summary: "", format: "basic_html")),
+            "field_comments": AnyEncodable(RichTextValue(value: payload.accessibilityComments, format: drupalDefaultTextFormat)),
+            "body": AnyEncodable(RichTextBodyValue(value: payload.appDescription, summary: "", format: drupalDefaultTextFormat)),
         ]
         if !payload.otherComments.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            attributes["field_other_comments"] = AnyEncodable(RichTextValue(value: payload.otherComments, format: "basic_html"))
+            attributes["field_other_comments"] = AnyEncodable(RichTextValue(value: payload.otherComments, format: drupalDefaultTextFormat))
         }
         if !payload.developerWebsite.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             attributes["field_link3"] = AnyEncodable(LinkValue(uri: payload.developerWebsite, title: ""))
@@ -895,11 +922,11 @@ struct AppEndpoints {
             "field_cost": AnyEncodable(payload.price),
             "field_osx_version": AnyEncodable(payload.osxVersionTested),
             "field_usability": AnyEncodable(payload.usability),
-            "field_comments": AnyEncodable(RichTextValue(value: payload.accessibilityComments, format: "basic_html")),
-            "body": AnyEncodable(RichTextBodyValue(value: payload.appDescription, summary: "", format: "basic_html")),
+            "field_comments": AnyEncodable(RichTextValue(value: payload.accessibilityComments, format: drupalDefaultTextFormat)),
+            "body": AnyEncodable(RichTextBodyValue(value: payload.appDescription, summary: "", format: drupalDefaultTextFormat)),
         ]
         if !payload.otherComments.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            attributes["field_other_comments"] = AnyEncodable(RichTextValue(value: payload.otherComments, format: "basic_html"))
+            attributes["field_other_comments"] = AnyEncodable(RichTextValue(value: payload.otherComments, format: drupalDefaultTextFormat))
         }
         if !payload.appStoreUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             attributes["field_link2"] = AnyEncodable(LinkValue(uri: payload.appStoreUrl, title: ""))

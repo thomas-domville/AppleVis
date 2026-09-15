@@ -31,6 +31,7 @@ struct SubmitBlogView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
+    @StateObject private var domainChecker = EmailDomainChecker()
     @AccessibilityFocusState private var isStepFocused: Bool
     @AccessibilityFocusState private var isErrorFocused: Bool
 
@@ -63,6 +64,8 @@ struct SubmitBlogView: View {
     @State private var showDiscardConfirm = false
     @State private var submitted = false
     @State private var blogDraftMinimumAnnounced = false
+    @State private var showAccountEmailChange = false
+    @State private var emailSuggestionDismissed = false
 
     /// Set when opened from the Share Extension with shared text.
     init(prefillText: String? = nil) {
@@ -84,15 +87,24 @@ struct SubmitBlogView: View {
         blogDraftLength >= 50 && emailValid && !pitchMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    private var emailValid: Bool {
-        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count <= 254 else { return false }
-        let parts = trimmed.split(separator: "@", omittingEmptySubsequences: false)
-        guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else { return false }
-        guard parts[1].contains(".") else { return false }
-        guard !trimmed.contains(" ") else { return false }
-        return true
+    private var contentBlockingReasons: [String] {
+        var reasons: [String] = []
+        if !emailValid {
+            reasons.append(String(localized: "Enter a valid email address to continue."))
+        }
+        if pitchMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            reasons.append(String(localized: "Tell us why this post would interest AppleVis readers to continue."))
+        }
+        if blogDraftLength < 50 {
+            reasons.append(String(localized: "Write at least \(50 - blogDraftLength) more character\(50 - blogDraftLength == 1 ? "" : "s") to continue."))
+        }
+        return reasons
     }
+
+    // Moved to String.isValidEmailFormat (EmailValidation.swift) so Contact
+    // Us, Submit Bug Report, and Report a Comment can share the same check
+    // instead of each having their own weaker "contains @" test.
+    private var emailValid: Bool { email.isValidEmailFormat }
 
     /// Mirrors Contact's crossing-the-threshold announcement so VoiceOver
     /// users learn the moment they can continue, not just via Next's
@@ -117,7 +129,12 @@ struct SubmitBlogView: View {
                         message: "Your draft is now in front of our editorial team. We genuinely appreciate you taking the time to write for AppleVis, and we'll be in touch soon with our decision.",
                         doneLabel: "Done",
                         onDone: { dismiss() }
-                    )
+                    ) {
+                        if !emailSuggestionDismissed,
+                           AccountEmailUpdateSuggestion.applies(usedEmail: email, accountEmail: auth.user?.email) {
+                            AccountEmailUpdateSuggestion(isDismissed: $emailSuggestionDismissed, showEmailChangeWizard: $showAccountEmailChange)
+                        }
+                    }
                 } else if !auth.isSignedIn {
                     signInRequiredView
                 } else {
@@ -164,11 +181,23 @@ struct SubmitBlogView: View {
         .sheet(isPresented: $showSignIn) {
             SignInView()
         }
+        .sheet(isPresented: $showAccountEmailChange) {
+            AccountSecurityWizard(mode: .email, initialEmail: email)
+        }
         // Step 1 previously got no explicit focus at all — only
         // goNext()/goBack() ever called focusStepAfterTransition(), so
         // opening this wizard left VoiceOver focus on system default
         // (typically Cancel). Full app-wide focus audit, requested directly.
-        .task { focusStepAfterTransition() }
+        .task {
+            // The live website pre-fills this same field with the signed-in
+            // user's real account email (see the `email` property comment
+            // above) — AuthUser.email now lets the app match that instead of
+            // making a signed-in user retype it. Reported directly.
+            if email.isEmpty, let acctEmail = auth.user?.email {
+                email = acctEmail
+            }
+            focusStepAfterTransition()
+        }
     }
 
     private var signInRequiredView: some View {
@@ -180,6 +209,7 @@ struct SubmitBlogView: View {
             Text("Sign In Required")
                 .font(.headline)
                 .accessibilityAddTraits(.isHeader)
+                .accessibilityFocused($isStepFocused)
             Text("You need to be signed in to your AppleVis account to submit a blog post.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -207,7 +237,22 @@ struct SubmitBlogView: View {
                 }
                 .accessibilityHint(String(localized: "Required."))
             }
+            Section {
+                WizardBlockingNote(reasons: detailsBlockingReasons)
+                WizardBottomButton(String(localized: "Next"), isEnabled: detailsValid, action: goNext)
+            }
         }
+    }
+
+    private var detailsBlockingReasons: [String] {
+        var reasons: [String] = []
+        if title.trimmingCharacters(in: .whitespaces).isEmpty {
+            reasons.append(String(localized: "Enter a blog title to continue."))
+        }
+        if category.isEmpty {
+            reasons.append(String(localized: "Choose a category to continue."))
+        }
+        return reasons
     }
 
     private var contentSection: some View {
@@ -215,18 +260,23 @@ struct SubmitBlogView: View {
             Section {
                 WizardStepIndicator(step: 2, total: 3, title: "Your Content", isFocused: $isStepFocused)
                 backButton
+                Text("Add your email so our editorial team can reply, then tell us about your post and write or import your draft.")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             Section {
                 TextField("Your Email", text: $email)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
                     .accessibilityHint(String(localized: "Required. The AppleVis editorial team may reply to follow up on your submission."))
+                    .onChange(of: email) { _, newValue in domainChecker.check(email: newValue) }
             } header: {
                 Text("Your Email")
             } footer: {
                 if !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !emailValid {
                     Text("Enter a valid email address.")
                         .foregroundStyle(.red)
+                } else {
+                    EmailDomainWarning(checker: domainChecker)
                 }
             }
             if intelligence.showTranslatePrompt {
@@ -285,6 +335,9 @@ struct SubmitBlogView: View {
                 Text("Tell us a little about your blog post and why you think it would be of interest and value to the AppleVis community.")
             }
             Section {
+                // Combined label+counter into one live-updating swipe-stop
+                // instead of two. Same fix applied to every minimum-length
+                // field across every wizard. Reported directly.
                 HStack {
                     Text("Blog Post Draft").font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -292,8 +345,10 @@ struct SubmitBlogView: View {
                         .font(.caption)
                         .fontWeight(blogDraftLength < 50 ? .bold : .regular)
                         .foregroundStyle(blogDraftLength < 50 ? .red : .secondary)
-                        .accessibilityLabel(blogDraftLength < 50 ? String(localized: "\(blogDraftLength) of 50 minimum characters") : String(localized: "\(blogDraftLength) characters"))
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(blogDraftLength < 50 ? String(localized: "Blog Post Draft: \(blogDraftLength) of 50 minimum characters") : String(localized: "Blog Post Draft: \(blogDraftLength) characters"))
+                .accessibilityAddTraits(.updatesFrequently)
                 TextEditor(text: $blogDraft)
                     .frame(minHeight: 200)
                     .accessibilityLabel(String(localized: "Blog Post Draft"))
@@ -325,6 +380,10 @@ struct SubmitBlogView: View {
                     .accessibilityHint(String(localized: "Replaces the draft with the contents of the clipboard."))
                 }
                 .buttonStyle(.borderless)
+            }
+            Section {
+                WizardBlockingNote(reasons: contentBlockingReasons)
+                WizardBottomButton(String(localized: "Next"), isEnabled: contentValid, action: goNext)
             }
         }
         .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.plainText, .text, .rtf], onCompletion: handleFileImport)
@@ -405,6 +464,8 @@ struct SubmitBlogView: View {
             Section {
                 WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused)
                 backButton
+                Text("Check your details, then tap Submit.")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             Section("Blog Post") {
                 WizardReviewRow(label: "Title", value: title)
@@ -423,6 +484,12 @@ struct SubmitBlogView: View {
                     OfflineComposeNotice()
                 }
                 .listRowSeparator(.hidden)
+            }
+            Section {
+                WizardBottomButton(
+                    String(localized: "Submit"),
+                    isEnabled: !isSubmitting && networkMonitor.isConnected
+                ) { Task { await submit() } }
             }
         }
     }

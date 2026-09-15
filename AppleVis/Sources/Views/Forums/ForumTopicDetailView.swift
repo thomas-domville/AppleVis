@@ -44,11 +44,8 @@ struct ForumTopicDetailView: View {
     // row's long-press menu (ContentActionsModifier); the detail screen for
     // the topic itself had no Edit/Delete/Unpublish at all.
     @State private var editingTopicNode: EditableNode?
-    @State private var showDeleteTopicConfirm = false
-    @State private var showUnpublishTopicConfirm = false
     @Environment(\.dismiss) private var dismiss
 
-    private var isAdmin: Bool { auth.user?.isAdmin ?? false }
     private var isOwnTopic: Bool {
         guard let detail, let user = auth.user else { return false }
         return !detail.authorId.isEmpty && user.uuid == detail.authorId
@@ -99,32 +96,17 @@ struct ForumTopicDetailView: View {
         }
         .handoff(title: detail?.title, url: detail?.url)
         .toolbar {
-            // Owner-only actions gated on !isAdmin: an owner who is also an
-            // admin already gets the superset admin block below (which also
-            // adds Unpublish) — otherwise they'd see two indistinguishable
-            // "Edit Topic" entries, the same duplicate class of bug fixed
-            // app-wide for row context menus in ContentActionsModifier.
-            if isOwnTopic && !isAdmin {
+            if let detail {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button { startEditTopic() } label: { Label("Edit Topic", systemImage: "pencil") }
-                        Button(role: .destructive) { showDeleteTopicConfirm = true } label: { Label("Delete Topic", systemImage: "trash") }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                    .accessibilityLabel(String(localized: "Topic actions"))
-                }
-            }
-            if isAdmin {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button { startEditTopic() } label: { Label("Edit Topic", systemImage: "pencil") }
-                        Button { showUnpublishTopicConfirm = true } label: { Label("Unpublish Topic", systemImage: "eye.slash") }
-                        Button(role: .destructive) { showDeleteTopicConfirm = true } label: { Label("Delete Topic", systemImage: "trash") }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                    .accessibilityLabel(String(localized: "Topic actions"))
+                    DetailActionsMenu(
+                        id: detail.id, entityId: detail.nid, kind: .forumTopic, title: detail.title, lastActivityAt: detail.lastActivityAt, url: detail.url,
+                        authorName: detail.authorName, excerpt: .excerpt(from: detail.body),
+                        isOwnContent: isOwnTopic,
+                        onAddComment: { showReplyCompose = true },
+                        onEdit: { startEditTopic() },
+                        onUnpublish: { await unpublishTopic() },
+                        onDelete: { await deleteTopic() }
+                    )
                 }
             }
         }
@@ -132,20 +114,6 @@ struct ForumTopicDetailView: View {
             EditNodeSheet(initialTitle: node.title, initialBody: node.body) { newTitle, newBody in
                 try await saveTopicEdit(title: newTitle, body: newBody)
             }
-        }
-        .confirmationDialog(
-            "Unpublish this topic?", isPresented: $showUnpublishTopicConfirm, titleVisibility: .visible
-        ) {
-            Button("Unpublish", role: .destructive) { Task { await unpublishTopic() } }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This hides it from public view.")
-        }
-        .confirmationDialog(
-            "Delete this topic?", isPresented: $showDeleteTopicConfirm, titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) { Task { await deleteTopic() } }
-            Button("Cancel", role: .cancel) {}
         }
         .task {
             SoundPlayer.shared.play(.articleOpen)
@@ -255,9 +223,15 @@ struct ForumTopicDetailView: View {
                         }
 
                         ForEach(Array(detail.replies.enumerated()), id: \.element.id) { index, reply in
+                            // The parent is always on this same topic — Drupal's
+                            // `pid` only ever points within the same commented
+                            // entity — so this is a plain lookup in the page
+                            // already on screen, never a second fetch.
+                            let parentReply = reply.parentId.flatMap { pid in detail.replies.first(where: { $0.id == pid }) }
                             ReplyView(
                                 reply: reply, index: index, total: detail.replies.count,
                                 topicAuthorId: detail.authorId, topicTitle: detail.title, topicURL: detail.url,
+                                parentAuthorName: parentReply?.authorName,
                                 onReplyTo: {
                                     guard auth.isSignedIn else {
                                         toast.warning(String(localized: "Sign in to reply to posts."))
@@ -265,13 +239,14 @@ struct ForumTopicDetailView: View {
                                     }
                                     quotedReplyTarget = reply
                                 },
+                                onJumpToParent: parentReply.map { parent in { pendingFocusReplyId = parent.id } },
                                 onDelete: { removeReplyLocally(reply, announcement: "Reply deleted.") },
                                 onEdit: { newBody in
                                     guard let idx = self.detail?.replies.firstIndex(where: { $0.id == reply.id }) else { return }
                                     self.detail?.replies[idx] = ForumReply(
                                         id: reply.id, subject: reply.subject, authorName: reply.authorName,
                                         authorId: reply.authorId, body: newBody, createdAt: reply.createdAt,
-                                        loveCount: reply.loveCount, isNew: reply.isNew
+                                        loveCount: reply.loveCount, isNew: reply.isNew, parentId: reply.parentId
                                     )
                                 },
                                 onUnpublish: { removeReplyLocally(reply, announcement: "Comment unpublished.") },
@@ -335,13 +310,21 @@ struct ForumTopicDetailView: View {
                 }
             }
             // "Replies to Me" only means anything once signed in — auth.user
-            // is nil otherwise, and isDirectedAt(_:body:) already returns
-            // false for an empty name, but the rotor shouldn't advertise a
+            // is nil otherwise, and both match checks below already return
+            // false without one, but the rotor shouldn't advertise a
             // category that can never have entries for a signed-out reader.
+            // Checks the real `pid` relationship first (reliable — matches
+            // by account id, not display name) and falls back to the old
+            // text-quote heuristic for replies posted before the site
+            // exposed `pid` at all, which never set it.
             .accessibilityRotor("Replies to Me") {
                 ForEach(detail.replies.filter { reply in
-                    guard let name = auth.user?.name else { return false }
-                    return QuotedReply.isDirectedAt(name, body: reply.body)
+                    guard let user = auth.user else { return false }
+                    if let parentId = reply.parentId,
+                       let parent = detail.replies.first(where: { $0.id == parentId }) {
+                        return parent.authorId == user.uuid
+                    }
+                    return QuotedReply.isDirectedAt(user.name, body: reply.body)
                 }) { reply in
                     AccessibilityRotorEntry(reply.authorName, id: reply.id)
                 }
@@ -472,8 +455,12 @@ struct ForumTopicDetailView: View {
         error = nil
         do {
             detail = try await APIClient.shared.forums.topicDetail(id: topicId)
-            isFollowing = detail.map { PersistenceStore.shared.isFollowed(id: $0.id) } ?? false
+            isFollowing = detail.map { PersistenceStore.shared.isFollowed(id: $0.id) || FollowStore.shared.isFollowed($0.id) } ?? false
             isSaved = detail.map { PersistenceStore.shared.isSaved(id: $0.id) } ?? false
+            if let user = auth.user, let topicUuid = detail?.id {
+                await FollowStore.shared.loadIfNeeded(for: user)
+                isFollowing = isFollowing || FollowStore.shared.isFollowed(topicUuid)
+            }
             PersistenceStore.shared.markTopicSeen(id: topicId)
             PersistenceStore.shared.lastViewedForumTopicId = topicId
             // ForumReply.isNew was hardcoded false in Mappers.swift and never
@@ -544,14 +531,16 @@ struct ForumTopicDetailView: View {
                 try await APIClient.shared.forums.unfollow(nodeUuid: d.id, token: user.csrfToken)
                 isFollowing = false
                 PersistenceStore.shared.markUnfollowed(id: d.id)
+                FollowStore.shared.markNotFollowed(d.id)
                 toast.success(String(localized: "Unfollowed topic"))
             } else {
-                try await APIClient.shared.forums.follow(nodeUuid: d.id, token: user.csrfToken)
+                try await APIClient.shared.forums.follow(nodeUuid: d.id, entityId: d.nid, token: user.csrfToken)
                 isFollowing = true
                 PersistenceStore.shared.markFollowed(FollowedItem(
                     id: d.id, kind: .forumTopic, nodeType: "node--forum",
                     title: d.title, followedAt: Date(), lastActivityAt: d.lastActivityAt, url: d.url
                 ))
+                FollowStore.shared.markFollowed(d.id)
                 toast.success(String(localized: "Following topic"))
             }
         } catch let e as APIError {
@@ -783,7 +772,18 @@ struct ReplyView: View {
     var topicAuthorId: String = ""
     var topicTitle: String = ""
     var topicURL: String = ""
+    /// Set only when `reply.parentId` resolved to a comment actually present
+    /// in the currently-loaded list — matches the site's own new "In reply
+    /// to [Title] by [Author]" citation (confirmed live 2026-09-15: it's
+    /// theme-rendered from the real `pid` relationship, not typed into the
+    /// comment body — see `ForumReply.parentId`'s doc comment).
+    var parentAuthorName: String? = nil
     var onReplyTo: (() -> Void)? = nil
+    /// Scrolls to and focuses the parent comment this one is replying to —
+    /// nil (hiding the citation's tap/action entirely) if the parent isn't
+    /// in the currently-loaded page yet, e.g. still behind "Load More
+    /// Replies".
+    var onJumpToParent: (() -> Void)? = nil
     var onDelete: (() -> Void)? = nil
     var onEdit: ((String) -> Void)? = nil
     /// Fired after an admin unpublish succeeds — like `onDelete`, lets the
@@ -836,12 +836,29 @@ struct ReplyView: View {
         if let subject = CommentSubject.display(reply.subject, parentTitle: topicTitle) {
             label += " Subject: \(subject)."
         }
+        if let parentAuthorName {
+            label += " Reply to \(parentAuthorName)'s comment."
+        }
         if reply.isNew { label += " New." }
         return label
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            // Matches the site's own new "In reply to [Title] by [Author]"
+            // citation — a separate, tappable stop rather than folded into
+            // the header row, so a VoiceOver user can act on it (jump to the
+            // parent) without it lengthening every reply's main heading.
+            // Hidden entirely (not just inert) when the parent isn't loaded
+            // yet, rather than showing a citation that goes nowhere.
+            if let parentAuthorName, let onJumpToParent {
+                Button(action: onJumpToParent) {
+                    Label(String(localized: "Replying to \(parentAuthorName)"), systemImage: "arrowshape.turn.up.left")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityHint(String(localized: "Jumps to the comment this one replies to."))
+            }
             HStack {
                 AuthorProfileButton(name: reply.authorName, authorId: reply.authorId, font: .subheadline.weight(.medium), showAvatar: true)
                 Spacer()
@@ -929,7 +946,7 @@ struct ReplyView: View {
             EditContentSheet(title: "Edit Comment", initialText: reply.body) { newText in
                 guard let user = auth.user else { return }
                 try await APIClient.shared.content.editComment(
-                    commentType: "comment_forum", commentId: reply.id, newBody: newText, format: "basic_html", csrfToken: user.csrfToken
+                    commentType: "comment_forum", commentId: reply.id, newBody: newText, format: drupalDefaultTextFormat, csrfToken: user.csrfToken
                 )
                 onEdit?(newText)
                 toast.success(String(localized: "Comment updated"))

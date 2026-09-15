@@ -72,16 +72,16 @@ struct PodcastEndpoints {
 
     @discardableResult
     func submitComment(episodeId: String, body: String, csrfToken: String) async throws -> PodcastComment {
+        var attributes = CommentBundle.podcastEpisode.baseAttributes
+        attributes["subject"] = AnyEncodable("Comment")
+        attributes["comment_body"] = AnyEncodable(RichTextValue(value: body, format: drupalDefaultTextFormat))
         let response = try await client.jsonAPICreate(
             "comment/comment_node_podcast",
             type: "comment--comment_node_podcast",
-            attributes: [
-                "subject": AnyEncodable("Comment"),
-                "comment_body": AnyEncodable(RichTextValue(value: body, format: "basic_html")),
-            ],
+            attributes: attributes,
             relationships: [
                 "entity_id": JsonApiRelationshipRef(type: "node--podcast", id: episodeId),
-                "comment_type": JsonApiRelationshipRef(type: "comment_type--comment_type", id: "comment_node_podcast"),
+                "comment_type": CommentBundle.podcastEpisode.commentTypeRelationship,
             ],
             headers: ["X-CSRF-Token": csrfToken]
         )

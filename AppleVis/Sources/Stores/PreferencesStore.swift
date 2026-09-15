@@ -56,7 +56,7 @@ final class PreferencesStore: ObservableObject {
     @AppStorage("feed.showApps")     var showApps     = true
     @AppStorage("feed.showGuides")   var showGuides   = true
     @AppStorage("feed.showBlogs")    var showBlogs    = true
-    @AppStorage("feed.appleOnly")    var appleOnlyForums = false
+    @AppStorage("feed.appleOnly")    var appleOnlyForums = true
 
     // MARK: - Podcast playback
     @AppStorage("podcast.speed")        var playbackSpeed: Double = 1.0
@@ -108,7 +108,27 @@ final class PreferencesStore: ObservableObject {
     // directly. Still available as an opt-in for anyone who prefers landing
     // straight in Search.
     @AppStorage("a11y.searchAutoFocus") var searchAutoFocusEnabled = false
-    @AppStorage("privacy.signedOutHistory") var rememberSignedOutHistory = true
+    /// Whether Home's What's New card, the New/Recap picker, and per-row "N
+    /// new" badges get shown — not whether reading history is tracked,
+    /// which now always happens regardless (see
+    /// `PersistenceStore.showsNewActivityIndicators`'s doc comment for why
+    /// these used to be the same on/off switch and no longer are).
+    @AppStorage("privacy.signedOutHistory") var showNewActivityIndicators = true
+    /// Masks a wider set of profanity than AppleVis blocks from posting —
+    /// see `ProfanityFilter`'s doc comment for why this defaults to *on*
+    /// rather than opt-in: a default-off filter wouldn't actually protect
+    /// anyone who never finds the setting, which defeats the point of
+    /// having it. Purely a display preference; never affects what a user is
+    /// allowed to post themselves, which `ContentSubmissionPolicy` enforces
+    /// unconditionally regardless of this setting.
+    @AppStorage("privacy.filterProfanity") var filterProfanity = true
+    /// Remembers the last email address a signed-out guest typed into
+    /// Contact Us or Report a Comment, purely so returning guests don't have
+    /// to retype it every time — signed-in users never touch this, since
+    /// their account email comes from AuthUser.email instead. Stored locally
+    /// only, never sent anywhere on its own; cleared by "Clear All Local
+    /// Data" in Settings > Privacy like other on-device convenience data.
+    @AppStorage("privacy.lastGuestEmail") var lastGuestEmail = ""
 
     // MARK: - Forums
     @AppStorage("forums.defaultFilter") var forumsDefaultFilter: ForumFilter = .recent

@@ -248,6 +248,83 @@ struct JsonApiEnvelope: Encodable {
     let data: JsonApiWriteBody
 }
 
+// MARK: - Comment/node write requirements (confirmed live 2026-09-15)
+
+/// Drupal text-format machine name for every rich-text field this app
+/// writes — comment bodies, node bodies, submission fields, all of it. Was
+/// `"basic_html"` until that stopped being a valid format entity on the
+/// live site — confirmed live 2026-09-15 via a direct JSON:API test:
+/// submitting `"basic_html"` now fails with "The value you selected is not
+/// a valid choice," while every real comment and node body already on the
+/// site (checked across all 10 comment bundles below, plus a forum topic's
+/// own `body` field) stores `"8"` instead. An unusually terse machine name,
+/// almost certainly a holdover from a much older Drupal version's numeric
+/// format IDs that was never renamed on this install — but it's what every
+/// real post on the site uses today, so it's the safe choice here too. This
+/// one string is what makes every comment, reply, topic, and submission
+/// body postable again; investigated while building forum reply-to-comment
+/// support, but the breakage is universal, not forum-specific.
+let drupalDefaultTextFormat = "8"
+
+/// Every comment bundle this app posts to, and the two extra things each
+/// one's create request needs beyond the obvious `entity_id` relationship —
+/// both confirmed live 2026-09-15 against the real site with a disposable
+/// test account, same investigate-then-fix approach as `FlagEndpoints`'s
+/// `entity_type`/`entity_id` requirement:
+///
+/// 1. The `comment_type` relationship's `id` must be this bundle's own
+///    JSON:API **UUID**, not its machine name — every comment-posting call
+///    site previously sent the machine name (e.g. `"comment_forum"`), which
+///    404s with "The resource identified by ... could not be found." A
+///    comment's own `relationships.comment_type.data.id` on read confirms
+///    the real UUID; `comment_type` config entities aren't independently
+///    listable without an admin permission this app's users don't have,
+///    which is why these are hardcoded below rather than resolved at
+///    request time — config entity UUIDs are fixed at creation and don't
+///    change, so this is stable, not fragile.
+/// 2. Two base-field attributes — `entity_type` (always `"node"` here) and
+///    `field_name` (this bundle's own machine name) — must be sent
+///    explicitly. Neither is inferable from `entity_id` alone; omitting
+///    them fails with "This value should not be null."
+enum CommentBundle: String {
+    case forumTopic = "comment_forum"
+    case guide = "comment_node_guides"
+    case blogPost = "comment_node_blog2"
+    case podcastEpisode = "comment_node_podcast"
+    case iosApp = "comment_node_ios_app_directory"
+    case macApp = "comment_node_mac_app_directory"
+    case tvApp = "comment_node_tv_directory"
+    case watchApp = "comment_node_watch_directory"
+    case iosBugReport = "comment_node_ios_bug_report"
+    case macBugReport = "comment_node_os_x_bug_report"
+
+    var typeUuid: String {
+        switch self {
+        case .forumTopic:     return "e793db3b-8546-46b6-a0c8-6b7107c75a1a"
+        case .guide:          return "96bfd690-7a09-43de-af67-b2fbb7b94026"
+        case .blogPost:       return "8180a642-cf03-4189-98d2-61e1a6d94d2b"
+        case .podcastEpisode: return "13036c94-8c55-4d91-ad78-928fdeeb3287"
+        case .iosApp:         return "ee475b17-740d-4521-b17f-07ca26fd1ee8"
+        case .macApp:         return "f2c92808-71e3-49dc-b703-04a377b5d720"
+        case .tvApp:          return "83641144-7f81-41e0-871f-f9316a6622c4"
+        case .watchApp:       return "8bf4d51d-0397-4813-8da7-6783cdbdd728"
+        case .iosBugReport:   return "19d2c82b-8ade-4f26-9f30-621883761ca4"
+        case .macBugReport:   return "b36f6a2c-dc72-4d02-b43c-cfcec8b50731"
+        }
+    }
+
+    /// Standard JSON:API write attributes/relationships every comment on
+    /// this bundle needs regardless of its own text/subject — merge with
+    /// whatever's bundle-specific (subject, comment_body, entity_id, pid).
+    var baseAttributes: [String: AnyEncodable] {
+        ["entity_type": AnyEncodable("node"), "field_name": AnyEncodable(rawValue)]
+    }
+
+    var commentTypeRelationship: JsonApiRelationshipRef {
+        JsonApiRelationshipRef(type: "comment_type--comment_type", id: typeUuid)
+    }
+}
+
 struct EmptyJSONAPIResponse: Decodable {}
 
 // MARK: - Text helpers (mirror src/services/api.ts textFromHtml/decodeHtml)

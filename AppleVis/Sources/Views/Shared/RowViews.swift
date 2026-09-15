@@ -73,10 +73,19 @@ func podcastContentType(showTitle: String) -> String {
     showTitle.localizedCaseInsensitiveContains("podcast") ? showTitle : "\(showTitle) podcast"
 }
 
+/// `newActivityLabel` (the "N new comments" phrase) is deliberately its own
+/// parameter, not folded into `alwaysAppend` — it needs to sit right next to
+/// `authorAndCount`'s comment total so the two related numbers stay
+/// adjacent, instead of trailing after `date` and any saved/following/
+/// downloaded suffixes where a listener has to hold both numbers in mind
+/// across an unrelated date announcement to connect them. Still unconditional
+/// at every detail level, same as `alwaysAppend`, so Simple-mode still hears
+/// it even though `authorAndCount` itself is skipped there. Reported directly.
 func detailLevelLabel(
     title: String,
     contentType: String,
     authorAndCount: String,
+    newActivityLabel: String = "",
     date: String,
     alwaysAppend: String
 ) -> String {
@@ -85,6 +94,7 @@ func detailLevelLabel(
     if level != .simple, !authorAndCount.isEmpty {
         parts += ", \(authorAndCount)"
     }
+    parts += newActivityLabel
     if level == .all {
         parts += ", \(date)"
     }
@@ -102,6 +112,33 @@ struct NewCountBadge: View {
             .padding(.horizontal, 6).padding(.vertical, 2)
             .background(preferences.colors.unread, in: Capsule())
             .accessibilityHidden(true)
+            .modifier(PopInAppearance())
+    }
+}
+
+/// Self-contained pop-in for `NewCountBadge`/`NewBadge` — animates on its
+/// own `.onAppear` rather than requiring every screen that shows one of
+/// these (Home, Forums, Podcasts, App Directory, Guides, Blog, and For
+/// You's various lists) to wrap its own data-loading state in
+/// `withAnimation`. Since List/LazyVStack rows fire `.onAppear` as they're
+/// scrolled into view, not just on first load, this also means a badge
+/// scrolled to a minute later still pops in rather than only animating for
+/// whatever happened to be on screen at launch — closer to "you noticed
+/// this is new" than a one-shot load animation. Sighted-only in effect
+/// (`accessibilityHidden` above means VoiceOver never sees this element at
+/// all, animated or not); respects Reduce Motion. Requested directly.
+private struct PopInAppearance: ViewModifier {
+    @State private var hasAppeared = false
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(hasAppeared ? 1 : 0.6)
+            .opacity(hasAppeared ? 1 : 0)
+            .onAppear {
+                withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .spring(response: 0.35, dampingFraction: 0.6)) {
+                    hasAppeared = true
+                }
+            }
     }
 }
 
@@ -122,6 +159,7 @@ struct NewBadge: View {
             .padding(.horizontal, 6).padding(.vertical, 2)
             .background(Color.accentColor, in: Capsule())
             .accessibilityHidden(true)
+            .modifier(PopInAppearance())
     }
 }
 
@@ -198,7 +236,7 @@ struct ForumTopicRow: View {
         .accessibilityLabel(topicLabel)
         .readAloudAction(topicLabel)
         .contentActions(
-            id: topic.id, kind: .forumTopic, title: topic.title, lastActivityAt: topic.lastActivityAt, url: topic.url,
+            id: topic.id, entityId: topic.nid ?? 0, kind: .forumTopic, title: topic.title, lastActivityAt: topic.lastActivityAt, url: topic.url,
             currentCommentCount: topic.replyCount,
             onAddComment: { showComposeReply = true },
             authorId: topic.authorId, onContentDeleted: onDelete
@@ -233,8 +271,9 @@ struct ForumTopicRow: View {
             // way to tell them apart by ear.
             contentType: forumContentType(category: topic.category),
             authorAndCount: byAuthorAndCount(topic.authorName, "\(topic.replyCount) comment\(topic.replyCount == 1 ? "" : "s")"),
+            newActivityLabel: newLabel,
             date: topic.lastActivityAt.formatted(.relative(presentation: .named)),
-            alwaysAppend: "\(savedFollowingLabel)\(newLabel)"
+            alwaysAppend: savedFollowingLabel
         )
     }
 }
@@ -304,7 +343,19 @@ struct PodcastEpisodeRow: View {
                             Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
                         }
                         if isQueued {
-                            Image(systemName: "text.badge.plus").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
+                            // Was "text.badge.plus" — the exact same glyph the
+                            // swipe/menu action below uses for "tap to add to
+                            // queue," so this status badge visually claimed
+                            // the opposite of what it meant. Every other badge
+                            // in this cluster (Saved, Downloaded) uses its
+                            // *.fill counterpart to mean "already done";
+                            // "text.badge.plus" has no such counterpart, so
+                            // this uses the same family's checkmark variant
+                            // instead. VoiceOver was never affected — the
+                            // badge is `.accessibilityHidden` and
+                            // `savedQueuedLabel` below already speaks "Queued"
+                            // correctly.
+                            Image(systemName: "text.badge.checkmark").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
                         }
                         if downloads.isDownloaded(episode.id) {
                             Image(systemName: "arrow.down.circle.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
@@ -355,7 +406,7 @@ struct PodcastEpisodeRow: View {
         // who has heard either place recognizes the other.
         .accessibilityAction(named: Text(downloadActionLabel)) { performDownloadAction() }
         .contentActions(
-            id: episode.id, kind: .podcastEpisode, title: episode.title, lastActivityAt: episode.lastActivityAt, url: episode.url,
+            id: episode.id, entityId: episode.nid, kind: .podcastEpisode, title: episode.title, lastActivityAt: episode.lastActivityAt, url: episode.url,
             currentCommentCount: episode.commentCount,
             onAddComment: { showComposeComment = true },
             onContentDeleted: onDelete
@@ -496,13 +547,14 @@ struct PodcastEpisodeRow: View {
             title: ContentTranslation.accessibilityTitle(original: episode.title, translated: translatedTitle),
             contentType: podcastContentType(showTitle: episode.showTitle),
             authorAndCount: authorAndCount,
+            newActivityLabel: newLabel,
             date: episode.publishedAt.formatted(.relative(presentation: .named)),
             // Paused/remaining position moved ahead of the Saved/Queued/
-            // Downloaded/New badge info instead of tacked onto the very end
+            // Downloaded badge info instead of tacked onto the very end
             // of the whole label — reported directly: remaining time was
             // being spoken last, after badges that have nothing to do with
             // playback position.
-            alwaysAppend: "\(progressAccessibilityText)\(savedQueuedLabel)\(downloadedLabel)\(newLabel)"
+            alwaysAppend: "\(progressAccessibilityText)\(savedQueuedLabel)\(downloadedLabel)"
         )
         // The visible NowPlayingWaveform and play/pause icon are both
         // .accessibilityHidden — nothing else here ever spoke playing state,
@@ -606,7 +658,7 @@ struct AppListingRow: View {
             UIApplication.shared.open(appStoreURL)
         })
         .contentActions(
-            id: app.id, kind: .appListing, title: app.name, lastActivityAt: app.lastActivityAt, url: app.url,
+            id: app.id, entityId: app.nid ?? 0, kind: .appListing, title: app.name, lastActivityAt: app.lastActivityAt, url: app.url,
             currentCommentCount: app.reviewCount, onContentDeleted: onDelete
         ) {
             // Matches the explicit .accessibilityAction above — hidden so
@@ -654,8 +706,9 @@ struct AppListingRow: View {
             // simply the wrong word. Every other row kind already says
             // "comment(s)"; matched for consistency, reported directly.
             authorAndCount: byAuthorAndCount(app.developer, "\(app.reviewCount) comment\(app.reviewCount == 1 ? "" : "s")"),
+            newActivityLabel: newLabel,
             date: app.lastActivityAt.formatted(.relative(presentation: .named)),
-            alwaysAppend: "\(app.isSaved ? ". Saved." : "")\(newLabel)"
+            alwaysAppend: app.isSaved ? ". Saved." : ""
         )
     }
 }
@@ -708,7 +761,7 @@ struct ResourceRow: View {
         .accessibilityLabel(resourceLabel)
         .readAloudAction(resourceLabel)
         .contentActions(
-            id: resource.id, kind: .resource, title: resource.title, lastActivityAt: resource.updatedAt, url: resource.url,
+            id: resource.id, entityId: resource.nid ?? 0, kind: .resource, title: resource.title, lastActivityAt: resource.updatedAt, url: resource.url,
             currentCommentCount: resource.commentCount, onContentDeleted: onDelete
         )
         .cardDensityPadding()
@@ -729,8 +782,9 @@ struct ResourceRow: View {
             title: ContentTranslation.accessibilityTitle(original: resource.title, translated: translatedTitle),
             contentType: resource.kind.displayName,
             authorAndCount: byAuthorAndCount(resource.authorName, "\(resource.commentCount) comment\(resource.commentCount == 1 ? "" : "s")"),
+            newActivityLabel: newLabel,
             date: resource.updatedAt.formatted(.relative(presentation: .named)),
-            alwaysAppend: "\(resource.isSaved ? ". Saved." : "")\(newLabel)"
+            alwaysAppend: resource.isSaved ? ". Saved." : ""
         )
     }
 }
@@ -787,7 +841,7 @@ struct BlogPostRow: View {
         .accessibilityLabel(postLabel)
         .readAloudAction(postLabel)
         .contentActions(
-            id: post.id, kind: .blogPost, title: post.title, lastActivityAt: post.lastActivityAt, url: post.url,
+            id: post.id, entityId: post.nid ?? 0, kind: .blogPost, title: post.title, lastActivityAt: post.lastActivityAt, url: post.url,
             currentCommentCount: post.commentCount, onContentDeleted: onDelete
         )
         .cardDensityPadding()
@@ -808,8 +862,9 @@ struct BlogPostRow: View {
             title: ContentTranslation.accessibilityTitle(original: post.title, translated: translatedTitle),
             contentType: "Blog post",
             authorAndCount: byAuthorAndCount(post.authorName, "\(post.commentCount) comment\(post.commentCount == 1 ? "" : "s")"),
+            newActivityLabel: newLabel,
             date: post.lastActivityAt.formatted(.relative(presentation: .named)),
-            alwaysAppend: "\(post.isSaved ? ". Saved." : "")\(newLabel)"
+            alwaysAppend: post.isSaved ? ". Saved." : ""
         )
     }
 }

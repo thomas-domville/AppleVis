@@ -23,11 +23,21 @@ struct BlogDetailView: View {
     @State private var pendingFocusCommentId: String?
     @State private var discussionSummary: String?
     @State private var isSummarizingDiscussion = false
+    // Post-level moderation — mirrors ForumTopicDetailView's own
+    // Edit/Unpublish/Delete via DetailActionsMenu; the original author gets
+    // Edit + Delete, an admin/editor gets Edit + Unpublish + Delete.
+    @State private var editingBlogNode: EditableNode?
+    @Environment(\.dismiss) private var dismiss
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedCommentId: String?
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
+
+    private func isOwnBlogPost(_ detail: BlogPostDetail) -> Bool {
+        guard let user = auth.user else { return false }
+        return !detail.authorId.isEmpty && user.uuid == detail.authorId
+    }
 
     var body: some View {
         Group {
@@ -128,9 +138,27 @@ struct BlogDetailView: View {
                 }
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                DetailActionsMenu(
+                    id: detail.id, entityId: detail.nid, kind: .blogPost, title: detail.title, lastActivityAt: detail.lastActivityAt, url: detail.url,
+                    authorName: detail.authorName, excerpt: .excerpt(from: detail.body),
+                    isOwnContent: isOwnBlogPost(detail),
+                    onAddComment: { showCompose = true },
+                    onEdit: { startEditBlogPost(detail) },
+                    onUnpublish: { await unpublishBlogPost(detail) },
+                    onDelete: { await deleteBlogPost(detail) }
+                )
+            }
+        }
+        .sheet(item: $editingBlogNode) { node in
+            EditNodeSheet(initialTitle: node.title, initialBody: node.body) { newTitle, newBody in
+                try await saveBlogEdit(nodeTypeSuffix: node.nodeTypeSuffix, title: newTitle, body: newBody)
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             ContentDetailActions(
-                id: detail.id, kind: .blogPost, title: detail.title, lastActivityAt: detail.lastActivityAt, url: detail.url,
+                id: detail.id, entityId: detail.nid, kind: .blogPost, title: detail.title, lastActivityAt: detail.lastActivityAt, url: detail.url,
                 onAddComment: { showCompose = true }
             )
         }
@@ -169,7 +197,6 @@ struct BlogDetailView: View {
                     index: index, total: detail.comments.count,
                     subject: comment.subject, parentTitle: detail.title, parentURL: detail.url,
                     commentId: comment.id, authorId: comment.authorId, commentType: "comment_node_blog2",
-                    supportsReport: false,
                     onDelete: {
                         self.detail?.comments.removeAll { $0.id == comment.id }
                     },
@@ -284,6 +311,41 @@ struct BlogDetailView: View {
         }
         summary += " Original post by \(detail.authorName)."
         UIAccessibility.post(notification: .announcement, argument: summary)
+    }
+
+    private func startEditBlogPost(_ detail: BlogPostDetail) {
+        editingBlogNode = EditableNode(title: detail.title, body: detail.body, nodeTypeSuffix: "blog2")
+    }
+
+    private func saveBlogEdit(nodeTypeSuffix: String, title: String, body: String) async throws {
+        guard let user = auth.user, let detail else { return }
+        try await APIClient.shared.content.editNode(nodeId: detail.id, nodeType: nodeTypeSuffix, title: title, body: body, csrfToken: user.csrfToken)
+        toast.success(String(localized: "Blog Post updated"))
+        await load()
+    }
+
+    private func unpublishBlogPost(_ detail: BlogPostDetail) async {
+        guard let user = auth.user else { return }
+        do {
+            try await APIClient.shared.content.unpublishNode(nodeId: detail.id, nodeType: "blog2", csrfToken: user.csrfToken)
+            toast.success(String(localized: "Blog Post unpublished"))
+        } catch {
+            toast.error(String(localized: "Couldn't unpublish."))
+        }
+    }
+
+    /// Deletes the post currently being viewed — unlike row-level deletion
+    /// elsewhere, there's no list to prune; the only sensible next step is
+    /// leaving the screen, matching ForumTopicDetailView.deleteTopic().
+    private func deleteBlogPost(_ detail: BlogPostDetail) async {
+        guard let user = auth.user else { return }
+        do {
+            try await APIClient.shared.content.deleteNode(nodeId: detail.id, nodeType: "blog2", csrfToken: user.csrfToken)
+            toast.success(String(localized: "Blog Post deleted"))
+            dismiss()
+        } catch {
+            toast.error(String(localized: "Couldn't delete."))
+        }
     }
 
     private func load() async {

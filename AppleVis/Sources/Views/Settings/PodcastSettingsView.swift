@@ -23,6 +23,11 @@ struct PodcastSettingsView: View {
                     }
                 }
                 .accessibilityHint(String(localized: "Controls how fast episodes play. 1× is normal speed."))
+                // Explicit value — without it, swiping up/down only played
+                // the "value changed" tone with no spoken speed. Same fix
+                // as PlayerView's own playback-speed control (PODCAST-06).
+                // Reported directly.
+                .accessibilityValue(Text(speedLabel(preferences.playbackSpeed)))
                 .accessibilityAdjustableAction { direction in
                     guard let idx = speedOptions.firstIndex(of: preferences.playbackSpeed) else { return }
                     switch direction {
@@ -49,6 +54,8 @@ struct PodcastSettingsView: View {
                     }
                 }
                 .accessibilityHint(String(localized: "How many seconds the skip-back button jumps."))
+                // Explicit value — see the Speed picker above (PODCAST-06).
+                .accessibilityValue(Text("\(Int(preferences.skipBackInterval)) seconds"))
                 .accessibilityAdjustableAction { direction in
                     guard let idx = skipBackOptions.firstIndex(of: preferences.skipBackInterval) else { return }
                     switch direction {
@@ -66,6 +73,8 @@ struct PodcastSettingsView: View {
                     }
                 }
                 .accessibilityHint(String(localized: "How many seconds the skip-forward button jumps."))
+                // Explicit value — see the Speed picker above (PODCAST-06).
+                .accessibilityValue(Text("\(Int(preferences.skipForwardInterval)) seconds"))
                 .accessibilityAdjustableAction { direction in
                     guard let idx = skipForwardOptions.firstIndex(of: preferences.skipForwardInterval) else { return }
                     switch direction {
@@ -100,6 +109,8 @@ struct PodcastSettingsView: View {
                     }
                 }
                 .accessibilityHint(String(localized: "Adjusts the audio frequency balance."))
+                // Explicit value — see the Speed picker above (PODCAST-06).
+                .accessibilityValue(Text(preferences.podcastEQ.displayName))
                 .accessibilityAdjustableAction { direction in
                     guard let idx = PodcastEQ.allCases.firstIndex(of: preferences.podcastEQ) else { return }
                     switch direction {
@@ -122,6 +133,8 @@ struct PodcastSettingsView: View {
                     }
                 }
                 .accessibilityHint(String(localized: "Automatically pauses playback after the chosen period. Useful for falling asleep while listening."))
+                // Explicit value — see the Speed picker above (PODCAST-06).
+                .accessibilityValue(Text(sleepTimerOptions.first { $0.minutes == preferences.sleepTimerMinutes }?.label ?? ""))
                 .accessibilityAdjustableAction { direction in
                     guard let idx = sleepTimerOptions.firstIndex(where: { $0.minutes == preferences.sleepTimerMinutes }) else { return }
                     switch direction {
@@ -142,6 +155,8 @@ struct PodcastSettingsView: View {
                     }
                 }
                 .accessibilityHint(String(localized: "When you resume a paused episode, the player rewinds by this many seconds to give you context."))
+                // Explicit value — see the Speed picker above (PODCAST-06).
+                .accessibilityValue(Text(resumeRewindOptions.first { $0.seconds == preferences.resumeRewindSeconds }?.label ?? ""))
                 .accessibilityAdjustableAction { direction in
                     guard let idx = resumeRewindOptions.firstIndex(where: { $0.seconds == preferences.resumeRewindSeconds }) else { return }
                     switch direction {
@@ -164,6 +179,8 @@ struct PodcastSettingsView: View {
                     }
                 }
                 .accessibilityHint(String(localized: "Automatically downloads new episodes for offline listening."))
+                // Explicit value — see the Speed picker above (PODCAST-06).
+                .accessibilityValue(Text(preferences.autoDownload.displayName))
                 .accessibilityAdjustableAction { direction in
                     guard let idx = PodcastAutoDownload.allCases.firstIndex(of: preferences.autoDownload) else { return }
                     switch direction {
@@ -184,6 +201,8 @@ struct PodcastSettingsView: View {
                     }
                 }
                 .accessibilityHint(String(localized: "Automatically removes played episodes to free up storage."))
+                // Explicit value — see the Speed picker above (PODCAST-06).
+                .accessibilityValue(Text(preferences.autoDelete.displayName))
                 .accessibilityAdjustableAction { direction in
                     guard let idx = PodcastAutoDelete.allCases.firstIndex(of: preferences.autoDelete) else { return }
                     switch direction {

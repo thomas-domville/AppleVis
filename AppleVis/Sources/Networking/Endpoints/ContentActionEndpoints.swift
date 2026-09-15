@@ -51,7 +51,7 @@ struct ContentActionEndpoints {
             "node/\(nodeType)/\(nodeId)", type: "node--\(nodeType)", id: nodeId,
             attributes: [
                 "title": AnyEncodable(title),
-                "body": AnyEncodable(RichTextValue(value: body, format: "basic_html")),
+                "body": AnyEncodable(RichTextValue(value: body, format: drupalDefaultTextFormat)),
             ],
             headers: ["X-CSRF-Token": csrfToken]
         )

@@ -8,6 +8,17 @@ import SwiftUI
 /// date let a human find the comment quickly without a guessed-and-possibly-
 /// wrong deep link.
 struct ReportCommentContext {
+    /// What's being reported, used to build "Reporting a comment by X" /
+    /// "Reporting a topic by X" and the navigation title/email subject —
+    /// singular, lowercase (e.g. "comment", "topic", "app entry", "episode",
+    /// "blog post", "guide", "bug report"). Defaults to "comment" so every
+    /// existing call site (reporting a comment/reply/review) keeps working
+    /// unchanged; `DetailActionsMenu` passes the primary content's own kind
+    /// when reporting a topic/entry itself rather than a comment on it.
+    var subjectKind: String = "comment"
+    /// Empty when there's no reliable author to show (e.g. a Podcast
+    /// Episode has no author identity) — the preview then reads "Reporting
+    /// this episode" instead of "... by X".
     let authorName: String
     let commentExcerpt: String
     let commentDate: Date
@@ -68,6 +79,15 @@ struct ReportCommentWizard: View {
             case .other: return "ellipsis.circle"
             }
         }
+
+        /// `label`/`description` above are plain String, so Text(_:String)
+        /// and Label(_:S, systemImage:) both display them verbatim, skipping
+        /// catalog lookup entirely — same bug as WizardStepIndicator/
+        /// WizardReviewRow. These resolve them explicitly for call sites
+        /// (accessibility labels, the composed report body) that need the
+        /// actual localized text rather than a SwiftUI view.
+        var localizedLabel: String { String(localized: String.LocalizationValue(label)) }
+        var localizedDescription: String { String(localized: String.LocalizationValue(description)) }
     }
 
     private enum Step: Int { case reason, details, review }
@@ -77,6 +97,7 @@ struct ReportCommentWizard: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var domainChecker = EmailDomainChecker()
     @AccessibilityFocusState private var isStepFocused: Bool
     @AccessibilityFocusState private var isErrorFocused: Bool
 
@@ -89,20 +110,28 @@ struct ReportCommentWizard: View {
     @State private var submitted = false
     @State private var error: String?
     @State private var showDiscardConfirm = false
+    @State private var showAccountEmailChange = false
+    @State private var emailSuggestionDismissed = false
 
     private let totalSteps = 3
     private var isSignedIn: Bool { auth.isSignedIn }
     private var effectiveReason: Reason { reason ?? .other }
     private var displayName: String { isSignedIn ? (auth.user?.name ?? "") : name }
+    private var navigationTitleText: String { String(localized: "Report \(context.subjectKind.capitalized)") }
+    private var reportedSubjectText: String {
+        context.authorName.isEmpty
+            ? String(localized: "Reporting this \(context.subjectKind)")
+            : String(localized: "Reporting a \(context.subjectKind) by \(context.authorName)")
+    }
 
     private func stepNumber(_ s: Step) -> Int { s.rawValue + 1 }
 
     private var detailsValid: Bool {
         let nameOK = isSignedIn || !name.trimmingCharacters(in: .whitespaces).isEmpty
-        return nameOK && email.contains("@")
+        return nameOK && email.isValidEmailFormat
     }
     private var canSend: Bool {
-        !displayName.trimmingCharacters(in: .whitespaces).isEmpty && email.contains("@") && !isSubmitting
+        !displayName.trimmingCharacters(in: .whitespaces).isEmpty && email.isValidEmailFormat && !isSubmitting
     }
     private var canGoNext: Bool {
         switch step {
@@ -119,10 +148,15 @@ struct ReportCommentWizard: View {
                     ThankYouView(
                         icon: "flag",
                         heading: "Report sent!",
-                        message: "Thanks for helping keep AppleVis welcoming. The editorial team will review this comment and follow up by email if needed.",
+                        message: String(localized: "Thanks for helping keep AppleVis welcoming. The editorial team will review this \(context.subjectKind) and follow up by email if needed."),
                         doneLabel: "Done",
                         onDone: { dismiss() }
-                    )
+                    ) {
+                        if isSignedIn, !emailSuggestionDismissed,
+                           AccountEmailUpdateSuggestion.applies(usedEmail: email, accountEmail: auth.user?.email) {
+                            AccountEmailUpdateSuggestion(isDismissed: $emailSuggestionDismissed, showEmailChangeWizard: $showAccountEmailChange)
+                        }
+                    }
                 } else {
                     Form {
                         switch step {
@@ -137,7 +171,7 @@ struct ReportCommentWizard: View {
                     .themedList(preferences.colors)
                 }
             }
-            .navigationTitle("Report Comment")
+            .navigationTitle(navigationTitleText)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if !submitted {
@@ -172,8 +206,23 @@ struct ReportCommentWizard: View {
             } message: {
                 Text("Your report will not be sent.")
             }
+            .sheet(isPresented: $showAccountEmailChange) {
+                AccountSecurityWizard(mode: .email, initialEmail: email)
+            }
             .onAppear {
                 if name.isEmpty { name = auth.user?.name ?? "" }
+                // A signed-in user's account email is already known
+                // (AuthUser.email) — no reason to make them retype it. A
+                // signed-out guest gets their last-typed email back instead,
+                // saved in submit() below, so returning guests don't have to
+                // retype it either. Matches the same fix in ContactView.
+                if email.isEmpty {
+                    if isSignedIn {
+                        email = auth.user?.email ?? ""
+                    } else {
+                        email = preferences.lastGuestEmail
+                    }
+                }
                 // Step 1 previously got no explicit focus at all — only
                 // goNext()/goBack() ever called focusStepAfterTransition(),
                 // so opening this wizard left VoiceOver focus on system
@@ -201,18 +250,24 @@ struct ReportCommentWizard: View {
                     reasonCard(r)
                 }
             }
+            Section {
+                WizardBlockingNote(reasons: reason == nil ? [String(localized: "Choose a reason to continue.")] : [])
+                WizardBottomButton(String(localized: "Next"), isEnabled: reason != nil, action: goNext)
+            }
         }
     }
 
     private var reportedCommentPreview: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Reporting a comment by \(context.authorName)")
+            Text(reportedSubjectText)
                 .font(.caption.bold())
                 .foregroundStyle(.secondary)
-            Text(context.commentExcerpt)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .lineLimit(3)
+            if !context.commentExcerpt.isEmpty {
+                Text(context.commentExcerpt)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+            }
         }
         .accessibilityElement(children: .combine)
     }
@@ -230,8 +285,8 @@ struct ReportCommentWizard: View {
                     .frame(width: 44, height: 44)
                     .background(isSelected ? Color.red : Color.red.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(r.label).font(.subheadline.bold())
-                    Text(r.description).font(.caption).foregroundStyle(.secondary)
+                    Text(LocalizedStringKey(r.label)).font(.subheadline.bold())
+                    Text(LocalizedStringKey(r.description)).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
@@ -242,7 +297,7 @@ struct ReportCommentWizard: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-        .accessibilityLabel(String(localized: "\(r.label). \(r.description)"))
+        .accessibilityLabel(String(localized: "\(r.localizedLabel). \(r.localizedDescription)"))
     }
 
     // MARK: - Step 2: Details + contact info
@@ -267,13 +322,37 @@ struct ReportCommentWizard: View {
                         .accessibilityHint(String(localized: "Required."))
                 }
             }
-            Section("Your Email") {
+            Section {
                 TextField("Email", text: $email)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
                     .accessibilityHint(String(localized: "Required. Used only if the editorial team needs to follow up."))
+                    .onChange(of: email) { _, newValue in domainChecker.check(email: newValue) }
+            } header: {
+                Text("Your Email")
+            } footer: {
+                if !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !email.isValidEmailFormat {
+                    Text("Enter a valid email address.")
+                } else {
+                    EmailDomainWarning(checker: domainChecker)
+                }
+            }
+            Section {
+                WizardBlockingNote(reasons: detailsBlockingReasons)
+                WizardBottomButton(String(localized: "Next"), isEnabled: detailsValid, action: goNext)
             }
         }
+    }
+
+    private var detailsBlockingReasons: [String] {
+        var reasons: [String] = []
+        if !isSignedIn && name.trimmingCharacters(in: .whitespaces).isEmpty {
+            reasons.append(String(localized: "Enter your name to continue."))
+        }
+        if !email.isValidEmailFormat {
+            reasons.append(String(localized: "Enter a valid email address to continue."))
+        }
+        return reasons
     }
 
     // MARK: - Step 3: Review + Send
@@ -288,7 +367,7 @@ struct ReportCommentWizard: View {
             }
             Section {
                 HStack {
-                    Label(effectiveReason.label, systemImage: effectiveReason.icon)
+                    Label(LocalizedStringKey(effectiveReason.label), systemImage: effectiveReason.icon)
                         .foregroundStyle(.red)
                     Spacer()
                     Button { step = .reason } label: {
@@ -297,7 +376,7 @@ struct ReportCommentWizard: View {
                     .accessibilityLabel(String(localized: "Edit reason"))
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel(String(localized: "Reason: \(effectiveReason.label)"))
+                .accessibilityLabel(String(localized: "Reason: \(effectiveReason.localizedLabel)"))
 
                 WizardReviewRow(label: "Comment by", value: context.authorName)
                 WizardReviewRow(label: "On", value: context.contentTitle)
@@ -308,6 +387,13 @@ struct ReportCommentWizard: View {
             Section("From") {
                 WizardReviewRow(label: "Name", value: isSignedIn ? displayName + " (from account)" : name)
                 WizardReviewRow(label: "Email", value: email)
+            }
+            Section {
+                WizardBlockingNote(reasons: email.isValidEmailFormat ? [] : [String(localized: "Enter a valid email address to continue.")])
+                WizardBottomButton(
+                    isSubmitting ? String(localized: "Sending…") : String(localized: "Send Report"),
+                    isEnabled: canSend
+                ) { Task { await submit() } }
             }
         }
     }
@@ -364,19 +450,23 @@ struct ReportCommentWizard: View {
         var lines = [
             "Reason: \(effectiveReason.label)",
             "",
-            "Reported comment by: \(context.authorName)",
+            context.authorName.isEmpty
+                ? "Reported \(context.subjectKind): \(context.contentTitle)"
+                : "Reported \(context.subjectKind) by: \(context.authorName)",
             "Posted: \(context.commentDate.formatted(date: .abbreviated, time: .shortened))",
             "On: \(context.contentTitle)",
         ]
         if !context.contentURL.isEmpty { lines.append("Link: \(context.contentURL)") }
-        lines.append("")
-        lines.append("Comment excerpt:")
-        lines.append("\"\(context.commentExcerpt)\"")
+        if !context.commentExcerpt.isEmpty {
+            lines.append("")
+            lines.append("Excerpt:")
+            lines.append("\"\(context.commentExcerpt)\"")
+        }
         lines.append("")
         lines.append("Reporter's additional details:")
         lines.append(details.trimmingCharacters(in: .whitespaces).isEmpty ? "(none provided)" : details)
         lines.append("")
-        lines.append("— Sent via the AppleVis app's Report Comment feature.")
+        lines.append("— Sent via the AppleVis app's Report feature.")
         return lines.joined(separator: "\n")
     }
 
@@ -388,13 +478,16 @@ struct ReportCommentWizard: View {
         let result = await DrupalFormClient.submitContact(
             name: displayName.trimmingCharacters(in: .whitespaces),
             email: email.trimmingCharacters(in: .whitespaces),
-            subject: "Comment Report: \(effectiveReason.label)",
+            subject: "\(context.subjectKind.capitalized) Report: \(effectiveReason.label)",
             message: composedMessage
         )
         switch result {
         case .ok:
             SoundPlayer.shared.play(.success)
             UIAccessibility.post(notification: .announcement, argument: "Report sent successfully.")
+            if !isSignedIn {
+                preferences.lastGuestEmail = email.trimmingCharacters(in: .whitespaces)
+            }
             submitted = true
         case .failure(let message):
             let fullMessage = message + "\n\nYou can also report this at applevis.com/contact."

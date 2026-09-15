@@ -246,7 +246,11 @@ struct BugReportRow: View {
         .accessibilityLabel(bugLabel)
         .readAloudAction(bugLabel)
         .contentActions(
-            id: bug.id, kind: .bugReport, title: bug.title, lastActivityAt: bug.changedAt, url: bug.url,
+            // BugReport (the browse-list row model) carries no `nid` today,
+            // unlike BugReportDetail — 0 falls through canOfferFollow's
+            // `entityId > 0` guard, so Follow simply doesn't show here
+            // rather than attempting a request guaranteed to fail server-side.
+            id: bug.id, entityId: 0, kind: .bugReport, title: bug.title, lastActivityAt: bug.changedAt, url: bug.url,
             currentCommentCount: bug.commentCount, onContentDeleted: onDelete
         )
         .cardDensityPadding()
@@ -267,8 +271,9 @@ struct BugReportRow: View {
             title: ContentTranslation.accessibilityTitle(original: bug.title, translated: translatedTitle),
             contentType: "\(bug.status.displayName), \(bug.severity.displayName) severity",
             authorAndCount: "\(bug.commentCount) comment\(bug.commentCount == 1 ? "" : "s")",
+            newActivityLabel: newLabel,
             date: bug.changedAt.formatted(.relative(presentation: .named)),
-            alwaysAppend: newLabel
+            alwaysAppend: ""
         )
     }
 }

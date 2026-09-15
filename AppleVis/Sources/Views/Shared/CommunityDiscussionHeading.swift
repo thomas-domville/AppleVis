@@ -171,15 +171,21 @@ enum QuotedReply {
         return "\(authorName) wrote:\n> \(excerpt)\n\n"
     }
 
-    /// Backs each detail screen's "Replies to Me" rotor. Nothing in the
-    /// Drupal comment data links a reply back to the specific comment or
-    /// author it's responding to — no parent id, no mentions field — so
-    /// this is the only signal available: does `body` open with exactly the
-    /// quote format `prefix(authorName:body:)` produces when someone taps
-    /// "Reply to this Comment" on one of `authorName`'s own comments. That
-    /// means this only catches explicit quote-replies, not a free-text
-    /// "@username" mention typed into an ordinary comment — there's no
-    /// distinct, detectable feature for that here at all.
+    /// Backs each detail screen's "Replies to Me" rotor. Was true for every
+    /// content type that nothing in the Drupal comment data links a reply
+    /// back to its parent comment or author — no parent id, no mentions
+    /// field — until forums specifically got a real `pid` (parent comment)
+    /// field exposed via the site's own new "Reply" button (confirmed live
+    /// 2026-09-15; see `ForumReply.parentId`'s doc comment). Forums'
+    /// `ForumTopicDetailView` now checks that real relationship first and
+    /// only falls back to this heuristic for older, pre-`pid` replies.
+    /// Guides/Blogs/Podcasts/Apps have no such button yet, so for those this
+    /// is still the only signal available: does `body` open with exactly
+    /// the quote format `prefix(authorName:body:)` produces when someone
+    /// taps "Reply to this Comment" on one of `authorName`'s own comments.
+    /// That means this only ever catches explicit quote-replies, not a
+    /// free-text "@username" mention typed into an ordinary comment —
+    /// there's no distinct, detectable feature for that here at all.
     static func isDirectedAt(_ authorName: String, body: String) -> Bool {
         guard !authorName.isEmpty else { return false }
         return body.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("\(authorName) wrote:")

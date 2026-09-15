@@ -28,6 +28,12 @@ nonisolated struct BugReportDetail: Identifiable, Codable, Sendable {
     let firstSeen: String?
     let fixedIn: String?
     let feedbackId: String?
+    /// The submitter's user UUID — lets the detail screen offer the
+    /// original reporter Edit/Delete on their own report, the same way a
+    /// forum topic's author can. Previously never parsed at all; bug
+    /// reports had no owner-level moderation, admin or otherwise. Reported
+    /// directly.
+    let authorId: String
     let body: String
     let stepsToReproduce: String?
     let workaround: String?

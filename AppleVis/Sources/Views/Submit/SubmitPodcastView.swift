@@ -210,6 +210,7 @@ struct SubmitPodcastView: View {
             Text("Sign In Required")
                 .font(.headline)
                 .accessibilityAddTraits(.isHeader)
+                .accessibilityFocused($isStepFocused)
             Text("You need to be signed in to your AppleVis account to submit a podcast.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -261,6 +262,11 @@ struct SubmitPodcastView: View {
                 }
             }
             Section {
+                // Combined label+counter into one live-updating swipe-stop,
+                // and hid the trailing caption from VoiceOver — it repeats
+                // text already in the field's own hint below. Same fix
+                // applied to every minimum-length field across every
+                // wizard. Reported directly.
                 HStack {
                     Text("Episode Description").font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -268,8 +274,10 @@ struct SubmitPodcastView: View {
                         .font(.caption)
                         .fontWeight(descriptionLength < 20 ? .bold : .regular)
                         .foregroundStyle(descriptionLength < 20 ? .red : .secondary)
-                        .accessibilityLabel(descriptionLength < 20 ? String(localized: "\(descriptionLength) of 20 minimum characters") : String(localized: "\(descriptionLength) characters"))
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(descriptionLength < 20 ? String(localized: "Episode Description: \(descriptionLength) of 20 minimum characters") : String(localized: "Episode Description: \(descriptionLength) characters"))
+                .accessibilityAddTraits(.updatesFrequently)
                 TextEditor(text: $description)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Episode Description"))
@@ -286,6 +294,7 @@ struct SubmitPodcastView: View {
                 Text("Tell listeners what this episode covers — the topics, guests, or themes — so they know what to expect before pressing play.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
                 rewriteButton
             }
             Section("Audio File") {
@@ -296,7 +305,22 @@ struct SubmitPodcastView: View {
                 }
                 .accessibilityHint(String(localized: "Opens the Files app to pick an audio file for this episode."))
             }
+            Section {
+                WizardBlockingNote(reasons: audioBlockingReasons)
+                WizardBottomButton(String(localized: "Next"), isEnabled: audioValid, action: goNext)
+            }
         }
+    }
+
+    private var audioBlockingReasons: [String] {
+        var reasons: [String] = []
+        if descriptionLength < 20 {
+            reasons.append(String(localized: "Write at least \(20 - descriptionLength) more character\(20 - descriptionLength == 1 ? "" : "s") to continue."))
+        }
+        if audioFileData == nil {
+            reasons.append(String(localized: "Choose an audio file to continue."))
+        }
+        return reasons
     }
 
     /// Was a toolbar button under the overflow "More" menu — easy to miss,
@@ -327,6 +351,8 @@ struct SubmitPodcastView: View {
             Section {
                 WizardStepIndicator(step: 2, total: 2, title: "Review & Submit", isFocused: $isStepFocused)
                 backButton
+                Text("Check your details, then tap Submit.")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             Section("From") {
                 WizardReviewRow(label: "Posting As", value: auth.user?.name ?? "")
@@ -340,6 +366,12 @@ struct SubmitPodcastView: View {
                     OfflineComposeNotice()
                 }
                 .listRowSeparator(.hidden)
+            }
+            Section {
+                WizardBottomButton(
+                    String(localized: "Submit"),
+                    isEnabled: !isSubmitting && networkMonitor.isConnected
+                ) { Task { await submit() } }
             }
         }
     }

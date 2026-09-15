@@ -49,6 +49,11 @@ struct NotificationSettingsView: View {
                 .onChange(of: preferences.notificationSound) { _, newValue in
                     SoundPlayer.shared.playNotificationPreview(newValue)
                 }
+                // Explicit value — without it, swiping up/down only played
+                // the "value changed" tone with no spoken sound name. Same
+                // fix as PlayerView's playback-speed control (PODCAST-06).
+                // Reported directly.
+                .accessibilityValue(Text(preferences.notificationSound.displayName))
                 .accessibilityAdjustableAction { direction in
                     guard let idx = NotificationSound.allCases.firstIndex(of: preferences.notificationSound) else { return }
                     switch direction {
@@ -58,6 +63,19 @@ struct NotificationSettingsView: View {
                         preferences.notificationSound = NotificationSound.allCases[(idx - 1 + NotificationSound.allCases.count) % NotificationSound.allCases.count]
                     @unknown default: break
                     }
+                }
+                // Swiping up/down to change the sound (or opening the picker
+                // and double-tapping an option) also plays a preview via the
+                // onChange below — with VoiceOver's audio ducking, VoiceOver's
+                // own value-changed announcement talks over the clip, making
+                // it hard to actually hear. This action (reachable via the
+                // rotor's Actions category) replays the currently selected
+                // sound on its own, without changing the selection or
+                // triggering that announcement. Same workaround as the
+                // onboarding sound picker (OnboardingView.swift), reported
+                // directly for the same ducking collision.
+                .accessibilityAction(named: Text("Preview")) {
+                    SoundPlayer.shared.playNotificationPreview(preferences.notificationSound)
                 }
 
                 if let sound = NotificationSound.allCases.first(where: { $0 == preferences.notificationSound }) {

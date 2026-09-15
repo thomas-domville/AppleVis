@@ -32,6 +32,10 @@ let followFeatureEnabled = true
 /// flagging endpoint (`APIClient.shared.flags`).
 struct ContentActionsModifier: ViewModifier {
     let id: String
+    /// The target's internal Drupal node ID (nid), not its JSON:API UUID —
+    /// required by Follow/Recommend's `entity_id` attribute; see
+    /// `FlagEndpoints.follow`'s doc comment for why.
+    let entityId: Int
     let kind: ContentKind
     let title: String
     let lastActivityAt: Date?
@@ -96,18 +100,26 @@ struct ContentActionsModifier: ViewModifier {
 
     /// `followFeatureEnabled` hides *starting* a new follow while it's
     /// shelved, but never hides Unfollow for something already followed —
-    /// see that flag's doc comment.
+    /// see that flag's doc comment. Starting a *new* follow additionally
+    /// needs `entityId > 0`: Follow's `entity_id` attribute requires a real
+    /// internal node ID, which the occasional lightweight row (`SavedItem`,
+    /// `FollowedItem` — locally-persisted, no `nid` field at all) doesn't
+    /// carry, so those fall back to entityId 0. Unfollow never needs this
+    /// check — it only looks up the existing flagging by UUID — which is
+    /// exactly the case a nid-less `FollowedItem` row on the Following list
+    /// hits, so gating unconditionally would have hidden Unfollow there too.
     private var canOfferFollow: Bool {
-        supportsFollow && auth.isSignedIn && (followFeatureEnabled || isFollowing)
+        supportsFollow && auth.isSignedIn && (isFollowing || (followFeatureEnabled && entityId > 0))
     }
 
     /// Tied directly to `.appListing` rather than a separate opt-in flag —
     /// "Recommend This App" (confirmed live against the site's own app
     /// pages, which show a "Recommendations" count + "most recently
     /// recommended by" credit) is inherently app-only, so there's no call
-    /// site that should ever need to remember to turn it on.
+    /// site that should ever need to remember to turn it on. Same
+    /// already-active-skips-the-entityId-check reasoning as canOfferFollow.
     private var canOfferRecommend: Bool {
-        kind == .appListing && auth.isSignedIn
+        kind == .appListing && auth.isSignedIn && (isRecommended || entityId > 0)
     }
 
     private var isOwnTopic: Bool {
@@ -316,7 +328,13 @@ struct ContentActionsModifier: ViewModifier {
             }
             .onAppear {
                 isSaved = PersistenceStore.shared.isSaved(id: id)
-                isFollowing = PersistenceStore.shared.isFollowed(id: id)
+                isFollowing = PersistenceStore.shared.isFollowed(id: id) || FollowStore.shared.isFollowed(id)
+                if let user = auth.user {
+                    Task {
+                        await FollowStore.shared.loadIfNeeded(for: user)
+                        isFollowing = isFollowing || FollowStore.shared.isFollowed(id)
+                    }
+                }
                 if kind == .appListing {
                     isRecommended = RecommendationStore.shared.isRecommended(id)
                     if let user = auth.user {
@@ -492,15 +510,17 @@ struct ContentActionsModifier: ViewModifier {
             if isFollowing {
                 try await APIClient.shared.flags.unfollow(nodeUuid: id, token: user.csrfToken)
                 PersistenceStore.shared.markUnfollowed(id: id)
+                FollowStore.shared.markNotFollowed(id)
                 isFollowing = false
                 toast.success(String(localized: "Unfollowed"))
                 onFollowToggle?(false)
             } else {
-                try await APIClient.shared.flags.follow(nodeUuid: id, nodeType: kind.nodeType, token: user.csrfToken)
+                try await APIClient.shared.flags.follow(nodeUuid: id, nodeType: kind.nodeType, entityId: entityId, token: user.csrfToken)
                 PersistenceStore.shared.markFollowed(FollowedItem(
                     id: id, kind: kind, nodeType: kind.nodeType, title: title,
                     followedAt: Date(), lastActivityAt: lastActivityAt, url: url ?? ""
                 ))
+                FollowStore.shared.markFollowed(id)
                 isFollowing = true
                 toast.success(String(localized: "Following"))
                 if kind == .forumTopic { tips.show(.followTopicNotifications) }
@@ -522,7 +542,7 @@ struct ContentActionsModifier: ViewModifier {
                 isRecommended = false
                 toast.success(String(localized: "Removed from Recommendations"))
             } else {
-                try await APIClient.shared.flags.recommend(nodeUuid: id, nodeType: kind.nodeType, token: user.csrfToken)
+                try await APIClient.shared.flags.recommend(nodeUuid: id, nodeType: kind.nodeType, entityId: entityId, token: user.csrfToken)
                 RecommendationStore.shared.markRecommended(id)
                 isRecommended = true
                 toast.success(String(localized: "You recommended this app!"))
@@ -826,7 +846,7 @@ extension View {
     /// equivalents already were — these used to only exist as
     /// `.accessibilityAction`s, invisible to anyone not using VoiceOver.
     func contentActions(
-        id: String, kind: ContentKind, title: String,
+        id: String, entityId: Int, kind: ContentKind, title: String,
         lastActivityAt: Date? = nil, url: String? = nil, supportsFollow: Bool = true,
         onSaveToggle: ((Bool) -> Void)? = nil, onFollowToggle: ((Bool) -> Void)? = nil,
         currentCommentCount: Int? = nil, onAddComment: (() -> Void)? = nil,
@@ -834,7 +854,7 @@ extension View {
         @ViewBuilder extraMenuItems: () -> some View = { EmptyView() }
     ) -> some View {
         modifier(ContentActionsModifier(
-            id: id, kind: kind, title: title, lastActivityAt: lastActivityAt, url: url, supportsFollow: supportsFollow,
+            id: id, entityId: entityId, kind: kind, title: title, lastActivityAt: lastActivityAt, url: url, supportsFollow: supportsFollow,
             onSaveToggle: onSaveToggle, onFollowToggle: onFollowToggle,
             currentCommentCount: currentCommentCount, onAddComment: onAddComment,
             authorId: authorId, onContentDeleted: onContentDeleted,
@@ -852,6 +872,10 @@ extension View {
 /// each call site, matching where users actually remember reaching for them.
 struct ContentDetailActions: View {
     let id: String
+    /// The target's internal Drupal node ID (nid), not its JSON:API UUID —
+    /// required by Follow/Recommend's `entity_id` attribute; see
+    /// `FlagEndpoints.follow`'s doc comment for why.
+    let entityId: Int
     let kind: ContentKind
     let title: String
     let lastActivityAt: Date?
@@ -887,12 +911,12 @@ struct ContentDetailActions: View {
     /// Same shelved-Follow gating as `ContentActionsModifier.canOfferFollow`
     /// — hides starting a new follow, never hides undoing an existing one.
     private var canOfferFollow: Bool {
-        supportsFollow && (followFeatureEnabled || isFollowing)
+        supportsFollow && (isFollowing || (followFeatureEnabled && entityId > 0))
     }
 
     /// Same app-only gating as `ContentActionsModifier.canOfferRecommend`.
     private var canOfferRecommend: Bool {
-        kind == .appListing
+        kind == .appListing && (isRecommended || entityId > 0)
     }
 
     private func requestRecommendToggle() {
@@ -973,7 +997,13 @@ struct ContentDetailActions: View {
         .overlay(alignment: .top) { Divider() }
         .onAppear {
             isSaved = PersistenceStore.shared.isSaved(id: id)
-            isFollowing = PersistenceStore.shared.isFollowed(id: id)
+            isFollowing = PersistenceStore.shared.isFollowed(id: id) || FollowStore.shared.isFollowed(id)
+            if let user = auth.user {
+                Task {
+                    await FollowStore.shared.loadIfNeeded(for: user)
+                    isFollowing = isFollowing || FollowStore.shared.isFollowed(id)
+                }
+            }
             if canOfferRecommend {
                 isRecommended = RecommendationStore.shared.isRecommended(id)
                 if let user = auth.user {
@@ -1005,14 +1035,16 @@ struct ContentDetailActions: View {
             if isFollowing {
                 try await APIClient.shared.flags.unfollow(nodeUuid: id, token: user.csrfToken)
                 PersistenceStore.shared.markUnfollowed(id: id)
+                FollowStore.shared.markNotFollowed(id)
                 isFollowing = false
                 toast.success(String(localized: "Unfollowed"))
             } else {
-                try await APIClient.shared.flags.follow(nodeUuid: id, nodeType: kind.nodeType, token: user.csrfToken)
+                try await APIClient.shared.flags.follow(nodeUuid: id, nodeType: kind.nodeType, entityId: entityId, token: user.csrfToken)
                 PersistenceStore.shared.markFollowed(FollowedItem(
                     id: id, kind: kind, nodeType: kind.nodeType, title: title,
                     followedAt: Date(), lastActivityAt: lastActivityAt, url: url ?? ""
                 ))
+                FollowStore.shared.markFollowed(id)
                 isFollowing = true
                 toast.success(String(localized: "Following"))
                 if kind == .forumTopic { tips.show(.followTopicNotifications) }
@@ -1033,7 +1065,7 @@ struct ContentDetailActions: View {
                 isRecommended = false
                 toast.success(String(localized: "Removed from Recommendations"))
             } else {
-                try await APIClient.shared.flags.recommend(nodeUuid: id, nodeType: kind.nodeType, token: user.csrfToken)
+                try await APIClient.shared.flags.recommend(nodeUuid: id, nodeType: kind.nodeType, entityId: entityId, token: user.csrfToken)
                 RecommendationStore.shared.markRecommended(id)
                 isRecommended = true
                 toast.success(String(localized: "You recommended this app!"))
@@ -1076,6 +1108,14 @@ struct DetailActionButtonLabel: View {
                 // .title3 matches the prior 20pt default exactly while
                 // still responding to the system text-size setting.
                 .font(.title3)
+                // Purely decorative — a symbol change (bookmark ->
+                // bookmark.fill, bell -> bell.fill) already carries the
+                // real state change; VoiceOver gets that from
+                // accessibilityLabel above, completely unaffected by this.
+                // System-provided, Reduce Motion-aware automatically (no
+                // separate gate needed, unlike ConfettiView elsewhere).
+                // Sighted-only, requested directly.
+                .symbolEffect(.bounce, value: systemImage)
             Text(String(localized: String.LocalizationValue(visualLabel)))
                 .font(.caption2)
         }

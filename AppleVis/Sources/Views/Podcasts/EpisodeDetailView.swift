@@ -32,8 +32,19 @@ struct EpisodeDetailView: View {
     @State private var newCommentCount = 0
     @State private var pendingFocusCommentId: String?
     @State private var artworkDescription: String?
+    // Episode-level moderation — mirrors ForumTopicDetailView's own
+    // Edit/Unpublish/Delete via DetailActionsMenu. No regular member ever
+    // "owns" an episode (PodcastEpisode carries no authorId), so this is
+    // effectively admin/editor-only in practice, but built the same way as
+    // every other content kind for consistency.
+    @State private var editingEpisodeNode: EditableNode?
+    @Environment(\.dismiss) private var dismiss
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedCommentId: String?
+    /// Dismissing the Transcript sheet otherwise left VoiceOver focus on
+    /// whatever this screen's default landing point is (the title), instead
+    /// of back on the button that opened it — reported directly.
+    @AccessibilityFocusState private var isTranscriptButtonFocused: Bool
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -45,6 +56,10 @@ struct EpisodeDetailView: View {
 
     private func isQueued(_ episode: PodcastEpisode) -> Bool {
         player.queue.contains { $0.id == episode.id }
+    }
+
+    private func isEpisodePlayed(_ episode: PodcastEpisode) -> Bool {
+        PersistenceStore.shared.isEpisodePlayed(episode.id)
     }
 
     var body: some View {
@@ -166,9 +181,26 @@ struct EpisodeDetailView: View {
                 }
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                DetailActionsMenu(
+                    id: episode.id, entityId: episode.nid, kind: .podcastEpisode, title: episode.title, lastActivityAt: episode.lastActivityAt, url: episode.url,
+                    excerpt: .excerpt(from: episode.description),
+                    onAddComment: { showCompose = true },
+                    onEdit: { startEditEpisode(episode) },
+                    onUnpublish: { await unpublishEpisode(episode) },
+                    onDelete: { await deleteEpisode(episode) }
+                )
+            }
+        }
+        .sheet(item: $editingEpisodeNode) { node in
+            EditNodeSheet(initialTitle: node.title, initialBody: node.body) { newTitle, newBody in
+                try await saveEpisodeEdit(nodeTypeSuffix: node.nodeTypeSuffix, title: newTitle, body: newBody)
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             ContentDetailActions(
-                id: episode.id, kind: .podcastEpisode, title: episode.title, lastActivityAt: episode.lastActivityAt, url: episode.url,
+                id: episode.id, entityId: episode.nid, kind: .podcastEpisode, title: episode.title, lastActivityAt: episode.lastActivityAt, url: episode.url,
                 onAddComment: { showCompose = true }
             )
         }
@@ -184,7 +216,9 @@ struct EpisodeDetailView: View {
                 pendingFocusCommentId = comment.id
             }
         }
-        .sheet(isPresented: $showTranscript) {
+        .sheet(isPresented: $showTranscript, onDismiss: {
+            Task { await retryAccessibilityFocus(into: $isTranscriptButtonFocused) }
+        }) {
             TranscriptView(episodeId: episode.id, episodeTitle: episode.title, episodeURL: episode.url, embeddedTranscript: embeddedTranscript)
         }
         .sheet(isPresented: $showFullPlayer) {
@@ -265,6 +299,7 @@ struct EpisodeDetailView: View {
                         showTranscript = true
                     }
                     .accessibilityLabel(String(localized: "Read Transcript"))
+                    .accessibilityFocused($isTranscriptButtonFocused)
                 }
 
                 episodeToolButton(
@@ -288,16 +323,30 @@ struct EpisodeDetailView: View {
                 }
                 .accessibilityLabel(String(localized: "Play Next"))
 
-                if PersistenceStore.shared.isEpisodePlayed(episode.id) {
-                    episodeToolLabel(title: "Played", subtitle: "Marked", systemImage: "checkmark.circle.fill")
-                        .accessibilityLabel(String(localized: "Played"))
-                } else {
-                    episodeToolButton(title: "Mark Played", subtitle: "Complete", systemImage: "checkmark.circle") {
+                // Toggle, not a one-way "Mark Played" → static "Played" —
+                // matches the Queue button's own toggle pattern just above.
+                // Previously there was no way back once marked, whether you
+                // tapped it by mistake or a synced iCloud state set it.
+                // "Listened" (not "Played") to avoid reading as ambiguous
+                // for audio content. Requested directly.
+                episodeToolButton(
+                    title: isEpisodePlayed(episode) ? "Listened" : "Mark Listened",
+                    subtitle: isEpisodePlayed(episode) ? "Marked" : "Complete",
+                    systemImage: isEpisodePlayed(episode) ? "checkmark.circle.fill" : "checkmark.circle"
+                ) {
+                    if isEpisodePlayed(episode) {
+                        PersistenceStore.shared.unmarkEpisodePlayed(episode.id)
+                        toast.success(String(localized: "Marked as not listened"))
+                    } else {
                         PersistenceStore.shared.markEpisodePlayed(episode.id)
-                        toast.success(String(localized: "Marked as played"))
+                        // Marking listened while a resume point is still on
+                        // file would otherwise offer to "Resume from 12:34"
+                        // for an episode you just said you're done with.
+                        player.clearSavedPosition(for: episode.id)
+                        toast.success(String(localized: "Marked as listened"))
                     }
-                    .accessibilityLabel(String(localized: "Mark as Played"))
                 }
+                .accessibilityLabel(String(localized: isEpisodePlayed(episode) ? "Listened" : "Mark as Listened"))
 
                 episodeToolButton(title: "Now Playing", subtitle: "Open", systemImage: "slider.horizontal.3") {
                     openFullPlayer(for: episode)
@@ -692,28 +741,33 @@ struct EpisodeDetailView: View {
     }
 
     /// Strips AppleVis's own "Transcript" block off the end of show notes —
-    /// confirmed against a real episode: a "Transcript" heading, an AI-
-    /// transcription disclaimer, then the full transcript, running straight
-    /// to the end of the body with nothing after it. `TranscriptView`
-    /// already fetches the real transcript from its own dedicated endpoint
-    /// (`APIClient.podcasts.transcript(id:)`), entirely independent of this
-    /// HTML — so it was never a source of truth, just a second, unformatted
-    /// copy of the same text sitting where the notes should end. Reuses
-    /// `HTMLSegmenter` (already splitting this exact body for rendering)
-    /// instead of a fresh regex: finds the first heading segment whose text
-    /// is exactly "Transcript" and drops it and everything after.
-    /// Only applied when `transcriptUrl` is set — otherwise the dedicated
-    /// button/modal won't be there to replace what got removed, and this
-    /// text is the only copy that would exist.
+    /// confirmed against real episodes (via the public podcast RSS feed): a
+    /// "Transcript" heading, an AI-transcription disclaimer, then the full
+    /// transcript, running straight to the end of the body with nothing
+    /// after it. `APIClient.podcasts.transcript(id:)`'s dedicated endpoint
+    /// turns out not to be the real source for this content — it 404s for
+    /// ordinary episodes — so this embedded block, extracted the same way
+    /// `extractedTranscript`/`hasTranscript` above already do via
+    /// `transcriptHeadingIndex`, is what `TranscriptView` actually shows.
+    /// Using that same shared check here means notes are only ever stripped
+    /// when the Transcript button is actually there to show what got
+    /// removed — never silently dropped with nothing to replace it.
     private func notesWithoutTranscript(_ episode: PodcastEpisode) -> String {
         let segments = HTMLSegmenter.segment(episode.description)
         guard let transcriptIndex = transcriptHeadingIndex(in: segments) else { return episode.description }
         return segments[..<transcriptIndex].map(\.html).joined()
     }
 
+    /// Previously also returned true whenever `episode.transcriptUrl` was
+    /// set, regardless of whether `extractedTranscript` actually found
+    /// anything — but `TranscriptView` never uses that URL for anything, so
+    /// an episode with a `transcriptUrl` but no matching heading in the show
+    /// notes showed the button, then dead-ended on "This item is no longer
+    /// available" once the id-based fetch 404'd with nothing to fall back
+    /// to. The button should only ever appear when there's something this
+    /// screen can actually show. Reported directly.
     private func hasTranscript(for episode: PodcastEpisode) -> Bool {
-        if let transcriptUrl = episode.transcriptUrl, !transcriptUrl.isEmpty { return true }
-        return extractedTranscript(from: episode) != nil
+        extractedTranscript(from: episode) != nil
     }
 
     private func extractedTranscript(from episode: PodcastEpisode) -> String? {
@@ -725,11 +779,21 @@ struct EpisodeDetailView: View {
         return transcript.isEmpty ? nil : transcript
     }
 
+    /// Checked against live episodes (AppleVis Extra 114/115/117, Deyesfree)
+    /// via the public podcast RSS feed: all of them use a real `<h3>
+    /// Transcript</h3>` heading, which the `segment.isHeading` check below
+    /// already matches — so requiring a real heading isn't the live bug.
+    /// This still also matches a short standalone paragraph whose entire
+    /// text is just the label (still an exact match, not a substring one,
+    /// so an ordinary sentence that happens to mention "transcript" can't
+    /// false-positive) — a host who bolds "Transcript:" in Drupal's WYSIWYG
+    /// editor instead of using a real heading style produces exactly that,
+    /// and it costs nothing to also accept it. The label itself never
+    /// depends on which transcription tool was used (VoicePen today, maybe
+    /// something else later) — only on the fixed "Transcript"-style wording
+    /// a host writes by hand, so a future tool change doesn't affect this.
     private func transcriptHeadingIndex(in segments: [HTMLSegment]) -> Int? {
-        segments.firstIndex { segment in
-            guard segment.isHeading else { return false }
-            return Self.isTranscriptHeading(segment.plainText)
-        }
+        segments.firstIndex { Self.isTranscriptHeading($0.plainText) }
     }
 
     static func isTranscriptHeading(_ text: String) -> Bool {
@@ -819,6 +883,41 @@ struct EpisodeDetailView: View {
             summary += " Original post by \(episode.authorName)."
         }
         UIAccessibility.post(notification: .announcement, argument: summary)
+    }
+
+    private func startEditEpisode(_ episode: PodcastEpisode) {
+        editingEpisodeNode = EditableNode(title: episode.title, body: episode.description, nodeTypeSuffix: "podcast")
+    }
+
+    private func saveEpisodeEdit(nodeTypeSuffix: String, title: String, body: String) async throws {
+        guard let user = auth.user, let episode else { return }
+        try await APIClient.shared.content.editNode(nodeId: episode.id, nodeType: nodeTypeSuffix, title: title, body: body, csrfToken: user.csrfToken)
+        toast.success(String(localized: "Episode updated"))
+        await load()
+    }
+
+    private func unpublishEpisode(_ episode: PodcastEpisode) async {
+        guard let user = auth.user else { return }
+        do {
+            try await APIClient.shared.content.unpublishNode(nodeId: episode.id, nodeType: "podcast", csrfToken: user.csrfToken)
+            toast.success(String(localized: "Episode unpublished"))
+        } catch {
+            toast.error(String(localized: "Couldn't unpublish."))
+        }
+    }
+
+    /// Deletes the episode currently being viewed — unlike row-level
+    /// deletion elsewhere, there's no list to prune; the only sensible next
+    /// step is leaving the screen, matching ForumTopicDetailView.deleteTopic().
+    private func deleteEpisode(_ episode: PodcastEpisode) async {
+        guard let user = auth.user else { return }
+        do {
+            try await APIClient.shared.content.deleteNode(nodeId: episode.id, nodeType: "podcast", csrfToken: user.csrfToken)
+            toast.success(String(localized: "Episode deleted"))
+            dismiss()
+        } catch {
+            toast.error(String(localized: "Couldn't delete."))
+        }
     }
 
     private func load() async {
@@ -1024,6 +1123,11 @@ private struct AudioEnhancementsSheet: View {
                         }
                     }
                     .accessibilityHint(String(localized: "Adjusts the audio frequency balance. Speech Clarity is usually best for spoken-word podcasts."))
+                    // Explicit value — without it, swiping up/down only
+                    // played the "value changed" tone with no spoken EQ
+                    // name. Same fix as PlayerView's playback-speed control
+                    // (PODCAST-06). Reported directly.
+                    .accessibilityValue(Text(preferences.podcastEQ.displayName))
                     .accessibilityAdjustableAction { direction in
                         guard let idx = PodcastEQ.allCases.firstIndex(of: preferences.podcastEQ) else { return }
                         switch direction {

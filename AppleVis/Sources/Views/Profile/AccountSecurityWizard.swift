@@ -30,12 +30,20 @@ struct AccountSecurityWizard: View {
     }
 
     let mode: Mode
+    /// Lets a caller land here already knowing what email to suggest — used
+    /// by the "update your account email too?" prompt on Contact Us, Submit
+    /// Bug Report, Submit Blog, and Report a Comment's thank-you screens, so
+    /// someone who already typed the address once doesn't have to retype it
+    /// here. Still requires confirming the current password on step 1
+    /// regardless — this only pre-fills step 2's value.
+    var initialEmail: String? = nil
 
     private enum Step: Int { case verify, newValue, review }
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var domainChecker = EmailDomainChecker()
 
     @State private var step: Step = .verify
     @State private var currentPassword = ""
@@ -51,12 +59,72 @@ struct AccountSecurityWizard: View {
 
     private let totalSteps = 3
 
+    /// Tightened from a bare 8-character minimum after a beta tester's
+    /// suggestion — now also requires a digit and a symbol, the standard
+    /// baseline most sites already enforce. These three are the only hard
+    /// requirements; `passwordStrength` below is advisory on top of them,
+    /// never blocking.
+    private var newPasswordMeetsRequirements: Bool {
+        newPassword.count >= 8
+            && newPassword.contains(where: \.isNumber)
+            && newPassword.contains(where: { !$0.isLetter && !$0.isNumber && !$0.isWhitespace })
+    }
+
     private var newValueValid: Bool {
         switch mode {
         case .password:
-            return newPassword.count >= 8 && newPassword == confirmPassword
+            return newPasswordMeetsRequirements && newPassword == confirmPassword
         case .email:
-            return newEmail.contains("@") && newEmail.contains(".")
+            return newEmail.isValidEmailFormat
+        }
+    }
+
+    enum PasswordStrength: CaseIterable {
+        case weak, moderate, strong, veryStrong
+
+        // Returns already-localized text (not a bare literal) — this gets
+        // interpolated into another String(localized:) template below, and
+        // a plain-String return here would insert untranslated English
+        // into an otherwise-translated sentence, the same catalog-skipping
+        // trap noted throughout this codebase for Text(String)/verbatim
+        // interpolation.
+        var label: String {
+            switch self {
+            case .weak: return String(localized: "Weak")
+            case .moderate: return String(localized: "Moderate")
+            case .strong: return String(localized: "Strong")
+            case .veryStrong: return String(localized: "Very Strong")
+            }
+        }
+
+        var color: Color {
+            switch self {
+            case .weak: return .red
+            case .moderate: return .orange
+            case .strong: return .yellow
+            case .veryStrong: return .green
+            }
+        }
+    }
+
+    /// A nudge, not a gate — scores beyond the three hard requirements
+    /// above (case variety, length past the minimum) so someone who meets
+    /// the bare minimum can still see there's room to do better, without
+    /// AppleVis ever refusing a password that meets its actual policy.
+    private func passwordStrength(_ password: String) -> PasswordStrength? {
+        guard !password.isEmpty else { return nil }
+        var score = 0
+        if password.count >= 8 { score += 1 }
+        if password.count >= 12 { score += 1 }
+        if password.contains(where: \.isUppercase) { score += 1 }
+        if password.contains(where: \.isLowercase) { score += 1 }
+        if password.contains(where: \.isNumber) { score += 1 }
+        if password.contains(where: { !$0.isLetter && !$0.isNumber && !$0.isWhitespace }) { score += 1 }
+        switch score {
+        case 0...2: return .weak
+        case 3...4: return .moderate
+        case 5: return .strong
+        default: return .veryStrong
         }
     }
 
@@ -139,7 +207,12 @@ struct AccountSecurityWizard: View {
             // opening this wizard left VoiceOver focus on system default
             // (typically Cancel). Full app-wide focus audit, requested
             // directly.
-            .task { focusStepAfterTransition() }
+            .task {
+                if mode == .email, newEmail.isEmpty, let initialEmail {
+                    newEmail = initialEmail
+                }
+                focusStepAfterTransition()
+            }
         }
     }
 
@@ -157,6 +230,10 @@ struct AccountSecurityWizard: View {
                     .textContentType(.password)
                     .accessibilityHint(String(localized: "Required."))
             }
+            Section {
+                WizardBlockingNote(reasons: currentPassword.isEmpty ? [String(localized: "Enter your current password to continue.")] : [])
+                WizardBottomButton(String(localized: "Next"), isEnabled: !currentPassword.isEmpty, action: goNext)
+            }
         }
     }
 
@@ -171,36 +248,86 @@ struct AccountSecurityWizard: View {
                     isFocused: $isStepFocused, accentColor: mode.color
                 )
                 backButton
+                Text(mode == .password
+                    ? "Enter a new password meeting the requirements below, then confirm it."
+                    : "Enter the new email address for your AppleVis account.")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             if mode == .password {
+                // The requirement used to live only in a hint and in a
+                // reactive warning that appeared after typing too little —
+                // stating it in the field's own label instead means
+                // VoiceOver hears it immediately, in the same swipe-stop as
+                // the field, rather than needing a separate line that only
+                // shows up once you've already gotten it wrong. A beta
+                // tester's suggestion, generalized here.
                 Section("New Password") {
-                    SecureField("New Password", text: $newPassword)
+                    SecureField("New Password (8+ characters, 1 number, 1 symbol)", text: $newPassword)
                         .textContentType(.newPassword)
-                        .accessibilityHint(String(localized: "Required. At least 8 characters."))
+                        .accessibilityHint(String(localized: "Required."))
+                    if let strength = passwordStrength(newPassword) {
+                        Label(String(localized: "Password strength: \(strength.label)"), systemImage: "gauge.with.dots.needle.bottom.50percent")
+                            .font(.caption)
+                            .foregroundStyle(strength.color)
+                            .accessibilityAddTraits(.updatesFrequently)
+                    }
                     SecureField("Confirm New Password", text: $confirmPassword)
                         .textContentType(.newPassword)
                         .accessibilityHint(String(localized: "Required. Must match the password above."))
+                } footer: {
+                    Text("Meeting the minimum is all that's required to continue — the strength meter above is just a nudge toward a password that's harder to guess.")
                 }
-                if !newPassword.isEmpty && newPassword.count < 8 {
-                    Section {
-                        Text("Password must be at least 8 characters.")
-                            .font(.caption).foregroundStyle(.red)
-                    }
-                } else if !confirmPassword.isEmpty && confirmPassword != newPassword {
+                if newPasswordMeetsRequirements && !confirmPassword.isEmpty && confirmPassword != newPassword {
                     Section {
                         Text("Passwords don't match.")
                             .font(.caption).foregroundStyle(.red)
                     }
                 }
             } else {
-                Section("New Email Address") {
+                Section {
                     TextField("Email", text: $newEmail)
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .accessibilityHint(String(localized: "Required."))
+                        .onChange(of: newEmail) { _, newValue in domainChecker.check(email: newValue) }
+                } header: {
+                    Text("New Email Address")
+                } footer: {
+                    if !newEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !newEmail.isValidEmailFormat {
+                        Text("Enter a valid email address.")
+                    } else {
+                        EmailDomainWarning(checker: domainChecker)
+                    }
                 }
             }
+            Section {
+                WizardBlockingNote(reasons: newValueBlockingReasons)
+                WizardBottomButton(String(localized: "Next"), isEnabled: newValueValid, action: goNext)
+            }
+        }
+    }
+
+    private var newValueBlockingReasons: [String] {
+        guard !newValueValid else { return [] }
+        switch mode {
+        case .password:
+            var reasons: [String] = []
+            if newPassword.count < 8 {
+                reasons.append(String(localized: "Enter a password of at least 8 characters to continue."))
+            }
+            if !newPassword.contains(where: \.isNumber) {
+                reasons.append(String(localized: "Include at least one number to continue."))
+            }
+            if !newPassword.contains(where: { !$0.isLetter && !$0.isNumber && !$0.isWhitespace }) {
+                reasons.append(String(localized: "Include at least one special character to continue."))
+            }
+            if reasons.isEmpty && confirmPassword != newPassword {
+                reasons.append(String(localized: "Confirm your new password to continue."))
+            }
+            return reasons
+        case .email:
+            return [String(localized: "Enter a valid email address to continue.")]
         }
     }
 
@@ -211,6 +338,8 @@ struct AccountSecurityWizard: View {
             Section {
                 WizardStepIndicator(step: 3, total: totalSteps, title: "Review and Save", isFocused: $isStepFocused, accentColor: mode.color)
                 backButton
+                Text("Check your change, then tap Save Changes.")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             Section {
                 if mode == .password {
@@ -218,6 +347,12 @@ struct AccountSecurityWizard: View {
                 } else {
                     WizardReviewRow(label: "New Email Address", value: newEmail)
                 }
+            }
+            Section {
+                WizardBottomButton(
+                    isSubmitting ? String(localized: "Saving…") : String(localized: "Save Changes"),
+                    isEnabled: !isSubmitting
+                ) { Task { await submit() } }
             }
         }
     }

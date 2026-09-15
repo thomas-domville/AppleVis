@@ -99,24 +99,30 @@ struct TranscriptView: View {
         }
     }
 
+    /// Previously always hit `podcasts/episodes/{id}/transcript` first and
+    /// only fell back to `embeddedTranscript` on failure — but that endpoint
+    /// 404s for ordinary episodes (it's for a transcript stored as its own
+    /// field, not the show-notes-embedded kind this screen mostly deals
+    /// with), so opening a transcript that's really just embedded in the
+    /// show notes meant a guaranteed failed network round trip, a visible
+    /// loading spinner, and a brief flash of "This item is no longer
+    /// available" before the fallback kicked in. `embeddedTranscript` is now
+    /// used immediately when present — the id-based fetch only runs as a
+    /// fallback for the rarer case where it isn't. Reported directly.
     private func load() async {
+        if let embeddedTranscript, !embeddedTranscript.isEmpty {
+            transcript = embeddedTranscript
+            return
+        }
         isLoading = true
         error = nil
         do {
             let fetched = try await APIClient.shared.podcasts.transcript(id: episodeId)
-            transcript = fetched.isEmpty ? embeddedTranscript : fetched
+            transcript = fetched.isEmpty ? nil : fetched
         } catch let e as APIError {
-            if let embeddedTranscript, !embeddedTranscript.isEmpty {
-                transcript = embeddedTranscript
-            } else {
-                error = e.localizedDescription
-            }
+            error = e.localizedDescription
         } catch {
-            if let embeddedTranscript, !embeddedTranscript.isEmpty {
-                transcript = embeddedTranscript
-            } else {
-                self.error = "Couldn't load transcript."
-            }
+            self.error = "Couldn't load transcript."
         }
         isLoading = false
     }

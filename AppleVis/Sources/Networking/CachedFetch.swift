@@ -46,7 +46,20 @@ func fetchWithCache<T: Codable & Sendable>(
         // (e.g. a moderated spam post), and markDown would wrongly trip the
         // whole content group's circuit breaker over one missing item.
         // Evict the stale entry instead so it can't zombie back later either.
+        //
+        // .forbidden gets the same treatment: Drupal's JSON:API returns 403,
+        // not 404, when a node still exists but access has been withdrawn
+        // (e.g. unpublished after this viewer already cached it) — from the
+        // cache's point of view that's the identical "confirmed gone for
+        // this viewer" signal, not a transient permission blip. A genuinely
+        // transient 403 (stale role after a server-side permission change)
+        // just means the next fetch re-populates the cache from scratch;
+        // validateStatus already kicks off a role refresh in that case.
         if case APIError.notFound = error {
+            ContentCache.shared.remove(key: key)
+            throw error
+        }
+        if case APIError.forbidden = error {
             ContentCache.shared.remove(key: key)
             throw error
         }

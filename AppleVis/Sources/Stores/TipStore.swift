@@ -15,7 +15,8 @@ enum TipKey: String {
     case forumRotorActions        = "forum_rotor_actions"
     case playerMagicTap           = "player_magic_tap"
     case episodeChapters          = "episode_chapters"
-    case savedSwipeActions        = "saved_swipe_actions"
+    case savedQuickActions        = "saved_quick_actions_v2"
+    case savedRotorActions        = "saved_rotor_actions"
     case downloadsOffline         = "downloads_offline"
     case reviewStarRating         = "review_star_rating"
     case settingsIntelligence     = "settings_intelligence"
@@ -42,17 +43,40 @@ enum Tips {
         .playerMagicTap: TipContent(
             title: "Quick Play and Pause, Anywhere",
             message: "Don't want to leave what you're doing just to hit pause? A two-finger double-tap anywhere on the screen plays or pauses whatever episode is loaded — no need to open the player first. It's called a Magic Tap, and it works throughout AppleVis, so it's always within reach.",
-            icon: "play.circle"
+            icon: "play.circle",
+            // Magic Tap is itself a VoiceOver/Switch Control-only gesture —
+            // .accessibilityAction(.magicTap) can only fire when one of those
+            // is already active, so this can only ever be triggered by a
+            // VoiceOver (or Switch Control) user in the first place. Flagging
+            // it explicitly here is just honest bookkeeping, not a behavior
+            // change — nothing was ever showing this to a sighted touch user.
+            screenReaderOnly: true
         ),
         .episodeChapters: TipContent(
             title: "This One Has Chapters!",
             message: "Good news — this episode has chapter markers, so you don't have to scrub around to find the part you want. Head to the Chapters section and pick one to jump straight there. With VoiceOver, just swipe through the list and double-tap the chapter you're after.",
             icon: "bookmark"
         ),
-        .savedSwipeActions: TipContent(
-            title: "Faster Episode Actions",
-            message: "A little shortcut for your Saved and Downloaded lists: swipe left on any episode to reveal quick actions for deleting, sharing, or marking it as played. Prefer the full picture? A long-press opens the complete action menu instead.",
+        // Split in two (2026-09-13, replacing the old `.savedSwipeActions`)
+        // after a beta tester saved a forum topic, landed on For You, and got
+        // a tip titled "Faster Episode Actions" describing swipe-to-delete
+        // and mark-as-played — neither of which exists on a saved topic's
+        // row (its only quick action is Unsave). The old tip also fired
+        // unconditionally for every VoiceOver user too, describing a plain
+        // one-finger swipe left, which under VoiceOver moves focus to the
+        // previous item rather than revealing anything — actively wrong
+        // instructions, not just irrelevant ones. New keys so beta users who
+        // already dismissed the old, incorrect tip get to see the fix once.
+        .savedQuickActions: TipContent(
+            title: "Faster Actions on Your Saved List",
+            message: "Swipe left on any saved item for quick actions — unsaving it, or downloading, sharing, and marking it played if it's an episode. Prefer the full picture? A long-press opens the complete action menu instead.",
             icon: "hand.point.left"
+        ),
+        .savedRotorActions: TipContent(
+            title: "Quicker Actions for Your Saved List",
+            message: "Here's a handy one: every saved item has its own set of VoiceOver actions tucked away. Rotate two fingers to bring up the Actions rotor, then flick up or down to reach Unsave, or Download, Share, and Mark as Played for episodes — no swiping or long-pressing needed to find them.",
+            icon: "hand.point.left",
+            screenReaderOnly: true
         ),
         .downloadsOffline: TipContent(
             title: "Take It Offline",

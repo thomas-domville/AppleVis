@@ -193,6 +193,14 @@ enum IntelligenceService {
         )
     }
 
+    /// Called once per item in a Mouse Recap section (up to several apps,
+    /// episodes, etc. in a row), each as an independent generation with no
+    /// visibility into its siblings. Without the "don't reintroduce"
+    /// instruction below, the model reliably opened almost every blurb with
+    /// some variant of "In this new \(kind)..." — harmless alone, but
+    /// repetitive read back to back, since the section header, its intro
+    /// sentence, and this card's own kicker label already say that. Reported
+    /// directly.
     static func newsletterBlurb(title: String, kind: String, sourceText: String) async -> String? {
         guard isAvailable else { return nil }
         let trimmed = sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -200,7 +208,10 @@ enum IntelligenceService {
         return await cleanedResponse(
             "Write a warm AppleVis newsletter-style blurb in 2-3 concise sentences for this \(kind). " +
             "The audience is blind and low vision Apple users. Preserve facts from the source, do not invent details, " +
-            "and do not include headings, labels, markdown, or links.\n\nTitle: \(title)\n\nSource:\n\(trimmed)"
+            "and do not include headings, labels, markdown, or links. " +
+            "Do not open by reintroducing what this is (e.g. \"In this new \(kind)...\" or restating the title/kind) — " +
+            "that context is already given elsewhere on screen. Start directly with what's notable about it.\n\n" +
+            "Title: \(title)\n\nSource:\n\(trimmed)"
         )
     }
 

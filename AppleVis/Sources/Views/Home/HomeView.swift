@@ -534,6 +534,11 @@ struct HomeView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                // Explicit value — without it, swiping up/down only played
+                // the "value changed" tone with no spoken filter name. Same
+                // fix as PlayerView's playback-speed control (PODCAST-06).
+                // Reported directly.
+                .accessibilityValue(Text(homeFeedFilter.label))
                 // Same swipe-up/down addition as the App Directory/For You
                 // pickers — moves to the next/previous segment in place.
                 .accessibilityAdjustableAction { direction in
@@ -809,6 +814,10 @@ private struct MouseRecapHomeContent: View {
             .pickerStyle(.segmented)
             .accessibilityLabel(String(localized: "Recap window"))
             .accessibilityHint(String(localized: "Choose how far back Mouse Recap looks."))
+            // Explicit value — without it, swiping up/down only played the
+            // "value changed" tone with no spoken window name. Same fix as
+            // PlayerView's playback-speed control (PODCAST-06). Reported directly.
+            .accessibilityValue(Text(window.label))
             // Same swipe-up/down addition as the other pickers in this
             // session's pass — moves between Past Week/Past Month in place.
             .accessibilityAdjustableAction { direction in
@@ -879,27 +888,9 @@ private struct MouseRecapHomeContent: View {
                 }
             } header: {
                 Label("Spotlight Feature", systemImage: "star.fill")
+                    .accessibilityAddTraits(.isHeader)
             }
             .listRowSeparator(.hidden)
-        }
-
-        Section {
-            ForEach(Array(digest.tableOfContents(periodName: window.label).enumerated()), id: \.offset) { index, item in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("\(index + 1).")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(item.title)
-                            .font(.subheadline.weight(.semibold))
-                        Text(item.detail)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-        } header: {
-            Text("In This Recap")
         }
 
         newsletterSection(
@@ -1042,6 +1033,7 @@ private struct MouseRecapHomeContent: View {
                 }
             } header: {
                 Label(title, systemImage: systemImage)
+                    .accessibilityAddTraits(.isHeader)
             }
         }
     }
@@ -1249,6 +1241,11 @@ private struct MouseRecapView: View {
                         .pickerStyle(.segmented)
                         .accessibilityLabel(String(localized: "Recap window"))
                         .accessibilityHint(String(localized: "Choose how far back Mouse Recap looks."))
+                        // Explicit value — without it, swiping up/down only
+                        // played the "value changed" tone with no spoken
+                        // window name. Same fix as PlayerView's playback-
+                        // speed control (PODCAST-06). Reported directly.
+                        .accessibilityValue(Text(window.label))
                         // Same swipe-up/down addition as the other pickers
                         // in this session's pass — moves between Past
                         // Week/Past Month in place.

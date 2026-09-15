@@ -87,7 +87,7 @@ struct HomeFeedSettingsView: View {
                     preferences.showApps = true
                     preferences.showGuides = true
                     preferences.showBlogs = true
-                    preferences.appleOnlyForums = false
+                    preferences.appleOnlyForums = true
                 }
             }
         }

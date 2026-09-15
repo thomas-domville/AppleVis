@@ -146,26 +146,34 @@ struct ForumEndpoints {
             type: "node--forum",
             attributes: [
                 "title": AnyEncodable(title),
-                "body": AnyEncodable(RichTextValue(value: body, format: "basic_html")),
+                "body": AnyEncodable(RichTextValue(value: body, format: drupalDefaultTextFormat)),
             ],
             headers: ["X-CSRF-Token": csrfToken]
         )
         return Mappers.forum(response.data, included: response.included ?? [])
     }
 
+    /// `replyToCommentId` sets the real Drupal `pid` (parent comment)
+    /// relationship — added alongside the site's own new "Reply" button
+    /// (see `ForumReply.parentId`'s doc comment for the full story). Nil
+    /// posts a plain top-level comment, same as before.
     @discardableResult
-    func submitReply(topicId: String, body: String, csrfToken: String, subject: String = "Reply") async throws -> ForumReply {
+    func submitReply(topicId: String, body: String, csrfToken: String, subject: String = "Reply", replyToCommentId: String? = nil) async throws -> ForumReply {
+        var relationships: [String: JsonApiRelationshipRef] = [
+            "entity_id": JsonApiRelationshipRef(type: "node--forum", id: topicId),
+            "comment_type": CommentBundle.forumTopic.commentTypeRelationship,
+        ]
+        if let replyToCommentId {
+            relationships["pid"] = JsonApiRelationshipRef(type: "comment--comment_forum", id: replyToCommentId)
+        }
+        var attributes = CommentBundle.forumTopic.baseAttributes
+        attributes["subject"] = AnyEncodable(subject)
+        attributes["comment_body"] = AnyEncodable(RichTextValue(value: body, format: drupalDefaultTextFormat))
         let response = try await client.jsonAPICreate(
             "comment/comment_forum",
             type: "comment--comment_forum",
-            attributes: [
-                "subject": AnyEncodable(subject),
-                "comment_body": AnyEncodable(RichTextValue(value: body, format: "basic_html")),
-            ],
-            relationships: [
-                "entity_id": JsonApiRelationshipRef(type: "node--forum", id: topicId),
-                "comment_type": JsonApiRelationshipRef(type: "comment_type--comment_type", id: "comment_forum"),
-            ],
+            attributes: attributes,
+            relationships: relationships,
             headers: ["X-CSRF-Token": csrfToken]
         )
         return Mappers.forumReply(response.data, included: response.included ?? [])
@@ -180,8 +188,8 @@ struct ForumEndpoints {
         return response.data.map { Mappers.forumReply($0, included: response.included ?? []) }
     }
 
-    func follow(nodeUuid: String, token: String) async throws {
-        try await client.flags.follow(nodeUuid: nodeUuid, nodeType: "node--forum", token: token)
+    func follow(nodeUuid: String, entityId: Int, token: String) async throws {
+        try await client.flags.follow(nodeUuid: nodeUuid, nodeType: "node--forum", entityId: entityId, token: token)
     }
 
     func unfollow(nodeUuid: String, token: String) async throws {

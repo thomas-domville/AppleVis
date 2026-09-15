@@ -8,19 +8,38 @@ struct GuidedExperienceView: View {
     var onFinish: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var keyCommands: KeyCommandRouter
     @EnvironmentObject private var pauseStore: GuidedExperiencePauseStore
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var stepIndex = 0
-    @State private var showExplainMore = false
     @State private var showHelpArticle: HelpArticle?
     @AccessibilityFocusState private var isHeadingFocused: Bool
-    @AccessibilityFocusState private var isExplainMoreFocused: Bool
     @State private var entranceVisible = false
 
     private var step: GuidedExperienceStep { experience.steps[stepIndex] }
     private var isFirstStep: Bool { stepIndex == 0 }
     private var isLastStep: Bool { stepIndex == experience.steps.count - 1 }
+    /// Every chapter-closing checkpoint sets a custom `continueLabel`
+    /// ("Continue to Discover" etc.) — reusing that as the "is this a
+    /// milestone step" signal instead of a second boolean that could drift
+    /// out of sync with it.
+    private var isCheckpoint: Bool { step.continueLabel != nil }
+
+    /// This step's position within its own chapter, not the whole
+    /// experience — e.g. "3 of 8" for Home's third step, regardless of how
+    /// many steps came before it in Welcome/Discover/etc. Chapters are
+    /// contiguous runs of matching `chapterTitle`, so a single forward scan
+    /// finds both the current step's index within its run and the run's
+    /// total length.
+    private var chapterProgress: (index: Int, total: Int) {
+        let title = step.chapterTitle
+        var start = stepIndex
+        while start > 0, experience.steps[start - 1].chapterTitle == title { start -= 1 }
+        var end = stepIndex
+        while end < experience.steps.count - 1, experience.steps[end + 1].chapterTitle == title { end += 1 }
+        return (stepIndex - start + 1, end - start + 1)
+    }
 
     var body: some View {
         NavigationStack {
@@ -36,56 +55,31 @@ struct GuidedExperienceView: View {
                     }
 
                     VStack(spacing: 24) {
-                        progressDots
+                        VStack(spacing: 8) {
+                            Text(step.chapterTitle.uppercased())
+                                .font(.caption).fontWeight(.semibold)
+                                .foregroundStyle(.secondary)
+                                .accessibilityHidden(true)
+                            progressDots
+                        }
 
-                        Image(systemName: step.icon)
-                            .font(.system(size: 34))
-                            .foregroundStyle(Color.accentColor)
-                            .frame(width: 72, height: 72)
-                            .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 20))
-                            .accessibilityHidden(true)
+                        stepIcon
 
                         VStack(spacing: 10) {
                             Text(step.title)
                                 .font(.title2).fontWeight(.bold)
                                 .multilineTextAlignment(.center)
                                 .accessibilityAddTraits(.isHeader)
-                                .accessibilityLabel(String(localized: "\(step.title). Step \(stepIndex + 1) of \(experience.steps.count)."))
+                                .accessibilityLabel(String(
+                                    localized: "\(step.title). \(step.chapterTitle), step \(chapterProgress.index) of \(chapterProgress.total)."
+                                ))
                                 .accessibilityFocused($isHeadingFocused)
-                            Text(step.shortText)
+                            Text(step.body)
                                 .font(.body)
                                 .multilineTextAlignment(.center)
                                 .foregroundStyle(.secondary)
                         }
                         .padding(.horizontal, 24)
-
-                        if let explainMore = step.explainMoreText {
-                            VStack(spacing: 8) {
-                                if showExplainMore {
-                                    Text(explainMore)
-                                        .font(.subheadline)
-                                        .multilineTextAlignment(.center)
-                                        .foregroundStyle(.secondary)
-                                        .padding(.horizontal, 24)
-                                        .transition(.opacity)
-                                        .accessibilityFocused($isExplainMoreFocused)
-                                }
-                                Button(showExplainMore ? "Show Less" : "Explain More") {
-                                    withReduceMotionAwareAnimation { showExplainMore.toggle() }
-                                    // Only on expand — VoiceOver otherwise stays on
-                                    // this button and just re-announces its own
-                                    // updated label ("Show Less"), never actually
-                                    // reaching the explanation text it revealed.
-                                    // Collapsing back has no equivalent problem:
-                                    // staying on the button is exactly right there.
-                                    // Reported directly.
-                                    if showExplainMore {
-                                        Task { await retryAccessibilityFocus(into: $isExplainMoreFocused) }
-                                    }
-                                }
-                                .font(.subheadline)
-                            }
-                        }
 
                         if isLastStep {
                             completionActions
@@ -104,6 +98,18 @@ struct GuidedExperienceView: View {
             .background(preferences.colors.background)
             .navigationTitle(experience.title)
             .navigationBarTitleDisplayMode(.inline)
+            // Reserved for the tour's true finale, not every chapter
+            // checkpoint — three confetti bursts back to back (one per
+            // checkpoint) would cheapen it fast. ConfettiView already
+            // hides itself from VoiceOver and disables hit testing on its
+            // own; `reduceMotion` here is still needed since, unlike the
+            // symbol effect above, it's hand-built rather than a system
+            // effect that backs off automatically.
+            .overlay {
+                if isLastStep && !reduceMotion {
+                    ConfettiView()
+                }
+            }
         }
         .onAppear {
             let progress = GuidedExperienceStore.getProgress(experience.id)
@@ -123,18 +129,41 @@ struct GuidedExperienceView: View {
         }
     }
 
+    // MARK: - Icon
+
+    /// The `.symbolEffect` is only attached for checkpoint steps — applying
+    /// it unconditionally would replay a bounce on every plain content step
+    /// too, which is exactly the "flourish on every step" busyness worth
+    /// avoiding. System symbol effects respect Reduce Motion on their own.
+    @ViewBuilder private var stepIcon: some View {
+        let base = Image(systemName: step.icon)
+            .font(.system(size: 34))
+            .foregroundStyle(Color.accentColor)
+            .frame(width: 72, height: 72)
+            .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 20))
+            .accessibilityHidden(true)
+        if isCheckpoint {
+            base.symbolEffect(.bounce, value: stepIndex)
+        } else {
+            base
+        }
+    }
+
     // MARK: - Progress
 
+    /// Dots for the current chapter only (e.g. Home's own 8), not the whole
+    /// experience — the entire point of chaptering the tour was to stop
+    /// "Step 11 of 28" from being the number anyone sees.
     private var progressDots: some View {
-        HStack(spacing: 8) {
-            ForEach(0..<experience.steps.count, id: \.self) { i in
+        let progress = chapterProgress
+        return HStack(spacing: 8) {
+            ForEach(1...progress.total, id: \.self) { i in
                 Capsule()
-                    .fill(i == stepIndex ? Color.accentColor : Color.secondary.opacity(0.3))
-                    .frame(width: i == stepIndex ? 22 : 8, height: 8)
+                    .fill(i == progress.index ? Color.accentColor : Color.secondary.opacity(0.3))
+                    .frame(width: i == progress.index ? 22 : 8, height: 8)
             }
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(String(localized: "Step \(stepIndex + 1) of \(experience.steps.count)"))
+        .accessibilityHidden(true)
     }
 
     // MARK: - Per-step actions (secondary + primary + skip)
@@ -145,9 +174,10 @@ struct GuidedExperienceView: View {
                 Button(action.label) { perform(action) }
                     .buttonStyle(.bordered)
                     .frame(maxWidth: .infinity)
+                    .accessibilityHint(secondaryActionHint(action.kind))
             }
 
-            Button("Continue") { goToStep(stepIndex + 1) }
+            Button(step.continueLabel ?? String(localized: "Continue")) { goToStep(stepIndex + 1) }
                 .buttonStyle(.borderedProminent)
                 .frame(maxWidth: .infinity)
                 .controlSize(.large)
@@ -159,6 +189,22 @@ struct GuidedExperienceView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 24)
+    }
+
+    /// Neither action navigates away from what the button's own label
+    /// already says plainly — this hint exists purely to answer the
+    /// question a beta tester's confusion raised: "if I leave, can I get
+    /// back?" Told upfront, before tapping, not left to be discovered (or
+    /// not) afterward.
+    private func secondaryActionHint(_ kind: GuidedExperienceSecondaryActionKind) -> String {
+        switch kind {
+        case .exploreScreen:
+            return String(localized: "Leaves the tour to show you this screen for real. A Resume Tour button brings you right back to this exact step.")
+        case .pauseHere:
+            return String(localized: "Stops the tour here for now. A Resume Tour button brings you right back to this exact step whenever you're ready.")
+        case .learnMore:
+            return String(localized: "Opens the full Help article in a new screen.")
+        }
     }
 
     private var completionActions: some View {
@@ -185,7 +231,6 @@ struct GuidedExperienceView: View {
         let clamped = max(0, min(experience.steps.count - 1, index))
         SoundPlayer.shared.play(.pickerTick)
         stepIndex = clamped
-        showExplainMore = false
         GuidedExperienceStore.markStep(experience.id, clamped)
         playEntranceAnimation()
         focusHeadingAfterTransition()
@@ -230,6 +275,11 @@ struct GuidedExperienceView: View {
             navigate(to: target)
         case .learnMore(let helpArticleId):
             showHelpArticle = HelpContent.find(helpArticleId)
+        case .pauseHere:
+            GuidedExperienceStore.markDismissedForNow(experience.id, stepIndex)
+            pauseStore.pauseForExplore(experienceId: experience.id, experienceTitle: experience.title, stepIndex: stepIndex)
+            UIAccessibility.post(notification: .announcement, argument: "Tour paused. Resume anytime from the Resume Tour button.")
+            dismiss()
         }
     }
 
@@ -238,7 +288,7 @@ struct GuidedExperienceView: View {
         case .home: keyCommands.selectedTab = 0
         case .discover: keyCommands.selectedTab = 1
         case .forYou: keyCommands.selectedTab = 2
-        case .profile, .settings: keyCommands.showSettings = true
+        case .profile: keyCommands.showSettings = true
         }
     }
 
@@ -258,7 +308,6 @@ struct GuidedExperienceView: View {
             GuidedExperienceStore.restart(experience.id)
             UIAccessibility.post(notification: .announcement, argument: "\(experience.title) restarted.")
             stepIndex = 0
-            showExplainMore = false
             playEntranceAnimation()
             focusHeadingAfterTransition()
         }

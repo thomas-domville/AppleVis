@@ -247,11 +247,12 @@ struct ComposeTopicView: View {
     /// follow manually from the topic itself if this quietly doesn't stick.
     private func followNewTopic(_ topic: ForumTopic, token: String) async -> Bool {
         do {
-            try await APIClient.shared.forums.follow(nodeUuid: topic.id, token: token)
+            try await APIClient.shared.forums.follow(nodeUuid: topic.id, entityId: topic.nid ?? 0, token: token)
             PersistenceStore.shared.markFollowed(FollowedItem(
                 id: topic.id, kind: .forumTopic, nodeType: "node--forum",
                 title: topic.title, followedAt: Date(), lastActivityAt: topic.lastActivityAt, url: topic.url
             ))
+            FollowStore.shared.markFollowed(topic.id)
             return true
         } catch {
             return false
@@ -262,14 +263,21 @@ struct ComposeTopicView: View {
 struct ComposeReplyView: View {
     let topicId: String
     let topicTitle: String
-    /// Set when opened via a comment's "Reply to this Comment" VoiceOver
-    /// action (ForumTopicDetailView) — prefills a quoted excerpt the same
-    /// way the old RN compose screen's replyToAuthor/replyToQuote params did.
+    /// Set when opened via a comment's "Reply to this Comment" action
+    /// (ForumTopicDetailView) — the header below already says "Replying to
+    /// [Author]," and `submit()` sends this comment's id as the real Drupal
+    /// `pid` relationship. No longer prefills a text quote into the body:
+    /// that was the only way to record "this is a reply to that" before the
+    /// site exposed its own `pid` field via a "Reply" button (see
+    /// `ForumReply.parentId`'s doc comment) — now that a real citation
+    /// renders on the posted comment itself, baking a second, redundant
+    /// "X wrote: > excerpt" into the permanent body text would just be
+    /// clutter, and it's not how the website's own new Reply button works
+    /// either (confirmed live: it never touches the body).
     var quotedReply: ForumReply? = nil
     let onPosted: (ForumReply) -> Void
 
-    @State private var bodyText: String
-    private let initialBodyText: String
+    @State private var bodyText = ""
     @State private var isSubmitting = false
     @State private var error: String?
     @State private var showDiscardConfirm = false
@@ -286,25 +294,12 @@ struct ComposeReplyView: View {
         self.topicTitle = topicTitle
         self.quotedReply = quotedReply
         self.onPosted = onPosted
-        let initial: String
-        if let quotedReply {
-            let plain = quotedReply.body.strippingHTMLTags()
-            let excerpt = plain.count > 150 ? String(plain.prefix(150)).trimmingCharacters(in: .whitespaces) + "…" : plain
-            initial = "\(quotedReply.authorName) wrote:\n> \(excerpt)\n\n"
-        } else {
-            initial = ""
-        }
-        _bodyText = State(initialValue: initial)
-        initialBodyText = initial
     }
 
     /// RN confirmed before discarding a filled-out form; Cancel here
-    /// previously dismissed immediately with no warning. Compares against
-    /// `initialBodyText` rather than plain emptiness — a quoted reply
-    /// prefills a non-empty quote excerpt, which isn't itself "progress"
-    /// worth confirming a discard over.
+    /// previously dismissed immediately with no warning.
     private func requestCancel() {
-        if bodyText != initialBodyText {
+        if !bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             showDiscardConfirm = true
         } else {
             SoundPlayer.shared.play(.screenClose)
@@ -321,6 +316,22 @@ struct ComposeReplyView: View {
                     .padding()
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityFocused($isHeaderFocused)
+                // Read-only context, not part of the actual comment body —
+                // see `quotedReply`'s doc comment for why this no longer
+                // gets typed into `bodyText` itself. VoiceOver already has
+                // this same text via the header above (announced first,
+                // since this element isn't itself an accessibility stop);
+                // this is here purely for a sighted/low-vision user glancing
+                // at the compose screen while writing.
+                if let quotedReply {
+                    Text(quotedReply.body.strippingHTMLTags())
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                        .padding(.horizontal)
+                        .padding(.bottom, 8)
+                        .accessibilityHidden(true)
+                }
                 if intelligence.showTranslatePrompt {
                     TranslatePromptView(isProcessing: intelligence.isProcessing) {
                         Task {
@@ -426,7 +437,9 @@ struct ComposeReplyView: View {
         isSubmitting = true
         error = nil
         do {
-            let reply = try await APIClient.shared.forums.submitReply(topicId: topicId, body: bodyText, csrfToken: user.csrfToken)
+            let reply = try await APIClient.shared.forums.submitReply(
+                topicId: topicId, body: bodyText, csrfToken: user.csrfToken, replyToCommentId: quotedReply?.id
+            )
             toast.success(String(localized: "Reply posted"))
             SoundPlayer.shared.play(.reply)
             onPosted(reply)

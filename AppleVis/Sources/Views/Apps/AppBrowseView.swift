@@ -100,6 +100,11 @@ struct AppBrowseView: View {
         }
         .pickerStyle(.menu)
         .accessibilityHint(String(localized: "Choose which App Directory platform to browse."))
+        // Explicit value, not left to whatever SwiftUI synthesizes for a
+        // .menu-style Picker — without it, swiping up/down only played the
+        // "value changed" tone with no spoken platform name. Same fix as
+        // PlayerView's playback-speed control (PODCAST-06). Reported directly.
+        .accessibilityValue(Text(platform.displayName))
         .accessibilityAdjustableAction { direction in
             guard let idx = AppPlatform.allCases.firstIndex(of: platform) else { return }
             switch direction {

@@ -91,6 +91,14 @@ struct ForYouView: View {
                 }
                 .pickerStyle(.menu)
                 .accessibilityHint(String(localized: "Choose which For You section to view."))
+                // Explicit value, not left to whatever SwiftUI synthesizes
+                // for a .menu-style Picker — VoiceOver's automatic post-
+                // adjustment announcement speaks accessibilityValue, and
+                // without setting it directly, swiping up/down only played
+                // the "value changed" tone with no spoken section name.
+                // Same fix as PlayerView's playback-speed control (PODCAST-06).
+                // Reported directly.
+                .accessibilityValue(Text(pickerAccessibilityLabel(selectedTab)))
                 // Adds swipe-up/down to move to the next/previous section
                 // without giving up the .menu style above — matches the
                 // identical addition on App Directory's Platform picker.
@@ -513,8 +521,8 @@ struct SavedItemsView: View {
                     )
                 } else {
                     EmptyStateView(
-                        title: "Nothing Saved",
-                        message: "Tap the bookmark icon on any item to save it.",
+                        title: "Nothing Saved Yet",
+                        message: "Save a topic, app, guide, blog post, or episode and it'll show up here so you can find it again.",
                         systemImage: "bookmark",
                         primaryActionLabel: "Browse Content",
                         primaryAction: { showBrowseContent = true }
@@ -554,7 +562,11 @@ struct SavedItemsView: View {
                     .frame(maxWidth: .infinity)
             }
         }
-        .onAppear { tips.show(.savedSwipeActions) }
+        // A plain swipe-left/long-press tip is actively wrong under
+        // VoiceOver (swipe left there moves focus, it doesn't reveal
+        // anything) rather than merely irrelevant, so VoiceOver users get
+        // the rotor-based variant instead of the touch-gesture one.
+        .onAppear { tips.show(UIAccessibility.isVoiceOverRunning ? .savedRotorActions : .savedQuickActions) }
         .refreshable { await load(); SoundPlayer.shared.play(.refresh) }
         .confirmationDialog(
             "Unsave all \(filtered.count) item\(filtered.count == 1 ? "" : "s")?",
@@ -622,6 +634,10 @@ struct SavedItemsView: View {
             }
             .pickerStyle(.menu)
             .accessibilityHint(String(localized: "Filters the saved items list by content type."))
+            // Explicit value — without it, swiping up/down only played the
+            // "value changed" tone with no spoken filter name. Same fix as
+            // PlayerView's playback-speed control (PODCAST-06). Reported directly.
+            .accessibilityValue(Text(filter?.savedFilterName ?? String(localized: "All Saved Items")))
             // Same swipe-up/down addition as the Section/Platform pickers —
             // moves to the next/previous filter without opening the menu.
             .accessibilityAdjustableAction { direction in
@@ -733,7 +749,12 @@ private struct GenericSavedItemRow: View {
             deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
         }
         .contentActions(
-            id: item.id, kind: item.kind, title: item.title, lastActivityAt: item.lastActivityAt,
+            // SavedItem carries no `nid` (it's a lightweight, locally
+            // persisted record) — 0 hides *starting* a new follow from this
+            // row (canOfferFollow's entityId>0 check) while leaving Unfollow
+            // untouched for anything already followed. Open the item itself
+            // for a real Follow.
+            id: item.id, entityId: 0, kind: item.kind, title: item.title, lastActivityAt: item.lastActivityAt,
             onSaveToggle: { isSaved in
                 guard !isSaved else { return }
                 onUnsave()
@@ -860,7 +881,7 @@ private struct SavedPodcastEpisodeCard: View {
             if isQueued { player.removeFromQueue(id: episode.id) } else { player.enqueue(episode) }
         }
         .contentActions(
-            id: episode.id, kind: .podcastEpisode, title: episode.title,
+            id: episode.id, entityId: episode.nid, kind: .podcastEpisode, title: episode.title,
             lastActivityAt: episode.lastActivityAt, url: episode.url,
             onSaveToggle: { isSaved in
                 guard !isSaved else { return }
@@ -1043,7 +1064,10 @@ private struct FollowedItemRow: View {
             deepLinkRouter.pendingContent = (kind: item.kind, id: item.id)
         }
         .contentActions(
-            id: item.id, kind: item.kind, title: item.title, lastActivityAt: item.lastActivityAt, url: item.url,
+            // FollowedItem carries no `nid` either — fine here since this
+            // row only ever shows something already followed, so Unfollow
+            // (the only action that actually applies) doesn't need it.
+            id: item.id, entityId: 0, kind: item.kind, title: item.title, lastActivityAt: item.lastActivityAt, url: item.url,
             onFollowToggle: { isFollowing in
                 guard !isFollowing else { return }
                 onUnfollow()

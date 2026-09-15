@@ -14,6 +14,9 @@ struct ProfileView: View {
             List {
                 if let user = auth.user {
                     signedInContent(user)
+                    if user.isAdmin {
+                        adminSection
+                    }
                 } else {
                     signedOutContent
                 }
@@ -84,6 +87,38 @@ struct ProfileView: View {
             .accessibilityLabel(String(localized: "Signed in as \(user.name)\(user.isAdmin ? ", Administrator" : "")"))
             .accessibilityHint(String(localized: "Opens My Account for profile, password, email, and sign out options."))
             .accessibilityFocused($focusTarget, equals: Self.titleFocusID)
+        }
+    }
+
+    // MARK: - Admin section
+    // Admin/editor-only. Deliberately excluded from Help content, the
+    // Welcome Tour, and What's New — this is internal team tooling, not a
+    // user-facing feature, and gating on isAdmin already means almost
+    // nobody would ever see a mention of it anyway. Applies to every item
+    // added under this section going forward, not just the one below.
+    // Requested directly.
+
+    private var adminSection: some View {
+        Section("Admin") {
+            NavigationLink {
+                ModeratorToolsView()
+                    .onDisappear {
+                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("moderatorTools")) }
+                    }
+            } label: {
+                Label("Moderator Tools", systemImage: "shield")
+            }
+            .accessibilityFocused($focusTarget, equals: AnyHashable("moderatorTools"))
+
+            NavigationLink {
+                AppEntryHealthCheckView()
+                    .onDisappear {
+                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("appHealthCheck")) }
+                    }
+            } label: {
+                Label("App Directory Health Check", systemImage: "checkmark.shield")
+            }
+            .accessibilityFocused($focusTarget, equals: AnyHashable("appHealthCheck"))
         }
     }
 
@@ -162,7 +197,7 @@ struct ProfileView: View {
                 Label("Replay Welcome Tour", systemImage: "arrow.clockwise")
             }
             .accessibilityLabel(String(localized: "Replay Welcome Tour"))
-            .accessibilityHint(String(localized: "Replays the short guided tour of Home, Discover, For You, Search, Profile, and Settings."))
+            .accessibilityHint(String(localized: "Replays the guided tour of Home, Discover, For You, and Profile & Settings."))
 
             // Privacy Policy and Terms of Service used to be repeated here
             // directly, one tap away from the identical pair inside "About &

@@ -111,10 +111,13 @@ struct AnniversaryCelebrationView: View {
 }
 
 /// A short burst of falling, rotating colored shapes — purely decorative
-/// (hidden from VoiceOver; its "meaning" is carried in
-/// `AnniversaryCelebrationView.accessibleDescription` instead) and skipped
+/// (hidden from VoiceOver; fold its "meaning" into whatever spoken
+/// description accompanies the moment it's used for, the way
+/// `AnniversaryCelebrationView.accessibleDescription` does) and skipped
 /// entirely under Reduce Motion rather than shown as a static freeze-frame.
-private struct ConfettiView: View {
+/// Not private — reused for the Welcome Tour's finale (see
+/// `GuidedExperienceView`), and any other one-time celebration moment.
+struct ConfettiView: View {
     private struct Piece: Identifiable {
         let id = UUID()
         let color: Color

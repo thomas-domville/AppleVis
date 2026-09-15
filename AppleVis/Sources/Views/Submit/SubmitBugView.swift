@@ -20,6 +20,7 @@ struct SubmitBugView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
+    @StateObject private var domainChecker = EmailDomainChecker()
     @AccessibilityFocusState private var isStepFocused: Bool
     @AccessibilityFocusState private var isErrorFocused: Bool
 
@@ -41,6 +42,8 @@ struct SubmitBugView: View {
     @State private var showDiscardConfirm = false
     @State private var submitted = false
     @State private var descriptionMinimumAnnounced = false
+    @State private var showAccountEmailChange = false
+    @State private var emailSuggestionDismissed = false
 
     private let platforms = ["iOS", "iPadOS", "macOS"]
     private let reproduceOptions = ["Yes, always", "Yes, sometimes", "No"]
@@ -56,7 +59,7 @@ struct SubmitBugView: View {
     private var descriptionLength: Int { description.trimmingCharacters(in: .whitespacesAndNewlines).count }
 
     private var descriptionValid: Bool {
-        !title.trimmingCharacters(in: .whitespaces).isEmpty && descriptionLength >= 30 && email.contains("@")
+        !title.trimmingCharacters(in: .whitespaces).isEmpty && descriptionLength >= 30 && email.isValidEmailFormat
     }
 
     /// Mirrors Contact's crossing-the-threshold announcement so VoiceOver
@@ -102,7 +105,12 @@ struct SubmitBugView: View {
                         message: "Your report is now in front of our team. We genuinely appreciate you taking the time to help make apps more accessible for everyone.",
                         doneLabel: "Done",
                         onDone: { dismiss() }
-                    )
+                    ) {
+                        if !emailSuggestionDismissed,
+                           AccountEmailUpdateSuggestion.applies(usedEmail: email, accountEmail: auth.user?.email) {
+                            AccountEmailUpdateSuggestion(isDismissed: $emailSuggestionDismissed, showEmailChangeWizard: $showAccountEmailChange)
+                        }
+                    }
                 } else if !auth.isSignedIn {
                     signInRequiredView
                 } else {
@@ -156,6 +164,9 @@ struct SubmitBugView: View {
         .sheet(isPresented: $showSignIn) {
             SignInView()
         }
+        .sheet(isPresented: $showAccountEmailChange) {
+            AccountSecurityWizard(mode: .email, initialEmail: email)
+        }
         .confirmationDialog(
             "Discard this submission?",
             isPresented: $showDiscardConfirm, titleVisibility: .visible
@@ -169,7 +180,16 @@ struct SubmitBugView: View {
         // goNext()/goBack() ever called focusStepAfterTransition(), so
         // opening this wizard left VoiceOver focus on system default
         // (typically Cancel). Full app-wide focus audit, requested directly.
-        .task { focusStepAfterTransition() }
+        .task {
+            // This wizard is sign-in only, so the account email
+            // (AuthUser.email) is always the right default — no reason to
+            // make a signed-in user retype an address the account already
+            // has. Reported directly.
+            if email.isEmpty, let acctEmail = auth.user?.email {
+                email = acctEmail
+            }
+            focusStepAfterTransition()
+        }
     }
 
     /// RN confirmed before discarding a filled-out form; Cancel here
@@ -199,6 +219,7 @@ struct SubmitBugView: View {
             Text("Sign In Required")
                 .font(.headline)
                 .accessibilityAddTraits(.isHeader)
+                .accessibilityFocused($isStepFocused)
             Text("You need to be signed in to your AppleVis account to submit a bug report.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -267,10 +288,24 @@ struct SubmitBugView: View {
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
                     .accessibilityHint(String(localized: "Required. The AppleVis team may reply to follow up on your report."))
+                    .onChange(of: email) { _, newValue in domainChecker.check(email: newValue) }
             } header: {
                 Text("Your Email")
+            } footer: {
+                if !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !email.isValidEmailFormat {
+                    Text("Enter a valid email address.")
+                } else {
+                    EmailDomainWarning(checker: domainChecker)
+                }
             }
             Section {
+                // Combined label+counter into one live-updating swipe-stop,
+                // and hid the trailing caption from VoiceOver — it's a
+                // verbatim repeat of text already in the field's own hint
+                // below, so it stays visible for sighted/low-vision readers
+                // but no longer gets spoken a second time. Same fix applied
+                // to every minimum-length field across every wizard.
+                // Reported directly.
                 HStack {
                     Text("Description").font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -278,8 +313,10 @@ struct SubmitBugView: View {
                         .font(.caption)
                         .fontWeight(descriptionLength < 30 ? .bold : .regular)
                         .foregroundStyle(descriptionLength < 30 ? .red : .secondary)
-                        .accessibilityLabel(descriptionLength < 30 ? String(localized: "\(descriptionLength) of 30 minimum characters") : String(localized: "\(descriptionLength) characters"))
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(descriptionLength < 30 ? String(localized: "Description: \(descriptionLength) of 30 minimum characters") : String(localized: "Description: \(descriptionLength) characters"))
+                .accessibilityAddTraits(.updatesFrequently)
                 TextEditor(text: $description)
                     .frame(minHeight: 160)
                     .accessibilityLabel(String(localized: "Description"))
@@ -296,9 +333,28 @@ struct SubmitBugView: View {
                 Text("The more detail you can share — what happened, what you expected instead, and the exact steps to get there — the easier it is for us to reproduce and track down.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
                 rewriteButton
             }
+            Section {
+                WizardBlockingNote(reasons: descriptionBlockingReasons)
+                WizardBottomButton(String(localized: "Next"), isEnabled: descriptionValid, action: goNext)
+            }
         }
+    }
+
+    private var descriptionBlockingReasons: [String] {
+        var reasons: [String] = []
+        if title.trimmingCharacters(in: .whitespaces).isEmpty {
+            reasons.append(String(localized: "Enter a title to continue."))
+        }
+        if descriptionLength < 30 {
+            reasons.append(String(localized: "Write at least \(30 - descriptionLength) more character\(30 - descriptionLength == 1 ? "" : "s") to continue."))
+        }
+        if !email.isValidEmailFormat {
+            reasons.append(String(localized: "Enter a valid email address to continue."))
+        }
+        return reasons
     }
 
     /// Was a toolbar button under the overflow "More" menu — easy to miss,
@@ -330,6 +386,8 @@ struct SubmitBugView: View {
             Section {
                 WizardStepIndicator(step: 2, total: 3, title: "Environment", isFocused: $isStepFocused)
                 backButton
+                Text("Tell us where this happens and the Apple Feedback number you filed it under.")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             Section("Where It Happens") {
                 Picker("Platform", selection: $platform) {
@@ -367,7 +425,22 @@ struct SubmitBugView: View {
                 .pickerStyle(.navigationLink)
                 .accessibilityHint(String(localized: "Controls how you're credited if this report leads to a fix."))
             }
+            Section {
+                WizardBlockingNote(reasons: bugInfoBlockingReasons)
+                WizardBottomButton(String(localized: "Next"), isEnabled: bugInfoValid, action: goNext)
+            }
         }
+    }
+
+    private var bugInfoBlockingReasons: [String] {
+        var reasons: [String] = []
+        if softwareVersion.trimmingCharacters(in: .whitespaces).isEmpty {
+            reasons.append(String(localized: "Enter the software version to continue."))
+        }
+        if !isAppleFeedbackIdValid {
+            reasons.append(String(localized: "Enter your Apple Feedback number to continue."))
+        }
+        return reasons
     }
 
     private var reviewSection: some View {
@@ -375,6 +448,8 @@ struct SubmitBugView: View {
             Section {
                 WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused)
                 backButton
+                Text("Check your details, then tap Submit.")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             Section("From") {
                 WizardReviewRow(label: "Posting As", value: auth.user?.name ?? "")
@@ -396,6 +471,12 @@ struct SubmitBugView: View {
                     OfflineComposeNotice()
                 }
                 .listRowSeparator(.hidden)
+            }
+            Section {
+                WizardBottomButton(
+                    String(localized: "Submit"),
+                    isEnabled: !isSubmitting && networkMonitor.isConnected
+                ) { Task { await submit() } }
             }
         }
     }

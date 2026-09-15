@@ -39,6 +39,14 @@ struct DiscoverView: View {
     @FocusState private var isSearchFieldFocused: Bool
     @AccessibilityFocusState private var focusTarget: AnyHashable?
     private static let titleFocusID = AnyHashable("discover.title")
+    // Tracks whether the stack is sitting at the hub grid or has something
+    // pushed (Podcasts, Apps, etc.) — a TabView never tears down a hidden
+    // tab's content, so switching away mid-navigation and back doesn't pop
+    // anything on its own. Without checking this, returning to the Discover
+    // tab while still deep in a section forced focus onto the hub's own
+    // title below, overriding whichever section's own restoreFocus was
+    // trying to put focus back where it belonged. Reported directly.
+    @State private var navigationPath = NavigationPath()
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var toast: ToastStore
@@ -47,26 +55,12 @@ struct DiscoverView: View {
 
     private static let bmeAppStoreURL = URL(string: "https://apps.apple.com/us/app/be-my-eyes/id905177575")!
 
-    private struct SocialLink: Identifiable {
-        let id: String
-        let label: String
-        let url: URL
-        let systemImage: String
-        var description: String { "Follow AppleVis on \(label)" }
-    }
-
-    private static let socialLinks: [SocialLink] = [
-        SocialLink(id: "mastodon", label: "Mastodon", url: URL(string: "https://mastodon.online/@AppleVis")!, systemImage: "network"),
-        SocialLink(id: "facebook", label: "Facebook", url: URL(string: "https://www.facebook.com/AppleVis")!, systemImage: "person.3.fill"),
-        SocialLink(id: "x", label: "X", url: URL(string: "https://x.com/AppleVis")!, systemImage: "at"),
-    ]
-
     init(initialSearchQuery: String? = nil) {
         _searchText = State(initialValue: initialSearchQuery ?? "")
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             Group {
                 if searchText.trimmingCharacters(in: .whitespaces).count < 2 {
                     hubGrid
@@ -144,6 +138,13 @@ struct DiscoverView: View {
                     return
                 }
                 guard searchText.trimmingCharacters(in: .whitespaces).count < 2 else { return }
+                // Only force focus to the hub title when the stack is
+                // actually showing the hub — forcing it while a section is
+                // still pushed underneath (switched away to another tab and
+                // back without popping) yanked focus to an element that
+                // wasn't even what the user was looking at, clobbering that
+                // section's own restoreFocus in the process. Reported directly.
+                guard navigationPath.isEmpty else { return }
                 Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: Self.titleFocusID) }
             }
             .navigationDestination(for: DiscoverHubDestination.self) { destination in
@@ -511,20 +512,20 @@ struct DiscoverView: View {
     }
 
     private var socialFollowLinks: some View {
-        ForEach(Self.socialLinks) { link in
+        ForEach(AppleVisSocial.platforms) { platform in
             // WebLink, not a raw openURL Button: these links honor the Web
             // Links preference instead of always forcing the external browser.
-            WebLink(destination: link.url) {
+            WebLink(destination: platform.url) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Image(systemName: link.systemImage)
+                    Image(systemName: platform.icon)
                         .font(.title2)
                         .foregroundStyle(.white)
                         .frame(width: 44, height: 44)
                         .background(Color.cyan, in: RoundedRectangle(cornerRadius: 10))
 
-                    Text("Follow on \(link.label)")
+                    Text("Follow on \(platform.name)")
                         .font(.headline)
-                    Text("Open AppleVis on \(link.label)")
+                    Text("Open AppleVis on \(platform.name)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -533,7 +534,7 @@ struct DiscoverView: View {
                 .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(link.description)
+            .accessibilityLabel(String(localized: "Follow AppleVis on \(platform.name)"))
             .accessibilityHint(String(localized: "Double-tap to open."))
         }
     }

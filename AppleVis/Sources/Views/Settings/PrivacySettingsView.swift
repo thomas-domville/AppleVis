@@ -3,7 +3,6 @@ import SwiftUI
 struct PrivacySettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var showClearDataConfirmation = false
-    @State private var showSignedOutHistoryConfirmation = false
     @State private var clearDataComplete = false
     @AccessibilityFocusState private var isTitleFocused: Bool
 
@@ -76,22 +75,30 @@ struct PrivacySettingsView: View {
                 }
             }
 
-            Section("Signed-Out Reading History") {
-                Toggle("Remember Reading History While Signed Out", isOn: Binding(
-                    get: { preferences.rememberSignedOutHistory },
-                    set: { newValue in
-                        if newValue {
-                            preferences.rememberSignedOutHistory = true
-                        } else {
-                            showSignedOutHistoryConfirmation = true
-                        }
-                    }
-                ))
-                .accessibilityHint(String(localized: "When on, AppleVis remembers what you open on this device while signed out so Home can show what is new since your last visit."))
+            Section("What's New Indicators") {
+                Toggle("Show What's New on Home", isOn: $preferences.showNewActivityIndicators)
+                    .accessibilityHint(String(localized: "When on, Home shows a New view, a quick summary, and small badges for content with new activity since your last visit."))
 
-                Text("When signed in, AppleVis uses your account's read state. This setting only controls local reading history while you are signed out.")
+                Text("Reading history is always tracked on-device — this only controls whether Home actually shows what's new because of it. Turning it off doesn't erase anything; it just keeps Home quieter.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            Section("Language Filtering") {
+                Toggle("Filter Profanity", isOn: $preferences.filterProfanity)
+                    .accessibilityHint(String(localized: "When on, milder language is shown masked, like s star star star, instead of spelled out."))
+
+                Text("AppleVis blocks strong or explicit language from every post and comment, always — this setting doesn't change that. It only controls whether milder language, which the site otherwise allows, is shown masked or spelled out. We keep this on by default to help AppleVis stay welcoming, and to stay within Apple's guidelines for our age rating.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if let article = HelpContent.find("community-language-filter") {
+                    NavigationLink {
+                        HelpArticleDetailView(article: article)
+                    } label: {
+                        Label("Learn More About Language Filtering", systemImage: "info.circle")
+                    }
+                }
             }
 
             Section("Data Management") {
@@ -131,21 +138,6 @@ struct PrivacySettingsView: View {
                 }
             }
         }
-        .confirmationDialog(
-            "Turn off signed-out reading history?",
-            isPresented: $showSignedOutHistoryConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Turn Off and Clear History", role: .destructive) {
-                preferences.rememberSignedOutHistory = false
-                PersistenceStore.shared.clearLocalReadHistory()
-            }
-            Button("Keep Remembering", role: .cancel) {
-                preferences.rememberSignedOutHistory = true
-            }
-        } message: {
-            Text("AppleVis will stop tracking what you open while signed out and will clear existing local read history. Saved items, downloads, and account data are not affected.")
-        }
         .themedList(preferences.colors)
         .navigationTitle("Privacy")
         .navigationBarTitleDisplayMode(.inline)
@@ -165,6 +157,7 @@ struct PrivacySettingsView: View {
         ContentCache.shared.clearAll()
         DownloadManager.shared.deleteAll()
         PersistenceStore.shared.clearAllLocalData()
+        preferences.lastGuestEmail = ""
         clearDataComplete = true
     }
 }

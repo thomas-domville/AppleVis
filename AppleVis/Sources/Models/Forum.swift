@@ -52,6 +52,15 @@ nonisolated struct ForumReply: Identifiable, Codable, Sendable {
     let createdAt: Date
     let loveCount: Int
     var isNew: Bool
+    /// The comment this one is a reply to, via Drupal's own `pid` (parent
+    /// comment) field — real threading data the site quietly always had but
+    /// only started surfacing with its own "Reply" button. Superseded
+    /// `QuotedReply`'s old text-prefix heuristic ("nothing in the Drupal
+    /// comment data links a reply back to its parent"), which was true right
+    /// up until this field got exposed. Matched against the topic's already-
+    /// loaded `replies` array by id — the parent is always on the same
+    /// topic, so no extra fetch is needed to resolve it.
+    var parentId: String? = nil
 }
 
 nonisolated struct ForumCategory: Identifiable, Codable, Hashable, Sendable {

@@ -27,6 +27,11 @@ struct GeneralSettingsView: View {
                     }
                 }
                 .accessibilityHint(String(localized: "Controls how much spoken announcement Home produces when you open or return to it."))
+                // Explicit value — without it, swiping up/down only played
+                // the "value changed" tone with no spoken option. Same fix
+                // as PlayerView's playback-speed control (PODCAST-06).
+                // Reported directly.
+                .accessibilityValue(Text(preferences.homeStartupBehavior.displayName))
                 .accessibilityAdjustableAction { direction in
                     guard let idx = HomeStartupBehavior.allCases.firstIndex(of: preferences.homeStartupBehavior) else { return }
                     switch direction {
@@ -73,6 +78,11 @@ struct GeneralSettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 .accessibilityHint(String(localized: "Controls whether web links open inside AppleVis or in your default browser."))
+                // Explicit value — without it, swiping up/down only played
+                // the "value changed" tone with no spoken option. Same fix
+                // as PlayerView's playback-speed control (PODCAST-06).
+                // Reported directly.
+                .accessibilityValue(Text(preferences.webBrowsingMode.displayName))
                 .accessibilityAdjustableAction { direction in
                     guard let idx = WebBrowsingMode.allCases.firstIndex(of: preferences.webBrowsingMode) else { return }
                     switch direction {

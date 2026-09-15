@@ -64,6 +64,7 @@ final class AuthStore: ObservableObject {
         // Local Data" button already used.
         PersistenceStore.shared.clearAllLocalData()
         RecommendationStore.shared.reset()
+        FollowStore.shared.reset()
     }
 
     /// Independent of whether the server-side logout call above succeeds —
@@ -94,6 +95,7 @@ final class AuthStore: ObservableObject {
         clearSessionCookies()
         PersistenceStore.shared.clearAllLocalData()
         RecommendationStore.shared.reset()
+        FollowStore.shared.reset()
         Task { await PushNotificationManager.clearRegistration() }
     }
 
@@ -121,9 +123,10 @@ final class AuthStore: ObservableObject {
                 updated.uuid = try await APIClient.shared.account.resolveUuid(uid: current.uid, csrfToken: current.csrfToken) ?? ""
             }
             guard !updated.uuid.isEmpty else { return }
-            let roles = try await APIClient.shared.account.resolveRoles(uuid: updated.uuid, csrfToken: current.csrfToken)
-            guard roles != current.roles || updated.uuid != current.uuid else { return }
-            updated.roles = roles
+            let details = try await APIClient.shared.account.resolveAccountDetails(uuid: updated.uuid, csrfToken: current.csrfToken)
+            guard details.roles != current.roles || details.email != current.email || updated.uuid != current.uuid else { return }
+            updated.roles = details.roles
+            updated.email = details.email
             user = updated
             saveToKeychain(updated)
         } catch {
