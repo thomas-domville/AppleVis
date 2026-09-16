@@ -1,11 +1,12 @@
 import SwiftUI
 
-/// Scans recently-active forum topics and replies for possible guideline
-/// violations — see `GuidelineViolationScanner` for how the scan itself
-/// works (forums-only for now, reusing the same cached fetches forum
-/// browsing already populates). Deliberately excluded from Help content,
-/// the Welcome Tour, and What's New — see `ModeratorToolsView`'s doc
-/// comment. Requested directly.
+/// Scans recently-posted content across every commentable content type —
+/// forum topics/replies, blog posts, guides, podcast episodes, app/TV/Watch/
+/// Mac directory entries and reviews, and bug reports — for possible
+/// guideline violations. See `GuidelineViolationScanner` for how the scan
+/// itself works. Deliberately excluded from Help content, the Welcome Tour,
+/// and What's New — see `ModeratorToolsView`'s doc comment. Requested
+/// directly.
 struct GuidelineViolationCheckView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @StateObject private var scanner = GuidelineViolationScanner()
@@ -27,7 +28,7 @@ struct GuidelineViolationCheckView: View {
     var body: some View {
         Form {
             Section {
-                Text("Scans recent forum topics and replies — Apple-related and not, no Home-style filtering — against AppleVis's posting guidelines. Not a substitute for judgment: a flag means \"worth a look,\" not \"definitely a violation.\"")
+                Text("Scans recent forum topics, blog posts, guides, podcast episodes, app/TV/Watch/Mac directory entries, bug reports, and their comments and replies — against AppleVis's posting guidelines. Not a substitute for judgment: a flag means \"worth a look,\" not \"definitely a violation.\"")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .accessibilityFocused($isTitleFocused)
@@ -45,7 +46,7 @@ struct GuidelineViolationCheckView: View {
                 Section {
                     HStack {
                         ProgressView()
-                        Text("Scanning recent forum activity…")
+                        Text("Scanning recent activity…")
                             .foregroundStyle(.secondary)
                     }
                     .accessibilityElement(children: .combine)
@@ -58,7 +59,7 @@ struct GuidelineViolationCheckView: View {
             } else {
                 Section {
                     HStack {
-                        Text("\(scanner.scannedTopicCount) topics scanned")
+                        Text("\(scanner.scannedItemCount) items scanned")
                         Spacer()
                         Text("\(visibleFlags.count) flagged")
                             .fontWeight(.semibold)
@@ -81,7 +82,7 @@ struct GuidelineViolationCheckView: View {
                     Section {
                         ForEach(visibleFlags) { flag in
                             NavigationLink {
-                                ForumTopicDetailView(topicId: flag.topicId)
+                                GuidelineFlagDestination(flag: flag)
                             } label: {
                                 GuidelineFlagRow(flag: flag)
                             }
@@ -114,6 +115,26 @@ struct GuidelineViolationCheckView: View {
     }
 }
 
+/// Routes to the right detail screen for a flag's content kind — every one
+/// of these accepts a bare content id and resolves the rest itself (no
+/// platform hint needed for app entries or bug reports, both of which
+/// already try each of their own possible node types in turn for a
+/// platform-less id).
+private struct GuidelineFlagDestination: View {
+    let flag: GuidelineFlag
+
+    var body: some View {
+        switch flag.kind {
+        case .forumTopic:     ForumTopicDetailView(topicId: flag.itemId)
+        case .blogPost:       BlogDetailView(postId: flag.itemId)
+        case .resource:       ResourceDetailView(resourceId: flag.itemId)
+        case .podcastEpisode: EpisodeDetailView(episodeId: flag.itemId)
+        case .appListing:     AppDetailView(appId: flag.itemId)
+        case .bugReport:      BugDetailView(bugId: flag.itemId)
+        }
+    }
+}
+
 private struct GuidelineFlagRow: View {
     let flag: GuidelineFlag
 
@@ -129,8 +150,18 @@ private struct GuidelineFlagRow: View {
         flag.warnings.map(\.rule).joined(separator: ", ")
     }
 
+    /// The root item itself uses its content kind's own name ("Topic,"
+    /// "Blog Post," "App Entry," …); a comment underneath it uses the
+    /// term that content type's own comment thread actually uses —
+    /// "Reply" for forums, "Review" for app/TV/Watch/Mac directory entries,
+    /// "Comment" for everything else.
     private var kindLabel: String {
-        flag.isTopicItself ? String(localized: "Topic") : String(localized: "Reply")
+        guard !flag.isRootItem else { return flag.kind.displayName }
+        switch flag.kind {
+        case .forumTopic:  return String(localized: "Reply")
+        case .appListing:  return String(localized: "Review")
+        default:           return String(localized: "Comment")
+        }
     }
 
     var body: some View {
@@ -150,7 +181,7 @@ private struct GuidelineFlagRow: View {
                     .foregroundStyle(.secondary)
             }
 
-            Text(flag.topicTitle)
+            Text(flag.itemTitle)
                 .font(.subheadline).fontWeight(.semibold)
                 .lineLimit(1)
 
@@ -166,6 +197,6 @@ private struct GuidelineFlagRow: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "\(severityConfig.label) severity. \(kindLabel) by \(flag.authorName), in \(flag.topicTitle). \(ruleNames). \(flag.excerpt)"))
+        .accessibilityLabel(String(localized: "\(severityConfig.label) severity. \(kindLabel) by \(flag.authorName), in \(flag.itemTitle). \(ruleNames). \(flag.excerpt)"))
     }
 }

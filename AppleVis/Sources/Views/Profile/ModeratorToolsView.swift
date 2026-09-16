@@ -24,7 +24,7 @@ struct ModeratorToolsView: View {
                 } label: {
                     Label("Guideline Violation Check", systemImage: "text.magnifyingglass")
                 }
-                .accessibilityHint(String(localized: "Scans recent forum activity for possible guideline violations."))
+                .accessibilityHint(String(localized: "Scans recent activity across the site for possible guideline violations."))
             }
         }
         .themedList(preferences.colors)
