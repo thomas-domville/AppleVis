@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 /// One iOS App Directory entry worth an editor's attention.

@@ -261,7 +261,7 @@ struct AccountSecurityWizard: View {
                 // the field, rather than needing a separate line that only
                 // shows up once you've already gotten it wrong. A beta
                 // tester's suggestion, generalized here.
-                Section("New Password") {
+                Section {
                     SecureField("New Password (8+ characters, 1 number, 1 symbol)", text: $newPassword)
                         .textContentType(.newPassword)
                         .accessibilityHint(String(localized: "Required."))
@@ -274,6 +274,8 @@ struct AccountSecurityWizard: View {
                     SecureField("Confirm New Password", text: $confirmPassword)
                         .textContentType(.newPassword)
                         .accessibilityHint(String(localized: "Required. Must match the password above."))
+                } header: {
+                    Text("New Password")
                 } footer: {
                     Text("Meeting the minimum is all that's required to continue — the strength meter above is just a nudge toward a password that's harder to guess.")
                 }

@@ -577,11 +577,17 @@ struct ContentAccessibilityLabel: ViewModifier {
     /// false so existing translation-only call sites (HelpArticleDetailView,
     /// which has no profanity-filtering concern — it's curated staff
     /// content, not user-generated) don't need to change.
-    let isOverridden: Bool = false
+    let isOverridden: Bool
     let isTranslated: Bool
     /// Already fully resolved: translated and/or profanity-masked as
     /// needed, via `SegmentedHTMLView.accessibilityText(for:)`.
     let text: String
+
+    init(isOverridden: Bool = false, isTranslated: Bool, text: String) {
+        self.isOverridden = isOverridden
+        self.isTranslated = isTranslated
+        self.text = text
+    }
 
     func body(content: Content) -> some View {
         if isTranslated {

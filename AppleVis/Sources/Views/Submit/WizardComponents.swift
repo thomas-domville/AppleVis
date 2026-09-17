@@ -212,14 +212,27 @@ struct WizardBottomButton: View {
     var isProminent: Bool = true
     let action: () -> Void
 
+    init(_ title: String, isEnabled: Bool = true, isProminent: Bool = true, action: @escaping () -> Void) {
+        self.title = title
+        self.isEnabled = isEnabled
+        self.isProminent = isProminent
+        self.action = action
+    }
+
     var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 4)
+        let label = Text(title)
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
+        Group {
+            if isProminent {
+                Button(action: action) { label }
+                    .buttonStyle(.borderedProminent)
+            } else {
+                Button(action: action) { label }
+                    .buttonStyle(.bordered)
+            }
         }
-        .buttonStyle(isProminent ? .borderedProminent : .bordered)
         .disabled(!isEnabled)
     }
 }

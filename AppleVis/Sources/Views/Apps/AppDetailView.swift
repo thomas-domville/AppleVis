@@ -270,7 +270,7 @@ struct AppDetailView: View {
                 }
                 DetailActionsMenu(
                     id: detail.id, entityId: detail.nid, kind: .appListing, title: detail.name, lastActivityAt: detail.lastUpdatedAt, url: detail.url,
-                    authorName: detail.authorName, excerpt: .excerpt(from: detail.body),
+                    authorName: detail.submittedBy, excerpt: .excerpt(from: detail.body),
                     isOwnContent: isOwnAppEntry(detail),
                     onAddComment: { showReviewCompose = true },
                     onEdit: { startEditApp(detail) },
