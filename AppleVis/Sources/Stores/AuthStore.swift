@@ -21,9 +21,24 @@ final class AuthStore: ObservableObject {
 
     private let keychainKey = "applevis.authUser"
     private let onboardedKey = "applevis.onboarded"
+    private let hasLaunchedKey = "applevis.hasLaunchedThisInstall"
 
     init() {
         isOnboarded = UserDefaults.standard.bool(forKey: "applevis.onboarded")
+        // The Keychain survives deleting the app — by design, so apps that
+        // want that (like a banking app restoring a session after a
+        // reinstall) can have it — but UserDefaults doesn't. A user who
+        // deletes and reinstalls AppleVis to get a clean slate (onboarding
+        // included) still found themselves silently signed back in, because
+        // the Keychain entry from the previous install was never touched.
+        // A missing hasLaunchedKey sentinel here means either a genuinely
+        // first-ever install, or exactly that reinstall case — either way,
+        // any Keychain entry found alongside it is leftover from before and
+        // gets cleared rather than silently restored. Reported directly.
+        if !UserDefaults.standard.bool(forKey: hasLaunchedKey) {
+            deleteFromKeychain()
+            UserDefaults.standard.set(true, forKey: hasLaunchedKey)
+        }
         user = Self.loadFromKeychain()
         AuthStore.current = self
     }

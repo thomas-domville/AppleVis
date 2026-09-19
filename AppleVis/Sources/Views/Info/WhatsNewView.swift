@@ -416,6 +416,18 @@ struct ChangeItem: Identifiable {
             title: "Fewer False Guideline Reminders",
             description: "The gentle reminder shown while composing a topic, reply, or review could fire on things that were never really a problem — a normal reply asking a few quick follow-up questions, criticizing an app or company rather than a person, mentioning \"my podcast player,\" or thanking people who already took a survey. Tightened up several of these checks so the reminder shows up for things that actually need a second look, not ordinary posts. Found while reviewing real flagged content together."
         ),
+        ChangeItem(
+            systemImage: "doc.plaintext",
+            tag: .new,
+            title: "Terms of Service and Privacy Policy Shown at Setup",
+            description: "The very first screen of setup now links directly to our Terms of Service and Privacy Policy, which continuing past it means agreeing to. Previously these were only reachable as an easy-to-miss link tucked into About and Settings."
+        ),
+        ChangeItem(
+            systemImage: "arrow.counterclockwise",
+            tag: .fixed,
+            title: "Reinstalling Now Actually Signs You Out",
+            description: "Deleting and reinstalling AppleVis brought onboarding back as expected, but silently signed you back in anyway — the Keychain, unlike everything else the app stores, survives an app deletion. A fresh install now clears any leftover sign-in from before, so reinstalling really does mean starting fresh. Reported directly."
+        ),
     ]
 
     /// Stable-sorts into New → Improved → Accessibility → Fixed while

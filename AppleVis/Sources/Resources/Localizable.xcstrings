@@ -235833,6 +235833,554 @@
           }
         }
       }
+    },
+    "Terms of Service and Privacy Policy Shown at Setup" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "شروط الخدمة وسياسة الخصوصية تظهر عند الإعداد"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nutzungsbedingungen und Datenschutzrichtlinie beim Setup"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Οι Όροι Χρήσης και η Πολιτική Απορρήτου εμφανίζονται στην αρχική ρύθμιση"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Términos del servicio y Política de privacidad en la configuración inicial"
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نمایش شرایط خدمات و سیاست حریم خصوصی هنگام راه‌اندازی اولیه"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conditions d'utilisation et politique de confidentialité affichées à la configuration"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "תנאי השירות ומדיניות הפרטיות מוצגים בהגדרה הראשונית"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "सेवा की शर्तें और गोपनीयता नीति अब सेटअप में दिखाई जाती हैं"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ketentuan Layanan dan Kebijakan Privasi Ditampilkan Saat Pengaturan"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Termini di servizio e informativa sulla privacy mostrati durante la configurazione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セットアップで利用規約とプライバシーポリシーを表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정 시작 화면에 이용약관 및 개인정보 처리방침 표시"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Servicevoorwaarden en privacybeleid getoond bij installatie"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warunki korzystania z usługi i polityka prywatności widoczne podczas konfiguracji"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Termos de serviço e política de privacidade exibidos na configuração"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Условия использования и политика конфиденциальности показаны при настройке"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Användarvillkor och integritetspolicy visas vid installationen"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "แสดงข้อกำหนดในการให้บริการและนโยบายความเป็นส่วนตัวตอนตั้งค่า"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kurulumda Hizmet Şartları ve Gizlilik Politikası Gösteriliyor"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Умови надання послуг і політика конфіденційності відображаються під час налаштування"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Điều khoản dịch vụ và Chính sách quyền riêng tư hiển thị khi thiết lập"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置时显示服务条款和隐私政策"
+          }
+        }
+      }
+    },
+    "The very first screen of setup now links directly to our Terms of Service and Privacy Policy, which continuing past it means agreeing to. Previously these were only reachable as an easy-to-miss link tucked into About and Settings." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعرض الشاشة الأولى من الإعداد الآن رابطًا مباشرًا لشروط الخدمة وسياسة الخصوصية لدينا، والمتابعة بعدها تعني موافقتك عليها. سابقًا، لم يكن الوصول إليهما ممكنًا إلا عبر رابط يسهل تفويته داخل حول التطبيق والإعدادات."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der allererste Setup-Bildschirm verlinkt jetzt direkt auf unsere Nutzungsbedingungen und Datenschutzrichtlinie – wenn du fortfährst, stimmst du ihnen zu. Bisher waren sie nur über einen leicht zu übersehenden Link in Über und Einstellungen erreichbar."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Η πρώτη οθόνη της αρχικής ρύθμισης συνδέεται πλέον απευθείας με τους Όρους Χρήσης και την Πολιτική Απορρήτου μας — συνεχίζοντας πέρα από αυτήν σημαίνει ότι συμφωνείτε μαζί τους. Παλαιότερα ήταν προσβάσιμοι μόνο μέσω ενός εύκολα παραβλέψιμου συνδέσμου στο Σχετικά και στις Ρυθμίσεις."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La primerísima pantalla de la configuración inicial ahora enlaza directamente a nuestros Términos del servicio y Política de privacidad; continuar más allá de ella significa que los aceptas. Antes solo se podía acceder a ellos mediante un enlace fácil de pasar por alto en Acerca de y Configuración."
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اولین صفحه راه‌اندازی اولیه اکنون مستقیماً به شرایط خدمات و سیاست حریم خصوصی ما پیوند دارد؛ ادامه دادن پس از آن به معنای موافقت با آن‌هاست. پیش از این، دسترسی به آن‌ها فقط از طریق پیوندی که به‌راحتی نادیده گرفته می‌شد در درباره و تنظیمات ممکن بود."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le tout premier écran de la configuration renvoie désormais directement vers nos Conditions d'utilisation et notre Politique de confidentialité ; continuer au-delà signifie que vous les acceptez. Auparavant, elles n'étaient accessibles que via un lien facile à manquer dans À propos et Réglages."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "המסך הראשון של ההגדרה הראשונית מקשר כעת ישירות לתנאי השירות ולמדיניות הפרטיות שלנו — המשך מעבר אליו פירושו הסכמה להם. בעבר ניתן היה לגשת אליהם רק דרך קישור שקל לפספס במסך אודות ובהגדרות."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "सेटअप की सबसे पहली स्क्रीन अब सीधे हमारी सेवा की शर्तें और गोपनीयता नीति से जुड़ती है — इसके आगे बढ़ने का मतलब है कि आप उनसे सहमत हैं। पहले इन्हें केवल 'अबाउट' और 'सेटिंग्स' में छिपे हुए एक लिंक से ही देखा जा सकता था।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Layar pertama pengaturan sekarang menautkan langsung ke Ketentuan Layanan dan Kebijakan Privasi kami — melanjutkan setelahnya berarti Anda menyetujuinya. Sebelumnya, keduanya hanya dapat diakses melalui tautan yang mudah terlewat di Tentang dan Pengaturan."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La primissima schermata della configurazione ora rimanda direttamente ai nostri Termini di servizio e all'Informativa sulla privacy: continuare oltre significa accettarli. In precedenza erano raggiungibili solo tramite un link facile da non notare in Info e Impostazioni."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セットアップの最初の画面から、利用規約とプライバシーポリシーに直接アクセスできるようになりました。この画面を進むことは、それらに同意したことになります。これまでは「概要」と「設定」の中の見落としやすいリンクからしかアクセスできませんでした。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정의 첫 화면에서 이제 이용약관 및 개인정보 처리방침으로 바로 연결됩니다. 이 화면에서 계속 진행하면 이에 동의하는 것으로 간주됩니다. 이전에는 정보 및 설정 화면 안의 놓치기 쉬운 링크로만 확인할 수 있었습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het allereerste installatiescherm linkt nu rechtstreeks naar onze Servicevoorwaarden en ons Privacybeleid — als je doorgaat, ga je ermee akkoord. Voorheen waren ze alleen te vinden via een gemakkelijk over het hoofd te ziene link in Over en Instellingen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pierwszy ekran konfiguracji zawiera teraz bezpośredni link do naszych Warunków korzystania z usługi i Polityki prywatności — kontynuowanie oznacza ich akceptację. Wcześniej można było je znaleźć tylko przez łatwy do przeoczenia link w sekcji Informacje i Ustawieniach."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A primeiríssima tela da configuração agora tem um link direto para nossos Termos de serviço e Política de privacidade — continuar depois dela significa que você concorda com eles. Antes, só era possível acessá-los por um link fácil de não notar em Sobre e Configurações."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Самый первый экран настройки теперь содержит прямую ссылку на наши Условия использования и Политику конфиденциальности — продолжив после него, вы соглашаетесь с ними. Раньше доступ к ним был возможен только через легко пропускаемую ссылку в разделах «О приложении» и «Настройки»."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Den allra första installationsskärmen länkar nu direkt till våra Användarvillkor och vår Integritetspolicy — att fortsätta förbi den innebär att du godkänner dem. Tidigare gick de bara att hitta via en lätt att missa länk i Om och Inställningar."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "หน้าจอแรกสุดของการตั้งค่าตอนนี้มีลิงก์ไปยังข้อกำหนดในการให้บริการและนโยบายความเป็นส่วนตัวของเราโดยตรง การดำเนินการต่อจากหน้านี้ถือว่าคุณยอมรับข้อกำหนดเหล่านั้น ก่อนหน้านี้สามารถเข้าถึงได้เพียงผ่านลิงก์ที่มองข้ามได้ง่ายในหน้าเกี่ยวกับและการตั้งค่าเท่านั้น"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kurulumun ilk ekranı artık Hizmet Şartlarımıza ve Gizlilik Politikamıza doğrudan bağlantı veriyor; bu ekrandan devam etmek onları kabul ettiğiniz anlamına gelir. Daha önce bunlara yalnızca Hakkında ve Ayarlar içinde gözden kaçması kolay bir bağlantıyla ulaşılabiliyordu."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Найперший екран налаштування тепер містить пряме посилання на наші Умови надання послуг і Політику конфіденційності — продовживши після нього, ви погоджуєтеся з ними. Раніше доступ до них був можливий лише через легко непомітне посилання в розділах «Про застосунок» і «Налаштування»."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Màn hình đầu tiên của quá trình thiết lập giờ đây liên kết trực tiếp đến Điều khoản dịch vụ và Chính sách quyền riêng tư của chúng tôi — tiếp tục qua màn hình này nghĩa là bạn đồng ý với chúng. Trước đây, chỉ có thể truy cập chúng qua một liên kết dễ bị bỏ sót trong mục Giới thiệu và Cài đặt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置的第一个屏幕现在会直接链接到我们的服务条款和隐私政策——继续操作即表示您同意这些条款。此前,只能通过“关于”和“设置”中一个容易被忽略的链接访问它们。"
+          }
+        }
+      }
+    },
+    "Reinstalling Now Actually Signs You Out" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إعادة التثبيت الآن تسجل خروجك فعليًا"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Neuinstallation meldet dich jetzt wirklich ab"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Η επανεγκατάσταση σάς αποσυνδέει πλέον πραγματικά"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reinstalar ahora sí cierra tu sesión"
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نصب مجدد اکنون واقعاً شما را از حساب خارج می‌کند"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réinstaller déconnecte désormais réellement votre session"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "התקנה מחדש כעת באמת מנתקת אותך"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अब दोबारा इंस्टॉल करने पर वाकई साइन आउट हो जाता है"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menginstal Ulang Kini Benar-Benar Mengeluarkan Anda dari Akun"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reinstallare ora ti disconnette davvero"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再インストールで実際にサインアウトされるようになりました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재설치 시 이제 실제로 로그아웃됩니다"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opnieuw installeren logt je nu echt uit"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ponowna instalacja teraz naprawdę wylogowuje"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reinstalar agora realmente encerra sua sessão"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переустановка теперь действительно выполняет выход из аккаунта"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ominstallation loggar nu verkligen ut dig"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "การติดตั้งใหม่ตอนนี้ออกจากระบบให้จริง ๆ แล้ว"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yeniden Yükleme Artık Gerçekten Oturumunuzu Kapatıyor"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перевстановлення тепер справді виходить з облікового запису"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cài đặt lại giờ đây thực sự đăng xuất bạn"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新安装现在会真正将您退出登录"
+          }
+        }
+      }
+    },
+    "Deleting and reinstalling AppleVis brought onboarding back as expected, but silently signed you back in anyway — the Keychain, unlike everything else the app stores, survives an app deletion. A fresh install now clears any leftover sign-in from before, so reinstalling really does mean starting fresh. Reported directly." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حذف تطبيق AppleVis وإعادة تثبيته كان يعيد عرض الإعداد كما هو متوقع، لكنه كان يعيد تسجيل دخولك دون علمك — فسلسلة المفاتيح (Keychain)، على عكس كل ما يخزنه التطبيق، تبقى بعد حذف التطبيق. التثبيت الجديد الآن يمسح أي تسجيل دخول متبقٍ من قبل، بحيث تعني إعادة التثبيت بداية جديدة فعلاً. تم الإبلاغ عنه مباشرة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Löschen und Neuinstallieren von AppleVis brachte das Setup wie erwartet zurück, meldete dich aber im Hintergrund trotzdem wieder an — der Schlüsselbund bleibt, anders als alles andere, was die App speichert, auch nach dem Löschen der App erhalten. Eine Neuinstallation löscht jetzt eine eventuell verbliebene Anmeldung von vorher, sodass eine Neuinstallation wirklich einen Neuanfang bedeutet. Direkt gemeldet."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Η διαγραφή και επανεγκατάσταση του AppleVis επανέφερε την αρχική ρύθμιση όπως αναμενόταν, αλλά σας συνέδεε ξανά σιωπηλά — το Keychain, σε αντίθεση με οτιδήποτε άλλο αποθηκεύει η εφαρμογή, παραμένει μετά τη διαγραφή της εφαρμογής. Μια νέα εγκατάσταση διαγράφει πλέον οποιαδήποτε παλιά σύνδεση, ώστε η επανεγκατάσταση να σημαίνει πραγματικά νέα αρχή. Αναφέρθηκε απευθείας."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar y reinstalar AppleVis volvía a mostrar la configuración inicial como se esperaba, pero te volvía a iniciar sesión sin avisarte — el llavero (Keychain), a diferencia de todo lo demás que guarda la app, sobrevive a la eliminación de la app. Una instalación nueva ahora elimina cualquier inicio de sesión anterior que quedara guardado, de modo que reinstalar realmente signifique empezar de cero. Reportado directamente."
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حذف و نصب دوباره AppleVis طبق انتظار راه‌اندازی اولیه را دوباره نشان می‌داد، اما بی‌سروصدا شما را دوباره وارد حساب می‌کرد — Keychain، برخلاف هر چیز دیگری که برنامه ذخیره می‌کند، پس از حذف برنامه باقی می‌ماند. نصب جدید اکنون هر ورود باقی‌مانده از قبل را پاک می‌کند، بنابراین نصب مجدد واقعاً به معنای شروعی تازه است. مستقیماً گزارش شده است."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer puis réinstaller AppleVis faisait bien réapparaître la configuration initiale comme prévu, mais vous reconnectait silencieusement quand même — le trousseau (Keychain), contrairement à tout ce que l'application stocke par ailleurs, survit à la suppression de l'application. Une nouvelle installation supprime désormais toute connexion résiduelle d'avant, afin qu'une réinstallation signifie vraiment repartir de zéro. Signalé directement."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מחיקה והתקנה מחדש של AppleVis החזירו את ההגדרה הראשונית כצפוי, אך חיברו אותך בחזרה בשקט בכל זאת — מחסן המפתחות (Keychain), בניגוד לכל דבר אחר שהאפליקציה שומרת, שורד מחיקת אפליקציה. התקנה חדשה מנקה כעת כל חיבור שנותר מלפני כן, כך שהתקנה מחדש באמת אומרת התחלה מחדש. דווח ישירות."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AppleVis को डिलीट करके दोबारा इंस्टॉल करने पर सेटअप तो उम्मीद के मुताबिक फिर से दिखता था, लेकिन चुपचाप आपको फिर से साइन इन कर देता था — कीचेन (Keychain), ऐप द्वारा सहेजी गई बाकी हर चीज़ के उलट, ऐप डिलीट करने के बाद भी बनी रहती है। अब नई इंस्टॉल पहले से बची किसी भी साइन-इन जानकारी को हटा देती है, ताकि दोबारा इंस्टॉल करना सच में एक नई शुरुआत हो। सीधे रिपोर्ट किया गया।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menghapus dan menginstal ulang AppleVis menampilkan kembali pengaturan awal seperti yang diharapkan, tetapi diam-diam tetap membuat Anda masuk kembali — Keychain, tidak seperti hal lain yang disimpan aplikasi, tetap ada meskipun aplikasi dihapus. Instalasi baru sekarang menghapus sisa sesi masuk sebelumnya, sehingga menginstal ulang benar-benar berarti memulai dari awal. Dilaporkan langsung."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminare e reinstallare AppleVis riportava la configurazione iniziale come previsto, ma ti riconnetteva comunque in silenzio — il portachiavi (Keychain), a differenza di tutto il resto che l'app memorizza, sopravvive alla cancellazione dell'app. Una nuova installazione ora elimina qualsiasi accesso residuo di prima, così reinstallare significa davvero ricominciare da capo. Segnalato direttamente."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AppleVisを削除して再インストールすると、セットアップは期待どおり再表示されていましたが、実は静かに元のアカウントで再サインインされていました — アプリが保存する他のすべてのデータと違い、キーチェーンはアプリを削除しても残るためです。新規インストール時には、以前残っていたサインイン情報が消去されるようになり、再インストールが本当に新しいスタートを意味するようになりました。直接報告されました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AppleVis를 삭제하고 다시 설치하면 설정 화면은 예상대로 다시 나타났지만, 조용히 이전 계정으로 다시 로그인되어 있었습니다 — 키체인은 앱이 저장하는 다른 모든 것과 달리 앱을 삭제해도 남아 있기 때문입니다. 이제 새로 설치하면 이전에 남아 있던 로그인 정보를 지우므로, 재설치가 정말로 새 시작을 의미하게 되었습니다. 직접 제보되었습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het verwijderen en opnieuw installeren van AppleVis liet de installatiewizard zoals verwacht terugkomen, maar logde je stiekem toch weer in — de sleutelhanger (Keychain) blijft, in tegenstelling tot al het andere dat de app opslaat, bewaard na het verwijderen van de app. Een nieuwe installatie wist nu elke achtergebleven aanmelding van eerder, zodat opnieuw installeren echt een frisse start betekent. Rechtstreeks gemeld."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usunięcie i ponowna instalacja AppleVis przywracały konfigurację początkową zgodnie z oczekiwaniami, ale po cichu logowały cię z powrotem — pęk kluczy (Keychain), w przeciwieństwie do wszystkiego innego, co przechowuje aplikacja, przetrwa usunięcie aplikacji. Nowa instalacja usuwa teraz wszelkie pozostałe logowanie sprzed, dzięki czemu ponowna instalacja naprawdę oznacza świeży start. Zgłoszone bezpośrednio."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir e reinstalar o AppleVis trazia de volta a configuração inicial como esperado, mas silenciosamente conectava você de novo — o chaveiro (Keychain), ao contrário de tudo mais que o app armazena, sobrevive à exclusão do app. Uma nova instalação agora apaga qualquer login que tenha restado de antes, então reinstalar realmente significa começar do zero. Reportado diretamente."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удаление и переустановка AppleVis возвращали настройку заново, как и ожидалось, но незаметно снова выполняли вход в аккаунт — связка ключей (Keychain), в отличие от всего остального, что сохраняет приложение, переживает удаление приложения. Новая установка теперь удаляет любой оставшийся вход из прошлого, так что переустановка теперь действительно означает чистый старт. Сообщено напрямую."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Att radera och installera om AppleVis tog tillbaka installationsguiden som förväntat, men loggade tyst in dig igen ändå — nyckelringen (Keychain), till skillnad från allt annat appen sparar, överlever att appen raderas. En ny installation rensar nu bort eventuell kvarvarande inloggning från tidigare, så att en ominstallation verkligen innebär en nystart. Rapporterat direkt."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "การลบและติดตั้ง AppleVis ใหม่ทำให้การตั้งค่าเริ่มต้นกลับมาแสดงตามที่คาดไว้ แต่กลับลงชื่อเข้าใช้ให้คุณอีกครั้งโดยไม่บอกกล่าว — Keychain ซึ่งต่างจากข้อมูลอื่น ๆ ที่แอปเก็บไว้ จะยังคงอยู่แม้ลบแอปไปแล้ว การติดตั้งใหม่ตอนนี้จะล้างข้อมูลการเข้าสู่ระบบที่ค้างอยู่จากก่อนหน้านี้ ทำให้การติดตั้งใหม่หมายถึงการเริ่มต้นใหม่จริง ๆ มีผู้แจ้งปัญหานี้โดยตรง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AppleVis'i silip yeniden yüklemek, kurulumu beklendiği gibi yeniden getiriyordu ama sizi sessizce tekrar oturum açmış hâlde bırakıyordu — anahtarlık (Keychain), uygulamanın sakladığı diğer her şeyin aksine, uygulama silindiğinde de kalıcı oluyor. Yeni bir yükleme artık öncesinden kalan oturum açma bilgisini temizliyor, böylece yeniden yükleme gerçekten sıfırdan başlamak anlamına geliyor. Doğrudan bildirildi."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видалення й повторне встановлення AppleVis повертали початкове налаштування, як і очікувалося, але непомітно знову входили в обліковий запис — зв'язка ключів (Keychain), на відміну від усього іншого, що зберігає застосунок, переживає видалення застосунку. Нове встановлення тепер стирає будь-який залишковий вхід із минулого, тож перевстановлення справді означає чистий старт. Повідомлено безпосередньо."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xóa và cài đặt lại AppleVis khiến màn hình thiết lập xuất hiện lại như mong đợi, nhưng vẫn âm thầm đăng nhập lại cho bạn — Keychain, khác với mọi thứ khác mà ứng dụng lưu trữ, vẫn tồn tại sau khi xóa ứng dụng. Việc cài đặt mới giờ đây sẽ xóa mọi thông tin đăng nhập còn sót lại từ trước, để việc cài đặt lại thực sự có nghĩa là bắt đầu lại từ đầu. Được báo cáo trực tiếp."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除并重新安装AppleVis后,设置流程会按预期重新出现,但实际上仍会悄悄地把您重新登录——与应用存储的其他所有内容不同,钥匙串(Keychain)在应用被删除后依然保留。现在,全新安装会清除之前遗留的任何登录信息,让重新安装真正意味着从头开始。已直接报告此问题。"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"
