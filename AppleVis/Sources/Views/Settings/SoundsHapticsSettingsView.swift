@@ -16,10 +16,16 @@ struct SoundsHapticsSettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                Text("Sounds and haptic feedback for everyday moments in AppleVis — saving, navigating, and confirming what just happened. Turn off whichever channel isn't for you; sounds and haptics for errors and connectivity changes always play, since those are too important to miss.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .accessibilityFocused($isTitleFocused)
+            }
+
             Section("Sounds") {
                 Toggle("Confirmation Sounds", isOn: $preferences.confirmationSoundsEnabled)
                     .accessibilityHint(String(localized: "Plays a sound for notifications, saving, downloads finishing, and podcast play and pause."))
-                    .accessibilityFocused($isTitleFocused)
                 Text("Plays a sound for moments worth noticing — saving, downloads finishing, notifications, and podcast play and pause.")
                     .font(.caption)
                     .foregroundStyle(.secondary)

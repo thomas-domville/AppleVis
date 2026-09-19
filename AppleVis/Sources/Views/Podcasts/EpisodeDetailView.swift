@@ -7,14 +7,34 @@ struct EpisodeDetailView: View {
     /// reasoning; routed the same way through DeepLinkRouter.pendingContentIntent.
     var focusFirstNewCommentOnAppear: Bool = false
     @State private var hasAppliedFirstNewCommentFocus = false
+    /// Set when opened from the admin Guideline Violation Check screen for a
+    /// flagged comment — see `ForumTopicDetailView.targetCommentId` for the
+    /// full reasoning.
+    var targetCommentId: String? = nil
+    @State private var hasAppliedTargetCommentFocus = false
     @State private var episode: PodcastEpisode?
     @State private var comments: [PodcastComment] = []
     @State private var isLoading = true
     @State private var error: String?
     @State private var showCompose = false
     @State private var quotedComment: PodcastComment?
-    @State private var showTranscript = false
-    @State private var embeddedTranscript: String?
+    // A single Identifiable item instead of a bool flag + a separate
+    // `embeddedTranscript` string — `.sheet(isPresented:)` with sibling
+    // state set in the same action is a known SwiftUI race (same one just
+    // fixed on the App Entry page's Refresh App Details sheet): the sheet's
+    // content closure can capture the sibling state's *previous* value
+    // rather than what was just assigned, since presentation and data
+    // aren't tied to the same value. Here that meant TranscriptView could
+    // open with `embeddedTranscript` still nil even though it was set the
+    // same instant — which sent it down the fallback path to the old
+    // id-based transcript endpoint that 404s for an ordinary embedded
+    // transcript, surfacing "This item is no longer available" even though
+    // a transcript was right there in the show notes the whole time.
+    // Reported directly: not tied to any particular transcription tool —
+    // a live-data comparison of a Google Gemini-transcribed episode against
+    // a VoicePen-transcribed one found both format the embedded transcript
+    // identically; this was a presentation-timing bug, not a parsing one.
+    @State private var transcriptRequest: TranscriptRequest?
     @State private var showFullPlayer = false
     @State private var showAudioEnhancements = false
     @State private var isLoadingMoreComments = false
@@ -156,6 +176,12 @@ struct EpisodeDetailView: View {
                 hasAppliedFirstNewCommentFocus = true
                 await jumpToFirstNewComment(proxy: proxy)
             }
+            .task {
+                guard let targetCommentId, !hasAppliedTargetCommentFocus else { return }
+                hasAppliedTargetCommentFocus = true
+                if hasMoreComments { await ensureAllCommentsLoaded() }
+                pendingFocusCommentId = targetCommentId
+            }
             // See ForumTopicDetailView's identical pair for the full
             // reasoning; PodcastComment has no per-item "isNew" flag, so
             // this is the newest `newCommentCount` comments by position.
@@ -216,10 +242,10 @@ struct EpisodeDetailView: View {
                 pendingFocusCommentId = comment.id
             }
         }
-        .sheet(isPresented: $showTranscript, onDismiss: {
+        .sheet(item: $transcriptRequest, onDismiss: {
             Task { await retryAccessibilityFocus(into: $isTranscriptButtonFocused) }
-        }) {
-            TranscriptView(episodeId: episode.id, episodeTitle: episode.title, episodeURL: episode.url, embeddedTranscript: embeddedTranscript)
+        }) { request in
+            TranscriptView(episodeId: episode.id, episodeTitle: episode.title, episodeURL: episode.url, embeddedTranscript: request.transcript)
         }
         .sheet(isPresented: $showFullPlayer) {
             FullPlayerView()
@@ -295,8 +321,7 @@ struct EpisodeDetailView: View {
 
                 if hasTranscript(for: episode) {
                     episodeToolButton(title: "Transcript", subtitle: "Read", systemImage: "text.quote") {
-                        embeddedTranscript = extractedTranscript(from: episode)
-                        showTranscript = true
+                        transcriptRequest = TranscriptRequest(transcript: extractedTranscript(from: episode))
                     }
                     .accessibilityLabel(String(localized: "Read Transcript"))
                     .accessibilityFocused($isTranscriptButtonFocused)
@@ -1230,7 +1255,7 @@ struct ComposePodcastCommentView: View {
                 TextEditor(text: $commentText)
                     .padding()
                     .onChange(of: commentText) { _, newValue in
-                        guidelines.textChanged(newValue)
+                        guidelines.textChanged(newValue, isReply: true)
                         intelligence.textChanged(
                             newValue,
                             translationEnabled: preferences.composeTranslationEnabled,

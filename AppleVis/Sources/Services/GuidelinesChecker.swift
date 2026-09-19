@@ -20,8 +20,17 @@ struct GuidelineWarning: Identifiable, Equatable {
 }
 
 enum GuidelinesChecker {
+    /// `isReply` — true for a comment/reply/review on existing content,
+    /// false (default) for a new topic/post/entry's own body. Only affects
+    /// "One Topic Per Post" below, which is meaningless applied to a reply:
+    /// live-data review (2026-09-19) found it firing constantly on ordinary
+    /// back-and-forth replies asking several short clarifying questions in a
+    /// busy support thread — ordinary conversation, not someone cramming
+    /// unrelated topics into a single post, which is what the rule is
+    /// actually for. Every other check still applies to both.
+    ///
     /// Returns warnings sorted by severity: high -> medium -> low.
-    static func check(_ text: String) -> [GuidelineWarning] {
+    static func check(_ text: String, isReply: Bool = false) -> [GuidelineWarning] {
         let trimmed = ContentSubmissionPolicy.policyText(body: text).trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 10 else { return [] }
         let lower = trimmed.lowercased()
@@ -85,8 +94,11 @@ enum GuidelinesChecker {
             ))
         }
 
-        // Self-promotion
-        if matches(text, #"\bmy (podcast|youtube channel|channel|website|blog|newsletter|mailing list|substack|patreon)\b"#, caseInsensitive: true) {
+        // Self-promotion. The negative lookahead excludes "my podcast
+        // player"/"my podcast app" etc (2026-09-19, live-data review) — a
+        // possession ("the device/app I use"), not a promotion ("check out
+        // my podcast"), which the bare pattern couldn't tell apart.
+        if matches(text, #"\bmy (podcast|youtube channel|channel|website|blog|newsletter|mailing list|substack|patreon)\b(?!\s+(player|app|reader|client))"#, caseInsensitive: true) {
             warnings.append(GuidelineWarning(
                 id: "self-promotion", rule: "No Self-Promotion",
                 message: "AppleVis asks that you not use the forums to promote your own podcast, YouTube channel, website, newsletter, or other online resource.",
@@ -103,8 +115,13 @@ enum GuidelinesChecker {
             ))
         }
 
-        // Announcements requiring prior approval
-        if matches(text, #"\b(survey|research study|research project|focus group|participants? needed|looking for participants?|study participants?)\b"#, caseInsensitive: true) {
+        // Announcements requiring prior approval. Checked sentence-by-
+        // sentence, skipping any sentence that also contains "thank"
+        // (2026-09-19, live-data review) — "thank you to everyone who
+        // contributed to our survey" is thanking past participants, not
+        // soliciting new ones, and the whole-text match couldn't tell that
+        // apart from an actual unapproved solicitation.
+        if announcementNeedsApproval(text) {
             warnings.append(GuidelineWarning(
                 id: "announcement-approval", rule: "Approval Required for Announcements",
                 message: "Posts about surveys, research projects, or studies require prior approval from the AppleVis Editorial Team. Please contact them via the Contact Form before posting.",
@@ -176,9 +193,10 @@ enum GuidelinesChecker {
             }
         }
 
-        // Multiple questions / topics
+        // Multiple questions / topics — root posts only, see `isReply`'s
+        // doc comment above.
         let questionCount = text.filter { $0 == "?" }.count
-        if questionCount >= 3 && trimmed.count > 120 {
+        if !isReply && questionCount >= 3 && trimmed.count > 120 {
             warnings.append(GuidelineWarning(
                 id: "multi-topic", rule: "One Topic Per Post",
                 message: "Your post appears to ask several different questions. AppleVis guidelines ask that you cover one topic per post — splitting into separate posts will get you better answers.",
@@ -210,5 +228,19 @@ enum GuidelinesChecker {
         var options: String.CompareOptions = [.regularExpression]
         if caseInsensitive { options.insert(.caseInsensitive) }
         return text.range(of: pattern, options: options) != nil
+    }
+
+    /// True if any sentence contains a survey/study/announcement keyword
+    /// *and* that same sentence doesn't also contain "thank" — see the
+    /// call site's doc comment.
+    private static func announcementNeedsApproval(_ text: String) -> Bool {
+        let pattern = #"\b(survey|research study|research project|focus group|participants? needed|looking for participants?|study participants?)\b"#
+        let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?"))
+        for sentence in sentences where matches(sentence, pattern, caseInsensitive: true) {
+            if !sentence.localizedCaseInsensitiveContains("thank") {
+                return true
+            }
+        }
+        return false
     }
 }

@@ -9,12 +9,15 @@ struct ComposeTopicView: View {
     @State private var bodyText = ""
     @State private var selectedCategory: ForumCategory?
     @State private var categories: [ForumCategory] = []
-    /// Pre-checked rather than a separate post-submit prompt — almost
-    /// everyone posting a question wants to know when someone answers it,
-    /// so this costs the common case zero extra taps; anyone who doesn't
-    /// want it just switches it off before posting. Best-effort on submit
-    /// (see `submit()`) — a failed follow-along never blocks or reverts the
-    /// topic post itself.
+    /// Seeded from Settings > Notifications > Replies to My Posts (see the
+    /// `.task` below) rather than always defaulting to true — that Settings
+    /// toggle is the one actual control for "notify me when someone replies
+    /// to something I posted," so this screen's own toggle should reflect
+    /// it, not silently override it with a hardcoded default. Still a
+    /// per-post override: switch it off here for just this one topic
+    /// without touching the Settings preference. Best-effort on submit (see
+    /// `submit()`) — a failed follow-along never blocks or reverts the
+    /// topic post itself. Requested directly.
     @State private var followOnPost = true
     @State private var isSubmitting = false
     @State private var error: String?
@@ -28,10 +31,14 @@ struct ComposeTopicView: View {
     /// no-ops (`submit()`'s `guard let user = auth.user` already bailed
     /// with no feedback at all).
     @State private var showSignIn = false
+    /// Gates `showSignIn` above via `.communityAgreementGate(...)` below —
+    /// see `CommunityAgreementStore`.
+    @State private var showCommunityAgreement = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var communityAgreement: CommunityAgreementStore
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
     // Mirrors OnboardingView's SignInStep: this screen's primary action is
@@ -130,7 +137,7 @@ struct ComposeTopicView: View {
                             Toggle("Follow This Topic", isOn: $followOnPost)
                                 .accessibilityHint(String(localized: "Notifies you when someone replies. You can unfollow anytime from the topic itself."))
                         } footer: {
-                            Text("Get notified when people reply to your topic.")
+                            Text("Get notified when people reply to your topic. Starts on or off based on Settings > Notifications > Replies to My Posts — turn it off here for just this one topic without changing that setting.")
                         }
                         if let error {
                             Section {
@@ -156,6 +163,7 @@ struct ComposeTopicView: View {
                 }
             }
             .task { await loadCategories() }
+            .task { followOnPost = preferences.notifyForumReplies }
             .confirmationDialog(
                 "Discard this submission?",
                 isPresented: $showDiscardConfirm, titleVisibility: .visible
@@ -166,6 +174,7 @@ struct ComposeTopicView: View {
                 Text("Your progress will be discarded.")
             }
             .sheet(isPresented: $showSignIn) { SignInView() }
+            .communityAgreementGate(showCommunityAgreement: $showCommunityAgreement, showSignIn: $showSignIn)
         }
     }
 
@@ -182,8 +191,10 @@ struct ComposeTopicView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("Sign In") { showSignIn = true }
-                .buttonStyle(.borderedProminent)
+            Button("Sign In") {
+                communityAgreement.requestSignIn(showCommunityAgreement: $showCommunityAgreement, showSignIn: $showSignIn)
+            }
+            .buttonStyle(.borderedProminent)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -367,7 +378,7 @@ struct ComposeReplyView: View {
                 TextEditor(text: $bodyText)
                     .padding()
                     .onChange(of: bodyText) { _, newValue in
-                        guidelines.textChanged(newValue)
+                        guidelines.textChanged(newValue, isReply: true)
                         intelligence.textChanged(
                             newValue,
                             translationEnabled: preferences.composeTranslationEnabled,

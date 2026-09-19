@@ -15,12 +15,6 @@ enum GuidedExperienceScreenTarget {
 
 enum GuidedExperienceSecondaryActionKind {
     case exploreScreen(GuidedExperienceScreenTarget)
-    case learnMore(helpArticleId: String)
-    /// Stops the tour right where you are — no navigation, unlike
-    /// `exploreScreen` — while still leaving the Resume Tour banner active,
-    /// unlike Skip Tour (which retires the tour rather than just pausing
-    /// it). Only offered on a chapter's last step, alongside Explore.
-    case pauseHere
 }
 
 struct GuidedExperienceSecondaryAction: Identifiable {
@@ -100,7 +94,13 @@ enum GuidedExperienceRegistry {
             ),
             GuidedExperienceStep(
                 id: "home-customize", chapterTitle: "Home", title: "Customize Your Feed", icon: "slider.horizontal.3",
-                body: "Tap that Customize Home button, and you're in control of exactly what shows up: turn Forum Topics, Podcast Episodes, App Listings, Guides & Tutorials, or Blog Posts on or off individually, whatever mix suits you. Want to keep things focused on Apple's own products and platforms? Flip on Apple Topics Only and everything else quietly steps aside. There's an even finer forum filter tucked in there too, for anyone who wants to fine-tune further. Changed your mind about any of it? Reset to Defaults puts everything back the way it started."
+                // Previously also claimed "an even finer forum filter" was
+                // "tucked in there too" — that Settings > Home Feed picker
+                // (Recent/New/Unread/Since Last Visit) has since been
+                // removed entirely (it silently pre-filtered forum topics
+                // underneath Home's own All/New switcher), so there's
+                // nothing left to point to. Requested directly.
+                body: "Tap that Customize Home button, and you're in control of exactly what shows up: turn Forum Topics, Podcast Episodes, App Listings, Guides & Tutorials, or Blog Posts on or off individually, whatever mix suits you. Want to keep things focused on Apple's own products and platforms? Flip on Apple Topics Only and everything else quietly steps aside. Changed your mind about any of it? Reset to Defaults puts everything back the way it started."
             ),
             GuidedExperienceStep(
                 id: "home-welcome-message", chapterTitle: "Home", title: "A Welcome, Your Way", icon: "text.bubble",
@@ -132,7 +132,6 @@ enum GuidedExperienceRegistry {
                 continueLabel: "Continue to Discover",
                 secondaryActions: [
                     GuidedExperienceSecondaryAction(label: "Explore Home Now", kind: .exploreScreen(.home)),
-                    GuidedExperienceSecondaryAction(label: "Pause Tour", kind: .pauseHere),
                 ]
             ),
 
@@ -171,7 +170,6 @@ enum GuidedExperienceRegistry {
                 continueLabel: "Continue to For You",
                 secondaryActions: [
                     GuidedExperienceSecondaryAction(label: "Explore Discover Now", kind: .exploreScreen(.discover)),
-                    GuidedExperienceSecondaryAction(label: "Pause Tour", kind: .pauseHere),
                 ]
             ),
 
@@ -198,15 +196,22 @@ enum GuidedExperienceRegistry {
                 continueLabel: "Continue to Profile & Settings",
                 secondaryActions: [
                     GuidedExperienceSecondaryAction(label: "Explore For You Now", kind: .exploreScreen(.forYou)),
-                    GuidedExperienceSecondaryAction(label: "Pause Tour", kind: .pauseHere),
                 ]
             ),
 
             // MARK: Profile & Settings
             GuidedExperienceStep(
                 id: "profile-settings-overview", chapterTitle: "Profile & Settings", title: "Profile & Settings", icon: "person.circle",
-                body: "Every screen — Home, Discover, and For You — has a button labeled Profile and Settings tucked into the toolbar, shown as a small person icon if you're looking for it visually. It stays with you no matter which tab you're on, rather than living as a tab of its own. Head in, and you'll find My Account for everything sign-in related, a link into Settings for making AppleVis feel like yours, and a section for What's New, About, quick access to Contact AppleVis, and — worth remembering — Replay Welcome Tour, right there whenever you want to run through this again. Let's go through what's actually in each.",
-                secondaryActions: [GuidedExperienceSecondaryAction(label: "Learn More", kind: .learnMore(helpArticleId: "start-tabs"))]
+                // Used to also offer a "Learn More" secondary action linking
+                // to the "Main Tabs and Navigation" Help article — but that
+                // article covers what Home/Discover/For You/Profile do
+                // broadly, which this step isn't about (it's specifically
+                // about the Profile/Settings toolbar button), and which the
+                // tour itself had already covered in far more depth over the
+                // preceding chapters anyway. Removed as the only "Learn
+                // More" in the whole tour, not a pattern applied elsewhere.
+                // Requested directly.
+                body: "Every screen — Home, Discover, and For You — has a button labeled Profile and Settings tucked into the toolbar, shown as a small person icon if you're looking for it visually. It stays with you no matter which tab you're on, rather than living as a tab of its own. Head in, and you'll find My Account for everything sign-in related, a link into Settings for making AppleVis feel like yours, and a section for What's New, About, quick access to Contact AppleVis, and — worth remembering — Replay Welcome Tour, right there whenever you want to run through this again. Let's go through what's actually in each."
             ),
             GuidedExperienceStep(
                 id: "profile-my-account", chapterTitle: "Profile & Settings", title: "My Account", icon: "person.crop.circle.badge.pencil",

@@ -5,6 +5,11 @@ struct EditContentSheet: View {
     let title: String
     let initialText: String
     let onSave: (String) async throws -> Void
+    /// See `GuidelinesChecker.check(_:isReply:)`'s doc comment. Defaults to
+    /// true since every call site but one (the admin Guideline Violation
+    /// Check screen, which can also be editing a flagged root item) is
+    /// editing an existing comment/reply/review.
+    let isReply: Bool
 
     @State private var text: String
     @State private var isSaving = false
@@ -21,9 +26,10 @@ struct EditContentSheet: View {
     /// directly.
     @AccessibilityFocusState private var isTextEditorFocused: Bool
 
-    init(title: String, initialText: String, onSave: @escaping (String) async throws -> Void) {
+    init(title: String, initialText: String, isReply: Bool = true, onSave: @escaping (String) async throws -> Void) {
         self.title = title
         self.initialText = initialText
+        self.isReply = isReply
         self.onSave = onSave
         _text = State(initialValue: initialText)
     }
@@ -67,7 +73,7 @@ struct EditContentSheet: View {
                     .padding()
                     .accessibilityFocused($isTextEditorFocused)
                     .onChange(of: text) { _, newValue in
-                        guidelines.textChanged(newValue)
+                        guidelines.textChanged(newValue, isReply: isReply)
                         intelligence.textChanged(
                             newValue,
                             translationEnabled: preferences.composeTranslationEnabled,

@@ -9,6 +9,13 @@ struct ForumTopicDetailView: View {
     /// instead of landing at the top of the topic like a normal open.
     var focusFirstNewCommentOnAppear: Bool = false
     @State private var hasAppliedFirstNewCommentFocus = false
+    /// Set when opened from the admin Guideline Violation Check screen for a
+    /// flagged reply — scrolls/focuses straight to that specific reply once
+    /// loaded, the same way `focusFirstNewCommentOnAppear` does for "first
+    /// new," just targeting a caller-known id instead of resolving one by
+    /// position. Requested directly.
+    var targetCommentId: String? = nil
+    @State private var hasAppliedTargetCommentFocus = false
     @State private var detail: ForumTopicDetail?
     @State private var isLoading = true
     @State private var error: String?
@@ -296,6 +303,12 @@ struct ForumTopicDetailView: View {
                 guard focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
                 hasAppliedFirstNewCommentFocus = true
                 await jumpToFirstNewReply(proxy: proxy)
+            }
+            .task {
+                guard let targetCommentId, !hasAppliedTargetCommentFocus else { return }
+                hasAppliedTargetCommentFocus = true
+                if hasMoreReplies { await ensureAllRepliesLoaded() }
+                pendingFocusReplyId = targetCommentId
             }
             // Two custom VoiceOver rotor categories — turn two fingers to
             // reach "New Comments"/"Replies to Me" alongside the built-in

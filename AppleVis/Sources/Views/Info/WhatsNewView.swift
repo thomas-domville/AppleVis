@@ -13,7 +13,7 @@ struct WhatsNewView: View {
                     .padding()
                     .accessibilityFocused($isHeaderFocused)
 
-                ForEach(ChangeItem.current) { item in
+                ForEach(ChangeItem.grouped(ChangeItem.current)) { item in
                     ChangeCard(item: item)
                         .padding(.horizontal)
                         .padding(.bottom, 12)
@@ -133,7 +133,7 @@ private struct HistorySectionView: View {
                 .padding(.bottom, 8)
                 .accessibilityAddTraits(.isHeader)
 
-            ForEach(section.items) { item in
+            ForEach(ChangeItem.grouped(section.items)) { item in
                 ChangeCard(item: item)
                     .padding(.horizontal)
                     .padding(.bottom, 12)
@@ -149,21 +149,37 @@ private struct HistorySectionView: View {
 enum ChangeTag: String {
     case new = "New"
     case improved = "Improved"
+    case accessibility = "Accessibility"
     case fixed = "Fixed"
+
+    /// Display order for grouped What's New sections: New, then Improved,
+    /// then Accessibility, then Fixed last (plain bug fixes are the least
+    /// exciting category, so they trail even behind assistive-tech fixes,
+    /// which matter more to this app's audience than a generic tag order would).
+    var groupOrder: Int {
+        switch self {
+        case .new:           return 0
+        case .improved:      return 1
+        case .accessibility: return 2
+        case .fixed:         return 3
+        }
+    }
 
     var backgroundColor: Color {
         switch self {
-        case .new:      return Color(red: 0.93, green: 0.99, blue: 0.96)
-        case .improved: return Color(red: 0.94, green: 0.96, blue: 1.0)
-        case .fixed:    return Color(red: 1.0, green: 0.97, blue: 0.93)
+        case .new:           return Color(red: 0.93, green: 0.99, blue: 0.96)
+        case .improved:      return Color(red: 0.94, green: 0.96, blue: 1.0)
+        case .accessibility: return Color(red: 0.96, green: 0.93, blue: 1.0)
+        case .fixed:         return Color(red: 1.0, green: 0.97, blue: 0.93)
         }
     }
 
     var foregroundColor: Color {
         switch self {
-        case .new:      return Color(red: 0.02, green: 0.37, blue: 0.27)
-        case .improved: return Color(red: 0.11, green: 0.30, blue: 0.85)
-        case .fixed:    return Color(red: 0.60, green: 0.20, blue: 0.07)
+        case .new:           return Color(red: 0.02, green: 0.37, blue: 0.27)
+        case .improved:      return Color(red: 0.11, green: 0.30, blue: 0.85)
+        case .accessibility: return Color(red: 0.42, green: 0.11, blue: 0.75)
+        case .fixed:         return Color(red: 0.60, green: 0.20, blue: 0.07)
         }
     }
 }
@@ -175,9 +191,247 @@ struct ChangeItem: Identifiable {
     let title: String
     let description: String
 
-    static let currentVersion = "2026.14"
+    static let currentVersion = "2026.15"
 
     static let current: [ChangeItem] = [
+        ChangeItem(
+            systemImage: "person.crop.circle",
+            tag: .accessibility,
+            title: "Setup Focuses Welcome First",
+            description: "Opening AppleVis for the very first time used to send VoiceOver focus straight to Cancel instead of the Welcome heading — every other step in setup already retried focus after Next/Back, but nothing did that for the initial screen itself. It now focuses Welcome first, like every step after it."
+        ),
+        ChangeItem(
+            systemImage: "text.badge.checkmark",
+            tag: .accessibility,
+            title: "No More Double \"Step X of Y\" in Setup",
+            description: "Every step of setup announced its step count twice in a row — once from the progress dots at the top, then again folded into the heading itself (\"Sign In. Step 2 of 9.\"). Headings now just say their own name; the progress dots at the top remain the one place setup announces which step you're on."
+        ),
+        ChangeItem(
+            systemImage: "forward.end",
+            tag: .improved,
+            title: "A Friendlier Way to Skip Setup",
+            description: "Setup's top-right Cancel button didn't actually cancel anything — it just accepted whatever hadn't been set yet and finished, exactly like completing setup normally. It's now a plain Skip Setup link under each step's own content instead, with a note that everything can still be changed later in Settings — gone entirely on the last step, since there's nothing left to skip by then."
+        ),
+        ChangeItem(
+            systemImage: "star",
+            tag: .improved,
+            title: "Setup Marks Our Recommended Pick",
+            description: "New Activity Display, Apple Topics, and Language Filtering each show two options that pick and move on with a single tap rather than a separate Continue step, so there was never a moment to show which one we'd suggest. A small Recommended badge now marks that option on all three."
+        ),
+        ChangeItem(
+            systemImage: "list.bullet.rectangle",
+            tag: .accessibility,
+            title: "Jump Between Sections in Setup",
+            description: "The Choose a Theme step's Accessibility, AppleVis, and Standard groupings, and the Notifications step's Notification Sound section, are now real VoiceOver headings — jump straight to one with the Headings rotor instead of swiping through everything ahead of it."
+        ),
+        ChangeItem(
+            systemImage: "checklist",
+            tag: .improved,
+            title: "A Shorter Setup",
+            description: "Setup no longer asks how much VoiceOver should announce before you've had a chance to actually hear it and judge for yourself — a choice you can't really make well on day one anyway, and one that's still right there in Settings > Accessibility whenever you want it. Setup is now 8 steps instead of 9."
+        ),
+        ChangeItem(
+            systemImage: "bell.badge",
+            tag: .new,
+            title: "All of Notifications, Not Just Three",
+            description: "Setup's Notifications step only ever offered 3 of the app's 8 real notification categories. It now offers all of them — Replies to My Posts, Mentions, and Followed Topics sit in their own My Activity group, dimmed with an explanation if you're continuing as a guest, alongside New Forum Topics, New Podcast Episodes, New App Directory Entries, New Resources, and New Comments."
+        ),
+        ChangeItem(
+            systemImage: "text.bubble",
+            tag: .improved,
+            title: "A Heads-Up Before the Notification Prompt",
+            description: "Setup's Allow Notifications button gave no sense of what iOS's own permission prompt was about to ask, or why. A short note now explains it only sends alerts for what you turned on above, and that you can change it anytime in Settings."
+        ),
+        ChangeItem(
+            systemImage: "speaker.slash",
+            tag: .accessibility,
+            title: "No More Dead Preview on System Default Sound",
+            description: "System Default's own description already says its preview is unavailable — there's no iOS API to play back a device's actual default alert tone — but the VoiceOver Preview action was still offered anyway, silently doing nothing when used. It's gone for just that one sound now, both in setup and in Settings > Notifications, while every other sound keeps it."
+        ),
+        ChangeItem(
+            systemImage: "globe",
+            tag: .fixed,
+            title: "Notification Sound Names Now Actually Translate",
+            description: "Mouse Squeak, Apple Crunch, Golden Retriever Bark, System Default, and each one's description were built from a code pattern that silently skipped the translation catalog, in both setup and Settings > Notifications. Non-English speakers saw English there no matter how many translations existed — now fixed and translated into all 22 supported languages."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.circle",
+            tag: .improved,
+            title: "A Friendlier You're All Set Summary",
+            description: "Setup's final summary listed things in no particular order, still mentioned VoiceOver Detail Level after that step was removed, never mentioned Show What's New or which notification sound you picked, and read as terse label-value pairs like \"Language: Milder Language Filtered.\" It's now ordered to match the steps you just went through — sign-in status first — covers every choice you actually made, and reads as plain, friendly sentences instead."
+        ),
+        ChangeItem(
+            systemImage: "map",
+            tag: .improved,
+            title: "A Reassurance on the Tour Prompt",
+            description: "The \"Take a quick tour?\" prompt right after setup only said what the tour covered, with no hint that saying no was perfectly fine or where to find it again. It now adds that you can always start it later from Profile > Replay Welcome Tour."
+        ),
+        ChangeItem(
+            systemImage: "1.circle",
+            tag: .accessibility,
+            title: "No More \"Step 1 of 1\" in the Welcome Tour",
+            description: "The Welcome Tour's Welcome and All Set chapters are each just one step, so VoiceOver always announced a trivially true \"step 1 of 1\" there — dropped for just those two chapters, while Home, Discover, For You, and Profile & Settings keep their genuinely useful step counts."
+        ),
+        ChangeItem(
+            systemImage: "globe",
+            tag: .fixed,
+            title: "Welcome Tour Step Announcements Now Actually Translate",
+            description: "Every VoiceOver step announcement in the Welcome Tour — \"Home, step 3 of 8\" and the like, heard on nearly all 28 steps — had never been translated into any of AppleVis's 22 supported languages, only ever existing in English. Fixed and translated into all 22."
+        ),
+        ChangeItem(
+            systemImage: "pause.circle",
+            tag: .improved,
+            title: "A Real Way to Pause the Welcome Tour",
+            description: "Skip Tour used to be the only way out of the Welcome Tour from 25 of its 28 steps — and it reset your progress, even if all you wanted was to step away and come back later. It's now Leave Tour everywhere, offering a real choice: pause and resume right where you left off, or skip the tour completely. The old checkpoint-only Pause Tour option is gone, since this covers every step instead of just 3."
+        ),
+        ChangeItem(
+            systemImage: "text.alignleft",
+            tag: .accessibility,
+            title: "Welcome Tour Steps Now Read Paragraph by Paragraph",
+            description: "Each Welcome Tour step's explanation used to read (or Braille-pan) as one long, unbroken block, the same problem already fixed for forum topics, blog posts, and podcast show notes. It's now split into shorter stops you can pause on, re-read, or skip past — a few more swipes, but no more one continuous wall of speech."
+        ),
+        ChangeItem(
+            systemImage: "globe",
+            tag: .fixed,
+            title: "The Whole Welcome Tour Now Actually Translates",
+            description: "Every step's title and explanation, every button, and the tour's own name were built from a code pattern that silently skipped the translation catalog, the same bug already fixed elsewhere in the app. Non-English speakers saw English throughout the entire tour no matter how many translations existed — and in this case, all 28 steps already had full translations sitting unused. Fixed, so all of it displays correctly now."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.seal",
+            tag: .fixed,
+            title: "Two Welcome Tour Content Corrections",
+            description: "The Home chapter's Customize Your Feed step claimed a finer forum filter was \"tucked into\" the Customize Home sheet — it isn't; that filter lives in Settings > Home Feed instead, so the claim is gone until that screen gets its own review. The Profile & Settings overview step's Learn More button also opened a Help article about what the four main tabs do, which the tour itself had already covered in far more depth — and didn't match what that step was actually about. Removed."
+        ),
+        ChangeItem(
+            systemImage: "square.grid.2x2",
+            tag: .accessibility,
+            title: "Mouse Recap Announces Each Section's Type Once",
+            description: "With 3 new apps in a week, VoiceOver announced \"New on the App Scene\" three times in a row — once per app card — instead of once for the whole group. Same fix for Podcast Episode, Blog Post, and Popular Discussion: announced once at the top of their section, with each card's own label still visible on screen but no longer repeated aloud. How-To Corner is unchanged, since its Guide/Tutorial label genuinely differs per item."
+        ),
+        ChangeItem(
+            systemImage: "globe",
+            tag: .accessibility,
+            title: "Mouse Recap Now Actually Translates",
+            description: "Its section titles, kickers like \"Podcast Episode\" and \"Popular Discussion,\" the intro line under each heading, and the Guide/Tutorial/Article labels in How-To Corner were all hardcoded English, so VoiceOver read them in English no matter what language the app was set to. They now follow the app's language like everything else."
+        ),
+        ChangeItem(
+            systemImage: "clock",
+            tag: .new,
+            title: "Episode Length and Reading Time in Mouse Recap",
+            description: "Podcast Episode cards now show how long the episode runs, and Blog Post cards now show an estimated reading time — alongside the author, date, and comment count already there. Requested directly."
+        ),
+        ChangeItem(
+            systemImage: "list.bullet",
+            tag: .accessibility,
+            title: "Two Fixes for the For You Section Picker",
+            description: "Tapping the section picker (Saved, Following, Recommended, Queue, Downloads) to open it spoke its selection twice in a row — \"Apps You've Recommended, 0 items\" once for the picker itself and again for the same row inside the menu. And because changing sections swaps in an entirely different screen underneath, swiping to the next section sometimes let VoiceOver focus drift off the picker entirely instead of staying put and announcing the new selection. Both fixed. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "text.bubble",
+            tag: .accessibility,
+            title: "Home Startup Behavior Explains Itself, and Stops Repeating",
+            description: "This picker used to say its own value twice in a row on a plain swipe through Settings — a leftover from a persistent VoiceOver override that duplicated what the control already announces natively. Fixed, the same way as the For You section picker above. Its VoiceOver hint also used to just say it \"controls how much spoken announcement Home produces,\" without saying what Quiet, Helpful, or Detailed each actually do — it now spells out the difference for VoiceOver users the same way the on-screen text already does for everyone else. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "text.bubble",
+            tag: .accessibility,
+            title: "Every Settings Picker Stops Repeating Itself",
+            description: "The same double-announcement fixed above in Home Startup Behavior — VoiceOver saying a setting's value twice in a row on a plain swipe — was actually present in every picker across Settings that supports swipe up/down to change its value: Web Links, Notification Sound, Card Density, Keep Cache For, and all eight pickers in Podcasts (Speed, Skip Back, Skip Forward, Equaliser, Sleep Timer, Resume Rewind, Auto-Download, Auto-Delete). All fixed the same way. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "sparkles",
+            tag: .improved,
+            title: "Detailed Is Now Home's Default Welcome",
+            description: "Home Startup Behavior now defaults to Detailed instead of Helpful — a plain \"Welcome back\" with no idea what's actually new wasn't pulling its weight as a first impression. Detailed adds an AI-generated summary of what's changed since your last visit, and quietly falls back to the same short welcome Helpful gives when there's nothing new to report, so nothing gets noisier on a quiet day. Change it anytime in Settings > General."
+        ),
+        ChangeItem(
+            systemImage: "text.alignleft",
+            tag: .improved,
+            title: "Overviews Added to More Settings Screens",
+            description: "Sounds & Haptics, Podcasts, Storage & Cache, and Notifications now open with the same kind of plain-language overview General and several other Settings screens already had — what the screen covers, in a sentence or two, before you get into the individual switches and pickers. Requested directly."
+        ),
+        ChangeItem(
+            systemImage: "person.badge.plus",
+            tag: .improved,
+            title: "Replies to My Posts Now Actually Auto-Follows",
+            description: "This preference now does what its description always implied: turn it on, and every new forum topic or app entry you post is automatically followed for you, the same as tapping Follow yourself — no separate step needed. It only applies going forward; anything posted before turning it on isn't touched, since there's nothing to retroactively follow. Forum topics already had their own follow-on-post toggle in the composer, seeded from this preference; app entries get the same treatment now too. Clarified directly after this was found to be misunderstood as a stateless notification filter rather than a real subscription."
+        ),
+        ChangeItem(
+            systemImage: "line.3.horizontal.decrease.circle",
+            tag: .fixed,
+            title: "Removed a Confusing Hidden Forum Filter",
+            description: "Settings > Home Feed had a second, easy-to-miss forum filter (Recent, New, Unread, Since Last Visit) that silently narrowed which forum topics reached Home's feed before Home's own All/New/Mouse Recap switcher ever saw them — so choosing All in Home could still quietly show only, say, Unread topics, with no visible explanation why. Two of its six options (Following, Saved) were already no-ops here besides. Removed entirely; Home's own All/New switcher is now the one place any content type, forums included, gets filtered. Discussed and requested directly."
+        ),
+        ChangeItem(
+            systemImage: "hand.raised",
+            tag: .improved,
+            title: "A Leaner Privacy Screen",
+            description: "Settings > Privacy had turned into a directory of shortcuts to screens that already have their own home in Settings — Smart Features and iCloud Sync just duplicated the Intelligence and Saved & Sync rows one tap away, and Manage Storage duplicated Storage & Cache. All three removed; the info cards above them already cover the privacy-relevant facts. Filter Profanity and Show What's New on Home also moved out — neither is really a privacy control (one's about how existing content displays, the other's a Home display preference), so both now live in Settings > General instead. Privacy is left with what's actually unique to it: what's collected, and the handful of real data actions. Discussed and requested directly."
+        ),
+        ChangeItem(
+            systemImage: "arrow.uturn.backward",
+            tag: .fixed,
+            title: "Settings Navigation Could Unexpectedly Kick You Out",
+            description: "Settings was nested inside a second NavigationStack on top of Profile's own — something SwiftUI doesn't support and can desync in unpredictable ways, especially a few pushes deep (Settings > Help > a tutorial or FAQ, for instance). On top of that, every row in Settings (including Help's own entry) was rebuilding its identity from scratch on every re-render instead of keeping a stable one, which could desync navigation further still. Both fixed — Settings now shares Profile's existing navigation stack instead of starting its own, and every row keeps a consistent identity. Reported directly: double-tapping into a Help article could unexpectedly land back out at Home instead of opening the article."
+        ),
+        ChangeItem(
+            systemImage: "questionmark.circle",
+            tag: .improved,
+            title: "Help Moved to Profile, About Duplicate Removed",
+            description: "Help used to sit a level deeper than it needed to — Profile > Settings > scroll down to Support > Help — despite being reference material people come back to, not a configuration screen. It now lives directly in Profile's About AppleVis section, alongside What's New and About & Credits. Settings > Support's About row was also just a duplicate of the one already in that same Profile section, so it's gone; Settings now holds configuration only. Discussed and requested directly."
+        ),
+        ChangeItem(
+            systemImage: "waveform",
+            tag: .accessibility,
+            title: "A VoiceOver Performance Heading on App Entries",
+            description: "The VoiceOver Performance, Button Labelling, and Usability ratings on an App Entry page used to float between About and Accessibility Comments with no heading of their own — reachable only by swiping past everything else, not by jumping there with the Headings rotor. They now sit under their own VoiceOver Performance heading. Requested directly."
+        ),
+        ChangeItem(
+            systemImage: "text.bubble",
+            tag: .accessibility,
+            title: "Comment Subjects No Longer Repeat",
+            description: "On Guide, Blog, Podcast, and Bug Report comments, a subject line was announced twice in a row — once as part of the comment's header (\"...Subject: X.\"), then again as its own separate stop right below. Forums and App Entries, which use their own comment row, never had this. Fixed here too; the subject is still shown on screen, just not read aloud twice. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "text.quote",
+            tag: .fixed,
+            title: "Podcast Transcripts Could Wrongly Say \"No Longer Available\"",
+            description: "Tapping Read Transcript could open to \"This item is no longer available\" even when the episode's show notes had a transcript right there the whole time — a timing bug where the transcript sheet could open before the already-extracted text finished being handed to it, sending it down a fallback network lookup that 404s for an ordinary embedded transcript. Not tied to any particular transcription tool (compared a Google Gemini-transcribed episode against a VoicePen one directly — both format identically); this was purely about when the sheet opened relative to the data being ready. Fixed by tying the two together so they can no longer land out of step. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "globe",
+            tag: .fixed,
+            title: "App Search Now Uses Your Own App Store Region",
+            description: "Searching for an app to add to the App Directory, or checking an app's live App Store details, always queried the US App Store no matter where you actually are — a real app that simply isn't sold there (or is exclusive to a different storefront) could turn up zero search results, or even get wrongly flagged as \"Removed\" in App Directory Health Check. Both now check your device's own region first, only falling back to the US store if that comes up empty. Reported directly by a tester in Ireland who couldn't find a real app while trying to submit it."
+        ),
+        ChangeItem(
+            systemImage: "person.2.circle",
+            tag: .new,
+            title: "A Community Agreement Before You Sign In",
+            description: "Before signing in — whether during first-run setup, from Profile, or from Add a Topic and every Submit screen — you'll now see a short Community Agreement explaining how guideline checks work and asking you to agree to follow them. Browsing AppleVis never required this and still doesn't; it only appears right before signing in. Declining just means continuing without an account, and you can review it again anytime you try to sign in later."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.shield",
+            tag: .fixed,
+            title: "Fewer False Guideline Reminders",
+            description: "The gentle reminder shown while composing a topic, reply, or review could fire on things that were never really a problem — a normal reply asking a few quick follow-up questions, criticizing an app or company rather than a person, mentioning \"my podcast player,\" or thanking people who already took a survey. Tightened up several of these checks so the reminder shows up for things that actually need a second look, not ordinary posts. Found while reviewing real flagged content together."
+        ),
+    ]
+
+    /// Stable-sorts into New → Improved → Accessibility → Fixed while
+    /// preserving each item's relative (hand-curated, importance-ordered)
+    /// position within its own group.
+    static func grouped(_ items: [ChangeItem]) -> [ChangeItem] {
+        items.enumerated()
+            .sorted {
+                $0.element.tag.groupOrder != $1.element.tag.groupOrder
+                    ? $0.element.tag.groupOrder < $1.element.tag.groupOrder
+                    : $0.offset < $1.offset
+            }
+            .map(\.element)
+    }
+
+    static let archivedFrom2026_14: [ChangeItem] = [
         ChangeItem(
             systemImage: "sparkles",
             tag: .improved,
@@ -246,13 +500,13 @@ struct ChangeItem: Identifiable {
         ),
         ChangeItem(
             systemImage: "hand.point.left",
-            tag: .fixed,
+            tag: .accessibility,
             title: "A Saved-List Tip That Actually Matches What You Saved",
             description: "Another beta-tester catch: saving a forum topic used to trigger a one-time tip titled \"Faster Episode Actions,\" describing swipe-to-delete and mark-as-played — neither of which exists on a saved topic. The tip now matches whatever you actually saved, and VoiceOver users get an accurate version pointing to the Actions rotor instead of a swipe-left instruction that, under VoiceOver, just moves focus to the previous item rather than doing anything useful."
         ),
         ChangeItem(
             systemImage: "bookmark",
-            tag: .fixed,
+            tag: .accessibility,
             title: "A Clearer Nudge for Saving Your First Item",
             description: "The empty For You > Saved screen used to say \"Tap the bookmark icon on any item to save it\" — a beta tester pointed out that VoiceOver never actually says the word \"bookmark\" anywhere in the app, since every Save button and menu item is labeled Save. It now says to save a topic, app, guide, blog post, or episode, matching what every Save control is actually called for every user."
         ),
@@ -264,7 +518,7 @@ struct ChangeItem: Identifiable {
         ),
         ChangeItem(
             systemImage: "text.line.first.and.arrowtriangle.forward",
-            tag: .improved,
+            tag: .accessibility,
             title: "Fewer Swipes on Minimum-Length Fields",
             description: "Description, Message, Blog Post Draft, Episode Description, and Accessibility Comments — every field with a character minimum — now combine their label and live counter into a single VoiceOver stop instead of two, and no longer repeat the same requirement a third time in a separate caption below the field."
         ),
@@ -306,7 +560,7 @@ struct ChangeItem: Identifiable {
         ),
         ChangeItem(
             systemImage: "waveform.badge.plus",
-            tag: .new,
+            tag: .accessibility,
             title: "Clearer Sound Previews for VoiceOver",
             description: "Double-tapping a notification sound to select it also played a preview right away, but VoiceOver's own selection announcement could talk over the clip because of audio ducking, making it hard to actually hear. A new Preview action, in the rotor's Actions category, is now available on both the setup sound picker and Settings > Notifications — it plays the sound on its own, without changing the selection or triggering that announcement."
         ),
@@ -324,7 +578,7 @@ struct ChangeItem: Identifiable {
         ),
         ChangeItem(
             systemImage: "person.crop.circle",
-            tag: .fixed,
+            tag: .accessibility,
             title: "Sign In Focuses Properly During Setup",
             description: "The Sign In step of setup used to send VoiceOver focus straight to the Username field, skipping past the step's own heading and explanation entirely. It now focuses the heading first, like every other setup step."
         ),
@@ -366,13 +620,13 @@ struct ChangeItem: Identifiable {
         ),
         ChangeItem(
             systemImage: "hand.draw",
-            tag: .fixed,
+            tag: .accessibility,
             title: "Swipeable Pickers Announce What You Picked",
             description: "Swiping up or down on a picker — For You's section switcher, Home Feed, App Directory's platform filter, and every swipeable setting in Podcasts, Notifications, Storage, and Appearance — previously played only a plain \"value changed\" sound with nothing spoken. VoiceOver now announces the actual selection, like \"Following\" or \"1.5 times,\" every time."
         ),
         ChangeItem(
             systemImage: "scope",
-            tag: .fixed,
+            tag: .accessibility,
             title: "Discover Focus Fixed After Switching Tabs",
             description: "Switching away from Discover while inside a section like Podcasts, then switching back without going all the way out first, used to yank VoiceOver focus up to the Discover heading instead of leaving it where you actually were. It now only refocuses the heading when you're really back at the Discover hub."
         ),
@@ -384,7 +638,7 @@ struct ChangeItem: Identifiable {
         ),
         ChangeItem(
             systemImage: "text.badge.checkmark",
-            tag: .fixed,
+            tag: .accessibility,
             title: "New Comment Count Announced in the Right Place",
             description: "On Forum, Podcast, App, Guide, Blog Post, and Bug Report cards, VoiceOver used to announce \"N new comments\" dead last — after the comment count, the date, and any Saved/Following status — making it easy to lose track of which number it belonged to. It's now spoken right next to the comment count it's describing, with the date and status following after."
         ),
@@ -398,6 +652,7 @@ struct HistorySection: Identifiable {
     let items: [ChangeItem]
 
     static let all: [HistorySection] = [
+        HistorySection(title: "Also in 2026.14", items: ChangeItem.archivedFrom2026_14),
         HistorySection(title: "Also in 2026.13", items: [
         ChangeItem(
             systemImage: "wifi.slash",
@@ -557,7 +812,7 @@ struct HistorySection: Identifiable {
         ),
         ChangeItem(
             systemImage: "house",
-            tag: .fixed,
+            tag: .accessibility,
             title: "Smoother Home Tab for VoiceOver",
             description: "Home no longer announces its own name twice when swiping through the screen."
         ),
@@ -575,7 +830,7 @@ struct HistorySection: Identifiable {
         ),
         ChangeItem(
             systemImage: "arrow.uturn.backward",
-            tag: .improved,
+            tag: .accessibility,
             title: "Home Picks Up Where You Left Off",
             description: "When there's nothing new to catch up on, Home now returns VoiceOver focus to the last item you visited instead of starting over at the greeting."
         ),
@@ -629,7 +884,7 @@ struct HistorySection: Identifiable {
         ),
         ChangeItem(
             systemImage: "bookmark.slash",
-            tag: .improved,
+            tag: .accessibility,
             title: "Faster Access to Bulk Actions in For You",
             description: "Unsave All and Remove All Downloads are now reachable as VoiceOver actions right on the summary at the top of the list, not just as a button after every item."
         ),
@@ -641,13 +896,13 @@ struct HistorySection: Identifiable {
         ),
         ChangeItem(
             systemImage: "arrow.left.circle",
-            tag: .fixed,
+            tag: .accessibility,
             title: "Back Button Returns VoiceOver Focus",
             description: "Coming back from a Settings, Profile, Discover, or About screen now lands VoiceOver focus on the row you tapped, instead of somewhere unrelated."
         ),
         ChangeItem(
             systemImage: "arrow.down.to.line",
-            tag: .fixed,
+            tag: .accessibility,
             title: "\"Jump to First New Comment\" Lands in the Right Place",
             description: "On a long thread, review list, or comment section, jumping to the newest or first new comment could land VoiceOver focus on the wrong entry instead of the actual new one. It now reliably lands on the right comment every time."
         ),
@@ -665,7 +920,7 @@ struct HistorySection: Identifiable {
         ),
         ChangeItem(
             systemImage: "text.badge.checkmark",
-            tag: .improved,
+            tag: .accessibility,
             title: "Jump Straight to a Mouse Recap Section",
             description: "Mouse Recap's section titles (New Accessible Apps, Community Voices, and the rest) are now real VoiceOver headings, so the Headings rotor jumps straight to one instead of swiping through everything ahead of it. Each card's repeated section label (like \"Popular Discussion\" on every discussion) no longer reads out again for every single item."
         ),
@@ -689,25 +944,25 @@ struct HistorySection: Identifiable {
         ),
         ChangeItem(
             systemImage: "hand.wave.fill",
-            tag: .improved,
+            tag: .accessibility,
             title: "Home Always Greets You First",
             description: "Opening Home with new activity or a reading position to resume used to skip straight past the greeting. VoiceOver focus now always lands on the greeting first, with What's New announced right after — instead of two separate \"welcome\" messages competing with each other."
         ),
         ChangeItem(
             systemImage: "arrow.clockwise",
-            tag: .fixed,
+            tag: .accessibility,
             title: "Pull to Refresh No Longer Repeats Itself",
             description: "Pulling to refresh Home and finding something new used to announce the summary, then say the exact same sentence again a moment later when focus landed on the What's New card. It's said once now."
         ),
         ChangeItem(
             systemImage: "scope",
-            tag: .fixed,
+            tag: .accessibility,
             title: "VoiceOver Focus, Cleaned Up Across the App",
             description: "A full pass on where VoiceOver focus lands when a screen opens: the Now Playing screen, Forums, Write a Review, and several account screens (sign in, edit profile, delete account, member profiles, contact a member) now focus something meaningful instead of nothing. Every multi-step wizard (Submit App/Blog/Bug/Podcast, Contact, Change Password/Email, Report a Comment) now focuses its first step reliably and re-checks focus a few times after each Next/Back, instead of a single guess that could go silent on a slower moment. Podcast and Storage settings no longer jump straight to a control."
         ),
         ChangeItem(
             systemImage: "text.alignleft",
-            tag: .improved,
+            tag: .accessibility,
             title: "Long Posts Now Read Paragraph by Paragraph",
             description: "Forum topics, replies, blog posts, bug reports, app descriptions, and podcast show notes previously read (or Braille-panned) as one long, undifferentiated block when there was no heading structure to break it up. Each paragraph is now its own stop, so you can pause, re-read, or skip to a specific one — reading everything continuously still works exactly the same as before."
         ),
@@ -725,7 +980,7 @@ struct HistorySection: Identifiable {
         ),
         ChangeItem(
             systemImage: "scope",
-            tag: .improved,
+            tag: .accessibility,
             title: "More VoiceOver Focus Fixes",
             description: "Continuing the focus pass from the last update: About, What's New, Help, RSS Feeds, Credits, Social Media, Open Source Licences, the Transcript screen, Customize Home, editing a topic/post, and For You's Saved/Following/Recommended/Downloads sections all focus something meaningful on their first appearance now instead of leaving VoiceOver wherever it happened to land."
         ),
@@ -793,7 +1048,7 @@ struct HistorySection: Identifiable {
             ),
             ChangeItem(
                 systemImage: "hand.point.up.left",
-                tag: .fixed,
+                tag: .accessibility,
                 title: "Smoother VoiceOver Focus",
                 description: "Many screens now move VoiceOver focus to the new page or field as soon as it opens, including Settings, Profile, Discover sections, app pages, podcasts, forums, and first-time setup."
             ),
@@ -822,7 +1077,7 @@ struct HistorySection: Identifiable {
                 description: "AppleVis editors can now see the right edit, unpublish, and delete actions in more places when signed in."
             ),
         ]),
-        HistorySection(title: "Also in 2026.10 - 2026.9", items: [
+        HistorySection(title: "Also in 2026.10", items: [
             ChangeItem(
                 systemImage: "person.crop.circle",
                 tag: .improved,
@@ -855,7 +1110,7 @@ struct HistorySection: Identifiable {
             ),
             ChangeItem(
                 systemImage: "dial.medium",
-                tag: .new,
+                tag: .accessibility,
                 title: "More VoiceOver Navigation",
                 description: "New rotor options and card actions make it quicker to jump to new comments, replies to you, and podcast chapters."
             ),
@@ -876,248 +1131,6 @@ struct HistorySection: Identifiable {
                 tag: .fixed,
                 title: "Reliability Fixes",
                 description: "This release fixed repeated VoiceOver card actions, stale sign-in sessions, a duplicate Now Playing card, and a System theme flicker."
-            ),
-        ]),
-        HistorySection(title: "Also in 2026.8 - 2026.7", items: [
-            ChangeItem(
-                systemImage: "square.and.arrow.up",
-                tag: .new,
-                title: "Share Into AppleVis",
-                description: "Sharing from Safari or another app can open the right AppleVis submission form with the link already filled in."
-            ),
-            ChangeItem(
-                systemImage: "ipad.and.iphone",
-                tag: .new,
-                title: "Handoff",
-                description: "You can pick up a topic or podcast on a nearby iPad or Mac from where you left off on iPhone."
-            ),
-            ChangeItem(
-                systemImage: "keyboard",
-                tag: .new,
-                title: "iPad Keyboard Shortcuts",
-                description: "Hold Command on iPad to see shortcuts for Search, Settings, Forums, Apps, Podcasts, and Resources."
-            ),
-            ChangeItem(
-                systemImage: "sparkles",
-                tag: .improved,
-                title: "Smarter Apple Features",
-                description: "Apple Intelligence, Siri Shortcuts, AirPlay, Spotlight, Lock Screen playback, Voice Boost, Trim Silence, artwork descriptions, and iCloud podcast sync all work more reliably."
-            ),
-            ChangeItem(
-                systemImage: "moon",
-                tag: .new,
-                title: "Focus Filters",
-                description: "AppleVis notification categories now appear in iOS Focus settings."
-            ),
-        ]),
-        HistorySection(title: "Also in 2026.6", items: [
-            ChangeItem(
-                systemImage: "envelope",
-                tag: .new,
-                title: "Contact App Support",
-                description: "A new support wizard lets you contact the AppleVis team without leaving the app or opening Mail."
-            ),
-            ChangeItem(
-                systemImage: "sparkles",
-                tag: .new,
-                title: "Apple Intelligence Tools",
-                description: "Supported devices can summarize, simplify, and translate text on device."
-            ),
-            ChangeItem(
-                systemImage: "mic",
-                tag: .new,
-                title: "More Siri Shortcuts",
-                description: "Siri can resume your podcast, search AppleVis, or open saved items by voice."
-            ),
-            ChangeItem(
-                systemImage: "music.note",
-                tag: .improved,
-                title: "Better Podcast Playback",
-                description: "Podcast playback gained queue skipping, Lock Screen artwork, Control Center artwork, and clearer Dynamic Island status."
-            ),
-            ChangeItem(
-                systemImage: "questionmark.circle",
-                tag: .improved,
-                title: "Updated Help and Icon",
-                description: "The Help Centre was refreshed, and the app icon can adapt to your Home Screen style on supported iOS versions."
-            ),
-        ]),
-        HistorySection(title: "Also in 2026.5", items: [
-            ChangeItem(
-                systemImage: "ant",
-                tag: .new,
-                title: "Submit Bug Reports",
-                description: "You can submit a bug report from inside the app with platform, OS version, title, Feedback ID, description, and recognition preference."
-            ),
-            ChangeItem(
-                systemImage: "newspaper",
-                tag: .new,
-                title: "Submit Blog Posts",
-                description: "You can write a blog post, import a text or Markdown file, or paste from the clipboard."
-            ),
-            ChangeItem(
-                systemImage: "mic",
-                tag: .new,
-                title: "Submit Podcasts",
-                description: "You can upload a podcast audio file directly from Files or iCloud Drive."
-            ),
-            ChangeItem(
-                systemImage: "square.grid.2x2",
-                tag: .new,
-                title: "Submit App Entries",
-                description: "You can submit App Directory entries with App Store search and accessibility ratings."
-            ),
-            ChangeItem(
-                systemImage: "square.and.arrow.up",
-                tag: .improved,
-                title: "Smarter Share Extension",
-                description: "Sharing App Store links, podcast URLs, and text files into AppleVis now opens the right wizard automatically."
-            ),
-            ChangeItem(
-                systemImage: "speaker.wave.2",
-                tag: .improved,
-                title: "Help and Sounds",
-                description: "The Help Centre gained guides for submission wizards, and the app sounds were refreshed."
-            ),
-        ]),
-        HistorySection(title: "Also in 2026.4 - 2026.3", items: [
-            ChangeItem(
-                systemImage: "pencil",
-                tag: .new,
-                title: "Edit Your Content",
-                description: "You can edit and delete your own posts and comments from detail pages inside the app."
-            ),
-            ChangeItem(
-                systemImage: "square.grid.2x2",
-                tag: .improved,
-                title: "App Pages Redesigned",
-                description: "App pages added clearer accessibility ratings, developer contact, App Store links, and supported devices."
-            ),
-            ChangeItem(
-                systemImage: "bubble.left.and.bubble.right",
-                tag: .improved,
-                title: "Forum Pages Redesigned",
-                description: "Forum topics added category headers, reply animations, better Braille reading, author colors, and summaries."
-            ),
-            ChangeItem(
-                systemImage: "book",
-                tag: .improved,
-                title: "Blog and Guide Pages Redesigned",
-                description: "Blog and guide pages now better match the forum design and VoiceOver behavior."
-            ),
-            ChangeItem(
-                systemImage: "house",
-                tag: .improved,
-                title: "Better Home Welcome",
-                description: "The Home welcome flow was redesigned to restore focus and return you to your last-read position."
-            ),
-        ]),
-        HistorySection(title: "Also in 2026.2", items: [
-            ChangeItem(
-                systemImage: "speaker.wave.2",
-                tag: .new,
-                title: "More Sound Options",
-                description: "A new alert sound was added, and all alert sounds were balanced to a more consistent volume."
-            ),
-            ChangeItem(
-                systemImage: "house",
-                tag: .improved,
-                title: "Better Welcome Card",
-                description: "The Welcome card shows new comment counts and can jump back to your last-read position."
-            ),
-            ChangeItem(
-                systemImage: "eye",
-                tag: .improved,
-                title: "VoiceOver Detail Levels",
-                description: "Simple, Normal, and All now provide clearer differences in how much detail VoiceOver reads."
-            ),
-            ChangeItem(
-                systemImage: "bell.badge",
-                tag: .new,
-                title: "Follow Forum Topics",
-                description: "You can follow forum topics and receive reply notifications."
-            ),
-            ChangeItem(
-                systemImage: "text.bubble",
-                tag: .improved,
-                title: "More In-App Reading and Comments",
-                description: "Blog posts, guides, app comments, forum threads, and redesigned detail pages work more fully inside the app."
-            ),
-            ChangeItem(
-                systemImage: "hand.point.up.left",
-                tag: .fixed,
-                title: "More Reliable VoiceOver Focus",
-                description: "VoiceOver focus now lands more reliably after feed loading and pull-to-refresh."
-            ),
-            ChangeItem(
-                systemImage: "speedometer",
-                tag: .fixed,
-                title: "Playback Speed Fix",
-                description: "Pitch correction now works correctly when changing podcast playback speed."
-            ),
-        ]),
-        HistorySection(title: "Also in 2026.0.1.3 - 2026.0.1.5", items: [
-            ChangeItem(
-                systemImage: "music.note",
-                tag: .improved,
-                title: "Refreshed Sounds",
-                description: "The welcome tone, notification sounds, and system sounds were refreshed."
-            ),
-            ChangeItem(
-                systemImage: "tray.full",
-                tag: .improved,
-                title: "Saved and Downloaded Episodes",
-                description: "Saved and downloaded episodes gained Queue, Share, Mark as Played, and sorting actions."
-            ),
-            ChangeItem(
-                systemImage: "text.alignleft",
-                tag: .improved,
-                title: "Better Episode Pages",
-                description: "Episode pages gained cleaner About text, live links, full-screen transcripts, and artwork descriptions."
-            ),
-            ChangeItem(
-                systemImage: "bubble.left.and.bubble.right",
-                tag: .new,
-                title: "Full Detail Pages",
-                description: "Forum topics and episodes gained full detail screens with bottom toolbars for quick actions."
-            ),
-        ]),
-        HistorySection(title: "Also in 2026.0.1.1 - 2026.0.1.2", items: [
-            ChangeItem(
-                systemImage: "bubble.left.and.bubble.right",
-                tag: .new,
-                title: "Forums Inside the App",
-                description: "You can read full forum threads and post replies directly inside AppleVis."
-            ),
-            ChangeItem(
-                systemImage: "square.grid.2x2",
-                tag: .new,
-                title: "Full App Listings",
-                description: "App listings now include all community comments inside the app."
-            ),
-            ChangeItem(
-                systemImage: "book",
-                tag: .new,
-                title: "Full Guides and Articles",
-                description: "Guides and articles can be read completely inside the app."
-            ),
-            ChangeItem(
-                systemImage: "gearshape",
-                tag: .improved,
-                title: "More Settings",
-                description: "Podcast, notification, theme, card size, and VoiceOver detail settings gained working controls and previews."
-            ),
-            ChangeItem(
-                systemImage: "arrow.left",
-                tag: .fixed,
-                title: "Back Buttons Everywhere",
-                description: "Settings, detail pages, and sub-screens now include a Back button."
-            ),
-            ChangeItem(
-                systemImage: "hand.tap",
-                tag: .new,
-                title: "Magic Tap for Podcasts",
-                description: "A two-finger double tap now plays and pauses podcasts."
             ),
         ]),
     ]

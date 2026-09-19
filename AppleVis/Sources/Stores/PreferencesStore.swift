@@ -101,7 +101,13 @@ final class PreferencesStore: ObservableObject {
     @AppStorage("a11y.announcement")    var announcementLevel: AnnouncementLevel = .normal
     @AppStorage("a11y.helpfulTips")     var helpfulTipsEnabled = true
     @AppStorage("a11y.welcomeSummary")  var welcomeSummaryEnabled = true
-    @AppStorage("a11y.homeStartup")     var homeStartupBehavior: HomeStartupBehavior = .helpful
+    // Detailed, not Helpful — Requested directly: a plain "Welcome back"
+    // with no idea what actually changed since your last visit wasn't
+    // pulling its weight as the default; the AI-generated summary is the
+    // more genuinely useful first impression, and it already degrades to
+    // the same short welcome Helpful gives when there's nothing new to
+    // report, so nobody's worse off on a quiet day.
+    @AppStorage("a11y.homeStartup")     var homeStartupBehavior: HomeStartupBehavior = .detailed
     // Defaults off — auto-raising the keyboard whenever Discover's Search
     // tab is opened meant a VoiceOver user who just wanted to browse the
     // hub grid had to dismiss the keyboard first every time. Reported
@@ -129,9 +135,6 @@ final class PreferencesStore: ObservableObject {
     /// only, never sent anywhere on its own; cleared by "Clear All Local
     /// Data" in Settings > Privacy like other on-device convenience data.
     @AppStorage("privacy.lastGuestEmail") var lastGuestEmail = ""
-
-    // MARK: - Forums
-    @AppStorage("forums.defaultFilter") var forumsDefaultFilter: ForumFilter = .recent
 
     // MARK: - Sounds & Haptics
     // docs/APPLEVIS_2026_1_MASTER_SPEC.md: "All app sounds must be optional.

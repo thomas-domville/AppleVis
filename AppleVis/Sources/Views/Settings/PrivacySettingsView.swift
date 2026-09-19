@@ -9,7 +9,7 @@ struct PrivacySettingsView: View {
     var body: some View {
         Form {
             Section {
-                Text("AppleVis is built by and for the blindness and low-vision community. Your privacy is not a product. This section explains what we collect, what stays on your device, and gives you control over smart features.")
+                Text("AppleVis is built by and for the blindness and low-vision community. Your privacy is not a product. This section explains what we collect and what stays on your device.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .accessibilityFocused($isTitleFocused)
@@ -53,54 +53,6 @@ struct PrivacySettingsView: View {
                 )
             }
 
-            Section("Smart Features") {
-                Text("Non-English detection, compose rewrite/translation, search translation, and AI summaries all run on-device via Apple Intelligence.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                NavigationLink {
-                    IntelligenceSettingsView()
-                } label: {
-                    Label("Manage Smart Features", systemImage: "cpu")
-                }
-            }
-
-            Section("iCloud Sync") {
-                Text("Saved items, followed content, podcast position, queue, and settings can sync across your devices via iCloud. Each of these can be turned on or off individually in Settings > Saved and Sync.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                NavigationLink {
-                    SavedSyncSettingsView()
-                } label: {
-                    Label("Manage iCloud Sync", systemImage: "icloud")
-                }
-            }
-
-            Section("What's New Indicators") {
-                Toggle("Show What's New on Home", isOn: $preferences.showNewActivityIndicators)
-                    .accessibilityHint(String(localized: "When on, Home shows a New view, a quick summary, and small badges for content with new activity since your last visit."))
-
-                Text("Reading history is always tracked on-device — this only controls whether Home actually shows what's new because of it. Turning it off doesn't erase anything; it just keeps Home quieter.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Language Filtering") {
-                Toggle("Filter Profanity", isOn: $preferences.filterProfanity)
-                    .accessibilityHint(String(localized: "When on, milder language is shown masked, like s star star star, instead of spelled out."))
-
-                Text("AppleVis blocks strong or explicit language from every post and comment, always — this setting doesn't change that. It only controls whether milder language, which the site otherwise allows, is shown masked or spelled out. We keep this on by default to help AppleVis stay welcoming, and to stay within Apple's guidelines for our age rating.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                if let article = HelpContent.find("community-language-filter") {
-                    NavigationLink {
-                        HelpArticleDetailView(article: article)
-                    } label: {
-                        Label("Learn More About Language Filtering", systemImage: "info.circle")
-                    }
-                }
-            }
-
             Section("Data Management") {
                 Button {
                     if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
@@ -108,12 +60,6 @@ struct PrivacySettingsView: View {
                     }
                 } label: {
                     Label("Notification Privacy Settings", systemImage: "bell.badge.slash")
-                }
-
-                NavigationLink {
-                    StorageView()
-                } label: {
-                    Label("Manage Storage", systemImage: "internaldrive")
                 }
 
                 WebLink(destination: URL(string: "https://www.applevis.com/privacy")!) {

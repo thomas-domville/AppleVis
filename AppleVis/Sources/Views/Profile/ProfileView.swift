@@ -3,7 +3,12 @@ import SwiftUI
 struct ProfileView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var communityAgreement: CommunityAgreementStore
     @State private var showSignIn = false
+    /// Gates `showSignIn` below — see `CommunityAgreementStore`. Shown
+    /// first only when the current version hasn't been accepted yet;
+    /// declining leaves `showSignIn` untouched.
+    @State private var showCommunityAgreement = false
     @State private var showContact = false
     @State private var showWelcomeTour = false
     @AccessibilityFocusState private var focusTarget: AnyHashable?
@@ -32,6 +37,11 @@ struct ProfileView: View {
         .sheet(isPresented: $showSignIn) {
             SignInView()
         }
+        .communityAgreementGate(
+            showCommunityAgreement: $showCommunityAgreement,
+            showSignIn: $showSignIn,
+            declineHint: String(localized: "Returns to Profile without signing in. You can review the agreement again later.")
+        )
         .sheet(isPresented: $showContact) {
             ContactView()
         }
@@ -100,15 +110,22 @@ struct ProfileView: View {
 
     private var adminSection: some View {
         Section("Admin") {
+            // Moderator Tools used to be its own hub screen holding just
+            // this one row — an extra tap for no reason with only a single
+            // tool in it. Flattened to match App Directory Health Check
+            // below, which was already a direct row. Revisit grouping again
+            // if this section grows enough tools to actually need it.
+            // Discussed and requested directly.
             NavigationLink {
-                ModeratorToolsView()
+                GuidelineViolationCheckView()
                     .onDisappear {
-                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("moderatorTools")) }
+                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("guidelineCheck")) }
                     }
             } label: {
-                Label("Moderator Tools", systemImage: "shield")
+                Label("Guideline Violation Check", systemImage: "text.magnifyingglass")
             }
-            .accessibilityFocused($focusTarget, equals: AnyHashable("moderatorTools"))
+            .accessibilityFocused($focusTarget, equals: AnyHashable("guidelineCheck"))
+            .accessibilityHint(String(localized: "Scans recent activity across the site for possible guideline violations."))
 
             NavigationLink {
                 AppEntryHealthCheckView()
@@ -134,7 +151,7 @@ struct ProfileView: View {
                 Text("Sign in to post in forums, follow topics, receive notifications, and sync your saved items.")
                     .font(.subheadline).foregroundStyle(.secondary)
                 Button("Sign in to AppleVis") {
-                    showSignIn = true
+                    communityAgreement.requestSignIn(showCommunityAgreement: $showCommunityAgreement, showSignIn: $showSignIn)
                 }
                 .buttonStyle(.borderedProminent)
                 .accessibilityLabel(String(localized: "Sign in to your AppleVis account"))
@@ -164,6 +181,24 @@ struct ProfileView: View {
 
     private var aboutSection: some View {
         Section("About AppleVis") {
+            // Moved from Settings > Support, where it sat a level deeper
+            // than it needed to (Profile > Settings > scroll to Support >
+            // Help) despite being reference material people return to, not
+            // a configuration screen — HelpView's own intro calls itself
+            // "Your Offline Guide." Given its own home here instead of
+            // staying duplicated in both places. Discussed and requested
+            // directly.
+            NavigationLink {
+                HelpView()
+                    .onDisappear {
+                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("help")) }
+                    }
+            } label: {
+                Label("Help", systemImage: "questionmark.circle")
+            }
+            .accessibilityFocused($focusTarget, equals: AnyHashable("help"))
+            .accessibilityLabel(String(localized: "Help and Support"))
+
             NavigationLink {
                 WhatsNewView()
                     .onDisappear {

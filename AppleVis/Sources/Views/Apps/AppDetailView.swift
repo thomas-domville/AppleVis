@@ -63,6 +63,11 @@ struct AppDetailView: View {
     /// reasoning; routed the same way through DeepLinkRouter.pendingContentIntent.
     var focusFirstNewCommentOnAppear: Bool = false
     @State private var hasAppliedFirstNewCommentFocus = false
+    /// Set when opened from the admin Guideline Violation Check screen for a
+    /// flagged review — see `ForumTopicDetailView.targetCommentId` for the
+    /// full reasoning.
+    var targetCommentId: String? = nil
+    @State private var hasAppliedTargetCommentFocus = false
     @State private var detail: AppDetail?
     @State private var appleVisTitle: String?
     @State private var isLoading = true
@@ -91,8 +96,19 @@ struct AppDetailView: View {
     @State private var isSummarizingReviews = false
     @State private var accessibilityConsensus: String?
     @State private var isSummarizingConsensus = false
-    @State private var showUpdateAppInfoSheet = false
-    @State private var appInfoDiffs: [AppInfoFieldDiff] = []
+    // A single Identifiable item instead of a bool flag + a separate
+    // `appInfoDiffs` array — `.sheet(isPresented:)` with sibling state set
+    // in the same action is a known SwiftUI race: the sheet's content
+    // closure can capture the *previous* value of that sibling state
+    // (here, still the default empty array) rather than what was just
+    // assigned, so the sheet opens showing nothing at all — no changed
+    // rows, no "Already Matches" rows either, exactly as if the diff had
+    // never run. `.sheet(item:)` doesn't have this race: the diffs are
+    // part of the same value that triggers presentation, so they're
+    // always in sync. Reported directly: Refresh App Details consistently
+    // said "nothing to update" even when the page's own version notice
+    // just above it was showing a real mismatch.
+    @State private var appInfoRefreshRequest: AppInfoRefreshRequest?
     @State private var selectedAppInfoFieldIDs: Set<String> = []
     @State private var isUpdatingAppInformation = false
     // App-level moderation — mirrors ForumTopicDetailView's own
@@ -162,6 +178,14 @@ struct AppDetailView: View {
                             .padding(.bottom, 16)
                     }
 
+                    // Grouped under their own heading so VoiceOver's Headings
+                    // rotor can jump straight here instead of only landing on
+                    // About above and Accessibility Comments below, with these
+                    // three ratings floating unreachable in between. Requested
+                    // directly.
+                    if hasAccessibilityRatings(detail) {
+                        sectionHeading("VoiceOver Performance")
+                    }
                     if let vo = detail.voiceOverPerformance, !vo.isEmpty {
                         RatingGaugeView(label: "VoiceOver Performance", ratingText: vo, options: AppAccessibilityRatings.voiceOverPerformance.map(\.value))
                             .padding(.horizontal).padding(.bottom, 12)
@@ -220,6 +244,12 @@ struct AppDetailView: View {
                 guard focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
                 hasAppliedFirstNewCommentFocus = true
                 await jumpToFirstNewReview(proxy: proxy)
+            }
+            .task {
+                guard let targetCommentId, !hasAppliedTargetCommentFocus else { return }
+                hasAppliedTargetCommentFocus = true
+                if hasMoreReviews { await ensureAllReviewsLoaded() }
+                pendingFocusReviewId = targetCommentId
             }
             // See ForumTopicDetailView's identical pair for the full
             // reasoning. AppReview has no per-item "isNew" flag (only
@@ -280,9 +310,9 @@ struct AppDetailView: View {
                 )
             }
         }
-        .sheet(isPresented: $showUpdateAppInfoSheet) {
+        .sheet(item: $appInfoRefreshRequest) { request in
             UpdateAppInfoSheet(
-                diffs: appInfoDiffs,
+                diffs: request.diffs,
                 selectedFieldIDs: $selectedAppInfoFieldIDs,
                 isUpdating: isUpdatingAppInformation,
                 onConfirm: { Task { await updateAppInformationFromStore() } }
@@ -326,9 +356,9 @@ struct AppDetailView: View {
     private func refreshAppDetailsMenuItem(_ detail: AppDetail) -> some View {
         if canUpdateAppInformation(detail), let itunesMetadata {
             Button {
-                appInfoDiffs = AppInfoFieldDiff.build(detail: detail, metadata: itunesMetadata)
-                selectedAppInfoFieldIDs = Set(appInfoDiffs.filter(\.changed).map(\.id))
-                showUpdateAppInfoSheet = true
+                let diffs = AppInfoFieldDiff.build(detail: detail, metadata: itunesMetadata)
+                selectedAppInfoFieldIDs = Set(diffs.filter(\.changed).map(\.id))
+                appInfoRefreshRequest = AppInfoRefreshRequest(diffs: diffs)
             } label: {
                 Label(
                     isUpdatingAppInformation ? String(localized: "Refreshing App Details…") : String(localized: "Refresh App Details"),
@@ -957,6 +987,12 @@ struct AppDetailView: View {
             .accessibilityAddTraits(.isHeader)
     }
 
+    private func hasAccessibilityRatings(_ detail: AppDetail) -> Bool {
+        !(detail.voiceOverPerformance ?? "").isEmpty
+            || !(detail.buttonLabelling ?? "").isEmpty
+            || !(detail.usabilityNotes ?? "").isEmpty
+    }
+
     @ViewBuilder
     private func reviewsSection(_ detail: AppDetail, proxy: ScrollViewProxy) -> some View {
         CommunityDiscussionHeading(
@@ -1224,7 +1260,7 @@ struct AppDetailView: View {
                 detail: current, metadata: metadata, includedFields: selectedAppInfoFieldIDs, csrfToken: user.csrfToken
             )
             toast.success(String(localized: "App details refreshed"))
-            showUpdateAppInfoSheet = false
+            appInfoRefreshRequest = nil
             await load()
         } catch APIError.forbidden {
             toast.error(String(localized: "You don't have permission to refresh this app."))
@@ -1693,7 +1729,7 @@ struct ComposeAppReviewView: View {
                 TextEditor(text: $reviewText)
                     .padding()
                     .onChange(of: reviewText) { _, newValue in
-                        guidelines.textChanged(newValue)
+                        guidelines.textChanged(newValue, isReply: true)
                         intelligence.textChanged(
                             newValue,
                             translationEnabled: preferences.composeTranslationEnabled,

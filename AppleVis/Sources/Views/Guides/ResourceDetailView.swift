@@ -8,6 +8,11 @@ struct ResourceDetailView: View {
     /// reasoning; routed the same way through DeepLinkRouter.pendingContentIntent.
     var focusFirstNewCommentOnAppear: Bool = false
     @State private var hasAppliedFirstNewCommentFocus = false
+    /// Set when opened from the admin Guideline Violation Check screen for a
+    /// flagged comment — see `ForumTopicDetailView.targetCommentId` for the
+    /// full reasoning.
+    var targetCommentId: String? = nil
+    @State private var hasAppliedTargetCommentFocus = false
     @State private var detail: ResourceDetail?
     @State private var isLoading = true
     @State private var error: String?
@@ -145,6 +150,12 @@ struct ResourceDetailView: View {
                 guard focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
                 hasAppliedFirstNewCommentFocus = true
                 await jumpToFirstNewComment(proxy: proxy)
+            }
+            .task {
+                guard let targetCommentId, !hasAppliedTargetCommentFocus else { return }
+                hasAppliedTargetCommentFocus = true
+                if hasMoreComments { await ensureAllCommentsLoaded() }
+                pendingFocusCommentId = targetCommentId
             }
             // See ForumTopicDetailView's identical pair for the full
             // reasoning; ResourceComment has no per-item "isNew" flag, so
@@ -593,7 +604,17 @@ struct CommentRow: View {
             .modifier(ConditionalAccessibilityAction(isActive: canDelete, name: "Delete Comment") { showDeleteConfirm = true })
 
             if let displaySubject {
-                Text(displaySubject).font(.subheadline).fontWeight(.medium)
+                // Already spoken as part of the combined header label above
+                // ("...Subject: X.") — without hiding this, swiping past the
+                // header landed on this same text again as its own stop,
+                // reading the subject a second time in a row. Kept visible
+                // for sighted/low-vision readers; just not re-announced.
+                // Reported directly: only noticed on Podcast comments, but
+                // this row is shared by Guides, Blogs, Podcasts, and Bugs —
+                // same fix applies to all four.
+                Text(displaySubject)
+                    .font(.subheadline).fontWeight(.medium)
+                    .accessibilityHidden(true)
             }
 
             SegmentedHTMLView(html: text, contentKind: "comment", contentId: commentId, field: "body")
@@ -771,7 +792,7 @@ struct ComposeResourceCommentView: View {
                 TextEditor(text: $commentText)
                     .padding()
                     .onChange(of: commentText) { _, newValue in
-                        guidelines.textChanged(newValue)
+                        guidelines.textChanged(newValue, isReply: true)
                         intelligence.textChanged(
                             newValue,
                             translationEnabled: preferences.composeTranslationEnabled,

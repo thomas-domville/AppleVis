@@ -13,11 +13,14 @@ struct GuidedExperienceView: View {
     @EnvironmentObject private var pauseStore: GuidedExperiencePauseStore
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var stepIndex = 0
-    @State private var showHelpArticle: HelpArticle?
     @AccessibilityFocusState private var isHeadingFocused: Bool
     @State private var entranceVisible = false
+    @State private var showLeaveConfirm = false
 
     private var step: GuidedExperienceStep { experience.steps[stepIndex] }
+    /// Resolved once so TextSegmentation.sentenceGroups chunks the actual
+    /// localized text, not the raw English source.
+    private var localizedBody: String { String(localized: String.LocalizationValue(step.body)) }
     private var isFirstStep: Bool { stepIndex == 0 }
     private var isLastStep: Bool { stepIndex == experience.steps.count - 1 }
     /// Every chapter-closing checkpoint sets a custom `continueLabel`
@@ -56,9 +59,21 @@ struct GuidedExperienceView: View {
 
                     VStack(spacing: 24) {
                         VStack(spacing: 8) {
-                            Text(step.chapterTitle.uppercased())
+                            // `step.chapterTitle`/`.title`/`.body` are all
+                            // String values, not string literals — Text(_
+                            // content: String) skips catalog lookup entirely,
+                            // same bug already fixed elsewhere in this app.
+                            // All 28 step titles and bodies already have full
+                            // translations sitting in the catalog — they were
+                            // just never reachable through these three Text
+                            // calls. `.uppercased()` was also mutating the
+                            // string itself (breaking the catalog key) rather
+                            // than just the display, hence the switch to
+                            // .textCase(.uppercase).
+                            Text(LocalizedStringKey(step.chapterTitle))
                                 .font(.caption).fontWeight(.semibold)
                                 .foregroundStyle(.secondary)
+                                .textCase(.uppercase)
                                 .accessibilityHidden(true)
                             progressDots
                         }
@@ -66,18 +81,41 @@ struct GuidedExperienceView: View {
                         stepIcon
 
                         VStack(spacing: 10) {
-                            Text(step.title)
+                            Text(LocalizedStringKey(step.title))
                                 .font(.title2).fontWeight(.bold)
                                 .multilineTextAlignment(.center)
                                 .accessibilityAddTraits(.isHeader)
-                                .accessibilityLabel(String(
-                                    localized: "\(step.title). \(step.chapterTitle), step \(chapterProgress.index) of \(chapterProgress.total)."
-                                ))
+                                // A chapter with just one step (Welcome,
+                                // All Set) always announces "step 1 of 1" —
+                                // trivially true and uninformative, unlike
+                                // Home/Discover/For You/Profile & Settings
+                                // where the count actually helps. Dropped
+                                // for those two only. Requested directly.
+                                .accessibilityLabel(chapterProgress.total > 1
+                                    ? String(localized: "\(step.title). \(step.chapterTitle), step \(chapterProgress.index) of \(chapterProgress.total).")
+                                    : String(localized: "\(step.title). \(step.chapterTitle).")
+                                )
                                 .accessibilityFocused($isHeadingFocused)
-                            Text(step.body)
-                                .font(.body)
-                                .multilineTextAlignment(.center)
-                                .foregroundStyle(.secondary)
+                            // Every step.body is one long unbroken block of
+                            // prose with no \n\n structure to split on — read
+                            // (or Braille-panned) as a single giant element,
+                            // the same problem already fixed for forum
+                            // topics, blog posts, and podcast show notes via
+                            // TextSegmentation.sentenceGroups. More swipes,
+                            // but each stop is now a size you can actually
+                            // pause on, re-read, or skip past, instead of one
+                            // continuous wall of speech. Localizing first,
+                            // then chunking — chunking the raw English source
+                            // would produce fragments that don't match any
+                            // catalog key. Requested directly.
+                            VStack(spacing: 12) {
+                                ForEach(Array(TextSegmentation.sentenceGroups(localizedBody).enumerated()), id: \.offset) { _, chunk in
+                                    Text(chunk)
+                                        .font(.body)
+                                        .multilineTextAlignment(.center)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
                         }
                         .padding(.horizontal, 24)
 
@@ -96,7 +134,7 @@ struct GuidedExperienceView: View {
                 .padding()
             }
             .background(preferences.colors.background)
-            .navigationTitle(experience.title)
+            .navigationTitle(LocalizedStringKey(experience.title))
             .navigationBarTitleDisplayMode(.inline)
             // Reserved for the tour's true finale, not every chapter
             // checkpoint — three confetti bursts back to back (one per
@@ -123,9 +161,6 @@ struct GuidedExperienceView: View {
             }
             playEntranceAnimation()
             focusHeadingAfterTransition()
-        }
-        .sheet(item: $showHelpArticle) { article in
-            NavigationStack { HelpArticleDetailView(article: article) }
         }
     }
 
@@ -171,24 +206,47 @@ struct GuidedExperienceView: View {
     private var stepActions: some View {
         VStack(spacing: 10) {
             ForEach(step.secondaryActions) { action in
-                Button(action.label) { perform(action) }
+                // Same verbatim-String bug as chapterTitle/title/body above.
+                Button(LocalizedStringKey(action.label)) { perform(action) }
                     .buttonStyle(.bordered)
                     .frame(maxWidth: .infinity)
                     .accessibilityHint(secondaryActionHint(action.kind))
             }
 
-            Button(step.continueLabel ?? String(localized: "Continue")) { goToStep(stepIndex + 1) }
+            // Same verbatim-String bug as chapterTitle/title/body above —
+            // "Continue to Discover" etc. are already fully translated but
+            // were never reaching the catalog through this call.
+            Button(LocalizedStringKey(step.continueLabel ?? "Continue")) { goToStep(stepIndex + 1) }
                 .buttonStyle(.borderedProminent)
                 .frame(maxWidth: .infinity)
                 .controlSize(.large)
 
-            Button("Skip Tour") { skip() }
+            // Was "Skip Tour", jumping straight to markSkipped — the only
+            // way out from any of the 25 non-checkpoint steps, even though
+            // most people who leave mid-tour want to come back to it, not
+            // reset it. "Pause Tour" already existed as this exact
+            // resumable behavior, but only as a secondary action on the 3
+            // chapter-checkpoint steps. Now offered from every step via this
+            // choice, with the old reset-everything behavior still
+            // available for anyone who really is done. Requested directly.
+            Button("Leave Tour") { showLeaveConfirm = true }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-                .accessibilityHint(String(localized: "Exits the tour. You can replay it any time from Profile."))
+                .accessibilityHint(String(localized: "Choose to pause and resume later, or skip the tour completely."))
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 24)
+        .confirmationDialog(
+            "Leave the tour?",
+            isPresented: $showLeaveConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Pause — Resume Later") { pauseTour() }
+            Button("Skip Tour Completely", role: .destructive) { skip() }
+            Button("Continue Tour", role: .cancel) {}
+        } message: {
+            Text("Pausing brings you right back to this exact step whenever you're ready. Skipping resets your progress.")
+        }
     }
 
     /// Neither action navigates away from what the button's own label
@@ -200,22 +258,19 @@ struct GuidedExperienceView: View {
         switch kind {
         case .exploreScreen:
             return String(localized: "Leaves the tour to show you this screen for real. A Resume Tour button brings you right back to this exact step.")
-        case .pauseHere:
-            return String(localized: "Stops the tour here for now. A Resume Tour button brings you right back to this exact step whenever you're ready.")
-        case .learnMore:
-            return String(localized: "Opens the full Help article in a new screen.")
         }
     }
 
     private var completionActions: some View {
         VStack(spacing: 10) {
             ForEach(experience.completionActions) { action in
+                // Same verbatim-String bug as chapterTitle/title/body above.
                 if action.kind == .finish {
-                    Button(action.label) { perform(action) }
+                    Button(LocalizedStringKey(action.label)) { perform(action) }
                         .buttonStyle(.borderedProminent)
                         .frame(maxWidth: .infinity)
                 } else {
-                    Button(action.label) { perform(action) }
+                    Button(LocalizedStringKey(action.label)) { perform(action) }
                         .buttonStyle(.bordered)
                         .frame(maxWidth: .infinity)
                 }
@@ -262,7 +317,18 @@ struct GuidedExperienceView: View {
     private func skip() {
         GuidedExperienceStore.markSkipped(experience.id)
         pauseStore.clearPaused()
-        UIAccessibility.post(notification: .announcement, argument: "\(experience.title) skipped.")
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "\(experience.title) skipped."))
+        dismiss()
+    }
+
+    /// Backs "Leave Tour" > "Pause — Resume Later" — the resumable pause
+    /// that used to only exist as a secondary action on the 3 chapter
+    /// checkpoints (now removed there as redundant) is available from every
+    /// step through this single dialog instead.
+    private func pauseTour() {
+        GuidedExperienceStore.markDismissedForNow(experience.id, stepIndex)
+        pauseStore.pauseForExplore(experienceId: experience.id, experienceTitle: experience.title, stepIndex: stepIndex)
+        UIAccessibility.post(notification: .announcement, argument: "Tour paused. Resume anytime from the Resume Tour button.")
         dismiss()
     }
 
@@ -273,13 +339,6 @@ struct GuidedExperienceView: View {
             pauseStore.pauseForExplore(experienceId: experience.id, experienceTitle: experience.title, stepIndex: stepIndex)
             dismiss()
             navigate(to: target)
-        case .learnMore(let helpArticleId):
-            showHelpArticle = HelpContent.find(helpArticleId)
-        case .pauseHere:
-            GuidedExperienceStore.markDismissedForNow(experience.id, stepIndex)
-            pauseStore.pauseForExplore(experienceId: experience.id, experienceTitle: experience.title, stepIndex: stepIndex)
-            UIAccessibility.post(notification: .announcement, argument: "Tour paused. Resume anytime from the Resume Tour button.")
-            dismiss()
         }
     }
 
@@ -306,7 +365,7 @@ struct GuidedExperienceView: View {
             onFinish?()
         case .replay:
             GuidedExperienceStore.restart(experience.id)
-            UIAccessibility.post(notification: .announcement, argument: "\(experience.title) restarted.")
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "\(experience.title) restarted."))
             stepIndex = 0
             playEntranceAnimation()
             focusHeadingAfterTransition()

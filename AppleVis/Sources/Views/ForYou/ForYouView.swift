@@ -16,6 +16,11 @@ struct ForYouView: View {
     @State private var followingCount: Int?
     @State private var recommendedCount: Int?
     @AccessibilityFocusState private var isPickerFocused: Bool
+    // Dedicated from isPickerFocused above, which targets the invisible
+    // "For You" heading on tab-switch — this one targets the section
+    // Picker itself, so a swipe-adjust can pull focus back onto the picker
+    // specifically without also re-announcing the screen heading.
+    @AccessibilityFocusState private var isSectionPickerFocused: Bool
 
     /// "Saved (12)" once a count is known, otherwise just the plain name —
     /// lets someone glance at what's inside each section without opening it,
@@ -83,14 +88,23 @@ struct ForYouView: View {
                 // to switch — the same pattern already used for the
                 // Platform picker in App Directory. Reported directly.
                 Picker("Section", selection: $selectedTab) {
+                    // No per-row .accessibilityLabel override here (there
+                    // was one) — it duplicated the Picker's own
+                    // .accessibilityValue below word-for-word. Both fire in
+                    // the same activation, so tapping to open the menu spoke
+                    // e.g. "Apps You've Recommended, 0 items" twice back to
+                    // back. Rows now just read their own visible text, same
+                    // as App Directory's Platform picker, which never had
+                    // this second label and never had the doubling either.
+                    // Reported directly.
                     ForEach(ForYouTab.allCases) { tab in
                         Text(pickerLabel(tab))
                             .tag(tab)
-                            .accessibilityLabel(Text(pickerAccessibilityLabel(tab)))
                     }
                 }
                 .pickerStyle(.menu)
                 .accessibilityHint(String(localized: "Choose which For You section to view."))
+                .accessibilityFocused($isSectionPickerFocused)
                 // Explicit value, not left to whatever SwiftUI synthesizes
                 // for a .menu-style Picker — VoiceOver's automatic post-
                 // adjustment announcement speaks accessibilityValue, and
@@ -111,6 +125,16 @@ struct ForYouView: View {
                         selectedTab = ForYouTab.allCases[(idx - 1 + ForYouTab.allCases.count) % ForYouTab.allCases.count]
                     @unknown default: break
                     }
+                    // Unlike Platform/Sound/Mouse Recap window pickers, which
+                    // only re-filter a list beneath them, changing sections
+                    // here swaps in an entirely different child view
+                    // (SavedItemsView, RecommendedAppsView, QueueView...) —
+                    // a much bigger tree change that could let VoiceOver
+                    // focus drift away from the picker instead of landing
+                    // back on it with the newly selected section announced.
+                    // Reported directly: focus was jumping out of the
+                    // picker on some swipes instead of staying put.
+                    Task { await retryAccessibilityFocus(into: $isSectionPickerFocused) }
                 }
                 .padding()
                 .onChange(of: selectedTab) { _, _ in

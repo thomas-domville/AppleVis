@@ -5,9 +5,10 @@ import UIKit
 struct OnboardingView: View {
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var communityAgreement: CommunityAgreementStore
 
     @State private var step = 0
-    @State private var showCancelConfirm = false
+    @State private var showSkipConfirm = false
     private let totalSteps = 9
     /// Every step's header binds to this so VoiceOver focus moves there after
     /// Next/Skip — previously each step was a distinct pushed screen in the
@@ -22,24 +23,48 @@ struct OnboardingView: View {
             chrome
             Group {
                 switch step {
-                case 0: WelcomeStep(onNext: nextStep, headerFocus: $isStepHeaderFocused, stepInfo: (1, totalSteps))
-                case 1: SignInStep(onNext: nextStep, onSkip: nextStep, headerFocus: $isStepHeaderFocused, stepInfo: (2, totalSteps))
-                case 2: NewActivityDisplayStep(onNext: nextStep, headerFocus: $isStepHeaderFocused, stepInfo: (3, totalSteps))
-                case 3: ThemeStep(onNext: nextStep, headerFocus: $isStepHeaderFocused, stepInfo: (4, totalSteps))
-                case 4: AnnouncementStep(onNext: nextStep, headerFocus: $isStepHeaderFocused, stepInfo: (5, totalSteps))
-                case 5: AppleTopicsStep(onNext: nextStep, headerFocus: $isStepHeaderFocused, stepInfo: (6, totalSteps))
-                case 6: LanguageFilterStep(onNext: nextStep, headerFocus: $isStepHeaderFocused, stepInfo: (7, totalSteps))
-                case 7: NotificationsStep(onNext: nextStep, headerFocus: $isStepHeaderFocused, stepInfo: (8, totalSteps))
-                case 8: ReadyStep(onFinish: finish, headerFocus: $isStepHeaderFocused, stepInfo: (9, totalSteps))
+                case 0: WelcomeStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
+                case 1: CommunityAgreementStep(onAgree: agreeToCommunityAgreement, onDecline: declineCommunityAgreementAndSkipSignIn, headerFocus: $isStepHeaderFocused)
+                case 2: SignInStep(onNext: nextStep, onSkip: nextStep, headerFocus: $isStepHeaderFocused)
+                case 3: NewActivityDisplayStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
+                case 4: ThemeStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
+                case 5: AppleTopicsStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
+                case 6: LanguageFilterStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
+                case 7: NotificationsStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
+                case 8: ReadyStep(onFinish: finish, headerFocus: $isStepHeaderFocused)
                 default: EmptyView()
                 }
+            }
+            // Cancel used to live in the top chrome row, but it didn't
+            // discard anything — it just accepted whatever hadn't been set
+            // yet and finished, exactly like Skip Setup below, just labeled
+            // and placed like a "get me out of here" affordance on someone's
+            // very first screen. Demoted to a plain text link after each
+            // step's own content instead, next to a plain-language reason
+            // it's safe to tap. Hidden on the last step: by then there's
+            // nothing left to skip. Requested directly.
+            if step < totalSteps - 1 {
+                VStack(spacing: 4) {
+                    Button("Skip Setup") { showSkipConfirm = true }
+                        .font(.subheadline)
+                        .accessibilityHint(String(localized: "Skips the rest of setup."))
+                    Text("You can change any of this later in Settings.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.bottom, 12)
             }
         }
         .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut(duration: 0.3), value: step)
         .background(preferences.colors.background)
+        // nextStep()/previousStep() already retry-focus the header after a
+        // transition, but nothing did that for the initial appearance, so
+        // VoiceOver defaulted to the chrome row's first focusable element
+        // instead of the Welcome heading on first launch.
+        .task { await retryAccessibilityFocus(into: $isStepHeaderFocused) }
         .confirmationDialog(
             "Skip the rest of setup?",
-            isPresented: $showCancelConfirm, titleVisibility: .visible
+            isPresented: $showSkipConfirm, titleVisibility: .visible
         ) {
             Button("Skip Setup", role: .destructive) { finish() }
             Button("Continue Setup", role: .cancel) {}
@@ -48,24 +73,22 @@ struct OnboardingView: View {
         }
     }
 
-    /// Persistent Back/Cancel/progress row shown above every step — RN's
-    /// shared WizardLayout gave every onboarding screen a Back button (once
-    /// past the first step), a Cancel button, and a step-progress indicator
-    /// (both visual dots and a "Step X of Y" VoiceOver announcement). None
-    /// of this existed here: there was no way back once you'd advanced, no
-    /// way to bail out of setup early, and no sense of progress at all.
+    /// Persistent Back/progress row shown above every step — RN's shared
+    /// WizardLayout gave every onboarding screen a Back button (once past
+    /// the first step) and a step-progress indicator (both visual dots and
+    /// a "Step X of Y" VoiceOver announcement). None of this existed here:
+    /// there was no way back once you'd advanced, and no sense of progress
+    /// at all.
     private var chrome: some View {
         VStack(spacing: 8) {
-            HStack {
-                if step > 0 {
+            if step > 0 {
+                HStack {
                     Button(action: previousStep) {
                         Label("Back", systemImage: "chevron.left")
                     }
                     .accessibilityHint(String(localized: "Returns to the previous step."))
+                    Spacer()
                 }
-                Spacer()
-                Button("Cancel") { showCancelConfirm = true }
-                    .accessibilityHint(String(localized: "Cancels and closes this form."))
             }
 
             HStack(spacing: 6) {
@@ -96,15 +119,35 @@ struct OnboardingView: View {
     }
 
     private func previousStep() {
-        // Can't land back on step 1 (SignIn): SignInStep's own onAppear
+        // Can't land back on step 2 (SignIn): SignInStep's own onAppear
         // immediately calls onNext() whenever already signed in, which
-        // just bounces straight back to step 2 — Back would silently do
+        // just bounces straight back to step 3 — Back would silently do
         // nothing. Welcome is the nearest step that's actually a valid
-        // destination for a signed-in user going back from Signed-Out
-        // History (step 2), which — unlike SignIn — now shows a
-        // sign-in-aware variant of its own content instead of skipping.
-        let previous = step == 2 && auth.isSignedIn ? 0 : max(step - 1, 0)
+        // destination for a signed-in user going back from New Activity
+        // Display (step 3) — Community Agreement (step 1) is skipped too,
+        // since CommunityAgreementStep's own onAppear bounces past itself
+        // for the same already-signed-in reason SignInStep does.
+        let previous = step == 3 && auth.isSignedIn ? 0 : max(step - 1, 0)
         withReduceMotionAwareAnimation { step = previous }
+        Task { await retryAccessibilityFocus(into: $isStepHeaderFocused) }
+    }
+
+    private func agreeToCommunityAgreement() {
+        communityAgreement.acceptCurrentVersion()
+        nextStep()
+    }
+
+    /// Declining only means "don't sign in right now" — browsing stays
+    /// fully available, matching Skip Setup elsewhere in this wizard.
+    /// Skips past the Sign In step too: without agreement there's nothing
+    /// for it to do here, and landing on it would just show a sign-in form
+    /// for something the user just said no to. Also used by
+    /// `CommunityAgreementStep` itself to bypass this step silently for an
+    /// already-signed-in user, without recording a fresh acceptance they
+    /// were never actually asked for.
+    private func declineCommunityAgreementAndSkipSignIn() {
+        let next = min(step + 2, totalSteps - 1)
+        withReduceMotionAwareAnimation { step = next }
         Task { await retryAccessibilityFocus(into: $isStepHeaderFocused) }
     }
 
@@ -118,7 +161,6 @@ struct OnboardingView: View {
 private struct WelcomeStep: View {
     let onNext: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
-    var stepInfo: (current: Int, total: Int)? = nil
     // Grows with Dynamic Type instead of staying pinned at 32pt while the
     // adjacent title/description wraps across several lines at the largest
     // accessibility text sizes.
@@ -158,7 +200,6 @@ private struct WelcomeStep: View {
                         .fontWeight(.bold)
                         .multilineTextAlignment(.center)
                         .accessibilityAddTraits(.isHeader)
-                        .accessibilityLabel(stepInfo.map { String(localized: "Welcome to AppleVis. Step \($0.current) of \($0.total).") } ?? String(localized: "Welcome to AppleVis"))
                         .modifier(OptionalAccessibilityFocus(isFocused: headerFocus))
 
                     Text("The community for blind and low-vision Apple users.")
@@ -212,6 +253,43 @@ private struct WelcomeStep: View {
                 }
                 .padding(.horizontal, 24)
 
+                // The app's own Terms of Service/Privacy Policy were only
+                // ever reachable as a buried, optional link in About and
+                // Settings — nobody had to see or acknowledge them to use
+                // the app. Placed here, on the very first screen everyone
+                // sees before any other choice (including signing in),
+                // this becomes the one moment that reaches every user, not
+                // just the ones who sign in — matching how the Community
+                // Agreement step later covers sign-in specifically.
+                // Requested directly, alongside an in-package NOTICE.txt
+                // and Info.plist copyright string covering the same ground
+                // for anyone inspecting the app outside of actually running
+                // it.
+                VStack(spacing: 4) {
+                    HStack(spacing: 4) {
+                        Text("By continuing, you agree to our")
+                            .foregroundStyle(.secondary)
+                        WebLink(destination: URL(string: "https://www.applevis.com/terms")!) {
+                            Text("Terms of Service")
+                        }
+                        .fontWeight(.semibold)
+                    }
+                    HStack(spacing: 4) {
+                        Text("and")
+                            .foregroundStyle(.secondary)
+                        WebLink(destination: URL(string: "https://www.applevis.com/privacy")!) {
+                            Text("Privacy Policy")
+                        }
+                        .fontWeight(.semibold)
+                        Text(".")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .font(.caption)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 8)
+
                 Button(action: onNext) {
                     Text("Get Started")
                         .font(.headline)
@@ -227,7 +305,36 @@ private struct WelcomeStep: View {
     }
 }
 
-// MARK: - Step 2: Sign In
+// MARK: - Step 2: Community Agreement
+
+private struct CommunityAgreementStep: View {
+    @EnvironmentObject private var auth: AuthStore
+    let onAgree: () -> Void
+    let onDecline: () -> Void
+    let headerFocus: AccessibilityFocusState<Bool>.Binding
+
+    var body: some View {
+        CommunityAgreementView(
+            headerFocus: headerFocus,
+            declineHint: String(localized: "Continues using AppleVis without signing in. You can review the agreement again later."),
+            onAgree: onAgree,
+            onDecline: onDecline
+        )
+        .onAppear {
+            // Matches SignInStep's identical guard just after this step —
+            // a returning user with a still-valid session isn't attempting
+            // to sign in right now, so there's nothing here for them to
+            // agree to before doing. `onDecline` (skip, don't record
+            // acceptance) rather than `onAgree`: they weren't actually
+            // asked, so nothing should be recorded on their behalf.
+            if auth.isSignedIn {
+                onDecline()
+            }
+        }
+    }
+}
+
+// MARK: - Step 3: Sign In
 
 private struct SignInStep: View {
     @EnvironmentObject private var auth: AuthStore
@@ -235,7 +342,6 @@ private struct SignInStep: View {
     let onNext: () -> Void
     let onSkip: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
-    var stepInfo: (current: Int, total: Int)? = nil
 
     @State private var username = ""
     @State private var password = ""
@@ -249,8 +355,7 @@ private struct SignInStep: View {
                     icon: "person.crop.circle",
                     title: "Sign In",
                     subtitle: "Sign in to post content, track saved items, and sync your activity between the AppleVis app and website. You can skip this and sign in later.",
-                    headerFocus: headerFocus,
-                    stepInfo: stepInfo
+                    headerFocus: headerFocus
                 )
 
                 VStack(spacing: 16) {
@@ -359,7 +464,7 @@ private struct SignInStep: View {
             // retryAccessibilityFocus call) — this step used to jump
             // straight to the Username field instead, which meant a
             // VoiceOver user landing here heard "Username field" with no
-            // "Sign In. Step 2 of 8." or explanation unless they swiped
+            // "Sign In. Step 3 of 9." or explanation unless they swiped
             // backward past it. Reported directly.
         }
     }
@@ -390,13 +495,12 @@ private struct SignInStep: View {
     }
 }
 
-// MARK: - Step 3: New Activity Display
+// MARK: - Step 4: New Activity Display
 
 private struct NewActivityDisplayStep: View {
     @EnvironmentObject private var preferences: PreferencesStore
     let onNext: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
-    var stepInfo: (current: Int, total: Int)? = nil
 
     // Previously asked whether to remember reading history at all — but
     // that conflated two different things: whether AppleVis tracks what
@@ -407,7 +511,7 @@ private struct NewActivityDisplayStep: View {
     // about — some find a running tally of what's new distracting rather
     // than helpful). Tracking itself is now unconditional; this step only
     // sets `showNewActivityIndicators`. Same reasoning as before for why
-    // every user still sees all 8 steps rather than this one being skipped
+    // every user still sees all 9 steps rather than this one being skipped
     // for anyone: the total was announced up front, so silently skipping a
     // step would break the count a VoiceOver user was already told.
     // Requested directly.
@@ -418,14 +522,13 @@ private struct NewActivityDisplayStep: View {
                     icon: "bell.badge",
                     title: "Show What's New?",
                     subtitle: "Home can highlight what's changed since your last visit — a New view alongside All and Mouse Recap, a quick summary card, and small badges on cards with new activity.",
-                    headerFocus: headerFocus,
-                    stepInfo: stepInfo
+                    headerFocus: headerFocus
                 )
 
                 VStack(alignment: .leading, spacing: 12) {
                     Label("A short summary and a New view each time you open Home.", systemImage: "sparkles")
                     Label("Small badges on cards with new replies or comments.", systemImage: "text.badge.plus")
-                    Label("You can change this anytime in Settings > Privacy.", systemImage: "hand.raised")
+                    Label("You can change this anytime in Settings > General.", systemImage: "hand.raised")
                 }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -438,6 +541,7 @@ private struct NewActivityDisplayStep: View {
                         onNext()
                     } label: {
                         VStack(spacing: 4) {
+                            RecommendedBadge()
                             Text("Yes, Show What's New")
                                 .font(.headline)
                             Text("The default — a New view, badges, and a quick summary on Home.")
@@ -473,13 +577,12 @@ private struct NewActivityDisplayStep: View {
     }
 }
 
-// MARK: - Step 4: Theme
+// MARK: - Step 5: Theme
 
 private struct ThemeStep: View {
     @EnvironmentObject private var preferences: PreferencesStore
     let onNext: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
-    var stepInfo: (current: Int, total: Int)? = nil
 
     var body: some View {
         ScrollView {
@@ -488,16 +591,23 @@ private struct ThemeStep: View {
                     icon: "paintbrush",
                     title: "Choose a Theme",
                     subtitle: "Pick your preferred colour scheme. You can always change this later in Settings.",
-                    headerFocus: headerFocus,
-                    stepInfo: stepInfo
+                    headerFocus: headerFocus
                 )
 
                 VStack(alignment: .leading, spacing: 20) {
                     ForEach(ThemeGroup.allCases) { group in
                         VStack(alignment: .leading, spacing: 12) {
-                            Text(group.label)
+                            // `group.label` is a String, not a string literal —
+                            // Text(_ content: String) treats a String argument as
+                            // already-resolved display text and skips catalog
+                            // lookup entirely, so these three group headers were
+                            // silently never being translated. Same fix as
+                            // OnboardingHeader's title/subtitle for the identical
+                            // problem.
+                            Text(LocalizedStringKey(group.label))
                                 .font(.headline)
                                 .foregroundStyle(.secondary)
+                                .accessibilityAddTraits(.isHeader)
 
                             VStack(spacing: 12) {
                                 ForEach(AppTheme.allCases.filter { $0.group == group }) { theme in
@@ -547,107 +657,12 @@ private struct ThemeStep: View {
 
 }
 
-// MARK: - Step 5: VoiceOver Detail Level
-
-private struct AnnouncementStep: View {
-    @EnvironmentObject private var preferences: PreferencesStore
-    let onNext: () -> Void
-    let headerFocus: AccessibilityFocusState<Bool>.Binding
-    var stepInfo: (current: Int, total: Int)? = nil
-
-    // A beta tester flagged that this step reads as a non-sequitur for
-    // low-vision users who rely on Zoom/large text/contrast instead of
-    // VoiceOver — "how much should VoiceOver announce" means nothing if
-    // you don't use VoiceOver. Rather than skip the step (which would
-    // reintroduce the same step-count discontinuity fixed on Signed-Out
-    // History), the choice stays available to everyone and only the
-    // framing adapts: the announcementLevel preference takes effect the
-    // moment VoiceOver is turned on, so setting it in advance is a real,
-    // forward-looking choice even for someone not currently using it.
-    @State private var isVoiceOverRunning = UIAccessibility.isVoiceOverRunning
-
-    private var title: String {
-        isVoiceOverRunning ? "VoiceOver Detail Level" : "In Case You Use VoiceOver"
-    }
-    private var subtitle: String {
-        isVoiceOverRunning
-            ? "How much information should VoiceOver announce for each content item? You can change this in Accessibility Settings."
-            : "If you or someone else using this device turns on VoiceOver later, how much detail should it announce for each item? You can change this anytime in Accessibility Settings."
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 28) {
-                OnboardingHeader(
-                    icon: "speaker.wave.3",
-                    title: title,
-                    subtitle: subtitle,
-                    headerFocus: headerFocus,
-                    stepInfo: stepInfo
-                )
-
-                VStack(spacing: 12) {
-                    ForEach(AnnouncementLevel.allCases) { level in
-                        Button {
-                            preferences.announcementLevel = level
-                        } label: {
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text(level.displayName)
-                                        .font(.headline)
-                                        .foregroundStyle(.primary)
-                                    Spacer()
-                                    if preferences.announcementLevel == level {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundStyle(Color.accentColor)
-                                            .accessibilityHidden(true)
-                                    }
-                                }
-                                Text(level.preview)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .italic()
-                            }
-                            .padding(16)
-                            .background(preferences.colors.card, in: RoundedRectangle(cornerRadius: 12))
-                        }
-                        // VoiceOver was auto-combining the displayName Text and the
-                        // italic preview Text with no indication the second one was
-                        // an example rather than a description, and the hint then
-                        // repeated the same preview text again. A beta tester asked
-                        // for this to clearly say "<Level>. Example: <preview>" once.
-                        .accessibilityLabel(String(localized: "\(level.displayName). Example: \(level.preview)"))
-                        .accessibilityAddTraits(preferences.announcementLevel == level ? [.isSelected] : [])
-                    }
-                }
-                .padding(.horizontal, 24)
-
-                Button(action: onNext) {
-                    Text("Continue")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                }
-                .buttonStyle(.borderedProminent)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 32)
-            }
-            .padding(.top, 48)
-        }
-        .onAppear { isVoiceOverRunning = UIAccessibility.isVoiceOverRunning }
-        .onReceive(NotificationCenter.default.publisher(for: UIAccessibility.voiceOverStatusDidChangeNotification)) { _ in
-            isVoiceOverRunning = UIAccessibility.isVoiceOverRunning
-        }
-    }
-}
-
 // MARK: - Step 6: Apple Topics
 
 private struct AppleTopicsStep: View {
     @EnvironmentObject private var preferences: PreferencesStore
     let onNext: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
-    var stepInfo: (current: Int, total: Int)? = nil
 
     var body: some View {
         ScrollView {
@@ -656,8 +671,7 @@ private struct AppleTopicsStep: View {
                     icon: "apps.iphone",
                     title: "Apple Topics Only?",
                     subtitle: "Forums on AppleVis include some non-Apple topics too. Want Home and Forums to focus on Apple only?",
-                    headerFocus: headerFocus,
-                    stepInfo: stepInfo
+                    headerFocus: headerFocus
                 )
 
                 VStack(alignment: .leading, spacing: 12) {
@@ -676,6 +690,7 @@ private struct AppleTopicsStep: View {
                         onNext()
                     } label: {
                         VStack(spacing: 4) {
+                            RecommendedBadge()
                             Text("Apple Topics Only")
                                 .font(.headline)
                             Text("Home and Forums stay focused on Apple products and services.")
@@ -717,7 +732,6 @@ private struct LanguageFilterStep: View {
     @EnvironmentObject private var preferences: PreferencesStore
     let onNext: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
-    var stepInfo: (current: Int, total: Int)? = nil
 
     var body: some View {
         ScrollView {
@@ -726,14 +740,13 @@ private struct LanguageFilterStep: View {
                     icon: "text.badge.checkmark",
                     title: "Filter Milder Language?",
                     subtitle: "AppleVis always blocks strong or explicit language from every post and comment — that never changes. This is just about whether milder language, which the site otherwise allows, shows up masked or spelled out.",
-                    headerFocus: headerFocus,
-                    stepInfo: stepInfo
+                    headerFocus: headerFocus
                 )
 
                 VStack(alignment: .leading, spacing: 12) {
                     Label("Masked text looks like \"s***\" instead of the word spelled out.", systemImage: "text.badge.checkmark")
                     Label("We keep this on by default to help AppleVis stay welcoming, and to stay within Apple's guidelines for our age rating.", systemImage: "checkmark.shield")
-                    Label("Change this anytime in Settings > Privacy.", systemImage: "hand.raised")
+                    Label("Change this anytime in Settings > General.", systemImage: "hand.raised")
                 }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -746,6 +759,7 @@ private struct LanguageFilterStep: View {
                         onNext()
                     } label: {
                         VStack(spacing: 4) {
+                            RecommendedBadge()
                             Text("Yes, Filter Milder Language")
                                 .font(.headline)
                             Text("The default — milder language is shown masked.")
@@ -788,7 +802,6 @@ private struct NotificationsStep: View {
     @EnvironmentObject private var auth: AuthStore
     let onNext: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
-    var stepInfo: (current: Int, total: Int)? = nil
 
     @State private var permissionGranted: Bool? = nil
 
@@ -799,41 +812,103 @@ private struct NotificationsStep: View {
                     icon: "bell.badge",
                     title: "Notifications",
                     subtitle: "Choose which alerts you'd like to receive. You can update these anytime in Settings.",
-                    headerFocus: headerFocus,
-                    stepInfo: stepInfo
+                    headerFocus: headerFocus
                 )
 
-                VStack(spacing: 0) {
-                    // "Announcements" removed from onboarding — AppleVis has
-                    // no "announcement" content type of its own;
-                    // announcements are posted to the Blog, Forum, or
-                    // Newsletter, each already covered by its own category
-                    // here. (Settings > Notifications still has this toggle
-                    // too — flagged separately, not touched in this pass.)
-                    // Reported directly.
-                    NotifToggle("New Forum Topics",  isOn: $preferences.notifyNewTopics)
-                    NotifToggle("New Podcast Episodes", isOn: $preferences.notifyNewEpisodes)
-                    NotifToggle("New App Directory Entries", isOn: $preferences.notifyAppUpdates)
+                // Matches Settings > Notifications' own "My Activity" grouping
+                // and sign-in gating — previously omitted here entirely, along
+                // with New Resources and New Comments below, so onboarding only
+                // ever offered 3 of the app's 8 real notification categories.
+                // Shown (not hidden) even when signed out, same reasoning as
+                // every other step that only fully applies in some situations:
+                // dimmed and explained rather than silently missing. Requested
+                // directly.
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("My Activity")
+                        .font(.headline)
+                        .padding(.horizontal, 24)
+                        .accessibilityAddTraits(.isHeader)
+                    VStack(spacing: 0) {
+                        NotifToggle("Replies to My Posts", isOn: $preferences.notifyForumReplies)
+                            .disabled(!auth.isSignedIn)
+                            .accessibilityHint(String(localized: auth.isSignedIn
+                                ? "Get notified when someone replies to your forum topics."
+                                : "Requires signing in."))
+                        NotifToggle("Mentions", isOn: $preferences.notifyMentions)
+                            .disabled(!auth.isSignedIn)
+                            .accessibilityHint(String(localized: auth.isSignedIn
+                                ? "Get notified when someone mentions you in a post or comment."
+                                : "Requires signing in."))
+                        NotifToggle("Followed Topics", isOn: $preferences.notifyFollowedTopics)
+                            .disabled(!auth.isSignedIn)
+                            .accessibilityHint(String(localized: auth.isSignedIn
+                                ? "Get notified about activity in topics you follow."
+                                : "Requires signing in."))
+                    }
+                    .background(preferences.colors.card, in: RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 24)
+                    // A ternary passed directly to Text(_:) risks Swift inferring
+                    // the branches as plain String rather than LocalizedStringKey,
+                    // silently skipping the catalog — same bug class documented
+                    // elsewhere in this file. Splitting into two literal Text()
+                    // calls keeps each one unambiguously translatable.
+                    if auth.isSignedIn {
+                        Text("These alerts are only available while signed in.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 24)
+                    } else {
+                        Text("You're continuing as a guest, so these stay dimmed — sign in anytime to turn them on.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 24)
+                    }
                 }
-                .background(preferences.colors.card, in: RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal, 24)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("New Content")
+                        .font(.headline)
+                        .padding(.horizontal, 24)
+                        .accessibilityAddTraits(.isHeader)
+                    VStack(spacing: 0) {
+                        // "Announcements" excluded — AppleVis has no
+                        // "announcement" content type of its own;
+                        // announcements are posted to the Blog, Forum, or
+                        // Newsletter, each already covered by its own category
+                        // here. (Settings > Notifications still has this
+                        // toggle too — flagged separately, not touched in
+                        // this pass.) Reported directly.
+                        NotifToggle("New Forum Topics",  isOn: $preferences.notifyNewTopics)
+                        NotifToggle("New Podcast Episodes", isOn: $preferences.notifyNewEpisodes)
+                        NotifToggle("New App Directory Entries", isOn: $preferences.notifyAppUpdates)
+                        NotifToggle("New Resources", isOn: $preferences.notifyNewResources)
+                        NotifToggle("New Comments", isOn: $preferences.notifyNewComments)
+                    }
+                    .background(preferences.colors.card, in: RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 24)
+                }
 
                 // Sound picker
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Notification Sound")
                         .font(.headline)
                         .padding(.horizontal, 24)
+                        .accessibilityAddTraits(.isHeader)
                     VStack(spacing: 0) {
                         ForEach(NotificationSound.allCases) { sound in
-                            Button {
+                            let row = Button {
                                 preferences.notificationSound = sound
                                 SoundPlayer.shared.playNotificationPreview(sound)
                             } label: {
                                 HStack {
+                                    // `sound.displayName`/`.description` are String
+                                    // values, not string literals — Text(_ content:
+                                    // String) skips catalog lookup entirely, same
+                                    // bug already fixed for ThemeGroup.label above.
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(sound.displayName)
+                                        Text(LocalizedStringKey(sound.displayName))
                                             .foregroundStyle(.primary)
-                                        Text(sound.description)
+                                        Text(LocalizedStringKey(sound.description))
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
@@ -848,18 +923,31 @@ private struct NotificationsStep: View {
                                 .padding(.vertical, 10)
                             }
                             .accessibilityAddTraits(preferences.notificationSound == sound ? [.isSelected] : [])
-                            // Double-tapping to select a sound also plays its
-                            // preview immediately — with VoiceOver's audio
-                            // ducking, VoiceOver's own selection announcement
-                            // talks over the clip, making it hard to actually
-                            // hear. This action (reachable via the rotor's
-                            // Actions category, or swiping down once it's
-                            // selected there) just plays the clip on its own,
-                            // without also changing the selection or
-                            // triggering that announcement. Reported directly
-                            // as a workaround for the ducking collision.
-                            .accessibilityAction(named: Text("Preview")) {
-                                SoundPlayer.shared.playNotificationPreview(sound)
+
+                            // System Default's own description already says
+                            // "Preview unavailable" — SoundPlayer.playNotification-
+                            // Preview(.system) deliberately does nothing (iOS has
+                            // no API to play back a device's actual default alert
+                            // tone). Offering a VoiceOver "Preview" action here
+                            // anyway would silently no-op, contradicting what the
+                            // row itself says. Every other sound keeps the action.
+                            // Requested directly.
+                            if sound == .system {
+                                row
+                            } else {
+                                // Double-tapping to select a sound also plays its
+                                // preview immediately — with VoiceOver's audio
+                                // ducking, VoiceOver's own selection announcement
+                                // talks over the clip, making it hard to actually
+                                // hear. This action (reachable via the rotor's
+                                // Actions category, or swiping down once it's
+                                // selected there) just plays the clip on its own,
+                                // without also changing the selection or
+                                // triggering that announcement. Reported directly
+                                // as a workaround for the ducking collision.
+                                row.accessibilityAction(named: Text("Preview")) {
+                                    SoundPlayer.shared.playNotificationPreview(sound)
+                                }
                             }
                             if sound != NotificationSound.allCases.last {
                                 Divider().padding(.leading, 16)
@@ -872,6 +960,15 @@ private struct NotificationsStep: View {
 
                 VStack(spacing: 12) {
                     if permissionGranted != true {
+                        // A bare "Allow Notifications" button gave no sense of
+                        // what iOS's own permission prompt was about to ask, or
+                        // why AppleVis wanted it — priming with what happens and
+                        // why before the system dialog appears. Requested
+                        // directly.
+                        Text("iOS will ask you to confirm — this only sends alerts for what you turned on above, and you can change it anytime in Settings.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
                         Button(action: requestPermission) {
                             Text("Allow Notifications")
                                 .font(.headline)
@@ -945,31 +1042,60 @@ private struct ReadyStep: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let onFinish: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
-    var stepInfo: (current: Int, total: Int)? = nil
     // See WelcomeStep.featureIconWidth — same fixed-vs-scaling mismatch
     // against the adjacent summary text.
     @ScaledMetric(relativeTo: .body) private var summaryIconWidth: CGFloat = 28
 
+    // Reordered to match the actual step order (Sign In first, then every
+    // step after it in sequence) instead of an arbitrary order that used to
+    // put Theme first and Sign In third. Also: dropped the VoiceOver Detail
+    // Level line entirely (that step no longer exists), added a Sign In line
+    // for guests too (previously silent), added the New Activity Display
+    // step's own choice (never appeared here at all, despite a comment here
+    // once claiming Notifications was "the only step" missing from this
+    // recap), added the notification sound (categories only, no sound,
+    // previously), and rewrote every line as a full warm sentence instead of
+    // a bare "Label: Value" pair — "Language: Milder Language Filtered" read
+    // as a setting name rather than a sentence, and "Notifications: Off"
+    // implied the feature itself was disabled rather than "you didn't pick
+    // any yet." Requested directly.
     private var summaryItems: [(icon: String, text: String)] {
         var items: [(String, String)] = []
-        items.append(("paintbrush", "Theme: \(preferences.theme.displayName)"))
-        items.append(("speaker.wave.2", "VoiceOver: \(preferences.announcementLevel.displayName)"))
-        if auth.isSignedIn { items.append(("person.crop.circle.fill", "Signed in as \(auth.user!.name)")) }
-        items.append(("apps.iphone", preferences.appleOnlyForums ? "Forums: Apple Topics Only" : "Forums: Everything"))
-        items.append(("text.badge.checkmark", preferences.filterProfanity ? "Language: Milder Language Filtered" : "Language: Show Everything"))
-        // The choices made on the Notifications step (categories, sound)
-        // never appeared anywhere in this summary — the only step in the
-        // whole wizard whose configuration wasn't reflected back to the
-        // user before finishing. Reported directly.
+
+        items.append(auth.isSignedIn
+            ? ("person.crop.circle.fill", "You're signed in as \(auth.user!.name).")
+            : ("person.crop.circle", "You're continuing as a guest — sign in anytime from Profile.")
+        )
+        items.append(preferences.showNewActivityIndicators
+            ? ("sparkles", "Home will highlight what's new since your last visit.")
+            : ("sparkles", "Home stays quiet, with no new-activity indicators.")
+        )
+        items.append(("paintbrush", "Using the \(preferences.theme.displayName) theme."))
+        items.append(preferences.appleOnlyForums
+            ? ("apps.iphone", "Forums focus on Apple topics only.")
+            : ("apps.iphone", "Forums show everything, Apple and beyond.")
+        )
+        items.append(preferences.filterProfanity
+            ? ("text.badge.checkmark", "Milder language is filtered to keep things welcoming.")
+            : ("text.badge.checkmark", "Language shows up exactly as written.")
+        )
+
         let enabledCategories = [
+            auth.isSignedIn && preferences.notifyForumReplies ? "Replies to My Posts" : nil,
+            auth.isSignedIn && preferences.notifyMentions ? "Mentions" : nil,
+            auth.isSignedIn && preferences.notifyFollowedTopics ? "Followed Topics" : nil,
             preferences.notifyNewTopics ? "New Forum Topics" : nil,
             preferences.notifyNewEpisodes ? "New Podcast Episodes" : nil,
             preferences.notifyAppUpdates ? "New App Directory Entries" : nil,
+            preferences.notifyNewResources ? "New Resources" : nil,
+            preferences.notifyNewComments ? "New Comments" : nil,
         ].compactMap { $0 }
         items.append(enabledCategories.isEmpty
-            ? ("bell.slash", "Notifications: Off")
-            : ("bell.badge", "Notifications: \(enabledCategories.joined(separator: ", "))")
+            ? ("bell.slash", "No notification categories are turned on yet.")
+            : ("bell.badge", "You'll be notified about \(enabledCategories.joined(separator: ", ")).")
         )
+        items.append(("speaker.wave.2", "Notifications will play the \(preferences.notificationSound.displayName) sound."))
+
         return items
     }
 
@@ -980,8 +1106,7 @@ private struct ReadyStep: View {
                     icon: "checkmark.circle.fill",
                     title: "You're All Set",
                     subtitle: "AppleVis is ready for you. Here's a summary of your setup:",
-                    headerFocus: headerFocus,
-                    stepInfo: stepInfo
+                    headerFocus: headerFocus
                 )
 
                 VStack(spacing: 12) {
@@ -1038,6 +1163,28 @@ private struct ReadyStep: View {
     }
 }
 
+// MARK: - Recommended badge
+
+/// Marks the pre-highlighted option on a binary-choice step (New Activity
+/// Display, Apple Topics, Language Filter) — those steps commit and advance
+/// on a single tap instead of select-then-Continue, so there's no separate
+/// moment to show a theme-style "Selected" checkmark. This is the only way
+/// those steps say "this one's our default," matching what the highlighted
+/// `.borderedProminent` button already implies visually. Requested directly.
+private struct RecommendedBadge: View {
+    var body: some View {
+        Text("Recommended")
+            .font(.caption2)
+            .fontWeight(.bold)
+            .textCase(.uppercase)
+            .tracking(0.4)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background(.white.opacity(0.25), in: Capsule())
+    }
+}
+
 // MARK: - Shared header
 
 private struct OnboardingHeader: View {
@@ -1045,11 +1192,6 @@ private struct OnboardingHeader: View {
     let title: String
     let subtitle: String
     var headerFocus: AccessibilityFocusState<Bool>.Binding? = nil
-    /// (current, total) — appended to the spoken header so a VoiceOver user
-    /// gets a sense of progress through the flow, matching RN's
-    /// `"${title}. Step ${step} of ${totalSteps}."` pattern. Previously
-    /// only the bare title was spoken.
-    var stepInfo: (current: Int, total: Int)? = nil
 
     // `title`/`subtitle` are runtime String values (some steps compute them
     // conditionally on sign-in/VoiceOver state), not string literals —
@@ -1075,12 +1217,16 @@ private struct OnboardingHeader: View {
             // existing pattern below) gives VoiceOver users a short heading
             // as one swipe-stop and the explanation as its own, separate
             // swipe-stop right after it.
+            // No step count folded in here — the chrome row's progress dots
+            // above already announce "Step X of Y" as their own element, so
+            // adding it to the heading too doubled up the same information
+            // on every step. Reported directly.
             Text(LocalizedStringKey(title))
                 .font(.largeTitle)
                 .fontWeight(.bold)
                 .multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
-                .accessibilityLabel(stepInfo.map { String(localized: "\(localizedTitle). Step \($0.current) of \($0.total).") } ?? localizedTitle)
+                .accessibilityLabel(localizedTitle)
                 .modifier(OptionalAccessibilityFocus(isFocused: headerFocus))
             Text(LocalizedStringKey(subtitle))
                 .font(.subheadline)

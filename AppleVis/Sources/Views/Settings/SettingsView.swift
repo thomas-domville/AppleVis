@@ -6,7 +6,18 @@ import UIKit
 /// hand-maintained filter switch — docs/APPLEVIS_2026_1_MASTER_SPEC.md calls
 /// for "a Settings search field in production."
 private struct SettingsEntry: Identifiable {
-    let id = UUID()
+    // `label` is unique across every entry below and never changes at
+    // runtime, unlike a `UUID()` default — that regenerated a fresh random
+    // id every time `sections` (a computed property) was re-evaluated,
+    // which happens on every state change, including the several
+    // `retryAccessibilityFocus` re-focus attempts already firing on this
+    // screen's own appearance. Every row's identity was silently churning
+    // underneath SwiftUI's List/NavigationLink diffing within moments of
+    // the screen loading, which could desync a push already in flight —
+    // consistent with tapping into Help (or anything else here) sometimes
+    // unwinding the whole stack back to Home instead of navigating in.
+    // Reported directly.
+    var id: String { label }
     let icon: String
     let label: String
     let subtitle: String
@@ -17,7 +28,7 @@ private struct SettingsEntry: Identifiable {
 }
 
 private struct SettingsSection: Identifiable {
-    let id = UUID()
+    var id: String { title }
     let title: String
     let entries: [SettingsEntry]
 }
@@ -78,15 +89,14 @@ struct SettingsView: View {
             // because it holds destructive actions (delete downloads,
             // clear cache), not because it's a content-vs-privacy
             // distinction like the rest of that section.
+            // Help and About removed from here — both are pure duplicates of
+            // rows that already live in Profile's own "About AppleVis"
+            // section (Help joined them there too), leaving Settings to
+            // just configuration and this one destructive-actions section.
+            // Discussed and requested directly.
             SettingsSection(title: "Storage & Cache", entries: [
                 SettingsEntry(icon: "internaldrive", label: "Storage & Cache", subtitle: "Manage downloads and cached content", color: Color(.systemGray),
                               destination: AnyView(StorageView())),
-            ]),
-            SettingsSection(title: "Support", entries: [
-                SettingsEntry(icon: "questionmark.circle", label: "Help", subtitle: "Guides and support", color: .purple,
-                              destination: AnyView(HelpView())),
-                SettingsEntry(icon: "info.circle", label: "About", subtitle: "Version info and credits", color: .gray,
-                              destination: AnyView(AboutView())),
             ]),
         ]
     }
@@ -112,68 +122,76 @@ struct SettingsView: View {
         )
     }
 
+    // Not wrapped in its own NavigationStack — ProfileView already pushes
+    // this onto its own NavigationStack (see `settingsSection` there), so
+    // this was nesting a second NavigationStack inside the first. Nested
+    // NavigationStacks are explicitly unsupported by SwiftUI and can
+    // desync push/pop state in exactly this kind of unpredictable way —
+    // consistent with drilling in a few levels (Settings > Help > an
+    // article) and having the whole thing unexpectedly unwind. Combined
+    // with the identity-churn fix on SettingsEntry/SettingsSection above,
+    // this is the most likely explanation for navigation inside Settings
+    // occasionally kicking all the way back out. Reported directly.
     var body: some View {
-        NavigationStack {
-            List {
-                if searchText.isEmpty {
-                    Section {
-                        HStack(alignment: .top, spacing: 12) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.accentColor)
-                                    .frame(width: 36, height: 36)
-                                Image(systemName: "gearshape")
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundStyle(.white)
-                            }
-                            .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Settings Center")
-                                    .font(.headline)
-                                Text("Tune AppleVis for VoiceOver, Braille, low vision, podcasts, notifications, and sync.")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                Text("Account and sign-in tools live in Profile.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+        List {
+            if searchText.isEmpty {
+                Section {
+                    HStack(alignment: .top, spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.accentColor)
+                                .frame(width: 36, height: 36)
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundStyle(.white)
                         }
-                        .padding(.vertical, 4)
-                        .overlay(alignment: .leading) {
-                            Rectangle().fill(Color.accentColor).frame(width: 3).clipShape(RoundedRectangle(cornerRadius: 1.5))
+                        .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Settings Center")
+                                .font(.headline)
+                            Text("Tune AppleVis for VoiceOver, Braille, low vision, podcasts, notifications, and sync.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Text("Account and sign-in tools live in Profile.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
-                        .padding(.leading, 4)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityAction(named: Text("Read Settings Summary")) { announceSettingsSummary() }
-                        .accessibilityFocused($focusTarget, equals: Self.titleFocusID)
                     }
+                    .padding(.vertical, 4)
+                    .overlay(alignment: .leading) {
+                        Rectangle().fill(Color.accentColor).frame(width: 3).clipShape(RoundedRectangle(cornerRadius: 1.5))
+                    }
+                    .padding(.leading, 4)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAction(named: Text("Read Settings Summary")) { announceSettingsSummary() }
+                    .accessibilityFocused($focusTarget, equals: Self.titleFocusID)
                 }
+            }
 
-                if filteredSections.isEmpty {
-                    EmptyStateView(title: "No Results", message: "No settings match \"\(searchText)\".", systemImage: "magnifyingglass")
-                }
+            if filteredSections.isEmpty {
+                EmptyStateView(title: "No Results", message: "No settings match \"\(searchText)\".", systemImage: "magnifyingglass")
+            }
 
-                ForEach(filteredSections) { section in
-                    Section(section.title) {
-                        ForEach(section.entries) { entry in
-                            NavigationLink {
-                                entry.destination
-                                    .onDisappear {
-                                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable(entry.id)) }
-                                    }
-                            } label: {
-                                SettingsRow(icon: entry.icon, label: entry.label, subtitle: entry.subtitle, color: entry.color)
-                            }
-                            .accessibilityFocused($focusTarget, equals: AnyHashable(entry.id))
+            ForEach(filteredSections) { section in
+                Section(section.title) {
+                    ForEach(section.entries) { entry in
+                        NavigationLink {
+                            entry.destination
+                                .onDisappear {
+                                    Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable(entry.id)) }
+                                }
+                        } label: {
+                            SettingsRow(icon: entry.icon, label: entry.label, subtitle: entry.subtitle, color: entry.color)
                         }
+                        .accessibilityFocused($focusTarget, equals: AnyHashable(entry.id))
                     }
                 }
             }
-            .themedList(preferences.colors)
-            .navigationTitle("Settings")
-            .searchable(text: $searchText, prompt: "Search Settings")
-            .task { await retryAccessibilityFocus(into: $focusTarget, returningTo: Self.titleFocusID) }
         }
+        .themedList(preferences.colors)
+        .navigationTitle("Settings")
+        .searchable(text: $searchText, prompt: "Search Settings")
+        .task { await retryAccessibilityFocus(into: $focusTarget, returningTo: Self.titleFocusID) }
     }
 }
 

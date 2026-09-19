@@ -99,7 +99,9 @@ final class GuidelinesCheckState: ObservableObject {
     private var lastAnnouncedId: String?
     private var checkTask: Task<Void, Never>?
 
-    func textChanged(_ text: String) {
+    /// `isReply` — see `GuidelinesChecker.check(_:isReply:)`'s doc comment;
+    /// forwarded as-is, defaulting to false (a new topic/post/entry).
+    func textChanged(_ text: String, isReply: Bool = false) {
         checkTask?.cancel()
         guard text.trimmingCharacters(in: .whitespacesAndNewlines).count >= 10 else {
             topWarning = nil
@@ -108,7 +110,7 @@ final class GuidelinesCheckState: ObservableObject {
         checkTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(1500))
             guard !Task.isCancelled, let self else { return }
-            var visible = GuidelinesChecker.check(text).filter { !self.dismissedIds.contains($0.id) }
+            var visible = GuidelinesChecker.check(text, isReply: isReply).filter { !self.dismissedIds.contains($0.id) }
             // AI-assisted second pass — existed but was never called
             // anywhere. Only runs when the rule-based check found nothing,
             // matching its own doc comment ("only flags obvious violations

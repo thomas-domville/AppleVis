@@ -18,16 +18,17 @@ struct StorageView: View {
 
     var body: some View {
         Form {
+            Section {
+                Text("How much space AppleVis is using on this device, how long cached content sticks around before it clears itself, and a few buttons for clearing things out sooner if you'd rather not wait.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .accessibilityFocused($isTitleFocused)
+            }
+
             Section("Usage") {
-                // Was focused on the "Downloaded Episodes" row itself — the
-                // literal "jump straight to a control/row" pattern this
-                // app's focus convention exists to avoid; every sibling
-                // Settings screen focuses descriptive text instead. Full
-                // app-wide focus audit, requested directly.
                 Text("Shows how much space AppleVis is using on this device, split between downloaded episodes and cached content.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .accessibilityFocused($isTitleFocused)
                 StorageRow(label: "Downloaded Episodes", value: downloadedMB, color: .blue)
                 StorageRow(label: "Cached Content", value: cachedMB, color: .green)
                 Divider()
@@ -42,11 +43,11 @@ struct StorageView: View {
                     }
                 }
                 .accessibilityHint(String(localized: "Cached articles and metadata older than this will be automatically removed."))
-                // Explicit value — without it, swiping up/down only played
-                // the "value changed" tone with no spoken option. Same fix
-                // as PlayerView's playback-speed control (PODCAST-06).
-                // Reported directly.
-                .accessibilityValue(Text(retentionOptions.first { $0.months == cacheRetentionMonths }?.label ?? ""))
+                // See GeneralSettingsView's Home Startup Behavior for the
+                // full reasoning — a persistent .accessibilityValue() here
+                // duplicated what the control already announces natively on
+                // plain focus. Swapped for a one-shot announcement fired
+                // only right after an adjustment.
                 .accessibilityAdjustableAction { direction in
                     guard let idx = retentionOptions.firstIndex(where: { $0.months == cacheRetentionMonths }) else { return }
                     switch direction {
@@ -56,6 +57,7 @@ struct StorageView: View {
                         cacheRetentionMonths = retentionOptions[(idx - 1 + retentionOptions.count) % retentionOptions.count].months
                     @unknown default: break
                     }
+                    UIAccessibility.post(notification: .announcement, argument: retentionOptions.first { $0.months == cacheRetentionMonths }?.label ?? "")
                 }
 
                 Text("Cached content lets you re-open articles without waiting for a network request. Older content is cleared automatically based on this setting.")

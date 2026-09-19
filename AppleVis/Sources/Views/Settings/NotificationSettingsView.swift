@@ -10,6 +10,13 @@ struct NotificationSettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                Text("What AppleVis can let you know about, and how — whether push notifications are allowed at the iOS level, which sound plays, badge counts, and which kinds of community activity (replies, mentions, new posts) are actually worth a ping.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .accessibilityFocused($isTitleFocused)
+            }
+
             // iOS permission status
             Section("iOS Permission") {
                 HStack {
@@ -35,25 +42,28 @@ struct NotificationSettingsView: View {
                     }
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityFocused($isTitleFocused)
             }
 
             // Sound
             Section {
-                Picker("Notification Sound", selection: $preferences.notificationSound) {
+                // `sound.displayName` is a String, not a string literal —
+                // Text(_ content: String) skips catalog lookup entirely, same
+                // bug already fixed for the onboarding sound picker
+                // (OnboardingView.swift) and ThemeGroup.label.
+                let picker = Picker("Notification Sound", selection: $preferences.notificationSound) {
                     ForEach(NotificationSound.allCases) { sound in
-                        Text(sound.displayName).tag(sound)
+                        Text(LocalizedStringKey(sound.displayName)).tag(sound)
                     }
                 }
                 .accessibilityHint(String(localized: "Choose the sound played for AppleVis notifications."))
                 .onChange(of: preferences.notificationSound) { _, newValue in
                     SoundPlayer.shared.playNotificationPreview(newValue)
                 }
-                // Explicit value — without it, swiping up/down only played
-                // the "value changed" tone with no spoken sound name. Same
-                // fix as PlayerView's playback-speed control (PODCAST-06).
-                // Reported directly.
-                .accessibilityValue(Text(preferences.notificationSound.displayName))
+                // See GeneralSettingsView's Home Startup Behavior for the
+                // full reasoning — a persistent .accessibilityValue() here
+                // duplicated what the control already announces natively on
+                // plain focus. Swapped for a one-shot announcement fired
+                // only right after an adjustment.
                 .accessibilityAdjustableAction { direction in
                     guard let idx = NotificationSound.allCases.firstIndex(of: preferences.notificationSound) else { return }
                     switch direction {
@@ -63,23 +73,34 @@ struct NotificationSettingsView: View {
                         preferences.notificationSound = NotificationSound.allCases[(idx - 1 + NotificationSound.allCases.count) % NotificationSound.allCases.count]
                     @unknown default: break
                     }
+                    UIAccessibility.post(notification: .announcement, argument: String(localized: String.LocalizationValue(preferences.notificationSound.displayName)))
                 }
-                // Swiping up/down to change the sound (or opening the picker
-                // and double-tapping an option) also plays a preview via the
-                // onChange below — with VoiceOver's audio ducking, VoiceOver's
-                // own value-changed announcement talks over the clip, making
-                // it hard to actually hear. This action (reachable via the
-                // rotor's Actions category) replays the currently selected
-                // sound on its own, without changing the selection or
-                // triggering that announcement. Same workaround as the
-                // onboarding sound picker (OnboardingView.swift), reported
-                // directly for the same ducking collision.
-                .accessibilityAction(named: Text("Preview")) {
-                    SoundPlayer.shared.playNotificationPreview(preferences.notificationSound)
+
+                // System Default's own description says "Preview unavailable"
+                // — SoundPlayer.playNotificationPreview(.system) deliberately
+                // does nothing (iOS has no API to play back a device's actual
+                // default alert tone), so offering this action while System
+                // Default is selected would silently no-op. Same fix as the
+                // onboarding sound picker (OnboardingView.swift). Requested
+                // directly.
+                if preferences.notificationSound == .system {
+                    picker
+                } else {
+                    // Swiping up/down to change the sound (or opening the picker
+                    // and double-tapping an option) also plays a preview via the
+                    // onChange below — with VoiceOver's audio ducking, VoiceOver's
+                    // own value-changed announcement talks over the clip, making
+                    // it hard to actually hear. This action (reachable via the
+                    // rotor's Actions category) replays the currently selected
+                    // sound on its own, without changing the selection or
+                    // triggering that announcement.
+                    picker.accessibilityAction(named: Text("Preview")) {
+                        SoundPlayer.shared.playNotificationPreview(preferences.notificationSound)
+                    }
                 }
 
                 if let sound = NotificationSound.allCases.first(where: { $0 == preferences.notificationSound }) {
-                    Text(sound.description)
+                    Text(LocalizedStringKey(sound.description))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -101,10 +122,20 @@ struct NotificationSettingsView: View {
             // Category toggles - community (auth required)
             if auth.isSignedIn {
                 Section {
+                    // Genuinely auto-follows, not just a push-category
+                    // filter — new forum topics and app entries you post get
+                    // the same Follow flag a manual tap on Follow would
+                    // create, via ComposeTopicView's own follow-on-post
+                    // toggle (seeded from this) and SubmitAppView's
+                    // followIfEnabled. Only applies going forward: nothing
+                    // already posted gets touched, since there's no
+                    // subscription record to retroactively create for it.
+                    // Clarified directly after being misread as a
+                    // stateless "you're the author" check.
                     Toggle("Replies to My Posts", isOn: $preferences.notifyForumReplies)
                         .disabled(pushDenied)
-                        .accessibilityHint(String(localized: "Get notified when someone replies to your forum topics."))
-                    Text("Notifies you when someone replies to a forum topic you started.")
+                        .accessibilityHint(String(localized: "Automatically follows new forum topics and app entries you post, so you're notified of replies without following them yourself."))
+                    Text("When you post a new forum topic or app entry, it's automatically followed for you — the same as tapping Follow yourself. This only applies going forward; anything you've already posted isn't affected.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 

@@ -1,0 +1,25 @@
+AppleVis for iOS
+© 2026 AppleVis. All rights reserved.
+
+This application, its source code, and its design are the property of
+AppleVis and are protected by copyright law. Reverse engineering or
+decompiling this application for personal understanding, research, or
+interoperability purposes is not restricted by AppleVis. However:
+
+- You may not copy, reproduce, redistribute, or incorporate this
+  application's code, assets, or design into any other product or
+  service without AppleVis's prior written consent.
+- You may not access, call, or make requests to AppleVis's backend
+  services or APIs except through the official AppleVis app as
+  distributed on the App Store.
+- You may not extract, share, publish, or use for any other purpose
+  any API key, token, or credential contained in this software. Any
+  such credential is provided solely for this application's own use
+  and is not authorized for use by any other person, application, or
+  service.
+
+Full Terms of Service: https://www.applevis.com/terms
+Privacy Policy: https://www.applevis.com/privacy
+
+Questions about permitted use? Contact AppleVis via the site above
+before assuming a use not covered here is allowed.

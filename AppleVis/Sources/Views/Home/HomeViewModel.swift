@@ -272,27 +272,29 @@ struct MouseRecapDigest: Codable {
     }
 
     func appSectionIntro(periodName: String) -> String {
-        "A fresh batch of App Directory entries arrived in the \(periodName.lowercased()), with practical discoveries for blind and low vision Apple users."
+        String(localized: "A fresh batch of App Directory entries arrived in the \(periodName.lowercased()), with practical discoveries for blind and low vision Apple users.")
     }
 
     func podcastSectionTitle(periodName: String) -> String {
-        periodName.localizedCaseInsensitiveContains("month") ? "This Month in Podcasts" : "This Week in Podcasts"
+        periodName.localizedCaseInsensitiveContains("month")
+            ? String(localized: "This Month in Podcasts")
+            : String(localized: "This Week in Podcasts")
     }
 
     func podcastSectionIntro(periodName: String) -> String {
-        "Recent AppleVis audio brought walkthroughs, conversations, and tips worth catching."
+        String(localized: "Recent AppleVis audio brought walkthroughs, conversations, and tips worth catching.")
     }
 
     func blogSectionIntro(periodName: String) -> String {
-        "News, updates, and editorial perspective from the AppleVis Blog."
+        String(localized: "News, updates, and editorial perspective from the AppleVis Blog.")
     }
 
     func resourceSectionIntro(periodName: String) -> String {
-        "Hands-on help and explainers for making more of your Apple devices."
+        String(localized: "Hands-on help and explainers for making more of your Apple devices.")
     }
 
     func forumSectionIntro(periodName: String) -> String {
-        "A curated look at active community conversations from the \(periodName.lowercased())."
+        String(localized: "A curated look at active community conversations from the \(periodName.lowercased()).")
     }
 
     static func limits(for periodName: String) -> (apps: Int, podcasts: Int, blogs: Int, resources: Int, forums: Int) {
@@ -731,22 +733,17 @@ final class HomeViewModel: ObservableObject {
         let showBlogs    = UserDefaults.standard.object(forKey: "feed.showBlogs")    as? Bool ?? true
         let appleOnly    = UserDefaults.standard.object(forKey: "feed.appleOnly")    as? Bool ?? false
 
-        let defaultFilterRaw = UserDefaults.standard.string(forKey: "forums.defaultFilter") ?? ForumFilter.recent.rawValue
-        let defaultFilter = ForumFilter(rawValue: defaultFilterRaw) ?? .recent
-
         async let forums = showForums
             ? fetchSource(name: "Forums") {
+                // No separate forum-only pre-filter here anymore — Home's
+                // own All/New/Mouse Recap switcher is the one place any
+                // content type gets filtered, forums included. A hidden
+                // Settings > Home Feed picker used to narrow forum topics
+                // before that switcher ever saw them, so choosing "All"
+                // could still silently show only, say, Unread topics with
+                // no visible explanation why. Removed. Requested directly.
                 let topics = try await APIClient.shared.forums.recent(page: page, appleOnly: appleOnly)
-                // Following/Saved aren't meaningful as a Home-feed filter
-                // (Home already mixes several content kinds) — treat them
-                // the same as Recent here.
-                let filtered: [ForumTopic]
-                if defaultFilter.supportsRefinement {
-                    filtered = defaultFilter.apply(to: topics, lastVisit: PersistenceStore.shared.forumsLastVisit)
-                } else {
-                    filtered = topics
-                }
-                return filtered.map { FeedItem.forumTopic($0) }
+                return topics.map { FeedItem.forumTopic($0) }
               }
             : SourceFetchResult(items: [], failedName: nil)
         async let podcasts = showPodcasts

@@ -18,6 +18,7 @@ struct SubmitPodcastView: View {
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var networkMonitor: NetworkMonitor
+    @EnvironmentObject private var communityAgreement: CommunityAgreementStore
     @Environment(\.dismiss) private var dismiss
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
@@ -26,6 +27,9 @@ struct SubmitPodcastView: View {
 
     @State private var step: Step = .audio
     @State private var showSignIn = false
+    /// Gates `showSignIn` above via `.communityAgreementGate(...)` below —
+    /// see `CommunityAgreementStore`.
+    @State private var showCommunityAgreement = false
     @State private var description = ""
     @State private var audioFileURL: URL?
     @State private var audioFileData: Data?
@@ -147,6 +151,7 @@ struct SubmitPodcastView: View {
         .sheet(isPresented: $showSignIn) {
             SignInView()
         }
+        .communityAgreementGate(showCommunityAgreement: $showCommunityAgreement, showSignIn: $showSignIn)
         .confirmationDialog(
             "Discard this submission?",
             isPresented: $showDiscardConfirm, titleVisibility: .visible
@@ -215,8 +220,10 @@ struct SubmitPodcastView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("Sign In") { showSignIn = true }
-                .buttonStyle(.borderedProminent)
+            Button("Sign In") {
+                communityAgreement.requestSignIn(showCommunityAgreement: $showCommunityAgreement, showSignIn: $showSignIn)
+            }
+            .buttonStyle(.borderedProminent)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

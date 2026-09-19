@@ -51,13 +51,11 @@ struct AppearanceSettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 .accessibilityHint(String(localized: "Compact reduces spacing between items in lists."))
-                // Explicit value — without it, swiping up/down only played
-                // the "value changed" tone with no spoken density name. Same
-                // fix as PlayerView's playback-speed control (PODCAST-06).
-                // Reported directly.
-                .accessibilityValue(Text(preferences.cardDensity.displayName))
-                // Same swipe-up/down addition as this session's other
-                // pickers — toggles Comfortable/Compact in place.
+                // See GeneralSettingsView's Home Startup Behavior for the
+                // full reasoning — a persistent .accessibilityValue() here
+                // duplicated what the control already announces natively on
+                // plain focus. Swapped for a one-shot announcement fired
+                // only right after an adjustment.
                 .accessibilityAdjustableAction { direction in
                     guard let idx = CardDensity.allCases.firstIndex(of: preferences.cardDensity) else { return }
                     switch direction {
@@ -67,6 +65,7 @@ struct AppearanceSettingsView: View {
                         preferences.cardDensity = CardDensity.allCases[(idx - 1 + CardDensity.allCases.count) % CardDensity.allCases.count]
                     @unknown default: break
                     }
+                    UIAccessibility.post(notification: .announcement, argument: preferences.cardDensity.displayName)
                 }
             }
 

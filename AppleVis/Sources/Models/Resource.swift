@@ -56,11 +56,11 @@ nonisolated enum ResourceKind: String, Codable, CaseIterable, Identifiable, Send
 
     var displayName: String {
         switch self {
-        case .guide:      return "Guide"
-        case .tutorial:   return "Tutorial"
-        case .article:    return "Article"
-        case .event:      return "Event"
-        case .developer:  return "Developer Resource"
+        case .guide:      return String(localized: "Guide")
+        case .tutorial:   return String(localized: "Tutorial")
+        case .article:    return String(localized: "Article")
+        case .event:      return String(localized: "Event")
+        case .developer:  return String(localized: "Developer Resource")
         }
     }
 

@@ -17,6 +17,7 @@ struct SubmitBugView: View {
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var networkMonitor: NetworkMonitor
+    @EnvironmentObject private var communityAgreement: CommunityAgreementStore
     @Environment(\.dismiss) private var dismiss
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
@@ -26,6 +27,9 @@ struct SubmitBugView: View {
 
     @State private var step: Step = .description
     @State private var showSignIn = false
+    /// Gates `showSignIn` above via `.communityAgreementGate(...)` below —
+    /// see `CommunityAgreementStore`.
+    @State private var showCommunityAgreement = false
     @State private var title = ""
     /// This webform's `email` field is genuinely required, same as the
     /// Blog submission form's — previously hardcoded to an empty string at
@@ -164,6 +168,7 @@ struct SubmitBugView: View {
         .sheet(isPresented: $showSignIn) {
             SignInView()
         }
+        .communityAgreementGate(showCommunityAgreement: $showCommunityAgreement, showSignIn: $showSignIn)
         .sheet(isPresented: $showAccountEmailChange) {
             AccountSecurityWizard(mode: .email, initialEmail: email)
         }
@@ -224,8 +229,10 @@ struct SubmitBugView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("Sign In") { showSignIn = true }
-                .buttonStyle(.borderedProminent)
+            Button("Sign In") {
+                communityAgreement.requestSignIn(showCommunityAgreement: $showCommunityAgreement, showSignIn: $showSignIn)
+            }
+            .buttonStyle(.borderedProminent)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

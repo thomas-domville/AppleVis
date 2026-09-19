@@ -109,7 +109,12 @@ struct ContentView: View {
             Button("Maybe Later", role: .cancel) {}
             Button("No Thanks") { GuidedExperienceStore.disableAutoPrompt() }
         } message: {
-            Text("A tab-by-tab walkthrough of Home, Discover, For You, and Profile & Settings — go at your own pace, and skip or pause anytime.")
+            // A native alert can't place text between individual buttons, so
+            // this reassurance — it's fine to say no, and where to find the
+            // tour again — goes in the one description slot an alert has,
+            // shown before any button is chosen so it covers both Maybe
+            // Later and No Thanks. Requested directly.
+            Text("A tab-by-tab walkthrough of Home, Discover, For You, and Profile & Settings — go at your own pace, and skip or pause anytime. No worries if you'd rather skip it — you can always start it later from Profile > Replay Welcome Tour.")
         }
         .alert(
             "AppleVis is written in English",

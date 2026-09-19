@@ -1,5 +1,19 @@
 import SwiftUI
 
+/// Wraps a pre-computed embedded transcript as a single Identifiable value
+/// so EpisodeDetailView can drive its sheet with `.sheet(item:)` instead of
+/// `.sheet(isPresented:)` plus a separate sibling `@State` string — the
+/// latter is a known SwiftUI race where the sheet's content closure can
+/// capture the sibling state's *previous* value (here, still nil) instead
+/// of what was just assigned in the same action. That sent TranscriptView
+/// down its network-fallback path even when a transcript was embedded in
+/// the show notes the whole time, surfacing a stale "This item is no
+/// longer available" instead of the transcript. Reported directly.
+struct TranscriptRequest: Identifiable {
+    let id = UUID()
+    let transcript: String?
+}
+
 /// docs/APPLEVIS_2026_1_MASTER_SPEC.md requires "Transcript support when
 /// available." WhatsNewView.swift had already told users this shipped as
 /// "a dedicated full-screen modal" before this file existed — the endpoint

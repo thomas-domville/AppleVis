@@ -1,18 +1,31 @@
 import SwiftUI
+import UIKit
 
 /// Scans recently-posted content across every commentable content type —
 /// forum topics/replies, blog posts, guides, podcast episodes, app/TV/Watch/
 /// Mac directory entries and reviews, and bug reports — for possible
 /// guideline violations. See `GuidelineViolationScanner` for how the scan
-/// itself works. Deliberately excluded from Help content, the Welcome Tour,
-/// and What's New — see `ModeratorToolsView`'s doc comment. Requested
-/// directly.
+/// itself works. A direct row under Profile > Admin (previously nested one
+/// level deeper inside a since-removed "Moderator Tools" hub screen that
+/// only ever held this one row). Deliberately excluded from Help content,
+/// the Welcome Tour, and What's New — this is internal team tooling, not a
+/// user-facing feature, and gating on `auth.user?.isAdmin` already means
+/// almost nobody would ever see a mention of it anyway. Requested directly.
 struct GuidelineViolationCheckView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @StateObject private var scanner = GuidelineViolationScanner()
     @State private var range: GuidelineScanRange = .day
     @State private var showLowSeverity = false
+    @State private var hasScannedOnce = false
     @AccessibilityFocusState private var isTitleFocused: Bool
+    /// Shared by whichever status section is currently showing —
+    /// "Scanning recent activity…", the error message, or the results
+    /// summary — since exactly one of them is ever present at a time.
+    /// Without this, tapping Rescan or changing the time range swapped in
+    /// new content nothing ever moved focus to, so a VoiceOver user had no
+    /// indication either action did anything — same gap found and fixed on
+    /// the sibling App Directory Health Check screen's Start Scan button.
+    @AccessibilityFocusState private var isStatusFocused: Bool
 
     /// Medium+High only by default — `GuidelinesChecker` was tuned to be
     /// gentle and advisory for someone's own draft. Run in bulk across
@@ -50,10 +63,12 @@ struct GuidelineViolationCheckView: View {
                             .foregroundStyle(.secondary)
                     }
                     .accessibilityElement(children: .combine)
+                    .accessibilityFocused($isStatusFocused)
                 }
             } else if let error = scanner.error {
                 Section {
                     Text(error).foregroundStyle(.red)
+                        .accessibilityFocused($isStatusFocused)
                     Button("Try Again") { Task { await scanner.scan(range: range) } }
                 }
             } else {
@@ -67,6 +82,7 @@ struct GuidelineViolationCheckView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .accessibilityElement(children: .combine)
+                    .accessibilityFocused($isStatusFocused)
 
                     if scanner.flags.contains(where: { $0.highestSeverity == .low }) {
                         Toggle("Show Low-Severity Items", isOn: $showLowSeverity)
@@ -86,6 +102,7 @@ struct GuidelineViolationCheckView: View {
                             } label: {
                                 GuidelineFlagRow(flag: flag)
                             }
+                            .modifier(GuidelineFlagActions(flag: flag, onHandled: { scanner.removeFlag(id: flag.id) }))
                         }
                     }
                 }
@@ -108,9 +125,19 @@ struct GuidelineViolationCheckView: View {
         .onChange(of: range) { _, newRange in
             Task { await scanner.scan(range: newRange) }
         }
+        // Guarded on hasScannedOnce so this doesn't compete with the
+        // initial .task's own title-focus retry below during the very
+        // first, automatic scan — only a user-initiated rescan (Rescan
+        // button, changing the time range) should pull focus to the status
+        // section as it changes.
+        .onChange(of: scanner.isScanning) { _, _ in
+            guard hasScannedOnce else { return }
+            Task { await retryAccessibilityFocus(into: $isStatusFocused) }
+        }
         .task {
             await retryAccessibilityFocus(into: $isTitleFocused)
             await scanner.scan(range: range)
+            hasScannedOnce = true
         }
     }
 }
@@ -125,12 +152,12 @@ private struct GuidelineFlagDestination: View {
 
     var body: some View {
         switch flag.kind {
-        case .forumTopic:     ForumTopicDetailView(topicId: flag.itemId)
-        case .blogPost:       BlogDetailView(postId: flag.itemId)
-        case .resource:       ResourceDetailView(resourceId: flag.itemId)
-        case .podcastEpisode: EpisodeDetailView(episodeId: flag.itemId)
-        case .appListing:     AppDetailView(appId: flag.itemId)
-        case .bugReport:      BugDetailView(bugId: flag.itemId)
+        case .forumTopic:     ForumTopicDetailView(topicId: flag.itemId, targetCommentId: flag.commentId)
+        case .blogPost:       BlogDetailView(postId: flag.itemId, targetCommentId: flag.commentId)
+        case .resource:       ResourceDetailView(resourceId: flag.itemId, targetCommentId: flag.commentId)
+        case .podcastEpisode: EpisodeDetailView(episodeId: flag.itemId, targetCommentId: flag.commentId)
+        case .appListing:     AppDetailView(appId: flag.itemId, targetCommentId: flag.commentId)
+        case .bugReport:      BugDetailView(bugId: flag.itemId, targetCommentId: flag.commentId)
         }
     }
 }
@@ -150,20 +177,6 @@ private struct GuidelineFlagRow: View {
         flag.warnings.map(\.rule).joined(separator: ", ")
     }
 
-    /// The root item itself uses its content kind's own name ("Topic,"
-    /// "Blog Post," "App Entry," …); a comment underneath it uses the
-    /// term that content type's own comment thread actually uses —
-    /// "Reply" for forums, "Review" for app/TV/Watch/Mac directory entries,
-    /// "Comment" for everything else.
-    private var kindLabel: String {
-        guard !flag.isRootItem else { return flag.kind.displayName }
-        switch flag.kind {
-        case .forumTopic:  return String(localized: "Reply")
-        case .appListing:  return String(localized: "Review")
-        default:           return String(localized: "Comment")
-        }
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -172,7 +185,7 @@ private struct GuidelineFlagRow: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(severityConfig.color, in: Capsule())
-                Text(kindLabel)
+                Text(flag.kindLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -185,7 +198,17 @@ private struct GuidelineFlagRow: View {
                 .font(.subheadline).fontWeight(.semibold)
                 .lineLimit(1)
 
-            Text("\(flag.authorName) — \(ruleNames)")
+            // Previously folded into the same caption line as the author
+            // name ("JohnDoe — Keep AppleVis 13+"), easy to skim right past
+            // — which guideline actually triggered the flag is the whole
+            // point of looking at one of these. Its own clearly-labeled
+            // line now. Requested directly.
+            Label("Guideline: \(ruleNames)", systemImage: "exclamationmark.triangle")
+                .font(.caption).fontWeight(.semibold)
+                .foregroundStyle(severityConfig.color)
+                .lineLimit(2)
+
+            Text("By \(flag.authorName)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -197,6 +220,163 @@ private struct GuidelineFlagRow: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "\(severityConfig.label) severity. \(kindLabel) by \(flag.authorName), in \(flag.itemTitle). \(ruleNames). \(flag.excerpt)"))
+        .accessibilityLabel(String(localized: "\(severityConfig.label) severity. \(flag.kindLabel) by \(flag.authorName), in \(flag.itemTitle). Guideline: \(ruleNames). \(flag.excerpt)"))
+    }
+}
+
+/// Edit/Unpublish/Delete/Share for a flagged item, as a swipe-action set on
+/// the admin list row — reuses the same `ContentActionEndpoints` calls every
+/// detail view's own comment/reply/review row already calls, dispatching on
+/// `flag.actionTarget` to cover both a root item (node) and a comment/reply/
+/// review underneath one. Every viewer of this screen is already an admin
+/// (Profile > Admin is `isAdmin`-gated), so unlike `CommentRow`/`ReplyView`
+/// there's no separate "own content" case to gate Edit/Delete behind.
+/// Requested directly.
+private struct GuidelineFlagActions: ViewModifier {
+    let flag: GuidelineFlag
+    let onHandled: () -> Void
+
+    @EnvironmentObject private var auth: AuthStore
+    @EnvironmentObject private var toast: ToastStore
+    @State private var showEditSheet = false
+    @State private var showUnpublishConfirm = false
+    @State private var showDeleteConfirm = false
+
+    /// Root items get the stronger "entire" wording — see the delete
+    /// confirmation's `message:` closure for why.
+    private var deleteConfirmationTitle: String {
+        flag.isRootItem
+            ? String(localized: "Delete this entire \(flag.kindLabel.lowercased())?")
+            : String(localized: "Delete this \(flag.kindLabel.lowercased())?")
+    }
+
+    func body(content: Content) -> some View {
+        content
+            // Swipe actions are unreachable to a VoiceOver user (their
+            // one-finger swipe is already claimed for element navigation) —
+            // see VoiceOverAwareSwipeActions's doc comment. The accessibility
+            // actions below are the real path for them.
+            .voiceOverAwareSwipeActions {
+                Button(role: .destructive) {
+                    showDeleteConfirm = true
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+                Button {
+                    showUnpublishConfirm = true
+                } label: {
+                    Label("Unpublish", systemImage: "eye.slash")
+                }
+                .tint(.orange)
+                Button {
+                    showEditSheet = true
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+                .tint(.blue)
+                Button {
+                    presentShareSheet()
+                } label: {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                .tint(.gray)
+            }
+            .accessibilityAction(named: Text("Edit \(flag.kindLabel)")) { showEditSheet = true }
+            .accessibilityAction(named: Text("Unpublish \(flag.kindLabel)")) { showUnpublishConfirm = true }
+            .accessibilityAction(named: Text("Delete \(flag.kindLabel)")) { showDeleteConfirm = true }
+            .accessibilityAction(named: Text("Share \(flag.kindLabel)")) { presentShareSheet() }
+            .confirmationDialog(
+                "Unpublish this \(flag.kindLabel.lowercased())?", isPresented: $showUnpublishConfirm, titleVisibility: .visible
+            ) {
+                Button("Unpublish", role: .destructive) { Task { await unpublish() } }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This hides it from public view.")
+            }
+            .confirmationDialog(
+                deleteConfirmationTitle, isPresented: $showDeleteConfirm, titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) { Task { await delete() } }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                // A comment/reply/review deletion is already scoped and
+                // final enough for the plain title alone, matching
+                // CommentRow/ReplyView/DetailActionsMenu's own delete
+                // dialogs elsewhere. Deleting a root item from this bulk
+                // moderation list is a much bigger blast radius — it takes
+                // the whole discussion with it, not just the flagged text —
+                // and that wasn't obvious from "Delete this topic?" alone.
+                // Requested directly.
+                if flag.isRootItem {
+                    Text("This permanently removes the entire \(flag.kindLabel.lowercased()) and everything posted underneath it.")
+                }
+            }
+            .sheet(isPresented: $showEditSheet) {
+                EditContentSheet(title: String(localized: "Edit \(flag.kindLabel)"), initialText: flag.body, isReply: !flag.isRootItem) { newText in
+                    try await edit(newText: newText)
+                }
+            }
+    }
+
+    private func edit(newText: String) async throws {
+        guard let user = auth.user, let target = flag.actionTarget else { return }
+        switch target {
+        case .comment(let type, let id):
+            try await APIClient.shared.content.editComment(
+                commentType: type, commentId: id, newBody: newText, format: drupalDefaultTextFormat, csrfToken: user.csrfToken
+            )
+        case .node(let type, let id):
+            try await APIClient.shared.content.editNode(
+                nodeId: id, nodeType: type, title: flag.itemTitle, body: newText, csrfToken: user.csrfToken
+            )
+        }
+        toast.success(String(localized: "\(flag.kindLabel) updated"))
+        onHandled()
+    }
+
+    private func unpublish() async {
+        guard let user = auth.user, let target = flag.actionTarget else { return }
+        do {
+            switch target {
+            case .comment(let type, let id):
+                try await APIClient.shared.content.unpublishComment(commentType: type, commentId: id, csrfToken: user.csrfToken)
+            case .node(let type, let id):
+                try await APIClient.shared.content.unpublishNode(nodeId: id, nodeType: type, csrfToken: user.csrfToken)
+            }
+            toast.success(String(localized: "\(flag.kindLabel) unpublished"))
+            onHandled()
+        } catch {
+            toast.error(String(localized: "Couldn't unpublish this. Try again."))
+        }
+    }
+
+    private func delete() async {
+        guard let user = auth.user, let target = flag.actionTarget else { return }
+        do {
+            switch target {
+            case .comment(let type, let id):
+                try await APIClient.shared.content.deleteComment(commentType: type, commentId: id, csrfToken: user.csrfToken)
+            case .node(let type, let id):
+                try await APIClient.shared.content.deleteNode(nodeId: id, nodeType: type, csrfToken: user.csrfToken)
+            }
+            toast.success(String(localized: "\(flag.kindLabel) deleted"))
+            onHandled()
+        } catch {
+            toast.error(String(localized: "Couldn't delete this. Try again."))
+        }
+    }
+
+    /// Mirrors CommentRow/ReplyView's own "Share Comment" — plain text
+    /// (author, body), not a URL, since a comment/reply/review has no
+    /// shareable link of its own.
+    private func presentShareSheet() {
+        let message = "\(flag.authorName) on AppleVis:\n\n\(flag.body.strippingHTMLTags())"
+        let activityVC = UIActivityViewController(activityItems: [message], applicationActivities: nil)
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }?
+            .rootViewController?
+            .present(activityVC, animated: true)
     }
 }

@@ -7,6 +7,11 @@ struct BlogDetailView: View {
     /// reasoning; routed the same way through DeepLinkRouter.pendingContentIntent.
     var focusFirstNewCommentOnAppear: Bool = false
     @State private var hasAppliedFirstNewCommentFocus = false
+    /// Set when opened from the admin Guideline Violation Check screen for a
+    /// flagged comment — see `ForumTopicDetailView.targetCommentId` for the
+    /// full reasoning.
+    var targetCommentId: String? = nil
+    @State private var hasAppliedTargetCommentFocus = false
     @State private var detail: BlogPostDetail?
     @State private var isLoading = true
     @State private var error: String?
@@ -120,6 +125,12 @@ struct BlogDetailView: View {
                 guard focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
                 hasAppliedFirstNewCommentFocus = true
                 await jumpToFirstNewComment(proxy: proxy)
+            }
+            .task {
+                guard let targetCommentId, !hasAppliedTargetCommentFocus else { return }
+                hasAppliedTargetCommentFocus = true
+                if hasMoreComments { await ensureAllCommentsLoaded() }
+                pendingFocusCommentId = targetCommentId
             }
             // See ForumTopicDetailView's identical pair for the full
             // reasoning; BlogComment has no per-item "isNew" flag, so this
@@ -532,7 +543,7 @@ struct ComposeBlogCommentView: View {
                 TextEditor(text: $commentText)
                     .padding()
                     .onChange(of: commentText) { _, newValue in
-                        guidelines.textChanged(newValue)
+                        guidelines.textChanged(newValue, isReply: true)
                         intelligence.textChanged(
                             newValue,
                             translationEnabled: preferences.composeTranslationEnabled,

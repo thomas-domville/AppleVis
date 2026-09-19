@@ -28,6 +28,7 @@ struct SubmitBlogView: View {
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var networkMonitor: NetworkMonitor
+    @EnvironmentObject private var communityAgreement: CommunityAgreementStore
     @Environment(\.dismiss) private var dismiss
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
@@ -37,6 +38,9 @@ struct SubmitBlogView: View {
 
     @State private var step: Step = .details
     @State private var showSignIn = false
+    /// Gates `showSignIn` above via `.communityAgreementGate(...)` below —
+    /// see `CommunityAgreementStore`.
+    @State private var showCommunityAgreement = false
     @State private var title = ""
     @State private var category = ""
     /// The live webform's actual required "Message" field — its own
@@ -181,6 +185,7 @@ struct SubmitBlogView: View {
         .sheet(isPresented: $showSignIn) {
             SignInView()
         }
+        .communityAgreementGate(showCommunityAgreement: $showCommunityAgreement, showSignIn: $showSignIn)
         .sheet(isPresented: $showAccountEmailChange) {
             AccountSecurityWizard(mode: .email, initialEmail: email)
         }
@@ -214,8 +219,10 @@ struct SubmitBlogView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("Sign In") { showSignIn = true }
-                .buttonStyle(.borderedProminent)
+            Button("Sign In") {
+                communityAgreement.requestSignIn(showCommunityAgreement: $showCommunityAgreement, showSignIn: $showSignIn)
+            }
+            .buttonStyle(.borderedProminent)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

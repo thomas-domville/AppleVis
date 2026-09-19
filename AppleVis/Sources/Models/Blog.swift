@@ -39,3 +39,19 @@ nonisolated struct BlogComment: Identifiable, Codable, Sendable {
     let body: String
     let createdAt: Date
 }
+
+nonisolated enum ReadingTime {
+    private static let wordsPerMinute = 200.0
+
+    /// "3 min read" — needs the full HTML body, so it's only computable
+    /// once that's been fetched (list-level BlogPost only carries `summary`;
+    /// full text lives on BlogPostDetail).
+    static func text(forHTMLBody body: String) -> String? {
+        let wordCount = body.strippingHTMLTags()
+            .split(whereSeparator: { $0.isWhitespace || $0.isNewline })
+            .count
+        guard wordCount > 0 else { return nil }
+        let minutes = max(1, Int((Double(wordCount) / wordsPerMinute).rounded(.up)))
+        return String(localized: "\(minutes) min read")
+    }
+}

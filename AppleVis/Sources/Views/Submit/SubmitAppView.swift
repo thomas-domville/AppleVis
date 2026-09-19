@@ -16,6 +16,7 @@ struct SubmitAppView: View {
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var networkMonitor: NetworkMonitor
+    @EnvironmentObject private var communityAgreement: CommunityAgreementStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var guidelines = GuidelinesCheckState()
@@ -101,6 +102,11 @@ struct SubmitAppView: View {
     @State private var agreedPersonalUse = false
     @State private var agreedNotDeveloper = false
     @State private var showSignIn = false
+    /// Gates `showSignIn` above via `.communityAgreementGate(...)` below —
+    /// see `CommunityAgreementStore`. Unrelated to `hasAgreedToBeforeYouBegin`
+    /// above, which is this screen's own "personal use, not the developer"
+    /// confirmation, not the app-wide Community Agreement.
+    @State private var showCommunityAgreement = false
     @State private var showDiscardConfirm = false
 
     /// Set when opened from the Share Extension with an App Store URL.
@@ -423,6 +429,7 @@ struct SubmitAppView: View {
             }
         }
         .sheet(isPresented: $showSignIn) { SignInView() }
+        .communityAgreementGate(showCommunityAgreement: $showCommunityAgreement, showSignIn: $showSignIn)
         .task {
             await applyPrefillIfNeeded()
             // Step 1 previously got no explicit focus at all — only
@@ -454,8 +461,10 @@ struct SubmitAppView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("Sign In") { showSignIn = true }
-                .buttonStyle(.borderedProminent)
+            Button("Sign In") {
+                communityAgreement.requestSignIn(showCommunityAgreement: $showCommunityAgreement, showSignIn: $showSignIn)
+            }
+            .buttonStyle(.borderedProminent)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -2168,9 +2177,10 @@ struct SubmitAppView: View {
         }
         isSubmitting = true; error = nil
         do {
-            _ = try await APIClient.shared.apps.submitApp(payload: payload, csrfToken: user.csrfToken)
+            let posted = try await APIClient.shared.apps.submitApp(payload: payload, csrfToken: user.csrfToken)
             SoundPlayer.shared.play(.success)
             submitted = true
+            await followIfEnabled(id: posted.id, nid: posted.nid, nodeType: ContentKind.appListing.nodeType, token: user.csrfToken)
         } catch let e as APIError {
             error = e.localizedDescription
             await announceWizardFailure(e.localizedDescription, focus: $isErrorFocused)
@@ -2179,6 +2189,20 @@ struct SubmitAppView: View {
             await announceWizardFailure("Couldn't submit app.", focus: $isErrorFocused)
         }
         isSubmitting = false
+    }
+
+    /// Same "Replies to My Posts" preference ComposeTopicView seeds its own
+    /// Follow-on-post toggle from — an app entry is the other of the only
+    /// two things a non-editor user can personally post, so it gets the
+    /// same automatic-subscribe treatment. Best-effort and silent: the
+    /// entry itself already submitted successfully by the time this runs,
+    /// and moderation review means it may not even be live yet, so a failed
+    /// or premature follow-along shouldn't block, revert, or alarm the user
+    /// — they can always follow manually once it's published. Requested
+    /// directly.
+    private func followIfEnabled(id: String, nid: Int, nodeType: String, token: String) async {
+        guard preferences.notifyForumReplies else { return }
+        _ = try? await APIClient.shared.flags.follow(nodeUuid: id, nodeType: nodeType, entityId: nid, token: token)
     }
 
     private func submitTv(user: AuthUser) async {
@@ -2197,9 +2221,10 @@ struct SubmitAppView: View {
         }
         isSubmitting = true; error = nil
         do {
-            _ = try await APIClient.shared.apps.submitTvApp(payload: tvPayload, csrfToken: user.csrfToken)
+            let posted = try await APIClient.shared.apps.submitTvApp(payload: tvPayload, csrfToken: user.csrfToken)
             SoundPlayer.shared.play(.success)
             submitted = true
+            await followIfEnabled(id: posted.id, nid: posted.nid, nodeType: "node--tv_directory", token: user.csrfToken)
         } catch let e as APIError {
             error = e.localizedDescription
             await announceWizardFailure(e.localizedDescription, focus: $isErrorFocused)
@@ -2226,9 +2251,10 @@ struct SubmitAppView: View {
         }
         isSubmitting = true; error = nil
         do {
-            _ = try await APIClient.shared.apps.submitWatchApp(payload: watchPayload, csrfToken: user.csrfToken)
+            let posted = try await APIClient.shared.apps.submitWatchApp(payload: watchPayload, csrfToken: user.csrfToken)
             SoundPlayer.shared.play(.success)
             submitted = true
+            await followIfEnabled(id: posted.id, nid: posted.nid, nodeType: "node--watch_directory", token: user.csrfToken)
         } catch let e as APIError {
             error = e.localizedDescription
             await announceWizardFailure(e.localizedDescription, focus: $isErrorFocused)
@@ -2255,9 +2281,10 @@ struct SubmitAppView: View {
         }
         isSubmitting = true; error = nil
         do {
-            _ = try await APIClient.shared.apps.submitMacApp(payload: macPayload, csrfToken: user.csrfToken)
+            let posted = try await APIClient.shared.apps.submitMacApp(payload: macPayload, csrfToken: user.csrfToken)
             SoundPlayer.shared.play(.success)
             submitted = true
+            await followIfEnabled(id: posted.id, nid: posted.nid, nodeType: "node--mac_app_directory", token: user.csrfToken)
         } catch let e as APIError {
             error = e.localizedDescription
             await announceWizardFailure(e.localizedDescription, focus: $isErrorFocused)

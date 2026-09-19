@@ -14,10 +14,11 @@ struct ItunesMetadata {
     let price: String
     /// Derived from the raw numeric `price` field, not by string-matching
     /// `price`/`formattedPrice` — those are already-localized display text
-    /// ("Free", "$2.99"), and matching against the literal word "Free"
-    /// would silently break for any country/language other than the
-    /// hardcoded `country=us` this app already requests, or if Apple ever
-    /// changes that wording.
+    /// ("Free", "$2.99", "Gratis"), and matching against the literal word
+    /// "Free" would silently break for any storefront/language other than
+    /// the US one, doubly so now that `ItunesAPI` queries whichever
+    /// storefront the person's own device region maps to (see
+    /// `ItunesAPI.currentCountry`), not just a hardcoded `country=us`.
     let isFree: Bool
     let version: String
     let releaseNotes: String
@@ -124,6 +125,21 @@ extension AppPlatform {
 }
 
 enum ItunesAPI {
+    /// The device's current Region setting, as an ISO 3166-1 country code —
+    /// the best available proxy for which App Store storefront someone is
+    /// actually browsing. Every lookup/search below used to hardcode
+    /// `country=us` regardless of where the person actually is, so a real,
+    /// published app that simply isn't sold in the US catalog (or is
+    /// exclusive to a different storefront) came back as zero search
+    /// results, or as "removed from the App Store," even though it's
+    /// genuinely still live there — reported directly by a tester in
+    /// Ireland who couldn't find a real app while submitting it. Falls back
+    /// to "US" only if the device has no region set at all, which
+    /// shouldn't normally happen.
+    private static var currentCountry: String {
+        (Locale.current.region?.identifier ?? "US").lowercased()
+    }
+
     static func search(_ query: String, limit: Int = 20, entity: String = "software") async -> [ItunesSearchHit] {
         await rawSearchResults(query, limit: limit, entity: entity).compactMap(hitFromRaw)
     }
@@ -154,12 +170,23 @@ enum ItunesAPI {
     private static func rawSearchResults(_ query: String, limit: Int, entity: String) async -> [[String: Any]] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
+        let results = await rawSearchResults(query: trimmed, limit: limit, entity: entity, country: currentCountry)
+        // Falls back to the US storefront if the person's own region's
+        // search comes up empty — AppleVis's own catalog skews toward apps
+        // that are on the US store, so trying only their region would just
+        // swap "can't find an Ireland-only app" for "can't find an ordinary
+        // US app" for anyone outside the US.
+        guard results.isEmpty, currentCountry != "us" else { return results }
+        return await rawSearchResults(query: trimmed, limit: limit, entity: entity, country: "us")
+    }
+
+    private static func rawSearchResults(query: String, limit: Int, entity: String, country: String) async -> [[String: Any]] {
         var components = URLComponents(string: "https://itunes.apple.com/search")!
         components.queryItems = [
-            URLQueryItem(name: "term", value: trimmed),
+            URLQueryItem(name: "term", value: query),
             URLQueryItem(name: "entity", value: entity),
             URLQueryItem(name: "limit", value: "\(limit)"),
-            URLQueryItem(name: "country", value: "us"),
+            URLQueryItem(name: "country", value: country),
         ]
         guard let url = components.url else { return [] }
         var request = URLRequest(url: url)
@@ -212,7 +239,18 @@ enum ItunesAPI {
     }
 
     private static func lookupMetadata(appStoreId id: String, entity: String, fallbackAppStoreUrl: String) async -> ItunesMetadataLookupResult {
-        guard let url = URL(string: "https://itunes.apple.com/lookup?id=\(id)&entity=\(entity)") else { return .failed }
+        let result = await lookupMetadata(appStoreId: id, entity: entity, fallbackAppStoreUrl: fallbackAppStoreUrl, country: currentCountry)
+        // See `rawSearchResults`'s identical fallback — without this, an
+        // app that's genuinely still live but just not sold in the
+        // person's own region (rather than actually delisted) would
+        // otherwise report `.notFound`, which App Directory Health Check
+        // would show as "Removed" even though it isn't.
+        guard case .notFound = result, currentCountry != "us" else { return result }
+        return await lookupMetadata(appStoreId: id, entity: entity, fallbackAppStoreUrl: fallbackAppStoreUrl, country: "us")
+    }
+
+    private static func lookupMetadata(appStoreId id: String, entity: String, fallbackAppStoreUrl: String, country: String) async -> ItunesMetadataLookupResult {
+        guard let url = URL(string: "https://itunes.apple.com/lookup?id=\(id)&entity=\(entity)&country=\(country)") else { return .failed }
 
         var request = URLRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -305,8 +343,23 @@ enum ItunesAPI {
     /// Store. Chunked by the caller (`AppEntryHealthScanner`), not here —
     /// this makes exactly one request per call, whatever the id count.
     static func batchLookup(appStoreIds: [String], entity: String = "software") async -> [String: ItunesMetadata] {
+        var byId = await batchLookup(appStoreIds: appStoreIds, entity: entity, country: currentCountry)
+        // Same reasoning as the single-app lookup's fallback: an id missing
+        // from the region-specific batch might just not be sold in the
+        // person's own region rather than genuinely delisted, so it's
+        // re-checked against the US storefront before being trusted as
+        // "really gone." One extra request for the whole missing subset,
+        // not one per app.
+        let missingIds = appStoreIds.filter { byId[$0] == nil }
+        guard !missingIds.isEmpty, currentCountry != "us" else { return byId }
+        let fallback = await batchLookup(appStoreIds: missingIds, entity: entity, country: "us")
+        byId.merge(fallback) { current, _ in current }
+        return byId
+    }
+
+    private static func batchLookup(appStoreIds: [String], entity: String, country: String) async -> [String: ItunesMetadata] {
         guard !appStoreIds.isEmpty,
-              let url = URL(string: "https://itunes.apple.com/lookup?id=\(appStoreIds.joined(separator: ","))&entity=\(entity)")
+              let url = URL(string: "https://itunes.apple.com/lookup?id=\(appStoreIds.joined(separator: ","))&entity=\(entity)&country=\(country)")
         else { return [:] }
 
         var request = URLRequest(url: url)
@@ -426,7 +479,13 @@ enum ItunesAPI {
     /// this on the app detail page (`fetchDeveloperApps`); Swift never had
     /// an equivalent at all.
     static func fetchDeveloperApps(artistId: Int, excluding appStoreId: String) async -> [ItunesDeveloperApp] {
-        guard let url = URL(string: "https://itunes.apple.com/lookup?id=\(artistId)&entity=software&limit=25") else { return [] }
+        let apps = await fetchDeveloperApps(artistId: artistId, excluding: appStoreId, country: currentCountry)
+        guard apps.isEmpty, currentCountry != "us" else { return apps }
+        return await fetchDeveloperApps(artistId: artistId, excluding: appStoreId, country: "us")
+    }
+
+    private static func fetchDeveloperApps(artistId: Int, excluding appStoreId: String, country: String) async -> [ItunesDeveloperApp] {
+        guard let url = URL(string: "https://itunes.apple.com/lookup?id=\(artistId)&entity=software&limit=25&country=\(country)") else { return [] }
         var request = URLRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         guard let (data, response) = try? await URLSession.shared.data(for: request),

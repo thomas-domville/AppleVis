@@ -8,6 +8,7 @@ import Translation
 struct AppleVisApp: App {
     @UIApplicationDelegateAdaptor(AppleVisAppDelegate.self) private var appDelegate
     @StateObject private var auth = AuthStore()
+    @StateObject private var communityAgreement = CommunityAgreementStore()
     @StateObject private var player = PlayerStore()
     @StateObject private var preferences = PreferencesStore()
     @StateObject private var toast = ToastStore()
@@ -50,6 +51,7 @@ struct AppleVisApp: App {
                 }
             }
             .environmentObject(auth)
+            .environmentObject(communityAgreement)
             .environmentObject(player)
             .environmentObject(preferences)
             .environmentObject(toast)

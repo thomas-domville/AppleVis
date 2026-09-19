@@ -707,7 +707,7 @@ struct AppEndpoints {
     /// `body` is server-required, not conditional; and `field_link3`
     /// ("Developer's Website") existed on the form but was never submitted
     /// at all. Reported directly.
-    func submitApp(payload: SubmitAppPayload, csrfToken: String) async throws -> (nid: Int, nodeUrl: String) {
+    func submitApp(payload: SubmitAppPayload, csrfToken: String) async throws -> (id: String, nid: Int, nodeUrl: String) {
         let bodySummary = await Self.bodySummary(
             appName: payload.appName,
             description: payload.appStoreDescription
@@ -749,7 +749,7 @@ struct AppEndpoints {
         let nid = a["drupal_internal__nid"]?.intValue ?? 0
         let alias = a["path"]?.pathAlias
         let nodeUrl = alias.map { "https://www.applevis.com\($0)" } ?? "https://www.applevis.com/node/\(nid)"
-        return (nid, nodeUrl)
+        return (response.data.id, nid, nodeUrl)
     }
 
     private static func bodySummary(appName: String, description: String) async -> String {
@@ -816,7 +816,7 @@ struct AppEndpoints {
     /// actual machine name is `apple_tb_app_directory` — apparently a
     /// long-standing typo on Drupal's side, not a guess on this end).
     /// Reported directly.
-    func submitTvApp(payload: SubmitTvAppPayload, csrfToken: String) async throws -> (nid: Int, nodeUrl: String) {
+    func submitTvApp(payload: SubmitTvAppPayload, csrfToken: String) async throws -> (id: String, nid: Int, nodeUrl: String) {
         var attributes: [String: AnyEncodable] = [
             "title": AnyEncodable(payload.appName),
             "status": AnyEncodable(true),
@@ -845,7 +845,7 @@ struct AppEndpoints {
         let nid = a["drupal_internal__nid"]?.intValue ?? 0
         let alias = a["path"]?.pathAlias
         let nodeUrl = alias.map { "https://www.applevis.com\($0)" } ?? "https://www.applevis.com/node/\(nid)"
-        return (nid, nodeUrl)
+        return (response.data.id, nid, nodeUrl)
     }
 
     /// Submits a standalone Apple Watch app directory entry — a genuinely
@@ -863,7 +863,7 @@ struct AppEndpoints {
     /// directly — this also corrects an old assumption baked into the
     /// platform picker before today ("watchOS apps ship bundled in an iOS
     /// entry, not submitted separately"), which turned out to be wrong.
-    func submitWatchApp(payload: SubmitWatchAppPayload, csrfToken: String) async throws -> (nid: Int, nodeUrl: String) {
+    func submitWatchApp(payload: SubmitWatchAppPayload, csrfToken: String) async throws -> (id: String, nid: Int, nodeUrl: String) {
         var attributes: [String: AnyEncodable] = [
             "title": AnyEncodable(payload.appName),
             "status": AnyEncodable(true),
@@ -898,7 +898,7 @@ struct AppEndpoints {
         let nid = a["drupal_internal__nid"]?.intValue ?? 0
         let alias = a["path"]?.pathAlias
         let nodeUrl = alias.map { "https://www.applevis.com\($0)" } ?? "https://www.applevis.com/node/\(nid)"
-        return (nid, nodeUrl)
+        return (response.data.id, nid, nodeUrl)
     }
 
     /// Submits a standalone Mac app directory entry — a genuinely separate
@@ -914,7 +914,7 @@ struct AppEndpoints {
     /// content type also has its own `field_link_macupdate` — a fallback
     /// reference to the app's MacUpdate.com listing, unique to Mac among
     /// all four directories. Reported directly, discussed explicitly.
-    func submitMacApp(payload: SubmitMacAppPayload, csrfToken: String) async throws -> (nid: Int, nodeUrl: String) {
+    func submitMacApp(payload: SubmitMacAppPayload, csrfToken: String) async throws -> (id: String, nid: Int, nodeUrl: String) {
         var attributes: [String: AnyEncodable] = [
             "title": AnyEncodable(payload.appName),
             "status": AnyEncodable(true),
@@ -954,7 +954,7 @@ struct AppEndpoints {
         let nid = a["drupal_internal__nid"]?.intValue ?? 0
         let alias = a["path"]?.pathAlias
         let nodeUrl = alias.map { "https://www.applevis.com\($0)" } ?? "https://www.applevis.com/node/\(nid)"
-        return (nid, nodeUrl)
+        return (response.data.id, nid, nodeUrl)
     }
 
     /// `vocabulary_16` term UUIDs — fetched live via

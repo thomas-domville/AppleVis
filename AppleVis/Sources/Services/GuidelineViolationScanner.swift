@@ -17,11 +17,19 @@ enum GuidelineScanRange: Int, CaseIterable, Identifiable {
         }
     }
 
+    // Was returning bare string literals — `Text(r.displayName)` in
+    // GuidelineViolationCheckView's Picker takes a `String`, and
+    // `Text(_ content: String)` never consults the localization catalog the
+    // way `Text(_ key: LocalizedStringKey)` does, so this Picker's three
+    // options were silently never translated. Same bug class as
+    // OnboardingHeader's title/subtitle; found while building
+    // `AppHealthScanRange`'s identical enum for the App Directory Health
+    // Check screen.
     var displayName: String {
         switch self {
-        case .day: return "Past Day"
-        case .threeDays: return "Past 3 Days"
-        case .week: return "Past Week"
+        case .day: return String(localized: "Past Day")
+        case .threeDays: return String(localized: "Past 3 Days")
+        case .week: return String(localized: "Past Week")
         }
     }
 }
@@ -34,8 +42,10 @@ enum GuidelineScanRange: Int, CaseIterable, Identifiable {
 /// post, episode, app entry, guide, or bug report), even when the flag is on
 /// a comment underneath it — every detail view this navigates to
 /// (`ForumTopicDetailView`, `BlogDetailView`, `AppDetailView`, etc.) shows
-/// the full comment thread inline, so there's no separate "jump to this one
-/// comment" destination to resolve.
+/// the full comment thread inline. `commentId`, when set, is that comment's
+/// own id, separate from `itemId` — passed to the detail view's
+/// `targetCommentId` so it scrolls/focuses straight to it instead of just
+/// opening at the top of the thread.
 struct GuidelineFlag: Identifiable {
     let id: String
     let kind: ContentKind
@@ -43,12 +53,57 @@ struct GuidelineFlag: Identifiable {
     let itemTitle: String
     let authorName: String
     let excerpt: String
+    /// The full, un-excerpted body — kept separately from `excerpt` so the
+    /// admin Edit/Share swipe actions have real content to work with rather
+    /// than a truncated preview.
+    let body: String
     let createdAt: Date
     let isRootItem: Bool
     let warnings: [GuidelineWarning]
+    /// nil for a root item; the comment/reply/review's own id when this flag
+    /// is on one of those underneath the root item.
+    let commentId: String?
+    /// Drupal JSON:API comment bundle (e.g. "comment_node_guides") for
+    /// `editComment`/`unpublishComment`/`deleteComment` — set exactly when
+    /// `commentId` is.
+    let commentType: String?
+    /// Drupal JSON:API node type suffix (e.g. "guides", "ios_app_directory")
+    /// for `editNode`/`unpublishNode`/`deleteNode` — set exactly when this
+    /// flag is on the root item itself (`commentId`/`commentType` are nil).
+    let nodeType: String?
 
     var highestSeverity: GuidelineWarning.Severity {
         warnings.map(\.severity).min(by: { $0.sortOrder < $1.sortOrder }) ?? .low
+    }
+
+    /// The root item itself uses its content kind's own name ("Topic,"
+    /// "Blog Post," "App Entry," …); a comment underneath it uses the term
+    /// that content type's own comment thread actually uses — "Reply" for
+    /// forums, "Review" for app/TV/Watch/Mac directory entries, "Comment"
+    /// for everything else. Shared by the admin list row and its swipe
+    /// actions so both agree on what to call a given flag.
+    var kindLabel: String {
+        guard !isRootItem else { return kind.displayName }
+        switch kind {
+        case .forumTopic:  return String(localized: "Reply")
+        case .appListing:  return String(localized: "Review")
+        default:           return String(localized: "Comment")
+        }
+    }
+
+    enum ActionTarget {
+        case comment(type: String, id: String)
+        case node(type: String, id: String)
+    }
+
+    /// What Edit/Unpublish/Delete should actually operate on — resolves to
+    /// whichever of the comment or node identity this flag carries. `nil`
+    /// only if the flag was constructed without either, which shouldn't
+    /// happen for any flag this scanner produces.
+    var actionTarget: ActionTarget? {
+        if let commentId, let commentType { return .comment(type: commentType, id: commentId) }
+        if let nodeType { return .node(type: nodeType, id: itemId) }
+        return nil
     }
 }
 
@@ -66,7 +121,7 @@ extension GuidelineWarning.Severity {
 /// Scans recently-posted content across every commentable content type —
 /// forum topics/replies, blog posts, guides, podcast episodes, app/TV/Watch/
 /// Mac directory entries and reviews, and bug reports — for possible
-/// guideline violations, for the Moderator Tools admin screen.
+/// guideline violations, for the Guideline Violation Check admin screen.
 ///
 /// Forums use the native `/api/v1/forums/recent` feed (see
 /// `ForumEndpoints.recent`), which is sorted by real last-comment activity —
@@ -95,6 +150,13 @@ final class GuidelineViolationScanner: ObservableObject {
     @Published var error: String?
 
     private var currentScanId = UUID()
+
+    /// Drops one flag from the list right after its admin swipe action
+    /// (Edit/Unpublish/Delete) succeeds — it's been handled, and re-running
+    /// the same check against it would just show stale content anyway.
+    func removeFlag(id: String) {
+        flags.removeAll { $0.id == id }
+    }
 
     /// One independently-scannable content stream: a node bundle plus its
     /// comment bundle. `kind` is shared across the four app-directory
@@ -142,7 +204,14 @@ final class GuidelineViolationScanner: ObservableObject {
         scannedItemCount = topics.count + streamScannedCount
 
         if topics.isEmpty, streamScannedCount == 0 {
-            error = "Couldn't load recent activity. Try again."
+            // Was a raw string literal — `error: String?` shown via
+            // `Text(error)` in GuidelineViolationCheckView, and `Text(String)`
+            // doesn't consult the localization catalog at all, unlike
+            // `Text(LocalizedStringKey)`. Wrapping it here, at the point the
+            // value is actually produced, is what fixes it: whatever's
+            // already stored in `error` just gets displayed as-is downstream.
+            // Same fix as `AppEntryHealthScanner.scan()`'s identical case.
+            error = String(localized: "Couldn't load recent activity. Try again.")
             isScanning = false
             return
         }
@@ -215,19 +284,21 @@ final class GuidelineViolationScanner: ObservableObject {
             if !warnings.isEmpty {
                 flags.append(GuidelineFlag(
                     id: "topic-\(detail.id)", kind: .forumTopic, itemId: detail.id, itemTitle: detail.title,
-                    authorName: detail.authorName, excerpt: .excerpt(from: detail.body),
-                    createdAt: detail.createdAt, isRootItem: true, warnings: warnings
+                    authorName: detail.authorName, excerpt: .excerpt(from: detail.body), body: detail.body,
+                    createdAt: detail.createdAt, isRootItem: true, warnings: warnings,
+                    commentId: nil, commentType: nil, nodeType: "forum"
                 ))
             }
         }
 
         for reply in detail.replies where reply.createdAt >= cutoff {
-            let warnings = GuidelinesChecker.check(reply.body)
+            let warnings = GuidelinesChecker.check(reply.body, isReply: true)
             if !warnings.isEmpty {
                 flags.append(GuidelineFlag(
                     id: "reply-\(reply.id)", kind: .forumTopic, itemId: detail.id, itemTitle: detail.title,
-                    authorName: reply.authorName, excerpt: .excerpt(from: reply.body),
-                    createdAt: reply.createdAt, isRootItem: false, warnings: warnings
+                    authorName: reply.authorName, excerpt: .excerpt(from: reply.body), body: reply.body,
+                    createdAt: reply.createdAt, isRootItem: false, warnings: warnings,
+                    commentId: reply.id, commentType: CommentBundle.forumTopic.rawValue, nodeType: nil
                 ))
             }
         }
@@ -282,19 +353,21 @@ final class GuidelineViolationScanner: ObservableObject {
             if !warnings.isEmpty {
                 flags.append(GuidelineFlag(
                     id: "\(stream.nodeType)-post-\(post.id)", kind: stream.kind, itemId: post.id, itemTitle: post.title,
-                    authorName: post.authorName, excerpt: .excerpt(from: post.body),
-                    createdAt: post.createdAt, isRootItem: true, warnings: warnings
+                    authorName: post.authorName, excerpt: .excerpt(from: post.body), body: post.body,
+                    createdAt: post.createdAt, isRootItem: true, warnings: warnings,
+                    commentId: nil, commentType: nil, nodeType: stream.nodeType
                 ))
             }
         }
 
         for comment in comments {
-            let warnings = GuidelinesChecker.check(comment.body)
+            let warnings = GuidelinesChecker.check(comment.body, isReply: true)
             if !warnings.isEmpty {
                 flags.append(GuidelineFlag(
                     id: "\(stream.commentBundle)-comment-\(comment.id)", kind: stream.kind, itemId: comment.parentId, itemTitle: comment.parentTitle,
-                    authorName: comment.authorName, excerpt: .excerpt(from: comment.body),
-                    createdAt: comment.createdAt, isRootItem: false, warnings: warnings
+                    authorName: comment.authorName, excerpt: .excerpt(from: comment.body), body: comment.body,
+                    createdAt: comment.createdAt, isRootItem: false, warnings: warnings,
+                    commentId: comment.id, commentType: stream.commentBundle, nodeType: nil
                 ))
             }
         }

@@ -29,7 +29,7 @@ final class ICloudSyncManager {
         "podcast.voiceBoost", "podcast.eq", "podcast.autoDownload", "podcast.autoDelete",
         "a11y.announcement", "a11y.helpfulTips", "a11y.welcomeSummary",
         "a11y.homeStartup", "a11y.searchAutoFocus",
-        "privacy.signedOutHistory", "forums.defaultFilter",
+        "privacy.signedOutHistory",
         "sound.interface", "sound.confirmation",
         "intel.nonEnglish", "intel.composeRewrite", "intel.composeTranslation",
         "intel.searchTranslation", "intel.aiSummaries",

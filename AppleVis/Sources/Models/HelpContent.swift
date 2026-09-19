@@ -336,9 +336,9 @@ enum HelpContent {
                         .steps([
                             "Open Profile and Settings.",
                             "Scroll to Replay Welcome Tour and tap it.",
-                            "The tour starts fresh from the beginning. Use Skip Tour to leave at any point, or Back to revisit a step.",
+                            "The tour starts fresh from the beginning. Use Leave Tour to pause and resume later or skip it completely, or Back to revisit a step.",
                         ]),
-                        .tip("At the end of each chapter, an Explore option takes you to the real screen, and Pause Tour stops without going anywhere — either way, a Resume Tour button appears so you can pick up right where you left off."),
+                        .tip("Leave Tour is available on every step and lets you pause — a Resume Tour button then appears so you can pick up right where you left off — or skip the tour completely if you're done with it. At the end of each chapter, an Explore option also takes you to the real screen right away."),
                     ],
                     contentType: .tutorial,
                     relatedLinks: [
@@ -654,7 +654,7 @@ enum HelpContent {
                             "Use Forums in Discover to browse topics.",
                             "Use the filters — Recent, New, Unread, Since Last Visit, Following, or Saved — to narrow things down.",
                             "Follow a topic and it lands in For You > Following, with a nudge when there's a new reply, if you want one.",
-                            "Settings > Home Feed controls which content types show up in your Home feed by default and whether it's limited to Apple-only topics, plus a separate forum-topics filter (Recent, New, Unread, Since Last Visit) applied before Home's own All / New / Mouse Recap switcher ever sees them.",
+                            "Settings > Home Feed controls which content types show up in your Home feed by default and whether it's limited to Apple-only topics.",
                             "Head to Settings > Notifications to fine-tune which of this actually pings you.",
                         ]),
                     ]
@@ -669,7 +669,15 @@ enum HelpContent {
                         .bullets([
                             "Rewrite polishes your draft's clarity and tone, without changing what you're actually trying to say.",
                             "If your draft looks like it's not in English, AppleVis offers to translate it for you.",
-                            "The guidelines checker is purely advisory — it never blocks you from posting.",
+                            // Was "The guidelines checker is purely advisory — it never
+                            // blocks you from posting," which isn't accurate:
+                            // ContentSubmissionPolicy does block a small set of things
+                            // (image links, strong vulgar language, a very hostile tone,
+                            // non-English text) before they can be submitted at all —
+                            // only GuidelinesChecker's broader, softer reminders are
+                            // purely advisory. Flagged during the Community Agreement
+                            // audit; corrected to describe both accurately.
+                            "Most guideline reminders are just a friendly heads-up you can dismiss and keep writing. A few things — like image links, strong language, or posting in a language other than English — do need to be fixed before you can post.",
                             "If AI helped you write something, a quick note saying so is appreciated by the community.",
                         ]),
                         .heading("Reading AppleVis in your own language"),
@@ -707,7 +715,7 @@ enum HelpContent {
                         .heading("What you can post"),
                         .body("Strong or explicit language is never allowed in anything you post through the app — a comment, a reply, a topic, a review, a message, anything. That's true for everyone, all the time, and it isn't something Settings can turn off."),
                         .heading("What you see"),
-                        .body("Settings > Privacy has a Filter Profanity toggle, on by default. When it's on, a wider range of language — including milder words the site itself allows — shows up masked, like \"s***\", instead of spelled out. Turn it off any time if you'd rather see everything exactly as written."),
+                        .body("Settings > General has a Filter Profanity toggle, on by default. When it's on, a wider range of language — including milder words the site itself allows — shows up masked, like \"s***\", instead of spelled out. Turn it off any time if you'd rather see everything exactly as written."),
                         .note("Turning this off only changes what you see. It never changes what you're allowed to post — that rule applies no matter what."),
                         .heading("Why this exists"),
                         .body("Partly, it's simply about keeping AppleVis feeling welcoming, since this community spans a wide range of ages and comfort levels. But there's a bigger reason too: Apple sets specific rules about how much strong language an app can contain for the age rating it's listed under, and filtering by default helps AppleVis stay compliant with those rules as the community keeps growing — not something we want to take a chance on."),
@@ -1040,7 +1048,7 @@ enum HelpContent {
                     summary: "Choose which AppleVis activity can reach you.",
                     content: [
                         .bullets([
-                            "Replies to My Posts — someone replies to your forum topics. Signed in only.",
+                            "Replies to My Posts — automatically follows new forum topics and app entries you post, so replies notify you without following them yourself. Only applies going forward. Signed in only.",
                             "Mentions — someone mentions you by name. Signed in only.",
                             "Followed Topics — activity in anything you follow. Signed in only.",
                             "New Forum Topics — fresh discussions across the community.",

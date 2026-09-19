@@ -26,12 +26,26 @@ struct GeneralSettingsView: View {
                         Text(behavior.displayName).tag(behavior)
                     }
                 }
-                .accessibilityHint(String(localized: "Controls how much spoken announcement Home produces when you open or return to it."))
-                // Explicit value — without it, swiping up/down only played
-                // the "value changed" tone with no spoken option. Same fix
-                // as PlayerView's playback-speed control (PODCAST-06).
-                // Reported directly.
-                .accessibilityValue(Text(preferences.homeStartupBehavior.displayName))
+                // Spells out what each option actually does, not just that
+                // the picker "controls spoken announcement" — that generic
+                // phrasing left a VoiceOver user with no way to tell Helpful
+                // and Detailed apart without also finding and swiping to the
+                // caption text below on its own. Reported directly: heard
+                // the option name on focus and had no idea what it meant.
+                .accessibilityHint(String(localized: "Quiet: nothing spoken. Helpful: a short spoken welcome. Detailed: that same welcome, plus an AI-generated summary of what's new since your last visit."))
+                // A persistent .accessibilityValue() here (the PODCAST-06
+                // fix, applied the same way in several other Settings
+                // pickers) was added so swiping up/down would speak the new
+                // option instead of just the "value changed" tone — but for
+                // this Form-style Picker, VoiceOver already speaks the
+                // selected option as part of its own built-in label/value on
+                // every normal focus, so the persistent override piled a
+                // second, identical readout on top of that ("Helpful.
+                // Helpful."). Swapped for a one-shot announcement fired only
+                // right after an adjustment, leaving ordinary focus to the
+                // built-in single readout. Reported directly — candidate fix,
+                // pending confirmation with VoiceOver before the same swap
+                // goes out to the other affected pickers.
                 .accessibilityAdjustableAction { direction in
                     guard let idx = HomeStartupBehavior.allCases.firstIndex(of: preferences.homeStartupBehavior) else { return }
                     switch direction {
@@ -41,6 +55,7 @@ struct GeneralSettingsView: View {
                         preferences.homeStartupBehavior = HomeStartupBehavior.allCases[(idx - 1 + HomeStartupBehavior.allCases.count) % HomeStartupBehavior.allCases.count]
                     @unknown default: break
                     }
+                    UIAccessibility.post(notification: .announcement, argument: preferences.homeStartupBehavior.displayName)
                 }
                 Text("What Home says out loud when you open or return to it. Quiet: nothing spoken. Helpful: a short spoken welcome. Detailed: that same welcome, plus an AI-generated summary of what's new since your last visit.")
                     .font(.caption)
@@ -55,6 +70,19 @@ struct GeneralSettingsView: View {
                 Toggle("Welcome Summary", isOn: $preferences.welcomeSummaryEnabled)
                     .accessibilityHint(String(localized: "Shows a dismissable card on Home summarizing new activity since your last visit."))
                 Text("The dismissable card on Home listing what's new since you were last here — separate from Home Startup Behavior above, which is about what's spoken, not what's shown.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                // Moved from Settings > Privacy — its underlying key
+                // (privacy.signedOutHistory) is a holdover from when this
+                // also controlled whether reading history was tracked at
+                // all for signed-out users; it doesn't anymore (tracking
+                // always happens now), so what's left is purely a Home
+                // display preference, not a privacy control. Discussed and
+                // requested directly.
+                Toggle("Show What's New on Home", isOn: $preferences.showNewActivityIndicators)
+                    .accessibilityHint(String(localized: "When on, Home shows a New view, a quick summary, and small badges for content with new activity since your last visit."))
+                Text("Reading history is always tracked on-device — this only controls whether Home actually shows what's new because of it. Turning it off doesn't erase anything; it just keeps Home quieter.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -78,11 +106,11 @@ struct GeneralSettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 .accessibilityHint(String(localized: "Controls whether web links open inside AppleVis or in your default browser."))
-                // Explicit value — without it, swiping up/down only played
-                // the "value changed" tone with no spoken option. Same fix
-                // as PlayerView's playback-speed control (PODCAST-06).
-                // Reported directly.
-                .accessibilityValue(Text(preferences.webBrowsingMode.displayName))
+                // See Home Startup Behavior above for the full reasoning —
+                // a persistent .accessibilityValue() here duplicated what
+                // the control already announces natively on plain focus.
+                // Swapped for a one-shot announcement fired only right
+                // after an adjustment.
                 .accessibilityAdjustableAction { direction in
                     guard let idx = WebBrowsingMode.allCases.firstIndex(of: preferences.webBrowsingMode) else { return }
                     switch direction {
@@ -92,6 +120,7 @@ struct GeneralSettingsView: View {
                         preferences.webBrowsingMode = WebBrowsingMode.allCases[(idx - 1 + WebBrowsingMode.allCases.count) % WebBrowsingMode.allCases.count]
                     @unknown default: break
                     }
+                    UIAccessibility.post(notification: .announcement, argument: preferences.webBrowsingMode.displayName)
                 }
             }
 
@@ -103,13 +132,35 @@ struct GeneralSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            // Moved from Settings > Privacy — this controls how existing
+            // site content is displayed to you (masked vs. spelled out), not
+            // what AppleVis collects or shares, so it's a content-display
+            // preference like Web Links or Tips above, not a privacy
+            // control. Discussed and requested directly.
+            Section("Language Filtering") {
+                Toggle("Filter Profanity", isOn: $preferences.filterProfanity)
+                    .accessibilityHint(String(localized: "When on, milder language is shown masked, like s star star star, instead of spelled out."))
+                Text("AppleVis blocks strong or explicit language from every post and comment, always — this setting doesn't change that. It only controls whether milder language, which the site otherwise allows, is shown masked or spelled out. We keep this on by default to help AppleVis stay welcoming, and to stay within Apple's guidelines for our age rating.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let article = HelpContent.find("community-language-filter") {
+                    NavigationLink {
+                        HelpArticleDetailView(article: article)
+                    } label: {
+                        Label("Learn More About Language Filtering", systemImage: "info.circle")
+                    }
+                }
+            }
+
             Section {
                 ResetToDefaultsButton {
-                    preferences.homeStartupBehavior = .helpful
+                    preferences.homeStartupBehavior = .detailed
                     preferences.welcomeSummaryEnabled = true
+                    preferences.showNewActivityIndicators = true
                     preferences.searchAutoFocusEnabled = false
                     preferences.webBrowsingMode = .inApp
                     preferences.helpfulTipsEnabled = true
+                    preferences.filterProfanity = true
                 }
             }
         }

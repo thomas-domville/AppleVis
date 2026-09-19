@@ -24,7 +24,7 @@ enum MouseRecapWindow: Int, CaseIterable, Identifiable {
     case week = 7
     case month = 30
     var id: Int { rawValue }
-    var label: String { self == .week ? "Past Week" : "Past Month" }
+    var label: String { self == .week ? String(localized: "Past Week") : String(localized: "Past Month") }
 }
 
 /// Where VoiceOver focus should land once Home finishes its initial load —
@@ -894,16 +894,18 @@ private struct MouseRecapHomeContent: View {
         }
 
         newsletterSection(
-            title: "New Accessible Apps",
+            title: String(localized: "New Accessible Apps"),
             systemImage: "square.grid.2x2",
             intro: digest.appSectionIntro(periodName: window.label),
+            kicker: String(localized: "New on the App Scene"),
             limitedMessage: limitedMessage(total: digest.apps.count, shown: apps.count, noun: "app"),
             items: apps
         ) { app in
             TranslatedMouseRecapTitle(kind: "appListing", id: app.id, title: app.name) { resolvedTitle, wasTranslated in
                 newsletterCard(
                     title: resolvedTitle,
-                    kicker: "New on the App Scene",
+                    kicker: String(localized: "New on the App Scene"),
+                    hideKickerFromAccessibility: true,
                     details: digest.appDetails(app),
                     body: aiBlurbs[app.id] ?? digest.newsletterBody(for: app),
                     accent: ContentKind.appListing.accentColor,
@@ -920,50 +922,58 @@ private struct MouseRecapHomeContent: View {
             title: digest.podcastSectionTitle(periodName: window.label),
             systemImage: "mic",
             intro: digest.podcastSectionIntro(periodName: window.label),
+            kicker: String(localized: "Podcast Episode"),
             limitedMessage: limitedMessage(total: digest.podcasts.count, shown: podcasts.count, noun: "episode"),
             items: podcasts
         ) { episode in
             TranslatedMouseRecapTitle(kind: "podcastEpisode", id: episode.id, title: episode.title) { resolvedTitle, wasTranslated in
-                newsletterCard(
-                    title: resolvedTitle,
-                    kicker: "Podcast Episode",
-                    details: digest.podcastDetails(episode),
-                    body: aiBlurbs[episode.id] ?? digest.newsletterBody(for: episode),
-                    accent: ContentKind.podcastEpisode.accentColor,
-                    wasTranslated: wasTranslated
-                ) {
-                    NavigationLink(value: episode) {
-                        Label("Listen to Episode", systemImage: "play.circle")
+                ResolvedPodcastDuration(episode: episode) { durationText in
+                    newsletterCard(
+                        title: resolvedTitle,
+                        kicker: String(localized: "Podcast Episode"),
+                        hideKickerFromAccessibility: true,
+                        details: digest.podcastDetails(episode) + (durationText.map { [$0] } ?? []),
+                        body: aiBlurbs[episode.id] ?? digest.newsletterBody(for: episode),
+                        accent: ContentKind.podcastEpisode.accentColor,
+                        wasTranslated: wasTranslated
+                    ) {
+                        NavigationLink(value: episode) {
+                            Label("Listen to Episode", systemImage: "play.circle")
+                        }
                     }
                 }
             }
         }
 
         newsletterSection(
-            title: "From the AppleVis Blog",
+            title: String(localized: "From the AppleVis Blog"),
             systemImage: "newspaper",
             intro: digest.blogSectionIntro(periodName: window.label),
+            kicker: String(localized: "Blog Post"),
             limitedMessage: limitedMessage(total: digest.standardBlogs.count, shown: blogs.count, noun: "post"),
             items: blogs
         ) { post in
             TranslatedMouseRecapTitle(kind: "blogPost", id: post.id, title: post.title) { resolvedTitle, wasTranslated in
-                newsletterCard(
-                    title: resolvedTitle,
-                    kicker: "Blog Post",
-                    details: digest.blogDetails(post),
-                    body: aiBlurbs[post.id] ?? digest.newsletterBody(for: post),
-                    accent: ContentKind.blogPost.accentColor,
-                    wasTranslated: wasTranslated
-                ) {
-                    NavigationLink(value: post) {
-                        Label("Read Blog Post", systemImage: "arrow.right.circle")
+                ResolvedBlogReadingTime(post: post) { readingTimeText in
+                    newsletterCard(
+                        title: resolvedTitle,
+                        kicker: String(localized: "Blog Post"),
+                        hideKickerFromAccessibility: true,
+                        details: digest.blogDetails(post) + (readingTimeText.map { [$0] } ?? []),
+                        body: aiBlurbs[post.id] ?? digest.newsletterBody(for: post),
+                        accent: ContentKind.blogPost.accentColor,
+                        wasTranslated: wasTranslated
+                    ) {
+                        NavigationLink(value: post) {
+                            Label("Read Blog Post", systemImage: "arrow.right.circle")
+                        }
                     }
                 }
             }
         }
 
         newsletterSection(
-            title: "How-To Corner",
+            title: String(localized: "How-To Corner"),
             systemImage: "book",
             intro: digest.resourceSectionIntro(periodName: window.label),
             limitedMessage: limitedMessage(total: digest.resources.count, shown: resources.count, noun: "guide or tutorial"),
@@ -986,16 +996,18 @@ private struct MouseRecapHomeContent: View {
         }
 
         newsletterSection(
-            title: "Community Voices",
+            title: String(localized: "Community Voices"),
             systemImage: "bubble.left.and.bubble.right",
             intro: digest.forumSectionIntro(periodName: window.label),
+            kicker: String(localized: "Popular Discussion"),
             limitedMessage: limitedMessage(total: digest.forums.count, shown: forums.count, noun: "discussion"),
             items: forums
         ) { topic in
             TranslatedMouseRecapTitle(kind: "forumTopic", id: topic.id, title: topic.title) { resolvedTitle, wasTranslated in
                 newsletterCard(
                     title: resolvedTitle,
-                    kicker: "Popular Discussion",
+                    kicker: String(localized: "Popular Discussion"),
+                    hideKickerFromAccessibility: true,
                     details: digest.forumDetails(topic),
                     body: aiBlurbs[topic.id] ?? digest.newsletterBody(for: topic),
                     accent: ContentKind.forumTopic.accentColor,
@@ -1014,6 +1026,14 @@ private struct MouseRecapHomeContent: View {
         title: String,
         systemImage: String,
         intro: String,
+        // Only for sections where every card shares the same kicker (e.g.
+        // "New on the App Scene" on every app) — announced once here instead
+        // of on every card. Left nil for How-To Corner, where the kicker is
+        // resource.kind.displayName and genuinely differs per item, so it
+        // still needs to be heard on each card. Requested directly: with 3
+        // new apps this week, "New on the App Scene" was heard 3 times in a
+        // row instead of once for the whole group.
+        kicker: String? = nil,
         limitedMessage: String?,
         items: [Item],
         @ViewBuilder row: @escaping (Item) -> Row
@@ -1023,6 +1043,7 @@ private struct MouseRecapHomeContent: View {
                 Text(intro)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .accessibilityLabel(kicker.map { String(localized: "\($0). \(intro)") } ?? intro)
                 ForEach(items) { item in
                     row(item)
                 }
@@ -1041,6 +1062,11 @@ private struct MouseRecapHomeContent: View {
     private func newsletterCard<Action: View>(
         title: String,
         kicker: String,
+        // True for the sections whose kicker is now announced once at the
+        // section level instead (see newsletterSection's `kicker` param) —
+        // kept visible on screen for sighted users scanning cards at a
+        // glance, just no longer read by VoiceOver on every single card.
+        hideKickerFromAccessibility: Bool = false,
         details: [String],
         body: String,
         accent: Color,
@@ -1051,6 +1077,7 @@ private struct MouseRecapHomeContent: View {
             Text(kicker)
                 .font(.caption.weight(.bold))
                 .foregroundStyle(accent)
+                .accessibilityHidden(hideKickerFromAccessibility)
             HStack(spacing: 4) {
                 Text(title)
                     .font(.headline)
@@ -1448,6 +1475,65 @@ private struct TranslatedMouseRecapTitle<Content: View>: View {
                 translatedTitle = await ContentTranslation.resolvedTitle(
                     kind: kind, id: id, originalTitle: title, targetLanguage: preferences.effectiveContentLanguage
                 )
+            }
+    }
+}
+
+/// Requested directly: episode length is a nice-to-have alongside the show
+/// name and date already in `podcastDetails`. `episode.duration` is almost
+/// always 0 (Drupal never fills it in), so this leans on the same
+/// cache-then-probe pattern `PodcastEpisodeRow` already uses elsewhere —
+/// instant if the episode's been seen before, silent (no chip) if a live
+/// probe can't resolve one.
+private struct ResolvedPodcastDuration<Content: View>: View {
+    let episode: PodcastEpisode
+    @ViewBuilder let content: (_ durationText: String?) -> Content
+
+    @State private var resolvedDuration: TimeInterval?
+
+    var body: some View {
+        content(durationText)
+            .task(id: episode.id) {
+                await resolveDurationIfNeeded()
+            }
+    }
+
+    private var durationText: String? {
+        guard let resolvedDuration, resolvedDuration > 0 else { return nil }
+        return PodcastDuration.abbreviated(resolvedDuration)
+    }
+
+    private func resolveDurationIfNeeded() async {
+        if let existing = episode.duration, existing > 0 {
+            resolvedDuration = existing
+            return
+        }
+        if let cached = PersistenceStore.shared.cachedAudioMetadata(episodeId: episode.id)?.duration, cached > 0 {
+            resolvedDuration = cached
+            return
+        }
+        guard let probed = await PodcastAudioMetadataProbe.resolveDuration(audioUrl: episode.audioUrl) else { return }
+        PersistenceStore.shared.cacheProbedDuration(episodeId: episode.id, duration: probed)
+        resolvedDuration = probed
+    }
+}
+
+/// Requested directly, alongside podcast length. The list-level `BlogPost`
+/// only carries `summary`, not the full article text, so a real reading
+/// time needs the same detail fetch the blog post's own screen already
+/// makes (and caches) — this just borrows that cache instead of adding a
+/// new one.
+private struct ResolvedBlogReadingTime<Content: View>: View {
+    let post: BlogPost
+    @ViewBuilder let content: (_ readingTimeText: String?) -> Content
+
+    @State private var readingTimeText: String?
+
+    var body: some View {
+        content(readingTimeText)
+            .task(id: post.id) {
+                guard let detail = try? await APIClient.shared.blogs.detail(id: post.id) else { return }
+                readingTimeText = ReadingTime.text(forHTMLBody: detail.body)
             }
     }
 }

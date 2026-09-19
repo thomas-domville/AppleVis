@@ -61,8 +61,15 @@ enum ContentSubmissionPolicy {
             return .high
         }
 
+        // "this/that/your" dropped from this pattern (2026-09-19, live-data
+        // review) — they matched "your app is garbage"/"this update is
+        // trash" exactly as readily as an actual dig at a person, and every
+        // real personal case ("you're an idiot," "you are ridiculous") is
+        // already covered by "you're/you are" here or by the high-severity
+        // pattern above. Reported directly after "Is your garbage" (about
+        // an email client, not a person) got flagged as a tone concern.
         let mediumPatterns = [
-            #"\b(this|that|your|you're|you are)\s+(is\s+)?(stupid|dumb|ridiculous|nonsense|garbage|trash)\b"#,
+            #"\b(you're|you are)\s+(is\s+)?(stupid|dumb|ridiculous|nonsense|garbage|trash)\b"#,
             #"\b(learn\s+to\s+read|use\s+your\s+brain|you\s+clearly\s+don't\s+know|you\s+obviously\s+don't\s+understand)\b"#,
             #"\b(stop\s+(whining|complaining|crying)|quit\s+(whining|complaining|crying))\b"#,
             #"\b(what\s+is\s+wrong\s+with\s+you|are\s+you\s+serious\s+right\s+now)\b"#,
@@ -71,8 +78,14 @@ enum ContentSubmissionPolicy {
             return .medium
         }
 
+        // "(?<!or\s)" excludes "or whatever" (2026-09-19, live-data review)
+        // — a common filler idiom ("a piece of mail or whatever") that this
+        // pattern's unbounded ".*[!?]" was matching against any "!"/"?"
+        // anywhere later in the message, however unrelated, misreading
+        // entirely friendly messages as a tone concern.
         let lowPatterns = [
-            #"\b(obviously|clearly|whatever|come\s+on)\b.*[!?]"#,
+            #"\b(obviously|clearly|come\s+on)\b.*[!?]"#,
+            #"\b(?<!or\s)whatever\b.*[!?]"#,
             #"\b(i\s+can't\s+believe|that's\s+absurd|that's\s+annoying)\b"#,
         ]
         if lowPatterns.contains(where: { matches(text, $0, caseInsensitive: true) }) {

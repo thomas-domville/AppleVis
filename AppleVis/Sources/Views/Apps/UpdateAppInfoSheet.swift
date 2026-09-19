@@ -1,5 +1,19 @@
 import SwiftUI
 
+/// Wraps a computed `[AppInfoFieldDiff]` as a single Identifiable value so
+/// AppDetailView can drive its sheet with `.sheet(item:)` instead of
+/// `.sheet(isPresented:)` plus a separate sibling `@State` array — the
+/// latter is a known SwiftUI race where the sheet's content closure can
+/// capture the sibling state's *previous* value instead of what was just
+/// assigned in the same action, since presentation and data aren't tied
+/// to the same value. Reported directly: Refresh App Details consistently
+/// showed nothing at all — not even "Already Matches" rows — because the
+/// sheet kept seeing the still-empty initial array.
+struct AppInfoRefreshRequest: Identifiable {
+    let id = UUID()
+    let diffs: [AppInfoFieldDiff]
+}
+
 /// One store-owned field `updateAppInformationFromStore()` can refresh from
 /// the App Store listing, alongside what AppleVis currently has on file for
 /// it. `oldValue`/`newValue` are always plain text (HTML stripped for
