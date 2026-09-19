@@ -69,7 +69,7 @@ struct MouseRecapDigest: Codable {
     }
 
     var appPickSpotlight: BlogPost? {
-        blogs.first(where: Self.isAppPickSpotlight)
+        blogs.first(where: { Self.isAppPickSpotlight($0) })
     }
 
     var standardBlogs: [BlogPost] {

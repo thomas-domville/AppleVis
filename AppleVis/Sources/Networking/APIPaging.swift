@@ -7,5 +7,5 @@ import Foundation
 /// silently drift apart across the six browse screens that each used to
 /// hardcode the literal `20` independently.
 enum APIPaging {
-    static let pageSize = 20
+    nonisolated static let pageSize = 20
 }

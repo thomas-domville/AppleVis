@@ -304,8 +304,8 @@ enum ItunesAPI {
         let screenshots = entity == "tvSoftware"
             ? ((r["appletvScreenshotUrls"] as? [String]) ?? [])
             : ((r["screenshotUrls"] as? [String]) ?? [])
-        let releaseDate = (r["releaseDate"] as? String).flatMap(parseISO8601)
-        let currentVersionReleaseDate = (r["currentVersionReleaseDate"] as? String).flatMap(parseISO8601)
+        let releaseDate = (r["releaseDate"] as? String).flatMap { parseISO8601($0) }
+        let currentVersionReleaseDate = (r["currentVersionReleaseDate"] as? String).flatMap { parseISO8601($0) }
 
         return ItunesMetadata(
             appStoreId: id,

@@ -314,8 +314,8 @@ private struct CountryPickerSheet: View {
     /// hand-maintained array — always current, and localizes automatically
     /// (a French-language device sees French country names).
     private static let allCountries: [String] = {
-        Locale.isoRegionCodes
-            .compactMap { Locale.current.localizedString(forRegionCode: $0) }
+        Locale.Region.isoRegions
+            .compactMap { Locale.current.localizedString(forRegionCode: $0.identifier) }
             .sorted()
     }()
 

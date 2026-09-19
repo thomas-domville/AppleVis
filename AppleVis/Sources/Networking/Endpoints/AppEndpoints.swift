@@ -27,7 +27,7 @@ private extension AppPlatform {
 struct AppEndpoints {
     let client: APIClient
 
-    private static let pageSize = 20
+    private nonisolated static let pageSize = 20
 
     /// Native REST — not consumed by any current screen, kept for API completeness.
     func platforms() async throws -> [String] {
