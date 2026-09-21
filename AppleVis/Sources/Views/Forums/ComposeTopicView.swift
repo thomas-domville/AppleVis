@@ -250,7 +250,7 @@ struct ComposeTopicView: View {
             onPosted(posted)
             dismiss()
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Couldn't post topic. Try again." }
+        } catch { self.error = String(localized: "Couldn't post topic. Try again.") }
         isSubmitting = false
     }
 
@@ -323,7 +323,7 @@ struct ComposeReplyView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
-                Text(quotedReply != nil ? "Replying to \(quotedReply!.authorName) — Re: \(topicTitle)" : "Re: \(topicTitle)")
+                Text(quotedReply != nil ? String(localized: "Replying to \(quotedReply!.authorName) — Re: \(topicTitle)") : String(localized: "Re: \(topicTitle)"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding()
@@ -460,7 +460,7 @@ struct ComposeReplyView: View {
             onPosted(reply)
             dismiss()
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Couldn't post reply. Try again." }
+        } catch { self.error = String(localized: "Couldn't post reply. Try again.") }
         isSubmitting = false
     }
 }

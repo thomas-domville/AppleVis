@@ -9,10 +9,13 @@ struct AccountSecurityWizard: View {
         case password, email
         var id: Self { self }
 
+        // Pre-resolved for the same reason as PasswordStrength.label below —
+        // this drives .navigationTitle(mode.title) directly, and a plain
+        // String literal there would never reach the catalog.
         var title: String {
             switch self {
-            case .password: return "Change Password"
-            case .email: return "Change Email Address"
+            case .password: return String(localized: "Change Password")
+            case .email: return String(localized: "Change Email Address")
             }
         }
         var icon: String {
@@ -200,7 +203,7 @@ struct AccountSecurityWizard: View {
                 Button("Discard", role: .destructive) { dismiss() }
                 Button("Keep Editing", role: .cancel) {}
             } message: {
-                Text(mode == .password ? "Your password change will be discarded." : "Your email change will be discarded.")
+                Text(mode == .password ? String(localized: "Your password change will be discarded.") : String(localized: "Your email change will be discarded."))
             }
             // Step 1 previously got no explicit focus at all — only
             // goNext()/goBack() ever called focusStepAfterTransition(), so
@@ -249,8 +252,8 @@ struct AccountSecurityWizard: View {
                 )
                 backButton
                 Text(mode == .password
-                    ? "Enter a new password meeting the requirements below, then confirm it."
-                    : "Enter the new email address for your AppleVis account.")
+                    ? String(localized: "Enter a new password meeting the requirements below, then confirm it.")
+                    : String(localized: "Enter the new email address for your AppleVis account."))
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             if mode == .password {
@@ -345,7 +348,7 @@ struct AccountSecurityWizard: View {
             }
             Section {
                 if mode == .password {
-                    WizardReviewRow(label: "Change", value: "Update your account password")
+                    WizardReviewRow(label: "Change", value: String(localized: "Update your account password"))
                 } else {
                     WizardReviewRow(label: "New Email Address", value: newEmail)
                 }
@@ -413,7 +416,7 @@ struct AccountSecurityWizard: View {
             guard let freshToken = try await APIClient.shared.account.verifyCurrentPassword(
                 username: user.name, password: currentPassword
             ) else {
-                let message = "Your current password is incorrect."
+                let message = String(localized: "Your current password is incorrect.")
                 error = message
                 await announceWizardFailure(message, focus: $isErrorFocused)
                 isSubmitting = false
@@ -426,13 +429,13 @@ struct AccountSecurityWizard: View {
                 try await APIClient.shared.account.changeEmail(uuid: user.uuid, csrfToken: freshToken, newEmail: newEmail)
             }
             SoundPlayer.shared.play(.success)
-            UIAccessibility.post(notification: .announcement, argument: mode == .password ? "Password updated." : "Email address updated.")
+            UIAccessibility.post(notification: .announcement, argument: mode == .password ? String(localized: "Password updated.") : String(localized: "Email address updated."))
             submitted = true
         } catch let e as APIError {
             error = e.localizedDescription
             await announceWizardFailure(e.localizedDescription, focus: $isErrorFocused)
         } catch {
-            let message = "Couldn't save changes. Please try again."
+            let message = String(localized: "Couldn't save changes. Please try again.")
             self.error = message
             await announceWizardFailure(message, focus: $isErrorFocused)
         }

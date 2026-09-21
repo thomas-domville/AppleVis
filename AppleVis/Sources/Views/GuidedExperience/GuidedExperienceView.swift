@@ -328,7 +328,7 @@ struct GuidedExperienceView: View {
     private func pauseTour() {
         GuidedExperienceStore.markDismissedForNow(experience.id, stepIndex)
         pauseStore.pauseForExplore(experienceId: experience.id, experienceTitle: experience.title, stepIndex: stepIndex)
-        UIAccessibility.post(notification: .announcement, argument: "Tour paused. Resume anytime from the Resume Tour button.")
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "Tour paused. Resume anytime from the Resume Tour button."))
         dismiss()
     }
 

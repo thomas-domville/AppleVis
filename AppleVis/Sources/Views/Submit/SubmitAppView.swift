@@ -291,7 +291,7 @@ struct SubmitAppView: View {
         let length = newValue.trimmingCharacters(in: .whitespacesAndNewlines).count
         if !accessibilityCommentsMinimumAnnounced && length >= 20 {
             accessibilityCommentsMinimumAnnounced = true
-            UIAccessibility.post(notification: .announcement, argument: "Minimum length reached.")
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "Minimum length reached."))
         } else if accessibilityCommentsMinimumAnnounced && length < 20 {
             accessibilityCommentsMinimumAnnounced = false
         }
@@ -301,7 +301,7 @@ struct SubmitAppView: View {
         let length = newValue.trimmingCharacters(in: .whitespacesAndNewlines).count
         if !tvAccessibilityCommentsMinimumAnnounced && length >= 20 {
             tvAccessibilityCommentsMinimumAnnounced = true
-            UIAccessibility.post(notification: .announcement, argument: "Minimum length reached.")
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "Minimum length reached."))
         } else if tvAccessibilityCommentsMinimumAnnounced && length < 20 {
             tvAccessibilityCommentsMinimumAnnounced = false
         }
@@ -311,7 +311,7 @@ struct SubmitAppView: View {
         let length = newValue.trimmingCharacters(in: .whitespacesAndNewlines).count
         if !watchAccessibilityCommentsMinimumAnnounced && length >= 20 {
             watchAccessibilityCommentsMinimumAnnounced = true
-            UIAccessibility.post(notification: .announcement, argument: "Minimum length reached.")
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "Minimum length reached."))
         } else if watchAccessibilityCommentsMinimumAnnounced && length < 20 {
             watchAccessibilityCommentsMinimumAnnounced = false
         }
@@ -321,7 +321,7 @@ struct SubmitAppView: View {
         let length = newValue.trimmingCharacters(in: .whitespacesAndNewlines).count
         if !macAccessibilityCommentsMinimumAnnounced && length >= 20 {
             macAccessibilityCommentsMinimumAnnounced = true
-            UIAccessibility.post(notification: .announcement, argument: "Minimum length reached.")
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "Minimum length reached."))
         } else if macAccessibilityCommentsMinimumAnnounced && length < 20 {
             macAccessibilityCommentsMinimumAnnounced = false
         }
@@ -543,8 +543,8 @@ struct SubmitAppView: View {
                 }
                 .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(.headline).foregroundStyle(.primary)
-                    Text(body).font(.subheadline).foregroundStyle(.secondary)
+                    Text(LocalizedStringKey(title)).font(.headline).foregroundStyle(.primary)
+                    Text(LocalizedStringKey(body)).font(.subheadline).foregroundStyle(.secondary)
                 }
             }
             .padding(16)
@@ -555,8 +555,8 @@ struct SubmitAppView: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityHint(body)
+        .accessibilityLabel(String(localized: String.LocalizationValue(title)))
+        .accessibilityHint(String(localized: String.LocalizationValue(body)))
         .accessibilityValue(checked.wrappedValue ? "Checked" : "Not checked")
         .accessibilityAddTraits(checked.wrappedValue ? [.isSelected] : [])
     }
@@ -699,7 +699,7 @@ struct SubmitAppView: View {
             }
             Section("Platform") {
                 Picker("Platform", selection: $platform) {
-                    ForEach([AppPlatform.ios, .macos, .tvos, .watchos]) { Text($0.displayName).tag($0) }
+                    ForEach([AppPlatform.ios, .macos, .tvos, .watchos]) { Text(LocalizedStringKey($0.displayName)).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: platform) { _, _ in
@@ -711,7 +711,7 @@ struct SubmitAppView: View {
                 // the "value changed" tone with no spoken platform name.
                 // Same fix as PlayerView's playback-speed control
                 // (PODCAST-06). Reported directly.
-                .accessibilityValue(Text(platform.displayName))
+                .accessibilityValue(Text(LocalizedStringKey(platform.displayName)))
                 // Same swipe-up/down addition as this session's other
                 // pickers — same on-screen order as the segments above.
                 .accessibilityAdjustableAction { direction in
@@ -838,7 +838,7 @@ struct SubmitAppView: View {
                         .accessibilityHint(String(localized: "The version number shown on the App Store listing."))
                     Picker("Category", selection: $payload.category) {
                         Text("Choose…").tag("")
-                        ForEach(categories, id: \.self) { Text($0).tag($0) }
+                        ForEach(categories, id: \.self) { Text(LocalizedStringKey($0)).tag($0) }
                     }
                     .accessibilityHint(String(localized: "Required."))
                     TextField("Minimum iOS Version", text: $payload.osVersion)
@@ -864,7 +864,7 @@ struct SubmitAppView: View {
             Section {
                 Picker("Price", selection: $payload.price) {
                     Text("Choose…").tag("")
-                    ForEach(priceOptions, id: \.self) { Text($0).tag($0) }
+                    ForEach(priceOptions, id: \.self) { Text(LocalizedStringKey($0)).tag($0) }
                 }
                 .accessibilityHint(String(localized: "Required."))
             } header: {
@@ -950,17 +950,17 @@ struct SubmitAppView: View {
             Section("Accessibility Assessment") {
                 Picker("VoiceOver Performance", selection: $payload.voiceOverPerformance) {
                     Text("Choose…").tag("")
-                    ForEach(voiceOverOptions, id: \.value) { Text($0.label).tag($0.value) }
+                    ForEach(voiceOverOptions, id: \.value) { Text(LocalizedStringKey($0.label)).tag($0.value) }
                 }
                 .accessibilityHint(String(localized: "Required. How well VoiceOver works overall in this app."))
                 Picker("Button Labelling", selection: $payload.buttonLabelling) {
                     Text("Choose…").tag("")
-                    ForEach(buttonLabellingOptions, id: \.value) { Text($0.label).tag($0.value) }
+                    ForEach(buttonLabellingOptions, id: \.value) { Text(LocalizedStringKey($0.label)).tag($0.value) }
                 }
                 .accessibilityHint(String(localized: "Required. Whether buttons and controls have clear, accurate VoiceOver labels."))
                 Picker("Usability", selection: $payload.usabilityNotes) {
                     Text("Choose…").tag("")
-                    ForEach(usabilityOptions, id: \.self) { Text($0).tag($0) }
+                    ForEach(usabilityOptions, id: \.self) { Text(LocalizedStringKey($0)).tag($0) }
                 }
                 .accessibilityHint(String(localized: "Required. How easy the app is to use as a blind or low-vision user overall."))
             }
@@ -1120,7 +1120,7 @@ struct SubmitAppView: View {
                 }
                 Picker("Category", selection: $tvPayload.category) {
                     Text("Choose…").tag("")
-                    ForEach(tvCategories, id: \.self) { Text($0).tag($0) }
+                    ForEach(tvCategories, id: \.self) { Text(LocalizedStringKey($0)).tag($0) }
                 }
                 .accessibilityHint(String(localized: "Required."))
             } header: {
@@ -1130,7 +1130,7 @@ struct SubmitAppView: View {
             Section {
                 Picker("Price", selection: $tvPayload.price) {
                     Text("Choose…").tag("")
-                    ForEach(priceOptions, id: \.self) { Text($0).tag($0) }
+                    ForEach(priceOptions, id: \.self) { Text(LocalizedStringKey($0)).tag($0) }
                 }
                 .accessibilityHint(String(localized: "Required."))
             } header: {
@@ -1161,7 +1161,7 @@ struct SubmitAppView: View {
             Section("Usability") {
                 Picker("Usability", selection: $tvPayload.usability) {
                     Text("Choose…").tag("")
-                    ForEach(tvUsabilityOptions, id: \.self) { Text($0).tag($0) }
+                    ForEach(tvUsabilityOptions, id: \.self) { Text(LocalizedStringKey($0)).tag($0) }
                 }
                 .accessibilityHint(String(localized: "Required. How accessible this app is on Apple TV overall."))
             }
@@ -1313,7 +1313,7 @@ struct SubmitAppView: View {
                 }
                 Picker("Category", selection: $watchPayload.category) {
                     Text("Choose…").tag("")
-                    ForEach(watchCategories, id: \.self) { Text($0).tag($0) }
+                    ForEach(watchCategories, id: \.self) { Text(LocalizedStringKey($0)).tag($0) }
                 }
                 .accessibilityHint(String(localized: "Required."))
                 // Not something a `software`-entity iTunes lookup can
@@ -1333,7 +1333,7 @@ struct SubmitAppView: View {
             Section {
                 Picker("Price", selection: $watchPayload.price) {
                     Text("Choose…").tag("")
-                    ForEach(priceOptions, id: \.self) { Text($0).tag($0) }
+                    ForEach(priceOptions, id: \.self) { Text(LocalizedStringKey($0)).tag($0) }
                 }
                 .accessibilityHint(String(localized: "Required."))
             } header: {
@@ -1373,7 +1373,7 @@ struct SubmitAppView: View {
             Section("Usability") {
                 Picker("Usability", selection: $watchPayload.usability) {
                     Text("Choose…").tag("")
-                    ForEach(watchUsabilityOptions, id: \.self) { Text($0).tag($0) }
+                    ForEach(watchUsabilityOptions, id: \.self) { Text(LocalizedStringKey($0)).tag($0) }
                 }
                 .accessibilityHint(String(localized: "Required. How accessible this app is on Apple Watch overall."))
             }
@@ -1535,7 +1535,7 @@ struct SubmitAppView: View {
                 }
                 Picker("Category", selection: $macPayload.category) {
                     Text("Choose…").tag("")
-                    ForEach(macCategories, id: \.self) { Text($0).tag($0) }
+                    ForEach(macCategories, id: \.self) { Text(LocalizedStringKey($0)).tag($0) }
                 }
                 .accessibilityHint(String(localized: "Required."))
                 TextField("Version Of macOS App Was Tested On", text: $macPayload.osxVersionTested)
@@ -1566,7 +1566,7 @@ struct SubmitAppView: View {
             Section {
                 Picker("Price", selection: $macPayload.price) {
                     Text("Choose…").tag("")
-                    ForEach(priceOptions, id: \.self) { Text($0).tag($0) }
+                    ForEach(priceOptions, id: \.self) { Text(LocalizedStringKey($0)).tag($0) }
                 }
                 .accessibilityHint(String(localized: "Required."))
             } header: {
@@ -1606,7 +1606,7 @@ struct SubmitAppView: View {
             Section("Usability") {
                 Picker("Usability", selection: $macPayload.usability) {
                     Text("Choose…").tag("")
-                    ForEach(macUsabilityOptions, id: \.self) { Text($0).tag($0) }
+                    ForEach(macUsabilityOptions, id: \.self) { Text(LocalizedStringKey($0)).tag($0) }
                 }
                 .accessibilityHint(String(localized: "Required. How easy the app is to use as a blind or low-vision user overall."))
             }
@@ -1941,8 +1941,8 @@ struct SubmitAppView: View {
                             .foregroundStyle(.orange)
                             .font(.subheadline.weight(.semibold))
                         Text(duplicateMatches.count == 1
-                            ? "An app entry already in the directory has a similar name:"
-                            : "\(duplicateMatches.count) app entries already in the directory have a similar name:")
+                            ? String(localized: "An app entry already in the directory has a similar name:")
+                            : String(localized: "\(duplicateMatches.count) app entries already in the directory have a similar name:"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         ForEach(duplicateMatches) { match in
@@ -2159,7 +2159,7 @@ struct SubmitAppView: View {
             return
         }
         if !exactDuplicateMatches.isEmpty {
-            let message = "This app already appears to exist in the AppleVis App Directory. Please open the existing entry instead of submitting a duplicate."
+            let message = String(localized: "This app already appears to exist in the AppleVis App Directory. Please open the existing entry instead of submitting a duplicate.")
             error = message
             await announceWizardFailure(message, focus: $isErrorFocused)
             return
@@ -2193,8 +2193,9 @@ struct SubmitAppView: View {
             error = e.localizedDescription
             await announceWizardFailure(e.localizedDescription, focus: $isErrorFocused)
         } catch {
-            self.error = "Couldn't submit app."
-            await announceWizardFailure("Couldn't submit app.", focus: $isErrorFocused)
+            let message = String(localized: "Couldn't submit app.")
+            self.error = message
+            await announceWizardFailure(message, focus: $isErrorFocused)
         }
         isSubmitting = false
     }
@@ -2237,8 +2238,9 @@ struct SubmitAppView: View {
             error = e.localizedDescription
             await announceWizardFailure(e.localizedDescription, focus: $isErrorFocused)
         } catch {
-            self.error = "Couldn't submit app."
-            await announceWizardFailure("Couldn't submit app.", focus: $isErrorFocused)
+            let message = String(localized: "Couldn't submit app.")
+            self.error = message
+            await announceWizardFailure(message, focus: $isErrorFocused)
         }
         isSubmitting = false
     }
@@ -2267,8 +2269,9 @@ struct SubmitAppView: View {
             error = e.localizedDescription
             await announceWizardFailure(e.localizedDescription, focus: $isErrorFocused)
         } catch {
-            self.error = "Couldn't submit app."
-            await announceWizardFailure("Couldn't submit app.", focus: $isErrorFocused)
+            let message = String(localized: "Couldn't submit app.")
+            self.error = message
+            await announceWizardFailure(message, focus: $isErrorFocused)
         }
         isSubmitting = false
     }
@@ -2297,8 +2300,9 @@ struct SubmitAppView: View {
             error = e.localizedDescription
             await announceWizardFailure(e.localizedDescription, focus: $isErrorFocused)
         } catch {
-            self.error = "Couldn't submit app."
-            await announceWizardFailure("Couldn't submit app.", focus: $isErrorFocused)
+            let message = String(localized: "Couldn't submit app.")
+            self.error = message
+            await announceWizardFailure(message, focus: $isErrorFocused)
         }
         isSubmitting = false
     }

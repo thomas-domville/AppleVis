@@ -73,7 +73,7 @@ struct SubmitBugView: View {
         let length = newValue.trimmingCharacters(in: .whitespacesAndNewlines).count
         if !descriptionMinimumAnnounced && length >= 30 {
             descriptionMinimumAnnounced = true
-            UIAccessibility.post(notification: .announcement, argument: "Minimum length reached. You can now continue.")
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "Minimum length reached. You can now continue."))
         } else if descriptionMinimumAnnounced && length < 30 {
             descriptionMinimumAnnounced = false
         }
@@ -400,12 +400,12 @@ struct SubmitBugView: View {
             }
             Section("Where It Happens") {
                 Picker("Platform", selection: $platform) {
-                    ForEach(platforms, id: \.self) { Text($0) }
+                    ForEach(platforms, id: \.self) { Text(LocalizedStringKey($0)) }
                 }
                 TextField("Software Version", text: $softwareVersion)
                     .accessibilityHint(String(localized: "Required."))
                 Picker("Can you reproduce it?", selection: $canReproduce) {
-                    ForEach(reproduceOptions, id: \.self) { Text($0) }
+                    ForEach(reproduceOptions, id: \.self) { Text(LocalizedStringKey($0)) }
                 }
             }
             // Genuinely required on the live form — see `bugInfoValid`'s
@@ -429,7 +429,7 @@ struct SubmitBugView: View {
             }
             Section("Recognition") {
                 Picker("Recognize your contribution?", selection: $recognition) {
-                    ForEach(recognitionOptions, id: \.self) { Text($0) }
+                    ForEach(recognitionOptions, id: \.self) { Text(LocalizedStringKey($0)) }
                 }
                 .pickerStyle(.navigationLink)
                 .accessibilityHint(String(localized: "Controls how you're credited if this report leads to a fix."))

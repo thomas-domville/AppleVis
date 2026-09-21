@@ -82,7 +82,7 @@ struct SubmitPodcastView: View {
         let length = newValue.trimmingCharacters(in: .whitespacesAndNewlines).count
         if !descriptionMinimumAnnounced && length >= 20 {
             descriptionMinimumAnnounced = true
-            UIAccessibility.post(notification: .announcement, argument: "Minimum length reached. You can now continue.")
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "Minimum length reached. You can now continue."))
         } else if descriptionMinimumAnnounced && length < 20 {
             descriptionMinimumAnnounced = false
         }

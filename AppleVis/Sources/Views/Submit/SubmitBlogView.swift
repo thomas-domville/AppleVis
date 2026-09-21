@@ -117,7 +117,7 @@ struct SubmitBlogView: View {
         let length = newValue.trimmingCharacters(in: .whitespacesAndNewlines).count
         if !blogDraftMinimumAnnounced && length >= 50 {
             blogDraftMinimumAnnounced = true
-            UIAccessibility.post(notification: .announcement, argument: "Minimum length reached. You can now continue.")
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "Minimum length reached. You can now continue."))
         } else if blogDraftMinimumAnnounced && length < 50 {
             blogDraftMinimumAnnounced = false
         }
@@ -240,7 +240,7 @@ struct SubmitBlogView: View {
                     .accessibilityHint(String(localized: "Required."))
                 Picker("Category", selection: $category) {
                     Text("Choose a category").tag("")
-                    ForEach(Self.categories, id: \.self) { Text($0).tag($0) }
+                    ForEach(Self.categories, id: \.self) { Text(LocalizedStringKey($0)).tag($0) }
                 }
                 .accessibilityHint(String(localized: "Required."))
             }
@@ -437,7 +437,7 @@ struct SubmitBlogView: View {
                 return
             }
             blogDraft = text
-            UIAccessibility.post(notification: .announcement, argument: "Imported \(text.count) characters.")
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "Imported \(text.count) characters."))
         case .failure:
             toast.error(String(localized: "Couldn't import that file."))
         }
@@ -461,11 +461,11 @@ struct SubmitBlogView: View {
 
     private func pasteFromClipboard() {
         guard let text = UIPasteboard.general.string, !text.isEmpty else {
-            UIAccessibility.post(notification: .announcement, argument: "Clipboard is empty.")
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "Clipboard is empty."))
             return
         }
         blogDraft = text
-        UIAccessibility.post(notification: .announcement, argument: "Pasted \(text.count) characters.")
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "Pasted \(text.count) characters."))
     }
 
     private var reviewSection: some View {

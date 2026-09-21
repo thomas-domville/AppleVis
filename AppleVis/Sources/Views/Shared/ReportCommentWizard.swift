@@ -473,7 +473,7 @@ struct ReportCommentWizard: View {
     private func submit() async {
         guard canSend else { return }
         isSubmitting = true; error = nil
-        UIAccessibility.post(notification: .announcement, argument: "Sending your report…")
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "Sending your report…"))
 
         let result = await DrupalFormClient.submitContact(
             name: displayName.trimmingCharacters(in: .whitespaces),
@@ -484,7 +484,7 @@ struct ReportCommentWizard: View {
         switch result {
         case .ok:
             SoundPlayer.shared.play(.success)
-            UIAccessibility.post(notification: .announcement, argument: "Report sent successfully.")
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "Report sent successfully."))
             if !isSignedIn {
                 preferences.lastGuestEmail = email.trimmingCharacters(in: .whitespaces)
             }
