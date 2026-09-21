@@ -651,6 +651,8 @@ struct ComposeBugCommentView: View {
                 if let warning = guidelines.topWarning {
                     GuidelinesReminderView(
                         warning: warning,
+                        draftText: commentText,
+                        context: "Bug Report Comment",
                         onDismiss: { guidelines.dismiss() },
                         onRewriteRespectfully: {
                             Task {

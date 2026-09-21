@@ -13,8 +13,18 @@ enum AccountAnniversary {
     /// same calendar year, or couldn't be resolved). Marks the year as
     /// shown as a side effect, so calling this again this year always
     /// returns nil even if called repeatedly.
+    ///
+    /// `isFirstDeviceVisit` should be true on a device's very first Home
+    /// load for this sign-in (fresh install, or first sign-in ever) — the
+    /// "already shown this year" bookkeeping below lives in local
+    /// UserDefaults, which a reinstall wipes, so without this a returning
+    /// member whose real anniversary already passed earlier in the year
+    /// would get congratulated again the moment they reinstall, right out
+    /// of onboarding. In that case the year is still marked consumed so it
+    /// won't pop up later this session either — celebrating resumes on the
+    /// account's next genuine anniversary.
     @MainActor
-    static func checkAndConsume(for user: AuthUser) async -> Int? {
+    static func checkAndConsume(for user: AuthUser, isFirstDeviceVisit: Bool = false) async -> Int? {
         guard let joinDate = await resolvedJoinDate(for: user) else { return nil }
 
         let calendar = Calendar.current
@@ -34,6 +44,7 @@ enum AccountAnniversary {
         guard currentYear > lastShown else { return nil }
 
         UserDefaults.standard.set(currentYear, forKey: shownKey)
+        guard !isFirstDeviceVisit else { return nil }
         return currentYear - joinYear
     }
 

@@ -5,20 +5,37 @@ import Combine
 /// trips one of the AppleVis posting-guideline checks. Never blocks posting.
 struct GuidelinesReminderView: View {
     let warning: GuidelineWarning
+    /// The actual draft text this warning fired on — included in a false-
+    /// positive report so the editorial team can see exactly what tripped
+    /// the rule, not just which rule it was.
+    let draftText: String
+    /// Short, human-readable label for where this banner is showing (e.g.
+    /// "Forum Topic", "Contact Us") — included in a false-positive report
+    /// for the same reason.
+    let context: String
     let onDismiss: () -> Void
     let onRewriteRespectfully: (() -> Void)?
 
-    init(warning: GuidelineWarning, onDismiss: @escaping () -> Void) {
+    init(warning: GuidelineWarning, draftText: String, context: String, onDismiss: @escaping () -> Void) {
         self.warning = warning
+        self.draftText = draftText
+        self.context = context
         self.onDismiss = onDismiss
         self.onRewriteRespectfully = nil
     }
 
-    init(warning: GuidelineWarning, onDismiss: @escaping () -> Void, onRewriteRespectfully: @escaping () -> Void) {
+    init(warning: GuidelineWarning, draftText: String, context: String, onDismiss: @escaping () -> Void, onRewriteRespectfully: @escaping () -> Void) {
         self.warning = warning
+        self.draftText = draftText
+        self.context = context
         self.onDismiss = onDismiss
         self.onRewriteRespectfully = onRewriteRespectfully
     }
+
+    @EnvironmentObject private var auth: AuthStore
+    @EnvironmentObject private var toast: ToastStore
+    @State private var isReportingFalsePositive = false
+    @State private var hasReportedFalsePositive = false
 
     private static let guidelinesURL = URL(string: "https://www.applevis.com/help/guidelines")!
 
@@ -81,10 +98,61 @@ struct GuidelinesReminderView: View {
                 }
                 .accessibilityHint(String(localized: "Opens the AppleVis guidelines page in Safari."))
             }
+
+            // Guest composers (Contact Us) have no account email to attach
+            // a report to, so this stays signed-in only rather than adding
+            // a whole extra guest-details capture just for this. A visible,
+            // persistent confirmation replaces the button after a
+            // successful report — not just a toast — so it's still clear
+            // something happened to anyone who missed it. Requested
+            // directly.
+            if auth.isSignedIn {
+                if hasReportedFalsePositive {
+                    Label("Reported — thanks for the feedback.", systemImage: "checkmark.circle.fill")
+                        .font(.caption).fontWeight(.semibold)
+                        .foregroundStyle(config.text)
+                        .accessibilityElement(children: .combine)
+                } else {
+                    Button(action: reportFalsePositive) {
+                        if isReportingFalsePositive {
+                            HStack(spacing: 6) {
+                                ProgressView().controlSize(.small)
+                                Text("Reporting…")
+                            }
+                        } else {
+                            Text("This Doesn't Seem Right")
+                        }
+                    }
+                    .font(.caption).fontWeight(.semibold)
+                    .foregroundStyle(config.text)
+                    .disabled(isReportingFalsePositive)
+                    .accessibilityHint(String(localized: "Reports this warning to the AppleVis editorial team as a possible false positive."))
+                }
+            }
         }
         .padding(14)
         .background(config.bg, in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(config.border, lineWidth: 1.5))
+    }
+
+    private func reportFalsePositive() {
+        guard let user = auth.user, !isReportingFalsePositive else { return }
+        isReportingFalsePositive = true
+        Task {
+            let ok = await GuidelineFalsePositiveReporter.report(
+                warning: warning, draftText: draftText, context: context,
+                reporterName: user.name, reporterEmail: user.email
+            )
+            isReportingFalsePositive = false
+            if ok {
+                hasReportedFalsePositive = true
+                SoundPlayer.shared.play(.success)
+                toast.success(String(localized: "Thanks — reported to our editorial team."))
+                UIAccessibility.post(notification: .announcement, argument: "Thanks — reported to our editorial team.")
+            } else {
+                toast.error(String(localized: "Couldn't send that report. Try again."))
+            }
+        }
     }
 }
 

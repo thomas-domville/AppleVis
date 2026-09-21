@@ -42,8 +42,12 @@ struct OnboardingView: View {
             // very first screen. Demoted to a plain text link after each
             // step's own content instead, next to a plain-language reason
             // it's safe to tap. Hidden on the last step: by then there's
-            // nothing left to skip. Requested directly.
-            if step < totalSteps - 1 {
+            // nothing left to skip. Also hidden on Welcome (step 0): Skip
+            // Setup still finishes onboarding and lets someone use the app,
+            // so it's a form of "continuing" too — it shouldn't be reachable
+            // before the Terms of Service/Privacy Policy agreement on that
+            // step has actually been made via Accept and Get Started.
+            if step > 0 && step < totalSteps - 1 {
                 VStack(spacing: 4) {
                     Button("Skip Setup") { showSkipConfirm = true }
                         .font(.subheadline)
@@ -291,7 +295,7 @@ private struct WelcomeStep: View {
                 .padding(.bottom, 8)
 
                 Button(action: onNext) {
-                    Text("Get Started")
+                    Text("Accept and Get Started")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
@@ -299,7 +303,7 @@ private struct WelcomeStep: View {
                 .buttonStyle(.borderedProminent)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 32)
-                .accessibilityHint(String(localized: "Advances to the next setup step."))
+                .accessibilityHint(String(localized: "Agrees to our Terms of Service and Privacy Policy, and advances to the next setup step."))
             }
         }
     }

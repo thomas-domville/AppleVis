@@ -56,6 +56,12 @@ struct CommunityAgreementView: View {
                     Text("Most of the time, we'll simply give you a friendly heads-up if something might be worth another look. For some types of content that aren't permitted on AppleVis, we'll ask you to make a change before posting.")
                     Text("Some guideline checks can use Apple's on-device intelligence when it's available. These checks happen on your device rather than sending your draft to an outside AI service.")
                     Text("By choosing Agree and Continue, you're agreeing to follow the AppleVis Community Guidelines when participating in the community.")
+                    // Previously the only explanation of what "I Don't Agree"
+                    // actually does lived in its VoiceOver-only
+                    // accessibilityHint below — a sighted user swiping
+                    // through on screen saw two buttons with no stated
+                    // consequence for the second one. Requested directly.
+                    Text("If you'd rather not agree right now, that's okay — AppleVis stays fully browsable without signing in, and we'll ask again the next time you try to sign in.")
                 }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)

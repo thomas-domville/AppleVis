@@ -52,7 +52,19 @@ enum ContentSubmissionPolicy {
     static func toneConcern(in text: String) -> ToneConcern? {
         let highPatterns = [
             #"\b(you|you're|you are|u r)\s+(an?\s+)?(idiot|moron|loser|stupid|dumb|clown|fool|jerk)\b"#,
-            #"\b(shut\s+up|go\s+away|nobody\s+wants\s+you|you\s+should\s+leave)\b"#,
+            #"\b(nobody\s+wants\s+you|you\s+should\s+leave)\b"#,
+            // Both scoped to a "you" subject (2026-09-21, live-data mock
+            // scan) — bare "go away" matched "the bugs go away"/"speech
+            // does not go away" (a symptom disappearing), and bare "shut
+            // up" matched "the browser learning to shut up" (a changelog
+            // describing quieter notifications) — neither aimed at a
+            // person. "you ___" still catches the genuinely hostile,
+            // directed form of each; the bare form drops to medium below
+            // rather than disappearing outright, since it's still worth a
+            // human glance, just not severe enough to block a post over.
+            // Reported directly.
+            #"\byou\s+(should\s+)?go\s+away\b"#,
+            #"\byou\s+shut\s+up\b"#,
             #"\b(kill\s+yourself|kys|i\s+hope\s+you\s+(die|suffer))\b"#,
             #"\b(all|those)\s+(blind|disabled|deaf|autistic|lgbt|gay|trans|black|white|asian|jewish|muslim|christian)\s+(people\s+)?(are|should)\b"#,
             #"\b(troll|trolling)\b.*\b(shut\s+up|go\s+away|idiot|moron|stupid)\b"#,
@@ -73,6 +85,13 @@ enum ContentSubmissionPolicy {
             #"\b(learn\s+to\s+read|use\s+your\s+brain|you\s+clearly\s+don't\s+know|you\s+obviously\s+don't\s+understand)\b"#,
             #"\b(stop\s+(whining|complaining|crying)|quit\s+(whining|complaining|crying))\b"#,
             #"\b(what\s+is\s+wrong\s+with\s+you|are\s+you\s+serious\s+right\s+now)\b"#,
+            // Only ever reached when the high-severity "you shut up" above
+            // didn't match — catches the ambiguous bare form ("shut up,"
+            // no clear personal target) at a severity that flags it for a
+            // moderator without blocking a post over it outright. See the
+            // high-severity comment above for the false positive that
+            // prompted splitting these.
+            #"\bshut\s+up\b"#,
         ]
         if mediumPatterns.contains(where: { matches(text, $0, caseInsensitive: true) }) {
             return .medium
@@ -82,17 +101,53 @@ enum ContentSubmissionPolicy {
         // — a common filler idiom ("a piece of mail or whatever") that this
         // pattern's unbounded ".*[!?]" was matching against any "!"/"?"
         // anywhere later in the message, however unrelated, misreading
-        // entirely friendly messages as a tone concern.
-        let lowPatterns = [
-            #"\b(obviously|clearly|come\s+on)\b.*[!?]"#,
+        // entirely friendly messages as a tone concern. Still not enough
+        // (2026-09-21, live-data mock scan): "whatever I am listening
+        // [to] stop[ped]... Anyone having issues?" matched even though
+        // "whatever" was a relative pronoun, not the dismissive
+        // interjection, and the "?" belonged to an unrelated sentence two
+        // clauses later. Scoped to one sentence at a time now — the same
+        // technique `announcementNeedsApproval` below already uses —
+        // instead of matching a "!"/"?" anywhere later in the whole text.
+        // Reported directly.
+        // "come on" dropped from this pattern (2026-09-21, live-data mock
+        // scan) — "Come on, Sarries!" was cheering on a rugby team, not
+        // being dismissive. Unlike "obviously"/"clearly," which are rarely
+        // used to express genuine enthusiasm, "come on" is common as a
+        // cheer or encouragement and too ambiguous to treat as a tone
+        // signal on its own. Reported directly.
+        let lowSentencePatterns = [
+            #"\b(obviously|clearly)\b.*[!?]"#,
             #"\b(?<!or\s)whatever\b.*[!?]"#,
-            #"\b(i\s+can't\s+believe|that's\s+absurd|that's\s+annoying)\b"#,
         ]
-        if lowPatterns.contains(where: { matches(text, $0, caseInsensitive: true) }) {
+        let lowSentenceHit = sentenceChunks(text).contains { sentence in
+            lowSentencePatterns.contains { matches(sentence, $0, caseInsensitive: true) }
+        }
+        if lowSentenceHit || matches(text, #"\b(i\s+can't\s+believe|that's\s+absurd|that's\s+annoying)\b"#, caseInsensitive: true) {
             return .low
         }
 
         return nil
+    }
+
+    /// Splits `text` into sentence-sized chunks, each ending with (and
+    /// including) its own terminating `.`/`!`/`?` — unlike
+    /// `components(separatedBy:)`, which would strip that punctuation out
+    /// entirely, useless for a pattern that specifically needs to check
+    /// whether a `!`/`?` appears within the *same* sentence as a trigger
+    /// word rather than anywhere later in the whole text.
+    private static func sentenceChunks(_ text: String) -> [String] {
+        var chunks: [String] = []
+        var current = ""
+        for char in text {
+            current.append(char)
+            if ".!?".contains(char) {
+                chunks.append(current)
+                current = ""
+            }
+        }
+        if !current.isEmpty { chunks.append(current) }
+        return chunks
     }
 
     static func policyText(subject: String? = nil, body: String) -> String {

@@ -272,6 +272,8 @@ struct SubmitBugView: View {
                 Section {
                     GuidelinesReminderView(
                         warning: warning,
+                        draftText: description,
+                        context: "Submit Bug Report",
                         onDismiss: { guidelines.dismiss() },
                         onRewriteRespectfully: {
                             Task {

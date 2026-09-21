@@ -396,6 +396,8 @@ struct ContactView: View {
                 Section {
                     GuidelinesReminderView(
                         warning: warning,
+                        draftText: message,
+                        context: "Contact Us",
                         onDismiss: { guidelines.dismiss() },
                         onRewriteRespectfully: {
                             Task {

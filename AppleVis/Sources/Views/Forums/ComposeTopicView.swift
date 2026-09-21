@@ -106,6 +106,8 @@ struct ComposeTopicView: View {
                             Section {
                                 GuidelinesReminderView(
                                     warning: warning,
+                                    draftText: bodyText,
+                                    context: "Forum Topic",
                                     onDismiss: { guidelines.dismiss() },
                                     onRewriteRespectfully: {
                                         Task {
@@ -361,6 +363,8 @@ struct ComposeReplyView: View {
                 if let warning = guidelines.topWarning {
                     GuidelinesReminderView(
                         warning: warning,
+                        draftText: bodyText,
+                        context: "Forum Reply",
                         onDismiss: { guidelines.dismiss() },
                         onRewriteRespectfully: {
                             Task {

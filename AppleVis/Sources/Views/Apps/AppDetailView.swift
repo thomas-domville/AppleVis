@@ -391,7 +391,7 @@ struct AppDetailView: View {
         guard let user = auth.user, let detail else { return }
         try await APIClient.shared.content.editNode(nodeId: detail.id, nodeType: nodeTypeSuffix, title: title, body: body, csrfToken: user.csrfToken)
         toast.success(String(localized: "App Entry updated"))
-        await load()
+        await load(forceRefresh: true)
     }
 
     private func unpublishApp(_ detail: AppDetail) async {
@@ -1065,10 +1065,20 @@ struct AppDetailView: View {
         UIAccessibility.post(notification: .announcement, argument: summary)
     }
 
-    private func load() async {
+    /// `forceRefresh` bypasses `apps:detail:`'s 15-minute "fresh" cache
+    /// window — needed by every reload that follows this view's own
+    /// mutation (saveAppEdit, updateAppInformationFromStore), since without
+    /// it the "fresh" cache from the page's initial load would just hand
+    /// back the pre-edit copy, showing a success toast while the visible
+    /// content silently stayed stale. The normal .task/ErrorView-retry
+    /// loads leave this false, since a fast cache-first load is exactly
+    /// what's wanted there. Reported directly: refreshing an app's details
+    /// from the App Store played a success tone, but the About section
+    /// still showed the old description.
+    private func load(forceRefresh: Bool = false) async {
         isLoading = true; error = nil
         do {
-            detail = try await APIClient.shared.apps.detail(id: appId, platform: platform)
+            detail = try await APIClient.shared.apps.detail(id: appId, platform: platform, forceRefresh: forceRefresh)
             appleVisTitle = detail?.name
             itunesMetadata = nil
             appStoreLookupIssue = nil
@@ -1261,7 +1271,7 @@ struct AppDetailView: View {
             )
             toast.success(String(localized: "App details refreshed"))
             appInfoRefreshRequest = nil
-            await load()
+            await load(forceRefresh: true)
         } catch APIError.forbidden {
             toast.error(String(localized: "You don't have permission to refresh this app."))
         } catch APIError.unauthorized {
@@ -1435,11 +1445,19 @@ struct AppReviewRow: View {
             }
             .font(.subheadline)
             .accessibilityElement(children: .combine)
+            // Every other comment type in the app (ForumReply, and the
+            // shared CommentRow used by Guides/Blogs/Podcasts/Bugs) marks
+            // its header as a heading, so VoiceOver's Headings rotor can
+            // jump straight between comments — this row never had it, so
+            // App Entry reviews were the one place that didn't work.
+            // Reported directly.
+            .accessibilityAddTraits(.isHeader)
             .accessibilityLabel(
                 String(localized: "Comment \(index) of \(total) by \(review.authorName). ") +
                 (review.rating.map { String(localized: "\($0) out of 5 stars. ") } ?? "") +
                 (displayedSubject.map { String(localized: "Subject: \($0).") } ?? "")
             )
+            .accessibilityHint(String(localized: "Actions available: copy, share, and more."))
             .modifier(OptionalReplyFocus(binding: focusBinding, id: review.id))
             .readAloudAction(review.body.strippingHTMLTags())
             // "Comment" throughout, matching Forums/Blogs/Bugs' shared
@@ -1450,9 +1468,13 @@ struct AppReviewRow: View {
             .modifier(ConditionalAccessibilityAction(isActive: onReplyTo != nil, name: "Reply to this Comment") { onReplyTo?() })
             .accessibilityAction(named: Text("Copy Comment Text")) { copyText() }
             .accessibilityAction(named: Text("Share Comment")) { presentShareSheet() }
-            .accessibilityAction(named: Text("Mark as Helpful")) {
-                toast.warning(String(localized: "Helpful votes are coming once the Drupal Flags API is confirmed."))
-            }
+            // Same call already made for Forums (see ForumTopicDetailView's
+            // ReplyView): this only ever showed a "coming once the Drupal
+            // Flags API is confirmed" toast, no real functionality yet, and
+            // the shared CommentRow used by Guides/Blogs/Podcasts/Bugs never
+            // had it either — App Entry was the one place still exposing an
+            // action that does nothing real. Removed until that backend
+            // work actually lands. Reported directly.
             .accessibilityAction(named: Text("Report Comment")) {
                 showReportSheet = true
             }
@@ -1491,9 +1513,6 @@ struct AppReviewRow: View {
             }
             Button { presentShareSheet() } label: {
                 Label("Share Comment", systemImage: "square.and.arrow.up")
-            }
-            Button { toast.warning(String(localized: "Helpful votes are coming once the Drupal Flags API is confirmed.")) } label: {
-                Label("Mark as Helpful", systemImage: "hand.thumbsup")
             }
             Button { showReportSheet = true } label: {
                 Label("Report Comment", systemImage: "flag")
@@ -1713,6 +1732,8 @@ struct ComposeAppReviewView: View {
                 if let warning = guidelines.topWarning {
                     GuidelinesReminderView(
                         warning: warning,
+                        draftText: reviewText,
+                        context: "App Entry Comment",
                         onDismiss: { guidelines.dismiss() },
                         onRewriteRespectfully: {
                             Task {

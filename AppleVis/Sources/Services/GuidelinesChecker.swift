@@ -76,8 +76,17 @@ enum GuidelinesChecker {
             }
         }
 
-        // Personal information (email address)
-        if matches(text, #"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"#) {
+        // Personal information (email address). Excludes well-known
+        // institutional/role addresses (2026-09-21, live-data mock scan) —
+        // "accessibility@apple.com," posted while pointing someone to
+        // Apple's own official channel, matched just as readily as an
+        // actual personal email, despite not being anyone's personal
+        // contact info at all. Also excludes generic placeholder local
+        // parts ("user," "example") — a wider 21-day pass turned up
+        // "Example: User@iCloud.com" (illustrating a domain format, not
+        // anyone's real address) tripping the same warning. Reported
+        // directly.
+        if matches(text, #"\b(?!(?:accessibility|support|contact|info|help|press|sales|admin|team|hello|feedback|abuse|legal|privacy|webmaster|postmaster|user|example|someone|yourname)@)[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"#) {
             warnings.append(GuidelineWarning(
                 id: "personal-info", rule: "Personal Information",
                 message: "Your post appears to contain an email address. For your privacy and security, the AppleVis guidelines recommend not sharing personal contact information publicly.",

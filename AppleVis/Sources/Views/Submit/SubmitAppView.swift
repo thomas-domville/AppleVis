@@ -984,6 +984,8 @@ struct SubmitAppView: View {
                 Section {
                     GuidelinesReminderView(
                         warning: warning,
+                        draftText: payload.accessibilityComments,
+                        context: "Submit App (iOS)",
                         onDismiss: { guidelines.dismiss() },
                         onRewriteRespectfully: {
                             Task {
@@ -1183,6 +1185,8 @@ struct SubmitAppView: View {
                 Section {
                     GuidelinesReminderView(
                         warning: warning,
+                        draftText: tvPayload.accessibilityComments,
+                        context: "Submit App (tvOS)",
                         onDismiss: { guidelines.dismiss() },
                         onRewriteRespectfully: {
                             Task {
@@ -1393,6 +1397,8 @@ struct SubmitAppView: View {
                 Section {
                     GuidelinesReminderView(
                         warning: warning,
+                        draftText: watchPayload.accessibilityComments,
+                        context: "Submit App (watchOS)",
                         onDismiss: { guidelines.dismiss() },
                         onRewriteRespectfully: {
                             Task {
@@ -1624,6 +1630,8 @@ struct SubmitAppView: View {
                 Section {
                     GuidelinesReminderView(
                         warning: warning,
+                        draftText: macPayload.accessibilityComments,
+                        context: "Submit App (macOS)",
                         onDismiss: { guidelines.dismiss() },
                         onRewriteRespectfully: {
                             Task {

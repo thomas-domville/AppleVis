@@ -77,18 +77,17 @@ struct GuidelineFlag: Identifiable {
     }
 
     /// The root item itself uses its content kind's own name ("Topic,"
-    /// "Blog Post," "App Entry," …); a comment underneath it uses the term
-    /// that content type's own comment thread actually uses — "Reply" for
-    /// forums, "Review" for app/TV/Watch/Mac directory entries, "Comment"
-    /// for everything else. Shared by the admin list row and its swipe
-    /// actions so both agree on what to call a given flag.
+    /// "Blog Post," "App Entry," …); a comment underneath it is always
+    /// "Comment" — matching every actual comment thread page's own
+    /// unified terminology (ForumTopicDetailView's header/actions/toasts
+    /// all say "Comment" now, not "Reply"; App Entry reviews were the same
+    /// fix, more recently). This used to special-case "Reply" for forums
+    /// and "Review" for app entries, which just went stale once those
+    /// pages themselves stopped using those words. Shared by the admin
+    /// list row and its swipe actions so both agree on what to call a
+    /// given flag. Reported directly.
     var kindLabel: String {
-        guard !isRootItem else { return kind.displayName }
-        switch kind {
-        case .forumTopic:  return String(localized: "Reply")
-        case .appListing:  return String(localized: "Review")
-        default:           return String(localized: "Comment")
-        }
+        isRootItem ? kind.displayName : String(localized: "Comment")
     }
 
     enum ActionTarget {

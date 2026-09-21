@@ -527,6 +527,8 @@ struct ComposeBlogCommentView: View {
                 if let warning = guidelines.topWarning {
                     GuidelinesReminderView(
                         warning: warning,
+                        draftText: commentText,
+                        context: "Blog Post Comment",
                         onDismiss: { guidelines.dismiss() },
                         onRewriteRespectfully: {
                             Task {

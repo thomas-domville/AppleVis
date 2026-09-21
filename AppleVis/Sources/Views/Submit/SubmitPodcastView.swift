@@ -255,6 +255,8 @@ struct SubmitPodcastView: View {
                 Section {
                     GuidelinesReminderView(
                         warning: warning,
+                        draftText: description,
+                        context: "Submit Podcast",
                         onDismiss: { guidelines.dismiss() },
                         onRewriteRespectfully: {
                             Task {

@@ -387,7 +387,7 @@ struct HomeView: View {
     private func checkAnniversary() async {
         guard !hasCheckedAnniversary, preferences.homeStartupBehavior != .quiet, let user = auth.user else { return }
         hasCheckedAnniversary = true
-        guard let years = await AccountAnniversary.checkAndConsume(for: user) else { return }
+        guard let years = await AccountAnniversary.checkAndConsume(for: user, isFirstDeviceVisit: !vm.isReturningVisit) else { return }
         anniversaryYears = years
         showAnniversary = true
     }
@@ -980,16 +980,18 @@ private struct MouseRecapHomeContent: View {
             items: resources
         ) { resource in
             TranslatedMouseRecapTitle(kind: "resource", id: resource.id, title: resource.title) { resolvedTitle, wasTranslated in
-                newsletterCard(
-                    title: resolvedTitle,
-                    kicker: resource.kind.displayName,
-                    details: digest.resourceDetails(resource),
-                    body: aiBlurbs[resource.id] ?? digest.newsletterBody(for: resource),
-                    accent: ContentKind.resource.accentColor,
-                    wasTranslated: wasTranslated
-                ) {
-                    NavigationLink(value: resource) {
-                        Label("Read Guide", systemImage: "arrow.right.circle")
+                ResolvedResourceReadingTime(resource: resource) { readingTimeText in
+                    newsletterCard(
+                        title: resolvedTitle,
+                        kicker: resource.kind.displayName,
+                        details: digest.resourceDetails(resource) + (readingTimeText.map { [$0] } ?? []),
+                        body: aiBlurbs[resource.id] ?? digest.newsletterBody(for: resource),
+                        accent: ContentKind.resource.accentColor,
+                        wasTranslated: wasTranslated
+                    ) {
+                        NavigationLink(value: resource) {
+                            Label("Read Guide", systemImage: "arrow.right.circle")
+                        }
                     }
                 }
             }
@@ -1533,6 +1535,25 @@ private struct ResolvedBlogReadingTime<Content: View>: View {
         content(readingTimeText)
             .task(id: post.id) {
                 guard let detail = try? await APIClient.shared.blogs.detail(id: post.id) else { return }
+                readingTimeText = ReadingTime.text(forHTMLBody: detail.body)
+            }
+    }
+}
+
+/// Same treatment as blog posts above, for How-To Corner's guides/tutorials/
+/// articles — the list-level `Resource` only carries `summary`, not the full
+/// body, so this borrows the same detail fetch/cache the guide's own screen
+/// already makes. Requested directly, alongside blog reading time.
+private struct ResolvedResourceReadingTime<Content: View>: View {
+    let resource: Resource
+    @ViewBuilder let content: (_ readingTimeText: String?) -> Content
+
+    @State private var readingTimeText: String?
+
+    var body: some View {
+        content(readingTimeText)
+            .task(id: resource.id) {
+                guard let detail = try? await APIClient.shared.resources.detail(id: resource.id) else { return }
                 readingTimeText = ReadingTime.text(forHTMLBody: detail.body)
             }
     }

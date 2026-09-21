@@ -135,6 +135,21 @@ struct ForYouView: View {
                     // Reported directly: focus was jumping out of the
                     // picker on some swipes instead of staying put.
                     Task { await retryAccessibilityFocus(into: $isSectionPickerFocused) }
+                    // That same big content swap also has a second symptom:
+                    // it interrupts VoiceOver's own automatic "speak the new
+                    // accessibilityValue" announcement before it's heard —
+                    // the adjustment tone played but the section name never
+                    // did. Every other swipeable picker in the app only
+                    // re-filters a list beneath it (no comparable disruption)
+                    // and doesn't need this; this is the one picker that
+                    // swaps in a whole different screen. Posted explicitly
+                    // instead, after a short delay so it isn't itself
+                    // swallowed by that same disruption. Reported directly.
+                    let newLabel = pickerAccessibilityLabel(selectedTab)
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(400))
+                        UIAccessibility.post(notification: .announcement, argument: newLabel)
+                    }
                 }
                 .padding()
                 .onChange(of: selectedTab) { _, _ in

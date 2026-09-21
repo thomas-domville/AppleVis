@@ -298,42 +298,60 @@ struct AppEndpoints {
     /// platform), this tries iOS first — the far larger directory — then
     /// TV, then Watch, then Mac, on successive not-founds, rather than
     /// silently assuming iOS and permanently failing to open an entry from
-    /// one of the other three reached that way.
-    func detail(id: String, platform: AppPlatform? = nil) async throws -> AppDetail {
+    /// one of the other three reached that way. `forceRefresh` skips the
+    /// 15-minute "fresh" cache window entirely — needed right after an
+    /// editor's own PATCH (Refresh App Details, Edit, Delete) so the
+    /// re-fetch that follows doesn't just hand back the pre-update cached
+    /// copy. Reported directly: refreshing an app's details from the App
+    /// Store showed a success toast, but the About section kept showing
+    /// the old description because the normal cache-first reload had no
+    /// way to know the cache it was reading from was already stale.
+    func detail(id: String, platform: AppPlatform? = nil, forceRefresh: Bool = false) async throws -> AppDetail {
         if platform == .tvos {
-            return try await tvDetail(id: id)
+            return try await tvDetail(id: id, forceRefresh: forceRefresh)
         }
         if platform == .watchos {
-            return try await watchDetail(id: id)
+            return try await watchDetail(id: id, forceRefresh: forceRefresh)
         }
         if platform == .macos {
-            return try await macDetail(id: id)
+            return try await macDetail(id: id, forceRefresh: forceRefresh)
         }
         if platform == nil {
             do {
-                return try await iosDetail(id: id)
+                return try await iosDetail(id: id, forceRefresh: forceRefresh)
             } catch APIError.notFound {
                 do {
-                    return try await tvDetail(id: id)
+                    return try await tvDetail(id: id, forceRefresh: forceRefresh)
                 } catch APIError.notFound {
                     do {
-                        return try await watchDetail(id: id)
+                        return try await watchDetail(id: id, forceRefresh: forceRefresh)
                     } catch APIError.notFound {
-                        return try await macDetail(id: id)
+                        return try await macDetail(id: id, forceRefresh: forceRefresh)
                     }
                 }
             }
         }
-        return try await iosDetail(id: id)
+        return try await iosDetail(id: id, forceRefresh: forceRefresh)
     }
 
-    /// Review bundle confirmed: comment_node_ios_app_directory.
-    private func iosDetail(id: String) async throws -> AppDetail {
-        try await fetchWithCache(group: .apps, key: "apps:detail:\(id)") {
+    /// Review bundle confirmed: comment_node_ios_app_directory. Sorted
+    /// oldest-first (`created`, not `-created`) — matches every other
+    /// content type's comment thread (Forums, Blogs, Guides, Podcasts, Bug
+    /// Reports all sort this way already). This one query sorted newest-
+    /// first instead, the only content type that did, which is why reviews
+    /// read as out of order compared to the website: replies ("Re:
+    /// Sponsors," "@Guilherme") appeared before the comment they were
+    /// replying to. Verified live against a real app entry with 24
+    /// comments — the site's own `thread` field sorts identically to
+    /// `created` ascending here (no comment on it actually used Drupal's
+    /// reply-to-a-specific-comment feature, so there's no real threading to
+    /// account for, just the reversed date sort). Reported directly.
+    private func iosDetail(id: String, forceRefresh: Bool = false) async throws -> AppDetail {
+        try await fetchWithCache(group: .apps, key: "apps:detail:\(id)", forceRefresh: forceRefresh) {
             async let appRes = client.jsonAPISingle("node/ios_app_directory/\(id)", query: ["include": "uid"])
             async let reviewsRes = client.jsonAPIList(
                 "comment/comment_node_ios_app_directory",
-                query: ["filter[entity_id.id]": id, "sort": "-created", "page[limit]": "100", "include": "uid"]
+                query: ["filter[entity_id.id]": id, "sort": "created", "page[limit]": "100", "include": "uid"]
             )
 
             let appResponse: JsonApiSingleResponse
@@ -390,12 +408,12 @@ struct AppEndpoints {
     /// content type), and `field_usability_tv` instead of `field_usability`.
     /// Review bundle confirmed live: comment_node_tv_directory, same
     /// subject/comment_body/uid shape as iOS's.
-    private func tvDetail(id: String) async throws -> AppDetail {
-        try await fetchWithCache(group: .apps, key: "apps:detail:tv:\(id)") {
+    private func tvDetail(id: String, forceRefresh: Bool = false) async throws -> AppDetail {
+        try await fetchWithCache(group: .apps, key: "apps:detail:tv:\(id)", forceRefresh: forceRefresh) {
             async let appRes = client.jsonAPISingle("node/tv_directory/\(id)", query: ["include": "uid"])
             async let reviewsRes = client.jsonAPIList(
                 "comment/comment_node_tv_directory",
-                query: ["filter[entity_id.id]": id, "sort": "-created", "page[limit]": "100", "include": "uid"]
+                query: ["filter[entity_id.id]": id, "sort": "created", "page[limit]": "100", "include": "uid"]
             )
 
             let appResponse: JsonApiSingleResponse
@@ -453,12 +471,12 @@ struct AppEndpoints {
     /// iOS's split `field_voiceover`/`field_labelling`. Review bundle
     /// confirmed live: comment_node_watch_directory, same
     /// subject/comment_body/uid shape as the other two.
-    private func watchDetail(id: String) async throws -> AppDetail {
-        try await fetchWithCache(group: .apps, key: "apps:detail:watch:\(id)") {
+    private func watchDetail(id: String, forceRefresh: Bool = false) async throws -> AppDetail {
+        try await fetchWithCache(group: .apps, key: "apps:detail:watch:\(id)", forceRefresh: forceRefresh) {
             async let appRes = client.jsonAPISingle("node/watch_directory/\(id)", query: ["include": "uid"])
             async let reviewsRes = client.jsonAPIList(
                 "comment/comment_node_watch_directory",
-                query: ["filter[entity_id.id]": id, "sort": "-created", "page[limit]": "100", "include": "uid"]
+                query: ["filter[entity_id.id]": id, "sort": "created", "page[limit]": "100", "include": "uid"]
             )
 
             let appResponse: JsonApiSingleResponse
@@ -519,12 +537,12 @@ struct AppEndpoints {
     /// the Mac App Store at all. Review bundle confirmed live:
     /// comment_node_mac_app_directory, same subject/comment_body/uid shape
     /// as the other three.
-    private func macDetail(id: String) async throws -> AppDetail {
-        try await fetchWithCache(group: .apps, key: "apps:detail:mac:\(id)") {
+    private func macDetail(id: String, forceRefresh: Bool = false) async throws -> AppDetail {
+        try await fetchWithCache(group: .apps, key: "apps:detail:mac:\(id)", forceRefresh: forceRefresh) {
             async let appRes = client.jsonAPISingle("node/mac_app_directory/\(id)", query: ["include": "uid"])
             async let reviewsRes = client.jsonAPIList(
                 "comment/comment_node_mac_app_directory",
-                query: ["filter[entity_id.id]": id, "sort": "-created", "page[limit]": "100", "include": "uid"]
+                query: ["filter[entity_id.id]": id, "sort": "created", "page[limit]": "100", "include": "uid"]
             )
 
             let appResponse: JsonApiSingleResponse
@@ -583,7 +601,7 @@ struct AppEndpoints {
     func moreReviews(appId: String, offset: Int, platform: AppPlatform) async throws -> [AppReview] {
         let response = try await client.jsonAPIList(
             "comment/\(Self.commentBundle(for: platform))",
-            query: ["filter[entity_id.id]": appId, "sort": "-created", "page[limit]": "100", "page[offset]": "\(offset)", "include": "uid"]
+            query: ["filter[entity_id.id]": appId, "sort": "created", "page[limit]": "100", "page[offset]": "\(offset)", "include": "uid"]
         )
         return response.data.map { Mappers.appReview($0, included: response.included ?? []) }
     }

@@ -686,6 +686,8 @@ struct EditNodeSheet: View {
                     if let warning = guidelines.topWarning {
                         GuidelinesReminderView(
                             warning: warning,
+                            draftText: bodyText,
+                            context: "Edit Post",
                             onDismiss: { guidelines.dismiss() },
                             onRewriteRespectfully: {
                                 Task {

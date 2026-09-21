@@ -191,9 +191,78 @@ struct ChangeItem: Identifiable {
     let title: String
     let description: String
 
-    static let currentVersion = "2026.15"
+    static let currentVersion = "2026.16"
 
     static let current: [ChangeItem] = [
+        ChangeItem(
+            systemImage: "checkmark.shield",
+            tag: .fixed,
+            title: "Skip Setup No Longer Skips Past Agreeing to Our Terms",
+            description: "Setup's Welcome screen says \"By continuing, you agree to our Terms of Service and Privacy Policy\" above its Get Started button — but Skip Setup, right below, was also reachable from that very first screen, letting someone finish setup and start using the app without ever passing through that agreement. Skip Setup now only appears from the second step onward, and Welcome's button is now Accept and Get Started, so agreeing always comes first. Discussed and requested directly."
+        ),
+        ChangeItem(
+            systemImage: "text.bubble",
+            tag: .improved,
+            title: "A Clearer Explanation on Our Community Agreement Screen",
+            description: "The only place that explained what I Don't Agree actually does was a VoiceOver-only accessibility hint on the button itself — anyone reading the screen visually saw two buttons with no stated consequence for the second one. It now says so in plain text too: declining is fine, AppleVis stays fully browsable without signing in, and we'll ask again the next time you try to sign in. Discussed directly."
+        ),
+        ChangeItem(
+            systemImage: "icloud.and.arrow.down",
+            tag: .fixed,
+            title: "Reinstalling No Longer Floods Home with False \"New\" Counts",
+            description: "Reinstalling AppleVis while signed in — or setting up a new device on the same account — pulled your read history back from iCloud, including when you first started using the app. That correctly marked you as a returning visitor, but the separate boundary read history gets compared against never made the same trip, so it fell back to the beginning of time: nearly everything in the feed that hadn't been individually opened before showed up as new all at once, whether it was actually posted yesterday or months ago. Fixed by syncing that boundary the same way the rest of read history already is. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "clock",
+            tag: .new,
+            title: "Reading Time in Mouse Recap's How-To Corner",
+            description: "Podcast Episode cards show how long the episode runs, and Blog Post cards show an estimated reading time — How-To Corner's guides, tutorials, and articles now show the same estimate, alongside the author, date, and comment count already there. Requested directly."
+        ),
+        ChangeItem(
+            systemImage: "list.bullet.rectangle",
+            tag: .accessibility,
+            title: "App Entry Comments Now Reachable with the Headings Rotor",
+            description: "Every comment on a Forum Topic, Guide, Blog Post, Podcast Episode, and Bug Report is marked as a heading, so VoiceOver's Headings rotor can jump straight from one comment to the next — App Entry reviews were the one place that never had it, so they were reachable only by swiping past everything else on the page. Fixed to match. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "hand.thumbsup.slash",
+            tag: .fixed,
+            title: "Removed a Not-Yet-Working Mark as Helpful Action on App Entries",
+            description: "App Entry comments had a Mark as Helpful action, in both the VoiceOver Actions rotor and the long-press menu, that only ever showed a \"coming once the Drupal Flags API is confirmed\" toast — no real functionality behind it yet. Forums already held this back for the same reason, and it was never added to Guides, Blogs, Podcasts, or Bug Reports either. Removed from App Entries too until that backend work actually lands. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "arrow.triangle.2.circlepath",
+            tag: .fixed,
+            title: "App Entry Edits Now Show Up Immediately",
+            description: "Editing an App Entry's title or description showed a success message right away, but the About section kept showing the old text until you left the page and came back — the reload that follows an edit was reading from a 15-minute cache instead of checking the server again. The edit itself was always saved; only the screen was stale. Fixed so a confirmed edit shows up immediately. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "exclamationmark.bubble",
+            tag: .new,
+            title: "Think a Guideline Reminder Got It Wrong? Tell Us",
+            description: "Any guideline reminder or friendly tip shown while composing a topic, reply, comment, or message now has a This Doesn't Seem Right button right next to Got It. It reports the rule, its message, and your draft text straight to our editorial team, so the checker itself can keep improving. Signed in only — dismissing still works exactly as before either way. Requested directly."
+        ),
+        ChangeItem(
+            systemImage: "hand.draw",
+            tag: .accessibility,
+            title: "For You's Section Picker Announces Your New Selection Again",
+            description: "Swiping up or down on For You's section picker (Saved, Following, Recommended, Queue, Downloads) played the change tone but never spoke which section you landed on — switching sections swaps in an entirely different screen underneath, and that swap was interrupting VoiceOver's usual announcement before it could be heard. Every other swipeable picker in the app only re-filters a list, so this was the one place it happened. Fixed by announcing the new selection explicitly instead. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "arrow.up.arrow.down",
+            tag: .fixed,
+            title: "App Entry Comments Now Appear in the Right Order",
+            description: "Every comment on a Forum Topic, Blog Post, Guide, Podcast Episode, and Bug Report is listed oldest to newest, the same order the website shows them in — App Entry reviews were the one place sorted newest first instead, so a reply could appear well before the comment it was replying to. Verified against a real app entry's live comments and the website's own page: fixed to sort oldest first everywhere, matching every other content type. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "party.popper",
+            tag: .fixed,
+            title: "No More Anniversary Popup Right After Reinstalling",
+            description: "A brand-new install could open straight into a Happy Anniversary celebration during setup, for an account that had already had its real anniversary earlier in the year — the \"already celebrated this year\" memory lives on the device, so reinstalling erased it and triggered the popup again the moment Home loaded. A fresh install now quietly notes the year without showing the popup, so celebrating picks back up on the account's next genuine anniversary instead. Reported directly."
+        ),
+    ]
+
+    static let archivedFrom2026_15: [ChangeItem] = [
         ChangeItem(
             systemImage: "person.crop.circle",
             tag: .accessibility,
@@ -664,6 +733,7 @@ struct HistorySection: Identifiable {
     let items: [ChangeItem]
 
     static let all: [HistorySection] = [
+        HistorySection(title: "Also in 2026.15", items: ChangeItem.archivedFrom2026_15),
         HistorySection(title: "Also in 2026.14", items: ChangeItem.archivedFrom2026_14),
         HistorySection(title: "Also in 2026.13", items: [
         ChangeItem(
@@ -1087,62 +1157,6 @@ struct HistorySection: Identifiable {
                 tag: .fixed,
                 title: "More Editorial Tools",
                 description: "AppleVis editors can now see the right edit, unpublish, and delete actions in more places when signed in."
-            ),
-        ]),
-        HistorySection(title: "Also in 2026.10", items: [
-            ChangeItem(
-                systemImage: "person.crop.circle",
-                tag: .improved,
-                title: "Cleaner For You",
-                description: "For You now starts with Saved Items, then Following, Podcast Queue, and Downloads, with a simpler filter picker for saved items."
-            ),
-            ChangeItem(
-                systemImage: "app.badge",
-                tag: .new,
-                title: "App Icon Badge",
-                description: "AppleVis can show a badge count for new activity, based on the notification categories you have turned on."
-            ),
-            ChangeItem(
-                systemImage: "square.grid.2x2",
-                tag: .improved,
-                title: "Redesigned App Directory",
-                description: "The App Directory added platform filters, supported devices, and app pages that can use current App Store details."
-            ),
-            ChangeItem(
-                systemImage: "slider.horizontal.3",
-                tag: .improved,
-                title: "Better Podcast Episode Pages",
-                description: "Podcast episode pages added clearer playback controls, audio enhancements, real durations, chapters, and a Download button on episode cards."
-            ),
-            ChangeItem(
-                systemImage: "plus.circle",
-                tag: .new,
-                title: "Add and Comment Buttons",
-                description: "Home gained an Add button for forum topics and app entries, and detail pages gained a consistent Comment button."
-            ),
-            ChangeItem(
-                systemImage: "dial.medium",
-                tag: .accessibility,
-                title: "More VoiceOver Navigation",
-                description: "New rotor options and card actions make it quicker to jump to new comments, replies to you, and podcast chapters."
-            ),
-            ChangeItem(
-                systemImage: "icloud",
-                tag: .improved,
-                title: "Expanded iCloud Sync",
-                description: "iCloud sync now covers more reading, podcast, saved item, and following state."
-            ),
-            ChangeItem(
-                systemImage: "checkmark.shield",
-                tag: .improved,
-                title: "Safer Posting",
-                description: "AppleVis now gives more guideline reminders, checks for duplicate app submissions, and can sync read status with the website when you are signed in."
-            ),
-            ChangeItem(
-                systemImage: "wrench.and.screwdriver",
-                tag: .fixed,
-                title: "Reliability Fixes",
-                description: "This release fixed repeated VoiceOver card actions, stale sign-in sessions, a duplicate Now Playing card, and a System theme flicker."
             ),
         ]),
     ]

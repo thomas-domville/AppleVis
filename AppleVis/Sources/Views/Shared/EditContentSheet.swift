@@ -55,6 +55,8 @@ struct EditContentSheet: View {
                 if let warning = guidelines.topWarning {
                     GuidelinesReminderView(
                         warning: warning,
+                        draftText: text,
+                        context: title,
                         onDismiss: { guidelines.dismiss() },
                         onRewriteRespectfully: {
                             Task {

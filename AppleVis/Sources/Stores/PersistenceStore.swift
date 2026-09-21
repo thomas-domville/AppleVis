@@ -223,6 +223,15 @@ final class PersistenceStore {
         var itemVisits: [String: ItemVisit]
         var forumsLastVisit: Date?
         var homeFirstVisit: Date?
+        /// Mirrors HomeViewModel's `visitBoundaryKey` ("applevis.home.visitBoundary")
+        /// — without this, a reinstall (or a genuinely new device) restored
+        /// `homeFirstVisit` below and so counted as a returning visitor, but
+        /// had no boundary to compare never-individually-visited items
+        /// against, so HomeViewModel fell back to `.distantPast` and flagged
+        /// nearly the entire feed as new. Reported directly: reinstalling
+        /// while signed in showed a flood of "new" topics/podcasts that
+        /// should have been suppressed the same way a true first launch is.
+        var homeVisitBoundary: Date?
     }
 
     func readHistorySnapshot() -> ReadHistorySnapshot? {
@@ -230,11 +239,15 @@ final class PersistenceStore {
         let homeFirstVisit = defaults.object(forKey: "applevis.lastVisit").map { _ in
             Date(timeIntervalSince1970: defaults.double(forKey: "applevis.lastVisit"))
         }
+        let homeVisitBoundary = defaults.object(forKey: "applevis.home.visitBoundary").map { _ in
+            Date(timeIntervalSince1970: defaults.double(forKey: "applevis.home.visitBoundary"))
+        }
         return ReadHistorySnapshot(
             seenTopicIds: Array(seenTopicIds()),
             itemVisits: allItemVisits(),
             forumsLastVisit: forumsLastVisit,
-            homeFirstVisit: homeFirstVisit
+            homeFirstVisit: homeFirstVisit,
+            homeVisitBoundary: homeVisitBoundary
         )
     }
 
@@ -263,6 +276,10 @@ final class PersistenceStore {
         if let remoteHome = snapshot.homeFirstVisit,
            defaults.object(forKey: "applevis.lastVisit") == nil {
             defaults.set(remoteHome.timeIntervalSince1970, forKey: "applevis.lastVisit")
+        }
+        if let remoteBoundary = snapshot.homeVisitBoundary,
+           defaults.object(forKey: "applevis.home.visitBoundary") == nil {
+            defaults.set(remoteBoundary.timeIntervalSince1970, forKey: "applevis.home.visitBoundary")
         }
     }
 
