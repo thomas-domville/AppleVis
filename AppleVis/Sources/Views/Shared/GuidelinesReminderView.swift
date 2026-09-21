@@ -136,12 +136,12 @@ struct GuidelinesReminderView: View {
     }
 
     private func reportFalsePositive() {
-        guard let user = auth.user, !isReportingFalsePositive else { return }
+        guard let user = auth.user, let email = user.email, !isReportingFalsePositive else { return }
         isReportingFalsePositive = true
         Task {
             let ok = await GuidelineFalsePositiveReporter.report(
                 warning: warning, draftText: draftText, context: context,
-                reporterName: user.name, reporterEmail: user.email
+                reporterName: user.name, reporterEmail: email
             )
             isReportingFalsePositive = false
             if ok {
