@@ -337,7 +337,7 @@ private struct GuidelineFlagActions: ViewModifier {
             )
         case .node(let type, let id):
             try await APIClient.shared.content.editNode(
-                nodeId: id, nodeType: type, title: flag.itemTitle, body: newText, csrfToken: user.csrfToken
+                nodeId: id, nodeType: type, title: flag.itemTitle, body: newText, format: drupalDefaultTextFormat, csrfToken: user.csrfToken
             )
         }
         toast.success(String(localized: "\(flag.kindLabel) updated"))

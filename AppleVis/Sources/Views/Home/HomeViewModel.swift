@@ -932,7 +932,7 @@ final class HomeViewModel: ObservableObject {
         bundle: String,
         nodeType: String,
         include: String,
-        map: (JsonApiNode, [JsonApiNode]) -> FeedItem
+        map: @MainActor (JsonApiNode, [JsonApiNode]) -> FeedItem
     ) async -> [FeedItem] {
         guard enabled else { return [] }
         guard let response = try? await APIClient.shared.jsonAPIList(

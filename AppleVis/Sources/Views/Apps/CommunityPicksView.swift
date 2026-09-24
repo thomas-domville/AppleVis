@@ -316,17 +316,18 @@ struct CommunityPickRow: View {
         })
         .contentActions(
             id: app.id, entityId: app.nid ?? 0, kind: .appListing, title: app.name,
-            lastActivityAt: app.lastActivityAt, url: app.url, currentCommentCount: app.reviewCount
-        ) {
-            // Hidden: the explicit accessibility action above already
-            // offers this to VoiceOver. See AppListingRow.
-            if let appStoreURL {
-                Link(destination: appStoreURL) {
-                    Label("Open in App Store", systemImage: "arrow.up.forward.app")
+            lastActivityAt: app.lastActivityAt, url: app.url, currentCommentCount: app.reviewCount,
+            extraMenuItems: {
+                // Hidden: the explicit accessibility action above already
+                // offers this to VoiceOver. See AppListingRow.
+                if let appStoreURL {
+                    Link(destination: appStoreURL) {
+                        Label("Open in App Store", systemImage: "arrow.up.forward.app")
+                    }
+                    .accessibilityHidden(true)
                 }
-                .accessibilityHidden(true)
             }
-        }
+        )
         .cardDensityPadding()
         .task(id: ContentTranslation.taskId(title: app.name, targetLanguage: preferences.effectiveContentLanguage)) {
             translatedTitle = await ContentTranslation.resolvedTitle(

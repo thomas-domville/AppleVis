@@ -306,7 +306,7 @@ struct JsonApiEnvelope: Encodable {
 /// one string is what makes every comment, reply, topic, and submission
 /// body postable again; investigated while building forum reply-to-comment
 /// support, but the breakage is universal, not forum-specific.
-let drupalDefaultTextFormat = "8"
+nonisolated let drupalDefaultTextFormat = "8"
 
 /// Every comment bundle this app posts to, and the two extra things each
 /// one's create request needs beyond the obvious `entity_id` relationship —
@@ -375,10 +375,10 @@ enum HTMLText {
     // Compiled once instead of per-call — these run on every forum post/bug
     // report/app listing mapped from a network response, and NSRegularExpression
     // compilation is comparatively expensive to repeat per item.
-    // nonisolated(unsafe): read-only after creation (NSRegularExpression is
-    // documented thread-safe), and needed so `decodeEntities` below can be
-    // nonisolated for `String.strippingHTMLTags()`.
-    nonisolated(unsafe) private static let numericEntityRegex = try? NSRegularExpression(pattern: "&#([0-9]+);")
+    // nonisolated: needed so `decodeEntities` below can be nonisolated for
+    // `String.strippingHTMLTags()`. No `(unsafe)` needed — NSRegularExpression
+    // is Sendable.
+    nonisolated private static let numericEntityRegex = try? NSRegularExpression(pattern: "&#([0-9]+);")
     private static let scriptTagRegex = try? NSRegularExpression(pattern: "<script[\\s\\S]*?</script>")
     private static let styleTagRegex = try? NSRegularExpression(pattern: "<style[\\s\\S]*?</style>")
     private static let anyTagRegex = try? NSRegularExpression(pattern: "<[^>]+>")
