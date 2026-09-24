@@ -11,7 +11,7 @@ struct StorageView: View {
     @AccessibilityFocusState private var isTitleFocused: Bool
 
     private let retentionOptions: [(label: String, months: Int)] = [
-        ("3 Months", 3), ("6 Months", 6), ("12 Months", 12), ("Keep Forever", 0)
+        ("3 Months", 3), ("6 Months", 6), ("12 Months", 12), (String(localized: "Keep Forever"), 0)
     ]
 
     private var totalMB: Double { downloadedMB + cachedMB }
@@ -29,11 +29,11 @@ struct StorageView: View {
                 Text("Shows how much space AppleVis is using on this device, split between downloaded episodes and cached content.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                StorageRow(label: "Downloaded Episodes", value: downloadedMB, color: .blue)
-                StorageRow(label: "Cached Content", value: cachedMB, color: .green)
+                StorageRow(label: String(localized: "Downloaded Episodes"), value: downloadedMB, color: .blue)
+                StorageRow(label: String(localized: "Cached Content"), value: cachedMB, color: .green)
                 Divider()
                     .accessibilityHidden(true)
-                StorageRow(label: "Total", value: totalMB, color: .primary, bold: true)
+                StorageRow(label: String(localized: "Total"), value: totalMB, color: .primary, bold: true)
             }
 
             Section("Cache Retention") {
@@ -154,7 +154,7 @@ private struct StorageRow: View {
     var bold: Bool = false
 
     private var displayText: String {
-        value < 1 ? "< 1 MB" : "\(Int(value)) MB"
+        value < 1 ? "< 1 MB" : String(localized: "\(Int(value)) MB")
     }
 
     var body: some View {

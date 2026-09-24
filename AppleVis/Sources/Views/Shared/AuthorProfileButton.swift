@@ -300,7 +300,7 @@ private struct AuthorProfileSheet: View {
         } catch let e as APIError {
             error = e.localizedDescription
         } catch {
-            self.error = "Couldn't load profile."
+            self.error = String(localized: "Couldn't load profile.")
         }
         isLoading = false
     }
@@ -338,7 +338,7 @@ private struct ContactUserSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("Your message is sent through AppleVis. \(recipientName) will not see your email address unless they choose to reply.")
+                    Text("Your message is sent through AppleVis. \(recipientName) won't see your email address unless they reply.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .accessibilityAddTraits(.isHeader)
@@ -406,7 +406,7 @@ private struct ContactUserSheet: View {
             error = e.localizedDescription
             isErrorFocused = true
         } catch {
-            self.error = "Couldn't send your message. Please try again."
+            self.error = String(localized: "Couldn't send your message. Please try again.")
             isErrorFocused = true
         }
         isSending = false

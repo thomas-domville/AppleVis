@@ -35,8 +35,8 @@ enum ImageDescriber {
             .joined(separator: " ")
 
         var parts: [String] = []
-        if !topLabels.isEmpty { parts.append("Image likely containing: \(topLabels.joined(separator: ", "))") }
-        if !recognizedText.isEmpty { parts.append("Text in image: \(recognizedText)") }
+        if !topLabels.isEmpty { parts.append(String(localized: "Image likely containing: \(topLabels.joined(separator: ", "))")) }
+        if !recognizedText.isEmpty { parts.append(String(localized: "Text in image: \(recognizedText)")) }
 
         return parts.isEmpty ? nil : parts.joined(separator: ". ")
     }

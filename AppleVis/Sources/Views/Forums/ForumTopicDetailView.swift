@@ -198,7 +198,7 @@ struct ForumTopicDetailView: View {
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityFocused($isTitleFocused)
                         HStack {
-                            AuthorProfileButton(name: "by \(detail.authorName)", authorId: detail.authorId)
+                            AuthorProfileButton(name: String(localized: "by \(detail.authorName)"), authorId: detail.authorId)
                             Spacer()
                             // A months-old topic with a comment three minutes
                             // ago looked identical to one nobody's touched
@@ -257,7 +257,7 @@ struct ForumTopicDetailView: View {
                                     quotedReplyTarget = reply
                                 },
                                 onJumpToParent: parentReply.map { parent in { pendingFocusReplyId = parent.id } },
-                                onDelete: { removeReplyLocally(reply, announcement: "Reply deleted.") },
+                                onDelete: { removeReplyLocally(reply, announcement: String(localized: "Reply deleted.")) },
                                 onEdit: { newBody in
                                     guard let idx = self.detail?.replies.firstIndex(where: { $0.id == reply.id }) else { return }
                                     self.detail?.replies[idx] = ForumReply(
@@ -266,7 +266,7 @@ struct ForumTopicDetailView: View {
                                         loveCount: reply.loveCount, isNew: reply.isNew, parentId: reply.parentId
                                     )
                                 },
-                                onUnpublish: { removeReplyLocally(reply, announcement: "Comment unpublished.") },
+                                onUnpublish: { removeReplyLocally(reply, announcement: String(localized: "Comment unpublished.")) },
                                 focusBinding: $focusedReplyId
                             )
                             .id(reply.id)
@@ -548,7 +548,7 @@ struct ForumTopicDetailView: View {
                 ))
             }
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Couldn't load topic." }
+        } catch { self.error = String(localized: "Couldn't load topic.") }
         isLoading = false
         // Opened via "Jump to First New Comment": that comment gets focus
         // instead. Title focus used to run regardless, and its retries could
@@ -992,7 +992,7 @@ struct ReplyView: View {
             Button("Cancel", role: .cancel) {}
         }
         .sheet(isPresented: $showEditSheet) {
-            EditContentSheet(title: "Edit Comment", initialText: reply.rawBody) { newText in
+            EditContentSheet(title: String(localized: "Edit Comment"), initialText: reply.rawBody) { newText in
                 guard let user = auth.user else { return }
                 try await APIClient.shared.content.editComment(
                     commentType: "comment_forum", commentId: reply.id, newBody: newText, format: reply.bodyFormat, csrfToken: user.csrfToken
@@ -1014,8 +1014,8 @@ struct ReplyView: View {
     private func presentShareSheet() {
         let plain = reply.body.strippingHTMLTags()
         let subject = reply.subject.trimmingCharacters(in: .whitespaces)
-        var message = "\(reply.authorName) on AppleVis"
-        if !subject.isEmpty { message += ":\n\nSubject: \(subject)" }
+        var message = String(localized: "\(reply.authorName) on AppleVis")
+        if !subject.isEmpty { message += String(localized: ":\n\nSubject: \(subject)") }
         message += "\n\n\(plain)"
         let activityVC = UIActivityViewController(activityItems: [message], applicationActivities: nil)
         UIApplication.shared.connectedScenes

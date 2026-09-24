@@ -58,7 +58,7 @@ final class AuthStore: ObservableObject {
         } catch let apiError as APIError {
             error = apiError.localizedDescription
         } catch {
-            self.error = "Couldn't sign in. Try again."
+            self.error = String(localized: "Couldn't sign in. Try again.")
         }
         isLoading = false
     }

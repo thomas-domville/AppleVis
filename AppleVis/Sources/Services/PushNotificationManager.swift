@@ -44,7 +44,7 @@ enum PushNotificationManager {
     }
 
     static func registerCategories() {
-        let viewAction = UNNotificationAction(identifier: "VIEW", title: "View", options: [.foreground])
+        let viewAction = UNNotificationAction(identifier: "VIEW", title: String(localized: "View"), options: [.foreground])
         let dismissAction = UNNotificationAction(identifier: "DISMISS", title: "Dismiss", options: [.destructive])
 
         let categories: [UNNotificationCategory] = [

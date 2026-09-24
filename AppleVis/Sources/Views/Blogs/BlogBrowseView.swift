@@ -24,8 +24,8 @@ struct BlogBrowseView: View {
                 // through to a blank List — indistinguishable from a silent
                 // failure, with no title, message, or retry (BLOGS-01).
                 EmptyStateView(
-                    title: "No Blog Posts",
-                    message: "There are no blog posts to show right now.",
+                    title: String(localized: "No Blog Posts"),
+                    message: String(localized: "There are no blog posts to show right now."),
                     systemImage: "newspaper"
                 )
             } else {
@@ -55,8 +55,8 @@ struct BlogBrowseView: View {
             }
             if !searchText.isEmpty && visible.isEmpty {
                 EmptyStateView(
-                    title: "No Results",
-                    message: "No posts match \"\(searchText)\".",
+                    title: String(localized: "No Results"),
+                    message: String(localized: "No posts match \"\(searchText)\"."),
                     systemImage: "magnifyingglass"
                 )
                 .listRowSeparator(.hidden)
@@ -98,7 +98,7 @@ struct BlogBrowseView: View {
             posts = fetched.items
             hasMore = fetched.hasMore
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Couldn't load posts." }
+        } catch { self.error = String(localized: "Couldn't load posts.") }
         isLoading = false
     }
 

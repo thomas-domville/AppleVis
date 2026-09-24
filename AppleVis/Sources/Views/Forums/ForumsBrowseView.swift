@@ -10,9 +10,9 @@ enum AppleTopicsFilter: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var displayName: String {
         switch self {
-        case .all:         return "All Topics"
-        case .appleOnly:    return "Apple Related"
-        case .nonAppleOnly: return "Non-Apple Related"
+        case .all:         return String(localized: "All Topics")
+        case .appleOnly:    return String(localized: "Apple Related")
+        case .nonAppleOnly: return String(localized: "Non-Apple Related")
         }
     }
 }
@@ -130,7 +130,7 @@ struct ForumsBrowseView: View {
                 let filteredLocalItems = localItems.filter { matchesSearch(title: $0.title) }
                 if localItems.isEmpty {
                     EmptyStateView(
-                        title: filter == .following ? "Not Following Any Topics" : "No Saved Topics",
+                        title: filter == .following ? String(localized: "Not Following Any Topics") : String(localized: "No Saved Topics"),
                         message: filter == .following
                             ? "You are not following any topics yet."
                             : "You have not saved any topics yet.",
@@ -173,13 +173,13 @@ struct ForumsBrowseView: View {
                 // `.task`/the filter-sheet dismiss handler below), so this
                 // doesn't start its own `.task`; two concurrent callers of
                 // loadMoreUntilEnoughOrCap() could otherwise race on `page`.
-                LoadingView(message: "Looking for \(filter.displayName)…")
+                LoadingView(message: String(localized: "Looking for \(filter.displayName)…"))
             } else if filteredTopics.isEmpty {
                 EmptyStateView(
                     title: "No topics",
-                    message: hasMore ? "No matches in the topics checked so far." : forumsEmptyMessage,
+                    message: hasMore ? String(localized: "No matches in the topics checked so far.") : forumsEmptyMessage,
                     systemImage: "bubble.left.and.bubble.right",
-                    primaryActionLabel: hasMore ? "Keep Looking" : nil,
+                    primaryActionLabel: hasMore ? String(localized: "Keep Looking") : nil,
                     primaryAction: hasMore ? { autoPaginateAttempts = 0 } : nil,
                     titleFocus: $isEmptyStateFocused
                 )
@@ -398,7 +398,7 @@ struct ForumsBrowseView: View {
             if !cats.isEmpty { categories = cats }
             hasMore = fetched.hasMore
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Couldn't load topics." }
+        } catch { self.error = String(localized: "Couldn't load topics.") }
         isLoading = false
     }
 

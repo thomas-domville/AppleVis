@@ -45,10 +45,10 @@ struct AppInfoFieldDiff: Identifiable {
         return Self.comparable(oldValue) != Self.comparable(newValue)
     }
 
-    /// Tags stripped, entities decoded, every run of whitespace (line
-    /// breaks included) collapsed to one space.
+    /// Tags stripped, entities decoded, invisible characters dropped, every
+    /// run of whitespace (line breaks included) collapsed to one space.
     static func comparable(_ text: String) -> String {
-        HTMLText.plainText(fromHTML: text)
+        HTMLText.comparableText(text)
     }
 
     /// Price is deliberately left out — the App Store lookup only ever
@@ -147,7 +147,7 @@ struct UpdateAppInfoSheet: View {
                     )
                     Text(changedDiffs.isEmpty
                         ? "Compares this entry against its live App Store listing."
-                        : "Compares this entry against its live App Store listing — choose which changes to accept below."
+                        : "Compares this entry with its current App Store listing. Choose which changes to accept below."
                     )
                     .font(.subheadline)
                     .foregroundStyle(.secondary)

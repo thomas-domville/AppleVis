@@ -87,37 +87,29 @@ nonisolated enum PodcastDuration {
     /// "1 minute, 23 seconds" / "1 hour, 2 minutes, 3 seconds" — used only
     /// for accessibility labels and announcements where colon-formatted time
     /// is ambiguous when spoken or read on a Braille display.
+    ///
+    /// Uses Foundation's wide unit style so the units and plurals follow the
+    /// app's language; the hand-built version always said "minutes" in English.
     static func accessibilityLabel(_ seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds.rounded()))
-        let hours = total / 3600
-        let minutes = (total % 3600) / 60
-        let seconds = total % 60
-        var parts: [String] = []
-
-        if hours > 0 {
-            parts.append(unit(hours, singular: "hour", plural: "hours"))
+        // Hiding zero units would leave nothing to say at 0, so spell out "0 seconds".
+        if total == 0 {
+            return Duration.seconds(0).formatted(.units(allowed: [.seconds], width: .wide, zeroValueUnits: .show(length: 1)))
         }
-        if minutes > 0 {
-            parts.append(unit(minutes, singular: "minute", plural: "minutes"))
-        }
-        if seconds > 0 || parts.isEmpty {
-            parts.append(unit(seconds, singular: "second", plural: "seconds"))
-        }
-
-        return parts.joined(separator: ", ")
+        return Duration.seconds(total).formatted(
+            .units(allowed: [.hours, .minutes, .seconds], width: .wide, zeroValueUnits: .hide)
+        )
     }
 
     static func accessibilityPosition(current: TimeInterval, duration: TimeInterval?) -> String {
         let currentText = accessibilityLabel(current)
         guard let duration, duration > 0 else { return currentText }
-        return "\(currentText) of \(accessibilityLabel(duration))"
+        let totalText = accessibilityLabel(duration)
+        return String(localized: "\(currentText) of \(totalText)")
     }
 
     static func accessibilityRemaining(_ seconds: TimeInterval) -> String {
-        "\(accessibilityLabel(seconds)) remaining"
-    }
-
-    private static func unit(_ value: Int, singular: String, plural: String) -> String {
-        "\(value) \(value == 1 ? singular : plural)"
+        let text = accessibilityLabel(seconds)
+        return String(localized: "\(text) remaining")
     }
 }

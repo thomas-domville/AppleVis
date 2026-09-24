@@ -94,7 +94,7 @@ struct ProfileView: View {
                 .padding(.vertical, 4)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel(String(localized: "Signed in as \(user.name)\(user.isAdmin ? ", Administrator" : "")"))
+            .accessibilityLabel((user.isAdmin ? String(localized: "Signed in as \(user.name), Administrator") : String(localized: "Signed in as \(user.name)")))
             .accessibilityHint(String(localized: "Opens My Account for profile, password, email, and sign out options."))
             .accessibilityFocused($focusTarget, equals: Self.titleFocusID)
         }

@@ -96,7 +96,7 @@ struct SubmitPodcastView: View {
                     ThankYouView(
                         icon: "mic",
                         heading: "You did it — thanks!",
-                        message: "Your podcast is now in front of our team. We genuinely appreciate you taking the time to share it, and we'll be in touch once it's ready to appear in the directory.",
+                        message: "Your podcast has been sent to our team. Thank you for sharing it. We'll let you know when it's ready to appear on AppleVis.",
                         doneLabel: "Done",
                         onDone: { dismiss() }
                     )
@@ -294,7 +294,7 @@ struct SubmitPodcastView: View {
                 TextEditor(text: $description)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Episode Description"))
-                    .accessibilityHint(String(localized: "Required, minimum 20 characters. Tell listeners what this episode covers — the topics, guests, or themes — so they know what to expect before pressing play."))
+                    .accessibilityHint(String(localized: "Required, at least 20 characters. Describe the topics, guests, or themes, so listeners know what to expect."))
                     .rewriteFlash($justRewrote)
                     .onChange(of: description) { _, newValue in
                         handleDescriptionChange(newValue)
@@ -305,7 +305,7 @@ struct SubmitPodcastView: View {
                             detectionEnabled: preferences.nonEnglishDetectionEnabled
                         )
                     }
-                Text("Tell listeners what this episode covers — the topics, guests, or themes — so they know what to expect before pressing play.")
+                Text("Tell listeners what this episode covers, such as the topics, guests, or themes, so they know what to expect before they play it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
@@ -315,7 +315,7 @@ struct SubmitPodcastView: View {
                 Button {
                     showFileImporter = true
                 } label: {
-                    Label(audioFileURL?.lastPathComponent ?? "Choose Audio File", systemImage: "waveform")
+                    Label(audioFileURL?.lastPathComponent ?? String(localized: "Choose Audio File"), systemImage: "waveform")
                 }
                 .accessibilityHint(String(localized: "Opens the Files app to pick an audio file for this episode."))
             }
@@ -329,7 +329,7 @@ struct SubmitPodcastView: View {
     private var audioBlockingReasons: [String] {
         var reasons: [String] = []
         if descriptionLength < 20 {
-            reasons.append(String(localized: "Write at least \(20 - descriptionLength) more character\(20 - descriptionLength == 1 ? "" : "s") to continue."))
+            reasons.append(String(localized: "Write at least \(20 - descriptionLength) more characters to continue."))
         }
         if audioFileData == nil {
             reasons.append(String(localized: "Choose an audio file to continue."))

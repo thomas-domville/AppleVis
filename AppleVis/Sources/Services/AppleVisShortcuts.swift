@@ -22,7 +22,7 @@ struct OpenAppleVisIntent: AppIntent {
 
 struct OpenAppleVisForumsIntent: AppIntent {
     static var title: LocalizedStringResource = "Open AppleVis Forums"
-    static var description = IntentDescription("Opens the AppleVis Forums tab.")
+    static var description = IntentDescription("Opens AppleVis Forums.")
     static var openAppWhenRun: Bool = true
 
     @MainActor
@@ -60,7 +60,7 @@ struct ResumeAppleVisPodcastIntent: AppIntent {
 
 struct PlayLatestPodcastIntent: AppIntent {
     static var title: LocalizedStringResource = "Play Latest AppleVis Podcast"
-    static var description = IntentDescription("Opens the Podcasts tab and plays the latest episode.")
+    static var description = IntentDescription("Opens AppleVis Podcasts and plays the latest episode.")
     static var openAppWhenRun: Bool = true
 
     @MainActor

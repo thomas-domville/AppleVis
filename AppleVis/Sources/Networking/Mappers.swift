@@ -593,7 +593,7 @@ enum Mappers {
         let a = node.attributes
         let base = bug(node, platform: platform)
         let howOftenInt = a["field_how_often_the_bug_occurs"]?.intValue ?? 0
-        let howOften: String = howOftenInt == 2 ? "always" : (howOftenInt == 1 ? "sometimes" : "rarely")
+        let howOften: String = howOftenInt == 2 ? String(localized: "Always") : (howOftenInt == 1 ? String(localized: "Sometimes") : String(localized: "Rarely"))
         return BugReportDetail(
             id: base.id,
             nid: a["drupal_internal__nid"]?.intValue ?? 0,

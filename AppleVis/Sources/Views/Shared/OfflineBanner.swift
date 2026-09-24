@@ -10,7 +10,7 @@ struct OfflineBanner: View {
     // "Saved" (bookmarks) feature, and the overlap was confusing enough
     // that a VoiceOver user asked whether this banner was a bug.
     private var label: String {
-        "You're offline. Showing previously loaded content — pull down to refresh once you're back online."
+        String(localized: "You're offline. Showing previously loaded content — pull down to refresh once you're back online.")
     }
 
     var body: some View {
@@ -42,7 +42,7 @@ struct OfflineComposeNotice: View {
     @State private var hasAnnounced = false
 
     private var label: String {
-        "You're offline right now, but don't lose your train of thought — keep writing. You'll just need to be back on Wi-Fi or cellular before this can be sent."
+        String(localized: "You're offline right now, but don't lose your train of thought — keep writing. You'll just need to be back on Wi-Fi or cellular before this can be sent.")
     }
 
     var body: some View {

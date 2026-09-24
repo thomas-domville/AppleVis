@@ -2,6 +2,7 @@ import SwiftUI
 
 private enum DiscoverHubDestination: Hashable {
     case apps
+    case communityPicks
     case forums
     case blogs
     case guides
@@ -12,6 +13,7 @@ private enum DiscoverHubDestination: Hashable {
     var focusID: AnyHashable {
         switch self {
         case .apps: return AnyHashable("apps")
+        case .communityPicks: return AnyHashable("communityPicks")
         case .forums: return AnyHashable("forums")
         case .blogs: return AnyHashable("blogs")
         case .guides: return AnyHashable("guides")
@@ -195,6 +197,9 @@ struct DiscoverView: View {
         case .apps:
             AppBrowseView()
                 .onDisappear { restoreFocus(to: destination.focusID) }
+        case .communityPicks:
+            CommunityPicksView()
+                .onDisappear { restoreFocus(to: destination.focusID) }
         case .forums:
             ForumsBrowseView(showsPersonalFilters: false)
                 .onDisappear { restoreFocus(to: destination.focusID) }
@@ -268,9 +273,10 @@ struct DiscoverView: View {
         ].filter { $0 }.count
         var message = total == 0
             ? String(localized: "No results")
-            : "\(total) result\(total == 1 ? "" : "s") found in \(categoryCount) categor\(categoryCount == 1 ? "y" : "ies")."
+            : String(localized: "\(String(localized: "\(total) results")) found in \(String(localized: "\(categoryCount) categories")).")
         if !results.failedCategories.isEmpty {
-            message += " Some results may be missing: \(results.failedCategories.joined(separator: ", "))."
+            let missing = ListFormatter.localizedString(byJoining: results.failedCategories)
+            message += " " + String(localized: "Some results may be missing: \(missing).")
         }
         // Previously posted on every debounce settle even when byte-for-byte
         // identical to the last announcement (e.g. typing then deleting a
@@ -330,28 +336,29 @@ struct DiscoverView: View {
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityFocused($focusTarget, equals: Self.titleFocusID)
 
-                hubSection(title: "App Directory", subtitle: "Browse accessible apps by platform and category.", accent: .green) {
-                    HubCard(title: "Apps", subtitle: "Apps by platform and category", systemImage: "square.grid.2x2", color: .green, destination: .apps, focusTarget: $focusTarget)
+                hubSection(title: "App Directory", subtitle: String(localized: "Browse accessible apps, and see which ones members recommend."), accent: .green) {
+                    HubCard(title: String(localized: "Apps"), subtitle: String(localized: "Apps by platform and category"), systemImage: "square.grid.2x2", color: .green, destination: .apps, focusTarget: $focusTarget)
+                    HubCard(title: String(localized: "Community Picks"), subtitle: String(localized: "Apps members recommend"), systemImage: "hand.thumbsup", color: .indigo, destination: .communityPicks, focusTarget: $focusTarget)
                 }
-                hubSection(title: "Community", subtitle: "Find discussions and recent posts from AppleVis members.", accent: .blue) {
-                    HubCard(title: "Forums", subtitle: "Discussion & help", systemImage: "bubble.left.and.bubble.right", color: .blue, destination: .forums, focusTarget: $focusTarget)
-                    HubCard(title: "Blogs", subtitle: "Articles & news", systemImage: "newspaper", color: .red, destination: .blogs, focusTarget: $focusTarget)
+                hubSection(title: "Community", subtitle: String(localized: "Find discussions and recent posts from AppleVis members."), accent: .blue) {
+                    HubCard(title: String(localized: "Forums"), subtitle: String(localized: "Discussion & help"), systemImage: "bubble.left.and.bubble.right", color: .blue, destination: .forums, focusTarget: $focusTarget)
+                    HubCard(title: String(localized: "Blogs"), subtitle: String(localized: "Articles & news"), systemImage: "newspaper", color: .red, destination: .blogs, focusTarget: $focusTarget)
                 }
-                hubSection(title: "Learn", subtitle: "Explore guides, podcast episodes, and practical accessibility resources.", accent: .orange) {
-                    HubCard(title: "Guides", subtitle: "Tutorials & resources", systemImage: "book", color: .orange, destination: .guides, focusTarget: $focusTarget)
-                    HubCard(title: "Podcasts", subtitle: "Audio content", systemImage: "mic.fill", color: .purple, destination: .podcasts, focusTarget: $focusTarget)
+                hubSection(title: String(localized: "Learn"), subtitle: String(localized: "Explore guides, podcast episodes, and practical accessibility resources."), accent: .orange) {
+                    HubCard(title: String(localized: "Guides"), subtitle: String(localized: "Tutorials & resources"), systemImage: "book", color: .orange, destination: .guides, focusTarget: $focusTarget)
+                    HubCard(title: String(localized: "Podcasts"), subtitle: String(localized: "Audio content"), systemImage: "mic.fill", color: .purple, destination: .podcasts, focusTarget: $focusTarget)
                 }
-                hubSection(title: "Bug Tracker", subtitle: "Browse active accessibility bugs reported by the AppleVis community.", accent: .brown) {
+                hubSection(title: "Bug Tracker", subtitle: String(localized: "Browse active accessibility bugs reported by the AppleVis community."), accent: .brown) {
                     // Card previously said "Bug Reports" — a real button,
                     // just under a different name than the section heading
                     // right above it ("Bug Tracker") and everywhere else in
                     // the app (Help, What's New, the Community Bug
                     // Program), which read as if the button itself were
                     // missing. Reported directly.
-                    HubCard(title: "Bug Tracker", subtitle: "Known accessibility bugs", systemImage: "ant", color: .brown, destination: .bugTracker, focusTarget: $focusTarget)
+                    HubCard(title: String(localized: "Bug Tracker"), subtitle: String(localized: "Known accessibility bugs"), systemImage: "ant", color: .brown, destination: .bugTracker, focusTarget: $focusTarget)
                 }
-                hubSection(title: "Stay Updated", subtitle: "Subscribe to AppleVis updates or follow us on social media.", accent: .cyan) {
-                    HubCard(title: "RSS Feeds", subtitle: "Copy or share feed links", systemImage: "dot.radiowaves.left.and.right", color: .cyan, destination: .rssFeeds, focusTarget: $focusTarget)
+                hubSection(title: String(localized: "Stay Updated"), subtitle: String(localized: "Subscribe to AppleVis updates or follow us on social media."), accent: .cyan) {
+                    HubCard(title: String(localized: "RSS Feeds"), subtitle: String(localized: "Copy or share feed links"), systemImage: "dot.radiowaves.left.and.right", color: .cyan, destination: .rssFeeds, focusTarget: $focusTarget)
                     socialFollowLinks
                 }
 
@@ -382,32 +389,32 @@ struct DiscoverView: View {
     private var friendsOfAppleVisSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HubSectionHeader(
-                title: "Friends of AppleVis",
-                subtitle: "Trusted organizations and services connected with the AppleVis community.",
+                title: String(localized: "Friends of AppleVis"),
+                subtitle: String(localized: "Trusted organizations and services connected with the AppleVis community."),
                 accent: .teal
             )
             VStack(spacing: 0) {
                 friendHeader(
                     "Be My Eyes",
-                    subtitle: "Free visual assistance from volunteers, AI, and accessible services.",
+                    subtitle: String(localized: "Free visual assistance from volunteers, AI, and accessible services."),
                     icon: "eye"
                 )
                 Divider().padding(.leading)
                 externalAppRow(
-                    "Call a Volunteer",
-                    subtitle: "Connect instantly with a sighted volunteer via live video, 24/7 in 185 languages.",
+                    String(localized: "Call a Volunteer"),
+                    subtitle: String(localized: "Connect instantly with a sighted volunteer via live video, 24/7 in 185 languages."),
                     icon: "person.2.fill"
                 ) { openBME(URL(string: "bemyeyes://volunteer")!) }
                 Divider().padding(.leading)
                 externalAppRow(
                     "Be My AI",
-                    subtitle: "Ask AI to describe images, read text, or answer visual questions in 36 languages.",
+                    subtitle: String(localized: "Ask AI to describe images, read text, or answer visual questions in 36 languages."),
                     icon: "sparkles"
                 ) { openBME(URL(string: "bemyeyes://ai")!) }
                 Divider().padding(.leading)
                 externalAppRow(
-                    "Service Directory",
-                    subtitle: "Reach accessible customer service at hundreds of companies and government departments.",
+                    String(localized: "Service Directory"),
+                    subtitle: String(localized: "Reach accessible customer service at hundreds of companies and government departments."),
                     icon: "building.2"
                 ) { openBME(URL(string: "bemyeyes://partner/applevis")!) }
             }
@@ -495,15 +502,15 @@ struct DiscoverView: View {
                 .accessibilityAddTraits(.isHeader)
 
             VStack(spacing: 0) {
-                contributeRow("Submit an App", icon: "square.grid.2x2", requiresSignIn: true) { showSubmitApp = true }
+                contributeRow(String(localized: "Submit an App"), icon: "square.grid.2x2", requiresSignIn: true) { showSubmitApp = true }
                 Divider().padding(.leading)
-                contributeRow("Submit a Blog Post", icon: "newspaper", requiresSignIn: true) { showSubmitBlog = true }
+                contributeRow(String(localized: "Submit a Blog Post"), icon: "newspaper", requiresSignIn: true) { showSubmitBlog = true }
                 Divider().padding(.leading)
-                contributeRow("Submit a Bug Report", icon: "ant", requiresSignIn: true) { showSubmitBug = true }
+                contributeRow(String(localized: "Submit a Bug Report"), icon: "ant", requiresSignIn: true) { showSubmitBug = true }
                 Divider().padding(.leading)
-                contributeRow("Submit a Podcast", icon: "mic", requiresSignIn: true) { showSubmitPodcast = true }
+                contributeRow(String(localized: "Submit a Podcast"), icon: "mic", requiresSignIn: true) { showSubmitPodcast = true }
                 Divider().padding(.leading)
-                contributeRow("Contact AppleVis", icon: "envelope", requiresSignIn: false) { showContact = true }
+                contributeRow(String(localized: "Contact AppleVis"), icon: "envelope", requiresSignIn: false) { showContact = true }
             }
             .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
             .padding(.horizontal)

@@ -35,14 +35,14 @@ enum TipKey: String {
 enum Tips {
     static let content: [TipKey: TipContent] = [
         .forumRotorActions: TipContent(
-            title: "Getting Around Comments Faster",
-            message: "Here's a handy one: every comment header in Community Discussion has its own set of VoiceOver actions tucked away. Rotate two fingers to bring up the Actions rotor, then flick up or down to reach things like Reply to this Comment, Copy Comment Text, Share Comment, or Report Comment — no extra buttons to hunt for. This applies to the comment list itself, not the topic text up top.",
+            title: "Actions on Comments",
+            message: "Each comment in Community Discussion has its own VoiceOver actions. Turn the rotor to Actions, then swipe up or down to reach Reply to this Comment, Copy Comment Text, Share Comment, or Report Comment. This works on the comments, not on the topic text at the top.",
             icon: "list.bullet",
             screenReaderOnly: true
         ),
         .playerMagicTap: TipContent(
-            title: "Quick Play and Pause, Anywhere",
-            message: "Don't want to leave what you're doing just to hit pause? A two-finger double-tap anywhere on the screen plays or pauses whatever episode is loaded — no need to open the player first. It's called a Magic Tap, and it works throughout AppleVis, so it's always within reach.",
+            title: "Play and Pause From Anywhere",
+            message: "A two-finger double-tap, called a Magic Tap, plays or pauses the loaded episode from anywhere in AppleVis. You don't need to open the player first.",
             icon: "play.circle",
             // Magic Tap is itself a VoiceOver/Switch Control-only gesture —
             // .accessibilityAction(.magicTap) can only fire when one of those
@@ -53,8 +53,8 @@ enum Tips {
             screenReaderOnly: true
         ),
         .episodeChapters: TipContent(
-            title: "This One Has Chapters!",
-            message: "Good news — this episode has chapter markers, so you don't have to scrub around to find the part you want. Head to the Chapters section and pick one to jump straight there. With VoiceOver, just swipe through the list and double-tap the chapter you're after.",
+            title: "This Episode Has Chapters",
+            message: "This episode has chapter markers. Go to the Chapters section and choose a chapter to go straight to it. With VoiceOver, swipe through the list and double-tap a chapter.",
             icon: "bookmark"
         ),
         // Split in two (2026-09-13, replacing the old `.savedSwipeActions`)
@@ -68,35 +68,35 @@ enum Tips {
         // instructions, not just irrelevant ones. New keys so beta users who
         // already dismissed the old, incorrect tip get to see the fix once.
         .savedQuickActions: TipContent(
-            title: "Faster Actions on Your Saved List",
-            message: "Swipe left on any saved item for quick actions — unsaving it, or downloading, sharing, and marking it played if it's an episode. Prefer the full picture? A long-press opens the complete action menu instead.",
+            title: "Quick Actions on Your Saved List",
+            message: "Swipe left on a saved item for quick actions, such as Unsave. Touch and hold an item to see all of its actions.",
             icon: "hand.point.left"
         ),
         .savedRotorActions: TipContent(
-            title: "Quicker Actions for Your Saved List",
-            message: "Here's a handy one: every saved item has its own set of VoiceOver actions tucked away. Rotate two fingers to bring up the Actions rotor, then flick up or down to reach Unsave, or Download, Share, and Mark as Played for episodes — no swiping or long-pressing needed to find them.",
+            title: "VoiceOver Actions on Your Saved List",
+            message: "Each saved item has its own VoiceOver actions, such as Unsave. Turn the rotor to Actions, then swipe up or down to reach them.",
             icon: "hand.point.left",
             screenReaderOnly: true
         ),
         .downloadsOffline: TipContent(
-            title: "Take It Offline",
-            message: "Downloaded episodes live right on your device, so they'll keep playing with no signal at all — great for flights, commutes, or that one spot with terrible reception. They're yours to keep until you decide to remove them.",
+            title: "Listen Offline",
+            message: "Downloaded episodes are stored on your device, so they play without a connection. They stay until you remove them.",
             icon: "arrow.down.circle"
         ),
         .reviewStarRating: TipContent(
             title: "Rating With VoiceOver",
-            message: "In the Write Comment form, the star rating works like an adjustable slider — flick up to raise it, flick down to lower it. Or bring up the VoiceOver rotor, choose Value, and flick from there instead.",
+            message: "In the Write Comment form, the star rating works like an adjustable control. Swipe up to raise it and down to lower it. You can also turn the rotor to Value and swipe from there.",
             icon: "star",
             screenReaderOnly: true
         ),
         .settingsIntelligence: TipContent(
             title: "Ask Siri About AppleVis",
-            message: "On supported iPhone and iPad models, AppleVis plays nicely with Apple Intelligence — ask Siri to open a topic, check what's new in your podcast feed, or look up an app, all in plain language. You can turn this on in Settings → Siri & Intelligence.",
+            message: "On supported iPhone and iPad models, you can ask Siri to open a topic, check what's new in your podcast feed, or look up an app, in your own words. Turn this on in Settings > Siri & Intelligence.",
             icon: "cpu"
         ),
         .followTopicNotifications: TipContent(
             title: "You're Following This Topic",
-            message: "Nice — you'll hear about new replies here from now on. Want to see everything you're following, or unfollow something? Head to For You → Following. Notification preferences live in Settings → Notifications, whenever you want to fine-tune them.",
+            message: "You'll be notified about new replies to this topic. To see everything you follow, or to unfollow, go to For You > Following. You can change notification settings in Settings > Notifications.",
             icon: "bell"
         ),
     ]

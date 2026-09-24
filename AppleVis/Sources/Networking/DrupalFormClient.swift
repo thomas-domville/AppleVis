@@ -97,7 +97,7 @@ enum DrupalFormClient {
     }
 
     private static func postForm(path: String, body: Data, contentType: String) async -> FormResult {
-        guard let url = URL(string: "\(base)\(path)") else { return .failure("Invalid form URL.") }
+        guard let url = URL(string: "\(base)\(path)") else { return .failure(String(localized: "Invalid form URL.")) }
         var request = URLRequest(url: url)
         applyBypassHeaders(to: &request)
         request.httpMethod = "POST"
@@ -109,10 +109,10 @@ enum DrupalFormClient {
                 return .ok
             }
             AppLog.network.error("Form POST to \(path, privacy: .public) was not redirected — likely a form validation error")
-            return .failure("The submission was not accepted. Please check your content and try again.")
+            return .failure(String(localized: "The submission was not accepted. Please check your content and try again."))
         } catch {
             AppLog.network.error("Form POST to \(path, privacy: .public) failed: \(error, privacy: .private)")
-            return .failure("Couldn't reach AppleVis. Check your connection and try again.")
+            return .failure(String(localized: "Couldn't reach AppleVis. Check your connection and try again."))
         }
     }
 
@@ -121,7 +121,7 @@ enum DrupalFormClient {
     static func submitBlog(name: String, email: String, message: String, blogDraft: String) async -> FormResult {
         let path = "/form/blog-submission"
         guard let tokens = await fetchTokens(path: path) else {
-            return .failure("Could not load the submission form. Check your connection and try again.")
+            return .failure(String(localized: "Could not load the submission form. Check your connection and try again."))
         }
         let body = encodeFields([
             "name": name, "email": email, "message": message, "blog_draft": blogDraft,
@@ -144,7 +144,7 @@ enum DrupalFormClient {
     ) async -> FormResult {
         let path = "/form/community-bug-report-form"
         guard let tokens = await fetchTokens(path: path) else {
-            return .failure("Could not load the submission form. Check your connection and try again.")
+            return .failure(String(localized: "Could not load the submission form. Check your connection and try again."))
         }
         let body = encodeFields([
             "your_name": name, "email": email, "title": title, "apple_feedback": appleFeedback,
@@ -178,13 +178,13 @@ enum DrupalFormClient {
         // error) for any file outside the sandbox, since no security scope
         // was ever opened at this point in time.
         guard let audioFileData, let audioFileName else {
-            return .failure("No audio file was attached. Please choose an audio file and try again.")
+            return .failure(String(localized: "No audio file was attached. Please choose an audio file and try again."))
         }
         let path = "/podcasts/upload"
         guard let tokens = await fetchTokens(path: path) else {
-            return .failure("Could not load the submission form. Check your connection and try again.")
+            return .failure(String(localized: "Could not load the submission form. Check your connection and try again."))
         }
-        guard let url = URL(string: "\(base)\(path)") else { return .failure("Invalid form URL.") }
+        guard let url = URL(string: "\(base)\(path)") else { return .failure(String(localized: "Invalid form URL.")) }
 
         let boundary = "AppleVisBoundary-\(UUID().uuidString)"
         var body = Data()
@@ -223,10 +223,10 @@ enum DrupalFormClient {
                 return .ok
             }
             AppLog.network.error("Podcast upload POST to \(path, privacy: .public) was not redirected — likely a form validation error")
-            return .failure("The submission was not accepted. Please check your content and try again.")
+            return .failure(String(localized: "The submission was not accepted. Please check your content and try again."))
         } catch {
             AppLog.network.error("Podcast upload POST to \(path, privacy: .public) failed: \(error, privacy: .private)")
-            return .failure("Couldn't reach AppleVis. Check your connection and try again.")
+            return .failure(String(localized: "Couldn't reach AppleVis. Check your connection and try again."))
         }
     }
 
@@ -260,7 +260,7 @@ enum DrupalFormClient {
     // variant the live session actually renders instead of assuming one.
     static func submitContact(name: String, email: String, subject: String, message: String) async -> FormResult {
         let path = "/contact"
-        guard let url = URL(string: "\(base)\(path)") else { return .failure("Invalid form URL.") }
+        guard let url = URL(string: "\(base)\(path)") else { return .failure(String(localized: "Invalid form URL.")) }
         var pageRequest = URLRequest(url: url)
         applyBypassHeaders(to: &pageRequest)
         pageRequest.setValue("text/html,application/xhtml+xml", forHTTPHeaderField: "Accept")
@@ -270,12 +270,12 @@ enum DrupalFormClient {
               let html = String(data: data, encoding: .utf8)
         else {
             AppLog.network.error("Contact form page fetch failed for \(path, privacy: .public)")
-            return .failure("Could not load the contact form. Check your connection and try again.")
+            return .failure(String(localized: "Could not load the contact form. Check your connection and try again."))
         }
 
         guard let formBuildId = firstMatch(#"name="form_build_id"\s+value="([^"]+)""#, in: html), !formBuildId.isEmpty else {
             AppLog.network.error("No form_build_id found scraping \(path, privacy: .public) — form markup may have changed")
-            return .failure("Could not load the contact form. Check your connection and try again.")
+            return .failure(String(localized: "Could not load the contact form. Check your connection and try again."))
         }
         let formToken = firstMatch(#"name="form_token"\s+value="([^"]+)""#, in: html) ?? ""
         let captchaSid = firstMatch(#"name="captcha_sid"\s+value="([^"]+)""#, in: html) ?? ""

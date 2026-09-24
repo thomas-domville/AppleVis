@@ -25,10 +25,10 @@ struct SignInView: View {
                             .font(.headline)
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityFocused($isIntroFocused)
-                        benefitRow("Post and reply in the forums")
-                        benefitRow("Follow topics and get notified of replies")
-                        benefitRow("Save items and sync across devices")
-                        benefitRow("Receive push notifications for new content")
+                        benefitRow(String(localized: "Post and reply in the forums"))
+                        benefitRow(String(localized: "Follow topics and get notified of replies"))
+                        benefitRow(String(localized: "Save items and sync across devices"))
+                        benefitRow(String(localized: "Receive push notifications for new content"))
 
                         HStack(spacing: 4) {
                             Text("Don't have an account?")
@@ -138,13 +138,13 @@ struct SignInView: View {
         // the password field's `.onSubmit` (hitting Return) bypassed that
         // and silently did nothing — give explicit feedback instead.
         guard !name.isEmpty else {
-            signInError = "Please enter your AppleVis username or email address."
+            signInError = String(localized: "Please enter your AppleVis username or email address.")
             UIAccessibility.post(notification: .announcement, argument: signInError!)
             isErrorFocused = true
             return
         }
         guard !password.isEmpty else {
-            signInError = "Please enter your AppleVis password."
+            signInError = String(localized: "Please enter your AppleVis password.")
             UIAccessibility.post(notification: .announcement, argument: signInError!)
             isErrorFocused = true
             return
@@ -157,7 +157,7 @@ struct SignInView: View {
             toast.success(String(localized: "Signed in as \(auth.user?.name ?? name)"))
             dismiss()
         } else {
-            signInError = auth.error ?? "Couldn't sign in. Try again."
+            signInError = auth.error ?? String(localized: "Couldn't sign in. Try again.")
             isErrorFocused = true
         }
     }

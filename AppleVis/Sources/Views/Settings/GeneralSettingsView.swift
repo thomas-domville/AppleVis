@@ -32,7 +32,7 @@ struct GeneralSettingsView: View {
                 // and Detailed apart without also finding and swiping to the
                 // caption text below on its own. Reported directly: heard
                 // the option name on focus and had no idea what it meant.
-                .accessibilityHint(String(localized: "Quiet: nothing spoken. Helpful: a short spoken welcome. Detailed: that same welcome, plus an AI-generated summary of what's new since your last visit."))
+                .accessibilityHint(String(localized: "Quiet says nothing. Helpful says a short welcome. Detailed adds an AI-generated summary of what's new since your last visit."))
                 // A persistent .accessibilityValue() here (the PODCAST-06
                 // fix, applied the same way in several other Settings
                 // pickers) was added so swiping up/down would speak the new
@@ -81,7 +81,7 @@ struct GeneralSettingsView: View {
                 // display preference, not a privacy control. Discussed and
                 // requested directly.
                 Toggle("Show What's New on Home", isOn: $preferences.showNewActivityIndicators)
-                    .accessibilityHint(String(localized: "When on, Home shows a New view, a quick summary, and small badges for content with new activity since your last visit."))
+                    .accessibilityHint(String(localized: "When on, Home shows a New view, a short summary, and badges on content with new activity since your last visit."))
                 Text("Reading history is always tracked on-device — this only controls whether Home actually shows what's new because of it. Turning it off doesn't erase anything; it just keeps Home quieter.")
                     .font(.caption)
                     .foregroundStyle(.secondary)

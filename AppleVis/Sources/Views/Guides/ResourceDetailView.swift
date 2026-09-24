@@ -87,7 +87,7 @@ struct ResourceDetailView: View {
                         // Inert plain text everywhere except Forums'
                         // matching topic header, despite authorId already
                         // being available (GUIDES-06).
-                        AuthorProfileButton(name: "by \(detail.authorName)", authorId: detail.authorId)
+                        AuthorProfileButton(name: String(localized: "by \(detail.authorName)"), authorId: detail.authorId)
                             .font(.subheadline).foregroundStyle(.secondary)
                         if !detail.categories.isEmpty {
                             Text(detail.categories.joined(separator: " · "))
@@ -432,7 +432,7 @@ struct ResourceDetailView: View {
                 ))
             }
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Couldn't load guide." }
+        } catch { self.error = String(localized: "Couldn't load guide.") }
         isLoading = false
         // Opened via "Jump to First New Comment": that comment gets focus
         // instead. Title focus used to run regardless, and its retries could
@@ -692,7 +692,7 @@ struct CommentRow: View {
             Button("Cancel", role: .cancel) {}
         }
         .sheet(isPresented: $showEditSheet) {
-            EditContentSheet(title: "Edit Comment", initialText: rawText) { newText in
+            EditContentSheet(title: String(localized: "Edit Comment"), initialText: rawText) { newText in
                 guard let user = auth.user, let commentId, let commentType else { return }
                 try await APIClient.shared.content.editComment(
                     commentType: commentType, commentId: commentId, newBody: newText, format: bodyFormat, csrfToken: user.csrfToken
@@ -709,7 +709,7 @@ struct CommentRow: View {
     }
 
     private func presentShareSheet() {
-        let message = "\(authorName) on AppleVis:\n\n\(text.strippingHTMLTags())"
+        let message = String(localized: "\(authorName) on AppleVis:\n\n\(text.strippingHTMLTags())")
         let activityVC = UIActivityViewController(activityItems: [message], applicationActivities: nil)
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
@@ -900,7 +900,7 @@ struct ComposeResourceCommentView: View {
             onPosted(comment)
             dismiss()
         } catch let e as APIError { submitError = e.localizedDescription
-        } catch { submitError = "Couldn't post comment. Try again." }
+        } catch { submitError = String(localized: "Couldn't post comment. Try again.") }
         isSubmitting = false
     }
 }

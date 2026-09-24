@@ -195,6 +195,24 @@ struct ChangeItem: Identifiable {
 
     static let current: [ChangeItem] = [
         ChangeItem(
+            systemImage: "hand.thumbsup",
+            tag: .new,
+            title: "Community Picks: The Apps Members Recommend",
+            description: "Discover has a new Community Picks button next to Apps. It shows the apps AppleVis members recommend. Choose Latest to see what people are recommending now, or Most Recommended to see long-time favorites. You can count recommendations from the past month up to all time, and choose a platform. Each app appears once, with how many people recommended it and when it was last recommended. The lists fill in once a small update to the AppleVis website is finished. Suggested directly."
+        ),
+        ChangeItem(
+            systemImage: "character.bubble",
+            tag: .fixed,
+            title: "The Rest of AppleVis Now Speaks Your Language",
+            description: "With the app set to another language, some places were still in English. These included error messages, empty screens, several settings, Mouse Recap, theme and notification sound names, and the messages from Share to AppleVis. They're now translated into all 22 languages. Siri also understands AppleVis phrases in your language, and counts like \"3 replies\" follow your language's own plural rules. In other languages, the monthly Mouse Recap was also treated as a weekly one. It now uses the right heading and shows a full month's worth."
+        ),
+        ChangeItem(
+            systemImage: "book.closed",
+            tag: .fixed,
+            title: "Cleaner Guide Labels in Mouse Recap",
+            description: "Mouse Recap's How-To Corner now has one Guides & Tutorials subheading, and each item no longer repeats Guide or Tutorial in its details. VoiceOver also skips the repeated category label as you move through the list."
+        ),
+        ChangeItem(
             systemImage: "app.badge.checkmark",
             tag: .fixed,
             title: "App Entries Are Clearer About What Changed on the App Store",
@@ -205,6 +223,18 @@ struct ChangeItem: Identifiable {
             tag: .fixed,
             title: "More of AppleVis Now Speaks Your Language",
             description: "Auto-Translate's own settings and the prompt that offers it were still in English, which is exactly when you'd need them in your own language. They're now translated into all 22 languages, along with everything new in this release. A few translated counts, like how many posts or reports were loaded, could also show jumbled text in some languages. Fixed too."
+        ),
+        ChangeItem(
+            systemImage: "text.alignleft",
+            tag: .improved,
+            title: "Plainer Wording Throughout the App",
+            description: "Help, setup, tips, guideline reminders, and the explanations in each form now use the same plain, short style as the Welcome Tour. Tips, guideline reminders, Home's greeting, and the setup summary were also English in every language. They're now translated too."
+        ),
+        ChangeItem(
+            systemImage: "figure.walk",
+            tag: .improved,
+            title: "A Clearer, Easier-to-Follow Welcome Tour",
+            description: "The AppleVis editorial team rewrote the Welcome Tour in plainer language, with short paragraphs instead of long blocks of text. With VoiceOver or a braille display, each paragraph is now its own stop, so it's easier to pause, go back, or skip ahead. The tour also covers the newest features, like Jump to First New Comment and the podcast Start Over button."
         ),
         ChangeItem(
             systemImage: "wand.and.stars",
@@ -264,37 +294,37 @@ struct ChangeItem: Identifiable {
             systemImage: "bubble.left.and.text.bubble.right",
             tag: .fixed,
             title: "New Comment Counts on Everything on Home",
-            description: "Home only counted new comments on things you'd opened before. Anything you'd never opened just showed nothing — and quietly stopped counting as new the next time the app opened, even if you never looked at Home. Now everything on Home counts new comments the same way, and the count keeps adding up until you open it or mark it as read. A topic posted since your last visit shows NEW plus its comment count, and the summary at the top only calls something a new topic if it really is. Reported directly."
+            description: "Home only counted new comments on things you'd opened before. Anything you hadn't opened showed no count, and stopped counting as new the next time the app opened. Now everything on Home counts new comments the same way, and the count keeps adding up until you open the item or mark it as read. A topic posted since your last visit shows NEW and its comment count, and the summary at the top only calls something a new topic if it really is. Reported directly."
         ),
         ChangeItem(
             systemImage: "quote.bubble",
             tag: .fixed,
             title: "Apostrophes Now Copy, Share, and Read Aloud Correctly",
-            description: "Copying, sharing, or using Read Aloud on a post or comment could turn apostrophes and quotation marks into web codes — \"I've\" came out as \"I\", an ampersand, a number, and then \"ve\" — and Read Aloud would actually speak them. The same codes could also reach translations, and VoiceOver on paragraphs where milder language is filtered. Fixed everywhere, so the text you copy, share, or hear matches what's on screen."
+            description: "Copying, sharing, or using Read Aloud on a post or comment could turn apostrophes and quotation marks into web codes, and Read Aloud would speak the codes. The same codes could appear in translations, and in VoiceOver on paragraphs with filtered language. This is fixed everywhere, so what you copy, share, or hear matches what's on screen."
         ),
         ChangeItem(
             systemImage: "speaker.slash",
             tag: .fixed,
             title: "Telling VoiceOver to Hush No Longer Triggers a Tone Reminder",
-            description: "Writing something like \"shut up, Siri\" or \"I wish VoiceOver would shut up\" used to bring up a reminder about respectful discussion, as if it were aimed at another member. Venting at VoiceOver, Siri, a named voice like Daniel or Samantha, or your phone itself no longer counts — a \"shut up\" aimed at a person still gets the gentle reminder."
+            description: "Writing something like \"shut up, Siri\" or \"I wish VoiceOver would shut up\" used to bring up a reminder about respectful discussion, as if it were aimed at another member. Telling VoiceOver, Siri, a named voice such as Daniel or Samantha, or your phone to shut up no longer does. A \"shut up\" aimed at a person still gets the reminder."
         ),
         ChangeItem(
             systemImage: "doc.text",
             tag: .fixed,
             title: "Editing a Topic, Comment, or Review No Longer Shows Raw HTML",
-            description: "Editing a Forum Topic, Guide comment, App Entry review, App Entry, Blog Post, Guide, Bug Report, or Podcast Episode used to pre-fill the edit box with the rendered HTML behind the content — literal <p> and <a href=\"...\"> tags — instead of the original text. Saving without cleaning that out could also silently corrupt the formatting, since the edit always saved as Plain Text regardless of the content's real format (Markdown, for many longer posts). Both fixed: editing now starts from the original source text, and saves preserve whichever format the content actually uses. Found while looking into a report of stray HTML showing up while editing a topic."
+            description: "Editing a forum topic, comment, review, app entry, blog post, guide, bug report, or podcast episode used to fill the edit box with the page's HTML code, such as <p> tags, instead of your original text. Saving could also change the formatting. Editing now starts from your original text and keeps the post's formatting when you save."
         ),
         ChangeItem(
             systemImage: "list.number",
             tag: .improved,
             title: "Every Wizard Now Matches the Welcome Tour's Step Format",
-            description: "Setup, Contact Us, Submit Bug Report, Submit Blog, Submit an App, Submit a Podcast, Report a Comment, and Change Password/Email each built their step header a little differently — some had a visible \"Step X of Y,\" some didn't; back buttons lived in different places from screen to screen. All of them, plus the Welcome Tour, Edit Profile, Bio Assist, and editors' Refresh App Details screen, now share one step header: Back button, a visible \"Step X of Y\" where relevant, and a heading that announces itself once, clearly, instead of possibly twice. Requested directly."
+            description: "Setup, Contact Us, the Submit forms, Report a Comment, and Change Password or Email each had a slightly different step header. Some showed \"Step X of Y\" and some didn't, and the Back button moved around. They now share one step header with the Welcome Tour, Edit Profile, and Bio Assist: a Back button, \"Step X of Y\" where it applies, and a heading that VoiceOver reads once. Requested directly."
         ),
         ChangeItem(
             systemImage: "wand.and.stars",
             tag: .improved,
             title: "Editing and Posting Feel More Alike Now, With a Few New Touches",
-            description: "Every Edit screen and every compose screen (new topics, replies, and comments on Guides, Blogs, Podcasts, Bug Reports, and App Entries) now opens with the same short heading and description, so it's clearer what you're about to do before you start typing. A few screens that were missing the one-tap Rewrite button (Editing, and commenting on App Entries, Guides, Blogs, Podcasts, and Bug Reports) now have it too. A couple of small touches: the Rewrite button gives a little bounce when it finishes, the text field briefly highlights so it's clear something changed, and a guideline reminder now eases into view instead of popping in abruptly. Submit an App/Blog/Podcast/Bug Report and Contact Us now share these same touches too, plus their Submit button shows a spinner while sending instead of just going dim. Requested directly."
+            description: "Every edit and compose screen now opens with the same short heading and description, so it's clear what you're about to do. Screens that were missing the Rewrite button now have it, including editing and commenting on app entries, guides, blogs, podcasts, and bug reports. There are also a few small visual touches: the Rewrite button bounces when it finishes, the text box briefly highlights when it changes, and guideline reminders fade in. The Submit forms and Contact Us have the same touches, and their Submit button shows a spinner while sending. Requested directly."
         ),
     ]
 

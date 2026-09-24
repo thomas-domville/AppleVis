@@ -210,9 +210,12 @@ final class AppEntryHealthScanner: ObservableObject {
                 flags.append(AppHealthFlag(id: "removed-\(entry.listing.id)", appId: entry.listing.id, appName: entry.listing.name, kind: .removed))
                 continue
             }
+            // Same comparison Refresh App Details uses — this was a plain
+            // string compare, so it flagged titles the app page then said
+            // hadn't changed (an invisible mark, a doubled space, an
+            // encoded "&"). Reported directly.
             let liveTitle = metadata.appName.trimmingCharacters(in: .whitespacesAndNewlines)
-            let storedTitle = entry.listing.name.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !liveTitle.isEmpty, liveTitle != storedTitle {
+            if !liveTitle.isEmpty, HTMLText.comparableText(liveTitle) != HTMLText.comparableText(entry.listing.name) {
                 flags.append(AppHealthFlag(id: "title-\(entry.listing.id)", appId: entry.listing.id, appName: entry.listing.name, kind: .titleChanged(newTitle: liveTitle)))
             }
         }

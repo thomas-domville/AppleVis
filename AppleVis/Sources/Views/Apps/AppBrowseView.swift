@@ -26,7 +26,7 @@ struct AppBrowseView: View {
             } else if let error, categories.isEmpty {
                 ErrorView(message: error) { await load() }
             } else if categories.isEmpty {
-                EmptyStateView(title: "No Categories", message: "Pull to refresh.", systemImage: "square.grid.2x2")
+                EmptyStateView(title: String(localized: "No Categories"), message: String(localized: "Pull to refresh."), systemImage: "square.grid.2x2")
             } else {
                 categoryList
             }
@@ -46,8 +46,8 @@ struct AppBrowseView: View {
             LoadingView()
         } else if searchResults.isEmpty {
             EmptyStateView(
-                title: "No Results",
-                message: "No apps match \"\(searchText)\".",
+                title: String(localized: "No Results"),
+                message: String(localized: "No apps match \"\(searchText)\"."),
                 systemImage: "magnifyingglass"
             )
         } else {
@@ -185,7 +185,7 @@ struct AppBrowseView: View {
         do {
             categories = try await APIClient.shared.apps.categories(platform: platform)
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Couldn't load categories." }
+        } catch { self.error = String(localized: "Couldn't load categories.") }
         isLoading = false
     }
 }
@@ -217,8 +217,8 @@ struct AppCategoryView: View {
                 ErrorView(message: error) { await load(reset: true) }
             } else if apps.isEmpty {
                 EmptyStateView(
-                    title: "No Apps Yet",
-                    message: "No \(destination.platform.displayName) apps loaded for \(destination.category.name). Pull to refresh.",
+                    title: String(localized: "No Apps Yet"),
+                    message: String(localized: "No \(destination.platform.displayName) apps loaded for \(destination.category.name). Pull to refresh."),
                     systemImage: "square.grid.2x2"
                 )
             } else {
@@ -324,7 +324,7 @@ struct AppCategoryView: View {
             }
             apps = alphabetized(allItems)
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Couldn't load apps." }
+        } catch { self.error = String(localized: "Couldn't load apps.") }
         isLoading = false
     }
 

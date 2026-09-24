@@ -152,7 +152,7 @@ nonisolated enum AppPlatform: String, Codable, CaseIterable, Identifiable, Senda
 
     var displayName: String {
         switch self {
-        case .ios:     return "iPhone and iPad"
+        case .ios:     return String(localized: "iPhone and iPad")
         case .macos:   return "Mac"
         case .watchos: return "Apple Watch"
         case .tvos:    return "Apple TV"

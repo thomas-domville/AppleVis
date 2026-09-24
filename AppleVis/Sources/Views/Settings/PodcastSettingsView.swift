@@ -7,10 +7,10 @@ struct PodcastSettingsView: View {
     private let skipBackOptions: [Double] = [5, 10, 15, 30]
     private let skipForwardOptions: [Double] = [15, 30, 45, 60]
     private let sleepTimerOptions: [(label: String, minutes: Int)] = [
-        ("Off", 0), ("15 minutes", 15), ("30 minutes", 30), ("45 minutes", 45), ("60 minutes", 60)
+        ("Off", 0), (String(localized: "15 minutes"), 15), (String(localized: "30 minutes"), 30), (String(localized: "45 minutes"), 45), (String(localized: "60 minutes"), 60)
     ]
     private let resumeRewindOptions: [(label: String, seconds: Int)] = [
-        ("Off", 0), ("5 seconds", 5), ("10 seconds", 10), ("15 seconds", 15), ("30 seconds", 30)
+        ("Off", 0), (String(localized: "5 seconds"), 5), (String(localized: "10 seconds"), 10), (String(localized: "15 seconds"), 15), (String(localized: "30 seconds"), 30)
     ]
     @AccessibilityFocusState private var isTitleFocused: Bool
 
@@ -257,6 +257,6 @@ struct PodcastSettingsView: View {
     }
 
     private func speedLabel(_ speed: Double) -> String {
-        speed == 1.0 ? "1× (Normal)" : "\(speed)×"
+        speed == 1.0 ? String(localized: "1× (Normal)") : "\(speed)×"
     }
 }

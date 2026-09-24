@@ -27,10 +27,10 @@ struct BugBrowseView: View {
                 // explanation (BUGS-01) — worded to reflect the active
                 // filter so it doesn't read as "the tracker is empty."
                 EmptyStateView(
-                    title: "No Bug Reports",
+                    title: String(localized: "No Bug Reports"),
                     message: statusFilter == .active
-                        ? "No active bugs for \(platform.displayName) right now."
-                        : "No bug reports for \(platform.displayName) right now.",
+                        ? String(localized: "No active bugs for \(platform.displayName) right now.")
+                        : String(localized: "No bug reports for \(platform.displayName) right now."),
                     systemImage: "ladybug"
                 )
             } else {
@@ -60,8 +60,8 @@ struct BugBrowseView: View {
             }
             if !searchText.isEmpty && visible.isEmpty {
                 EmptyStateView(
-                    title: "No Results",
-                    message: "No reports match \"\(searchText)\".",
+                    title: String(localized: "No Results"),
+                    message: String(localized: "No reports match \"\(searchText)\"."),
                     systemImage: "magnifyingglass"
                 )
                 .listRowSeparator(.hidden)
@@ -153,7 +153,7 @@ struct BugBrowseView: View {
             bugs = fetched.items
             hasMore = fetched.hasMore
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Couldn't load bug reports." }
+        } catch { self.error = String(localized: "Couldn't load bug reports.") }
         isLoading = false
     }
 

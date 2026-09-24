@@ -18,38 +18,38 @@ struct PrivacySettingsView: View {
             Section("Privacy at a Glance") {
                 InfoCard(
                     icon: "person.text.rectangle",
-                    title: "What We Collect",
-                    text: "AppleVis collects your email address and username for your account, and a device push token for notifications."
+                    title: String(localized: "What We Collect"),
+                    text: String(localized: "AppleVis collects your email address and username for your account, and a device push token for notifications.")
                 )
                 InfoCard(
                     icon: "key.icloud",
-                    title: "Your Session Is Encrypted",
-                    text: "Your sign-in session is stored in the iOS Keychain, not in plain app storage."
+                    title: String(localized: "Your Session Is Encrypted"),
+                    text: String(localized: "Your sign-in session is stored in the iOS Keychain, not in plain app storage.")
                 )
                 InfoCard(
                     icon: "nosign",
-                    title: "No Ad Tracking",
-                    text: "We do not use third-party advertising networks or sell your data to advertisers."
+                    title: String(localized: "No Ad Tracking"),
+                    text: String(localized: "We do not use third-party advertising networks or sell your data to advertisers.")
                 )
                 InfoCard(
                     icon: "icloud.slash",
-                    title: "Analytics Are Anonymous",
-                    text: "Usage analytics are aggregated and never linked to your account or device identity."
+                    title: String(localized: "Analytics Are Anonymous"),
+                    text: String(localized: "Usage analytics are aggregated and never linked to your account or device identity.")
                 )
                 InfoCard(
                     icon: "lock.icloud",
-                    title: "iCloud Sync Is End-to-End",
-                    text: "Data synced via iCloud uses Apple's end-to-end encryption. AppleVis cannot read it."
+                    title: String(localized: "iCloud Sync Is End-to-End"),
+                    text: String(localized: "Data synced via iCloud uses Apple's end-to-end encryption. AppleVis cannot read it.")
                 )
                 InfoCard(
                     icon: "cpu",
-                    title: "On-Device AI",
-                    text: "Smart features powered by AI run on your device using Apple Intelligence. Content is not sent to external servers."
+                    title: String(localized: "On-Device AI"),
+                    text: String(localized: "Smart features powered by AI run on your device using Apple Intelligence. Content is not sent to external servers.")
                 )
                 InfoCard(
                     icon: "envelope.badge.shield.half.filled",
-                    title: "Notification Privacy",
-                    text: "Push notification content is encrypted in transit. Notification payloads are minimal — we don't embed full article text."
+                    title: String(localized: "Notification Privacy"),
+                    text: String(localized: "Push notification content is encrypted in transit. Notification payloads are minimal — we don't embed full article text.")
                 )
             }
 

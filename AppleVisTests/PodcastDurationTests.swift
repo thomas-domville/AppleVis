@@ -44,4 +44,18 @@ struct PodcastDurationTests {
         #expect(result.contains("2"))
         #expect(result.contains("15"))
     }
+
+    @Test("accessibilityLabel: zero still says something for VoiceOver")
+    func accessibilityLabelZero() {
+        #expect(!PodcastDuration.accessibilityLabel(0).isEmpty)
+        #expect(PodcastDuration.accessibilityLabel(0).contains("0"))
+    }
+
+    @Test("accessibilityLabel: spoken form has no colons")
+    func accessibilityLabelNoColons() {
+        let result = PodcastDuration.accessibilityLabel(3665)
+        #expect(result.contains("1"))
+        #expect(result.contains("5"))
+        #expect(!result.contains(":"))
+    }
 }

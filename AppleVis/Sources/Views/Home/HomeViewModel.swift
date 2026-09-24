@@ -76,38 +76,40 @@ struct MouseRecapDigest: Codable {
         blogs.filter { !Self.isAppPickSpotlight($0) }
     }
 
-    var countSummary: String {
-        let parts = [
-            Self.countPart(apps.count, singular: "accessible app", plural: "accessible apps"),
-            Self.countPart(podcasts.count, singular: "podcast episode", plural: "podcast episodes"),
-            Self.countPart(forums.count, singular: "popular discussion", plural: "popular discussions"),
-            Self.countPart(resources.count, singular: "guide or tutorial", plural: "guides and tutorials"),
-            Self.countPart(blogs.count, singular: "blog post", plural: "blog posts"),
+    /// One entry per non-empty section, each a whole translatable phrase with
+    /// real plural forms — the old version glued an English noun onto the
+    /// count ("3 " + "podcast episodes"), which no other language could follow.
+    private var countParts: [String] {
+        [
+            apps.isEmpty ? nil : String(localized: "\(apps.count) accessible apps"),
+            podcasts.isEmpty ? nil : String(localized: "\(podcasts.count) podcast episodes"),
+            forums.isEmpty ? nil : String(localized: "\(forums.count) popular discussions"),
+            resources.isEmpty ? nil : String(localized: "\(resources.count) guides and tutorials"),
+            blogs.isEmpty ? nil : String(localized: "\(blogs.count) blog posts"),
         ].compactMap { $0 }
-        return parts.isEmpty ? "No recap items found for this period." : parts.joined(separator: " · ")
+    }
+
+    var countSummary: String {
+        let parts = countParts
+        return parts.isEmpty ? String(localized: "No recap items found for this period.") : parts.joined(separator: " · ")
     }
 
     var dateRangeText: String {
         let start = startDate.formatted(date: .abbreviated, time: .omitted)
         let end = endDate.formatted(date: .abbreviated, time: .omitted)
-        return "\(start) through \(end)"
+        return String(localized: "\(start) through \(end)")
     }
 
     func newsletterIntro(for periodName: String) -> String {
         let period = periodName.lowercased()
-        let parts = [
-            Self.countPart(apps.count, singular: "accessible app", plural: "accessible apps"),
-            Self.countPart(podcasts.count, singular: "podcast episode", plural: "podcast episodes"),
-            Self.countPart(forums.count, singular: "popular discussion", plural: "popular discussions"),
-            Self.countPart(resources.count, singular: "guide or tutorial", plural: "guides and tutorials"),
-            Self.countPart(blogs.count, singular: "blog post", plural: "blog posts"),
-        ].compactMap { $0 }
+        let parts = countParts
 
         guard !parts.isEmpty else {
-            return "No recap items were found for the \(period)."
+            return String(localized: "No recap items were found for the \(period).")
         }
 
-        return "Here's your AppleVis roundup from the \(period). \(editorialLead) Inside: \(Self.sentenceList(parts))."
+        let list = ListFormatter.localizedString(byJoining: parts)
+        return String(localized: "Here's your AppleVis roundup from the \(period). \(editorialLead) Inside: \(list).")
     }
 
     func shareText(for periodName: String, aiBlurbs: [String: String] = [:]) -> String {
@@ -119,18 +121,18 @@ struct MouseRecapDigest: Codable {
         let visibleForums = Array(forums.prefix(limits.forums))
 
         var lines = [
-            "Mouse Recap",
+            String(localized: "Mouse Recap"),
             periodName,
             dateRangeText,
             "",
-            "From the Mouse",
+            String(localized: "From the Mouse"),
             newsletterIntro(for: periodName),
         ]
 
         if let spotlight = appPickSpotlight {
             appendShareSection(
-                title: "Spotlight Feature",
-                description: "AnonyMouse's App Pick of the Month",
+                title: String(localized: "Spotlight Feature"),
+                description: String(localized: "AnonyMouse's App Pick of the Month"),
                 items: [shareItem(
                     title: spotlight.title,
                     details: blogDetails(spotlight),
@@ -142,14 +144,14 @@ struct MouseRecapDigest: Codable {
         }
 
         appendShareSection(
-            title: "In This Recap",
+            title: String(localized: "In This Recap"),
             description: "",
             items: tableOfContents(periodName: periodName).map { "\($0.title): \($0.detail)" },
             to: &lines
         )
 
         appendShareSection(
-            title: "New Accessible Apps",
+            title: String(localized: "New Accessible Apps"),
             description: appSectionIntro(periodName: periodName),
             items: visibleApps.map {
                 shareItem(title: $0.name, details: appDetails($0), body: aiBlurbs[$0.id] ?? newsletterBody(for: $0), url: $0.url)
@@ -165,7 +167,7 @@ struct MouseRecapDigest: Codable {
             to: &lines
         )
         appendShareSection(
-            title: "From the AppleVis Blog",
+            title: String(localized: "From the AppleVis Blog"),
             description: blogSectionIntro(periodName: periodName),
             items: visibleBlogs.map {
                 shareItem(title: $0.title, details: blogDetails($0), body: aiBlurbs[$0.id] ?? newsletterBody(for: $0), url: $0.url)
@@ -173,7 +175,7 @@ struct MouseRecapDigest: Codable {
             to: &lines
         )
         appendShareSection(
-            title: "How-To Corner",
+            title: String(localized: "How-To Corner"),
             description: resourceSectionIntro(periodName: periodName),
             items: visibleResources.map {
                 shareItem(title: $0.title, details: resourceDetails($0), body: aiBlurbs[$0.id] ?? newsletterBody(for: $0), url: $0.url)
@@ -181,7 +183,7 @@ struct MouseRecapDigest: Codable {
             to: &lines
         )
         appendShareSection(
-            title: "Community Voices",
+            title: String(localized: "Community Voices"),
             description: forumSectionIntro(periodName: periodName),
             items: visibleForums.map {
                 shareItem(title: $0.title, details: forumDetails($0), body: aiBlurbs[$0.id] ?? newsletterBody(for: $0), url: $0.url)
@@ -193,81 +195,84 @@ struct MouseRecapDigest: Codable {
 
     func tableOfContents(periodName: String) -> [(title: String, detail: String)] {
         var items: [(String, String)] = []
-        if appPickSpotlight != nil { items.append(("Spotlight Feature", "AnonyMouse's App Pick of the Month")) }
-        if !apps.isEmpty { items.append(("New Accessible Apps", Self.countPart(apps.count, singular: "app", plural: "apps") ?? "")) }
-        if !podcasts.isEmpty { items.append((podcastSectionTitle(periodName: periodName), Self.countPart(podcasts.count, singular: "episode", plural: "episodes") ?? "")) }
-        if !standardBlogs.isEmpty { items.append(("From the AppleVis Blog", Self.countPart(standardBlogs.count, singular: "post", plural: "posts") ?? "")) }
-        if !resources.isEmpty { items.append(("How-To Corner", Self.countPart(resources.count, singular: "guide or tutorial", plural: "guides and tutorials") ?? "")) }
-        if !forums.isEmpty { items.append(("Community Voices", Self.countPart(forums.count, singular: "discussion", plural: "discussions") ?? "")) }
+        if appPickSpotlight != nil { items.append((String(localized: "Spotlight Feature"), String(localized: "AnonyMouse's App Pick of the Month"))) }
+        if !apps.isEmpty { items.append((String(localized: "New Accessible Apps"), String(localized: "\(apps.count) apps"))) }
+        if !podcasts.isEmpty { items.append((podcastSectionTitle(periodName: periodName), String(localized: "\(podcasts.count) episodes"))) }
+        if !standardBlogs.isEmpty { items.append((String(localized: "From the AppleVis Blog"), String(localized: "\(standardBlogs.count) posts"))) }
+        if !resources.isEmpty { items.append((String(localized: "How-To Corner"), String(localized: "\(resources.count) guides and tutorials"))) }
+        if !forums.isEmpty { items.append((String(localized: "Community Voices"), String(localized: "\(forums.count) discussions"))) }
         return items
     }
 
     func newsletterBody(for app: AppListing) -> String {
-        let fallback = "\(app.name) is a \(app.platform.displayName) app in \(app.category)."
+        let fallback = String(localized: "\(app.name) is a \(app.platform.displayName) app in \(app.category).")
         return excerpt(from: app.summary, fallback: fallback)
     }
 
     func newsletterBody(for episode: PodcastEpisode) -> String {
-        excerpt(from: episode.description, fallback: "Listen to the full episode on AppleVis.")
+        excerpt(from: episode.description, fallback: String(localized: "Listen to the full episode on AppleVis."))
     }
 
     func newsletterBody(for resource: Resource) -> String {
-        excerpt(from: resource.summary, fallback: "Read the full \(resource.kind.displayName.lowercased()) on AppleVis.")
+        excerpt(from: resource.summary, fallback: String(localized: "Read more on AppleVis."))
     }
 
     func newsletterBody(for post: BlogPost) -> String {
-        excerpt(from: post.summary, fallback: "Read the full post on AppleVis.")
+        excerpt(from: post.summary, fallback: String(localized: "Read the full post on AppleVis."))
     }
 
     func newsletterBody(for topic: ForumTopic) -> String {
         if let excerpt = forumExcerpts[topic.id], !excerpt.isEmpty {
             return excerpt
         }
-        let replyText = "\(topic.replyCount) comment\(topic.replyCount == 1 ? "" : "s")"
-        let kind = topic.category.isEmpty ? "discussion" : "\(topic.category) discussion"
-        return "This \(kind) has been active in the community, with \(replyText) so far."
+        let comments = String(localized: "\(topic.replyCount) comments")
+        if topic.category.isEmpty {
+            return String(localized: "This discussion has been active in the community, with \(comments) so far.")
+        }
+        return String(localized: "This \(topic.category) discussion has been active in the community, with \(comments) so far.")
     }
 
     func appDetails(_ app: AppListing) -> [String] {
         [
-            app.developer.isEmpty ? "" : "Developer: \(app.developer)",
-            "Platform: \(app.platform.displayName)",
-            app.category.isEmpty ? "" : "Category: \(app.category)",
-            app.price.isEmpty ? "" : "Price: \(app.price)",
+            app.developer.isEmpty ? "" : String(localized: "Developer: \(app.developer)"),
+            String(localized: "Platform: \(app.platform.displayName)"),
+            app.category.isEmpty ? "" : String(localized: "Category: \(app.category)"),
+            app.price.isEmpty ? "" : String(localized: "Price: \(app.price)"),
         ].filter { !$0.isEmpty }
     }
 
     func podcastDetails(_ episode: PodcastEpisode) -> [String] {
         [
             episode.showTitle,
-            episode.authorName.isEmpty ? "" : "By \(episode.authorName)",
+            episode.authorName.isEmpty ? "" : String(localized: "By \(episode.authorName)"),
             publishedText(episode.publishedAt),
         ].filter { !$0.isEmpty }
     }
 
     func blogDetails(_ post: BlogPost) -> [String] {
         [
-            post.authorName.isEmpty ? "" : "By \(post.authorName)",
+            post.authorName.isEmpty ? "" : String(localized: "By \(post.authorName)"),
             publishedText(post.publishedAt),
-            "\(post.commentCount) comment\(post.commentCount == 1 ? "" : "s")",
+            String(localized: "\(post.commentCount) comments"),
         ].filter { !$0.isEmpty }
     }
 
     func resourceDetails(_ resource: Resource) -> [String] {
         [
             resource.kind.displayName,
-            resource.authorName.isEmpty ? "" : "By \(resource.authorName)",
+            resource.authorName.isEmpty ? "" : String(localized: "By \(resource.authorName)"),
             publishedText(resource.createdAt),
-            "\(resource.commentCount) comment\(resource.commentCount == 1 ? "" : "s")",
+            String(localized: "\(resource.commentCount) comments"),
         ].filter { !$0.isEmpty }
     }
 
     func forumDetails(_ topic: ForumTopic) -> [String] {
-        [
+        let active = topic.lastActivityAt.formatted(.relative(presentation: .named))
+        return [
             topic.category.isEmpty ? "" : topic.category,
-            topic.authorName.isEmpty ? "" : "By \(topic.authorName)",
-            "\(topic.replyCount) comment\(topic.replyCount == 1 ? "" : "s")",
-            "Active \(topic.lastActivityAt.formatted(.relative(presentation: .named)))",
+            topic.authorName.isEmpty ? "" : String(localized: "By \(topic.authorName)"),
+            String(localized: "\(topic.replyCount) comments"),
+            String(localized: "Active \(active)"),
         ].filter { !$0.isEmpty }
     }
 
@@ -275,8 +280,15 @@ struct MouseRecapDigest: Codable {
         String(localized: "A fresh batch of App Directory entries arrived in the \(periodName.lowercased()), with practical discoveries for blind and low vision Apple users.")
     }
 
+    /// `periodName` is the window's translated label, so compare it with the
+    /// translated "Past Month" rather than searching it for the English word
+    /// "month", which never matched in other languages.
+    static func isMonth(_ periodName: String) -> Bool {
+        periodName == MouseRecapWindow.month.label
+    }
+
     func podcastSectionTitle(periodName: String) -> String {
-        periodName.localizedCaseInsensitiveContains("month")
+        Self.isMonth(periodName)
             ? String(localized: "This Month in Podcasts")
             : String(localized: "This Week in Podcasts")
     }
@@ -298,7 +310,7 @@ struct MouseRecapDigest: Codable {
     }
 
     static func limits(for periodName: String) -> (apps: Int, podcasts: Int, blogs: Int, resources: Int, forums: Int) {
-        if periodName.localizedCaseInsensitiveContains("month") {
+        if isMonth(periodName) {
             return (apps: 12, podcasts: 5, blogs: 5, resources: 6, forums: 8)
         }
         return (apps: 8, podcasts: 5, blogs: 5, resources: 6, forums: 5)
@@ -337,43 +349,24 @@ struct MouseRecapDigest: Codable {
 
     private var editorialLead: String {
         if !apps.isEmpty && !forums.isEmpty {
-            return "New app discoveries and community conversations led the way."
+            return String(localized: "New app discoveries and community conversations led the way.")
         }
         if !apps.isEmpty {
-            return "New app discoveries led the way."
+            return String(localized: "New app discoveries led the way.")
         }
         if !forums.isEmpty {
-            return "Community conversations led the way."
+            return String(localized: "Community conversations led the way.")
         }
         if !podcasts.isEmpty {
-            return "Recent podcast episodes brought fresh walkthroughs and tips."
+            return String(localized: "Recent podcast episodes brought fresh walkthroughs and tips.")
         }
         if !resources.isEmpty {
-            return "Fresh guides and tutorials brought practical help."
+            return String(localized: "Fresh guides and tutorials brought practical help.")
         }
         if !blogs.isEmpty {
-            return "AppleVis blog posts brought the latest news and perspective."
+            return String(localized: "AppleVis blog posts brought the latest news and perspective.")
         }
-        return "Check back soon for new apps, podcasts, discussions, guides, and blog posts."
-    }
-
-    private static func countPart(_ count: Int, singular: String, plural: String) -> String? {
-        guard count > 0 else { return nil }
-        return "\(count) \(count == 1 ? singular : plural)"
-    }
-
-    private static func sentenceList(_ parts: [String]) -> String {
-        switch parts.count {
-        case 0:
-            return ""
-        case 1:
-            return parts[0]
-        case 2:
-            return parts.joined(separator: " and ")
-        default:
-            let initial = parts.dropLast().joined(separator: ", ")
-            return "\(initial), and \(parts[parts.count - 1])"
-        }
+        return String(localized: "Check back soon for new apps, podcasts, discussions, guides, and blog posts.")
     }
 
     private func appendShareSection(title: String, description: String, items: [String], to lines: inout [String]) {
@@ -386,7 +379,7 @@ struct MouseRecapDigest: Codable {
     private func shareItem(title: String, details: [String], body: String, url: String) -> String {
         var lines = [title]
         if !details.isEmpty { lines += details }
-        lines += ["", body, "", "Read on AppleVis:", url]
+        lines += ["", body, "", String(localized: "Read on AppleVis:"), url]
         return lines.joined(separator: "\n")
     }
 
@@ -527,7 +520,7 @@ final class HomeViewModel: ObservableObject {
             // alone rather than blanking it — the failedSourceNames banner
             // already tells the user something's wrong.
             if hadNoItems {
-                error = "Couldn't load Home. Pull to refresh."
+                error = String(localized: "Couldn't load Home. Pull to refresh.")
             }
         } else {
             error = nil
@@ -773,7 +766,7 @@ final class HomeViewModel: ObservableObject {
             // Fetch failed outright — leave the cached digest (if any) on
             // screen rather than clearing it, same as Home's own failed-load
             // handling.
-            mouseRecapError = "Couldn't load Mouse Recap. Pull to refresh."
+            mouseRecapError = String(localized: "Couldn't load Mouse Recap. Pull to refresh.")
         } else {
             let digest = await enrichMouseRecap(Self.buildMouseRecap(from: result.items, startDate: startDate, endDate: endDate))
             mouseRecap = digest

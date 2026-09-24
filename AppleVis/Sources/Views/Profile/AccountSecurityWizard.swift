@@ -147,8 +147,8 @@ struct AccountSecurityWizard: View {
                         icon: mode.icon,
                         heading: mode == .password ? "Password updated!" : "Email address updated!",
                         message: mode == .password
-                            ? "Your AppleVis password has been changed. You'll need it the next time you sign in on another device."
-                            : "Your AppleVis account email has been updated to \(newEmail).",
+                            ? String(localized: "Your AppleVis password has been changed. You'll need it the next time you sign in on another device.")
+                            : String(localized: "Your AppleVis account email has been updated to \(newEmail)."),
                         doneLabel: "Done",
                         onDone: { dismiss() }
                     )

@@ -34,7 +34,7 @@ struct ForYouView: View {
 
     private func pickerAccessibilityLabel(_ tab: ForYouTab) -> String {
         guard let count = itemCount(for: tab) else { return tab.accessibilityLabel }
-        return "\(tab.accessibilityLabel), \(count) item\(count == 1 ? "" : "s")"
+        return String(localized: "\(tab.accessibilityLabel), \(String(localized: "\(count) items"))")
     }
 
     private func itemCount(for tab: ForYouTab) -> Int? {
@@ -224,9 +224,9 @@ enum ForYouTab: String, CaseIterable, Identifiable {
     var accessibilityLabel: String {
         switch self {
         case .saved:       return "Saved Items"
-        case .recommended: return "Apps You've Recommended"
-        case .queue:       return "Podcast Queue"
-        case .downloads:   return "Podcast Downloads"
+        case .recommended: return String(localized: "Apps You've Recommended")
+        case .queue:       return String(localized: "Podcast Queue")
+        case .downloads:   return String(localized: "Podcast Downloads")
         default:           return displayName
         }
     }
@@ -265,10 +265,10 @@ struct DownloadsView: View {
                 // (FORYOU-07) — a first-time user with nothing downloaded
                 // had no path forward besides leaving the tab on their own.
                 EmptyStateView(
-                    title: "No Downloads",
-                    message: "Download episodes for offline playback from any episode's detail page.",
+                    title: String(localized: "No Downloads"),
+                    message: String(localized: "Download episodes for offline playback from any episode's detail page."),
                     systemImage: "arrow.down.circle",
-                    primaryActionLabel: "Browse Podcasts",
+                    primaryActionLabel: String(localized: "Browse Podcasts"),
                     primaryAction: { showBrowsePodcasts = true }
                 )
                 .sheet(isPresented: $showBrowsePodcasts) {
@@ -324,7 +324,7 @@ struct DownloadsView: View {
                 .onAppear { tips.show(.downloadsOffline) }
                 .task { await retryAccessibilityFocus(into: $summaryFocused) }
                 .confirmationDialog(
-                    "Remove all \(downloads.downloadedEpisodes.count) downloaded episode\(downloads.downloadedEpisodes.count == 1 ? "" : "s")?",
+                    String(localized: "Remove all \(downloads.downloadedEpisodes.count) downloaded episodes?"),
                     isPresented: $showRemoveAllConfirm, titleVisibility: .visible
                 ) {
                     Button("Remove Downloads", role: .destructive) {
@@ -352,15 +352,15 @@ struct DownloadsView: View {
     private var downloadsSummaryHeader: some View {
         let total = downloads.downloadedEpisodes.count
         return CollectionSummaryHeader(
-            text: "\(total) downloaded episode\(total == 1 ? "" : "s")",
-            summaryActionName: "Downloads summary",
+            text: String(localized: "\(total) downloaded episodes"),
+            summaryActionName: String(localized: "Downloads summary"),
             onSummaryAction: {
                 let totalBytes = downloads.downloadedEpisodes.reduce(0) { $0 + $1.fileSizeBytes }
                 UIAccessibility.post(notification: .announcement, argument: total == 0
-                    ? "No downloaded episodes."
-                    : "\(total) downloaded episode\(total == 1 ? "" : "s"), \(formattedSize(totalBytes)) total.")
+                    ? String(localized: "No downloaded episodes.")
+                    : String(localized: "\(String(localized: "\(total) downloaded episodes")), \(formattedSize(totalBytes)) total."))
             },
-            bulkActionName: total == 0 ? nil : "Remove All Downloads",
+            bulkActionName: total == 0 ? nil : String(localized: "Remove All Downloads"),
             onBulkAction: total == 0 ? nil : { showRemoveAllConfirm = true }
         )
     }
@@ -608,7 +608,7 @@ struct SavedItemsView: View {
         .onAppear { tips.show(UIAccessibility.isVoiceOverRunning ? .savedRotorActions : .savedQuickActions) }
         .refreshable { await load(); SoundPlayer.shared.play(.refresh) }
         .confirmationDialog(
-            "Unsave all \(filtered.count) item\(filtered.count == 1 ? "" : "s")?",
+            String(localized: "Unsave all \(filtered.count) items?"),
             isPresented: $showUnsaveAllConfirm, titleVisibility: .visible
         ) {
             Button("Unsave All", role: .destructive) { unsaveAll() }
@@ -638,9 +638,9 @@ struct SavedItemsView: View {
             text: filter == nil
                 ? String(localized: "\(items.count) items")
                 : filter!.countPhrase(filtered.count),
-            summaryActionName: "Saved summary",
+            summaryActionName: String(localized: "Saved summary"),
             onSummaryAction: { announceSummary(counts: counts) },
-            bulkActionName: filtered.isEmpty ? nil : "Unsave All",
+            bulkActionName: filtered.isEmpty ? nil : String(localized: "Unsave All"),
             onBulkAction: filtered.isEmpty ? nil : { showUnsaveAllConfirm = true }
         )
     }
@@ -709,8 +709,8 @@ struct SavedItemsView: View {
         let toRemove = Set(filtered.map(\.id))
         for id in toRemove { PersistenceStore.shared.unsave(id: id) }
         items.removeAll { toRemove.contains($0.id) }
-        toast.success(String(localized: "Removed \(toRemove.count) item\(toRemove.count == 1 ? "" : "s") from Saved"))
-        UIAccessibility.post(notification: .announcement, argument: "Removed saved items.")
+        toast.success(String(localized: "Removed \(toRemove.count) items from Saved"))
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "Removed saved items."))
         focusSummaryAfterDelay()
     }
 
@@ -958,17 +958,17 @@ struct FollowingView: View {
     var body: some View {
         Group {
             if !auth.isSignedIn {
-                EmptyStateView(title: "Sign In Required", message: "Sign in to view topics you're following.", systemImage: "bell")
+                EmptyStateView(title: "Sign In Required", message: String(localized: "Sign in to view topics you're following."), systemImage: "bell")
             } else if isLoading {
                 LoadingView()
             } else if let error {
                 ErrorView(message: error) { await load() }
             } else if items.isEmpty {
                 EmptyStateView(
-                    title: "Not Following Anything",
-                    message: "Follow forum topics to get notified of new replies.",
+                    title: String(localized: "Not Following Anything"),
+                    message: String(localized: "Follow forum topics to get notified of new replies."),
                     systemImage: "bell",
-                    primaryActionLabel: "Browse Forums",
+                    primaryActionLabel: String(localized: "Browse Forums"),
                     primaryAction: { showBrowseForums = true }
                 )
                 .sheet(isPresented: $showBrowseForums) {
@@ -1004,12 +1004,12 @@ struct FollowingView: View {
 
     private var summaryHeader: some View {
         CollectionSummaryHeader(
-            text: "\(items.count) followed item\(items.count == 1 ? "" : "s")",
-            summaryActionName: "Following summary",
+            text: String(localized: "\(items.count) followed items"),
+            summaryActionName: String(localized: "Following summary"),
             onSummaryAction: {
                 UIAccessibility.post(
                     notification: .announcement,
-                    argument: items.isEmpty ? "No followed items." : "\(items.count) followed item\(items.count == 1 ? "" : "s")."
+                    argument: items.isEmpty ? String(localized: "No followed items.") : String(localized: "\(items.count) followed items.")
                 )
             }
         )
@@ -1040,14 +1040,14 @@ struct FollowingView: View {
             if !local.isEmpty {
                 items = local
             } else {
-                error = networkMonitor.isConnected ? e.localizedDescription : "You're offline. Connect to Wi-Fi or cellular to see what you're following."
+                error = networkMonitor.isConnected ? e.localizedDescription : String(localized: "You're offline. Connect to Wi-Fi or cellular to see what you're following.")
             }
         } catch {
             let local = PersistenceStore.shared.followedItems()
             if !local.isEmpty {
                 items = local
             } else {
-                self.error = networkMonitor.isConnected ? "Couldn't load your followed items." : "You're offline. Connect to Wi-Fi or cellular to see what you're following."
+                self.error = networkMonitor.isConnected ? String(localized: "Couldn't load your followed items.") : String(localized: "You're offline. Connect to Wi-Fi or cellular to see what you're following.")
             }
         }
         isLoading = false
@@ -1147,17 +1147,17 @@ struct RecommendedAppsView: View {
     var body: some View {
         Group {
             if !auth.isSignedIn {
-                EmptyStateView(title: "Sign In Required", message: "Sign in to view apps you've recommended.", systemImage: "hand.thumbsup")
+                EmptyStateView(title: "Sign In Required", message: String(localized: "Sign in to view apps you've recommended."), systemImage: "hand.thumbsup")
             } else if isLoading {
                 LoadingView()
             } else if let error {
                 ErrorView(message: error) { await load() }
             } else if apps.isEmpty {
                 EmptyStateView(
-                    title: "No Recommendations Yet",
-                    message: "When you recommend an app from its App Directory page, it shows up here.",
+                    title: String(localized: "No Recommendations Yet"),
+                    message: String(localized: "When you recommend an app from its App Directory page, it shows up here."),
                     systemImage: "hand.thumbsup",
-                    primaryActionLabel: "Browse App Directory",
+                    primaryActionLabel: String(localized: "Browse App Directory"),
                     primaryAction: { showBrowseApps = true }
                 )
                 .sheet(isPresented: $showBrowseApps) {
@@ -1188,12 +1188,12 @@ struct RecommendedAppsView: View {
 
     private var summaryHeader: some View {
         CollectionSummaryHeader(
-            text: "\(apps.count) recommended app\(apps.count == 1 ? "" : "s")",
-            summaryActionName: "Recommendations summary",
+            text: String(localized: "\(apps.count) recommended apps"),
+            summaryActionName: String(localized: "Recommendations summary"),
             onSummaryAction: {
                 UIAccessibility.post(
                     notification: .announcement,
-                    argument: apps.isEmpty ? "No recommended apps." : "\(apps.count) recommended app\(apps.count == 1 ? "" : "s")."
+                    argument: apps.isEmpty ? String(localized: "No recommended apps.") : String(localized: "\(apps.count) recommended apps.")
                 )
             }
         )
@@ -1206,9 +1206,9 @@ struct RecommendedAppsView: View {
         do {
             apps = try await APIClient.shared.flags.recommendedApps(uid: user.uuid, csrfToken: user.csrfToken)
         } catch let e as APIError {
-            error = networkMonitor.isConnected ? e.localizedDescription : "You're offline. Connect to Wi-Fi or cellular to see your recommendations."
+            error = networkMonitor.isConnected ? e.localizedDescription : String(localized: "You're offline. Connect to Wi-Fi or cellular to see your recommendations.")
         } catch {
-            self.error = networkMonitor.isConnected ? "Couldn't load your recommendations." : "You're offline. Connect to Wi-Fi or cellular to see your recommendations."
+            self.error = networkMonitor.isConnected ? String(localized: "Couldn't load your recommendations.") : String(localized: "You're offline. Connect to Wi-Fi or cellular to see your recommendations.")
         }
         isLoading = false
         if error == nil { onLoaded?(apps.count) }
@@ -1292,7 +1292,7 @@ private extension ContentKind {
         case .appListing:     return "Apps"
         case .resource:       return "Guides"
         case .blogPost:       return "Blog Posts"
-        case .bugReport:      return "Bug Reports"
+        case .bugReport:      return String(localized: "Bug Reports")
         }
     }
 }

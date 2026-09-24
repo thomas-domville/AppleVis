@@ -21,6 +21,18 @@ struct GuidedExperienceView: View {
     /// Resolved once so TextSegmentation.sentenceGroups chunks the actual
     /// localized text, not the raw English source.
     private var localizedBody: String { String(localized: String.LocalizationValue(step.body)) }
+
+    /// One stop per paragraph now that the tour is written in short
+    /// paragraphs (the editorial team's rewording) — grouping every four
+    /// sentences would have cut across them. Falls back to sentence groups
+    /// for any text that's still a single block.
+    private var bodyChunks: [String] {
+        let paragraphs = localizedBody
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return paragraphs.count > 1 ? paragraphs : TextSegmentation.sentenceGroups(localizedBody)
+    }
     private var isFirstStep: Bool { stepIndex == 0 }
     private var isLastStep: Bool { stepIndex == experience.steps.count - 1 }
     /// Every chapter-closing checkpoint sets a custom `continueLabel`
@@ -64,7 +76,8 @@ struct GuidedExperienceView: View {
                             headerFocus: $isHeadingFocused
                         )
 
-                        // Every step.body is one long unbroken block of
+                        // (Now split by paragraph — see bodyChunks.) Every
+                        // step.body used to be one long unbroken block of
                         // prose with no \n\n structure to split on — read
                         // (or Braille-panned) as a single giant element,
                         // the same problem already fixed for forum
@@ -77,7 +90,7 @@ struct GuidedExperienceView: View {
                         // would produce fragments that don't match any
                         // catalog key. Requested directly.
                         VStack(spacing: 12) {
-                            ForEach(Array(TextSegmentation.sentenceGroups(localizedBody).enumerated()), id: \.offset) { _, chunk in
+                            ForEach(Array(bodyChunks.enumerated()), id: \.offset) { _, chunk in
                                 Text(chunk)
                                     .font(.body)
                                     .multilineTextAlignment(.center)

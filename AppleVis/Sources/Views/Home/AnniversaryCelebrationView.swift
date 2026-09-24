@@ -26,22 +26,22 @@ struct AnniversaryCelebrationView: View {
         case 1:
             icon = "party.popper.fill"
             accentColor = Color(red: 0.976, green: 0.451, blue: 0.086) // orange
-            heading = "Happy First Anniversary!"
+            heading = String(localized: "Happy First Anniversary!")
         case let y where y % 5 == 0:
             icon = "star.circle.fill"
             accentColor = Color(red: 0.961, green: 0.620, blue: 0.043) // amber
-            heading = "Happy \(y)-Year Anniversary!"
+            heading = String(localized: "Happy \(y)-Year Anniversary!")
         default:
             icon = "birthday.cake.fill"
             accentColor = Color.accentColor
-            heading = "Happy Anniversary!"
+            heading = String(localized: "Happy Anniversary!")
         }
 
-        let yearWord = years == 1 ? "year" : "years"
+        let span = String(localized: "\(years) years")
         let templates = [
-            "\(years) \(yearWord) ago today, you joined the AppleVis community. Thanks for being part of it!",
-            "It's been \(years) \(yearWord) since you joined AppleVis. Here's to many more!",
-            "\(years) \(yearWord) with AppleVis today. We're glad you're here!",
+            String(localized: "\(span) ago today, you joined the AppleVis community. Thanks for being part of it!"),
+            String(localized: "It's been \(span) since you joined AppleVis. Here's to many more!"),
+            String(localized: "\(span) with AppleVis today. We're glad you're here!"),
         ]
         message = templates.randomElement() ?? templates[0]
     }
@@ -54,7 +54,7 @@ struct AnniversaryCelebrationView: View {
     }
 
     private var shareText: String {
-        "🎉 \(heading) I've been part of the AppleVis community for \(years) \(years == 1 ? "year" : "years")!"
+        String(localized: "🎉 \(heading) I've been part of the AppleVis community for \(String(localized: "\(years) years"))!")
     }
 
     var body: some View {

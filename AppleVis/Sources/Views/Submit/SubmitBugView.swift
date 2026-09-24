@@ -107,7 +107,7 @@ struct SubmitBugView: View {
                     ThankYouView(
                         icon: "ladybug",
                         heading: "You did it — thanks!",
-                        message: "Your report is now in front of our team. We genuinely appreciate you taking the time to help make apps more accessible for everyone.",
+                        message: "Your report has been sent to our team. Thank you for helping make apps more accessible for everyone.",
                         doneLabel: "Done",
                         onDone: { dismiss() }
                     ) {
@@ -250,7 +250,7 @@ struct SubmitBugView: View {
                 // Surfaced here, at the very start of the wizard, rather
                 // than as a surprise once Environment asks for the FB
                 // number. Reported directly.
-                Text("Report an accessibility bug for the community Bug Tracker. AppleVis requires every report to first be filed with Apple's Feedback Assistant — you'll need the FB number from that report to submit here.")
+                Text("Report an accessibility bug for the community Bug Tracker. Every report must be filed with Apple's Feedback Assistant first, and you'll need the FB number from that report here.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             if intelligence.showTranslatePrompt {
@@ -333,7 +333,7 @@ struct SubmitBugView: View {
                 TextEditor(text: $description)
                     .frame(minHeight: 160)
                     .accessibilityLabel(String(localized: "Description"))
-                    .accessibilityHint(String(localized: "Required, minimum 30 characters. The more detail you can share — what happened, what you expected instead, and the exact steps to get there — the easier it is for us to reproduce and track down."))
+                    .accessibilityHint(String(localized: "Required, at least 30 characters. Include what happened, what you expected, and the exact steps to reproduce it."))
                     .rewriteFlash($justRewrote)
                     .onChange(of: description) { _, newValue in
                         handleDescriptionChange(newValue)
@@ -344,7 +344,7 @@ struct SubmitBugView: View {
                             detectionEnabled: preferences.nonEnglishDetectionEnabled
                         )
                     }
-                Text("The more detail you can share — what happened, what you expected instead, and the exact steps to get there — the easier it is for us to reproduce and track down.")
+                Text("Include what happened, what you expected instead, and the exact steps to get there. The more detail you share, the easier it is for us to reproduce the bug.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
@@ -363,7 +363,7 @@ struct SubmitBugView: View {
             reasons.append(String(localized: "Enter a title to continue."))
         }
         if descriptionLength < 30 {
-            reasons.append(String(localized: "Write at least \(30 - descriptionLength) more character\(30 - descriptionLength == 1 ? "" : "s") to continue."))
+            reasons.append(String(localized: "Write at least \(30 - descriptionLength) more characters to continue."))
         }
         if !email.isValidEmailFormat {
             reasons.append(String(localized: "Enter a valid email address to continue."))

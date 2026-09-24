@@ -53,17 +53,26 @@ struct GuidelinesReminderView: View {
         }
     }
 
+    // The rule name and message stay English in GuidelineWarning (the
+    // false-positive report sends them to the editorial team as written)
+    // and are translated here, only for display. They used to be shown as
+    // written, so these reminders were English in every language.
+    // AI-generated reminders have no catalog entry and show as they are.
+    private var localizedLabel: String { String(localized: String.LocalizationValue(config.label)) }
+    private var localizedRule: String { String(localized: String.LocalizationValue(warning.rule)) }
+    private var localizedMessage: String { String(localized: String.LocalizationValue(warning.message)) }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(config.label): \(warning.rule)")
+                Text(verbatim: "\(localizedLabel): \(localizedRule)")
                     .font(.caption).fontWeight(.bold)
                     .foregroundStyle(config.text)
-                Text(warning.message)
+                Text(verbatim: localizedMessage)
                     .font(.subheadline)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel(String(localized: "\(config.label): \(warning.rule). \(warning.message)"))
+            .accessibilityLabel(String(localized: "\(localizedLabel): \(localizedRule). \(localizedMessage)"))
 
             HStack(spacing: 10) {
                 if warning.isToneConcern, let onRewriteRespectfully, IntelligenceService.isAvailable {
@@ -192,7 +201,7 @@ final class GuidelinesCheckState: ObservableObject {
             self.topWarning = visible.first
             if let top = visible.first, top.id != self.lastAnnouncedId {
                 self.lastAnnouncedId = top.id
-                UIAccessibility.post(notification: .announcement, argument: "Guideline reminder: \(top.rule). \(top.message)")
+                UIAccessibility.post(notification: .announcement, argument: String(localized: "Guideline reminder: \(String(localized: String.LocalizationValue(top.rule))). \(String(localized: String.LocalizationValue(top.message)))"))
             }
         }
     }

@@ -46,7 +46,7 @@ enum SpotlightIndexer {
     }
 
     static func index(_ topic: ForumTopic) {
-        index(kind: .forumTopic, id: topic.id, title: topic.title, contentDescription: "\(topic.category) · \(topic.replyCount) replies", url: topic.url)
+        index(kind: .forumTopic, id: topic.id, title: topic.title, contentDescription: "\(topic.category) · \(String(localized: "\(topic.replyCount) replies"))", url: topic.url)
     }
 
     static func index(_ episode: PodcastEpisode) {

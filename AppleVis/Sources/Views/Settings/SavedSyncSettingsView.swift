@@ -27,7 +27,7 @@ struct SavedSyncSettingsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Last Synced")
                                 .font(.subheadline)
-                            Text(lastSyncDate.map { $0.formatted(date: .abbreviated, time: .shortened) } ?? "Never")
+                            Text(lastSyncDate.map { $0.formatted(date: .abbreviated, time: .shortened) } ?? String(localized: "Never"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -56,43 +56,43 @@ struct SavedSyncSettingsView: View {
                     SyncToggleRow(
                         isOn: $preferences.savedItemsSync,
                         icon: "bookmark",
-                        label: "Saved Items",
-                        detail: "Articles, episodes, and apps you've bookmarked."
+                        label: String(localized: "Saved Items"),
+                        detail: String(localized: "Articles, episodes, and apps you've bookmarked.")
                     )
 
                     SyncToggleRow(
                         isOn: $preferences.followedItemsSync,
                         icon: "bell",
-                        label: "Following",
-                        detail: "Topics and content you follow stay the same on all devices."
+                        label: String(localized: "Following"),
+                        detail: String(localized: "Topics and content you follow stay the same on all devices.")
                     )
 
                     SyncToggleRow(
                         isOn: $preferences.podcastPositionSync,
                         icon: "headphones",
-                        label: "Podcast Position",
-                        detail: "Continue listening from where you left off on any device."
+                        label: String(localized: "Podcast Position"),
+                        detail: String(localized: "Continue listening from where you left off on any device.")
                     )
 
                     SyncToggleRow(
                         isOn: $preferences.queueSync,
                         icon: "list.number",
-                        label: "Podcast Queue",
-                        detail: "Your listening queue stays the same on all devices."
+                        label: String(localized: "Podcast Queue"),
+                        detail: String(localized: "Your listening queue stays the same on all devices.")
                     )
 
                     SyncToggleRow(
                         isOn: $preferences.readHistorySync,
                         icon: "clock.arrow.circlepath",
-                        label: "Read History",
-                        detail: "Seen topics, new-comment tracking, and visit history can follow you across devices when history is enabled."
+                        label: String(localized: "Read History"),
+                        detail: String(localized: "Seen topics, new-comment tracking, and visit history can follow you across devices when history is enabled.")
                     )
 
                     SyncToggleRow(
                         isOn: $preferences.settingsSync,
                         icon: "gearshape",
-                        label: "Settings & Preferences",
-                        detail: "Theme, accessibility settings, and app preferences."
+                        label: String(localized: "Settings & Preferences"),
+                        detail: String(localized: "Theme, accessibility settings, and app preferences.")
                     )
                 }
 

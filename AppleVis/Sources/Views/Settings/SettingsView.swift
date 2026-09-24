@@ -47,41 +47,41 @@ struct SettingsView: View {
             // none of them being accessibility-specific. Requested
             // directly.
             SettingsSection(title: "General", entries: [
-                SettingsEntry(icon: "slider.horizontal.3", label: "General", subtitle: "Home behavior, tips, and web links", color: .mint,
+                SettingsEntry(icon: "slider.horizontal.3", label: "General", subtitle: String(localized: "Home behavior, tips, and web links"), color: .mint,
                               destination: AnyView(GeneralSettingsView())),
             ]),
             SettingsSection(title: "Customisation", entries: [
-                SettingsEntry(icon: "paintbrush", label: "Appearance", subtitle: "Theme, colour, and card density", color: .purple,
+                SettingsEntry(icon: "paintbrush", label: "Appearance", subtitle: String(localized: "Theme, colour, and card density"), color: .purple,
                               destination: AnyView(AppearanceSettingsView())),
-                SettingsEntry(icon: "accessibility", label: "Accessibility", subtitle: "VoiceOver and low vision controls", color: .blue,
+                SettingsEntry(icon: "accessibility", label: "Accessibility", subtitle: String(localized: "VoiceOver and low vision controls"), color: .blue,
                               destination: AnyView(AccessibilitySettingsView())),
             ]),
             SettingsSection(title: "Alerts", entries: [
-                SettingsEntry(icon: "bell", label: "Notifications", subtitle: "Alerts, sounds, and activity", color: .orange,
+                SettingsEntry(icon: "bell", label: "Notifications", subtitle: String(localized: "Alerts, sounds, and activity"), color: .orange,
                               destination: AnyView(NotificationSettingsView())),
-                SettingsEntry(icon: "speaker.wave.2", label: "Sounds & Haptics", subtitle: "Interface and confirmation sounds", color: .pink,
+                SettingsEntry(icon: "speaker.wave.2", label: "Sounds & Haptics", subtitle: String(localized: "Interface and confirmation sounds"), color: .pink,
                               destination: AnyView(SoundsHapticsSettingsView())),
             ]),
             SettingsSection(title: "Content", entries: [
-                SettingsEntry(icon: "bubble.left.and.bubble.right", label: "Home Feed", subtitle: "What shows up in your Home feed", color: .green,
+                SettingsEntry(icon: "bubble.left.and.bubble.right", label: "Home Feed", subtitle: String(localized: "What shows up in your Home feed"), color: .green,
                               destination: AnyView(HomeFeedSettingsView())),
-                SettingsEntry(icon: "headphones", label: "Podcasts", subtitle: "Playback and download defaults", color: .pink,
+                SettingsEntry(icon: "headphones", label: "Podcasts", subtitle: String(localized: "Playback and download defaults"), color: .pink,
                               destination: AnyView(PodcastSettingsView())),
             ]),
             SettingsSection(title: "Data & Privacy", entries: [
-                SettingsEntry(icon: "icloud", label: "Saved & Sync", subtitle: "Saved items and iCloud sync", color: .blue,
+                SettingsEntry(icon: "icloud", label: "Saved & Sync", subtitle: String(localized: "Saved items and iCloud sync"), color: .blue,
                               destination: AnyView(SavedSyncSettingsView())),
-                SettingsEntry(icon: "hand.raised", label: "Privacy", subtitle: "What we collect, and how to clear your local data", color: .teal,
+                SettingsEntry(icon: "hand.raised", label: "Privacy", subtitle: String(localized: "What we collect, and how to clear your local data"), color: .teal,
                               destination: AnyView(PrivacySettingsView())),
-                SettingsEntry(icon: "sparkles", label: "Intelligence", subtitle: "Smart features and AI controls", color: .indigo,
+                SettingsEntry(icon: "sparkles", label: "Intelligence", subtitle: String(localized: "Smart features and AI controls"), color: .indigo,
                               destination: AnyView(IntelligenceSettingsView())),
                 // Deliberately not nested inside Intelligence above — unlike
                 // every toggle there, this has no Apple Intelligence
                 // hardware/OS-26 gate, and grouping it in would misleadingly
                 // imply the same requirement.
-                SettingsEntry(icon: "globe", label: "Content Translation", subtitle: "Read AppleVis in your own language", color: .cyan,
+                SettingsEntry(icon: "globe", label: "Content Translation", subtitle: String(localized: "Read AppleVis in your own language"), color: .cyan,
                               destination: AnyView(ContentTranslationSettingsView())),
-                SettingsEntry(icon: "waveform", label: "Siri & Shortcuts", subtitle: "Voice commands and Shortcuts app actions", color: .indigo,
+                SettingsEntry(icon: "waveform", label: "Siri & Shortcuts", subtitle: String(localized: "Voice commands and Shortcuts app actions"), color: .indigo,
                               destination: AnyView(SiriShortcutsSettingsView())),
             ]),
             // Kept out of "Data & Privacy" — RN gave this its own visually
@@ -95,7 +95,7 @@ struct SettingsView: View {
             // just configuration and this one destructive-actions section.
             // Discussed and requested directly.
             SettingsSection(title: "Storage & Cache", entries: [
-                SettingsEntry(icon: "internaldrive", label: "Storage & Cache", subtitle: "Manage downloads and cached content", color: Color(.systemGray),
+                SettingsEntry(icon: "internaldrive", label: "Storage & Cache", subtitle: String(localized: "Manage downloads and cached content"), color: Color(.systemGray),
                               destination: AnyView(StorageView())),
             ]),
         ]
@@ -169,7 +169,7 @@ struct SettingsView: View {
             }
 
             if filteredSections.isEmpty {
-                EmptyStateView(title: "No Results", message: "No settings match \"\(searchText)\".", systemImage: "magnifyingglass")
+                EmptyStateView(title: String(localized: "No Results"), message: String(localized: "No settings match \"\(searchText)\"."), systemImage: "magnifyingglass")
             }
 
             ForEach(filteredSections) { section in

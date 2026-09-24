@@ -71,7 +71,7 @@ struct CommunityAgreementView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("AppleVis is at its best when everyone feels welcome to join the conversation. Our Community Guidelines help make that possible.")
                     Text("When you write a topic, reply, comment, review, or other community content in the AppleVis app, we may automatically check your draft against our Community Guidelines as you write.")
-                    Text("Most of the time, we'll simply give you a friendly heads-up if something might be worth another look. For some types of content that aren't permitted on AppleVis, we'll ask you to make a change before posting.")
+                    Text("Most of the time, we'll show a friendly note if something might need another look. For content that isn't allowed on AppleVis, we'll ask you to change it before posting.")
                     Text("Some guideline checks can use Apple's on-device intelligence when it's available. These checks happen on your device rather than sending your draft to an outside AI service.")
                     Text("By choosing Agree and Continue, you're agreeing to follow the AppleVis Community Guidelines when participating in the community.")
                     // Previously the only explanation of what "I Don't Agree"
@@ -79,7 +79,7 @@ struct CommunityAgreementView: View {
                     // accessibilityHint below — a sighted user swiping
                     // through on screen saw two buttons with no stated
                     // consequence for the second one. Requested directly.
-                    Text("If you'd rather not agree right now, that's okay — AppleVis stays fully browsable without signing in, and we'll ask again the next time you try to sign in.")
+                    Text("If you'd rather not agree now, that's fine. You can still browse all of AppleVis without signing in, and we'll ask again the next time you sign in.")
                 }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)

@@ -56,7 +56,7 @@ final class ShareViewController: UIViewController {
             case .none:
                 self.extensionContext?.cancelRequest(withError: NSError(
                     domain: "com.applevis.shareextension", code: 1,
-                    userInfo: [NSLocalizedDescriptionKey: "Unsupported content type"]
+                    userInfo: [NSLocalizedDescriptionKey: String(localized: "This type of content can't be shared to AppleVis.")]
                 ))
             }
         }
@@ -227,7 +227,7 @@ final class ShareViewController: UIViewController {
         guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Self.appGroupSuite) else {
             extensionContext?.cancelRequest(withError: NSError(
                 domain: "com.applevis.shareextension", code: 2,
-                userInfo: [NSLocalizedDescriptionKey: "Couldn't prepare shared storage."]
+                userInfo: [NSLocalizedDescriptionKey: String(localized: "Couldn't prepare shared storage.")]
             ))
             return
         }
@@ -236,7 +236,7 @@ final class ShareViewController: UIViewController {
         guard (try? FileManager.default.copyItem(at: fileURL, to: destination)) != nil else {
             extensionContext?.cancelRequest(withError: NSError(
                 domain: "com.applevis.shareextension", code: 3,
-                userInfo: [NSLocalizedDescriptionKey: "Couldn't copy the audio file."]
+                userInfo: [NSLocalizedDescriptionKey: String(localized: "Couldn't copy the audio file.")]
             ))
             return
         }

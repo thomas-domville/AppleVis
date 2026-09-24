@@ -161,7 +161,7 @@ struct ReportCommentWizard: View {
                     ThankYouView(
                         icon: "flag",
                         heading: "Report sent!",
-                        message: String(localized: "Thanks for helping keep AppleVis welcoming. The editorial team will review this \(context.subjectKind) and follow up by email if needed."),
+                        message: String(localized: "Thanks for helping keep AppleVis welcoming. The editorial team will review this \(displayedSubjectKind.lowercased()) and follow up by email if needed."),
                         doneLabel: "Done",
                         onDone: { dismiss() }
                     ) {
@@ -342,7 +342,7 @@ struct ReportCommentWizard: View {
                 TextEditor(text: $details)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Additional details"))
-                    .accessibilityHint(String(localized: "Optional. Anything that would help our editorial team understand what's wrong here — extra context is always appreciated, but never required."))
+                    .accessibilityHint(String(localized: "Optional. Anything that would help the editorial team understand the problem."))
                     .rewriteFlash($justRewrote)
                     .onChange(of: details) { _, newValue in
                         intelligence.textChanged(

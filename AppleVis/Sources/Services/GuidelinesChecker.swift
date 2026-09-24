@@ -40,7 +40,7 @@ enum GuidelinesChecker {
         if ContentSubmissionPolicy.containsImageReference(trimmed) {
             warnings.append(GuidelineWarning(
                 id: "no-images", rule: "No Images in Posts",
-                message: "AppleVis posts should not include embedded images or direct image links. Please describe the relevant information in text instead.",
+                message: "AppleVis posts shouldn't include images or direct links to images. Please describe the information in text instead.",
                 severity: .high
             ))
         }
@@ -48,7 +48,7 @@ enum GuidelinesChecker {
         if ContentSubmissionPolicy.containsStrongVulgarLanguage(trimmed) {
             warnings.append(GuidelineWarning(
                 id: "vulgar-language", rule: "Keep AppleVis 13+",
-                message: "AppleVis allows mild language, but posts must avoid vulgar or explicit wording so the community stays welcoming and appropriate for the app's age rating.",
+                message: "AppleVis allows mild language, but not vulgar or explicit wording. This keeps the community welcoming and suitable for the app's age rating.",
                 severity: .high
             ))
         }
@@ -58,19 +58,19 @@ enum GuidelinesChecker {
             case .high:
                 warnings.append(GuidelineWarning(
                     id: "tone-high", rule: "Respectful Discussion",
-                    message: "This draft may come across as a personal attack, harassment, hate, or trolling. Please revise it to focus on the issue rather than the person before posting.",
+                    message: "This draft may come across as a personal attack, harassment, hate, or trolling. Please change it to focus on the issue, not the person, before posting.",
                     severity: .high
                 ))
             case .medium:
                 warnings.append(GuidelineWarning(
                     id: "tone-medium", rule: "Respectful Discussion",
-                    message: "This draft may sound hostile or inflammatory. Consider softening the tone so it focuses on the problem, experience, or question.",
+                    message: "This draft may sound hostile. Consider a softer tone that focuses on the problem, your experience, or your question.",
                     severity: .medium
                 ))
             case .low:
                 warnings.append(GuidelineWarning(
                     id: "tone-low", rule: "Tone Check",
-                    message: "This draft may read as frustrated or sharp. A calmer tone may help other community members respond constructively.",
+                    message: "This draft may sound frustrated or sharp. A calmer tone can help others respond helpfully.",
                     severity: .low
                 ))
             }
@@ -89,7 +89,7 @@ enum GuidelinesChecker {
         if matches(text, #"\b(?!(?:accessibility|support|contact|info|help|press|sales|admin|team|hello|feedback|abuse|legal|privacy|webmaster|postmaster|user|example|someone|yourname)@)[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"#) {
             warnings.append(GuidelineWarning(
                 id: "personal-info", rule: "Personal Information",
-                message: "Your post appears to contain an email address. For your privacy and security, the AppleVis guidelines recommend not sharing personal contact information publicly.",
+                message: "Your post seems to include an email address. For your privacy and safety, the AppleVis guidelines recommend not sharing personal contact details publicly.",
                 severity: .medium
             ))
         }
@@ -98,7 +98,7 @@ enum GuidelinesChecker {
         if matches(text, #"[?&](ref|referral|affiliate|aff|partner|subid)="#, caseInsensitive: true) {
             warnings.append(GuidelineWarning(
                 id: "referral-link", rule: "No Referral Links",
-                message: "Your post may contain a referral or affiliate link. These are not permitted on AppleVis as they can create conflicts of interest.",
+                message: "Your post may include a referral or affiliate link. These aren't allowed on AppleVis because they can create a conflict of interest.",
                 severity: .medium
             ))
         }
@@ -110,7 +110,7 @@ enum GuidelinesChecker {
         if matches(text, #"\bmy (podcast|youtube channel|channel|website|blog|newsletter|mailing list|substack|patreon)\b(?!\s+(player|app|reader|client))"#, caseInsensitive: true) {
             warnings.append(GuidelineWarning(
                 id: "self-promotion", rule: "No Self-Promotion",
-                message: "AppleVis asks that you not use the forums to promote your own podcast, YouTube channel, website, newsletter, or other online resource.",
+                message: "AppleVis asks members not to use the forums to promote their own podcast, YouTube channel, website, newsletter, or other resource.",
                 severity: .medium
             ))
         }
@@ -119,7 +119,7 @@ enum GuidelinesChecker {
         if matches(text, #"(\bfor sale\b|\bwanted to buy\b|\bbuy now\b|\bpromo code\b|\bcoupon code\b|\bget \d+% off\b)"#, caseInsensitive: true) {
             warnings.append(GuidelineWarning(
                 id: "advertising", rule: "No Advertising or Selling",
-                message: "AppleVis forums are not for selling, trading, or advertising products or services. If you believe this is genuinely useful to the community, please contact AppleVis first.",
+                message: "The AppleVis forums aren't for selling, trading, or advertising. If you think this would really help the community, please contact AppleVis first.",
                 severity: .medium
             ))
         }
@@ -133,7 +133,7 @@ enum GuidelinesChecker {
         if announcementNeedsApproval(text) {
             warnings.append(GuidelineWarning(
                 id: "announcement-approval", rule: "Approval Required for Announcements",
-                message: "Posts about surveys, research projects, or studies require prior approval from the AppleVis Editorial Team. Please contact them via the Contact Form before posting.",
+                message: "Posts about surveys, research projects, or studies need approval from the AppleVis editorial team first. Please use the Contact Form before posting.",
                 severity: .high
             ))
         }
@@ -142,7 +142,7 @@ enum GuidelinesChecker {
         if matches(text, #"\bpress release\b"#, caseInsensitive: true) || matches(text, #"\bfor immediate release\b"#, caseInsensitive: true) {
             warnings.append(GuidelineWarning(
                 id: "press-release", rule: "Press Releases",
-                message: "Press releases may only be posted as part of a broader discussion, not purely to promote a product or service. Make sure your post adds context beyond the release itself.",
+                message: "Press releases can only be posted as part of a wider discussion, not just to promote a product or service. Please add context beyond the release itself.",
                 severity: .medium
             ))
         }
@@ -157,7 +157,7 @@ enum GuidelinesChecker {
         if aiArtifacts.contains(where: { lower.contains($0) }) {
             warnings.append(GuidelineWarning(
                 id: "ai-disclosure", rule: "Disclose AI-Generated Content",
-                message: "Your post may contain AI-generated text. AppleVis requires you to clearly state in the body of your post when AI tools have been used to help generate the content.",
+                message: "Your post may contain AI-generated text. AppleVis asks you to say clearly in your post when AI tools helped create it.",
                 severity: .medium
             ))
         }
@@ -170,7 +170,7 @@ enum GuidelinesChecker {
             if Double(capsCount) / Double(wordTokens.count) > 0.55 {
                 warnings.append(GuidelineWarning(
                     id: "all-caps", rule: "Be Polite",
-                    message: "Your post uses a lot of capital letters, which can read as shouting. Normal capitalization will make it easier and friendlier to read.",
+                    message: "Your post uses a lot of capital letters, which can read as shouting. Normal capitalization is easier and friendlier to read.",
                     severity: .low
                 ))
             }
@@ -180,7 +180,7 @@ enum GuidelinesChecker {
         if matches(text, #"[!?]{3,}"#) {
             warnings.append(GuidelineWarning(
                 id: "excessive-punctuation", rule: "Be Polite",
-                message: "Your post contains multiple consecutive exclamation marks or question marks. Toning these down will help your message come across more calmly.",
+                message: "Your post has several exclamation or question marks in a row. Using fewer will help your message sound calmer.",
                 severity: .low
             ))
         }
@@ -196,7 +196,7 @@ enum GuidelinesChecker {
             if noValuePhrases.contains(where: { lower.contains($0) }) {
                 warnings.append(GuidelineWarning(
                     id: "low-value", rule: "Add Value to the Discussion",
-                    message: "Short replies like \"me too\" or \"I haven't used that\" don't add much to the discussion. Consider sharing specific details, experience, or a follow-up question instead.",
+                    message: "Short replies like \"me too\" or \"I haven't used that\" don't add much to the discussion. Consider sharing details, your experience, or a follow-up question instead.",
                     severity: .low
                 ))
             }
@@ -208,7 +208,7 @@ enum GuidelinesChecker {
         if !isReply && questionCount >= 3 && trimmed.count > 120 {
             warnings.append(GuidelineWarning(
                 id: "multi-topic", rule: "One Topic Per Post",
-                message: "Your post appears to ask several different questions. AppleVis guidelines ask that you cover one topic per post — splitting into separate posts will get you better answers.",
+                message: "Your post seems to ask several different questions. The AppleVis guidelines ask for one topic per post. Separate posts will get you better answers.",
                 severity: .low
             ))
         }
@@ -223,7 +223,7 @@ enum GuidelinesChecker {
             if Double(unique.count) / Double(sentences.count) < 0.55 {
                 warnings.append(GuidelineWarning(
                     id: "repetition", rule: "No Spam or Repetition",
-                    message: "Your post contains repeated phrases or sentences. Please avoid repeating the same content multiple times in a single post.",
+                    message: "Your post repeats some phrases or sentences. Please avoid repeating the same content in one post.",
                     severity: .medium
                 ))
             }

@@ -48,7 +48,7 @@ struct GuideBrowseView: View {
                     .listRowSeparator(.hidden)
             }
             if !searchText.isEmpty && visible.isEmpty {
-                EmptyStateView(title: "No Results", message: "No guides match \"\(searchText)\".", systemImage: "magnifyingglass")
+                EmptyStateView(title: String(localized: "No Results"), message: String(localized: "No guides match \"\(searchText)\"."), systemImage: "magnifyingglass")
                     .listRowSeparator(.hidden)
             }
 
@@ -153,8 +153,8 @@ enum GuideFilter: String, CaseIterable, Identifiable {
         case .braille:     return "Braille"
         case .accessories: return "Accessories"
         case .gaming:      return "Gaming"
-        case .programming: return "Programming"
-        case .misc:        return "Miscellaneous"
+        case .programming: return String(localized: "Programming")
+        case .misc:        return String(localized: "Miscellaneous")
         }
     }
 

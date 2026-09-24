@@ -364,7 +364,7 @@ struct SearchEndpoints {
         if podcastsResult == nil { failed.append("Podcasts") }
         let iosBugsResult = try? await iosBugsRes
         let macBugsResult = try? await macBugsRes
-        if iosBugsResult == nil && macBugsResult == nil { failed.append("Bug Reports") }
+        if iosBugsResult == nil && macBugsResult == nil { failed.append(String(localized: "Bug Reports")) }
 
         let forums = forumsResult.map { r in r.data.map { Mappers.forum($0, included: r.included ?? []) } } ?? []
         let apps = appsResult.map { r in r.data.map { Mappers.app($0, included: r.included ?? []) } } ?? []
@@ -574,10 +574,10 @@ struct RecommendedApp: Identifiable {
 
     static func platformLabel(forNodeType type: String) -> String {
         switch type {
-        case "node--ios_app_directory":  return "iOS and iPadOS App Directory"
-        case "node--tv_directory":       return "Apple TV App Directory"
-        case "node--watch_directory":    return "Apple Watch App Directory"
-        case "node--mac_app_directory":  return "Mac App Directory"
+        case "node--ios_app_directory":  return String(localized: "iOS and iPadOS App Directory")
+        case "node--tv_directory":       return String(localized: "Apple TV App Directory")
+        case "node--watch_directory":    return String(localized: "Apple Watch App Directory")
+        case "node--mac_app_directory":  return String(localized: "Mac App Directory")
         default:                         return "App Directory"
         }
     }

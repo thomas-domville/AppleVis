@@ -101,7 +101,7 @@ struct SubmitBlogView: View {
             reasons.append(String(localized: "Tell us why this post would interest AppleVis readers to continue."))
         }
         if blogDraftLength < 50 {
-            reasons.append(String(localized: "Write at least \(50 - blogDraftLength) more character\(50 - blogDraftLength == 1 ? "" : "s") to continue."))
+            reasons.append(String(localized: "Write at least \(50 - blogDraftLength) more characters to continue."))
         }
         return reasons
     }
@@ -131,7 +131,7 @@ struct SubmitBlogView: View {
                     ThankYouView(
                         icon: "doc.text",
                         heading: "You did it — thanks!",
-                        message: "Your draft is now in front of our editorial team. We genuinely appreciate you taking the time to write for AppleVis, and we'll be in touch soon with our decision.",
+                        message: "Your draft has been sent to our editorial team. Thank you for writing for AppleVis. We'll be in touch soon with our decision.",
                         doneLabel: "Done",
                         onDone: { dismiss() }
                     ) {
@@ -233,7 +233,7 @@ struct SubmitBlogView: View {
         Group {
             Section {
                 WizardStepHeader(title: "Title & Category", stepIndex: 1, stepTotal: 3, headerFocus: $isStepFocused)
-                Text("Submit a blog post draft for the AppleVis editorial team to review. This does not publish immediately — an editor will follow up.")
+                Text("Submit a blog post draft for the AppleVis editorial team to review. It isn't published straight away. An editor will follow up with you.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             Section("Blog Post") {
@@ -333,7 +333,7 @@ struct SubmitBlogView: View {
                 TextEditor(text: $pitchMessage)
                     .frame(minHeight: 80)
                     .accessibilityLabel(String(localized: "Why this post would interest AppleVis readers"))
-                    .accessibilityHint(String(localized: "Required. Tell us a little about your blog post and why you think it would be of interest and value to the AppleVis community."))
+                    .accessibilityHint(String(localized: "Required. Tell us about your post and why it would interest the AppleVis community."))
                     .rewriteFlash($justRewrote)
                     .onChange(of: pitchMessage) { _, newValue in
                         guidelines.textChanged(newValue)

@@ -52,7 +52,7 @@ struct AccountDetailView: View {
                 }
                 .padding(.vertical, 4)
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel(String(localized: "Signed in as \(user.name)\(user.isAdmin ? ", Administrator" : "")"))
+                .accessibilityLabel((user.isAdmin ? String(localized: "Signed in as \(user.name), Administrator") : String(localized: "Signed in as \(user.name)")))
                 .accessibilityFocused($focusTarget, equals: Self.titleFocusID)
             }
 

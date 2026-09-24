@@ -335,7 +335,7 @@ struct EpisodeDetailView: View {
                 }
 
                 episodeToolButton(
-                    title: isQueued(episode) ? "Queued" : "Queue",
+                    title: isQueued(episode) ? String(localized: "Queued") : "Queue",
                     subtitle: isQueued(episode) ? "Remove" : "Add",
                     systemImage: isQueued(episode) ? "text.badge.minus" : "text.badge.plus"
                 ) {
@@ -657,10 +657,10 @@ struct EpisodeDetailView: View {
 
     private var audioEnhancementsSummary: String {
         var parts: [String] = []
-        parts.append(preferences.voiceBoost ? "Voice Boost on" : "Voice Boost off")
-        parts.append(preferences.trimSilence ? "Trim Silence on" : "Trim Silence off")
-        parts.append("EQ \(preferences.podcastEQ.displayName)")
-        parts.append("Pitch correction on")
+        parts.append(preferences.voiceBoost ? String(localized: "Voice Boost on") : String(localized: "Voice Boost off"))
+        parts.append(preferences.trimSilence ? String(localized: "Trim Silence on") : String(localized: "Trim Silence off"))
+        parts.append(String(localized: "EQ \(preferences.podcastEQ.displayName)"))
+        parts.append(String(localized: "Pitch correction on"))
         return parts.joined(separator: ", ")
     }
 
@@ -1030,7 +1030,7 @@ struct EpisodeDetailView: View {
             }
             SpotlightIndexer.index(fetchedEp)
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Couldn't load episode." }
+        } catch { self.error = String(localized: "Couldn't load episode.") }
         isLoading = false
         // isTitleFocused was declared and bound to the hero card but never
         // actually set anywhere — VoiceOver focus was left wherever it was
@@ -1179,10 +1179,10 @@ private struct AudioEnhancementsSheet: View {
 
     private var stateSummary: String {
         [
-            preferences.voiceBoost ? "Voice Boost on" : "Voice Boost off",
-            preferences.trimSilence ? "Trim Silence on" : "Trim Silence off",
-            "EQ \(preferences.podcastEQ.displayName)",
-            "Pitch correction on"
+            preferences.voiceBoost ? String(localized: "Voice Boost on") : String(localized: "Voice Boost off"),
+            preferences.trimSilence ? String(localized: "Trim Silence on") : String(localized: "Trim Silence off"),
+            String(localized: "EQ \(preferences.podcastEQ.displayName)"),
+            String(localized: "Pitch correction on")
         ].joined(separator: ", ")
     }
 
@@ -1397,7 +1397,7 @@ struct ComposePodcastCommentView: View {
             onPosted(comment)
             dismiss()
         } catch let e as APIError { submitError = e.localizedDescription
-        } catch { submitError = "Couldn't post comment. Try again." }
+        } catch { submitError = String(localized: "Couldn't post comment. Try again.") }
         isSubmitting = false
     }
 }

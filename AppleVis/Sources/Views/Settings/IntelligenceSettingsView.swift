@@ -27,7 +27,7 @@ struct IntelligenceSettingsView: View {
                 // `ContentSubmissionPolicy.blockingMessage`), which this
                 // toggle cannot turn off. Reported directly.
                 Toggle("Non-English Draft Detection", isOn: $preferences.nonEnglishDetectionEnabled)
-                    .accessibilityHint(String(localized: "While you're writing a post, reply, or comment, offers to translate your draft if it looks like it isn't in English."))
+                    .accessibilityHint(String(localized: "While you write a post, reply, or comment, offers to translate your draft if it isn't in English."))
                 Text("AppleVis posts must be in English — that's always checked when you submit, no matter how this is set. This only controls whether you get a proactive nudge to translate while you're still typing, instead of finding out at submission.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -51,16 +51,16 @@ struct IntelligenceSettingsView: View {
                     .foregroundStyle(.secondary)
 
                 Toggle("AI Summaries", isOn: $preferences.aiSummariesEnabled)
-                    .accessibilityHint(String(localized: "Generates concise summaries for long forum threads and articles so you can quickly decide whether to read more."))
+                    .accessibilityHint(String(localized: "Creates short summaries of long forum threads and articles, so you can decide whether to read more."))
                 Text("Boils down long threads and articles into a quick summary, so you can decide whether it's worth reading in full.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 FeatureInfoRow(
                     icon: "checkmark.bubble",
-                    title: "Accessibility Consensus",
-                    subtitle: "On an app's page, under comments",
-                    detail: "Aggregates an app's comments into one sentence about how well it works with VoiceOver — an instant overview instead of reading every comment yourself.",
+                    title: String(localized: "Accessibility Consensus"),
+                    subtitle: String(localized: "On an app's page, under comments"),
+                    detail: String(localized: "Aggregates an app's comments into one sentence about how well it works with VoiceOver — an instant overview instead of reading every comment yourself."),
                     isSystemFeature: false
                 )
             }
@@ -68,17 +68,17 @@ struct IntelligenceSettingsView: View {
             Section("Live System Features") {
                 FeatureInfoRow(
                     icon: "speaker.wave.3",
-                    title: "Read Aloud",
-                    subtitle: "iOS system feature",
-                    detail: "Reads any text on screen. Available via the Share sheet or accessibility shortcut.",
+                    title: String(localized: "Read Aloud"),
+                    subtitle: String(localized: "iOS system feature"),
+                    detail: String(localized: "Reads any text on screen. Available via the Share sheet or accessibility shortcut."),
                     isSystemFeature: true
                 )
 
                 FeatureInfoRow(
                     icon: "character.bubble",
-                    title: "Translate",
-                    subtitle: "iOS system feature",
-                    detail: "Translate selected text using the iOS Translate system. Long-press any text to access.",
+                    title: String(localized: "Translate"),
+                    subtitle: String(localized: "iOS system feature"),
+                    detail: String(localized: "Translate selected text using the iOS Translate system. Long-press any text to access."),
                     isSystemFeature: true
                 )
             }
@@ -87,16 +87,16 @@ struct IntelligenceSettingsView: View {
                 FeatureInfoRow(
                     icon: "magnifyingglass",
                     title: "Spotlight",
-                    subtitle: "Search saved items from Spotlight",
-                    detail: "Your bookmarked content is indexed and searchable from iOS Spotlight Search.",
+                    subtitle: String(localized: "Search saved items from Spotlight"),
+                    detail: String(localized: "Your bookmarked content is indexed and searchable from iOS Spotlight Search."),
                     isSystemFeature: true
                 )
 
                 FeatureInfoRow(
                     icon: "lock.fill",
-                    title: "Lock Screen & Control Center",
-                    subtitle: "Playback controls while podcasts are playing",
-                    detail: "Play, pause, and skip from the Lock Screen and Control Center while a podcast episode is playing.",
+                    title: String(localized: "Lock Screen & Control Center"),
+                    subtitle: String(localized: "Playback controls while podcasts are playing"),
+                    detail: String(localized: "Play, pause, and skip from the Lock Screen and Control Center while a podcast episode is playing."),
                     isSystemFeature: true
                 )
             }

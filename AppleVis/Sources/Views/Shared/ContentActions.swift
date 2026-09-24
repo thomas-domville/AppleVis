@@ -815,7 +815,7 @@ struct EditNodeSheet: View {
         } catch let e as APIError {
             error = e.localizedDescription
         } catch {
-            self.error = "Couldn't save changes."
+            self.error = String(localized: "Couldn't save changes.")
         }
         isSubmitting = false
     }

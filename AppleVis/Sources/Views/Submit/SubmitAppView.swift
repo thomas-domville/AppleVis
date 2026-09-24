@@ -350,7 +350,7 @@ struct SubmitAppView: View {
                     ThankYouView(
                         icon: "app.badge",
                         heading: "You did it — thanks!",
-                        message: "Your submission is now in front of our team. We genuinely appreciate you taking the time to document this app's accessibility, and we'll be in touch once it's ready to appear in the directory.",
+                        message: "Your submission has been sent to our team. Thank you for describing this app's accessibility. We'll let you know when it's ready to appear in the directory.",
                         doneLabel: "Done",
                         onDone: { dismiss() }
                     )
@@ -496,19 +496,19 @@ struct SubmitAppView: View {
                     .font(.headline)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityFocused($isStepFocused)
-                Text("The AppleVis App Directory is a community resource. Please read and confirm the following before adding an app.")
+                Text("The AppleVis App Directory is a community resource. Read and confirm the following before adding an app.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
                 beforeYouBeginRow(
                     checked: $agreedPersonalUse,
                     title: "I have used this app",
-                    body: "I have personally used this app and can describe its accessibility — I am not submitting based on the App Store description alone."
+                    body: "I have used this app myself and can describe its accessibility. I'm not relying on the App Store description alone."
                 )
                 beforeYouBeginRow(
                     checked: $agreedNotDeveloper,
                     title: "I am not the developer",
-                    body: "I am not the developer, publisher, or otherwise affiliated with this app. Developers may not submit their own apps per AppleVis guidelines."
+                    body: "I'm not the developer or publisher of this app, and I'm not otherwise connected with it. AppleVis guidelines don't allow developers to submit their own apps."
                 )
 
                 WebLink(destination: URL(string: "https://www.applevis.com/submitting-app-applevis-community-app-directory-guidelines")!, showsExternalIcon: false) {
@@ -882,7 +882,7 @@ struct SubmitAppView: View {
                 Text("Price")
             } footer: {
                 if isMetadataFromAppStore {
-                    Text("Free or Paid was detected from the App Store listing — change it if this app is actually free with in-app purchases or requires a subscription.")
+                    Text("Free or Paid was taken from the App Store listing. Change it if the app is free with in-app purchases or needs a subscription.")
                 }
             }
 
@@ -1033,7 +1033,7 @@ struct SubmitAppView: View {
                 TextEditor(text: $payload.accessibilityComments)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
-                    .accessibilityHint(String(localized: "Required, minimum 20 characters. Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it."))
+                    .accessibilityHint(String(localized: "Required, at least 20 characters. Describe what works well with VoiceOver or other accessibility features, what doesn't, and anything other blind or low vision users should know."))
                     .rewriteFlash($justRewrote)
                     .onChange(of: payload.accessibilityComments) { _, newValue in
                         handleAccessibilityCommentsChange(newValue)
@@ -1045,7 +1045,7 @@ struct SubmitAppView: View {
                         )
                     }
                 rewriteButton(text: $payload.accessibilityComments)
-                Text("Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it.")
+                Text("Describe what it's like to use this app with VoiceOver or other accessibility features: what works well, what doesn't, and anything another blind or low vision user should know before trying it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
@@ -1107,7 +1107,7 @@ struct SubmitAppView: View {
             reasons.append(String(localized: "Rate overall usability to continue."))
         }
         if accessibilityCommentsLength < 20 {
-            reasons.append(String(localized: "Write at least \(20 - accessibilityCommentsLength) more character\(20 - accessibilityCommentsLength == 1 ? "" : "s") describing accessibility to continue."))
+            reasons.append(String(localized: "Write at least \(20 - accessibilityCommentsLength) more characters about accessibility to continue."))
         }
         return reasons
     }
@@ -1151,7 +1151,7 @@ struct SubmitAppView: View {
                 Text("Price")
             } footer: {
                 if isMetadataFromAppStore {
-                    Text("Free or Paid was detected from the App Store listing — change it if this app is actually free with in-app purchases or requires a subscription.")
+                    Text("Free or Paid was taken from the App Store listing. Change it if the app is free with in-app purchases or needs a subscription.")
                 }
             }
 
@@ -1239,7 +1239,7 @@ struct SubmitAppView: View {
                 TextEditor(text: $tvPayload.accessibilityComments)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
-                    .accessibilityHint(String(localized: "Required, minimum 20 characters. Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it."))
+                    .accessibilityHint(String(localized: "Required, at least 20 characters. Describe what works well with VoiceOver or other accessibility features, what doesn't, and anything other blind or low vision users should know."))
                     .rewriteFlash($justRewrote)
                     .onChange(of: tvPayload.accessibilityComments) { _, newValue in
                         handleTvAccessibilityCommentsChange(newValue)
@@ -1251,7 +1251,7 @@ struct SubmitAppView: View {
                         )
                     }
                 rewriteButton(text: $tvPayload.accessibilityComments)
-                Text("Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it.")
+                Text("Describe what it's like to use this app with VoiceOver or other accessibility features: what works well, what doesn't, and anything another blind or low vision user should know before trying it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
@@ -1298,7 +1298,7 @@ struct SubmitAppView: View {
             reasons.append(String(localized: "Rate overall usability to continue."))
         }
         if tvAccessibilityCommentsLength < 20 {
-            reasons.append(String(localized: "Write at least \(20 - tvAccessibilityCommentsLength) more character\(20 - tvAccessibilityCommentsLength == 1 ? "" : "s") describing accessibility to continue."))
+            reasons.append(String(localized: "Write at least \(20 - tvAccessibilityCommentsLength) more characters about accessibility to continue."))
         }
         return reasons
     }
@@ -1359,7 +1359,7 @@ struct SubmitAppView: View {
                 Text("Price")
             } footer: {
                 if isMetadataFromAppStore {
-                    Text("Free or Paid was detected from the App Store listing — change it if this app is actually free with in-app purchases or requires a subscription.")
+                    Text("Free or Paid was taken from the App Store listing. Change it if the app is free with in-app purchases or needs a subscription.")
                 }
             }
 
@@ -1456,7 +1456,7 @@ struct SubmitAppView: View {
                 TextEditor(text: $watchPayload.accessibilityComments)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
-                    .accessibilityHint(String(localized: "Required, minimum 20 characters. Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it."))
+                    .accessibilityHint(String(localized: "Required, at least 20 characters. Describe what works well with VoiceOver or other accessibility features, what doesn't, and anything other blind or low vision users should know."))
                     .rewriteFlash($justRewrote)
                     .onChange(of: watchPayload.accessibilityComments) { _, newValue in
                         handleWatchAccessibilityCommentsChange(newValue)
@@ -1468,7 +1468,7 @@ struct SubmitAppView: View {
                         )
                     }
                 rewriteButton(text: $watchPayload.accessibilityComments)
-                Text("Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it.")
+                Text("Describe what it's like to use this app with VoiceOver or other accessibility features: what works well, what doesn't, and anything another blind or low vision user should know before trying it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
@@ -1521,7 +1521,7 @@ struct SubmitAppView: View {
             reasons.append(String(localized: "Rate overall usability to continue."))
         }
         if watchAccessibilityCommentsLength < 20 {
-            reasons.append(String(localized: "Write at least \(20 - watchAccessibilityCommentsLength) more character\(20 - watchAccessibilityCommentsLength == 1 ? "" : "s") describing accessibility to continue."))
+            reasons.append(String(localized: "Write at least \(20 - watchAccessibilityCommentsLength) more characters about accessibility to continue."))
         }
         return reasons
     }
@@ -1597,7 +1597,7 @@ struct SubmitAppView: View {
                 Text("Price")
             } footer: {
                 if isMetadataFromAppStore {
-                    Text("Free or Paid was detected from the App Store listing — change it if this app is actually free with in-app purchases or requires a subscription.")
+                    Text("Free or Paid was taken from the App Store listing. Change it if the app is free with in-app purchases or needs a subscription.")
                 }
             }
 
@@ -1694,7 +1694,7 @@ struct SubmitAppView: View {
                 TextEditor(text: $macPayload.accessibilityComments)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
-                    .accessibilityHint(String(localized: "Required, minimum 20 characters. Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it."))
+                    .accessibilityHint(String(localized: "Required, at least 20 characters. Describe what works well with VoiceOver or other accessibility features, what doesn't, and anything other blind or low vision users should know."))
                     .rewriteFlash($justRewrote)
                     .onChange(of: macPayload.accessibilityComments) { _, newValue in
                         handleMacAccessibilityCommentsChange(newValue)
@@ -1706,7 +1706,7 @@ struct SubmitAppView: View {
                         )
                     }
                 rewriteButton(text: $macPayload.accessibilityComments)
-                Text("Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it.")
+                Text("Describe what it's like to use this app with VoiceOver or other accessibility features: what works well, what doesn't, and anything another blind or low vision user should know before trying it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
@@ -1759,7 +1759,7 @@ struct SubmitAppView: View {
             reasons.append(String(localized: "Rate overall usability to continue."))
         }
         if macAccessibilityCommentsLength < 20 {
-            reasons.append(String(localized: "Write at least \(20 - macAccessibilityCommentsLength) more character\(20 - macAccessibilityCommentsLength == 1 ? "" : "s") describing accessibility to continue."))
+            reasons.append(String(localized: "Write at least \(20 - macAccessibilityCommentsLength) more characters about accessibility to continue."))
         }
         return reasons
     }
@@ -1939,7 +1939,7 @@ struct SubmitAppView: View {
                         Label("Already in App Directory", systemImage: "exclamationmark.octagon.fill")
                             .foregroundStyle(.red)
                             .font(.subheadline.weight(.semibold))
-                        Text("This App Store listing appears to already have an AppleVis app entry. To avoid duplication, choose a different app or open the existing entry.")
+                        Text("This app seems to already have an AppleVis app entry. Choose a different app, or open the existing entry.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         ForEach(exactDuplicateMatches) { match in
@@ -2179,7 +2179,7 @@ struct SubmitAppView: View {
             return
         }
         if !exactDuplicateMatches.isEmpty {
-            let message = String(localized: "This app already appears to exist in the AppleVis App Directory. Please open the existing entry instead of submitting a duplicate.")
+            let message = String(localized: "This app seems to already be in the AppleVis App Directory. Open the existing entry instead of submitting it again.")
             error = message
             await announceWizardFailure(message, focus: $isErrorFocused)
             return

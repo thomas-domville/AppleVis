@@ -142,7 +142,7 @@ struct NotificationSettingsView: View {
                     // stateless "you're the author" check.
                     Toggle("Replies to My Posts", isOn: $preferences.notifyForumReplies)
                         .disabled(pushDenied)
-                        .accessibilityHint(String(localized: "Automatically follows new forum topics and app entries you post, so you're notified of replies without following them yourself."))
+                        .accessibilityHint(String(localized: "Automatically follows forum topics and app entries you post, so you're notified about replies."))
                     Text("When you post a new forum topic or app entry, it's automatically followed for you — the same as tapping Follow yourself. This only applies going forward; anything you've already posted isn't affected.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -205,7 +205,7 @@ struct NotificationSettingsView: View {
                 // toggle until that exists. Reported directly.
                 Toggle("New Comments", isOn: $preferences.notifyNewComments)
                     .disabled(pushDenied)
-                    .accessibilityHint(String(localized: "Get notified about new comments on any forum topic, podcast episode, app entry, blog post, or guide — not just ones you follow. This can be frequent."))
+                    .accessibilityHint(String(localized: "Notifies you about new comments on any forum topic, podcast episode, app entry, blog post, or guide, not only ones you follow. This can be frequent."))
                 Text("Notifies you about new comments anywhere on AppleVis, not just things you follow. This one can get chatty.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -265,12 +265,12 @@ struct NotificationSettingsView: View {
 
     private var statusText: String {
         switch systemAuthStatus {
-        case .authorized:       return "Allowed"
-        case .denied:           return "Blocked — change in iOS Settings"
-        case .notDetermined:    return "Not yet requested"
-        case .provisional:      return "Provisional (quiet)"
-        case .ephemeral:        return "Ephemeral"
-        @unknown default:       return "Unknown"
+        case .authorized:       return String(localized: "Allowed")
+        case .denied:           return String(localized: "Blocked — change in iOS Settings")
+        case .notDetermined:    return String(localized: "Not yet requested")
+        case .provisional:      return String(localized: "Provisional (quiet)")
+        case .ephemeral:        return String(localized: "Ephemeral")
+        @unknown default:       return String(localized: "Unknown")
         }
     }
 

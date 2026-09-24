@@ -22,7 +22,7 @@ struct PodcastBrowseView: View {
             } else if let error, episodes.isEmpty {
                 ErrorView(message: error) { await load(reset: true) }
             } else if episodes.isEmpty {
-                EmptyStateView(title: "No Episodes Yet", message: "Pull to refresh podcast episodes", systemImage: "mic")
+                EmptyStateView(title: String(localized: "No Episodes Yet"), message: "Pull to refresh podcast episodes", systemImage: "mic")
             } else {
                 episodeList
             }

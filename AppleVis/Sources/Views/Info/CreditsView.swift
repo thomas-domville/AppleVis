@@ -31,8 +31,8 @@ struct CreditsView: View {
             icon: "hammer",
             body: "The AppleVis app was shaped by people who cared deeply about making the community easier, faster, and more enjoyable to use.",
             people: [
-                ("Design and Coding", "Thomas Domville"),
-                ("Wording and Quality", "Michael Hansen"),
+                (String(localized: "Design and Coding"), "Thomas Domville"),
+                (String(localized: "Wording and Quality"), "Michael Hansen"),
             ]
         ),
         CreditSection(

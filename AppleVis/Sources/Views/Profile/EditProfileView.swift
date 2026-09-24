@@ -96,12 +96,12 @@ struct EditProfileView: View {
                         Button {
                             showCountryPicker = true
                         } label: {
-                            Text(location.isEmpty ? "Not Set" : location)
+                            Text(location.isEmpty ? String(localized: "Not Set") : location)
                                 .foregroundStyle(location.isEmpty ? .secondary : .primary)
                         }
                     }
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel(String(localized: "Location: \(location.isEmpty ? "not set" : location)"))
+                    .accessibilityLabel(String(localized: "Location: \(location.isEmpty ? String(localized: "not set") : location)"))
                     .accessibilityHint(String(localized: "Double-tap to choose your country. City-level location is not collected."))
 
                     LabeledContent("Interests") {
@@ -114,13 +114,13 @@ struct EditProfileView: View {
                         Button {
                             showDevicesPicker = true
                         } label: {
-                            Text(owns.isEmpty ? "Not Set" : owns)
+                            Text(owns.isEmpty ? String(localized: "Not Set") : owns)
                                 .foregroundStyle(owns.isEmpty ? .secondary : .primary)
                                 .multilineTextAlignment(.trailing)
                         }
                     }
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel(String(localized: "Apple Products Owned: \(owns.isEmpty ? "not set" : owns)"))
+                    .accessibilityLabel(String(localized: "Apple Products Owned: \(owns.isEmpty ? String(localized: "not set") : owns)"))
                     .accessibilityHint(String(localized: "Double-tap to choose which Apple products you use."))
                 }
 
@@ -164,13 +164,13 @@ struct EditProfileView: View {
                         Button {
                             showTimeZonePicker = true
                         } label: {
-                            Text(timezone.isEmpty ? "Not Set" : displayTimeZone(timezone))
+                            Text(timezone.isEmpty ? String(localized: "Not Set") : displayTimeZone(timezone))
                                 .foregroundStyle(timezone.isEmpty ? .secondary : .primary)
                                 .multilineTextAlignment(.trailing)
                         }
                     }
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel(String(localized: "Time Zone: \(timezone.isEmpty ? "not set" : displayTimeZone(timezone))"))
+                    .accessibilityLabel(String(localized: "Time Zone: \(timezone.isEmpty ? String(localized: "not set") : displayTimeZone(timezone))"))
                     .accessibilityHint(String(localized: "Double-tap to choose your time zone."))
 
                     Toggle(isOn: $allowsContact) {
@@ -259,7 +259,7 @@ struct EditProfileView: View {
             timezone = fields.timezone ?? ""
             allowsContact = fields.allowsContact ?? true
         } catch {
-            errorMessage = "Couldn't load your current profile. You can still make changes below."
+            errorMessage = String(localized: "Couldn't load your current profile. You can still make changes below.")
             isErrorFocused = true
         }
         isLoading = false
@@ -295,7 +295,7 @@ struct EditProfileView: View {
                 errorMessage = error.localizedDescription
                 isErrorFocused = true
             } catch {
-                errorMessage = "Couldn't save your profile. Try again."
+                errorMessage = String(localized: "Couldn't save your profile. Try again.")
                 isErrorFocused = true
             }
             isSaving = false
@@ -329,7 +329,7 @@ private struct CountryPickerSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                countryRow(name: "Not Set", isSelected: selection.isEmpty) {
+                countryRow(name: String(localized: "Not Set"), isSelected: selection.isEmpty) {
                     selection = ""
                 }
                 ForEach(filtered, id: \.self) { country in
@@ -455,7 +455,7 @@ private struct BioAssistSheet: View {
         if let result = await IntelligenceService.draftBio(from: notes) {
             draft = result
         } else {
-            error = "Couldn't generate a draft. Please try again, or write your bio manually."
+            error = String(localized: "Couldn't generate a draft. Please try again, or write your bio manually.")
         }
         isGenerating = false
     }
@@ -570,10 +570,10 @@ private struct DevicesPickerSheet: View {
 
     private var cleanupMessage: String {
         if suggestedCleanups.count == 1, let only = suggestedCleanups.first {
-            return "Looks like \"\(only.raw)\" in Other is basically \(only.match), already on the list above. Want me to check that box and clear it out of Other so things stay nice and tidy?"
+            return String(localized: "Looks like \"\(only.raw)\" in Other is basically \(only.match), already on the list above. Want me to check that box and clear it out of Other so things stay nice and tidy?")
         }
         let matches = suggestedCleanups.map(\.match).joined(separator: ", ")
-        return "A few things in Other look like they're already on the list above (\(matches)). Want me to check those boxes and clean up Other for you?"
+        return String(localized: "A few things in Other look like they're already on the list above (\(matches)). Want me to check those boxes and clean up Other for you?")
     }
 
     private func applySuggestedCleanups() {

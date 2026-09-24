@@ -210,7 +210,7 @@ enum ThemeGroup: String, CaseIterable, Identifiable {
         switch self {
         case .accessibility: return "Accessibility"
         case .appleVis:     return "AppleVis"
-        case .standard:     return "Standard"
+        case .standard:     return String(localized: "Standard")
         }
     }
 }
@@ -240,17 +240,17 @@ enum AppTheme: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .system:            return "System"
-        case .oppositeToSystem: return "System (Inverted)"
-        case .light:              return "Light"
-        case .dark:                return "Dark"
+        case .system:            return String(localized: "System")
+        case .oppositeToSystem: return String(localized: "System (Inverted)")
+        case .light:              return String(localized: "Light")
+        case .dark:                return String(localized: "Dark")
         case .midnight:           return "Midnight"
-        case .warm:               return "Warm"
-        case .sepia:              return "Sepia"
-        case .applevisClassic:   return "AppleVis Classic"
-        case .mouseLight:        return "Mouse — Light"
-        case .mouseDark:         return "Mouse — Dark"
-        case .orchard:            return "Orchard"
+        case .warm:               return String(localized: "Warm")
+        case .sepia:              return String(localized: "Sepia")
+        case .applevisClassic:   return String(localized: "AppleVis Classic")
+        case .mouseLight:        return String(localized: "Mouse — Light")
+        case .mouseDark:         return String(localized: "Mouse — Dark")
+        case .orchard:            return String(localized: "Orchard")
         // Was "Golden Gate" — Apple's own macOS 26 code name, and not
         // worth the trademark risk for a theme name with no real
         // connection to it beyond both evoking San Francisco. Reported
@@ -258,30 +258,30 @@ enum AppTheme: String, CaseIterable, Identifiable {
         // untouched — it's what `@AppStorage` actually persists, so
         // renaming it would silently reset this specific choice back to
         // the default for anyone who'd already picked it.
-        case .goldenGate:        return "Cupertino Sunset"
-        case .nebula:             return "Nebula"
-        case .highContrastLight: return "High Contrast Light"
-        case .highContrastDark:  return "High Contrast Dark"
+        case .goldenGate:        return String(localized: "Cupertino Sunset")
+        case .nebula:             return String(localized: "Nebula")
+        case .highContrastLight: return String(localized: "High Contrast Light")
+        case .highContrastDark:  return String(localized: "High Contrast Dark")
         }
     }
 
     var subtitle: String {
         switch self {
-        case .system:            return "Follows iOS appearance setting"
-        case .oppositeToSystem: return "Always the opposite of your iOS appearance"
-        case .light:              return "Always uses light colours"
-        case .dark:                return "Always uses dark colours"
-        case .midnight:           return "Deep black background for low-light use"
-        case .warm:               return "Soft cream and amber tones that reduce blue light"
-        case .sepia:              return "Warm, low-glare tones for extended reading"
-        case .applevisClassic:   return "The blue and white scheme from applevis.com"
-        case .mouseLight:        return "Warm, playful theme inspired by AnonyMouse"
-        case .mouseDark:         return "The Mouse theme in a warm charcoal dark edition"
-        case .orchard:            return "Fresh apple greens and deep reds"
-        case .goldenGate:        return "Warm California sunset tones"
-        case .nebula:             return "Deep indigo and soft lavender, space-inspired"
-        case .highContrastLight: return "Maximum contrast on a light background"
-        case .highContrastDark:  return "Maximum contrast on a dark background"
+        case .system:            return String(localized: "Follows iOS appearance setting")
+        case .oppositeToSystem: return String(localized: "Always the opposite of your iOS appearance")
+        case .light:              return String(localized: "Always uses light colours")
+        case .dark:                return String(localized: "Always uses dark colours")
+        case .midnight:           return String(localized: "Deep black background for low-light use")
+        case .warm:               return String(localized: "Soft cream and amber tones that reduce blue light")
+        case .sepia:              return String(localized: "Warm, low-glare tones for extended reading")
+        case .applevisClassic:   return String(localized: "The blue and white scheme from applevis.com")
+        case .mouseLight:        return String(localized: "Warm, playful theme inspired by AnonyMouse")
+        case .mouseDark:         return String(localized: "The Mouse theme in a warm charcoal dark edition")
+        case .orchard:            return String(localized: "Fresh apple greens and deep reds")
+        case .goldenGate:        return String(localized: "Warm California sunset tones")
+        case .nebula:             return String(localized: "Deep indigo and soft lavender, space-inspired")
+        case .highContrastLight: return String(localized: "Maximum contrast on a light background")
+        case .highContrastDark:  return String(localized: "Maximum contrast on a dark background")
         }
     }
 
@@ -369,8 +369,8 @@ enum WebBrowsingMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var displayName: String {
         switch self {
-        case .inApp:    return "In-App Browser"
-        case .external: return "Default Browser"
+        case .inApp:    return String(localized: "In-App Browser")
+        case .external: return String(localized: "Default Browser")
         }
     }
 }
@@ -408,9 +408,9 @@ enum AnnouncementLevel: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var displayName: String {
         switch self {
-        case .simple: return "Simple"
-        case .normal: return "Normal"
-        case .all:    return "All Details"
+        case .simple: return String(localized: "Simple")
+        case .normal: return String(localized: "Normal")
+        case .all:    return String(localized: "All Details")
         }
     }
     // Rewritten to match what a forum topic row actually says today (see
@@ -421,9 +421,9 @@ enum AnnouncementLevel: String, CaseIterable, Identifiable {
     // Kept in sync going forward per the Help-content-upkeep rule.
     var preview: String {
         switch self {
-        case .simple: return "\"iOS 18 VoiceOver Tips, iOS and iPadOS topic.\""
-        case .normal: return "\"iOS 18 VoiceOver Tips, iOS and iPadOS topic, by JaneD, 14 comments.\""
-        case .all:    return "\"iOS 18 VoiceOver Tips, iOS and iPadOS topic, by JaneD, 14 comments, 2 days ago.\""
+        case .simple: return String(localized: "\"iOS 18 VoiceOver Tips, iOS and iPadOS topic.\"")
+        case .normal: return String(localized: "\"iOS 18 VoiceOver Tips, iOS and iPadOS topic, by JaneD, 14 comments.\"")
+        case .all:    return String(localized: "\"iOS 18 VoiceOver Tips, iOS and iPadOS topic, by JaneD, 14 comments, 2 days ago.\"")
         }
     }
 }
@@ -439,10 +439,10 @@ enum PodcastEQ: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var displayName: String {
         switch self {
-        case .flat:        return "Flat"
-        case .speech:      return "Speech Clarity"
-        case .bassBoost:   return "Bass Boost"
-        case .trebleBoost: return "Treble Boost"
+        case .flat:        return String(localized: "Flat")
+        case .speech:      return String(localized: "Speech Clarity")
+        case .bassBoost:   return String(localized: "Bass Boost")
+        case .trebleBoost: return String(localized: "Treble Boost")
         }
     }
 }
@@ -453,8 +453,8 @@ enum PodcastAutoDownload: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .off:      return "Off"
-        case .wifiOnly: return "Wi-Fi Only"
-        case .always:   return "Always"
+        case .wifiOnly: return String(localized: "Wi-Fi Only")
+        case .always:   return String(localized: "Always")
         }
     }
 }
@@ -465,10 +465,10 @@ enum PodcastAutoDelete: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .off:        return "Off"
-        case .immediate:  return "Immediately After Playing"
-        case .oneDay:     return "After 1 Day"
-        case .threeDays:  return "After 3 Days"
-        case .sevenDays:  return "After 7 Days"
+        case .immediate:  return String(localized: "Immediately After Playing")
+        case .oneDay:     return String(localized: "After 1 Day")
+        case .threeDays:  return String(localized: "After 3 Days")
+        case .sevenDays:  return String(localized: "After 7 Days")
         }
     }
 }
@@ -478,17 +478,17 @@ enum NotificationSound: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var displayName: String {
         switch self {
-        case .mouseSqueak:         return "Mouse Squeak"
-        case .appleCrunch:         return "Apple Crunch"
-        case .goldenRetrieverBark: return "Golden Retriever Bark"
-        case .system:              return "System Default"
+        case .mouseSqueak:         return String(localized: "Mouse Squeak")
+        case .appleCrunch:         return String(localized: "Apple Crunch")
+        case .goldenRetrieverBark: return String(localized: "Golden Retriever Bark")
+        case .system:              return String(localized: "System Default")
         }
     }
     var description: String {
         switch self {
-        case .mouseSqueak:         return "The AppleVis signature sound, soft and distinctive."
-        case .appleCrunch:         return "A crisp apple crunch."
-        case .goldenRetrieverBark: return "A friendly golden retriever bark, warm and cheerful."
+        case .mouseSqueak:         return String(localized: "The AppleVis signature sound, soft and distinctive.")
+        case .appleCrunch:         return String(localized: "A crisp apple crunch.")
+        case .goldenRetrieverBark: return String(localized: "A friendly golden retriever bark, warm and cheerful.")
         // iOS has no API for a third-party app to read or play back
         // exactly which alert tone a user has personally set as their
         // device default — this sends "default" in the push payload,
@@ -497,7 +497,7 @@ enum NotificationSound: String, CaseIterable, Identifiable {
         // nothing to preview in-app beforehand that's guaranteed to match
         // it. Reworded after a beta tester's preview played Tri-Tone while
         // their actual configured default was Rebound.
-        case .system:              return "Uses your device's own default alert tone when a notification arrives. Preview unavailable due to iOS system restrictions."
+        case .system:              return String(localized: "Uses your device's own default alert tone when a notification arrives. Preview unavailable due to iOS system restrictions.")
         }
     }
     /// Value stored server-side in `field_push_sound` so a push payload can

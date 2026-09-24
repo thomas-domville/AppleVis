@@ -15,9 +15,9 @@ struct ContactView: View {
         var label: String {
             switch self {
             case .bug: return "Bug Report"
-            case .feedback: return "Feedback"
-            case .suggestion: return "Suggestion"
-            case .general: return "General Enquiry"
+            case .feedback: return String(localized: "Feedback")
+            case .suggestion: return String(localized: "Suggestion")
+            case .general: return String(localized: "General Enquiry")
             }
         }
 
@@ -32,28 +32,28 @@ struct ContactView: View {
 
         var description: String {
             switch self {
-            case .bug: return "Something in the app is broken or not working as expected."
-            case .feedback: return "Share your thoughts, reactions, or general impressions about the app."
-            case .suggestion: return "An idea to make the app better — a feature, improvement, or change."
-            case .general: return "Ask a question, raise a concern, or get in touch about anything else."
+            case .bug: return String(localized: "Something in the app is broken or not working as expected.")
+            case .feedback: return String(localized: "Share your thoughts, reactions, or general impressions about the app.")
+            case .suggestion: return String(localized: "An idea to make the app better — a feature, improvement, or change.")
+            case .general: return String(localized: "Ask a question, raise a concern, or get in touch about anything else.")
             }
         }
 
         var hint: String {
             switch self {
-            case .bug: return "Report a technical problem with the AppleVis app."
-            case .feedback: return "Tell us what you think about the app."
-            case .suggestion: return "Suggest a new feature or improvement."
-            case .general: return "Ask a general question or share a concern about AppleVis."
+            case .bug: return String(localized: "Report a technical problem with the AppleVis app.")
+            case .feedback: return String(localized: "Tell us what you think about the app.")
+            case .suggestion: return String(localized: "Suggest a new feature or improvement.")
+            case .general: return String(localized: "Ask a general question or share a concern about AppleVis.")
             }
         }
 
         var messagePlaceholder: String {
             switch self {
-            case .bug: return "Describe what happened, what you expected, and the steps to reproduce it…"
-            case .feedback: return "Share your thoughts about the AppleVis app…"
-            case .suggestion: return "Describe your idea and why it would improve the app…"
-            case .general: return "Tell us what's on your mind…"
+            case .bug: return String(localized: "Describe what happened, what you expected, and the steps to reproduce it…")
+            case .feedback: return String(localized: "Share your thoughts about the AppleVis app…")
+            case .suggestion: return String(localized: "Describe your idea and why it would improve the app…")
+            case .general: return String(localized: "Tell us what's on your mind…")
             }
         }
 
@@ -142,7 +142,7 @@ struct ContactView: View {
                     ThankYouView(
                         icon: "envelope",
                         heading: "Message sent!",
-                        message: "Thanks for reaching out — we've received your message. We typically reply to urgent issues as soon as possible and routine enquiries within one business day.",
+                        message: "Thanks for getting in touch. We've received your message. We reply to urgent issues as soon as we can, and to other questions within one business day.",
                         doneLabel: "Back to Profile",
                         onDone: { dismiss() }
                     ) {
@@ -464,7 +464,7 @@ struct ContactView: View {
                     Toggle(isOn: $includeSysInfo) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Include app and device info").font(.subheadline.bold())
-                            Text("Appends your app version, device, and accessibility settings (like VoiceOver) to help diagnose the issue.")
+                            Text("Adds your app version, device, and accessibility settings, such as VoiceOver, to help us find the problem.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
@@ -474,15 +474,15 @@ struct ContactView: View {
                     Label("Tips for a helpful bug report", systemImage: "lightbulb")
                         .font(.caption.bold())
                         .foregroundStyle(effectiveType.color)
-                    Text("• Describe the exact steps to reproduce the issue.\n• State what you expected versus what actually happened.\n• Turn on \"Include app and device info\" above to attach your version details.")
+                    Text("• Describe the exact steps to reproduce the problem.\n• Say what you expected and what happened instead.\n• Turn on \"Include app and device info\" above to add your version details.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel(String(localized: "Tips for a helpful bug report: describe the exact steps to reproduce the issue, what you expected to happen, and what actually happened. Turn on Include app and device info above to automatically attach your version details."))
+                .accessibilityLabel(String(localized: "Tips for a helpful bug report: describe the exact steps to reproduce the problem, what you expected, and what happened instead. Turn on Include app and device info above to add your version details."))
             }
             Section {
-                WizardBlockingNote(reasons: messageValid ? [] : [String(localized: "Write at least \(20 - messageLength) more character\(20 - messageLength == 1 ? "" : "s") to continue.")])
+                WizardBlockingNote(reasons: messageValid ? [] : [String(localized: "Write at least \(20 - messageLength) more characters to continue.")])
                 WizardBottomButton(String(localized: "Next"), isEnabled: messageValid, action: goNext)
             }
         }
@@ -605,7 +605,7 @@ struct ContactView: View {
                     HStack(alignment: .top, spacing: 12) {
                         Image(systemName: declarationAgreed ? "checkmark.square.fill" : "square")
                             .foregroundStyle(declarationAgreed ? effectiveType.color : .secondary)
-                        Text("I confirm this is a genuine message — not sponsored content, advertising, an SEO submission, or any other paid proposal.")
+                        Text("I confirm this is a genuine message. It isn't sponsored content, advertising, an SEO submission, or any other paid proposal.")
                             .font(.footnote)
                             .foregroundStyle(.primary)
                             .multilineTextAlignment(.leading)

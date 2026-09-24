@@ -25,16 +25,16 @@ enum APIError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .network:       return "Network error. Check your connection and try again."
-        case .timeout:       return "The request timed out. Try again."
-        case .unauthorized:  return "Incorrect username or password."
-        case .forbidden:     return "You don't have permission to do that."
-        case .rateLimited:   return "Too many requests. Please wait a moment."
-        case .server:        return "AppleVis is having trouble right now. Try again later."
-        case .decoding: return "AppleVis sent back something this version of the app doesn't understand. Try updating the app."
-        case .notFound: return "This item is no longer available. It may have been removed, moved, or is awaiting moderation."
-        case .unknown: return "AppleVis sent back something unexpected. Try again in a moment."
-        case .offlineNoCache(let group): return "No saved \(group) content yet. Connect to the internet to load content for the first time."
+        case .network:       return String(localized: "Network error. Check your connection and try again.")
+        case .timeout:       return String(localized: "The request timed out. Try again.")
+        case .unauthorized:  return String(localized: "Incorrect username or password.")
+        case .forbidden:     return String(localized: "You don't have permission to do that.")
+        case .rateLimited:   return String(localized: "Too many requests. Please wait a moment.")
+        case .server:        return String(localized: "AppleVis is having trouble right now. Try again later.")
+        case .decoding: return String(localized: "AppleVis sent back something this version of the app doesn't understand. Try updating the app.")
+        case .notFound: return String(localized: "This item is no longer available. It may have been removed, moved, or is awaiting moderation.")
+        case .unknown: return String(localized: "AppleVis sent back something unexpected. Try again in a moment.")
+        case .offlineNoCache(let group): return String(localized: "No saved \(group) content yet. Connect to the internet to load content for the first time.")
         }
     }
 }

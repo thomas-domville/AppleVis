@@ -150,14 +150,14 @@ private struct WelcomeStep: View {
         // reworded again: the app's actual VoiceOver support should speak
         // for itself through the experience, not through a claim about it
         // here. Reported directly.
-        ("person.3",        "Community-Driven",             "Tips, reviews, and guides contributed by blind and low-vision users."),
+        ("person.3",        "Community-Driven",             "Tips, reviews, and guides written by blind and low vision users."),
         ("newspaper",       "All the Content You Need",     "Forums, app comments, podcasts, tutorials, and news in one place."),
         // RN's welcome copy is concrete about how many themes and which
         // ones — Swift's was generic ("High-contrast and low-vision-
         // friendly themes built in") despite having the same 15 themes
         // available (PreferencesStore's AppTheme enum).
-        ("paintbrush",      "Accessible Themes",            "15 themes including High Contrast, Mouse, and Midnight — choose yours in the next few steps."),
-        ("bell.badge",      "Smart Notifications",          "Stay informed about the content that matters to you."),
+        ("paintbrush",      "Accessible Themes",            "15 themes, including High Contrast, Mouse, and Midnight. You'll choose one in the next few steps."),
+        ("bell.badge",      "Smart Notifications",          "Choose the activity you want to be notified about."),
     ]
 
     var body: some View {
@@ -189,7 +189,7 @@ private struct WelcomeStep: View {
                     Label("Used AppleVis before?", systemImage: "arrow.triangle.2.circlepath")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color.accentColor)
-                    Text("This is a rebuilt version of the app. Your forum posts, comments, and account are all still there on the website — just sign back in. Local settings like your saved episodes and preferences were reset and will need to be set up again.")
+                    Text("This is a rebuilt version of the app. Your account, forum posts, and comments are still on the website, so you only need to sign in again. Settings on this device, such as saved episodes and preferences, were reset and need to be set up again.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -197,7 +197,7 @@ private struct WelcomeStep: View {
                 .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
                 .padding(.horizontal, 24)
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel(String(localized: "Used AppleVis before? This is a rebuilt version of the app. Your forum posts, reviews, and account are all still there on the website — just sign back in. Local settings like your saved episodes and preferences were reset and will need to be set up again."))
+                .accessibilityLabel(String(localized: "Used AppleVis before? This is a rebuilt version of the app. Your account, forum posts, and comments are still on the website, so you only need to sign in again. Settings on this device, such as saved episodes and preferences, were reset and need to be set up again."))
 
                 VStack(spacing: 20) {
                     ForEach(features, id: \.title) { feature in
@@ -208,9 +208,11 @@ private struct WelcomeStep: View {
                                 .frame(width: featureIconWidth)
                                 .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(feature.title)
+                                // Were Text(String), which skips the catalog, so
+                                // this list was English in every language.
+                                Text(LocalizedStringKey(feature.title))
                                     .font(.headline)
-                                Text(feature.desc)
+                                Text(LocalizedStringKey(feature.desc))
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
@@ -448,13 +450,13 @@ private struct SignInStep: View {
     private func signIn() {
         let name = username.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else {
-            validationMessage = "Please enter your AppleVis username or email address."
+            validationMessage = String(localized: "Please enter your AppleVis username or email address.")
             UIAccessibility.post(notification: .announcement, argument: validationMessage!)
             isErrorFocused = true
             return
         }
         guard !password.isEmpty else {
-            validationMessage = "Please enter your AppleVis password."
+            validationMessage = String(localized: "Please enter your AppleVis password.")
             UIAccessibility.post(notification: .announcement, argument: validationMessage!)
             isErrorFocused = true
             return
@@ -500,7 +502,7 @@ private struct NewActivityDisplayStep: View {
                         title: "Show What's New?", icon: "bell.badge",
                         stepIndex: 4, stepTotal: 9, onBack: onBack, headerFocus: headerFocus
                     )
-                    Text("Home can highlight what's changed since your last visit — a New view alongside All and Mouse Recap, a quick summary at the top, and a small label on anything with new activity.")
+                    Text("Home can show what's changed since your last visit: a New view alongside All and Mouse Recap, a short summary at the top, and a label on anything with new activity.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -526,7 +528,7 @@ private struct NewActivityDisplayStep: View {
                             RecommendedBadge()
                             Text("Yes, Show What's New")
                                 .font(.headline)
-                            Text("The default — a New view, labels, and a quick summary on Home.")
+                            Text("The default. Home shows a New view, labels, and a short summary.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -585,9 +587,9 @@ private struct ThemeStep: View {
 
     private var introText: String {
         if let suggestedHighContrast {
-            return String(localized: "Since Increase Contrast is turned on for your iPhone, we've picked \(suggestedHighContrast.displayName) for you. If that works for you, just continue, or choose another theme below. You can always change this later in Settings.")
+            return String(localized: "Increase Contrast is on for your iPhone, so \(suggestedHighContrast.displayName) is selected. Continue to keep it, or choose another theme below. You can change this later in Settings.")
         }
-        return String(localized: "It's already set to System, which matches your iPhone's Light or Dark Mode. If that works for you, just continue. If you have some vision, High Contrast or Midnight can make text easier to read. You can always change this later in Settings.")
+        return String(localized: "The theme is set to System, which follows your iPhone's Light or Dark Mode. Continue to keep it. If you have some vision, High Contrast or Midnight can make text easier to read. You can change this later in Settings.")
     }
 
     var body: some View {
@@ -738,9 +740,9 @@ private struct AppleTopicsStep: View {
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
-                    Label("Apple Related covers Apple products and platforms — iPhone, Mac, Apple Watch, apps, and more.", systemImage: "apps.iphone")
+                    Label("Apple Related covers Apple products and platforms, such as iPhone, Mac, Apple Watch, and apps.", systemImage: "apps.iphone")
                     Label("Non-Apple topics include Windows, Android, smart home tech, and general assistive technology discussions.", systemImage: "globe")
-                    Label("Podcasts, Guides, Apps, and Blogs are already all about Apple — only Forums has non-Apple discussions to filter. Change this anytime from Customize Home (on the Home tab) or Settings > Home Feed.", systemImage: "gearshape")
+                    Label("Podcasts, Guides, Apps, and Blogs are all about Apple already. Only Forums has non-Apple discussions to filter. You can change this at any time in Customize Home on the Home tab, or in Settings > Home Feed.", systemImage: "gearshape")
                 }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -805,7 +807,7 @@ private struct LanguageFilterStep: View {
                         title: "Filter Milder Language?", icon: "text.badge.checkmark",
                         stepIndex: 7, stepTotal: 9, onBack: onBack, headerFocus: headerFocus
                     )
-                    Text("AppleVis always blocks strong or explicit language from every post and comment — that never changes. This is just about whether milder language, which the site otherwise allows, shows up masked or spelled out.")
+                    Text("AppleVis always blocks strong or explicit language in posts and comments, and that doesn't change. This setting only decides whether milder language, which the website allows, is masked or shown as written.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -814,7 +816,7 @@ private struct LanguageFilterStep: View {
 
                 VStack(alignment: .leading, spacing: 12) {
                     Label("Masked text looks like \"s***\" instead of the word spelled out.", systemImage: "text.badge.checkmark")
-                    Label("We keep this on by default to help AppleVis stay welcoming, and to stay within Apple's guidelines for our age rating.", systemImage: "checkmark.shield")
+                    Label("This is on by default to help keep AppleVis welcoming, and to stay within Apple's rules for the app's age rating.", systemImage: "checkmark.shield")
                     Label("Change this anytime in Settings > General.", systemImage: "hand.raised")
                 }
                 .font(.subheadline)
@@ -904,7 +906,7 @@ private struct NotificationsStep: View {
                         .padding(.horizontal, 24)
                         .accessibilityAddTraits(.isHeader)
                     VStack(spacing: 0) {
-                        NotifToggle("Replies to My Posts", isOn: $preferences.notifyForumReplies)
+                        NotifToggle(String(localized: "Replies to My Posts"), isOn: $preferences.notifyForumReplies)
                             .disabled(!auth.isSignedIn)
                             .accessibilityHint(String(localized: auth.isSignedIn
                                 ? "Get notified when someone replies to your forum topics."
@@ -915,7 +917,7 @@ private struct NotificationsStep: View {
                         // can't deliver. `notifyMentions` and the "mention" push
                         // category are kept for if the website ever adds real
                         // mentions; only the switch is hidden.
-                        NotifToggle("Followed Topics", isOn: $preferences.notifyFollowedTopics)
+                        NotifToggle(String(localized: "Followed Topics"), isOn: $preferences.notifyFollowedTopics)
                             .disabled(!auth.isSignedIn)
                             .accessibilityHint(String(localized: auth.isSignedIn
                                 ? "Get notified about activity in topics you follow."
@@ -934,7 +936,7 @@ private struct NotificationsStep: View {
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 24)
                     } else {
-                        Text("You're continuing as a guest, so these stay dimmed — sign in anytime to turn them on.")
+                        Text("You're continuing as a guest, so these are unavailable. Sign in at any time to turn them on.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 24)
@@ -954,11 +956,11 @@ private struct NotificationsStep: View {
                         // here. (Settings > Notifications still has this
                         // toggle too — flagged separately, not touched in
                         // this pass.) Reported directly.
-                        NotifToggle("New Forum Topics",  isOn: $preferences.notifyNewTopics)
-                        NotifToggle("New Podcast Episodes", isOn: $preferences.notifyNewEpisodes)
-                        NotifToggle("New App Directory Entries", isOn: $preferences.notifyAppUpdates)
-                        NotifToggle("New Guides", isOn: $preferences.notifyNewResources)
-                        NotifToggle("New Comments", isOn: $preferences.notifyNewComments)
+                        NotifToggle(String(localized: "New Forum Topics"),  isOn: $preferences.notifyNewTopics)
+                        NotifToggle(String(localized: "New Podcast Episodes"), isOn: $preferences.notifyNewEpisodes)
+                        NotifToggle(String(localized: "New App Directory Entries"), isOn: $preferences.notifyAppUpdates)
+                        NotifToggle(String(localized: "New Guides"), isOn: $preferences.notifyNewResources)
+                        NotifToggle(String(localized: "New Comments"), isOn: $preferences.notifyNewComments)
                     }
                     .background(preferences.colors.card, in: RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal, 24)
@@ -1041,7 +1043,7 @@ private struct NotificationsStep: View {
                         // why AppleVis wanted it — priming with what happens and
                         // why before the system dialog appears. Requested
                         // directly.
-                        Text("iOS will ask you to confirm — this only sends alerts for what you turned on above, and you can change it anytime in Settings.")
+                        Text("iOS will ask you to confirm. You'll only get notifications for what you turned on above, and you can change this at any time in Settings.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
@@ -1136,41 +1138,44 @@ private struct ReadyStep: View {
     // as a setting name rather than a sentence, and "Notifications: Off"
     // implied the feature itself was disabled rather than "you didn't pick
     // any yet." Requested directly.
+    /// Localized here, where the text is built: the interpolated lines
+    /// (name, theme, sound, notification list) could never match a catalog
+    /// key once assembled, so this whole summary used to stay in English.
     private var summaryItems: [(icon: String, text: String)] {
         var items: [(String, String)] = []
 
         items.append(auth.isSignedIn
-            ? ("person.crop.circle.fill", "You're signed in as \(auth.user!.name).")
-            : ("person.crop.circle", "You're continuing as a guest — sign in anytime from Profile.")
+            ? ("person.crop.circle.fill", String(localized: "You're signed in as \(auth.user!.name)."))
+            : ("person.crop.circle", String(localized: "You're continuing as a guest. You can sign in at any time from Profile."))
         )
         items.append(preferences.showNewActivityIndicators
-            ? ("sparkles", "Home will highlight what's new since your last visit.")
-            : ("sparkles", "Home stays quiet, with no new-activity indicators.")
+            ? ("sparkles", String(localized: "Home shows what's new since your last visit."))
+            : ("sparkles", String(localized: "Home doesn't show new-activity indicators."))
         )
-        items.append(("paintbrush", "Using the \(preferences.theme.displayName) theme."))
+        items.append(("paintbrush", String(localized: "Using the \(preferences.theme.displayName) theme.")))
         items.append(preferences.appleOnlyForums
-            ? ("apps.iphone", "Forums focus on Apple topics only.")
-            : ("apps.iphone", "Forums show everything, Apple and beyond.")
+            ? ("apps.iphone", String(localized: "Forums show Apple topics only."))
+            : ("apps.iphone", String(localized: "Forums show all topics, including non-Apple ones."))
         )
         items.append(preferences.filterProfanity
-            ? ("text.badge.checkmark", "Milder language is filtered to keep things welcoming.")
-            : ("text.badge.checkmark", "Language shows up exactly as written.")
+            ? ("text.badge.checkmark", String(localized: "Milder language is masked."))
+            : ("text.badge.checkmark", String(localized: "Language is shown as written."))
         )
 
         let enabledCategories = [
-            auth.isSignedIn && preferences.notifyForumReplies ? "Replies to My Posts" : nil,
-            auth.isSignedIn && preferences.notifyFollowedTopics ? "Followed Topics" : nil,
-            preferences.notifyNewTopics ? "New Forum Topics" : nil,
-            preferences.notifyNewEpisodes ? "New Podcast Episodes" : nil,
-            preferences.notifyAppUpdates ? "New App Directory Entries" : nil,
-            preferences.notifyNewResources ? "New Guides" : nil,
-            preferences.notifyNewComments ? "New Comments" : nil,
+            auth.isSignedIn && preferences.notifyForumReplies ? String(localized: "Replies to My Posts") : nil,
+            auth.isSignedIn && preferences.notifyFollowedTopics ? String(localized: "Followed Topics") : nil,
+            preferences.notifyNewTopics ? String(localized: "New Forum Topics") : nil,
+            preferences.notifyNewEpisodes ? String(localized: "New Podcast Episodes") : nil,
+            preferences.notifyAppUpdates ? String(localized: "New App Directory Entries") : nil,
+            preferences.notifyNewResources ? String(localized: "New Guides") : nil,
+            preferences.notifyNewComments ? String(localized: "New Comments") : nil,
         ].compactMap { $0 }
         items.append(enabledCategories.isEmpty
-            ? ("bell.slash", "No notification categories are turned on yet.")
-            : ("bell.badge", "You'll be notified about \(enabledCategories.joined(separator: ", ")).")
+            ? ("bell.slash", String(localized: "No notification types are turned on yet."))
+            : ("bell.badge", String(localized: "You'll be notified about \(ListFormatter.localizedString(byJoining: enabledCategories))."))
         )
-        items.append(("speaker.wave.2", "Notifications will play the \(preferences.notificationSound.displayName) sound."))
+        items.append(("speaker.wave.2", String(localized: "Notifications will play the \(preferences.notificationSound.displayName) sound.")))
 
         return items
     }

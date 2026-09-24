@@ -35,9 +35,9 @@ struct TranscriptView: View {
     @AccessibilityFocusState private var isEmptyStateFocused: Bool
 
     private var shareText: String {
-        var lines = ["\(episodeTitle) — Transcript", "", transcript ?? ""]
+        var lines = [String(localized: "\(episodeTitle) — Transcript"), "", transcript ?? ""]
         if let episodeURL, !episodeURL.isEmpty {
-            lines += ["", "Listen on AppleVis: \(episodeURL)"]
+            lines += ["", String(localized: "Listen on AppleVis: \(episodeURL)")]
         }
         return lines.joined(separator: "\n")
     }
@@ -78,8 +78,8 @@ struct TranscriptView: View {
                     .background(preferences.colors.background)
                 } else {
                     EmptyStateView(
-                        title: "No Transcript",
-                        message: "A transcript isn't available for this episode yet.",
+                        title: String(localized: "No Transcript"),
+                        message: String(localized: "A transcript isn't available for this episode yet."),
                         systemImage: "text.quote"
                     )
                     .accessibilityFocused($isEmptyStateFocused)
@@ -136,7 +136,7 @@ struct TranscriptView: View {
         } catch let e as APIError {
             error = e.localizedDescription
         } catch {
-            self.error = "Couldn't load transcript."
+            self.error = String(localized: "Couldn't load transcript.")
         }
         isLoading = false
     }

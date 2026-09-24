@@ -72,7 +72,7 @@ struct MiniPlayerView: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel(
                 String(localized: "\(episode.title) by \(episode.showTitle). ") +
-                String(localized: "\(player.isPlaying ? "Playing" : "Paused"). Double-tap to open player.")
+                (player.isPlaying ? String(localized: "Playing. Double-tap to open player.") : String(localized: "Paused. Double-tap to open player."))
             )
             .sheet(isPresented: $showFullPlayer) {
                 FullPlayerView()

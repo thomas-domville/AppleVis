@@ -86,7 +86,7 @@ final class PlayerStore: ObservableObject {
         }
 
         guard let url = DownloadManager.shared.localURL(for: episode.id) ?? URL(string: episode.audioUrl) else {
-            errorMessage = "This episode doesn't have a playable audio file."
+            errorMessage = String(localized: "This episode doesn't have a playable audio file.")
             return
         }
 
@@ -665,7 +665,7 @@ final class PlayerStore: ObservableObject {
     /// the system volume HUD use, so this reads as familiar rather than
     /// inventing its own terminology for the same thing.
     private static func resolveOutputName() -> String {
-        AVAudioSession.sharedInstance().currentRoute.outputs.first?.portName ?? "Speaker"
+        AVAudioSession.sharedInstance().currentRoute.outputs.first?.portName ?? String(localized: "Speaker")
     }
 
     // MARK: - Persistence

@@ -61,13 +61,15 @@ private struct TipCard: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel(String(localized: "AppleVis Tip"))
 
-            Text(tip.content.title)
+            // Title and message were Text(String), shown exactly as
+            // written, so every tip was English in every language.
+            Text(LocalizedStringKey(tip.content.title))
                 .font(.title3)
                 .fontWeight(.bold)
-                .accessibilityLabel(String(localized: "AppleVis Tip. \(tip.content.title). \(tip.content.message)"))
+                .accessibilityLabel(String(localized: "AppleVis Tip. \(String(localized: String.LocalizationValue(tip.content.title))). \(String(localized: String.LocalizationValue(tip.content.message)))"))
                 .accessibilityFocused($isTitleFocused)
 
-            Text(tip.content.message)
+            Text(LocalizedStringKey(tip.content.message))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)

@@ -17,8 +17,8 @@ struct AboutView: View {
                 }
                 .accessibilityFocused($focusTarget, equals: AnyHashable("whatsNew"))
                 .accessibilityLabel(String(localized: "What's New in AppleVis"))
-                InfoRow(label: "Version", value: DiagnosticInfo.appVersion)
-                InfoRow(label: "Build", value: DiagnosticInfo.buildNumber)
+                InfoRow(label: String(localized: "Version"), value: DiagnosticInfo.appVersion)
+                InfoRow(label: String(localized: "Build"), value: DiagnosticInfo.buildNumber)
                 // Device details, accessibility status, and Copy Support
                 // Info used to spill directly into this screen as ten-plus
                 // flat rows before anyone had asked for them — moved behind

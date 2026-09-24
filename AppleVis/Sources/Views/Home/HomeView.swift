@@ -41,10 +41,11 @@ enum HomeFocusTarget: Hashable {
 enum Greeting {
     static func text(for date: Date = Date()) -> String {
         switch Calendar.current.component(.hour, from: date) {
-        case 5..<12:  return "Good morning"
-        case 12..<17: return "Good afternoon"
-        case 17..<22: return "Good evening"
-        default:      return "Good night"
+        // Were plain Strings, so the greeting was English in every language.
+        case 5..<12:  return String(localized: "Good morning")
+        case 12..<17: return String(localized: "Good afternoon")
+        case 17..<22: return String(localized: "Good evening")
+        default:      return String(localized: "Good night")
         }
     }
 
@@ -313,8 +314,8 @@ struct HomeView: View {
         SoundPlayer.shared.play(.welcome)
 
         let baseText = vm.isReturningVisit
-            ? "Welcome back to AppleVis. Returning to where you left off."
-            : "Welcome to AppleVis. Home is ready."
+            ? String(localized: "Welcome back to AppleVis. Returning to where you left off.")
+            : String(localized: "Welcome to AppleVis. Home is ready.")
 
         if preferences.homeStartupBehavior == .detailed && !vm.newActivitySummary.isEmpty {
             // IntelligenceService.generateDigest existed but was never
@@ -401,7 +402,7 @@ struct HomeView: View {
     private var greetingHeadline: String {
         let name = auth.user?.name ?? ""
         if !name.isEmpty { return name }
-        return vm.isReturningVisit ? "Welcome back" : "Welcome to AppleVis"
+        return vm.isReturningVisit ? String(localized: "Welcome back") : String(localized: "Welcome to AppleVis")
     }
 
     private var greetingCard: some View {
@@ -558,11 +559,11 @@ struct HomeView: View {
                     let announcement: String
                     switch filter {
                     case .all:
-                        announcement = "Showing all Home activity."
+                        announcement = String(localized: "Showing all Home activity.")
                     case .new:
-                        announcement = "\(vm.newItems.count) new activity item\(vm.newItems.count == 1 ? "" : "s")."
+                        announcement = String(localized: "\(vm.newItems.count) new activity items.")
                     case .mouseRecap:
-                        announcement = "Showing Mouse Recap."
+                        announcement = String(localized: "Showing Mouse Recap.")
                     }
                     UIAccessibility.post(notification: .announcement, argument: announcement)
                 }
@@ -882,7 +883,7 @@ private struct MouseRecapHomeContent: View {
                 TranslatedMouseRecapTitle(kind: "blogPost", id: spotlight.id, title: spotlight.title) { resolvedTitle, wasTranslated in
                     newsletterCard(
                         title: resolvedTitle,
-                        kicker: "AnonyMouse's App Pick of the Month",
+                        kicker: String(localized: "AnonyMouse's App Pick of the Month"),
                         details: digest.blogDetails(spotlight),
                         body: aiBlurbs[spotlight.id] ?? digest.newsletterBody(for: spotlight),
                         accent: ContentKind.blogPost.accentColor,
@@ -905,7 +906,7 @@ private struct MouseRecapHomeContent: View {
             systemImage: "square.grid.2x2",
             intro: digest.appSectionIntro(periodName: window.label),
             kicker: String(localized: "New on the App Scene"),
-            limitedMessage: limitedMessage(total: digest.apps.count, shown: apps.count, noun: "app"),
+            limitedMessage: limitedMessage(total: digest.apps.count, shown: apps.count, phrase: String(localized: "\(apps.count) apps")),
             items: apps
         ) { app in
             TranslatedMouseRecapTitle(kind: "appListing", id: app.id, title: app.name) { resolvedTitle, wasTranslated in
@@ -930,7 +931,7 @@ private struct MouseRecapHomeContent: View {
             systemImage: "mic",
             intro: digest.podcastSectionIntro(periodName: window.label),
             kicker: String(localized: "Podcast Episode"),
-            limitedMessage: limitedMessage(total: digest.podcasts.count, shown: podcasts.count, noun: "episode"),
+            limitedMessage: limitedMessage(total: digest.podcasts.count, shown: podcasts.count, phrase: String(localized: "\(podcasts.count) episodes")),
             items: podcasts
         ) { episode in
             TranslatedMouseRecapTitle(kind: "podcastEpisode", id: episode.id, title: episode.title) { resolvedTitle, wasTranslated in
@@ -957,7 +958,7 @@ private struct MouseRecapHomeContent: View {
             systemImage: "newspaper",
             intro: digest.blogSectionIntro(periodName: window.label),
             kicker: String(localized: "Blog Post"),
-            limitedMessage: limitedMessage(total: digest.standardBlogs.count, shown: blogs.count, noun: "post"),
+            limitedMessage: limitedMessage(total: digest.standardBlogs.count, shown: blogs.count, phrase: String(localized: "\(blogs.count) posts")),
             items: blogs
         ) { post in
             TranslatedMouseRecapTitle(kind: "blogPost", id: post.id, title: post.title) { resolvedTitle, wasTranslated in
@@ -983,15 +984,18 @@ private struct MouseRecapHomeContent: View {
             title: String(localized: "How-To Corner"),
             systemImage: "book",
             intro: digest.resourceSectionIntro(periodName: window.label),
-            limitedMessage: limitedMessage(total: digest.resources.count, shown: resources.count, noun: "guide or tutorial"),
+            kicker: String(localized: "Guides & Tutorials"),
+            limitedMessage: limitedMessage(total: digest.resources.count, shown: resources.count, phrase: String(localized: "\(resources.count) guides and tutorials")),
             items: resources
         ) { resource in
             TranslatedMouseRecapTitle(kind: "resource", id: resource.id, title: resource.title) { resolvedTitle, wasTranslated in
                 ResolvedResourceReadingTime(resource: resource) { readingTimeText in
+                    let details = digest.resourceDetails(resource).filter { $0 != resource.kind.displayName }
                     newsletterCard(
                         title: resolvedTitle,
                         kicker: resource.kind.displayName,
-                        details: digest.resourceDetails(resource) + (readingTimeText.map { [$0] } ?? []),
+                        hideKickerFromAccessibility: true,
+                        details: details + (readingTimeText.map { [$0] } ?? []),
                         body: aiBlurbs[resource.id] ?? digest.newsletterBody(for: resource),
                         accent: ContentKind.resource.accentColor,
                         wasTranslated: wasTranslated
@@ -1009,7 +1013,7 @@ private struct MouseRecapHomeContent: View {
             systemImage: "bubble.left.and.bubble.right",
             intro: digest.forumSectionIntro(periodName: window.label),
             kicker: String(localized: "Popular Discussion"),
-            limitedMessage: limitedMessage(total: digest.forums.count, shown: forums.count, noun: "discussion"),
+            limitedMessage: limitedMessage(total: digest.forums.count, shown: forums.count, phrase: String(localized: "\(forums.count) discussions")),
             items: forums
         ) { topic in
             TranslatedMouseRecapTitle(kind: "forumTopic", id: topic.id, title: topic.title) { resolvedTitle, wasTranslated in
@@ -1035,11 +1039,8 @@ private struct MouseRecapHomeContent: View {
         title: String,
         systemImage: String,
         intro: String,
-        // Only for sections where every card shares the same kicker (e.g.
-        // "New on the App Scene" on every app) — announced once here instead
-        // of on every card. Left nil for How-To Corner, where the kicker is
-        // resource.kind.displayName and genuinely differs per item, so it
-        // still needs to be heard on each card. Requested directly: with 3
+        // For sections with a repeated category label, announce it once here
+        // instead of on every card. Requested directly: with 3
         // new apps this week, "New on the App Scene" was heard 3 times in a
         // row instead of once for the whole group.
         kicker: String? = nil,
@@ -1107,10 +1108,11 @@ private struct MouseRecapHomeContent: View {
         .accessibilityElement(children: .contain)
     }
 
-    private func limitedMessage(total: Int, shown: Int, noun: String) -> String? {
+    /// `phrase` is the already-translated count ("5 apps"), built with a
+    /// real plural form by the caller.
+    private func limitedMessage(total: Int, shown: Int, phrase: String) -> String? {
         guard total > shown else { return nil }
-        let plural = noun == "guide or tutorial" ? "guides and tutorials" : "\(noun)s"
-        return "Showing the most relevant \(shown) \(shown == 1 ? noun : plural) from this period."
+        return String(localized: "Showing the most relevant \(phrase) from this period.")
     }
 
     private func generateAIBlurbs(for digest: MouseRecapDigest) async {
@@ -1245,10 +1247,10 @@ private struct MouseRecapCard: View {
     }
 
     private var accessibilityLabel: String {
-        if isLoading && digest == nil { return "Mouse Recap. Building your recap." }
-        if let error { return "Mouse Recap. \(error)" }
-        if let digest { return "Mouse Recap. \(digest.countSummary)" }
-        return "Mouse Recap. Recent activity summary."
+        if isLoading && digest == nil { return String(localized: "Mouse Recap. Building your recap.") }
+        if let error { return String(localized: "Mouse Recap. \(error)") }
+        if let digest { return String(localized: "Mouse Recap. \(digest.countSummary)") }
+        return String(localized: "Mouse Recap. Recent activity summary.")
     }
 }
 
@@ -1326,9 +1328,9 @@ private struct MouseRecapView: View {
                     }
 
                     recapSection(
-                        "New Accessible Apps",
+                        String(localized: "New Accessible Apps"),
                         systemImage: "square.grid.2x2",
-                        description: "A quick look at the newest additions to the AppleVis App Directory.",
+                        description: String(localized: "A quick look at the newest additions to the AppleVis App Directory."),
                         items: digest.apps
                     ) { app in
                         NavigationLink(value: app) {
@@ -1338,9 +1340,9 @@ private struct MouseRecapView: View {
                         }
                     }
                     recapSection(
-                        "Podcast Episodes",
+                        String(localized: "Podcast Episodes"),
                         systemImage: "mic",
-                        description: "Recent audio walkthroughs, conversations, and practical tips.",
+                        description: String(localized: "Recent audio walkthroughs, conversations, and practical tips."),
                         items: digest.podcasts
                     ) { episode in
                         NavigationLink(value: episode) {
@@ -1350,16 +1352,16 @@ private struct MouseRecapView: View {
                         }
                     }
                     recapSection(
-                        "Popular Discussions",
+                        String(localized: "Popular Discussions"),
                         systemImage: "bubble.left.and.bubble.right",
-                        description: "Community conversations that have been drawing replies.",
+                        description: String(localized: "Community conversations that have been drawing replies."),
                         items: digest.forums
                     ) { topic in
                         NavigationLink(value: topic) {
                             TranslatedMouseRecapTitle(kind: "forumTopic", id: topic.id, title: topic.title) { resolvedTitle, wasTranslated in
                                 MouseRecapItemRow(
                                     title: resolvedTitle,
-                                    subtitle: "\(topic.replyCount) repl\(topic.replyCount == 1 ? "y" : "ies")",
+                                    subtitle: String(localized: "\(topic.replyCount) replies"),
                                     date: topic.lastActivityAt,
                                     wasTranslated: wasTranslated
                                 )
@@ -1367,9 +1369,9 @@ private struct MouseRecapView: View {
                         }
                     }
                     recapSection(
-                        "Guides and Tutorials",
+                        String(localized: "Guides and Tutorials"),
                         systemImage: "book",
-                        description: "Hands-on help and explainers from the AppleVis community.",
+                        description: String(localized: "Hands-on help and explainers from the AppleVis community."),
                         items: digest.resources
                     ) { resource in
                         NavigationLink(value: resource) {
@@ -1379,9 +1381,9 @@ private struct MouseRecapView: View {
                         }
                     }
                     recapSection(
-                        "Blog Posts",
+                        String(localized: "Blog Posts"),
                         systemImage: "newspaper",
-                        description: "News, updates, and editorial coverage from AppleVis.",
+                        description: String(localized: "News, updates, and editorial coverage from AppleVis."),
                         items: digest.blogs
                     ) { post in
                         NavigationLink(value: post) {
@@ -1668,7 +1670,7 @@ struct NotificationHistoryView: View {
     var body: some View {
         Group {
             if items.isEmpty {
-                EmptyStateView(title: "No Notifications Yet", message: "Notifications you receive will appear here.", systemImage: "bell")
+                EmptyStateView(title: String(localized: "No Notifications Yet"), message: String(localized: "Notifications you receive will appear here."), systemImage: "bell")
             } else {
                 List(items) { item in
                     let isRoutable = item.kind != nil && item.contentId != nil

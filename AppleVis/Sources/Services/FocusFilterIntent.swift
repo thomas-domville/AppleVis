@@ -56,8 +56,8 @@ struct AppleVisFocusFilterIntent: SetFocusFilterIntent {
         return DisplayRepresentation(
             title: "AppleVis",
             subtitle: categories.isEmpty
-                ? "All notifications silenced"
-                : "\(categories.count) categor\(categories.count == 1 ? "y" : "ies") allowed"
+                ? LocalizedStringResource("All notifications silenced")
+                : LocalizedStringResource("\(categories.count) categories allowed")
         )
     }
 

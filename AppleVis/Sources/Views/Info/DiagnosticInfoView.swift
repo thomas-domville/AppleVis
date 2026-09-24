@@ -51,23 +51,23 @@ struct DiagnosticInfoView: View {
             }
 
             Section("Device") {
-                InfoRow(label: "Version", value: DiagnosticInfo.appVersion)
-                InfoRow(label: "Build", value: DiagnosticInfo.buildNumber)
-                InfoRow(label: "Device", value: deviceSummary)
+                InfoRow(label: String(localized: "Version"), value: DiagnosticInfo.appVersion)
+                InfoRow(label: String(localized: "Build"), value: DiagnosticInfo.buildNumber)
+                InfoRow(label: String(localized: "Device"), value: deviceSummary)
                 InfoRow(label: "iOS", value: DiagnosticInfo.iosVersion)
-                InfoRow(label: "Screen", value: DiagnosticInfo.screenSize)
+                InfoRow(label: String(localized: "Screen"), value: DiagnosticInfo.screenSize)
             }
 
             Section("Accessibility Status") {
                 AccessibilityStatusRow(label: "VoiceOver", isActive: UIAccessibility.isVoiceOverRunning)
-                AccessibilityStatusRow(label: "Switch Control", isActive: UIAccessibility.isSwitchControlRunning)
-                AccessibilityStatusRow(label: "Reduced Motion", isActive: UIAccessibility.isReduceMotionEnabled)
-                AccessibilityStatusRow(label: "Bold Text", isActive: UIAccessibility.isBoldTextEnabled)
-                AccessibilityStatusRow(label: "Reduce Transparency", isActive: UIAccessibility.isReduceTransparencyEnabled)
-                AccessibilityStatusRow(label: "Increased Contrast", isActive: UIAccessibility.isDarkerSystemColorsEnabled)
-                AccessibilityStatusRow(label: "Grayscale", isActive: UIAccessibility.isGrayscaleEnabled)
-                AccessibilityStatusRow(label: "Invert Colors", isActive: UIAccessibility.isInvertColorsEnabled)
-                InfoRow(label: "Dynamic Type Scale", value: DiagnosticInfo.dynamicTypeScale(dynamicTypeSize))
+                AccessibilityStatusRow(label: String(localized: "Switch Control"), isActive: UIAccessibility.isSwitchControlRunning)
+                AccessibilityStatusRow(label: String(localized: "Reduced Motion"), isActive: UIAccessibility.isReduceMotionEnabled)
+                AccessibilityStatusRow(label: String(localized: "Bold Text"), isActive: UIAccessibility.isBoldTextEnabled)
+                AccessibilityStatusRow(label: String(localized: "Reduce Transparency"), isActive: UIAccessibility.isReduceTransparencyEnabled)
+                AccessibilityStatusRow(label: String(localized: "Increased Contrast"), isActive: UIAccessibility.isDarkerSystemColorsEnabled)
+                AccessibilityStatusRow(label: String(localized: "Grayscale"), isActive: UIAccessibility.isGrayscaleEnabled)
+                AccessibilityStatusRow(label: String(localized: "Invert Colors"), isActive: UIAccessibility.isInvertColorsEnabled)
+                InfoRow(label: String(localized: "Dynamic Type Scale"), value: DiagnosticInfo.dynamicTypeScale(dynamicTypeSize))
             }
 
             Section {

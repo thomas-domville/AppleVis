@@ -432,4 +432,19 @@ enum HTMLText {
         text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return decodeEntities(text)
     }
+
+    /// For deciding whether two pieces of text say the same thing — the
+    /// App Directory Health Check and Refresh App Details both use this, so
+    /// they can't disagree. `plainText`, minus invisible formatting
+    /// characters (the App Store's web page leaves a left-to-right mark,
+    /// U+200E, on titles copied from it — confirmed live on several
+    /// entries, flagged as a "title change" with nothing visible to fix),
+    /// with every kind of space collapsed to one. Case still counts: a
+    /// capitalization change is a real, visible difference.
+    static func comparableText(_ text: String) -> String {
+        let visible = plainText(fromHTML: text).unicodeScalars.filter { $0.properties.generalCategory != .format }
+        return String(String.UnicodeScalarView(visible))
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+    }
 }

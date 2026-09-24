@@ -471,7 +471,7 @@ struct AppDetailView: View {
     private func recommendationSummaryCard(_ summary: RecommendationSummary) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Label(
-                summary.count == 1 ? "1 person has recommended this app" : "\(summary.count) people have recommended this app",
+                String(localized: "\(summary.count) people have recommended this app"),
                 systemImage: "hand.thumbsup.fill"
             )
             .font(.subheadline.weight(.semibold))
@@ -727,7 +727,7 @@ struct AppDetailView: View {
                 if let rating = meta.appStoreRating {
                     infoRow("Rating", String(format: "%.1f ★ (%d ratings)", rating, meta.appStoreRatingCount))
                 }
-                if !meta.minimumOsVersion.isEmpty { infoRow("Requires", "iOS \(meta.minimumOsVersion)+") }
+                if !meta.minimumOsVersion.isEmpty { infoRow("Requires", String(localized: "iOS \(meta.minimumOsVersion)+")) }
                 if !meta.languageCodes.isEmpty { infoRow("Language", meta.languageNames) }
                 if !meta.ageRating.isEmpty { infoRow("Age Rating", meta.ageRating) }
                 if !meta.fileSizeMb.isEmpty { infoRow("Size", meta.fileSizeMb) }
@@ -1198,7 +1198,7 @@ struct AppDetailView: View {
                 ))
             }
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Couldn't load app." }
+        } catch { self.error = String(localized: "Couldn't load app.") }
         isLoading = false
         // Opened via "Jump to First New Comment": that comment gets focus
         // instead. Title focus used to run regardless, and its retries could
@@ -1574,7 +1574,7 @@ struct AppReviewRow: View {
             Button("Cancel", role: .cancel) {}
         }
         .sheet(isPresented: $showEditSheet) {
-            EditContentSheet(title: "Edit Comment", initialText: review.rawBody) { newText in
+            EditContentSheet(title: String(localized: "Edit Comment"), initialText: review.rawBody) { newText in
                 guard let user = auth.user else { return }
                 try await APIClient.shared.content.editComment(
                     commentType: "comment_node_ios_app_directory", commentId: review.id, newBody: newText, format: review.bodyFormat, csrfToken: user.csrfToken
@@ -1606,8 +1606,8 @@ struct AppReviewRow: View {
     private func presentShareSheet() {
         let plain = review.body.strippingHTMLTags()
         let subject = review.subject.trimmingCharacters(in: .whitespaces)
-        var message = "\(review.authorName) on AppleVis"
-        if !subject.isEmpty { message += ":\n\nSubject: \(subject)" }
+        var message = String(localized: "\(review.authorName) on AppleVis")
+        if !subject.isEmpty { message += String(localized: ":\n\nSubject: \(subject)") }
         message += "\n\n\(plain)"
         let activityVC = UIActivityViewController(activityItems: [message], applicationActivities: nil)
         UIApplication.shared.connectedScenes
@@ -1876,7 +1876,7 @@ struct ComposeAppReviewView: View {
             onPosted(review)
             dismiss()
         } catch let e as APIError { submitError = e.localizedDescription
-        } catch { submitError = "Couldn't post comment. Try again." }
+        } catch { submitError = String(localized: "Couldn't post comment. Try again.") }
         isSubmitting = false
     }
 }

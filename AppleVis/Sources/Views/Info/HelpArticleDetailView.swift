@@ -26,7 +26,7 @@ struct HelpArticleDetailView: View {
             if case .steps(let items) = block { return count + items.count }
             return count
         }
-        return "\(article.title). \(article.summary). \(headingCount) section headings. \(stepCount) steps."
+        return String(localized: "\(article.title). \(article.summary). \(headingCount) section headings. \(stepCount) steps.")
     }
 
     var body: some View {
@@ -244,11 +244,11 @@ struct HelpBlockView: View {
                 .padding(.bottom, 8)
 
             case .tip(let originalText):
-                Callout(label: "Tip", text: text(block.id, originalText), color: .green, isTranslated: translated[block.id] != nil)
+                Callout(label: String(localized: "Tip"), text: text(block.id, originalText), color: .green, isTranslated: translated[block.id] != nil)
             case .note(let originalText):
-                Callout(label: "Note", text: text(block.id, originalText), color: .blue, isTranslated: translated[block.id] != nil)
+                Callout(label: String(localized: "Note"), text: text(block.id, originalText), color: .blue, isTranslated: translated[block.id] != nil)
             case .warning(let originalText):
-                Callout(label: "Important", text: text(block.id, originalText), color: .orange, isTranslated: translated[block.id] != nil)
+                Callout(label: String(localized: "Important"), text: text(block.id, originalText), color: .orange, isTranslated: translated[block.id] != nil)
 
             case .faq(let question, let answer):
                 let qField = "\(block.id).q"

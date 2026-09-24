@@ -298,7 +298,7 @@ struct BugDetailView: View {
             parts.append(String(part.prefix(remaining)))
             remaining -= part.count
         }
-        let input = "Bug report: \(detail.title)\n\n\(parts.joined(separator: "\n\n"))"
+        let input = String(localized: "Bug report: \(detail.title)\n\n\(parts.joined(separator: "\n\n"))")
         if let summary = await IntelligenceService.summarize(input) {
             discussionSummary = summary
         } else {
@@ -530,7 +530,7 @@ struct BugDetailView: View {
                 ))
             }
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Couldn't load bug report." }
+        } catch { self.error = String(localized: "Couldn't load bug report.") }
         isLoading = false
         // Opened via "Jump to First New Comment": that comment gets focus
         // instead. Title focus used to run regardless, and its retries could
@@ -771,7 +771,7 @@ struct ComposeBugCommentView: View {
             onPosted(comment)
             dismiss()
         } catch let e as APIError { submitError = e.localizedDescription
-        } catch { submitError = "Couldn't post comment. Try again." }
+        } catch { submitError = String(localized: "Couldn't post comment. Try again.") }
         isSubmitting = false
     }
 }

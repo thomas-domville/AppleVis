@@ -10,8 +10,8 @@ struct SearchResultsView: View {
 
     private var offlineOrFallbackMessage: String {
         networkMonitor.isConnected
-            ? "Some results may be missing. AppleVis search is using the available fallback sources."
-            : "You're offline, so search can't reach AppleVis right now. Reconnect and try again."
+            ? String(localized: "Some results may be missing. AppleVis search is using the available fallback sources.")
+            : String(localized: "You're offline, so search can't reach AppleVis right now. Reconnect and try again.")
     }
 
     var body: some View {
@@ -21,7 +21,7 @@ struct SearchResultsView: View {
             } else if let results {
                 resultsList(results)
             } else {
-                EmptyStateView(title: "No Results", message: "Try a different search term.", systemImage: "magnifyingglass")
+                EmptyStateView(title: String(localized: "No Results"), message: String(localized: "Try a different search term."), systemImage: "magnifyingglass")
             }
         }
     }
@@ -41,10 +41,10 @@ struct SearchResultsView: View {
             }
         } else if isEmpty {
             EmptyStateView(
-                title: "No Results",
-                message: "Nothing matched your search. Check the spelling, use fewer words, or search for a broader topic.",
+                title: String(localized: "No Results"),
+                message: String(localized: "Nothing matched your search. Check the spelling, use fewer words, or search for a broader topic."),
                 systemImage: "magnifyingglass",
-                primaryActionLabel: "Clear Search",
+                primaryActionLabel: String(localized: "Clear Search"),
                 primaryAction: onClearSearch
             )
         } else {

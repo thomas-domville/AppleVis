@@ -46,7 +46,7 @@ struct QueueView: View {
                         } header: {
                             Text("Up Next")
                         } footer: {
-                            Text("\(player.queue.count) episode\(player.queue.count == 1 ? "" : "s") in queue")
+                            Text("\(player.queue.count) episodes in queue")
                         }
 
                         Button("Clear Queue", role: .destructive) { showClearConfirm = true }
@@ -89,10 +89,10 @@ struct QueueView: View {
             .accessibilityFocused($isTitleFocused)
             .accessibilityAction(named: Text("Queue summary")) {
                 let totalSeconds = player.queue.reduce(0.0) { $0 + ($1.duration ?? 0) }
-                let duration = totalSeconds > 0 ? ", about \(PodcastDuration.accessibilityLabel(totalSeconds))" : ""
+                let duration = totalSeconds > 0 ? String(localized: ", about \(PodcastDuration.accessibilityLabel(totalSeconds))") : ""
                 UIAccessibility.post(
                     notification: .announcement,
-                    argument: "\(player.queue.count) episode\(player.queue.count == 1 ? "" : "s") in queue\(duration)."
+                    argument: String(localized: "\(String(localized: "\(player.queue.count) episodes in queue"))\(duration).")
                 )
             }
     }

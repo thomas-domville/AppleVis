@@ -22,65 +22,65 @@ struct SiriShortcutsSettingsView: View {
             Section("Available Shortcuts") {
                 FeatureInfoRow(
                     icon: "house",
-                    title: "Open AppleVis",
-                    subtitle: "\"Hey Siri, open AppleVis\"",
-                    detail: "Opens AppleVis to the Home tab.",
+                    title: String(localized: "Open AppleVis"),
+                    subtitle: String(localized: "\"Hey Siri, open AppleVis\""),
+                    detail: String(localized: "Opens AppleVis to the Home tab."),
                     isSystemFeature: true
                 )
                 FeatureInfoRow(
                     icon: "bubble.left.and.bubble.right",
-                    title: "Open AppleVis Forums",
-                    subtitle: "\"Hey Siri, open AppleVis Forums\"",
-                    detail: "Opens the Forums browser.",
+                    title: String(localized: "Open AppleVis Forums"),
+                    subtitle: String(localized: "\"Hey Siri, open AppleVis Forums\""),
+                    detail: String(localized: "Opens the Forums browser."),
                     isSystemFeature: true
                 )
                 FeatureInfoRow(
                     icon: "circle.badge",
-                    title: "Show Unread AppleVis Topics",
-                    subtitle: "\"Hey Siri, show unread AppleVis topics\"",
-                    detail: "Opens Forums filtered to unread topics.",
+                    title: String(localized: "Show Unread AppleVis Topics"),
+                    subtitle: String(localized: "\"Hey Siri, show unread AppleVis topics\""),
+                    detail: String(localized: "Opens Forums filtered to unread topics."),
                     isSystemFeature: true
                 )
                 FeatureInfoRow(
                     icon: "play.circle",
-                    title: "Resume AppleVis Podcast",
-                    subtitle: "\"Hey Siri, resume AppleVis podcast\"",
-                    detail: "Resumes the last-played episode from where you left off.",
+                    title: String(localized: "Resume AppleVis Podcast"),
+                    subtitle: String(localized: "\"Hey Siri, resume AppleVis podcast\""),
+                    detail: String(localized: "Resumes the last-played episode from where you left off."),
                     isSystemFeature: true
                 )
                 FeatureInfoRow(
                     icon: "play.circle.fill",
-                    title: "Play Latest AppleVis Podcast",
-                    subtitle: "\"Hey Siri, play latest AppleVis podcast\"",
-                    detail: "Plays the newest AppleVis podcast episode.",
+                    title: String(localized: "Play Latest AppleVis Podcast"),
+                    subtitle: String(localized: "\"Hey Siri, play latest AppleVis podcast\""),
+                    detail: String(localized: "Plays the newest AppleVis podcast episode."),
                     isSystemFeature: true
                 )
                 FeatureInfoRow(
                     icon: "magnifyingglass",
-                    title: "Search AppleVis",
-                    subtitle: "\"Hey Siri, search AppleVis\"",
-                    detail: "Searches forum topics, apps, podcast episodes, and guides.",
+                    title: String(localized: "Search AppleVis"),
+                    subtitle: String(localized: "\"Hey Siri, search AppleVis\""),
+                    detail: String(localized: "Searches forum topics, apps, podcast episodes, and guides."),
                     isSystemFeature: true
                 )
                 FeatureInfoRow(
                     icon: "bookmark",
-                    title: "Open AppleVis Saved Items",
-                    subtitle: "\"Hey Siri, open AppleVis saved items\"",
-                    detail: "Opens your saved items.",
+                    title: String(localized: "Open AppleVis Saved Items"),
+                    subtitle: String(localized: "\"Hey Siri, open AppleVis saved items\""),
+                    detail: String(localized: "Opens your saved items."),
                     isSystemFeature: true
                 )
                 FeatureInfoRow(
                     icon: "sparkles",
-                    title: "What's New on AppleVis",
-                    subtitle: "\"Hey Siri, what's new on AppleVis\"",
-                    detail: "Speaks a summary of what's new since your last visit.",
+                    title: String(localized: "What's New on AppleVis"),
+                    subtitle: String(localized: "\"Hey Siri, what's new on AppleVis\""),
+                    detail: String(localized: "Speaks a summary of what's new since your last visit."),
                     isSystemFeature: true
                 )
                 FeatureInfoRow(
                     icon: "ant",
-                    title: "Report an AppleVis Bug",
-                    subtitle: "\"Hey Siri, report a bug to AppleVis\"",
-                    detail: "Opens straight to the accessibility bug report form.",
+                    title: String(localized: "Report an AppleVis Bug"),
+                    subtitle: String(localized: "\"Hey Siri, report a bug to AppleVis\""),
+                    detail: String(localized: "Opens straight to the accessibility bug report form."),
                     isSystemFeature: true
                 )
             }

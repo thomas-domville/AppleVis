@@ -28,10 +28,10 @@ struct DeleteAccountView: View {
                         .font(.subheadline)
 
                     VStack(alignment: .leading, spacing: 6) {
-                        BulletRow("Your AppleVis account and login credentials.")
-                        BulletRow("All forum posts and comments you have authored.")
-                        BulletRow("Your saved items and followed content.")
-                        BulletRow("Your profile and public contributions.")
+                        BulletRow(String(localized: "Your AppleVis account and login credentials."))
+                        BulletRow(String(localized: "All forum posts and comments you have authored."))
+                        BulletRow(String(localized: "Your saved items and followed content."))
+                        BulletRow(String(localized: "Your profile and public contributions."))
                     }
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -121,7 +121,7 @@ struct DeleteAccountView: View {
                 isDeleting = false
                 isErrorFocused = true
             } catch {
-                errorMessage = "Could not delete account. Please contact support."
+                errorMessage = String(localized: "Could not delete account. Please contact support.")
                 isDeleting = false
                 isErrorFocused = true
             }

@@ -34,7 +34,7 @@ enum ContentSubmissionPolicy {
         }
 
         if toneConcern(in: text) == .high {
-            return String(localized: "This draft may violate AppleVis guidelines on respectful community discussion. Please revise the tone before posting.")
+            return String(localized: "This draft may break the AppleVis guidelines on respectful discussion. Please change the tone before posting.")
         }
 
         // Unconditional — see shouldDetectNonEnglish's doc comment. Only

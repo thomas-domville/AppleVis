@@ -37,7 +37,7 @@ struct HelpView: View {
         let sectionCount = HelpContent.sections.count
         let articleCount = HelpContent.sections.reduce(0) { $0 + $1.articles.count }
         let titles = HelpContent.sections.map(\.title).joined(separator: ", ")
-        return "\(sectionCount) help sections and \(articleCount) articles. Includes \(titles)."
+        return String(localized: "\(sectionCount) help sections and \(articleCount) articles. Includes \(titles).")
     }
 
     var body: some View {

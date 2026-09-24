@@ -515,8 +515,7 @@ enum ItunesAPI {
 
     private static func formatBytes(_ bytes: Int64) -> String {
         guard bytes > 0 else { return "" }
-        if bytes < 1_048_576 { return "\(bytes / 1024) KB" }
-        return String(format: "%.1f MB", Double(bytes) / 1_048_576)
+        return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
 }
 
