@@ -56,21 +56,33 @@ struct NowPlayingWaveform: View {
 /// than producing "by , 39 replies," which read as a data typo rather than
 /// a missing name. Reported directly by a VoiceOver user.
 func byAuthorAndCount(_ author: String, _ count: String) -> String {
-    author.isEmpty ? count : "by \(author), \(count)"
+    author.isEmpty ? count : String(localized: "by \(author), \(count)")
+}
+
+/// "1 comment" / "12 comments" — translated with each language's real
+/// plural forms (catalog plural variations). Every card label used to build
+/// this as English "comment" + "s".
+func commentCountPhrase(_ count: Int) -> String {
+    String(localized: "\(count) comments")
+}
+
+/// ". 3 new comments" for a card label, or "" when there's nothing new.
+func newCommentsSuffix(_ count: Int) -> String {
+    count > 0 ? ". " + String(localized: "\(count) new comments") : ""
 }
 
 /// Omits the leading space when `category` is blank (a topic whose url
 /// didn't resolve to a category) rather than reading as a bare, leading-
 /// space "topic". Reported directly by a VoiceOver user.
 func forumContentType(category: String) -> String {
-    category.isEmpty ? "topic" : "\(category) topic"
+    category.isEmpty ? String(localized: "topic") : String(localized: "\(category) topic")
 }
 
 /// Some show titles already end in "Podcast" (e.g. "AppleVis Podcast") —
 /// appending " podcast" unconditionally read as "AppleVis Podcast podcast".
 /// Reported via a live transcript.
 func podcastContentType(showTitle: String) -> String {
-    showTitle.localizedCaseInsensitiveContains("podcast") ? showTitle : "\(showTitle) podcast"
+    showTitle.localizedCaseInsensitiveContains("podcast") ? showTitle : String(localized: "\(showTitle) podcast")
 }
 
 /// `newActivityLabel` (the "N new comments" phrase) is deliberately its own
@@ -142,8 +154,10 @@ private struct PopInAppearance: ViewModifier {
     }
 }
 
-/// Plain "NEW" pill for an item with no reply-count baseline yet (see
-/// FeedRow.isNew). Rendered inline in the same badge slot each row already
+/// Plain "NEW" pill for an item posted since the last visit (see
+/// FeedRow.isNew) — shown alongside NewCountBadge when that new item
+/// already has comments, so a brand-new topic with 3 replies reads as both
+/// "NEW" and "3 NEW." Rendered inline in the same badge slot each row already
 /// reserves for NewCountBadge — previously drawn as a card-level
 /// `.overlay(alignment: .topTrailing)` in FeedRow, which sat on top of
 /// whatever that row already had in its top-right corner (the relative date,
@@ -179,9 +193,9 @@ struct ForumTopicRow: View {
     /// wording. Spoken here, and shown visually via the icons below.
     private var savedFollowingLabel: String {
         switch (topic.isSaved, topic.isFollowing) {
-        case (true, true): return ". Saved, following."
-        case (true, false): return ". Saved."
-        case (false, true): return ". Following."
+        case (true, true): return String(localized: ". Saved, following.")
+        case (true, false): return String(localized: ". Saved.")
+        case (false, true): return String(localized: ". Following.")
         case (false, false): return ""
         }
     }
@@ -198,10 +212,11 @@ struct ForumTopicRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
+                    if isNew {
+                        NewBadge()
+                    }
                     if newCount > 0 {
                         NewCountBadge(count: newCount)
-                    } else if isNew {
-                        NewBadge()
                     }
                     if topic.isSaved {
                         Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
@@ -260,7 +275,7 @@ struct ForumTopicRow: View {
         // action (Reply to this Comment); this is the
         // generic new-activity count, same word everywhere else. Reported
         // directly.
-        let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
+        let newLabel = newCommentsSuffix(newCount)
         return detailLevelLabel(
             title: ContentTranslation.accessibilityTitle(original: topic.title, translated: translatedTitle),
             // Previously just the category ("iOS/iPadOS Gaming"), with
@@ -270,7 +285,7 @@ struct ForumTopicRow: View {
             // content kinds on Home read structurally differently with no
             // way to tell them apart by ear.
             contentType: forumContentType(category: topic.category),
-            authorAndCount: byAuthorAndCount(topic.authorName, "\(topic.replyCount) comment\(topic.replyCount == 1 ? "" : "s")"),
+            authorAndCount: byAuthorAndCount(topic.authorName, commentCountPhrase(topic.replyCount)),
             newActivityLabel: newLabel,
             date: topic.lastActivityAt.formatted(.relative(presentation: .named)),
             alwaysAppend: savedFollowingLabel
@@ -301,6 +316,9 @@ struct PodcastEpisodeRow: View {
     /// the App Entry page — only fires once this row actually scrolls into
     /// view, not for every row in a long list at once.
     @State private var resolvedDuration: TimeInterval?
+    /// The episode page's Listened switch, shown here as a reminder right
+    /// where you choose what to play next. Requested directly.
+    @State private var isListened = false
 
     var body: some View {
         NavigationLink(value: episode) {
@@ -334,10 +352,11 @@ struct PodcastEpisodeRow: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
+                        if isNew {
+                            NewBadge()
+                        }
                         if newCount > 0 {
                             NewCountBadge(count: newCount)
-                        } else if isNew {
-                            NewBadge()
                         }
                         if episode.isSaved {
                             Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
@@ -359,6 +378,14 @@ struct PodcastEpisodeRow: View {
                         }
                         if downloads.isDownloaded(episode.id) {
                             Image(systemName: "arrow.down.circle.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
+                        }
+                        if isListened {
+                            // Spoken through episodeLabel's ". Listened."
+                            Label("Listened", systemImage: "checkmark.circle.fill")
+                                .labelStyle(.iconOnly)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .accessibilityHidden(true)
                         }
                         RelativeDateLabel(date: episode.publishedAt)
                     }
@@ -405,6 +432,7 @@ struct PodcastEpisodeRow: View {
         // wording DownloadsView already uses for the latter two, so a user
         // who has heard either place recognizes the other.
         .accessibilityAction(named: Text(downloadActionLabel)) { performDownloadAction() }
+        .accessibilityAction(named: Text(listenedActionLabel)) { toggleListened() }
         .contentActions(
             id: episode.id, entityId: episode.nid, kind: .podcastEpisode, title: episode.title, lastActivityAt: episode.lastActivityAt, url: episode.url,
             currentCommentCount: episode.commentCount,
@@ -433,8 +461,18 @@ struct PodcastEpisodeRow: View {
                 Label(downloadActionLabel, systemImage: downloadActionSystemImage)
             }
             .accessibilityHidden(true)
+            Button {
+                toggleListened()
+            } label: {
+                Label(listenedActionLabel, systemImage: isListened ? "circle" : "checkmark.circle")
+            }
+            .accessibilityHidden(true)
         }
         .cardDensityPadding()
+        .onAppear { isListened = PersistenceStore.shared.isEpisodePlayed(episode.id) }
+        .onReceive(NotificationCenter.default.publisher(for: PersistenceStore.playedEpisodesDidChange)) { _ in
+            isListened = PersistenceStore.shared.isEpisodePlayed(episode.id)
+        }
         .task { await resolveDurationIfNeeded() }
         .task(id: ContentTranslation.taskId(title: episode.title, targetLanguage: preferences.effectiveContentLanguage)) {
             translatedTitle = await ContentTranslation.resolvedTitle(
@@ -465,18 +503,35 @@ struct PodcastEpisodeRow: View {
 
     private var progressText: String? {
         guard let resumePosition, !isCurrentlyPlaying else { return nil }
-        let total = displayDuration.map { " of \(PodcastDuration.colon($0))" } ?? ""
-        return "Paused \(PodcastDuration.colon(resumePosition))\(total)"
+        let position = PodcastDuration.colon(resumePosition)
+        guard let displayDuration else { return String(localized: "Paused \(position)") }
+        return String(localized: "Paused \(position) of \(PodcastDuration.colon(displayDuration))")
     }
 
     private var progressAccessibilityText: String {
         guard let resumePosition else { return "" }
-        return ". Paused at \(PodcastDuration.accessibilityPosition(current: resumePosition, duration: displayDuration))."
+        return String(localized: ". Paused at \(PodcastDuration.accessibilityPosition(current: resumePosition, duration: displayDuration)).")
     }
 
     private var playActionLabel: String {
-        if isCurrentlyPlaying { return "Pause" }
-        return resumePosition == nil ? "Play" : "Resume Episode"
+        if isCurrentlyPlaying { return String(localized: "Pause") }
+        return resumePosition == nil ? String(localized: "Play") : String(localized: "Resume Episode")
+    }
+
+    private var listenedActionLabel: String {
+        isListened ? String(localized: "Mark as Not Listened") : String(localized: "Mark as Listened")
+    }
+
+    private func toggleListened() {
+        if isListened {
+            PersistenceStore.shared.unmarkEpisodePlayed(episode.id)
+        } else {
+            PersistenceStore.shared.markEpisodePlayed(episode.id)
+        }
+        isListened.toggle()
+        UIAccessibility.post(notification: .announcement, argument: isListened
+            ? String(localized: "Marked as listened")
+            : String(localized: "Marked as not listened"))
     }
 
     private func resolveDurationIfNeeded() async {
@@ -512,9 +567,9 @@ struct PodcastEpisodeRow: View {
     }
 
     private var downloadActionLabel: String {
-        if downloads.isDownloaded(episode.id) { return "Remove Download" }
-        if downloads.activeDownloads.contains(episode.id) { return "Cancel Download" }
-        return "Download Episode"
+        if downloads.isDownloaded(episode.id) { return String(localized: "Remove Download") }
+        if downloads.activeDownloads.contains(episode.id) { return String(localized: "Cancel Download") }
+        return String(localized: "Download Episode")
     }
 
     private var downloadActionSystemImage: String {
@@ -538,10 +593,10 @@ struct PodcastEpisodeRow: View {
     }
 
     private var episodeLabel: String {
-        let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
-        let downloadedLabel = downloads.isDownloaded(episode.id) ? ". Downloaded." : ""
+        let newLabel = newCommentsSuffix(newCount)
+        let downloadedLabel = downloads.isDownloaded(episode.id) ? String(localized: ". Downloaded.") : ""
         let durationText = displayDuration.map { PodcastDuration.accessibilityLabel($0) } ?? ""
-        let countText = episode.commentCount > 0 ? "\(episode.commentCount) comment\(episode.commentCount == 1 ? "" : "s")" : ""
+        let countText = episode.commentCount > 0 ? commentCountPhrase(episode.commentCount) : ""
         let authorAndCount = [durationText, countText].filter { !$0.isEmpty }.joined(separator: ", ")
         let base = detailLevelLabel(
             title: ContentTranslation.accessibilityTitle(original: episode.title, translated: translatedTitle),
@@ -554,7 +609,7 @@ struct PodcastEpisodeRow: View {
             // of the whole label — reported directly: remaining time was
             // being spoken last, after badges that have nothing to do with
             // playback position.
-            alwaysAppend: "\(progressAccessibilityText)\(savedQueuedLabel)\(downloadedLabel)"
+            alwaysAppend: "\(progressAccessibilityText)\(savedQueuedLabel)\(downloadedLabel)\(listenedLabel)"
         )
         // The visible NowPlayingWaveform and play/pause icon are both
         // .accessibilityHidden — nothing else here ever spoke playing state,
@@ -572,11 +627,15 @@ struct PodcastEpisodeRow: View {
     // on the model but was never surfaced here, and the live player queue
     // state had no VoiceOver announcement at all. Reported directly: saved/
     // queued state used to be announced on cards and no longer is.
+    private var listenedLabel: String {
+        isListened ? String(localized: ". Listened.") : ""
+    }
+
     private var savedQueuedLabel: String {
         switch (episode.isSaved, isQueued) {
-        case (true, true): return ". Saved, queued."
-        case (true, false): return ". Saved."
-        case (false, true): return ". Queued."
+        case (true, true): return String(localized: ". Saved, queued.")
+        case (true, false): return String(localized: ". Saved.")
+        case (false, true): return String(localized: ". Queued.")
         case (false, false): return ""
         }
     }
@@ -621,10 +680,11 @@ struct AppListingRow: View {
                     HStack {
                         Text(app.category)
                         Spacer()
+                        if isNew {
+                            NewBadge()
+                        }
                         if newCount > 0 {
                             NewCountBadge(count: newCount)
-                        } else if isNew {
-                            NewBadge()
                         }
                         if app.isSaved {
                             Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
@@ -693,22 +753,22 @@ struct AppListingRow: View {
     }
 
     private var appLabel: String {
-        let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
+        let newLabel = newCommentsSuffix(newCount)
         return detailLevelLabel(
             title: ContentTranslation.accessibilityTitle(original: app.name, translated: translatedTitle),
             // Previously just the category ("Games"), with nothing in the
             // label saying this was an app listing at all — see the same
             // fix on ForumTopicRow's contentType for the full reasoning.
-            contentType: "\(app.category) app entry",
+            contentType: String(localized: "\(app.category) app entry"),
             // Despite the "reviewCount" field name, list-level counts come
             // from Drupal's comment_count (Mappers.swift), not the separate
             // Reviews feature on the app detail page — "review(s)" here was
             // simply the wrong word. Every other row kind already says
             // "comment(s)"; matched for consistency, reported directly.
-            authorAndCount: byAuthorAndCount(app.developer, "\(app.reviewCount) comment\(app.reviewCount == 1 ? "" : "s")"),
+            authorAndCount: byAuthorAndCount(app.developer, commentCountPhrase(app.reviewCount)),
             newActivityLabel: newLabel,
             date: app.lastActivityAt.formatted(.relative(presentation: .named)),
-            alwaysAppend: app.isSaved ? ". Saved." : ""
+            alwaysAppend: app.isSaved ? String(localized: ". Saved.") : ""
         )
     }
 }
@@ -730,10 +790,11 @@ struct ResourceRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
+                    if isNew {
+                        NewBadge()
+                    }
                     if newCount > 0 {
                         NewCountBadge(count: newCount)
-                    } else if isNew {
-                        NewBadge()
                     }
                     if resource.isSaved {
                         Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
@@ -777,14 +838,14 @@ struct ResourceRow: View {
     }
 
     private var resourceLabel: String {
-        let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
+        let newLabel = newCommentsSuffix(newCount)
         return detailLevelLabel(
             title: ContentTranslation.accessibilityTitle(original: resource.title, translated: translatedTitle),
             contentType: resource.kind.displayName,
-            authorAndCount: byAuthorAndCount(resource.authorName, "\(resource.commentCount) comment\(resource.commentCount == 1 ? "" : "s")"),
+            authorAndCount: byAuthorAndCount(resource.authorName, commentCountPhrase(resource.commentCount)),
             newActivityLabel: newLabel,
             date: resource.updatedAt.formatted(.relative(presentation: .named)),
-            alwaysAppend: resource.isSaved ? ". Saved." : ""
+            alwaysAppend: resource.isSaved ? String(localized: ". Saved.") : ""
         )
     }
 }
@@ -806,10 +867,11 @@ struct BlogPostRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
+                    if isNew {
+                        NewBadge()
+                    }
                     if newCount > 0 {
                         NewCountBadge(count: newCount)
-                    } else if isNew {
-                        NewBadge()
                     }
                     if post.isSaved {
                         Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true)
@@ -857,14 +919,14 @@ struct BlogPostRow: View {
     }
 
     private var postLabel: String {
-        let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")" : ""
+        let newLabel = newCommentsSuffix(newCount)
         return detailLevelLabel(
             title: ContentTranslation.accessibilityTitle(original: post.title, translated: translatedTitle),
-            contentType: "Blog post",
-            authorAndCount: byAuthorAndCount(post.authorName, "\(post.commentCount) comment\(post.commentCount == 1 ? "" : "s")"),
+            contentType: String(localized: "Blog post"),
+            authorAndCount: byAuthorAndCount(post.authorName, commentCountPhrase(post.commentCount)),
             newActivityLabel: newLabel,
             date: post.lastActivityAt.formatted(.relative(presentation: .named)),
-            alwaysAppend: post.isSaved ? ". Saved." : ""
+            alwaysAppend: post.isSaved ? String(localized: ". Saved.") : ""
         )
     }
 }

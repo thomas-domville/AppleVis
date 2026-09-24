@@ -9,6 +9,10 @@ struct ForumTopicDetailView: View {
     /// instead of landing at the top of the topic like a normal open.
     var focusFirstNewCommentOnAppear: Bool = false
     @State private var hasAppliedFirstNewCommentFocus = false
+    /// When "new" started for this visit — kept because the visit stamp is
+    /// overwritten as soon as the topic loads, and replies on later pages
+    /// (fetched afterwards) need the same marking as the first page.
+    @State private var newRepliesSince: Date?
     /// Set when opened from the admin Guideline Violation Check screen for a
     /// flagged reply — scrolls/focuses straight to that specific reply once
     /// loaded, the same way `focusFirstNewCommentOnAppear` does for "first
@@ -118,8 +122,8 @@ struct ForumTopicDetailView: View {
             }
         }
         .sheet(item: $editingTopicNode) { node in
-            EditNodeSheet(initialTitle: node.title, initialBody: node.body) { newTitle, newBody in
-                try await saveTopicEdit(title: newTitle, body: newBody)
+            EditNodeSheet(initialTitle: node.title, initialBody: node.body, nodeTypeSuffix: node.nodeTypeSuffix) { newTitle, newBody in
+                try await saveTopicEdit(title: newTitle, body: newBody, format: node.format)
             }
         }
         .task {
@@ -130,14 +134,20 @@ struct ForumTopicDetailView: View {
 
     private func startEditTopic() {
         guard let detail else { return }
-        editingTopicNode = EditableNode(title: detail.title, body: detail.body, nodeTypeSuffix: "forum")
+        editingTopicNode = EditableNode(title: detail.title, body: detail.rawBody, format: detail.bodyFormat, nodeTypeSuffix: "forum")
     }
 
-    private func saveTopicEdit(title: String, body: String) async throws {
+    private func saveTopicEdit(title: String, body: String, format: String) async throws {
         guard let user = auth.user, let detail else { return }
-        try await APIClient.shared.content.editNode(nodeId: detail.id, nodeType: "forum", title: title, body: body, csrfToken: user.csrfToken)
+        try await APIClient.shared.content.editNode(nodeId: detail.id, nodeType: "forum", title: title, body: body, format: format, csrfToken: user.csrfToken)
         self.detail?.title = title
-        self.detail?.body = body
+        // Not `detail.body` (rendered HTML) — that would show literal
+        // Markdown/plain-text source on screen until the next real reload,
+        // since there's no client-side renderer to turn raw text back into
+        // the HTML SegmentedHTMLView expects. `rawBody` is kept in sync so
+        // reopening Edit immediately after shows what was just saved.
+        self.detail?.rawBody = body
+        self.detail?.bodyFormat = format
         toast.success(String(localized: "Topic updated"))
     }
 
@@ -294,15 +304,22 @@ struct ForumTopicDetailView: View {
                     pendingFocusReplyId = nil
                 }
             }
-            .task {
-                // Guarded on hasApplied rather than just the intent flag —
-                // topicContent(_:) re-renders on every reply-list mutation
-                // (posting a reply, deleting one), and this should only ever
-                // fire once, right after the initial load this screen was
-                // opened for.
-                guard focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
+            // Guarded on hasApplied rather than just the intent flag —
+            // topicContent(_:) re-renders on every reply-list mutation
+            // (posting a reply, deleting one), and this should only ever
+            // fire once, right after the initial load this screen was
+            // opened for.
+            // Keyed on isLoading so this waits for load() to finish: the
+            // page can appear before the new-comment count is known (App
+            // Store enrichment, Follow state), and jumping then found
+            // nothing new and gave up — leaving VoiceOver on the title.
+            // Reported directly.
+            .task(id: isLoading) {
+                guard !isLoading, focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
                 hasAppliedFirstNewCommentFocus = true
-                await jumpToFirstNewReply(proxy: proxy)
+                // Nothing to land on after all — load() skipped the title
+                // for this, so put focus there instead of nowhere.
+                if !(await jumpToFirstNewReply(proxy: proxy)), hasNewReplies { focusTitleAfterLoad() }
             }
             .task {
                 guard let targetCommentId, !hasAppliedTargetCommentFocus else { return }
@@ -443,12 +460,12 @@ struct ForumTopicDetailView: View {
     /// different ways, so this only speaks what's actually real right now.
     private func announceThreadOverview(_ detail: ForumTopicDetail) {
         let mostRecent = detail.replies.max { $0.createdAt < $1.createdAt }
-        var summary = "Thread has \(detail.replies.count) comment\(detail.replies.count == 1 ? "" : "s")."
-        if let mostRecent {
-            summary += " Most recent comment by \(mostRecent.authorName), \(mostRecent.createdAt.formatted(.relative(presentation: .named)))."
-        }
-        summary += " Original post by \(detail.authorName)."
-        UIAccessibility.post(notification: .announcement, argument: summary)
+        ThreadOverview.announce(
+            commentCount: detail.replies.count,
+            mostRecentAuthor: mostRecent?.authorName,
+            mostRecentDate: mostRecent?.createdAt,
+            originalAuthor: detail.authorName
+        )
     }
 
     /// VoiceOver lands on the back button after push navigation by default;
@@ -467,7 +484,20 @@ struct ForumTopicDetailView: View {
         isLoading = true
         error = nil
         do {
-            detail = try await APIClient.shared.forums.topicDetail(id: topicId)
+            var fetched = try await APIClient.shared.forums.topicDetail(id: topicId)
+            // ForumReply.isNew was hardcoded false in Mappers.swift and never
+            // set anywhere — wire it to the same per-item visit-stamp
+            // mechanism Home already uses for its own "N new" counts.
+            // Captured before stampItemVisit below overwrites it with "now".
+            // Marked before `detail` is assigned, so the page never shows
+            // (or jumps) with every reply still unmarked. Falls back to when
+            // Home first saw the topic, like Home's own counts do — without
+            // that, a topic Home said had "3 new comments" showed none as
+            // new once opened, and Jump to First New Comment found nothing.
+            // Reported directly.
+            newRepliesSince = PersistenceStore.shared.newActivityCutoff(kind: .forumTopic, id: fetched.id)
+            fetched.replies = markingNew(fetched.replies)
+            detail = fetched
             isFollowing = detail.map { PersistenceStore.shared.isFollowed(id: $0.id) || FollowStore.shared.isFollowed($0.id) } ?? false
             isSaved = detail.map { PersistenceStore.shared.isSaved(id: $0.id) } ?? false
             if let user = auth.user, let topicUuid = detail?.id {
@@ -476,20 +506,6 @@ struct ForumTopicDetailView: View {
             }
             PersistenceStore.shared.markTopicSeen(id: topicId)
             PersistenceStore.shared.lastViewedForumTopicId = topicId
-            // ForumReply.isNew was hardcoded false in Mappers.swift and never
-            // set anywhere — wire it to the same per-item visit-stamp
-            // mechanism Home already uses for its own "N new" counts.
-            // Captured before stampItemVisit below overwrites it with "now".
-            // A topic with no prior visit record has no baseline, so nothing
-            // is marked new on a first-ever open (matches the rule Home
-            // already follows for the same reason).
-            if var currentDetail = detail,
-               let previousVisit = PersistenceStore.shared.allItemVisits()[FeedItem.visitKey(kind: .forumTopic, contentId: currentDetail.id)] {
-                for index in currentDetail.replies.indices {
-                    currentDetail.replies[index].isNew = currentDetail.replies[index].createdAt > previousVisit.seenAt
-                }
-                detail = currentDetail
-            }
             // Opening the topic itself should clear its "new" state on Home,
             // not just Home's own explicit "Mark as Read" action — otherwise
             // a topic you've actually read stays flagged as new indefinitely.
@@ -534,7 +550,10 @@ struct ForumTopicDetailView: View {
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Couldn't load topic." }
         isLoading = false
-        focusTitleAfterLoad()
+        // Opened via "Jump to First New Comment": that comment gets focus
+        // instead. Title focus used to run regardless, and its retries could
+        // pull focus straight back to the title. Reported directly.
+        if !(focusFirstNewCommentOnAppear && hasNewReplies) { focusTitleAfterLoad() }
     }
 
     private func toggleFollow() async {
@@ -584,7 +603,7 @@ struct ForumTopicDetailView: View {
             if more.isEmpty {
                 hasMoreReplies = false
             } else {
-                self.detail?.replies.append(contentsOf: more)
+                self.detail?.replies.append(contentsOf: markingNew(more))
             }
         } catch {
             toast.error(String(localized: "Couldn't load more replies."))
@@ -602,7 +621,7 @@ struct ForumTopicDetailView: View {
             while let current = self.detail, current.replies.count < current.replyCount {
                 let more = try await APIClient.shared.forums.moreReplies(topicId: current.id, offset: current.replies.count)
                 guard !more.isEmpty else { break }
-                self.detail?.replies.append(contentsOf: more)
+                self.detail?.replies.append(contentsOf: markingNew(more))
             }
         } catch {
             toast.error(String(localized: "Couldn't load more replies."))
@@ -672,15 +691,29 @@ struct ForumTopicDetailView: View {
         detail?.replies.filter(\.isNew).count ?? 0
     }
 
+    private var hasNewReplies: Bool { newReplyCountForHeading > 0 }
+
+    private func markingNew(_ replies: [ForumReply]) -> [ForumReply] {
+        guard let since = newRepliesSince else { return replies }
+        return replies.map { reply in
+            var reply = reply
+            reply.isNew = reply.createdAt > since
+            return reply
+        }
+    }
+
     /// "Jump to First New Comment" — mirrors jumpToLastReply, landing on
     /// the earliest reply posted since the previous visit instead of the
     /// thread's very end.
-    private func jumpToFirstNewReply(proxy: ScrollViewProxy) async {
+    @discardableResult
+    private func jumpToFirstNewReply(proxy: ScrollViewProxy) async -> Bool {
         if hasMoreReplies { await ensureAllRepliesLoaded() }
-        guard let firstNew = detail?.replies.first(where: { $0.isNew }) else { return }
+        guard let firstNew = detail?.replies.first(where: { $0.isNew }) else { return false }
         withReduceMotionAwareAnimation { proxy.scrollTo(firstNew.id, anchor: .top) }
-        try? await Task.sleep(for: .milliseconds(400))
-        focusedReplyId = firstNew.id
+        // Retried like the title focus — one assignment after a guessed
+        // delay could miss a row that wasn't laid out yet.
+        await retryAccessibilityFocus(firstNew.id, into: $focusedReplyId)
+        return true
     }
 
     private func jumpToLastReply(proxy: ScrollViewProxy) async {
@@ -843,16 +876,19 @@ struct ReplyView: View {
     /// — mirrors the old app's per-comment header label so VoiceOver users
     /// get the same at-a-glance context and rotor-navigable heading stops.
     private var headerAccessibilityLabel: String {
-        var label = "Comment \(index + 1) of \(total). \(reply.authorName)"
-        if isOriginalPoster { label += ", Original Poster" }
+        // Built from translated pieces — was plain English string building,
+        // so VoiceOver read every comment header in English in every
+        // language.
+        var label = String(localized: "Comment \(index + 1) of \(total). \(reply.authorName)")
+        if isOriginalPoster { label += String(localized: ", Original Poster") }
         label += ". \(reply.createdAt.formatted(.relative(presentation: .named)))."
         if let subject = CommentSubject.display(reply.subject, parentTitle: topicTitle) {
-            label += " Subject: \(subject)."
+            label += " " + String(localized: "Subject: \(subject).")
         }
         if let parentAuthorName {
-            label += " Reply to \(parentAuthorName)'s comment."
+            label += " " + String(localized: "Reply to \(parentAuthorName)'s comment.")
         }
-        if reply.isNew { label += " New." }
+        if reply.isNew { label += " " + String(localized: "New.") }
         return label
     }
 
@@ -956,10 +992,10 @@ struct ReplyView: View {
             Button("Cancel", role: .cancel) {}
         }
         .sheet(isPresented: $showEditSheet) {
-            EditContentSheet(title: "Edit Comment", initialText: reply.body) { newText in
+            EditContentSheet(title: "Edit Comment", initialText: reply.rawBody) { newText in
                 guard let user = auth.user else { return }
                 try await APIClient.shared.content.editComment(
-                    commentType: "comment_forum", commentId: reply.id, newBody: newText, format: drupalDefaultTextFormat, csrfToken: user.csrfToken
+                    commentType: "comment_forum", commentId: reply.id, newBody: newText, format: reply.bodyFormat, csrfToken: user.csrfToken
                 )
                 onEdit?(newText)
                 toast.success(String(localized: "Comment updated"))

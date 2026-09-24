@@ -9,22 +9,22 @@ private enum AppStoreLookupIssue {
     var title: String {
         switch self {
         case .notFound:
-            return "This app may no longer be available in the App Store."
+            return String(localized: "This app may no longer be available in the App Store.")
         case .invalidLink:
-            return "The App Store link for this entry needs review."
+            return String(localized: "The App Store link for this entry needs review.")
         case .failed:
-            return "App Store information is temporarily unavailable."
+            return String(localized: "App Store information is temporarily unavailable.")
         }
     }
 
     var message: String {
         switch self {
         case .notFound:
-            return "AppleVis still has this community entry, but the App Store listing could not be found."
+            return String(localized: "AppleVis still has this community entry, but the App Store listing could not be found.")
         case .invalidLink:
-            return "AppleVis could not find a valid App Store app ID in the saved link."
+            return String(localized: "AppleVis could not find a valid App Store app ID in the saved link.")
         case .failed:
-            return "AppleVis could not check the App Store right now. Try again later."
+            return String(localized: "AppleVis could not check the App Store right now. Try again later.")
         }
     }
 
@@ -109,6 +109,13 @@ struct AppDetailView: View {
     // said "nothing to update" even when the page's own version notice
     // just above it was showing a real mismatch.
     @State private var appInfoRefreshRequest: AppInfoRefreshRequest?
+    @State private var selectedAppInfoDevices: Set<String> = []
+    /// The entry exactly as saved on AppleVis. `detail` gets its name and
+    /// App Store link replaced by the App Store's once the lookup succeeds
+    /// (`enriched(with:)`), so Refresh App Details comparing against it saw
+    /// the App Store's own values and always reported title and link as
+    /// "Already matches" — it could never offer those fixes.
+    @State private var siteDetail: AppDetail?
     @State private var selectedAppInfoFieldIDs: Set<String> = []
     @State private var isUpdatingAppInformation = false
     // App-level moderation — mirrors ForumTopicDetailView's own
@@ -240,10 +247,17 @@ struct AppDetailView: View {
                     pendingFocusReviewId = nil
                 }
             }
-            .task {
-                guard focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
+            // Keyed on isLoading so this waits for load() to finish: the
+            // page can appear before the new-comment count is known (App
+            // Store enrichment, Follow state), and jumping then found
+            // nothing new and gave up — leaving VoiceOver on the title.
+            // Reported directly.
+            .task(id: isLoading) {
+                guard !isLoading, focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
                 hasAppliedFirstNewCommentFocus = true
-                await jumpToFirstNewReview(proxy: proxy)
+                // Nothing to land on after all — load() skipped the title
+                // for this, so put focus there instead of nowhere.
+                if !(await jumpToFirstNewReview(proxy: proxy)), newReviewCount > 0 { focusTitleAfterLoad() }
             }
             .task {
                 guard let targetCommentId, !hasAppliedTargetCommentFocus else { return }
@@ -289,11 +303,12 @@ struct AppDetailView: View {
                         Image(systemName: "arrow.up.right.square")
                     }
                     .accessibilityLabel(String(localized: "Open in App Store"))
+                    .accessibilityHint(String(localized: "Opens the App Store, outside the app."))
                 } else if let macUpdateURL = detail.macUpdateUrl.flatMap(URL.init) {
                     // Only ever reachable for a Mac entry with no App Store
                     // link at all — AppleVis's own fallback reference for
                     // apps not in the Mac App Store. Reported directly.
-                    WebLink(destination: macUpdateURL) {
+                    WebLink(destination: macUpdateURL, showsExternalIcon: false) {
                         Image(systemName: "arrow.up.right.square")
                     }
                     .accessibilityLabel(String(localized: "Open on MacUpdate"))
@@ -314,13 +329,14 @@ struct AppDetailView: View {
             UpdateAppInfoSheet(
                 diffs: request.diffs,
                 selectedFieldIDs: $selectedAppInfoFieldIDs,
+                selectedDevices: $selectedAppInfoDevices,
                 isUpdating: isUpdatingAppInformation,
                 onConfirm: { Task { await updateAppInformationFromStore() } }
             )
         }
         .sheet(item: $editingAppNode) { node in
-            EditNodeSheet(initialTitle: node.title, initialBody: node.body) { newTitle, newBody in
-                try await saveAppEdit(nodeTypeSuffix: node.nodeTypeSuffix, title: newTitle, body: newBody)
+            EditNodeSheet(initialTitle: node.title, initialBody: node.body, nodeTypeSuffix: node.nodeTypeSuffix) { newTitle, newBody in
+                try await saveAppEdit(nodeTypeSuffix: node.nodeTypeSuffix, title: newTitle, body: newBody, format: node.format)
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -356,8 +372,9 @@ struct AppDetailView: View {
     private func refreshAppDetailsMenuItem(_ detail: AppDetail) -> some View {
         if canUpdateAppInformation(detail), let itunesMetadata {
             Button {
-                let diffs = AppInfoFieldDiff.build(detail: detail, metadata: itunesMetadata)
+                let diffs = AppInfoFieldDiff.build(detail: siteDetail ?? detail, metadata: itunesMetadata)
                 selectedAppInfoFieldIDs = Set(diffs.filter(\.changed).map(\.id))
+                selectedAppInfoDevices = Set(diffs.first { $0.id == "devices" }?.deviceChoices ?? [])
                 appInfoRefreshRequest = AppInfoRefreshRequest(diffs: diffs)
             } label: {
                 Label(
@@ -384,12 +401,12 @@ struct AppDetailView: View {
     }
 
     private func startEditApp(_ detail: AppDetail) {
-        editingAppNode = EditableNode(title: detail.name, body: detail.body, nodeTypeSuffix: appNodeTypeSuffix(for: detail.platform))
+        editingAppNode = EditableNode(title: detail.name, body: detail.rawBody, format: detail.bodyFormat, nodeTypeSuffix: appNodeTypeSuffix(for: detail.platform))
     }
 
-    private func saveAppEdit(nodeTypeSuffix: String, title: String, body: String) async throws {
+    private func saveAppEdit(nodeTypeSuffix: String, title: String, body: String, format: String) async throws {
         guard let user = auth.user, let detail else { return }
-        try await APIClient.shared.content.editNode(nodeId: detail.id, nodeType: nodeTypeSuffix, title: title, body: body, csrfToken: user.csrfToken)
+        try await APIClient.shared.content.editNode(nodeId: detail.id, nodeType: nodeTypeSuffix, title: title, body: body, format: format, csrfToken: user.csrfToken)
         toast.success(String(localized: "App Entry updated"))
         await load(forceRefresh: true)
     }
@@ -480,7 +497,7 @@ struct AppDetailView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.down.to.line.compact")
-                    Text("\(newReviewCount) new comment\(newReviewCount == 1 ? "" : "s") — Jump to First New Comment")
+                    Text("\(String(localized: "\(newReviewCount) new comments")) — Jump to First New Comment")
                         .font(.subheadline).fontWeight(.medium)
                     Spacer(minLength: 0)
                 }
@@ -492,7 +509,7 @@ struct AppDetailView: View {
             .buttonStyle(.plain)
             .padding(.horizontal)
             .padding(.bottom, 8)
-            .accessibilityLabel(String(localized: "\(newReviewCount) new comment\(newReviewCount == 1 ? "" : "s")"))
+            .accessibilityLabel(String(localized: "\(newReviewCount) new comments"))
             .accessibilityHint(String(localized: "Double-tap to jump to the first new comment."))
         }
     }
@@ -581,7 +598,7 @@ struct AppDetailView: View {
             .accessibilityLabel(String(localized: "Open \(detail.name) in the App Store."))
             .accessibilityHint(String(localized: "Opens the App Store listing. Downloads and purchases are handled by Apple."))
         } else if let macUpdateURL = detail.macUpdateUrl.flatMap(URL.init) {
-            WebLink(destination: macUpdateURL) {
+            WebLink(destination: macUpdateURL, showsExternalIcon: false) {
                 storeActionLabel(
                     title: "Open on MacUpdate",
                     caption: "Downloads and purchases are handled outside AppleVis.",
@@ -601,9 +618,9 @@ struct AppDetailView: View {
                 .font(.title3)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(.headline)
-                Text(caption)
+                Text(LocalizedStringKey(caption))
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.85))
             }
@@ -667,12 +684,17 @@ struct AppDetailView: View {
         "\(date.formatted(date: .abbreviated, time: .omitted)) (\(date.formatted(.relative(presentation: .named))))"
     }
 
+    /// Only for a real rename — ignoring capitalization, punctuation, and
+    /// spacing ("No wifi mini games" vs "No Wifi Mini Games"), and a title
+    /// that just adds or drops a subtitle ("Pomagotchi" vs "Pomagotchi -
+    /// Virtual Pom Pet & Mini Games"; both real, 2026-09-23). Was a plain
+    /// case-insensitive compare, and plain English.
     private func appStoreTitleNotice(for detail: AppDetail) -> String? {
-        guard let appleVisTitle,
-              !appleVisTitle.isEmpty,
-              appleVisTitle.localizedCaseInsensitiveCompare(detail.name) != .orderedSame
-        else { return nil }
-        return "Current App Store title. Originally listed on AppleVis as \(appleVisTitle)."
+        guard let appleVisTitle, !appleVisTitle.isEmpty else { return nil }
+        func squashed(_ s: String) -> String { s.lowercased().filter { $0.isLetter || $0.isNumber } }
+        let ours = squashed(appleVisTitle), theirs = squashed(detail.name)
+        guard !ours.isEmpty, !theirs.isEmpty, !ours.hasPrefix(theirs), !theirs.hasPrefix(ours) else { return nil }
+        return String(localized: "Current App Store title. Originally listed on AppleVis as \(appleVisTitle).")
     }
 
     private func appStoreInfoSection(_ detail: AppDetail, _ meta: ItunesMetadata) -> some View {
@@ -766,12 +788,17 @@ struct AppDetailView: View {
     private func aboutSourceNotice(for detail: AppDetail) -> String? {
         if let description = itunesMetadata?.appStoreDescription.trimmingCharacters(in: .whitespacesAndNewlines),
            !description.isEmpty {
-            if !detail.body.strippingHTMLTags().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                return "Description from the current App Store listing. The original AppleVis entry may differ."
+            let ours = AppInfoFieldDiff.comparable(detail.body)
+            // Used to say "may differ" whenever both existed, without ever
+            // comparing — so it never went away, even right after an editor
+            // copied the App Store description over word for word.
+            // Reported directly.
+            if !ours.isEmpty, ours != AppInfoFieldDiff.comparable(description) {
+                return String(localized: "Description from the current App Store listing. The original AppleVis entry may differ.")
             }
-            return "Description from the current App Store listing."
+            return String(localized: "Description from the current App Store listing.")
         }
-        return detail.body.isEmpty ? nil : "Description from the AppleVis entry."
+        return detail.body.isEmpty ? nil : String(localized: "Description from the AppleVis entry.")
     }
 
     private func versionDifferenceNotice(detail: AppDetail, meta: ItunesMetadata) -> String? {
@@ -780,7 +807,7 @@ struct AppDetailView: View {
               !meta.version.isEmpty,
               reviewed.localizedCaseInsensitiveCompare(meta.version) != .orderedSame
         else { return nil }
-        return "AppleVis originally tested version \(reviewed). Accessibility may differ in the current App Store version."
+        return String(localized: "AppleVis originally tested version \(reviewed). Accessibility may differ in the current App Store version.")
     }
 
     private static func htmlParagraphs(fromPlainText text: String) -> String {
@@ -794,7 +821,7 @@ struct AppDetailView: View {
     @ViewBuilder
     private func developerAppsSection(_ detail: AppDetail) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeading("More by \(detail.developer)")
+            sectionHeading(String(localized: "More by \(detail.developer)"))
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
                     ForEach(developerApps) { app in
@@ -820,7 +847,7 @@ struct AppDetailView: View {
                             }
                             .accessibilityElement(children: .combine)
                             .accessibilityLabel(app.appName)
-                            .accessibilityHint(String(localized: "Double-tap to open in the App Store."))
+                            .accessibilityHint(String(localized: "Opens the App Store, outside the app."))
                         }
                     }
                 }
@@ -967,9 +994,13 @@ struct AppDetailView: View {
         isSummarizingReviews = false
     }
 
+    // `label`/`text` are String parameters, and Text(String) skips the
+    // localization catalog entirely — so every row label and heading on
+    // this page ("Developer", "Devices", "App Store Info", …) showed in
+    // English in every language. Same fix as WizardStepHeader's title.
     private func infoRow(_ label: String, _ value: String) -> some View {
         HStack {
-            Text(label).foregroundStyle(.secondary)
+            Text(LocalizedStringKey(label)).foregroundStyle(.secondary)
             Spacer()
             Text(value)
         }
@@ -979,7 +1010,7 @@ struct AppDetailView: View {
     }
 
     private func sectionHeading(_ text: String) -> some View {
-        Text(text)
+        Text(LocalizedStringKey(text))
             .font(.headline)
             .padding(.horizontal)
             .padding(.top, 16)
@@ -1057,12 +1088,12 @@ struct AppDetailView: View {
     /// a spoken summary in place of manually reading through every review.
     private func announceThreadOverview(_ detail: AppDetail) {
         let mostRecent = detail.reviews.max { $0.createdAt < $1.createdAt }
-        var summary = "Thread has \(detail.reviews.count) comment\(detail.reviews.count == 1 ? "" : "s")."
-        if let mostRecent {
-            summary += " Most recent comment by \(mostRecent.authorName), \(mostRecent.createdAt.formatted(.relative(presentation: .named)))."
-        }
-        summary += " Submitted by \(detail.submittedBy)."
-        UIAccessibility.post(notification: .announcement, argument: summary)
+        ThreadOverview.announce(
+            commentCount: detail.reviews.count,
+            mostRecentAuthor: mostRecent?.authorName,
+            mostRecentDate: mostRecent?.createdAt,
+            submittedBy: detail.submittedBy
+        )
     }
 
     /// `forceRefresh` bypasses `apps:detail:`'s 15-minute "fresh" cache
@@ -1080,6 +1111,7 @@ struct AppDetailView: View {
         do {
             detail = try await APIClient.shared.apps.detail(id: appId, platform: platform, forceRefresh: forceRefresh)
             appleVisTitle = detail?.name
+            siteDetail = detail
             itunesMetadata = nil
             appStoreLookupIssue = nil
             developerApps = []
@@ -1168,7 +1200,10 @@ struct AppDetailView: View {
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Couldn't load app." }
         isLoading = false
-        focusTitleAfterLoad()
+        // Opened via "Jump to First New Comment": that comment gets focus
+        // instead. Title focus used to run regardless, and its retries could
+        // pull focus straight back to the title. Reported directly.
+        if !(focusFirstNewCommentOnAppear && newReviewCount > 0) { focusTitleAfterLoad() }
     }
 
     private func confirmAppleTVSupport(for appStoreId: String) async {
@@ -1267,7 +1302,9 @@ struct AppDetailView: View {
 
         do {
             try await APIClient.shared.apps.updateAppInformation(
-                detail: current, metadata: metadata, includedFields: selectedAppInfoFieldIDs, csrfToken: user.csrfToken
+                detail: current, metadata: metadata, includedFields: selectedAppInfoFieldIDs,
+                devices: ["iPhone", "iPad", "Mac"].filter(selectedAppInfoDevices.contains),
+                csrfToken: user.csrfToken
             )
             toast.success(String(localized: "App details refreshed"))
             appInfoRefreshRequest = nil
@@ -1293,15 +1330,18 @@ struct AppDetailView: View {
     /// oldest-first (matches "Jump to Last" scrolling to `.last`), so the
     /// first of the `newReviewCount` most recently posted reviews sits at
     /// `reviews.count - newReviewCount`.
-    private func jumpToFirstNewReview(proxy: ScrollViewProxy) async {
+    @discardableResult
+    private func jumpToFirstNewReview(proxy: ScrollViewProxy) async -> Bool {
         if hasMoreReviews { await ensureAllReviewsLoaded() }
         let reviews = self.detail?.reviews ?? []
         let targetIndex = reviews.count - newReviewCount
-        guard newReviewCount > 0, targetIndex >= 0, targetIndex < reviews.count else { return }
+        guard newReviewCount > 0, targetIndex >= 0, targetIndex < reviews.count else { return false }
         let targetId = reviews[targetIndex].id
         withReduceMotionAwareAnimation { proxy.scrollTo(targetId, anchor: .top) }
-        try? await Task.sleep(for: .milliseconds(400))
-        focusedReviewId = targetId
+        // Retried like the title focus — one assignment after a guessed
+        // delay could miss a row that wasn't laid out yet.
+        await retryAccessibilityFocus(targetId, into: $focusedReviewId)
+        return true
     }
 
     /// VoiceOver lands on the back button after push navigation by default;
@@ -1534,10 +1574,10 @@ struct AppReviewRow: View {
             Button("Cancel", role: .cancel) {}
         }
         .sheet(isPresented: $showEditSheet) {
-            EditContentSheet(title: "Edit Comment", initialText: review.body) { newText in
+            EditContentSheet(title: "Edit Comment", initialText: review.rawBody) { newText in
                 guard let user = auth.user else { return }
                 try await APIClient.shared.content.editComment(
-                    commentType: "comment_node_ios_app_directory", commentId: review.id, newBody: newText, format: drupalDefaultTextFormat, csrfToken: user.csrfToken
+                    commentType: "comment_node_ios_app_directory", commentId: review.id, newBody: newText, format: review.bodyFormat, csrfToken: user.csrfToken
                 )
                 onEdit?(newText)
                 toast.success(String(localized: "Comment updated"))
@@ -1676,6 +1716,7 @@ struct ComposeAppReviewView: View {
     @State private var reviewText: String
     @State private var isSubmitting = false
     @State private var submitError: String?
+    @State private var justRewrote = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -1706,11 +1747,14 @@ struct ComposeAppReviewView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
+                WizardStepHeader(
+                    title: "Add Comment", icon: "text.bubble",
+                    stepIndex: 1, stepTotal: 1, headerFocus: $isHeaderFocused
+                )
+                .padding(.top)
                 Text(quotedReview != nil ? "Replying to \(quotedReview!.authorName) — Commenting on: \(appName)" : "Commenting on: \(appName)")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .padding(.horizontal).padding(.top)
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityFocused($isHeaderFocused)
                 TextField("Subject (optional)", text: $subject)
                     .textFieldStyle(.roundedBorder)
                     .padding()
@@ -1720,6 +1764,7 @@ struct ComposeAppReviewView: View {
                             if let result = await intelligence.translate(subject: subject, body: reviewText, isTopic: false) {
                                 subject = result.subject ?? subject
                                 reviewText = result.body
+                                justRewrote = true
                             } else {
                                 toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
@@ -1739,6 +1784,7 @@ struct ComposeAppReviewView: View {
                             Task {
                                 if let result = await intelligence.rewriteRespectfully(subject: subject, body: reviewText, isTopic: false) {
                                     reviewText = result.body
+                                    justRewrote = true
                                 } else {
                                     toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                 }
@@ -1746,9 +1792,11 @@ struct ComposeAppReviewView: View {
                         }
                     )
                         .padding(.horizontal)
+                        .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
                 }
                 TextEditor(text: $reviewText)
                     .padding()
+                    .rewriteFlash($justRewrote)
                     .onChange(of: reviewText) { _, newValue in
                         guidelines.textChanged(newValue, isReply: true)
                         intelligence.textChanged(
@@ -1757,22 +1805,56 @@ struct ComposeAppReviewView: View {
                             detectionEnabled: preferences.nonEnglishDetectionEnabled
                         )
                     }
+                rewriteButton
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
                 if let err = submitError {
                     Text(err).foregroundStyle(.red).padding()
                 }
             }
             .navigationTitle("Add Comment")
             .navigationBarTitleDisplayMode(.inline)
+            .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut, value: guidelines.topWarning?.id)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Post") { Task { await submit() } }
-                        .disabled(reviewText.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
+                    Button {
+                        Task { await submit() }
+                    } label: {
+                        if isSubmitting {
+                            ProgressView()
+                        } else {
+                            Text("Post")
+                        }
+                    }
+                    .disabled(reviewText.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
                 }
             }
             .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
+        }
+    }
+
+    @ViewBuilder
+    private var rewriteButton: some View {
+        if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+            Button {
+                Task {
+                    if let result = await intelligence.rewrite(subject: subject, body: reviewText, isTopic: false) {
+                        subject = result.subject ?? subject
+                        reviewText = result.body
+                        justRewrote = true
+                    } else {
+                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
+                    }
+                }
+            } label: {
+                Label("Rewrite", systemImage: "wand.and.stars")
+                    .symbolEffect(.bounce, value: justRewrote)
+            }
+            .disabled(reviewText.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+            .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
         }
     }
 

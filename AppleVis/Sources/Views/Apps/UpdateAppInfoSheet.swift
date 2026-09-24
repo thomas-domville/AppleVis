@@ -26,9 +26,29 @@ struct AppInfoFieldDiff: Identifiable {
     let systemImage: String
     let oldValue: String
     let newValue: String
+    /// Devices only: what the entry has now, and what the App Store
+    /// suggests (each individually untickable in the sheet). Compared as
+    /// sets, so order never counts as a change.
+    var currentDevices: [String] = []
+    var deviceChoices: [String] = []
 
+    /// Compares what the text actually says, not how it's laid out. The
+    /// AppleVis side arrives as Drupal's rendered HTML flattened to one
+    /// line, the App Store side as plain text full of line breaks — so a
+    /// plain string compare flagged the description as different even
+    /// right after an editor had copied it over word for word (confirmed
+    /// live, 2026-09-23: No Wifi Mini Games' stored description matched
+    /// the App Store exactly and still showed as changed). Reported
+    /// directly.
     var changed: Bool {
-        oldValue.trimmingCharacters(in: .whitespacesAndNewlines) != newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if id == "devices" { return Set(currentDevices) != Set(deviceChoices) }
+        return Self.comparable(oldValue) != Self.comparable(newValue)
+    }
+
+    /// Tags stripped, entities decoded, every run of whitespace (line
+    /// breaks included) collapsed to one space.
+    static func comparable(_ text: String) -> String {
+        HTMLText.plainText(fromHTML: text)
     }
 
     /// Price is deliberately left out — the App Store lookup only ever
@@ -71,6 +91,21 @@ struct AppInfoFieldDiff: Identifiable {
             ))
         }
 
+        // Supported devices, same as the submit wizard: suggested from the
+        // App Store, each one untickable, saved into the site's devices
+        // field (still labelled "Tested On" on the website until it's
+        // renamed — see AppDetail.siteDevices). Requested directly.
+        let choices = detail.refreshedDevices(storeFamilies: metadata.deviceFamilies)
+        if !choices.isEmpty {
+            let current = detail.siteDevices
+            diffs.append(AppInfoFieldDiff(
+                id: "devices", label: String(localized: "Supported Devices"), systemImage: "iphone.and.ipad",
+                oldValue: ListFormatter.localizedString(byJoining: current),
+                newValue: ListFormatter.localizedString(byJoining: choices),
+                currentDevices: current, deviceChoices: choices
+            ))
+        }
+
         return diffs
     }
 }
@@ -84,6 +119,8 @@ struct AppInfoFieldDiff: Identifiable {
 struct UpdateAppInfoSheet: View {
     let diffs: [AppInfoFieldDiff]
     @Binding var selectedFieldIDs: Set<String>
+    /// Which suggested devices to save, when Supported Devices is included.
+    @Binding var selectedDevices: Set<String>
     let isUpdating: Bool
     let onConfirm: () -> Void
 
@@ -93,15 +130,32 @@ struct UpdateAppInfoSheet: View {
 
     private var changedDiffs: [AppInfoFieldDiff] { diffs.filter(\.changed) }
     private var unchangedDiffs: [AppInfoFieldDiff] { diffs.filter { !$0.changed } }
+    private var devicesDiff: AppInfoFieldDiff? { changedDiffs.first { $0.id == "devices" } }
+
+    /// Saving "no devices" isn't allowed — the website requires at least one.
+    private var canConfirm: Bool {
+        !selectedFieldIDs.isEmpty && !(selectedFieldIDs.contains("devices") && selectedDevices.isEmpty)
+    }
 
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    WizardStepHeader(
+                        title: "Refresh App Details", icon: "arrow.triangle.2.circlepath",
+                        stepIndex: 1, stepTotal: 1, headerFocus: $isHeaderFocused
+                    )
+                    Text(changedDiffs.isEmpty
+                        ? "Compares this entry against its live App Store listing."
+                        : "Compares this entry against its live App Store listing — choose which changes to accept below."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
                 if changedDiffs.isEmpty {
                     Section {
                         Text("Everything here already matches the App Store listing. You're all set.")
                             .foregroundStyle(.secondary)
-                            .accessibilityFocused($isHeaderFocused)
                     }
                 } else {
                     Section {
@@ -109,9 +163,28 @@ struct UpdateAppInfoSheet: View {
                             fieldToggleRow(diff)
                         }
                     } header: {
-                        Text("Updates to Review").accessibilityFocused($isHeaderFocused)
+                        Text("Updates to Review")
                     } footer: {
                         Text("Refresh the details that look right. Anything you leave off will stay just as it is.")
+                    }
+                }
+
+                if let devicesDiff, selectedFieldIDs.contains("devices") {
+                    Section {
+                        ForEach(devicesDiff.deviceChoices, id: \.self) { device in
+                            Toggle(device, isOn: Binding(
+                                get: { selectedDevices.contains(device) },
+                                set: { isOn in
+                                    if isOn { selectedDevices.insert(device) } else { selectedDevices.remove(device) }
+                                }
+                            ))
+                        }
+                    } header: {
+                        Text("Supported Devices")
+                    } footer: {
+                        Text(selectedDevices.isEmpty
+                            ? "Choose at least one device."
+                            : "Suggested from the App Store. Untick any device this app doesn't really support.")
                     }
                 }
 
@@ -135,7 +208,7 @@ struct UpdateAppInfoSheet: View {
                         ProgressView()
                     } else if !changedDiffs.isEmpty {
                         Button("Refresh") { onConfirm() }
-                            .disabled(selectedFieldIDs.isEmpty)
+                            .disabled(!canConfirm)
                     }
                 }
             }

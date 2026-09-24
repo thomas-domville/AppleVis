@@ -257,7 +257,7 @@ struct MouseRecapDigest: Codable {
         [
             resource.kind.displayName,
             resource.authorName.isEmpty ? "" : "By \(resource.authorName)",
-            publishedText(resource.updatedAt),
+            publishedText(resource.createdAt),
             "\(resource.commentCount) comment\(resource.commentCount == 1 ? "" : "s")",
         ].filter { !$0.isEmpty }
     }
@@ -413,7 +413,7 @@ struct MouseRecapDigest: Codable {
             apps: apps.filter { $0.createdAt >= newStart },
             podcasts: podcasts.filter { $0.publishedAt >= newStart },
             forums: forums.filter { $0.lastActivityAt >= newStart },
-            resources: resources.filter { $0.updatedAt >= newStart },
+            resources: resources.filter { $0.createdAt >= newStart },
             blogs: blogs.filter { $0.publishedAt >= newStart || $0.lastActivityAt >= newStart },
             forumExcerpts: forumExcerpts
         )
@@ -456,6 +456,10 @@ final class HomeViewModel: ObservableObject {
     private let pageSize = 20
     private var page = 0
     private var itemVisits: [String: PersistenceStore.ItemVisit] = [:]
+    /// Comment counts for never-opened items, captured when each first
+    /// appeared — see `establishFeedBaselines` and PersistenceStore's
+    /// "Feed baselines" section.
+    private var feedBaselines: [String: PersistenceStore.FeedBaseline] = [:]
     private static let visitBoundaryKey = "applevis.home.visitBoundary"
     /// How long since the last successful load before a new one counts as
     /// "returning after being away" rather than "still in the same
@@ -536,6 +540,7 @@ final class HomeViewModel: ObservableObject {
             // that was just moved to "now."
             currentVisitBoundary = visitBoundary
             advanceVisitBoundaryIfNeeded(previousLoadedAt: previousLoadedAt)
+            await establishFeedBaselines(for: items)
             buildNewActivitySummary()
             lastLoadedAt = Date()
         }
@@ -573,6 +578,10 @@ final class HomeViewModel: ObservableObject {
         let merged = (items + more).sorted { $0.lastActivityAt > $1.lastActivityAt }
         items = Self.deduplicated(merged)
         hasMore = more.count >= pageSize
+        // Later pages need baselines too, or an unopened item that only
+        // ever appears past page one could never show a count.
+        await establishFeedBaselines(for: more)
+        recomputeNewActivity()
     }
 
     /// Content posted between one page fetch and the next shifts every
@@ -593,9 +602,109 @@ final class HomeViewModel: ObservableObject {
     /// from an item being newer-than-lastVisit outright, since without this a
     /// long-running thread you'd already opened once could keep getting new
     /// replies forever without ever showing up in "New" again.
+    ///
+    /// Falls back to the item's feed baseline when it's never been opened,
+    /// so unopened items get the same kind of count opened ones always had.
     func newReplyCount(for item: FeedItem) -> Int {
-        guard let visit = itemVisits[item.id] else { return 0 }
-        return max(0, item.commentCount - visit.commentCount)
+        guard let seenCount = itemVisits[item.id]?.commentCount ?? feedBaselines[item.id]?.commentCount else { return 0 }
+        return max(0, item.commentCount - seenCount)
+    }
+
+    /// Posted since the last visit and not yet opened or marked read — gets
+    /// the "NEW" badge (alongside a comment count, if it has comments),
+    /// and counts as a new topic/episode/etc. in the summary. Stays true
+    /// until cleared, not just until the visit boundary next moves.
+    func isBrandNew(_ item: FeedItem) -> Bool {
+        itemVisits[item.id] == nil && feedBaselines[item.id]?.isNewItem == true
+    }
+
+    /// Records a comment-count baseline for every item that has neither a
+    /// visit nor a baseline yet — set once, at first sight, never moved
+    /// forward, so an unopened item's "N new" keeps building until it's
+    /// opened or marked read:
+    /// - first launch, or no activity since the visit boundary: its
+    ///   current count (nothing new).
+    /// - posted since the boundary: 0, and flagged brand new — none of it
+    ///   has been seen, so every comment counts.
+    /// - older, but with activity since the boundary: asks the server
+    ///   exactly how many comments arrived since then (one small query per
+    ///   item, only ever on first sight). If that fails, assumes 1 — the
+    ///   activity timestamp proves at least something happened.
+    private func establishFeedBaselines(for items: [FeedItem]) async {
+        feedBaselines = PersistenceStore.shared.allFeedBaselines()
+        let boundary = currentVisitBoundary
+        let hasBoundary = isReturningVisit && boundary != .distantPast
+        let now = Date()
+        var additions: [String: PersistenceStore.FeedBaseline] = [:]
+        var needsExactCount: [FeedItem] = []
+
+        for item in items where itemVisits[item.id] == nil && feedBaselines[item.id] == nil && additions[item.id] == nil {
+            if !hasBoundary || item.lastActivityAt <= boundary {
+                additions[item.id] = .init(firstSeenAt: now, commentCount: item.commentCount, isNewItem: false)
+            } else if item.createdAt > boundary {
+                additions[item.id] = .init(firstSeenAt: now, commentCount: 0, isNewItem: true)
+            } else {
+                needsExactCount.append(item)
+            }
+        }
+
+        let newSince = await Self.commentCountsSince(boundary, for: needsExactCount)
+        for item in needsExactCount {
+            let arrived = newSince[item.id] ?? 1
+            additions[item.id] = .init(firstSeenAt: now, commentCount: max(0, item.commentCount - arrived), isNewItem: false)
+        }
+
+        PersistenceStore.shared.addFeedBaselines(additions)
+        feedBaselines = PersistenceStore.shared.allFeedBaselines()
+    }
+
+    /// How many comments each item received after `date`, keyed by
+    /// `FeedItem.id`. Items whose query fails are left out. Four at a time,
+    /// matching the app's other bounded fan-outs.
+    private static func commentCountsSince(_ date: Date, for items: [FeedItem]) async -> [String: Int] {
+        guard !items.isEmpty else { return [:] }
+        // Plain strings only, so nothing main-actor-isolated crosses into
+        // the child tasks.
+        let requests = items.map { (id: $0.id, bundle: $0.commentBundle.rawValue, contentId: $0.contentId) }
+        var results: [String: Int] = [:]
+        await withTaskGroup(of: (String, Int?).self) { group in
+            var iterator = requests.makeIterator()
+            for _ in 0..<4 {
+                guard let r = iterator.next() else { break }
+                group.addTask { (r.id, try? await commentCountSince(date, bundle: r.bundle, contentId: r.contentId)) }
+            }
+            while let (id, count) = await group.next() {
+                if let count { results[id] = count }
+                if let r = iterator.next() {
+                    group.addTask { (r.id, try? await commentCountSince(date, bundle: r.bundle, contentId: r.contentId)) }
+                }
+            }
+        }
+        return results
+    }
+
+    /// Drupal's JSON:API only honors a `created` filter given as a Unix
+    /// timestamp — an ISO date string is silently ignored and returns every
+    /// comment (confirmed live, 2026-09-23).
+    private static func commentCountSince(_ date: Date, bundle: String, contentId: String) async throws -> Int {
+        var total = 0
+        for page in 0..<10 {
+            let response = try await APIClient.shared.jsonAPIList(
+                "comment/\(bundle)",
+                query: [
+                    "filter[entity_id.id]": contentId,
+                    "filter[since][condition][path]": "created",
+                    "filter[since][condition][operator]": ">",
+                    "filter[since][condition][value]": "\(Int(date.timeIntervalSince1970))",
+                    "fields[comment--\(bundle)]": "created",
+                    "page[limit]": "50",
+                    "page[offset]": "\(page * 50)",
+                ]
+            )
+            total += response.data.count
+            if response.data.count < 50 { break }
+        }
+        return total
     }
 
     /// Stamps this item as read (current comment count + now), so it drops
@@ -610,7 +719,7 @@ final class HomeViewModel: ObservableObject {
             PersistenceStore.shared.markTopicSeen(id: topic.id)
         }
         recomputeNewActivity()
-        UIAccessibility.post(notification: .announcement, argument: "Marked as read.")
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "Marked as read."))
     }
 
     func markAllAsRead(_ itemsToMark: [FeedItem]) {
@@ -746,17 +855,60 @@ final class HomeViewModel: ObservableObject {
                 return topics.map { FeedItem.forumTopic($0) }
               }
             : SourceFetchResult(items: [], failedName: nil)
+        // Page 0 of each of these also pulls in whatever just got comments —
+        // see `recentlyCommented`.
+        let includeRecentlyCommented = page == 0
         async let podcasts = showPodcasts
-            ? fetchSource(name: "Podcasts") { try await APIClient.shared.podcasts.episodes(page: page).items.map { FeedItem.podcastEpisode($0) } }
+            ? fetchSource(name: "Podcasts") {
+                async let listedPage = APIClient.shared.podcasts.episodes(page: page)
+                async let active = Self.recentlyCommented(
+                    enabled: includeRecentlyCommented,
+                    bundle: "comment_node_podcast", nodeType: "podcast",
+                    include: "entity_id,entity_id.uid,entity_id.field_podcast,entity_id.taxonomy_vocabulary_15",
+                    map: { FeedItem.podcastEpisode(Mappers.podcast($0, included: $1)) }
+                )
+                let listed = try await listedPage.items.map { FeedItem.podcastEpisode($0) }
+                return Self.adding(await active, to: listed)
+              }
             : SourceFetchResult(items: [], failedName: nil)
         async let apps = showApps
-            ? fetchSource(name: "Apps") { try await APIClient.shared.apps.list(page: page).items.map { FeedItem.appListing($0) } }
+            ? fetchSource(name: "Apps") {
+                async let listedPage = APIClient.shared.apps.list(page: page)
+                async let active = Self.recentlyCommented(
+                    enabled: includeRecentlyCommented,
+                    bundle: "comment_node_ios_app_directory", nodeType: "ios_app_directory",
+                    include: "entity_id,entity_id.uid",
+                    map: { FeedItem.appListing(Mappers.app($0, included: $1)) }
+                )
+                let listed = try await listedPage.items.map { FeedItem.appListing($0) }
+                return Self.adding(await active, to: listed)
+              }
             : SourceFetchResult(items: [], failedName: nil)
         async let guides = showGuides
-            ? fetchSource(name: "Guides") { try await APIClient.shared.resources.list(page: page).items.map { FeedItem.resource($0) } }
+            ? fetchSource(name: "Guides") {
+                async let listedPage = APIClient.shared.resources.list(page: page)
+                async let active = Self.recentlyCommented(
+                    enabled: includeRecentlyCommented,
+                    bundle: "comment_node_guides", nodeType: "guides",
+                    include: "entity_id,entity_id.uid,entity_id.taxonomy_vocabulary_3",
+                    map: { FeedItem.resource(Mappers.resource($0, included: $1)) }
+                )
+                let listed = try await listedPage.items.map { FeedItem.resource($0) }
+                return Self.adding(await active, to: listed)
+              }
             : SourceFetchResult(items: [], failedName: nil)
         async let blogs = showBlogs
-            ? fetchSource(name: "Blogs") { try await APIClient.shared.blogs.list(page: page).items.map { FeedItem.blogPost($0) } }
+            ? fetchSource(name: "Blogs") {
+                async let listedPage = APIClient.shared.blogs.list(page: page)
+                async let active = Self.recentlyCommented(
+                    enabled: includeRecentlyCommented,
+                    bundle: "comment_node_blog2", nodeType: "blog2",
+                    include: "entity_id,entity_id.uid",
+                    map: { FeedItem.blogPost(Mappers.blog($0, included: $1)) }
+                )
+                let listed = try await listedPage.items.map { FeedItem.blogPost($0) }
+                return Self.adding(await active, to: listed)
+              }
             : SourceFetchResult(items: [], failedName: nil)
 
         let results = await [forums, podcasts, apps, guides, blogs]
@@ -767,6 +919,50 @@ final class HomeViewModel: ObservableObject {
             if let name = result.failedName { failed.append(name) }
         }
         return (combined, failed)
+    }
+
+    /// Posts, episodes, guides, and app entries that just got comments.
+    /// Their list endpoints can only sort by when the item itself was last
+    /// edited (JSON:API rejects sorting on the comment-statistics field —
+    /// "Invalid specifier 'last_comment_timestamp'", confirmed live
+    /// 2026-09-23), so an older item getting a burst of comments never
+    /// reached page 0 and couldn't show up as new on Home. Beta-tester
+    /// report: an iPhone 18 Pro blog post with comments that day didn't
+    /// appear. This asks for the newest 50 comments across the whole
+    /// bundle instead and keeps the items they belong to — one extra
+    /// request per type, with each item's author (and, for episodes, its
+    /// audio file) included so it maps exactly like a list result. Same
+    /// technique GuidelineViolationScanner uses. Failures just return
+    /// nothing: the regular list still loads either way.
+    private static func recentlyCommented(
+        enabled: Bool,
+        bundle: String,
+        nodeType: String,
+        include: String,
+        map: (JsonApiNode, [JsonApiNode]) -> FeedItem
+    ) async -> [FeedItem] {
+        guard enabled else { return [] }
+        guard let response = try? await APIClient.shared.jsonAPIList(
+            "comment/\(bundle)",
+            query: [
+                "sort": "-created",
+                "page[limit]": "50",
+                "fields[comment--\(bundle)]": "created,entity_id",
+                "include": include,
+            ]
+        ) else { return [] }
+        let included = response.included ?? []
+        var seen = Set<String>()
+        return included
+            .filter { $0.type == "node--\(nodeType)" && seen.insert($0.id).inserted }
+            .map { map($0, included) }
+    }
+
+    /// Appends the recently-commented items the regular list didn't
+    /// already have — the list's own copy wins when both have one.
+    private static func adding(_ extra: [FeedItem], to listed: [FeedItem]) -> [FeedItem] {
+        let listedIds = Set(listed.map(\.id))
+        return listed + extra.filter { !listedIds.contains($0.id) }
     }
 
     private func fetchMouseRecapItems(since startDate: Date) async -> MouseRecapFetchResult {
@@ -864,10 +1060,10 @@ final class HomeViewModel: ObservableObject {
         .prefix(Self.mouseRecapForumLimit)
 
         let resources = items.compactMap { item -> Resource? in
-            guard case .resource(let resource) = item, resource.updatedAt >= startDate else { return nil }
+            guard case .resource(let resource) = item, resource.createdAt >= startDate else { return nil }
             return resource
         }
-        .sorted { $0.updatedAt > $1.updatedAt }
+        .sorted { $0.createdAt > $1.createdAt }
         .prefix(Self.mouseRecapResourceLimit)
 
         let blogs = items.compactMap { item -> BlogPost? in
@@ -919,10 +1115,13 @@ final class HomeViewModel: ObservableObject {
     private func isNewActivity(_ item: FeedItem) -> Bool {
         guard isReturningVisit else { return false }
         if newReplyCount(for: item) > 0 { return true }
-        guard let visit = itemVisits[item.id] else {
-            return item.lastActivityAt > currentVisitBoundary
+        if let visit = itemVisits[item.id] {
+            return visit.seenAt < item.lastActivityAt
         }
-        return visit.seenAt < item.lastActivityAt
+        if let baseline = feedBaselines[item.id] {
+            return baseline.isNewItem
+        }
+        return item.lastActivityAt > currentVisitBoundary
     }
 
     private func recomputeNewActivity() {
@@ -938,43 +1137,43 @@ final class HomeViewModel: ObservableObject {
             return false
         }.count
         guard !newItems.isEmpty else { newActivitySummary = ""; return }
-        newActivitySummary = Self.buildSummaryText(for: newItems, itemVisits: itemVisits)
+        newActivitySummary = buildSummaryText(for: newItems)
     }
 
     /// Breaks "N new items" down by what actually changed — e.g. "2 new
     /// forum topics, 1 new podcast episode, 5 new comments" — instead of a
     /// bare count that doesn't say what kind of activity it was.
     ///
-    /// The comment figure counts: the reply delta for items you'd already
-    /// visited before (only the new part, since you've seen the rest), plus
-    /// the FULL comment count for brand-new items (since you've never seen
-    /// any of it). Without that second half, a user who mostly just
-    /// refreshes Home without opening individual items would never see a
-    /// "new comments" figure at all — every item would be brand-new (no
-    /// prior visit to diff against), so the count stayed permanently 0
-    /// even when those brand-new topics already had real replies attached.
-    private static func buildSummaryText(for newItems: [FeedItem], itemVisits: [String: PersistenceStore.ItemVisit]) -> String {
+    /// The comment figure is the same per-item count each card shows
+    /// (`newReplyCount`) — since your last open for opened items, since
+    /// first sight for unopened ones, and all of them for something posted
+    /// since your last visit (its baseline is 0). Only items actually
+    /// posted since the last visit count as "new topics" etc. — this used
+    /// to count every never-opened item that way, so a months-old thread
+    /// with one fresh comment was reported as a new topic.
+    private func buildSummaryText(for newItems: [FeedItem]) -> String {
         var brandNewByKind: [ContentKind: Int] = [:]
         var newCommentTotal = 0
         for item in newItems {
-            if let visit = itemVisits[item.id] {
-                newCommentTotal += max(0, item.commentCount - visit.commentCount)
-            } else {
+            if isBrandNew(item) {
                 brandNewByKind[item.kind, default: 0] += 1
-                newCommentTotal += item.commentCount
             }
+            newCommentTotal += newReplyCount(for: item)
         }
         var parts: [String] = []
         for kind in [ContentKind.forumTopic, .podcastEpisode, .appListing, .resource, .blogPost] {
             guard let n = brandNewByKind[kind], n > 0 else { continue }
-            parts.append("\(n) new \(kind.displayNamePlural(n))")
+            parts.append(kind.newCountPhrase(n))
         }
         if newCommentTotal > 0 {
-            parts.append("\(newCommentTotal) new comment\(newCommentTotal == 1 ? "" : "s")")
+            parts.append(String(localized: "\(newCommentTotal) new comments"))
         }
+        // Shown on the Home summary card and spoken on arrival — was plain
+        // English interpolation, so it never translated. Plural forms come
+        // from the catalog's variations for these keys.
         guard !parts.isEmpty else {
-            return "\(newItems.count) new item\(newItems.count == 1 ? "" : "s") since your last visit"
+            return String(localized: "\(newItems.count) new items since your last visit")
         }
-        return parts.joined(separator: ", ") + " since your last visit"
+        return String(localized: "\(ListFormatter.localizedString(byJoining: parts)) since your last visit")
     }
 }

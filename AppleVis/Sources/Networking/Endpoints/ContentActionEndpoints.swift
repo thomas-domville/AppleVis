@@ -10,6 +10,8 @@ extension APIClient {
 struct ContentActionEndpoints {
     let client: APIClient
 
+    /// `format` must be whatever the comment was actually stored in — see
+    /// `editNode`'s identical doc comment for why.
     func editComment(commentType: String, commentId: String, newBody: String, format: String, csrfToken: String) async throws {
         try await client.jsonAPIUpdate(
             "comment/\(commentType)/\(commentId)",
@@ -46,12 +48,17 @@ struct ContentActionEndpoints {
         )
     }
 
-    func editNode(nodeId: String, nodeType: String, title: String, body: String, csrfToken: String) async throws {
+    /// `format` must be whatever the content was actually stored in
+    /// (e.g. `"7"` for Markdown) — not always `drupalDefaultTextFormat`.
+    /// Resubmitting under a different format than the original can silently
+    /// corrupt already-formatted content (e.g. Markdown source reinterpreted
+    /// as Plain Text shows literal "### heading" instead of rendering it).
+    func editNode(nodeId: String, nodeType: String, title: String, body: String, format: String, csrfToken: String) async throws {
         try await client.jsonAPIUpdate(
             "node/\(nodeType)/\(nodeId)", type: "node--\(nodeType)", id: nodeId,
             attributes: [
                 "title": AnyEncodable(title),
-                "body": AnyEncodable(RichTextValue(value: body, format: drupalDefaultTextFormat)),
+                "body": AnyEncodable(RichTextValue(value: body, format: format)),
             ],
             headers: ["X-CSRF-Token": csrfToken]
         )

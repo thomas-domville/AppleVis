@@ -515,7 +515,7 @@ struct DiscoverView: View {
         ForEach(AppleVisSocial.platforms) { platform in
             // WebLink, not a raw openURL Button: these links honor the Web
             // Links preference instead of always forcing the external browser.
-            WebLink(destination: platform.url) {
+            WebLink(destination: platform.url, showsExternalIcon: false) {
                 VStack(alignment: .leading, spacing: 8) {
                     Image(systemName: platform.icon)
                         .font(.title2)

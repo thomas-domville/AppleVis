@@ -86,7 +86,7 @@ struct BugBrowseView: View {
             }
 
             if !bugs.isEmpty && !hasMore && searchText.isEmpty {
-                Text("\(bugs.count) report\(bugs.count == 1 ? "" : "s") loaded")
+                Text("Reports loaded: \(bugs.count)")
                     .font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                     .listRowSeparator(.hidden)
@@ -266,11 +266,11 @@ struct BugReportRow: View {
     }
 
     private var bugLabel: String {
-        let newLabel = newCount > 0 ? ". \(newCount) new comment\(newCount == 1 ? "" : "s")." : ""
+        let newLabel = newCommentsSuffix(newCount) + (newCount > 0 ? "." : "")
         return detailLevelLabel(
             title: ContentTranslation.accessibilityTitle(original: bug.title, translated: translatedTitle),
-            contentType: "\(bug.status.displayName), \(bug.severity.displayName) severity",
-            authorAndCount: "\(bug.commentCount) comment\(bug.commentCount == 1 ? "" : "s")",
+            contentType: String(localized: "\(bug.status.displayName), \(bug.severity.displayName) severity"),
+            authorAndCount: commentCountPhrase(bug.commentCount),
             newActivityLabel: newLabel,
             date: bug.changedAt.formatted(.relative(presentation: .named)),
             alwaysAppend: ""

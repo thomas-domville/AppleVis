@@ -19,6 +19,9 @@ nonisolated struct PodcastEpisode: Identifiable, Codable, Hashable, Sendable {
     let publishedAt: Date
     let lastActivityAt: Date
     let description: String
+    /// See `ForumTopicDetail.rawBody`/`bodyFormat`'s doc comment.
+    var rawDescription: String = ""
+    var bodyFormat: String = drupalDefaultTextFormat
     let artworkUrl: String?
     let transcriptUrl: String?
     var chapters: [Chapter]

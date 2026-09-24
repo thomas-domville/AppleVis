@@ -39,6 +39,7 @@ struct SubmitPodcastView: View {
     @State private var showDiscardConfirm = false
     @State private var submitted = false
     @State private var descriptionMinimumAnnounced = false
+    @State private var justRewrote = false
 
     /// Set when opened from the Share Extension with a shared podcast URL,
     /// or with a shared audio file itself. This form needs an actual audio
@@ -232,7 +233,7 @@ struct SubmitPodcastView: View {
     private var audioSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 1, total: 2, title: "Episode & Audio", isFocused: $isStepFocused)
+                WizardStepHeader(title: "Episode & Audio", stepIndex: 1, stepTotal: 2, headerFocus: $isStepFocused)
                 Text("Share your podcast about accessibility, Apple products, or blindness with the AppleVis community.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -242,6 +243,7 @@ struct SubmitPodcastView: View {
                         Task {
                             if let result = await intelligence.translate(subject: nil, body: description, isTopic: false) {
                                 description = result.body
+                                justRewrote = true
                             } else {
                                 toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
@@ -262,6 +264,7 @@ struct SubmitPodcastView: View {
                             Task {
                                 if let result = await intelligence.rewriteRespectfully(subject: nil, body: description, isTopic: false) {
                                     description = result.body
+                                    justRewrote = true
                                 } else {
                                     toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                 }
@@ -269,6 +272,7 @@ struct SubmitPodcastView: View {
                         }
                     )
                 }
+                .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
             }
             Section {
                 // Combined label+counter into one live-updating swipe-stop,
@@ -291,6 +295,7 @@ struct SubmitPodcastView: View {
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Episode Description"))
                     .accessibilityHint(String(localized: "Required, minimum 20 characters. Tell listeners what this episode covers — the topics, guests, or themes — so they know what to expect before pressing play."))
+                    .rewriteFlash($justRewrote)
                     .onChange(of: description) { _, newValue in
                         handleDescriptionChange(newValue)
                         guidelines.textChanged(newValue)
@@ -343,12 +348,14 @@ struct SubmitPodcastView: View {
                 Task {
                     if let result = await intelligence.rewrite(subject: nil, body: description, isTopic: false) {
                         description = result.body
+                        justRewrote = true
                     } else {
                         toast.error(String(localized: "Couldn't rewrite this. Try again."))
                     }
                 }
             } label: {
                 Label("Rewrite", systemImage: "wand.and.stars")
+                    .symbolEffect(.bounce, value: justRewrote)
             }
             .disabled(description.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
             .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
@@ -358,8 +365,7 @@ struct SubmitPodcastView: View {
     private var reviewSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 2, total: 2, title: "Review & Submit", isFocused: $isStepFocused)
-                backButton
+                WizardStepHeader(title: "Review & Submit", stepIndex: 2, stepTotal: 2, onBack: goBack, headerFocus: $isStepFocused)
                 Text("Check your details, then tap Submit.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -379,7 +385,7 @@ struct SubmitPodcastView: View {
             Section {
                 WizardBottomButton(
                     String(localized: "Submit"),
-                    isEnabled: !isSubmitting && networkMonitor.isConnected
+                    isEnabled: !isSubmitting && networkMonitor.isConnected, isLoading: isSubmitting
                 ) { Task { await submit() } }
             }
         }
@@ -406,14 +412,6 @@ struct SubmitPodcastView: View {
 
     /// Step-backward navigation, separated from the toolbar's Cancel button
     /// so a user can discard the submission from any step.
-    private var backButton: some View {
-        Button {
-            goBack()
-        } label: {
-            Label("Back", systemImage: "chevron.backward")
-        }
-    }
-
     private func submit() async {
         // The real form derives the submitter from the authenticated
         // session server-side — no `name`/`mail` field to pass along (see

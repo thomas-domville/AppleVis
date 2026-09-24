@@ -191,9 +191,114 @@ struct ChangeItem: Identifiable {
     let title: String
     let description: String
 
-    static let currentVersion = "2026.16"
+    static let currentVersion = "2026.17"
 
     static let current: [ChangeItem] = [
+        ChangeItem(
+            systemImage: "app.badge.checkmark",
+            tag: .fixed,
+            title: "App Entries Are Clearer About What Changed on the App Store",
+            description: "An app's page always said its description \"may differ\" from the App Store, even when the two were word for word the same, so updating an entry never made the note go away. It now only says so when they really differ, and app pages also mention when the App Store has renamed an app. When you submit an app, the devices it supports are still filled in from the App Store, but you can now untick any it doesn't really support. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "globe",
+            tag: .fixed,
+            title: "More of AppleVis Now Speaks Your Language",
+            description: "Auto-Translate's own settings and the prompt that offers it were still in English, which is exactly when you'd need them in your own language. They're now translated into all 22 languages, along with everything new in this release. A few translated counts, like how many posts or reports were loaded, could also show jumbled text in some languages. Fixed too."
+        ),
+        ChangeItem(
+            systemImage: "wand.and.stars",
+            tag: .improved,
+            title: "Rewrite and Translate in More Places",
+            description: "Report a Comment's details box now has Rewrite and the offer to translate into English, like every other form that goes to our team. Messaging another member now has Rewrite too. On Submit an App and Submit a Blog Post, Translate used to change only one box even when the other one was the one not in English. It now translates every box that needs it, and the blog pitch box gets its own Rewrite button. Requested directly."
+        ),
+        ChangeItem(
+            systemImage: "backward.end",
+            tag: .improved,
+            title: "Listened Is Now a Simple Reminder, and Start Over Is Its Own Button",
+            description: "The Mark Listened button in a podcast episode's Episode Tools was confusing. It changed its name once pressed, and it also quietly erased your place in the episode. Listened is now a plain on/off switch, just a reminder that you've heard the episode, and it shows as a checkmark in episode lists too. It still turns on by itself when an episode plays to the end, and turning it off now stays off across your devices. Going back to the beginning has its own Start Over button, which appears whenever you have a saved place in the episode. Suggested directly."
+        ),
+        ChangeItem(
+            systemImage: "arrow.down.to.line",
+            tag: .accessibility,
+            title: "Jump to First New Comment Lands on the Comment Again",
+            description: "Using Jump to First New Comment from Home opened the page but left VoiceOver on the title instead of the first new comment. This happened most often with forum topics and app entries, and with anything you hadn't opened before. It now lands right on the first comment you haven't seen, even when it's further down a long thread. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "character.bubble",
+            tag: .fixed,
+            title: "Detail Pages and VoiceOver Now Use Your Language Throughout",
+            description: "With the app set to another language, parts of every detail page were still in English: section headings like Steps to Reproduce and Episode Notes, the podcast player's buttons, bug status and severity, App Store notices on app entries, and much of what VoiceOver says, like comment numbers, the thread summary when a page opens, and every item's comment count. They're now translated into all 22 languages, and counts use each language's own plural forms instead of adding an English \"s\"."
+        ),
+        ChangeItem(
+            systemImage: "clock.arrow.circlepath",
+            tag: .fixed,
+            title: "Blog Posts, Episodes, and Guides With New Comments Now Show Up",
+            description: "Blog posts, podcast episodes, and guides went by when the post itself was last edited, not when the latest comment came in. A busy post with new comments today could still say \"6 days ago\" and never show up as new on Home. They now go by their latest comment, the same as forum topics and app entries, and Home now brings in anything that just got comments, even older posts. Reported by a beta tester."
+        ),
+        ChangeItem(
+            systemImage: "book",
+            tag: .fixed,
+            title: "Guides Are Called Guides Everywhere Now",
+            description: "A few places still used an old name, Resources, for what AppleVis calls Guides: the New Resources notification switch, a Resources section in search results, and the Guides screen itself. They all say Guides now, matching the website. The Mentions notification switch is also gone for now, since AppleVis doesn't have real mentions. Typing someone's username doesn't notify them. Suggested by a beta tester."
+        ),
+        ChangeItem(
+            systemImage: "paintbrush",
+            tag: .improved,
+            title: "Setup's Theme Step Is Quicker to Get Through",
+            description: "The Choose a Theme step now says up front that it's already set to System, matching your iPhone's Light or Dark Mode, with a Continue button right below instead of past all 15 themes. That's just a couple of swipes with VoiceOver instead of about 20. It also mentions that High Contrast or Midnight can help if you have some vision, marks the default as Recommended, and if Increase Contrast is already on for your iPhone, it starts you on a High Contrast theme. Suggested by a beta tester."
+        ),
+        ChangeItem(
+            systemImage: "arrow.up.forward.square",
+            tag: .improved,
+            title: "Links That Leave the App Now Say So",
+            description: "Links like Sign up for free, Reset Password, Terms of Service, and social media now show a small arrow after their name, and VoiceOver tells you whether they'll open in the app's browser or in your web browser, matching your Web Links setting. Buttons that jump to the App Store or the Settings app say so too. No more landing on a web page without warning. Suggested by a beta tester."
+        ),
+        ChangeItem(
+            systemImage: "link",
+            tag: .improved,
+            title: "AppleVis Links in Posts Now Open Right in the App",
+            description: "When a post or comment links to another forum topic, app entry, guide, blog post, podcast episode, or bug report on AppleVis, tapping it now opens that page right in the app, instead of sending you out to Safari. Links to other websites still open the way they always have."
+        ),
+        ChangeItem(
+            systemImage: "bubble.left.and.text.bubble.right",
+            tag: .fixed,
+            title: "New Comment Counts on Everything on Home",
+            description: "Home only counted new comments on things you'd opened before. Anything you'd never opened just showed nothing — and quietly stopped counting as new the next time the app opened, even if you never looked at Home. Now everything on Home counts new comments the same way, and the count keeps adding up until you open it or mark it as read. A topic posted since your last visit shows NEW plus its comment count, and the summary at the top only calls something a new topic if it really is. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "quote.bubble",
+            tag: .fixed,
+            title: "Apostrophes Now Copy, Share, and Read Aloud Correctly",
+            description: "Copying, sharing, or using Read Aloud on a post or comment could turn apostrophes and quotation marks into web codes — \"I've\" came out as \"I\", an ampersand, a number, and then \"ve\" — and Read Aloud would actually speak them. The same codes could also reach translations, and VoiceOver on paragraphs where milder language is filtered. Fixed everywhere, so the text you copy, share, or hear matches what's on screen."
+        ),
+        ChangeItem(
+            systemImage: "speaker.slash",
+            tag: .fixed,
+            title: "Telling VoiceOver to Hush No Longer Triggers a Tone Reminder",
+            description: "Writing something like \"shut up, Siri\" or \"I wish VoiceOver would shut up\" used to bring up a reminder about respectful discussion, as if it were aimed at another member. Venting at VoiceOver, Siri, a named voice like Daniel or Samantha, or your phone itself no longer counts — a \"shut up\" aimed at a person still gets the gentle reminder."
+        ),
+        ChangeItem(
+            systemImage: "doc.text",
+            tag: .fixed,
+            title: "Editing a Topic, Comment, or Review No Longer Shows Raw HTML",
+            description: "Editing a Forum Topic, Guide comment, App Entry review, App Entry, Blog Post, Guide, Bug Report, or Podcast Episode used to pre-fill the edit box with the rendered HTML behind the content — literal <p> and <a href=\"...\"> tags — instead of the original text. Saving without cleaning that out could also silently corrupt the formatting, since the edit always saved as Plain Text regardless of the content's real format (Markdown, for many longer posts). Both fixed: editing now starts from the original source text, and saves preserve whichever format the content actually uses. Found while looking into a report of stray HTML showing up while editing a topic."
+        ),
+        ChangeItem(
+            systemImage: "list.number",
+            tag: .improved,
+            title: "Every Wizard Now Matches the Welcome Tour's Step Format",
+            description: "Setup, Contact Us, Submit Bug Report, Submit Blog, Submit an App, Submit a Podcast, Report a Comment, and Change Password/Email each built their step header a little differently — some had a visible \"Step X of Y,\" some didn't; back buttons lived in different places from screen to screen. All of them, plus the Welcome Tour, Edit Profile, Bio Assist, and editors' Refresh App Details screen, now share one step header: Back button, a visible \"Step X of Y\" where relevant, and a heading that announces itself once, clearly, instead of possibly twice. Requested directly."
+        ),
+        ChangeItem(
+            systemImage: "wand.and.stars",
+            tag: .improved,
+            title: "Editing and Posting Feel More Alike Now, With a Few New Touches",
+            description: "Every Edit screen and every compose screen (new topics, replies, and comments on Guides, Blogs, Podcasts, Bug Reports, and App Entries) now opens with the same short heading and description, so it's clearer what you're about to do before you start typing. A few screens that were missing the one-tap Rewrite button (Editing, and commenting on App Entries, Guides, Blogs, Podcasts, and Bug Reports) now have it too. A couple of small touches: the Rewrite button gives a little bounce when it finishes, the text field briefly highlights so it's clear something changed, and a guideline reminder now eases into view instead of popping in abruptly. Submit an App/Blog/Podcast/Bug Report and Contact Us now share these same touches too, plus their Submit button shows a spinner while sending instead of just going dim. Requested directly."
+        ),
+    ]
+
+    static let archivedFrom2026_16: [ChangeItem] = [
         ChangeItem(
             systemImage: "checkmark.shield",
             tag: .fixed,

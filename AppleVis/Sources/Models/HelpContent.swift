@@ -247,15 +247,15 @@ enum HelpContent {
                     summary: "Keep track of what matters to you, and clear the rest when you're done with it.",
                     content: [
                         .steps([
-                            "Find a topic, app, blog post, guide, podcast episode, or other card you want to keep track of.",
-                            "Open its action menu, or long-press the card.",
+                            "Find a topic, app, blog post, guide, podcast episode, or anything else you want to keep track of.",
+                            "Open its action menu, or long-press it.",
                             "Choose Save to keep it in For You > Saved.",
                             "Choose Follow if you'd like to hear about future activity.",
                             "On an app, choose Recommend if you want to give it a public thumbs-up — it'll show up in For You > Recommended.",
                             "Choose Mark as Read to clear the new-activity flag without opening the item.",
                             "On Home, use Mark All as Read when you'd rather just reset everything at once.",
                         ]),
-                        .tip("VoiceOver users can reach these through the Actions rotor on any content card. Sighted and low-vision users can long-press the same cards to open the same menu."),
+                        .tip("VoiceOver users can reach these through the Actions rotor on any topic, post, app, or episode. Sighted and low-vision users can long-press the same items to open the same menu."),
                     ]
                 ),
                 HelpArticle(
@@ -303,14 +303,14 @@ enum HelpContent {
                             "Scroll to Bug Tracker and choose iOS / iPadOS Bugs or macOS Bugs.",
                             "Active is selected by default — switch to All Bugs to include ones that have already been fixed.",
                             "Scroll through the list, or type a keyword in the search field to narrow it down.",
-                            "Tap a bug card to read the full report: description, steps to reproduce, workaround, version information, and Apple Feedback ID.",
+                            "Tap a bug report to read the full report: description, steps to reproduce, workaround, version information, and Apple Feedback ID.",
                             "On an active bug, tap Report to Apple to open Feedback Assistant and add your own report — the more reports Apple sees, the more likely a fix.",
                             "Tap Save to keep the report in For You for easy reference.",
                             "Tap Share to send the report link to someone else.",
                             "To submit a new bug, head back to Discover, scroll to Contribute, and tap Submit a Bug Report — a guided wizard opens right inside the app.",
                         ]),
                         .tip("Filing your own report in Apple's Feedback Assistant for the same bug helps raise its priority. Always include your device model, OS version, and exact steps to reproduce."),
-                        .note("VoiceOver users: each bug card announces its severity, status, first-seen version, and fix version as a single accessibility label, so there's no need to swipe through individual elements on the card."),
+                        .note("VoiceOver users: each bug report in the list announces its severity, status, first-seen version, and fix version all at once, so there's no need to swipe through each detail separately."),
                     ]
                 ),
                 HelpArticle(
@@ -320,7 +320,7 @@ enum HelpContent {
                     content: [
                         .steps([
                             "Open Settings > Appearance and pick a theme that feels comfortable — including High Contrast Light or High Contrast Dark, if you want the most contrast available.",
-                            "Choose a Comfortable or Compact card density, depending on how much you like fitting on a screen at once.",
+                            "Use Card Density to choose Comfortable or Compact spacing, depending on how much you like fitting on a screen at once.",
                             "Open iOS Settings > Display & Text Size to adjust Dynamic Type, Bold Text, Button Shapes, Reduce Transparency, and Increase Contrast.",
                             "Open Settings > Accessibility in AppleVis to see which iOS accessibility settings the app is already picking up on.",
                         ]),
@@ -368,7 +368,7 @@ enum HelpContent {
                         .bullets([
                             "The Save, Follow, and Recommend icons at the bottom of a topic, app, episode, or post give a small bounce the moment you tap them, alongside the confirmation sound.",
                             "Switching themes — in Settings > Appearance, or during setup — crossfades between color schemes instead of snapping instantly.",
-                            "A small \"NEW\" or \"N NEW\" badge on a card pops in with a little spring as you scroll to it, rather than just appearing flat.",
+                            "A small \"NEW\" or \"3 NEW\" label pops in with a little spring as you scroll to it, rather than just appearing flat.",
                         ]),
                     ],
                     contentType: .accessibilityLesson
@@ -387,6 +387,7 @@ enum HelpContent {
                             "Two-finger double-tap to play or pause podcasts from anywhere in the app.",
                         ]),
                         .note("Most list screens move VoiceOver focus to the first useful item once they've finished loading, so you're not left hunting for the start of the list."),
+                        .body("When you open a topic, post, or anything else with comments, VoiceOver gives a quick summary: how many comments there are, and who commented most recently. Each comment starts with its number, like \"Comment 3 of 12\", so you always know where you are. All of this is spoken in your iPhone's language. Anything on Home with new comments also has a Jump to First New Comment action, which opens it with VoiceOver already on the first comment you haven't seen."),
                         .heading("VoiceOver Detail Level"),
                         .body("Settings > Accessibility > VoiceOver Detail Level controls how much AppleVis announces when you navigate forum topics, apps, and podcast episodes."),
                         .bullets([
@@ -447,6 +448,13 @@ enum HelpContent {
                             "New narrows it down to just what's happened since you were last here.",
                             "Mouse Recap gives you a shareable weekly or monthly digest of new accessible apps, podcast episodes, popular discussions, guides, and blog posts.",
                         ]),
+                        .heading("Reading the badges"),
+                        .bullets([
+                            "NEW means the item itself was posted since your last visit.",
+                            "A number, like 3 NEW, counts the comments added since you last opened that item — or since it first showed up on Home, if you've never opened it.",
+                            "A new topic that already has replies shows both.",
+                            "Counts keep adding up across visits until you open the item or mark it as read.",
+                        ]),
                         .heading("Keeping it tidy"),
                         .bullets([
                             "Mark as Read clears an item's new-activity flag without opening it.",
@@ -492,15 +500,15 @@ enum HelpContent {
                         .heading("Browsing bugs"),
                         .bullets([
                             "Active shows only open, unresolved bugs. All Bugs shows both active and fixed ones.",
-                            "Each card shows the bug title, severity (Low, Medium, or High), status (Active or Fixed), the OS version it first appeared in, and the version it was fixed in, if known.",
-                            "Each card also shows when the bug was first reported and last updated.",
+                            "Each bug report in the list shows its title, severity (Low, Medium, or High), status (Active or Fixed), the OS version it first appeared in, and the version it was fixed in, if known.",
+                            "Each one also shows when the bug was first reported and last updated.",
                             "Use the search field to filter the current list by keyword.",
                             "Scroll to the end and more bug reports load automatically.",
                             "Pull down to refresh the list.",
                         ]),
                         .heading("Reading a bug report"),
                         .steps([
-                            "Tap a bug card to open its full detail page.",
+                            "Tap a bug report to open its full detail page.",
                             "Read the description, steps to reproduce, and any known workaround.",
                             "Check Bug Details for platform, first-seen version, fixed-in version, device, how often it happens, and the Apple Feedback ID.",
                             "Use Report to Apple on active bugs to open Feedback Assistant and file your own report.",
@@ -627,7 +635,7 @@ enum HelpContent {
                         .bullets([
                             "Forum Topics — community discussions.",
                             "Apps — entries from the App Directory.",
-                            "Resources — guides and tutorials.",
+                            "Guides — guides and tutorials.",
                             "Blogs — posts from the AppleVis Blog.",
                             "Podcasts — episodes from any AppleVis podcast.",
                             "Bug Reports — accessibility bugs in the tracker.",
@@ -669,6 +677,8 @@ enum HelpContent {
                         .bullets([
                             "Rewrite polishes your draft's clarity and tone, without changing what you're actually trying to say.",
                             "If your draft looks like it's not in English, AppleVis offers to translate it for you.",
+                            "Both are there wherever you write something for the community or our team: topics, replies, comments, reviews, edits, Contact Us, every Submit form, and Report a Comment. On forms with more than one box, Translate takes care of every box that isn't in English.",
+                            "Messaging another member privately has Rewrite but no translate prompt, since you're welcome to write to each other in any language you share.",
                             // Was "The guidelines checker is purely advisory — it never
                             // blocks you from posting," which isn't accurate:
                             // ContentSubmissionPolicy does block a small set of things
@@ -686,6 +696,7 @@ enum HelpContent {
                             "Translation happens on your iPhone — nothing you read is sent to an outside server.",
                             "It's automatic, but never perfect — look for the small \"Translated\" note, and tap Show Original any time to see the exact English text.",
                             "Links inside translated text still go exactly where they're supposed to.",
+                            "The app itself — its buttons, headings, and everything VoiceOver says, like comment numbers and counts — already follows your iPhone's language in 22 languages, with or without Auto-Translate.",
                         ]),
                         .tip("If you use VoiceOver, translated text is automatically spoken in the correct voice and pronunciation for that language — you don't need to change your VoiceOver language setting yourself just to read translated AppleVis content."),
                     ]
@@ -753,6 +764,7 @@ enum HelpContent {
                             "Edit the text and tap Save.",
                         ]),
                         .note("Edits apply immediately — no need to reload the page to see them reflected."),
+                        .tip("Tap Rewrite if you'd like a hand smoothing out the tone before you save your edit."),
                         .tip("VoiceOver users can also reach Edit through the rotor's Actions, without ever opening the long-press menu."),
                     ]
                 ),
@@ -877,7 +889,7 @@ enum HelpContent {
                         .heading("Step 2 — App Details"),
                         .body("What you'll fill in here depends on the platform. Confirm the details pulled from the App Store, then share your accessibility assessment."),
                         .bullets([
-                            "For iPhone and iPad apps: separate ratings for VoiceOver Performance, Button Labelling, and Usability, plus the devices the app supports.",
+                            "For iPhone and iPad apps: separate ratings for VoiceOver Performance, Button Labelling, and Usability, plus the devices the app supports — pre-ticked from the App Store, and you can untick any it doesn't really support.",
                             "For Mac, Apple Watch, and Apple TV apps: a single combined Usability rating.",
                             "Every platform asks for detailed Accessibility Comments — twenty characters minimum, but the more you share, the more useful it is to the next person reading it.",
                         ]),
@@ -953,6 +965,7 @@ enum HelpContent {
                             "Save or Follow an app to find it again in For You, or Recommend it to give it a public thumbs-up — everything you've recommended lives in For You > Recommended.",
                             "Share an App Store link into AppleVis from anywhere to look up, or submit, an app.",
                             "If an app's App Store link stops working, its page lets you know the listing may no longer be available.",
+                            "If the App Store has a newer version or a new name for the app than the AppleVis entry, the page mentions that too, so you know what to look for. The same goes for the description: you'll only see a note when the App Store's description really differs from the one on AppleVis.",
                         ]),
                     ]
                 ),
@@ -965,11 +978,13 @@ enum HelpContent {
                             "Play, pause, seek, skip forward and back, and change speed from the player or the mini player at the bottom of the screen.",
                             "Use Add to Queue or Play Next to control what plays after the current episode.",
                             "Download episodes for offline listening.",
+                            "AppleVis remembers where you stopped in each episode. To go back to the beginning, open the episode and use Start Over in Episode Tools.",
+                            "Listened in Episode Tools is a switch you can turn on or off as a reminder that you've already heard an episode. It turns on by itself when an episode plays to the end, and episode lists show a checkmark for it. It doesn't change your place in the episode.",
                             "Navigate chapters from the chapter strip when an episode has chapter markers.",
                             "The Lock Screen shows the episode title, artwork, progress bar, and playback controls.",
                             "Dynamic Island shows the episode title and playback state on supported iPhone models while you use other apps.",
                             "AirPods: double-tap to play or pause. With a queue going, the next-track gesture skips to the next episode, and previous-track restarts the current one from the beginning.",
-                            "Control Center shows a Now Playing card with artwork, title, and controls.",
+                            "Control Center shows Now Playing, with artwork, title, and controls.",
                         ]),
                         .tip("Fine-tune playback in Settings > Podcasts: speed, skip intervals, auto-play, Trim Silence, Voice Boost, an equalizer (Flat, Speech, Bass Boost, or Treble Boost), a sleep timer, and resume rewind."),
                     ]
@@ -1021,9 +1036,9 @@ enum HelpContent {
                 HelpArticle(
                     id: "settings-appearance",
                     title: "Appearance",
-                    summary: "Themes, Liquid Glass, card density, contrast, and visual comfort.",
+                    summary: "Themes, Liquid Glass, spacing, contrast, and visual comfort.",
                     content: [
-                        .body("Appearance is where AppleVis starts to feel like yours. Pick a theme grouped by System, Light, Dark, or High Contrast, and choose a Comfortable or Compact card density depending on how much you like fitting on a screen. Liquid Glass gives supported surfaces a soft, modern translucency, and steps back automatically to solid backgrounds when Reduce Transparency or a high-contrast theme is on."),
+                        .body("Appearance is where AppleVis starts to feel like yours. Pick a theme grouped by System, Light, Dark, or High Contrast, and use Card Density to choose Comfortable or Compact spacing, depending on how much you like fitting on a screen. Liquid Glass gives supported surfaces a soft, modern translucency, and steps back automatically to solid backgrounds when Reduce Transparency or a high-contrast theme is on."),
                     ]
                 ),
                 HelpArticle(
@@ -1034,9 +1049,10 @@ enum HelpContent {
                         .body("Settings > General holds everyday AppleVis behavior that isn't tied to any particular access method — a sighted user is just as likely to want these adjusted as anyone else."),
                         .bullets([
                             "Home Startup Behavior — how much Home says out loud when you open or return to it: Quiet (nothing spoken), Helpful (a short spoken welcome), or Detailed (that welcome plus an AI-generated summary of what's new).",
-                            "Welcome Summary — a separate switch for the dismissable card on Home listing what's new since your last visit. This is about what's shown, not what's spoken — turn it off and Home stays visually quieter even if Home Startup Behavior is still speaking a welcome.",
+                            "Welcome Summary — a separate switch for the short summary at the top of Home listing what's new since your last visit. This is about what's shown, not what's spoken — turn it off and Home stays visually quieter even if Home Startup Behavior is still speaking a welcome.",
                             "Auto-Focus Search Field — raises the keyboard the moment you open Search, so you can start typing right away.",
-                            "Web Links — choose In-App Browser (stay inside AppleVis) or Default Browser (hand links to Safari or whatever browser you've set as default) for App Store pages, social links, legal pages, and Open in Browser actions throughout the app.",
+                            "Web Links — choose In-App Browser (stay inside AppleVis) or Default Browser (hand links to Safari or whatever browser you've set as default) for App Store pages, social links, legal pages, and Open in Browser actions throughout the app. Links like these show a small arrow after their name, and VoiceOver tells you where they'll open, so you always know before you tap.",
+                            "Links in posts and comments to other AppleVis pages — a forum topic, app entry, guide, blog post, podcast episode, or bug report — open right in the app instead of a browser.",
                             "AppleVis Tips — short, friendly tips that pop up here and there, timed to save you a step.",
                         ]),
                         .tip("VoiceOver Detail Level is the one AppleVis-specific control that stayed in Settings > Accessibility, since it's genuinely about how much VoiceOver announces."),
@@ -1049,12 +1065,11 @@ enum HelpContent {
                     content: [
                         .bullets([
                             "Replies to My Posts — automatically follows new forum topics and app entries you post, so replies notify you without following them yourself. Only applies going forward. Signed in only.",
-                            "Mentions — someone mentions you by name. Signed in only.",
                             "Followed Topics — activity in anything you follow. Signed in only.",
                             "New Forum Topics — fresh discussions across the community.",
                             "New App Directory Entries — new or updated app listings.",
                             "New Podcast Episodes.",
-                            "New Resources — new guides and tutorials.",
+                            "New Guides — new guides and tutorials.",
                             "New Comments — comments on anything, anywhere, not just things you follow. This one can get chatty.",
                         ]),
                         .note("You can also pick a notification sound and turn the app icon's badge count on or off. iOS notification permission is still controlled separately in iPhone Settings — if it's off there, nothing arrives no matter what's toggled here."),
@@ -1162,7 +1177,7 @@ enum HelpContent {
                             "\"Hey Siri, report a bug to AppleVis\" — opens straight to the accessibility bug report form.",
                         ]),
                         .heading("Spotlight"),
-                        .body("Spotlight can surface AppleVis topics, apps, podcasts, and resources right from iOS Search — anything you've opened gets indexed, so it's easy to find again later."),
+                        .body("Spotlight can surface AppleVis topics, apps, podcasts, and guides right from iOS Search — anything you've opened gets indexed, so it's easy to find again later."),
                     ]
                 ),
                 HelpArticle(
@@ -1306,7 +1321,7 @@ enum HelpContent {
                         .steps([
                             "Open Profile and tap Contact AppleVis, or open Help and scroll to the Contact section.",
                             "Choose what kind of message you're sending: App Bug Report, App Feedback, App Suggestion, or App Enquiry.",
-                            "Tap the card for your chosen type — the subject fills in automatically.",
+                            "Choose the type that fits — the subject fills in automatically.",
                             "Tap Continue.",
                         ]),
                         .heading("Step 2 — Your contact details (not signed in only)"),

@@ -83,7 +83,7 @@ struct SearchResultsView: View {
                     }
                 }
                 if !results.guides.isEmpty {
-                    Section("Resources (\(String(results.guides.count)))") {
+                    Section("Guides (\(String(results.guides.count)))") {
                         ForEach(results.guides) { guide in
                             ResourceRow(resource: guide)
                         }

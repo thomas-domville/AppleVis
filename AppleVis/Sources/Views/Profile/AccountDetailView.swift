@@ -78,15 +78,15 @@ struct AccountDetailView: View {
                 }
                 .accessibilityLabel(String(localized: "Change your account email address"))
 
-                WebLink(destination: URL(string: "https://www.applevis.com/users/\(user.name)")!) {
+                WebLink(destination: URL(string: "https://www.applevis.com/users/\(user.name)")!, showsExternalIcon: false) {
                     Label("View Full Profile on applevis.com", systemImage: "arrow.up.right.square")
                 }
-                .accessibilityLabel(String(localized: "View your full public profile on applevis.com, opens in browser"))
+                .accessibilityLabel(String(localized: "View your full public profile on applevis.com"))
 
-                WebLink(destination: URL(string: "https://www.applevis.com/user")!) {
+                WebLink(destination: URL(string: "https://www.applevis.com/user")!, showsExternalIcon: false) {
                     Label("More Account Settings on applevis.com", systemImage: "arrow.up.right.square")
                 }
-                .accessibilityLabel(String(localized: "More Account Settings on applevis.com, opens in browser"))
+                .accessibilityLabel(String(localized: "More Account Settings on applevis.com"))
 
                 NavigationLink {
                     DeleteAccountView()

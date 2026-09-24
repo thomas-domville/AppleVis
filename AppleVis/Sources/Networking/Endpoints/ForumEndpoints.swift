@@ -22,7 +22,13 @@ struct ForumEndpoints {
             }
             let raw: JSONValue = try await client.get("forums/recent", queryItems: queryItems)
             let items = raw.arrayValue ?? []
-            return items.compactMap { $0.objectValue }.compactMap { Mappers.forumFromRecent($0) }
+            let topics = items.compactMap { $0.objectValue }.compactMap { Mappers.forumFromRecent($0) }
+            // Pinned-first, stable otherwise — matches the website's own
+            // ordering once the backend starts sending `sticky`; a no-op
+            // today since every item maps `isPinned` to false until then.
+            return topics.enumerated()
+                .sorted { $0.element.isPinned != $1.element.isPinned ? $0.element.isPinned : $0.offset < $1.offset }
+                .map(\.element)
         }
     }
 
@@ -96,6 +102,8 @@ struct ForumEndpoints {
             let included = topicResponse.included ?? []
             let topic = Mappers.forum(node, included: included)
             let body = node.attributes["body"]?.richTextValue ?? ""
+            let rawBody = node.attributes["body"]?.rawTextValue ?? ""
+            let bodyFormat = node.attributes["body"]?.textFormat ?? drupalDefaultTextFormat
             let alias = node.attributes["path"]?.pathAlias
             let url = alias.map { "https://www.applevis.com\($0)" } ?? "https://www.applevis.com/node/\(node.id)"
 
@@ -127,6 +135,8 @@ struct ForumEndpoints {
                 category: topic.category,
                 categoryId: topic.categoryId,
                 body: body,
+                rawBody: rawBody,
+                bodyFormat: bodyFormat,
                 url: url,
                 isFollowing: false,
                 isSaved: false,

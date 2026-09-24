@@ -94,7 +94,9 @@ struct ContentActionsModifier: ViewModifier {
     /// alone didn't actually do, and it was the only kind that read
     /// differently from the rest of the row types for the same action.
     /// Reported directly.
-    private var addCommentLabel: String { "Add Comment" }
+    /// LocalizedStringKey so Label/Text actually look it up (as a String,
+    /// both render it verbatim).
+    private var addCommentLabel: LocalizedStringKey { "Add Comment" }
 
     private var isAdmin: Bool { auth.user?.isAdmin ?? false }
 
@@ -306,8 +308,8 @@ struct ContentActionsModifier: ViewModifier {
                 }
             }
             .sheet(item: $editingNode) { node in
-                EditNodeSheet(initialTitle: node.title, initialBody: node.body) { newTitle, newBody in
-                    try await saveEdit(nodeTypeSuffix: node.nodeTypeSuffix, title: newTitle, body: newBody)
+                EditNodeSheet(initialTitle: node.title, initialBody: node.body, nodeTypeSuffix: node.nodeTypeSuffix) { newTitle, newBody in
+                    try await saveEdit(nodeTypeSuffix: node.nodeTypeSuffix, title: newTitle, body: newBody, format: node.format)
                 }
             }
             .confirmationDialog(
@@ -375,10 +377,10 @@ struct ContentActionsModifier: ViewModifier {
         switch kind {
         case .forumTopic:
             guard let d = try? await APIClient.shared.forums.topicDetail(id: id) else { return nil }
-            return EditableNode(title: d.title, body: d.body, nodeTypeSuffix: "forum")
+            return EditableNode(title: d.title, body: d.rawBody, format: d.bodyFormat, nodeTypeSuffix: "forum")
         case .podcastEpisode:
             guard let d = try? await APIClient.shared.podcasts.episode(id: id) else { return nil }
-            return EditableNode(title: d.title, body: d.description, nodeTypeSuffix: "podcast")
+            return EditableNode(title: d.title, body: d.rawDescription, format: d.bodyFormat, nodeTypeSuffix: "podcast")
         case .appListing:
             guard let d = try? await APIClient.shared.apps.detail(id: id) else { return nil }
             let nodeTypeSuffix: String
@@ -388,22 +390,22 @@ struct ContentActionsModifier: ViewModifier {
             case .macos:   nodeTypeSuffix = "mac_app_directory"
             case .ios:     nodeTypeSuffix = "ios_app_directory"
             }
-            return EditableNode(title: d.name, body: d.body, nodeTypeSuffix: nodeTypeSuffix)
+            return EditableNode(title: d.name, body: d.rawBody, format: d.bodyFormat, nodeTypeSuffix: nodeTypeSuffix)
         case .resource:
             guard let d = try? await APIClient.shared.resources.detail(id: id) else { return nil }
-            return EditableNode(title: d.title, body: d.body, nodeTypeSuffix: "guides")
+            return EditableNode(title: d.title, body: d.rawBody, format: d.bodyFormat, nodeTypeSuffix: "guides")
         case .blogPost:
             guard let d = try? await APIClient.shared.blogs.detail(id: id) else { return nil }
-            return EditableNode(title: d.title, body: d.body, nodeTypeSuffix: "blog2")
+            return EditableNode(title: d.title, body: d.rawBody, format: d.bodyFormat, nodeTypeSuffix: "blog2")
         case .bugReport:
             guard let d = try? await APIClient.shared.bugReports.detail(id: id) else { return nil }
-            return EditableNode(title: d.title, body: d.body, nodeTypeSuffix: d.platform == .ios ? "ios_bug_report" : "os_x_bug_report")
+            return EditableNode(title: d.title, body: d.rawBody, format: d.bodyFormat, nodeTypeSuffix: d.platform == .ios ? "ios_bug_report" : "os_x_bug_report")
         }
     }
 
-    private func saveEdit(nodeTypeSuffix: String, title: String, body: String) async throws {
+    private func saveEdit(nodeTypeSuffix: String, title: String, body: String, format: String) async throws {
         guard let user = auth.user else { return }
-        try await APIClient.shared.content.editNode(nodeId: id, nodeType: nodeTypeSuffix, title: title, body: body, csrfToken: user.csrfToken)
+        try await APIClient.shared.content.editNode(nodeId: id, nodeType: nodeTypeSuffix, title: title, body: body, format: format, csrfToken: user.csrfToken)
         toast.success(String(localized: "\(kind.displayName) updated"))
     }
 
@@ -450,7 +452,7 @@ struct ContentActionsModifier: ViewModifier {
     private func markAsRead() {
         guard let currentCommentCount else { return }
         PersistenceStore.shared.stampItemVisit(id: FeedItem.visitKey(kind: kind, contentId: id), commentCount: currentCommentCount)
-        UIAccessibility.post(notification: .announcement, argument: "Marked as read.")
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "Marked as read."))
     }
 
     /// Opens the item and lands VoiceOver focus directly on the first new
@@ -629,7 +631,12 @@ extension ContentActionsModifier {
 struct EditableNode: Identifiable {
     let id = UUID()
     let title: String
+    /// The raw source text (not rendered HTML) to pre-fill the edit field
+    /// with — see `JsonApiNode.rawTextValue`'s doc comment.
     let body: String
+    /// The Drupal text-format ID this content is actually stored in — must
+    /// be sent back unchanged on save. See `JsonApiNode.textFormat`.
+    let format: String
     let nodeTypeSuffix: String
 }
 
@@ -638,35 +645,62 @@ struct EditableNode: Identifiable {
 /// than building 6 nearly-identical edit screens.
 struct EditNodeSheet: View {
     let onSave: (String, String) async throws -> Void
+    private let icon: String
+    private let contentLabel: String
 
     @State private var title: String
     @State private var bodyText: String
     @State private var isSubmitting = false
     @State private var error: String?
+    @State private var justRewrote = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var toast: ToastStore
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
-    /// Had no focus management at all — focuses the title field itself
-    /// rather than a separate heading, matching ComposeTopicView's identical
-    /// reasoning for a single-field-first edit form: otherwise it silently
-    /// defaults to the back button. Full app-wide focus audit, requested
-    /// directly.
-    @AccessibilityFocusState private var isTitleFieldFocused: Bool
+    /// Now focuses the header below, not the title field — matches how
+    /// every other wizard-style screen in the app (Setup, the Welcome Tour,
+    /// Submit/Contact) focuses its heading first, not straight into a
+    /// field. Previously had no focus management at all and silently
+    /// defaulted to the back button; this is a further refinement of that
+    /// original fix, not a reversal of it.
+    @AccessibilityFocusState private var isHeaderFocused: Bool
 
-    init(initialTitle: String, initialBody: String, onSave: @escaping (String, String) async throws -> Void) {
+    init(initialTitle: String, initialBody: String, nodeTypeSuffix: String, onSave: @escaping (String, String) async throws -> Void) {
         self.onSave = onSave
         _title = State(initialValue: initialTitle)
         _bodyText = State(initialValue: initialBody)
+        (icon, contentLabel) = Self.iconAndLabel(for: nodeTypeSuffix)
+    }
+
+    /// Labels are localized here, where they're produced — they're
+    /// interpolated into "Edit %@", and a plain English String argument
+    /// would come out as "Editar Topic" in Spanish.
+    private static func iconAndLabel(for nodeTypeSuffix: String) -> (icon: String, label: String) {
+        switch nodeTypeSuffix {
+        case "forum": return ("text.bubble", String(localized: "Topic"))
+        case "podcast": return ("mic", String(localized: "Episode"))
+        case "guides": return ("book", String(localized: "Guide"))
+        case "blog2": return ("doc.text", String(localized: "Blog Post"))
+        case "ios_bug_report", "os_x_bug_report": return ("ladybug", String(localized: "Bug Report"))
+        default: return ("square.and.pencil", String(localized: "App Entry"))
+        }
     }
 
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    WizardStepHeader(
+                        title: "Edit \(contentLabel)", icon: icon,
+                        stepIndex: 1, stepTotal: 1, headerFocus: $isHeaderFocused
+                    )
+                    Text("Update the title and body below, then tap Save.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
                 Section("Title") {
                     TextField("Title", text: $title)
-                        .accessibilityFocused($isTitleFieldFocused)
                 }
                 Section("Body") {
                     if intelligence.showTranslatePrompt {
@@ -675,6 +709,7 @@ struct EditNodeSheet: View {
                                 if let result = await intelligence.translate(subject: title, body: bodyText, isTopic: true) {
                                     title = result.subject ?? title
                                     bodyText = result.body
+                                    justRewrote = true
                                 } else {
                                     toast.error(String(localized: "Couldn't translate this. Try again."))
                                 }
@@ -694,15 +729,18 @@ struct EditNodeSheet: View {
                                     if let result = await intelligence.rewriteRespectfully(subject: title, body: bodyText, isTopic: true) {
                                         title = result.subject ?? title
                                         bodyText = result.body
+                                        justRewrote = true
                                     } else {
                                         toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                     }
                                 }
                             }
                         )
+                        .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
                     }
                     TextEditor(text: $bodyText)
                         .frame(minHeight: 200)
+                        .rewriteFlash($justRewrote)
                         .onChange(of: bodyText) { _, newValue in
                             guidelines.textChanged(newValue)
                             intelligence.textChanged(
@@ -711,6 +749,7 @@ struct EditNodeSheet: View {
                                 detectionEnabled: preferences.nonEnglishDetectionEnabled
                             )
                         }
+                    rewriteButton
                 }
                 if let error {
                     Text(error).foregroundStyle(.red)
@@ -722,11 +761,42 @@ struct EditNodeSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { Task { await submit() } }
-                        .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
+                    Button {
+                        Task { await submit() }
+                    } label: {
+                        if isSubmitting {
+                            ProgressView()
+                        } else {
+                            Text("Save")
+                        }
+                    }
+                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
                 }
             }
-            .task { await retryAccessibilityFocus(into: $isTitleFieldFocused) }
+            .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut, value: guidelines.topWarning?.id)
+            .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
+        }
+    }
+
+    @ViewBuilder
+    private var rewriteButton: some View {
+        if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+            Button {
+                Task {
+                    if let result = await intelligence.rewrite(subject: title, body: bodyText, isTopic: true) {
+                        title = result.subject ?? title
+                        bodyText = result.body
+                        justRewrote = true
+                    } else {
+                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
+                    }
+                }
+            } label: {
+                Label("Rewrite", systemImage: "wand.and.stars")
+                    .symbolEffect(.bounce, value: justRewrote)
+            }
+            .disabled(bodyText.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+            .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
         }
     }
 
@@ -758,7 +828,11 @@ struct EditNodeSheet: View {
 /// conditional-action need (e.g. ReplyView's Edit/Delete) can reuse it.
 struct ConditionalAccessibilityAction: ViewModifier {
     let isActive: Bool
-    let name: String
+    /// LocalizedStringKey, not String — every caller passes a literal
+    /// ("Share \(kind.displayName)"), and as a String it went through
+    /// Text(String), which skips the catalog, so every Actions rotor name
+    /// was English in every language.
+    let name: LocalizedStringKey
     let action: () -> Void
 
     func body(content: Content) -> some View {

@@ -72,7 +72,26 @@ enum ContentKind: String, Codable, CaseIterable {
     case blogPost
     case bugReport
 
+    /// Translated, for anything shown or spoken. Was plain English, so it
+    /// came out untranslated inside otherwise-translated sentences — "Guardar
+    /// Topic", "¿Eliminar este topic?" — everywhere a kind name is
+    /// interpolated (Save/Follow/Share/Edit/Delete labels, confirmations,
+    /// the Actions rotor). Use `englishName` for anything sent to the
+    /// AppleVis team instead.
     var displayName: String {
+        switch self {
+        case .forumTopic:     return String(localized: "Topic")
+        case .podcastEpisode: return String(localized: "Podcast")
+        case .appListing:     return String(localized: "App Entry")
+        case .resource:       return String(localized: "Guide")
+        case .blogPost:       return String(localized: "Blog Post")
+        case .bugReport:      return String(localized: "Bug Report")
+        }
+    }
+
+    /// Always English — for report emails and anything else read by the
+    /// (English-speaking) editorial team rather than shown to the user.
+    var englishName: String {
         switch self {
         case .forumTopic:     return "Topic"
         case .podcastEpisode: return "Podcast"
@@ -91,17 +110,33 @@ enum ContentKind: String, Codable, CaseIterable {
     /// VoiceOver user after noticing Save/Follow wording was the one place
     /// on every row that never named the content kind at all.
     var saveActionNoun: String {
-        self == .podcastEpisode ? "Episode" : displayName
+        self == .podcastEpisode ? String(localized: "Episode") : displayName
     }
 
-    /// Lowercased, correctly-pluralized `displayName` for count summaries
-    /// ("20 new topics," "18 new app entries") — naively appending "s"
-    /// broke for "App Entry" ("18 new app entrys").
-    func displayNamePlural(_ count: Int) -> String {
-        guard count != 1 else { return displayName.lowercased() }
+    /// "1 topic" / "12 topics", translated with each language's real plural
+    /// forms (the catalog holds plural variations for these keys). Replaces
+    /// `displayNamePlural`, whose English-only "+s" rule was spliced into
+    /// untranslated sentences.
+    func countPhrase(_ count: Int) -> String {
         switch self {
-        case .appListing: return "app entries"
-        default:          return displayName.lowercased() + "s"
+        case .forumTopic:     return String(localized: "\(count) topics")
+        case .podcastEpisode: return String(localized: "\(count) podcasts")
+        case .appListing:     return String(localized: "\(count) app entries")
+        case .resource:       return String(localized: "\(count) guides")
+        case .blogPost:       return String(localized: "\(count) blog posts")
+        case .bugReport:      return String(localized: "\(count) bug reports")
+        }
+    }
+
+    /// "1 new topic" / "12 new topics" — see `countPhrase`.
+    func newCountPhrase(_ count: Int) -> String {
+        switch self {
+        case .forumTopic:     return String(localized: "\(count) new topics")
+        case .podcastEpisode: return String(localized: "\(count) new podcasts")
+        case .appListing:     return String(localized: "\(count) new app entries")
+        case .resource:       return String(localized: "\(count) new guides")
+        case .blogPost:       return String(localized: "\(count) new blog posts")
+        case .bugReport:      return String(localized: "\(count) new bug reports")
         }
     }
 

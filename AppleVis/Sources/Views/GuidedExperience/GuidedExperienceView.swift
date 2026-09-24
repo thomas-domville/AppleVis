@@ -48,73 +48,40 @@ struct GuidedExperienceView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    if !isFirstStep {
-                        Button {
-                            goToStep(stepIndex - 1)
-                        } label: {
-                            Label("Back", systemImage: "chevron.backward")
-                        }
-                        .padding(.bottom, 4)
-                    }
-
                     VStack(spacing: 24) {
-                        VStack(spacing: 8) {
-                            // `step.chapterTitle`/`.title`/`.body` are all
-                            // String values, not string literals — Text(_
-                            // content: String) skips catalog lookup entirely,
-                            // same bug already fixed elsewhere in this app.
-                            // All 28 step titles and bodies already have full
-                            // translations sitting in the catalog — they were
-                            // just never reachable through these three Text
-                            // calls. `.uppercased()` was also mutating the
-                            // string itself (breaking the catalog key) rather
-                            // than just the display, hence the switch to
-                            // .textCase(.uppercase).
-                            Text(LocalizedStringKey(step.chapterTitle))
-                                .font(.caption).fontWeight(.semibold)
-                                .foregroundStyle(.secondary)
-                                .textCase(.uppercase)
-                                .accessibilityHidden(true)
-                            progressDots
-                        }
+                        // A chapter with just one step (Welcome, All Set)
+                        // always has chapterProgress.total == 1 — WizardStep-
+                        // Header already drops the "step X of Y" clause
+                        // whenever stepTotal <= 1, so this stays a trivially-
+                        // true-free announcement for those two chapters
+                        // without any special-casing here. Requested directly
+                        // (the original reasoning for that behavior).
+                        WizardStepHeader(
+                            sectionLabel: step.chapterTitle, title: step.title, icon: step.icon,
+                            iconBounceTrigger: isCheckpoint ? stepIndex : nil,
+                            stepIndex: chapterProgress.index, stepTotal: chapterProgress.total,
+                            onBack: isFirstStep ? nil : { goToStep(stepIndex - 1) },
+                            headerFocus: $isHeadingFocused
+                        )
 
-                        stepIcon
-
-                        VStack(spacing: 10) {
-                            Text(LocalizedStringKey(step.title))
-                                .font(.title2).fontWeight(.bold)
-                                .multilineTextAlignment(.center)
-                                .accessibilityAddTraits(.isHeader)
-                                // A chapter with just one step (Welcome,
-                                // All Set) always announces "step 1 of 1" —
-                                // trivially true and uninformative, unlike
-                                // Home/Discover/For You/Profile & Settings
-                                // where the count actually helps. Dropped
-                                // for those two only. Requested directly.
-                                .accessibilityLabel(chapterProgress.total > 1
-                                    ? String(localized: "\(step.title). \(step.chapterTitle), step \(chapterProgress.index) of \(chapterProgress.total).")
-                                    : String(localized: "\(step.title). \(step.chapterTitle).")
-                                )
-                                .accessibilityFocused($isHeadingFocused)
-                            // Every step.body is one long unbroken block of
-                            // prose with no \n\n structure to split on — read
-                            // (or Braille-panned) as a single giant element,
-                            // the same problem already fixed for forum
-                            // topics, blog posts, and podcast show notes via
-                            // TextSegmentation.sentenceGroups. More swipes,
-                            // but each stop is now a size you can actually
-                            // pause on, re-read, or skip past, instead of one
-                            // continuous wall of speech. Localizing first,
-                            // then chunking — chunking the raw English source
-                            // would produce fragments that don't match any
-                            // catalog key. Requested directly.
-                            VStack(spacing: 12) {
-                                ForEach(Array(TextSegmentation.sentenceGroups(localizedBody).enumerated()), id: \.offset) { _, chunk in
-                                    Text(chunk)
-                                        .font(.body)
-                                        .multilineTextAlignment(.center)
-                                        .foregroundStyle(.secondary)
-                                }
+                        // Every step.body is one long unbroken block of
+                        // prose with no \n\n structure to split on — read
+                        // (or Braille-panned) as a single giant element,
+                        // the same problem already fixed for forum
+                        // topics, blog posts, and podcast show notes via
+                        // TextSegmentation.sentenceGroups. More swipes,
+                        // but each stop is now a size you can actually
+                        // pause on, re-read, or skip past, instead of one
+                        // continuous wall of speech. Localizing first,
+                        // then chunking — chunking the raw English source
+                        // would produce fragments that don't match any
+                        // catalog key. Requested directly.
+                        VStack(spacing: 12) {
+                            ForEach(Array(TextSegmentation.sentenceGroups(localizedBody).enumerated()), id: \.offset) { _, chunk in
+                                Text(chunk)
+                                    .font(.body)
+                                    .multilineTextAlignment(.center)
+                                    .foregroundStyle(.secondary)
                             }
                         }
                         .padding(.horizontal, 24)
@@ -162,43 +129,6 @@ struct GuidedExperienceView: View {
             playEntranceAnimation()
             focusHeadingAfterTransition()
         }
-    }
-
-    // MARK: - Icon
-
-    /// The `.symbolEffect` is only attached for checkpoint steps — applying
-    /// it unconditionally would replay a bounce on every plain content step
-    /// too, which is exactly the "flourish on every step" busyness worth
-    /// avoiding. System symbol effects respect Reduce Motion on their own.
-    @ViewBuilder private var stepIcon: some View {
-        let base = Image(systemName: step.icon)
-            .font(.system(size: 34))
-            .foregroundStyle(Color.accentColor)
-            .frame(width: 72, height: 72)
-            .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 20))
-            .accessibilityHidden(true)
-        if isCheckpoint {
-            base.symbolEffect(.bounce, value: stepIndex)
-        } else {
-            base
-        }
-    }
-
-    // MARK: - Progress
-
-    /// Dots for the current chapter only (e.g. Home's own 8), not the whole
-    /// experience — the entire point of chaptering the tour was to stop
-    /// "Step 11 of 28" from being the number anyone sees.
-    private var progressDots: some View {
-        let progress = chapterProgress
-        return HStack(spacing: 8) {
-            ForEach(1...progress.total, id: \.self) { i in
-                Capsule()
-                    .fill(i == progress.index ? Color.accentColor : Color.secondary.opacity(0.3))
-                    .frame(width: i == progress.index ? 22 : 8, height: 8)
-            }
-        }
-        .accessibilityHidden(true)
     }
 
     // MARK: - Per-step actions (secondary + primary + skip)

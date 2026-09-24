@@ -47,10 +47,14 @@ struct HTMLTextView: View {
 extension String {
     /// Strips HTML tags for contexts that need plain text (e.g. feeding
     /// rich-text content to the on-device summarizer).
+    ///
+    /// Used to decode only `&nbsp;` and `&amp;`, so every other entity
+    /// Drupal emits came through literally — Copy, Share, and Read Aloud of
+    /// a comment turned "I've" into "I&#039;ve" (2026-09-23, spotted in a
+    /// shared Guideline Violation Check item). Now uses the same full
+    /// decoder the network mappers already use.
     nonisolated func strippingHTMLTags() -> String {
-        replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
-            .replacingOccurrences(of: "&nbsp;", with: " ")
-            .replacingOccurrences(of: "&amp;", with: "&")
+        HTMLText.decodeEntities(replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression))
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 

@@ -37,7 +37,15 @@ struct NotificationSettingsView: View {
                             .buttonStyle(.borderedProminent)
                             .controlSize(.small)
                     } else if systemAuthStatus == .denied {
-                        Button("Open Settings") { openSettings() }
+                        Button {
+                            openSettings()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text("Open Settings")
+                                ExternalLinkIndicator()
+                            }
+                        }
+                        .accessibilityHint(String(localized: "Opens the Settings app, outside AppleVis."))
                             .controlSize(.small)
                     }
                 }
@@ -139,12 +147,12 @@ struct NotificationSettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    Toggle("Mentions", isOn: $preferences.notifyMentions)
-                        .disabled(pushDenied)
-                        .accessibilityHint(String(localized: "Get notified when someone mentions you in a post or comment."))
-                    Text("Notifies you when someone mentions you by name in a post or comment.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    // Mentions shelved (2026-09-23, beta-tester feedback): AppleVis
+                    // has no real @mention feature — typing someone's username
+                    // doesn't notify them — so this promised something the site
+                    // can't deliver. `notifyMentions` and the "mention" push
+                    // category are kept for if the website ever adds real
+                    // mentions; only the switch is hidden.
 
                     Toggle("Followed Topics", isOn: $preferences.notifyFollowedTopics)
                         .disabled(pushDenied)
@@ -183,7 +191,7 @@ struct NotificationSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Toggle("New Resources", isOn: $preferences.notifyNewResources)
+                Toggle("New Guides", isOn: $preferences.notifyNewResources)
                     .disabled(pushDenied)
                     .accessibilityHint(String(localized: "Get notified when new guides, tutorials, and tips are published."))
                 Text("Notifies you when a new guide, tutorial, or tip is published.")
@@ -217,7 +225,7 @@ struct NotificationSettingsView: View {
             if !auth.isSignedIn {
                 Section {
                     Label {
-                        Text("Sign in to enable forum reply and mention notifications.")
+                        Text("Sign in to get notified about replies to your posts and topics you follow.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     } icon: {

@@ -171,11 +171,24 @@ final class PersistenceStore {
         playedEpisodeIds().contains(id)
     }
 
+    /// Posted whenever an episode's Listened state changes (here, from
+    /// playback finishing, or from iCloud) so episode rows can update their
+    /// Listened checkmark without being reloaded.
+    static let playedEpisodesDidChange = Notification.Name("applevis.playedEpisodesDidChange")
+
+    /// One timestamped change per episode, so iCloud can tell "turned off"
+    /// apart from "never synced": the old plain list was merged by union,
+    /// so an episode turned back off on one device was re-added by the next
+    /// sync from any other. The newest change for an episode wins.
+    struct PlayedChange: Codable {
+        let played: Bool
+        let at: Date
+    }
+
+    private let playedChangesKey = "applevis.podcast.playedEpisodeChanges"
+
     func markEpisodePlayed(_ id: String) {
-        var ids = playedEpisodeIds()
-        guard ids.insert(id).inserted else { return }
-        defaults.set(Array(ids), forKey: playedEpisodesKey)
-        Task { @MainActor in ICloudSyncManager.shared.pushPlayedEpisodes() }
+        setEpisodePlayed(id, played: true)
     }
 
     /// Previously marking an episode listened was a one-way door — the
@@ -183,14 +196,39 @@ final class PersistenceStore {
     /// label with no way back, whether you tapped it by mistake or it
     /// arrived via iCloud sync from another device. Requested directly.
     func unmarkEpisodePlayed(_ id: String) {
-        var ids = playedEpisodeIds()
-        guard ids.remove(id) != nil else { return }
-        defaults.set(Array(ids), forKey: playedEpisodesKey)
+        setEpisodePlayed(id, played: false)
+    }
+
+    private func setEpisodePlayed(_ id: String, played: Bool) {
+        var changes = playedChanges()
+        guard (changes[id]?.played ?? false) != played else { return }
+        changes[id] = PlayedChange(played: played, at: Date())
+        savePlayedChanges(changes)
         Task { @MainActor in ICloudSyncManager.shared.pushPlayedEpisodes() }
     }
 
     private func playedEpisodeIds() -> Set<String> {
-        Set(defaults.stringArray(forKey: playedEpisodesKey) ?? [])
+        Set(playedChanges().filter(\.value.played).keys)
+    }
+
+    /// Falls back to the old plain list (pre-2026.17), treating each entry
+    /// as marked long ago so any real change made since wins over it.
+    func playedChanges() -> [String: PlayedChange] {
+        if let data = defaults.data(forKey: playedChangesKey),
+           let changes = try? JSONDecoder().decode([String: PlayedChange].self, from: data) {
+            return changes
+        }
+        let legacy = defaults.stringArray(forKey: playedEpisodesKey) ?? []
+        return Dictionary(legacy.map { ($0, PlayedChange(played: true, at: .distantPast)) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    private func savePlayedChanges(_ changes: [String: PlayedChange]) {
+        if let data = try? JSONEncoder().encode(changes) {
+            defaults.set(data, forKey: playedChangesKey)
+        }
+        // Kept current for older builds reading the same defaults.
+        defaults.set(changes.filter(\.value.played).map(\.key), forKey: playedEpisodesKey)
+        NotificationCenter.default.post(name: Self.playedEpisodesDidChange, object: nil)
     }
 
     // MARK: - Per-item visit tracking (backs Home's "Mark as Read" and new-reply detection)
@@ -216,6 +254,62 @@ final class PersistenceStore {
         visits[id] = ItemVisit(seenAt: seenAt, commentCount: commentCount)
         persist(visits, key: itemVisitsKey)
         Task { @MainActor in ICloudSyncManager.shared.pushReadHistory() }
+    }
+
+    // MARK: - Feed baselines
+    //
+    // The comment count an item had when it first showed up in a feed,
+    // for items never individually opened — so every row can show a real
+    // "N new" count, not just the ones someone happened to open once.
+    // Before this, a never-opened item had no count to diff against and
+    // fell back to a single time comparison against Home's visit boundary,
+    // which moves forward on every app launch — so any activity before the
+    // most recent launch silently stopped counting as new, even if Home was
+    // never actually looked at (e.g. launching straight into Profile).
+    // Rows side by side disagreed for no visible reason: opened-once topics
+    // showed "8 NEW," never-opened ones with fresh comments showed nothing.
+    // Reported directly.
+    //
+    // Deliberately separate from `itemVisits`: a baseline isn't a read —
+    // it never feeds "last visited," read-history sync, or Mark as Read,
+    // and an item's visit (once it has one) always takes precedence.
+
+    struct FeedBaseline: Codable {
+        let firstSeenAt: Date
+        let commentCount: Int
+        /// Created since the visit boundary when first seen — shows the
+        /// "NEW" badge (alongside any comment count) until opened or
+        /// marked read, rather than only until the boundary next moves.
+        let isNewItem: Bool
+    }
+
+    private let feedBaselinesKey = "applevis.home.feedBaselines.v1"
+    /// Entries this old are dropped on write — anything not opened in two
+    /// months has long since scrolled out of every feed anyway.
+    private let feedBaselineMaxAge: TimeInterval = 60 * 24 * 60 * 60
+    /// Read on every row render (via `newReplyCount`), so kept in memory
+    /// rather than re-decoded from UserDefaults each time.
+    private var cachedFeedBaselines: [String: FeedBaseline]?
+
+    func allFeedBaselines() -> [String: FeedBaseline] {
+        if let cachedFeedBaselines { return cachedFeedBaselines }
+        let loaded: [String: FeedBaseline] = load(key: feedBaselinesKey) ?? [:]
+        cachedFeedBaselines = loaded
+        return loaded
+    }
+
+    /// Adds baselines only for keys that don't have one yet — a baseline
+    /// is set once, at first sight, and never moved forward, which is what
+    /// lets an unopened item's count keep building until it's cleared.
+    func addFeedBaselines(_ new: [String: FeedBaseline]) {
+        guard !new.isEmpty else { return }
+        let cutoff = Date().addingTimeInterval(-feedBaselineMaxAge)
+        var merged = allFeedBaselines().filter { $0.value.firstSeenAt > cutoff }
+        for (key, baseline) in new where merged[key] == nil {
+            merged[key] = baseline
+        }
+        cachedFeedBaselines = merged
+        persist(merged, key: feedBaselinesKey)
     }
 
     struct ReadHistorySnapshot: Codable {
@@ -287,9 +381,27 @@ final class PersistenceStore {
         Array(playedEpisodeIds())
     }
 
+    /// Old-format cloud list, from a device on an older build: only fills
+    /// in episodes this device has no record of at all.
     func applyPlayedEpisodeIds(_ ids: [String]) {
-        let merged = playedEpisodeIds().union(ids)
-        defaults.set(Array(merged), forKey: playedEpisodesKey)
+        var changes = playedChanges()
+        var changed = false
+        for id in ids where changes[id] == nil {
+            changes[id] = PlayedChange(played: true, at: .distantPast)
+            changed = true
+        }
+        if changed { savePlayedChanges(changes) }
+    }
+
+    /// Newest change per episode wins, whichever device made it.
+    func applyPlayedChanges(_ remote: [String: PlayedChange]) {
+        var changes = playedChanges()
+        var changed = false
+        for (id, change) in remote where change.at > (changes[id]?.at ?? .distantPast) {
+            changes[id] = change
+            changed = true
+        }
+        if changed { savePlayedChanges(changes) }
     }
 
     /// New replies/comments since this item was last visited — same
@@ -297,10 +409,21 @@ final class PersistenceStore {
     /// Guides, Apps, Blogs, Podcasts, Bug Reports) can show the same
     /// per-item "N new" signal Home already has, instead of only Home
     /// knowing about it.
+    /// Falls back to the item's feed baseline when it's never been opened.
+    /// When "new" starts for a detail screen that marks individual
+    /// comments as new (forum topics): the last visit, or failing that,
+    /// when Home first saw the item — the same fallback `newReplyCount`
+    /// uses, so what Home counts as new is what the topic shows as new.
+    func newActivityCutoff(kind: ContentKind, id: String) -> Date? {
+        let key = FeedItem.visitKey(kind: kind, contentId: id)
+        return allItemVisits()[key]?.seenAt ?? allFeedBaselines()[key]?.firstSeenAt
+    }
+
     func newReplyCount(kind: ContentKind, id: String, currentCount: Int) -> Int {
         guard showsNewActivityIndicators else { return 0 }
-        guard let visit = allItemVisits()[FeedItem.visitKey(kind: kind, contentId: id)] else { return 0 }
-        return max(0, currentCount - visit.commentCount)
+        let key = FeedItem.visitKey(kind: kind, contentId: id)
+        guard let seenCount = allItemVisits()[key]?.commentCount ?? allFeedBaselines()[key]?.commentCount else { return 0 }
+        return max(0, currentCount - seenCount)
     }
 
     /// Backs Settings > Privacy > "Clear All Local Data" — previously that
@@ -312,6 +435,8 @@ final class PersistenceStore {
         defaults.removeObject(forKey: notificationHistoryKey)
         defaults.removeObject(forKey: seenTopicsKey)
         defaults.removeObject(forKey: itemVisitsKey)
+        defaults.removeObject(forKey: feedBaselinesKey)
+        cachedFeedBaselines = nil
         defaults.removeObject(forKey: episodeAudioMetadataKey)
         defaults.removeObject(forKey: mouseRecapDigestKey)
         defaults.removeObject(forKey: translationCacheKey)

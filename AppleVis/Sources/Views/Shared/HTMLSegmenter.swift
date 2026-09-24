@@ -290,7 +290,8 @@ struct SegmentedHTMLView: View {
                     .id(segment.id)
             }
             if shouldCollapse {
-                Button(expandLabel) { expanded = true }
+                // expandLabel is a String — Button(String) skips the catalog.
+                Button(LocalizedStringKey(expandLabel)) { expanded = true }
                     .padding(.top, 4)
             }
         }

@@ -41,11 +41,14 @@ struct ComposeTopicView: View {
     @EnvironmentObject private var communityAgreement: CommunityAgreementStore
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
-    // Mirrors OnboardingView's SignInStep: this screen's primary action is
-    // typing into a field, so VoiceOver focus lands there directly rather
-    // than on a generic heading — otherwise, like every other pushed
-    // screen, it silently defaults to the back button after the push.
-    @AccessibilityFocusState private var isTitleFieldFocused: Bool
+    @State private var justRewrote = false
+    /// Now focuses the header, not the title field — matches how every
+    /// other wizard-style screen in the app (Setup, the Welcome Tour,
+    /// Submit/Contact) focuses its heading first, not straight into a
+    /// field. Previously focused the title field directly for the reason
+    /// given in the (now removed) comment here; this brings it in line
+    /// with the rest of the app instead.
+    @AccessibilityFocusState private var isHeaderFocused: Bool
 
     private var isValid: Bool {
         !title.trimmingCharacters(in: .whitespaces).isEmpty
@@ -74,9 +77,17 @@ struct ComposeTopicView: View {
                     signInRequiredView
                 } else {
                     Form {
+                        Section {
+                            WizardStepHeader(
+                                title: "New Topic", icon: "plus.bubble",
+                                stepIndex: 1, stepTotal: 1, headerFocus: $isHeaderFocused
+                            )
+                            Text("Share a new discussion with the AppleVis community.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                         Section("Title") {
                             TextField("Topic title", text: $title)
-                                .accessibilityFocused($isTitleFieldFocused)
                         }
                         Section("Category") {
                             Picker("Category", selection: $selectedCategory) {
@@ -93,6 +104,7 @@ struct ComposeTopicView: View {
                                         if let result = await intelligence.translate(subject: title, body: bodyText, isTopic: true) {
                                             title = result.subject ?? title
                                             bodyText = result.body
+                                            justRewrote = true
                                         } else {
                                             toast.error(String(localized: "Couldn't translate this. Try again."))
                                         }
@@ -114,6 +126,7 @@ struct ComposeTopicView: View {
                                             if let result = await intelligence.rewriteRespectfully(subject: title, body: bodyText, isTopic: true) {
                                                 title = result.subject ?? title
                                                 bodyText = result.body
+                                                justRewrote = true
                                             } else {
                                                 toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                             }
@@ -121,10 +134,12 @@ struct ComposeTopicView: View {
                                     }
                                 )
                             }
+                            .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
                         }
                         Section("Body") {
                             TextEditor(text: $bodyText)
                                 .frame(minHeight: 200)
+                                .rewriteFlash($justRewrote)
                                 .onChange(of: bodyText) { _, newValue in
                                     guidelines.textChanged(newValue)
                                     intelligence.textChanged(
@@ -152,15 +167,24 @@ struct ComposeTopicView: View {
             }
             .navigationTitle("New Topic")
             .navigationBarTitleDisplayMode(.inline)
-            .task { await retryAccessibilityFocus(into: $isTitleFieldFocused) }
+            .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut, value: guidelines.topWarning?.id)
+            .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { requestCancel() }
                 }
                 if auth.isSignedIn {
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Post") { Task { await submit() } }
-                            .disabled(!isValid || isSubmitting)
+                        Button {
+                            Task { await submit() }
+                        } label: {
+                            if isSubmitting {
+                                ProgressView()
+                            } else {
+                                Text("Post")
+                            }
+                        }
+                        .disabled(!isValid || isSubmitting)
                     }
                 }
             }
@@ -214,12 +238,14 @@ struct ComposeTopicView: View {
                     if let result = await intelligence.rewrite(subject: title, body: bodyText, isTopic: true) {
                         title = result.subject ?? title
                         bodyText = result.body
+                        justRewrote = true
                     } else {
                         toast.error(String(localized: "Couldn't rewrite this. Try again."))
                     }
                 }
             } label: {
                 Label("Rewrite", systemImage: "wand.and.stars")
+                    .symbolEffect(.bounce, value: justRewrote)
             }
             .disabled(bodyText.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
             .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
@@ -294,6 +320,7 @@ struct ComposeReplyView: View {
     @State private var isSubmitting = false
     @State private var error: String?
     @State private var showDiscardConfirm = false
+    @State private var justRewrote = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -323,12 +350,15 @@ struct ComposeReplyView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
+                WizardStepHeader(
+                    title: "Reply", icon: "arrowshape.turn.up.left",
+                    stepIndex: 1, stepTotal: 1, headerFocus: $isHeaderFocused
+                )
+                .padding(.top)
                 Text(quotedReply != nil ? String(localized: "Replying to \(quotedReply!.authorName) — Re: \(topicTitle)") : String(localized: "Re: \(topicTitle)"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding()
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityFocused($isHeaderFocused)
                 // Read-only context, not part of the actual comment body —
                 // see `quotedReply`'s doc comment for why this no longer
                 // gets typed into `bodyText` itself. VoiceOver already has
@@ -350,6 +380,7 @@ struct ComposeReplyView: View {
                         Task {
                             if let result = await intelligence.translate(subject: nil, body: bodyText, isTopic: false) {
                                 bodyText = result.body
+                                justRewrote = true
                             } else {
                                 toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
@@ -370,6 +401,7 @@ struct ComposeReplyView: View {
                             Task {
                                 if let result = await intelligence.rewriteRespectfully(subject: nil, body: bodyText, isTopic: false) {
                                     bodyText = result.body
+                                    justRewrote = true
                                 } else {
                                     toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                 }
@@ -378,9 +410,11 @@ struct ComposeReplyView: View {
                     )
                         .padding(.horizontal)
                         .padding(.bottom, 8)
+                        .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
                 }
                 TextEditor(text: $bodyText)
                     .padding()
+                    .rewriteFlash($justRewrote)
                     .onChange(of: bodyText) { _, newValue in
                         guidelines.textChanged(newValue, isReply: true)
                         intelligence.textChanged(
@@ -398,12 +432,21 @@ struct ComposeReplyView: View {
             }
             .navigationTitle("Reply")
             .navigationBarTitleDisplayMode(.inline)
+            .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut, value: guidelines.topWarning?.id)
             .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { requestCancel() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Post") { Task { await submit() } }
-                        .disabled(bodyText.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
+                    Button {
+                        Task { await submit() }
+                    } label: {
+                        if isSubmitting {
+                            ProgressView()
+                        } else {
+                            Text("Post")
+                        }
+                    }
+                    .disabled(bodyText.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
                 }
             }
             .confirmationDialog(
@@ -429,12 +472,14 @@ struct ComposeReplyView: View {
                 Task {
                     if let result = await intelligence.rewrite(subject: nil, body: bodyText, isTopic: false) {
                         bodyText = result.body
+                        justRewrote = true
                     } else {
                         toast.error(String(localized: "Couldn't rewrite this. Try again."))
                     }
                 }
             } label: {
                 Label("Rewrite", systemImage: "wand.and.stars")
+                    .symbolEffect(.bounce, value: justRewrote)
             }
             .disabled(bodyText.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
             .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))

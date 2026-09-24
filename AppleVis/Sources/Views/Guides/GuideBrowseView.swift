@@ -17,16 +17,16 @@ struct GuideBrowseView: View {
     var body: some View {
         Group {
             if isLoading && resources.isEmpty {
-                LoadingView(message: "Loading resources…")
+                LoadingView(message: "Loading guides…")
             } else if let error, resources.isEmpty {
                 ErrorView(message: error) { await load(reset: true) }
             } else if resources.isEmpty {
-                EmptyStateView(title: "No Resources Yet", message: "Pull to refresh resources", systemImage: "book")
+                EmptyStateView(title: "No Guides Yet", message: "Pull to refresh guides", systemImage: "book")
             } else {
                 resourceList
             }
         }
-        .navigationTitle("Guides & Resources")
+        .navigationTitle("Guides")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) { filterMenu }
         }
@@ -69,11 +69,14 @@ struct GuideBrowseView: View {
             }
 
             if !resources.isEmpty && !hasMore && searchText.isEmpty {
-                Text("\(resources.count) resource\(resources.count == 1 ? "" : "s") loaded")
+                // No English-only plural "s" slot: most languages don't pluralize
+                // with a suffix, and the old "%lld resource%@ loaded" key had
+                // picked up translations with two %@ for one argument.
+                Text("Guides loaded: \(resources.count)")
                     .font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                     .listRowSeparator(.hidden)
-                    .accessibilityLabel(String(localized: "\(resources.count) resources loaded."))
+                    .accessibilityLabel(String(localized: "Guides loaded: \(resources.count)"))
             }
         }
         .listStyle(.plain)
@@ -108,7 +111,7 @@ struct GuideBrowseView: View {
             resources = fetched.items
             hasMore = fetched.hasMore
         } catch let e as APIError { error = e.localizedDescription
-        } catch { self.error = "Couldn't load resources." }
+        } catch { self.error = "Couldn't load guides." }
         isLoading = false
     }
 
@@ -121,7 +124,7 @@ struct GuideBrowseView: View {
             resources += more.items
             hasMore = more.hasMore
         } catch {
-            toast.error(String(localized: "Couldn't load more resources."))
+            toast.error(String(localized: "Couldn't load more guides."))
         }
         isLoadingMore = false
     }

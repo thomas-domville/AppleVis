@@ -93,6 +93,12 @@ struct SubmitAppView: View {
     @State private var isSubmitting = false
     @State private var error: String?
     @State private var submitted = false
+    /// Shared across every platform's Accessibility/Additional Comments
+    /// field — imprecise about which exact field just changed when more
+    /// than one could be visible, but only one platform section is ever
+    /// shown at a time, so the extra flash on an adjacent field costs
+    /// nothing real. Not worth 8 separate per-field states for that.
+    @State private var justRewrote = false
 
     // "Before You Begin" gate — RN required these two confirmations before
     // a submitter could even reach the form (step 1 of its 5-step wizard).
@@ -154,6 +160,11 @@ struct SubmitAppView: View {
     private let deviceOptions: [(label: String, value: String)] = [
         ("iPhone", "iPhone"), ("iPad", "1"), ("Mac", "mac"),
     ]
+    /// The device values the App Store listing named, captured when the
+    /// lookup fills the form — the only ones offered as toggles then, so a
+    /// submitter can untick a device but not claim one the App Store
+    /// doesn't list. Empty (all three offered) in manual entry mode.
+    @State private var storeDeviceValues: [String] = []
     private let usabilityOptions = AppAccessibilityRatings.usabilityIOS
 
     // Apple TV's real 14-category taxonomy (`field_category_tv`, vocabulary
@@ -500,11 +511,10 @@ struct SubmitAppView: View {
                     body: "I am not the developer, publisher, or otherwise affiliated with this app. Developers may not submit their own apps per AppleVis guidelines."
                 )
 
-                WebLink(destination: URL(string: "https://www.applevis.com/submitting-app-applevis-community-app-directory-guidelines")!) {
+                WebLink(destination: URL(string: "https://www.applevis.com/submitting-app-applevis-community-app-directory-guidelines")!, showsExternalIcon: false) {
                     Label("Read submission guidelines", systemImage: "arrow.up.forward.square")
                 }
                 .font(.subheadline).fontWeight(.semibold)
-                .accessibilityHint(String(localized: "Opens in Safari."))
 
                 if !canContinueBeforeYouBegin {
                     Text("Confirm both checkboxes to continue")
@@ -621,6 +631,7 @@ struct SubmitAppView: View {
         payload.supportedDevices = deviceOptions
             .filter { meta.deviceFamilies.contains($0.label) }
             .map(\.value)
+        storeDeviceValues = payload.supportedDevices
         appStoreIndicatesFree = meta.isFree
         isMetadataFromAppStore = true
         updatePriceCategory()
@@ -693,7 +704,7 @@ struct SubmitAppView: View {
     private var searchSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 1, total: 3, title: "Find the App", isFocused: $isStepFocused)
+                WizardStepHeader(title: "Find the App", stepIndex: 1, stepTotal: 3, headerFocus: $isStepFocused)
                 Text("Search the App Store for the app you want to add, or enter its details manually if you can't find it.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -779,6 +790,7 @@ struct SubmitAppView: View {
                         macPayload.developerWebsite = ""
                     case .ios:
                         payload.supportedDevices = []
+                        storeDeviceValues = []
                         payload.appStoreDescription = ""
                         payload.developerWebsite = ""
                     }
@@ -809,8 +821,7 @@ struct SubmitAppView: View {
     private var detailsSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 2, total: 3, title: "App Details", isFocused: $isStepFocused)
-                backButton
+                WizardStepHeader(title: "App Details", stepIndex: 2, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
                 Text("Confirm the app's basic details, then describe its accessibility for AppleVis members.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -885,33 +896,31 @@ struct SubmitAppView: View {
             // runs on" is a reasonable stand-in for "which did you test,"
             // and not worth a manual confirmation step. Manual entry mode
             // has no API data to draw from, so it keeps real toggles.
+            // Used to be read-only whenever the App Store lookup succeeded.
+            // Now pre-ticked from the App Store but each one untickable —
+            // the site's field is still labelled "Device(s) App Was Tested
+            // On", but the app treats it as supported devices until the
+            // site renames it (decided 2026-09-23). Requested directly.
             Section {
-                if isMetadataFromAppStore {
-                    WizardReviewRow(
-                        label: "App Supports",
-                        value: deviceOptions.filter { payload.supportedDevices.contains($0.value) }.map(\.label).joined(separator: ", ")
-                    )
-                } else {
-                    ForEach(deviceOptions, id: \.value) { option in
-                        Toggle(option.label, isOn: Binding(
-                            get: { payload.supportedDevices.contains(option.value) },
-                            set: { isOn in
-                                if isOn {
-                                    if !payload.supportedDevices.contains(option.value) {
-                                        payload.supportedDevices.append(option.value)
-                                    }
-                                } else {
-                                    payload.supportedDevices.removeAll { $0 == option.value }
+                ForEach(deviceOptions.filter { storeDeviceValues.isEmpty || !isMetadataFromAppStore || storeDeviceValues.contains($0.value) }, id: \.value) { option in
+                    Toggle(option.label, isOn: Binding(
+                        get: { payload.supportedDevices.contains(option.value) },
+                        set: { isOn in
+                            if isOn {
+                                if !payload.supportedDevices.contains(option.value) {
+                                    payload.supportedDevices.append(option.value)
                                 }
+                            } else {
+                                payload.supportedDevices.removeAll { $0 == option.value }
                             }
-                        ))
-                    }
+                        }
+                    ))
                 }
             } header: {
                 Text("App Supports")
             } footer: {
-                if isMetadataFromAppStore {
-                    Text("Taken from the devices this app supports on the App Store.")
+                if isMetadataFromAppStore && !storeDeviceValues.isEmpty {
+                    Text("Suggested from the App Store. Untick any device this app doesn't really support.")
                 } else {
                     Text("Required. Select every device this app supports.")
                 }
@@ -969,8 +978,10 @@ struct SubmitAppView: View {
                 Section {
                     TranslatePromptView(isProcessing: intelligence.isProcessing) {
                         Task {
-                            if let result = await intelligence.translate(subject: nil, body: payload.accessibilityComments, isTopic: false) {
-                                payload.accessibilityComments = result.body
+                            // Either comment box can set off the prompt, so translate
+                            // whichever of them isn't in English. Reported directly.
+                            if await intelligence.translateEach([$payload.accessibilityComments, $payload.otherComments]) {
+                                justRewrote = true
                             } else {
                                 toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
@@ -991,6 +1002,7 @@ struct SubmitAppView: View {
                             Task {
                                 if let result = await intelligence.rewriteRespectfully(subject: nil, body: payload.accessibilityComments, isTopic: false) {
                                     payload.accessibilityComments = result.body
+                                    justRewrote = true
                                 } else {
                                     toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                 }
@@ -998,6 +1010,7 @@ struct SubmitAppView: View {
                         }
                     )
                 }
+                .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
             }
 
             Section {
@@ -1021,6 +1034,7 @@ struct SubmitAppView: View {
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
                     .accessibilityHint(String(localized: "Required, minimum 20 characters. Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it."))
+                    .rewriteFlash($justRewrote)
                     .onChange(of: payload.accessibilityComments) { _, newValue in
                         handleAccessibilityCommentsChange(newValue)
                         guidelines.textChanged(newValue)
@@ -1045,6 +1059,7 @@ struct SubmitAppView: View {
                     .frame(minHeight: 80)
                     .accessibilityLabel(String(localized: "Additional Comments"))
                     .accessibilityHint(String(localized: "Optional. Anything else about this app worth mentioning that didn't fit above."))
+                    .rewriteFlash($justRewrote)
                     .onChange(of: payload.otherComments) { _, newValue in
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
@@ -1080,7 +1095,7 @@ struct SubmitAppView: View {
             reasons.append(String(localized: "Enter the app's description to continue."))
         }
         if payload.supportedDevices.isEmpty {
-            reasons.append(String(localized: "Choose at least one device you tested on to continue."))
+            reasons.append(String(localized: "Choose at least one device this app supports to continue."))
         }
         if payload.voiceOverPerformance.isEmpty {
             reasons.append(String(localized: "Rate VoiceOver performance to continue."))
@@ -1106,8 +1121,7 @@ struct SubmitAppView: View {
     private var tvDetailsSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 2, total: 3, title: "App Details", isFocused: $isStepFocused)
-                backButton
+                WizardStepHeader(title: "App Details", stepIndex: 2, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
                 Text("Confirm the app's basic details, then describe its accessibility for AppleVis members.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -1170,8 +1184,10 @@ struct SubmitAppView: View {
                 Section {
                     TranslatePromptView(isProcessing: intelligence.isProcessing) {
                         Task {
-                            if let result = await intelligence.translate(subject: nil, body: tvPayload.accessibilityComments, isTopic: false) {
-                                tvPayload.accessibilityComments = result.body
+                            // Either comment box can set off the prompt, so translate
+                            // whichever of them isn't in English. Reported directly.
+                            if await intelligence.translateEach([$tvPayload.accessibilityComments, $tvPayload.otherComments]) {
+                                justRewrote = true
                             } else {
                                 toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
@@ -1192,6 +1208,7 @@ struct SubmitAppView: View {
                             Task {
                                 if let result = await intelligence.rewriteRespectfully(subject: nil, body: tvPayload.accessibilityComments, isTopic: false) {
                                     tvPayload.accessibilityComments = result.body
+                                    justRewrote = true
                                 } else {
                                     toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                 }
@@ -1199,6 +1216,7 @@ struct SubmitAppView: View {
                         }
                     )
                 }
+                .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
             }
 
             Section {
@@ -1222,6 +1240,7 @@ struct SubmitAppView: View {
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
                     .accessibilityHint(String(localized: "Required, minimum 20 characters. Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it."))
+                    .rewriteFlash($justRewrote)
                     .onChange(of: tvPayload.accessibilityComments) { _, newValue in
                         handleTvAccessibilityCommentsChange(newValue)
                         guidelines.textChanged(newValue)
@@ -1243,6 +1262,7 @@ struct SubmitAppView: View {
                     .frame(minHeight: 80)
                     .accessibilityLabel(String(localized: "Other Comments"))
                     .accessibilityHint(String(localized: "Optional. Anything else about this app worth mentioning that didn't fit above."))
+                    .rewriteFlash($justRewrote)
                     .onChange(of: tvPayload.otherComments) { _, newValue in
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
@@ -1291,8 +1311,7 @@ struct SubmitAppView: View {
     private var watchDetailsSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 2, total: 3, title: "App Details", isFocused: $isStepFocused)
-                backButton
+                WizardStepHeader(title: "App Details", stepIndex: 2, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
                 Text("Confirm the app's basic details, then describe its accessibility for AppleVis members.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -1382,8 +1401,10 @@ struct SubmitAppView: View {
                 Section {
                     TranslatePromptView(isProcessing: intelligence.isProcessing) {
                         Task {
-                            if let result = await intelligence.translate(subject: nil, body: watchPayload.accessibilityComments, isTopic: false) {
-                                watchPayload.accessibilityComments = result.body
+                            // Either comment box can set off the prompt, so translate
+                            // whichever of them isn't in English. Reported directly.
+                            if await intelligence.translateEach([$watchPayload.accessibilityComments, $watchPayload.otherComments]) {
+                                justRewrote = true
                             } else {
                                 toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
@@ -1404,6 +1425,7 @@ struct SubmitAppView: View {
                             Task {
                                 if let result = await intelligence.rewriteRespectfully(subject: nil, body: watchPayload.accessibilityComments, isTopic: false) {
                                     watchPayload.accessibilityComments = result.body
+                                    justRewrote = true
                                 } else {
                                     toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                 }
@@ -1411,6 +1433,7 @@ struct SubmitAppView: View {
                         }
                     )
                 }
+                .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
             }
 
             Section {
@@ -1434,6 +1457,7 @@ struct SubmitAppView: View {
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
                     .accessibilityHint(String(localized: "Required, minimum 20 characters. Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it."))
+                    .rewriteFlash($justRewrote)
                     .onChange(of: watchPayload.accessibilityComments) { _, newValue in
                         handleWatchAccessibilityCommentsChange(newValue)
                         guidelines.textChanged(newValue)
@@ -1455,6 +1479,7 @@ struct SubmitAppView: View {
                     .frame(minHeight: 80)
                     .accessibilityLabel(String(localized: "Other Comments"))
                     .accessibilityHint(String(localized: "Optional. Anything else about this app worth mentioning that didn't fit above."))
+                    .rewriteFlash($justRewrote)
                     .onChange(of: watchPayload.otherComments) { _, newValue in
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
@@ -1513,8 +1538,7 @@ struct SubmitAppView: View {
     private var macDetailsSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 2, total: 3, title: "App Details", isFocused: $isStepFocused)
-                backButton
+                WizardStepHeader(title: "App Details", stepIndex: 2, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
                 Text("Confirm the app's basic details, then describe its accessibility for AppleVis members.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -1615,8 +1639,10 @@ struct SubmitAppView: View {
                 Section {
                     TranslatePromptView(isProcessing: intelligence.isProcessing) {
                         Task {
-                            if let result = await intelligence.translate(subject: nil, body: macPayload.accessibilityComments, isTopic: false) {
-                                macPayload.accessibilityComments = result.body
+                            // Either comment box can set off the prompt, so translate
+                            // whichever of them isn't in English. Reported directly.
+                            if await intelligence.translateEach([$macPayload.accessibilityComments, $macPayload.otherComments]) {
+                                justRewrote = true
                             } else {
                                 toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
@@ -1637,6 +1663,7 @@ struct SubmitAppView: View {
                             Task {
                                 if let result = await intelligence.rewriteRespectfully(subject: nil, body: macPayload.accessibilityComments, isTopic: false) {
                                     macPayload.accessibilityComments = result.body
+                                    justRewrote = true
                                 } else {
                                     toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                 }
@@ -1644,6 +1671,7 @@ struct SubmitAppView: View {
                         }
                     )
                 }
+                .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
             }
 
             Section {
@@ -1667,6 +1695,7 @@ struct SubmitAppView: View {
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
                     .accessibilityHint(String(localized: "Required, minimum 20 characters. Share what it's actually like to use this app with VoiceOver or other accessibility features — what works well, what doesn't, and anything another blind or low vision user would want to know before trying it."))
+                    .rewriteFlash($justRewrote)
                     .onChange(of: macPayload.accessibilityComments) { _, newValue in
                         handleMacAccessibilityCommentsChange(newValue)
                         guidelines.textChanged(newValue)
@@ -1688,6 +1717,7 @@ struct SubmitAppView: View {
                     .frame(minHeight: 80)
                     .accessibilityLabel(String(localized: "Other Comments"))
                     .accessibilityHint(String(localized: "Optional. Anything else about this app worth mentioning that didn't fit above."))
+                    .rewriteFlash($justRewrote)
                     .onChange(of: macPayload.otherComments) { _, newValue in
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
@@ -1750,12 +1780,14 @@ struct SubmitAppView: View {
                 Task {
                     if let result = await intelligence.rewrite(subject: nil, body: text.wrappedValue, isTopic: false) {
                         text.wrappedValue = result.body
+                        justRewrote = true
                     } else {
                         toast.error(String(localized: "Couldn't rewrite this. Try again."))
                     }
                 }
             } label: {
                 Label("Rewrite", systemImage: "wand.and.stars")
+                    .symbolEffect(.bounce, value: justRewrote)
             }
             .disabled(text.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
             .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
@@ -1856,14 +1888,6 @@ struct SubmitAppView: View {
     /// Step-backward navigation, separated from the toolbar's Cancel button
     /// (which now always cancels, regardless of step) — matches the Welcome
     /// Tour's existing in-content Back button.
-    private var backButton: some View {
-        Button {
-            goBack()
-        } label: {
-            Label("Back", systemImage: "chevron.backward")
-        }
-    }
-
     /// Was a single guessed 300ms delay, the same unreliable-on-slower-
     /// devices pattern the detail-screen title-focus convention was built to
     /// eliminate (see AccessibilityFocusRetry.swift) — regrown here (and in
@@ -1897,8 +1921,7 @@ struct SubmitAppView: View {
     private var reviewSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused)
-                backButton
+                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
                 Text("Check your details, then tap Submit.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -1991,7 +2014,7 @@ struct SubmitAppView: View {
                 WizardBlockingNote(reasons: reviewBlockingReasons)
                 WizardBottomButton(
                     String(localized: "Submit"),
-                    isEnabled: isValid && !isSubmitting && exactDuplicateMatches.isEmpty && networkMonitor.isConnected
+                    isEnabled: isValid && !isSubmitting && exactDuplicateMatches.isEmpty && networkMonitor.isConnected, isLoading: isSubmitting
                 ) { Task { await submit() } }
             }
         }
@@ -2013,8 +2036,7 @@ struct SubmitAppView: View {
     private var tvReviewSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused)
-                backButton
+                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
                 Text("Check your details, then tap Submit.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -2043,7 +2065,7 @@ struct SubmitAppView: View {
                 WizardBlockingNote(reasons: networkMonitor.isConnected ? [] : [String(localized: "You're offline. Reconnect to continue.")])
                 WizardBottomButton(
                     String(localized: "Submit"),
-                    isEnabled: isValid && !isSubmitting && networkMonitor.isConnected
+                    isEnabled: isValid && !isSubmitting && networkMonitor.isConnected, isLoading: isSubmitting
                 ) { Task { await submit() } }
             }
         }
@@ -2052,8 +2074,7 @@ struct SubmitAppView: View {
     private var watchReviewSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused)
-                backButton
+                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
                 Text("Check your details, then tap Submit.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -2089,7 +2110,7 @@ struct SubmitAppView: View {
                 WizardBlockingNote(reasons: networkMonitor.isConnected ? [] : [String(localized: "You're offline. Reconnect to continue.")])
                 WizardBottomButton(
                     String(localized: "Submit"),
-                    isEnabled: isValid && !isSubmitting && networkMonitor.isConnected
+                    isEnabled: isValid && !isSubmitting && networkMonitor.isConnected, isLoading: isSubmitting
                 ) { Task { await submit() } }
             }
         }
@@ -2098,8 +2119,7 @@ struct SubmitAppView: View {
     private var macReviewSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused)
-                backButton
+                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
                 Text("Check your details, then tap Submit.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -2138,7 +2158,7 @@ struct SubmitAppView: View {
                 WizardBlockingNote(reasons: networkMonitor.isConnected ? [] : [String(localized: "You're offline. Reconnect to continue.")])
                 WizardBottomButton(
                     String(localized: "Submit"),
-                    isEnabled: isValid && !isSubmitting && networkMonitor.isConnected
+                    isEnabled: isValid && !isSubmitting && networkMonitor.isConnected, isLoading: isSubmitting
                 ) { Task { await submit() } }
             }
         }

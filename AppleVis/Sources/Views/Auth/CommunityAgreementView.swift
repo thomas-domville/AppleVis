@@ -19,6 +19,13 @@ struct CommunityAgreementView: View {
     let declineHint: String
     let onAgree: () -> Void
     let onDecline: () -> Void
+    /// Set only by `OnboardingView`'s Community Agreement step — Setup's
+    /// other 8 steps each show a Back button via `WizardStepHeader`, but
+    /// this view predates that and builds its own header, so it needs its
+    /// own small Back affordance to match rather than losing one. `nil`
+    /// (the Profile sheet's standalone use) omits it entirely — there's
+    /// nothing to go "back" to there, just Cancel/Decline.
+    var onBack: (() -> Void)? = nil
 
     @AccessibilityFocusState private var ownTitleFocus: Bool
     private static let guidelinesURL = URL(string: "https://www.applevis.com/help/guidelines")!
@@ -30,6 +37,17 @@ struct CommunityAgreementView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
+                if let onBack {
+                    HStack {
+                        Button(action: onBack) {
+                            Label("Back", systemImage: "chevron.backward")
+                        }
+                        .accessibilityHint(String(localized: "Returns to the previous step."))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 8)
+                }
                 VStack(spacing: 12) {
                     Image(systemName: "person.2.circle")
                         .font(.system(size: 56))
@@ -67,11 +85,10 @@ struct CommunityAgreementView: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 24)
 
-                WebLink(destination: Self.guidelinesURL) {
+                WebLink(destination: Self.guidelinesURL, hint: String(localized: "Opens the complete AppleVis Community Guidelines.")) {
                     Text("Read the Community Guidelines")
                         .fontWeight(.semibold)
                 }
-                .accessibilityHint(String(localized: "Opens the complete AppleVis Community Guidelines."))
 
                 VStack(spacing: 12) {
                     Button(action: onAgree) {

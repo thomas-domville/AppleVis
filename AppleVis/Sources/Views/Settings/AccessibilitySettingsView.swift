@@ -75,8 +75,12 @@ struct AccessibilitySettingsView: View {
                         UIApplication.shared.open(url)
                     }
                 } label: {
-                    Label("Open iOS Settings", systemImage: "gear")
+                    HStack(spacing: 4) {
+                        Label("Open iOS Settings", systemImage: "gear")
+                        ExternalLinkIndicator()
+                    }
                 }
+                .accessibilityHint(String(localized: "Opens the Settings app, outside AppleVis."))
             }
 
             Section {

@@ -82,7 +82,7 @@ struct ReportCommentWizard: View {
 
         /// `label`/`description` above are plain String, so Text(_:String)
         /// and Label(_:S, systemImage:) both display them verbatim, skipping
-        /// catalog lookup entirely — same bug as WizardStepIndicator/
+        /// catalog lookup entirely — same bug as WizardStepHeader/
         /// WizardReviewRow. These resolve them explicitly for call sites
         /// (accessibility labels, the composed report body) that need the
         /// actual localized text rather than a SwiftUI view.
@@ -98,6 +98,12 @@ struct ReportCommentWizard: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @Environment(\.dismiss) private var dismiss
     @StateObject private var domainChecker = EmailDomainChecker()
+    /// Translate to English and Rewrite for Additional Details, like every
+    /// other screen that sends writing to the editorial team. Requested
+    /// directly.
+    @StateObject private var intelligence = ComposeIntelligenceState()
+    @EnvironmentObject private var toast: ToastStore
+    @State private var justRewrote = false
     @AccessibilityFocusState private var isStepFocused: Bool
     @AccessibilityFocusState private var isErrorFocused: Bool
 
@@ -117,11 +123,18 @@ struct ReportCommentWizard: View {
     private var isSignedIn: Bool { auth.isSignedIn }
     private var effectiveReason: Reason { reason ?? .other }
     private var displayName: String { isSignedIn ? (auth.user?.name ?? "") : name }
-    private var navigationTitleText: String { String(localized: "Report \(context.subjectKind.capitalized)") }
+    /// `subjectKind` is English on purpose — it also goes into the report
+    /// email the editorial team reads. Translated here, for display only,
+    /// via the catalog's own entries for those nouns ("Topic", "Comment", …).
+    private var displayedSubjectKind: String {
+        String(localized: String.LocalizationValue(context.subjectKind.capitalized))
+    }
+
+    private var navigationTitleText: String { String(localized: "Report \(displayedSubjectKind)") }
     private var reportedSubjectText: String {
         context.authorName.isEmpty
-            ? String(localized: "Reporting this \(context.subjectKind)")
-            : String(localized: "Reporting a \(context.subjectKind) by \(context.authorName)")
+            ? String(localized: "Reporting this \(displayedSubjectKind.lowercased())")
+            : String(localized: "Reporting a \(displayedSubjectKind.lowercased()) by \(context.authorName)")
     }
 
     private func stepNumber(_ s: Step) -> Int { s.rawValue + 1 }
@@ -238,7 +251,7 @@ struct ReportCommentWizard: View {
     private var reasonSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 1, total: totalSteps, title: "Why are you reporting this?", isFocused: $isStepFocused, accentColor: .red)
+                WizardStepHeader(title: "Why are you reporting this?", stepIndex: 1, stepTotal: totalSteps, accentColor: .red, headerFocus: $isStepFocused)
                 Text("Choose the option that best describes the problem.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -305,16 +318,40 @@ struct ReportCommentWizard: View {
     private var detailsSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: stepNumber(.details), total: totalSteps, title: "Add any details", isFocused: $isStepFocused, accentColor: .red)
-                backButton
+                WizardStepHeader(title: "Add any details", stepIndex: stepNumber(.details), stepTotal: totalSteps, accentColor: .red, onBack: goBack, headerFocus: $isStepFocused)
                 Text("Anything else that would help the editorial team review this is optional but appreciated.")
                     .font(.subheadline).foregroundStyle(.secondary)
+            }
+            if intelligence.showTranslatePrompt {
+                Section {
+                    TranslatePromptView(isProcessing: intelligence.isProcessing) {
+                        Task {
+                            if let result = await intelligence.translate(subject: nil, body: details, isTopic: false) {
+                                details = result.body
+                                justRewrote = true
+                            } else {
+                                toast.error(String(localized: "Couldn't translate this. Try again."))
+                            }
+                        }
+                    } onDismiss: {
+                        intelligence.dismissTranslatePrompt()
+                    }
+                }
             }
             Section("Additional Details") {
                 TextEditor(text: $details)
                     .frame(minHeight: 120)
                     .accessibilityLabel(String(localized: "Additional details"))
                     .accessibilityHint(String(localized: "Optional. Anything that would help our editorial team understand what's wrong here — extra context is always appreciated, but never required."))
+                    .rewriteFlash($justRewrote)
+                    .onChange(of: details) { _, newValue in
+                        intelligence.textChanged(
+                            newValue,
+                            translationEnabled: preferences.composeTranslationEnabled,
+                            detectionEnabled: preferences.nonEnglishDetectionEnabled
+                        )
+                    }
+                DraftRewriteButton(intelligence: intelligence, text: $details, justRewrote: $justRewrote)
             }
             if !isSignedIn {
                 Section("Your Name") {
@@ -360,8 +397,7 @@ struct ReportCommentWizard: View {
     private var reviewSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: stepNumber(.review), total: totalSteps, title: "Review and send", isFocused: $isStepFocused, accentColor: .red)
-                backButton
+                WizardStepHeader(title: "Review and send", stepIndex: stepNumber(.review), stepTotal: totalSteps, accentColor: .red, onBack: goBack, headerFocus: $isStepFocused)
                 Text("Check your report, then tap Send Report.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -438,14 +474,6 @@ struct ReportCommentWizard: View {
 
     /// Step-backward navigation, separated from the toolbar's Cancel button
     /// so a user can discard the report from any step.
-    private var backButton: some View {
-        Button {
-            goBack()
-        } label: {
-            Label("Back", systemImage: "chevron.backward")
-        }
-    }
-
     private var composedMessage: String {
         var lines = [
             "Reason: \(effectiveReason.label)",

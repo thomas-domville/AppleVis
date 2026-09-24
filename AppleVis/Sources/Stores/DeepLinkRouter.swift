@@ -1,12 +1,13 @@
 import Foundation
 import Combine
+import UIKit
 
-/// Resolves Spotlight search-result taps and (best-effort) universal links
-/// into in-app navigation. Spotlight identifiers are our own encoding
-/// (kind.id), so those resolve reliably. Real applevis.com URLs from
-/// Universal Links don't map to a fetchable JSON:API id without a
-/// path-alias-resolution endpoint this app doesn't implement — those open in
-/// an in-app browser instead of a fabricated (and likely wrong) deep link.
+/// Resolves Spotlight search-result taps, push notifications, and
+/// applevis.com links into in-app navigation. Spotlight identifiers are our
+/// own encoding (kind.id). Real applevis.com URLs — Universal Links and
+/// links tapped inside posts — go through `AppleVisLinkResolver`, which
+/// reads the page's node number to find the native screen; anything it
+/// can't resolve still opens in the browser rather than a guessed screen.
 @MainActor
 final class DeepLinkRouter: ObservableObject {
     @Published var pendingContent: (kind: ContentKind, id: String)?
@@ -35,13 +36,45 @@ final class DeepLinkRouter: ObservableObject {
         pendingContent = resolved
     }
 
+    /// True while an AppleVis link is being looked up — drives ContentView's
+    /// "Opening…" indicator, and stops a second tap from starting a second
+    /// lookup.
+    @Published private(set) var isResolvingLink = false
+
     func handleUniversalLink(_ url: URL) {
-        // `.contains` would also match a spoofed host like
-        // "applevis.com.attacker.com" — iOS's own universal-link domain
-        // verification already restricts which real domains can reach this
-        // handler at all, but the check itself should still be precise.
-        guard let host = url.host, host == "applevis.com" || host.hasSuffix(".applevis.com") else { return }
-        pendingWebURL = url
+        guard AppleVisLinkResolver.isAppleVisURL(url) else { return }
+        openAppleVisLink(url)
+    }
+
+    /// Opens an applevis.com link on its native screen when it points to
+    /// content — a topic, app entry, guide, and so on — and in the browser
+    /// otherwise, or if the lookup fails. Used to always go straight to the
+    /// browser: Universal Links opened as a web page inside the app, and
+    /// links tapped inside posts left the app for Safari entirely.
+    /// Requested directly.
+    ///
+    /// `onUnresolved` decides where a link goes if it isn't content or the
+    /// lookup fails — the in-app browser by default (Universal Links), or
+    /// whatever the caller did before (a link inside a post passes Safari,
+    /// its old behavior, since ContentView's web sheet can't appear over
+    /// the detail sheet that link may be sitting in).
+    func openAppleVisLink(_ url: URL, onUnresolved: ((URL) -> Void)? = nil) {
+        let fallback = onUnresolved ?? { [weak self] in self?.pendingWebURL = $0 }
+        guard AppleVisLinkResolver.destination(for: url) != nil else {
+            fallback(url)
+            return
+        }
+        guard !isResolvingLink else { return }
+        isResolvingLink = true
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "Opening link…"))
+        Task {
+            if let resolved = await AppleVisLinkResolver.resolve(url) {
+                pendingContent = resolved
+            } else {
+                fallback(url)
+            }
+            isResolvingLink = false
+        }
     }
 
     /// Handles the Share Extension's "applevis://" deep link. Returns

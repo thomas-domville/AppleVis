@@ -224,7 +224,7 @@ struct AccountSecurityWizard: View {
     private var verifySection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 1, total: totalSteps, title: "Confirm Your Password", isFocused: $isStepFocused, accentColor: mode.color)
+                WizardStepHeader(title: "Confirm Your Password", stepIndex: 1, stepTotal: totalSteps, accentColor: mode.color, headerFocus: $isStepFocused)
                 Text("For your security, enter your current AppleVis password to continue.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -245,12 +245,11 @@ struct AccountSecurityWizard: View {
     private var newValueSection: some View {
         Group {
             Section {
-                WizardStepIndicator(
-                    step: 2, total: totalSteps,
+                WizardStepHeader(
                     title: mode == .password ? "Choose a New Password" : "Enter Your New Email",
-                    isFocused: $isStepFocused, accentColor: mode.color
+                    stepIndex: 2, stepTotal: totalSteps,
+                    accentColor: mode.color, onBack: goBack, headerFocus: $isStepFocused
                 )
-                backButton
                 Text(mode == .password
                     ? String(localized: "Enter a new password meeting the requirements below, then confirm it.")
                     : String(localized: "Enter the new email address for your AppleVis account."))
@@ -341,8 +340,7 @@ struct AccountSecurityWizard: View {
     private var reviewSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 3, total: totalSteps, title: "Review and Save", isFocused: $isStepFocused, accentColor: mode.color)
-                backButton
+                WizardStepHeader(title: "Review and Save", stepIndex: 3, stepTotal: totalSteps, accentColor: mode.color, onBack: goBack, headerFocus: $isStepFocused)
                 Text("Check your change, then tap Save Changes.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -401,14 +399,6 @@ struct AccountSecurityWizard: View {
 
     /// Step-backward navigation, separated from the toolbar's Cancel button
     /// so a user can discard the change from any step.
-    private var backButton: some View {
-        Button {
-            goBack()
-        } label: {
-            Label("Back", systemImage: "chevron.backward")
-        }
-    }
-
     private func submit() async {
         guard let user = auth.user else { return }
         isSubmitting = true; error = nil

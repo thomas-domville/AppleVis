@@ -127,6 +127,8 @@ final class ICloudSyncManager {
 
     func pushPlayedEpisodes() {
         guard isSyncEnabled("sync.podcastPosition") else { return }
+        setJSON(PersistenceStore.shared.playedChanges(), key: "icloud.playedEpisodeChanges")
+        // Old-format list, still written for devices on older builds.
         setJSON(PersistenceStore.shared.playedEpisodeIdsSnapshot(), key: "icloud.playedEpisodes")
         store.synchronize()
         touchLastSyncDate()
@@ -258,7 +260,9 @@ final class ICloudSyncManager {
 
     private func pullPlayedEpisodes() {
         guard isSyncEnabled("sync.podcastPosition") else { return }
-        if let ids: [String] = getJSON(key: "icloud.playedEpisodes") {
+        if let changes: [String: PersistenceStore.PlayedChange] = getJSON(key: "icloud.playedEpisodeChanges") {
+            PersistenceStore.shared.applyPlayedChanges(changes)
+        } else if let ids: [String] = getJSON(key: "icloud.playedEpisodes") {
             PersistenceStore.shared.applyPlayedEpisodeIds(ids)
         }
     }

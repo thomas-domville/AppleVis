@@ -24,7 +24,6 @@ struct SocialLinksView: View {
                         Label("Follow AppleVis on \(platform.name)", systemImage: platform.icon)
                     }
                     .accessibilityLabel(String(localized: "Follow AppleVis on \(platform.name)"))
-                    .accessibilityHint(String(localized: "Opens in Safari."))
                 }
             }
         }

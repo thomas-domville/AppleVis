@@ -285,8 +285,8 @@ private struct AppHealthFlagActions: ViewModifier {
                 Text(String(localized: "This permanently removes the entire \(ContentKind.appListing.displayName.lowercased()) and everything posted underneath it."))
             }
             .sheet(item: $editingNode) { node in
-                EditNodeSheet(initialTitle: node.title, initialBody: node.body) { newTitle, newBody in
-                    try await saveEdit(title: newTitle, body: newBody)
+                EditNodeSheet(initialTitle: node.title, initialBody: node.body, nodeTypeSuffix: node.nodeTypeSuffix) { newTitle, newBody in
+                    try await saveEdit(title: newTitle, body: newBody, format: node.format)
                 }
             }
     }
@@ -296,12 +296,12 @@ private struct AppHealthFlagActions: ViewModifier {
             toast.error(String(localized: "Couldn't load this app entry. Try again."))
             return
         }
-        editingNode = EditableNode(title: detail.name, body: detail.body, nodeTypeSuffix: Self.nodeType)
+        editingNode = EditableNode(title: detail.name, body: detail.rawBody, format: detail.bodyFormat, nodeTypeSuffix: Self.nodeType)
     }
 
-    private func saveEdit(title: String, body: String) async throws {
+    private func saveEdit(title: String, body: String, format: String) async throws {
         guard let user = auth.user else { return }
-        try await APIClient.shared.content.editNode(nodeId: flag.appId, nodeType: Self.nodeType, title: title, body: body, csrfToken: user.csrfToken)
+        try await APIClient.shared.content.editNode(nodeId: flag.appId, nodeType: Self.nodeType, title: title, body: body, format: format, csrfToken: user.csrfToken)
         toast.success(String(localized: "App Entry updated"))
         onHandled()
     }

@@ -54,6 +54,9 @@ nonisolated struct AppDetail: Identifiable, Codable, Sendable {
     let buttonLabelling: String?
     let usabilityNotes: String?
     let body: String
+    /// See `ForumTopicDetail.rawBody`/`bodyFormat`'s doc comment.
+    var rawBody: String = ""
+    var bodyFormat: String = drupalDefaultTextFormat
     let reviewedVersion: String?
     let testedOnIOS: String?
     let accessibilityComments: String?
@@ -72,6 +75,53 @@ nonisolated struct AppDetail: Identifiable, Codable, Sendable {
     var macUpdateUrl: String? = nil
 }
 
+extension AppDetail {
+    /// The site's `field_device_used`, as readable names. The website still
+    /// labels this "Device(s) App Was Tested On", but the app deliberately
+    /// treats it as the devices the app *supports* — pre-filled from the
+    /// App Store, trimmed by whoever submits or refreshes the entry — until
+    /// the site renames the field to match (decided 2026-09-23). The live
+    /// form stores iPad as the literal value "1" and Mac as "mac" (see
+    /// SubmitAppView's `deviceOptions`), so raw values can't be shown as-is.
+    nonisolated var siteDevices: [String] {
+        var result: [String] = []
+        for raw in supportedDevices {
+            let value = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let name: String?
+            switch value {
+            case "iphone": name = "iPhone"
+            case "1", "ipad": name = "iPad"
+            case _ where value.contains("mac"): name = "Mac"
+            default: name = raw.isEmpty ? nil : raw
+            }
+            if let name, !result.contains(name) { result.append(name) }
+        }
+        return result
+    }
+
+    /// What Refresh App Details offers for the devices field: the App
+    /// Store's iPhone/iPad list, plus Mac if either the App Store lists it
+    /// or the entry already has it — the App Store lookup only reports Mac
+    /// for Catalyst builds, so an iPhone app that genuinely runs on Apple
+    /// silicon Macs would otherwise silently lose Mac on every refresh.
+    /// iOS directory entries only (the only platform with this field).
+    nonisolated func refreshedDevices(storeFamilies: [String]) -> [String] {
+        guard platform == .ios else { return [] }
+        return ["iPhone", "iPad", "Mac"].filter {
+            storeFamilies.contains($0) || ($0 == "Mac" && siteDevices.contains("Mac"))
+        }
+    }
+
+    /// The value the live form submits for a device name.
+    nonisolated static func siteDeviceValue(for name: String) -> String {
+        switch name {
+        case "iPad": return "1"
+        case "Mac": return "mac"
+        default: return name
+        }
+    }
+}
+
 nonisolated struct AppReview: Identifiable, Codable, Sendable {
     let id: String
     let subject: String
@@ -79,6 +129,8 @@ nonisolated struct AppReview: Identifiable, Codable, Sendable {
     let authorId: String
     let rating: Int?
     let body: String
+    var rawBody: String = ""
+    var bodyFormat: String = drupalDefaultTextFormat
     let createdAt: Date
 }
 

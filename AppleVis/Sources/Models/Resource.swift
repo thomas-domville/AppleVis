@@ -28,6 +28,9 @@ nonisolated struct ResourceDetail: Identifiable, Codable, Sendable {
     let categories: [String]
     let summary: String
     let body: String
+    /// See `ForumTopicDetail.rawBody`/`bodyFormat`'s doc comment.
+    var rawBody: String = ""
+    var bodyFormat: String = drupalDefaultTextFormat
     let createdAt: Date
     let updatedAt: Date
     let commentCount: Int
@@ -42,6 +45,8 @@ nonisolated struct ResourceComment: Identifiable, Codable, Sendable {
     let authorId: String
     let subject: String
     let body: String
+    var rawBody: String = ""
+    var bodyFormat: String = drupalDefaultTextFormat
     let createdAt: Date
 }
 

@@ -79,7 +79,7 @@ struct BlogBrowseView: View {
             }
 
             if !posts.isEmpty && !hasMore && searchText.isEmpty {
-                Text("\(posts.count) post\(posts.count == 1 ? "" : "s") loaded")
+                Text("Posts loaded: \(posts.count)")
                     .font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                     .listRowSeparator(.hidden)

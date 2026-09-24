@@ -107,6 +107,7 @@ struct ContactView: View {
     @State private var error: String?
     @State private var showDiscardConfirm = false
     @State private var messageMinimumAnnounced = false
+    @State private var justRewrote = false
     @State private var showAccountEmailChange = false
     @State private var emailSuggestionDismissed = false
 
@@ -248,7 +249,7 @@ struct ContactView: View {
     private var typeSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 1, total: totalSteps, title: "Contact AppleVis", isFocused: $isStepFocused, accentColor: contactType?.color)
+                WizardStepHeader(title: "Contact AppleVis", stepIndex: 1, stepTotal: totalSteps, accentColor: contactType?.color ?? .accentColor, headerFocus: $isStepFocused)
                 Text("Choose the type of message you'd like to send. This helps us get it to the right team.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -303,8 +304,7 @@ struct ContactView: View {
     private var detailsSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: stepNumber(.details), total: totalSteps, title: "Your Details", isFocused: $isStepFocused, accentColor: effectiveType.color)
-                backButton
+                WizardStepHeader(title: "Your Details", stepIndex: stepNumber(.details), stepTotal: totalSteps, accentColor: effectiveType.color, onBack: goBack, headerFocus: $isStepFocused)
                 Text("We need your name and email address so we can reply to you.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -354,8 +354,7 @@ struct ContactView: View {
     private var messageSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: stepNumber(.message), total: totalSteps, title: "Write your message", isFocused: $isStepFocused, accentColor: effectiveType.color)
-                backButton
+                WizardStepHeader(title: "Write your message", stepIndex: stepNumber(.message), stepTotal: totalSteps, accentColor: effectiveType.color, onBack: goBack, headerFocus: $isStepFocused)
                 Text("You're sending a \(effectiveType.label). Write as much detail as you like.")
                     .font(.subheadline).foregroundStyle(.secondary)
                 HStack {
@@ -383,6 +382,7 @@ struct ContactView: View {
                         Task {
                             if let result = await intelligence.translate(subject: effectiveType.subject, body: message, isTopic: false) {
                                 message = result.body
+                                justRewrote = true
                             } else {
                                 toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
@@ -403,6 +403,7 @@ struct ContactView: View {
                             Task {
                                 if let result = await intelligence.rewriteRespectfully(subject: effectiveType.subject, body: message, isTopic: false) {
                                     message = result.body
+                                    justRewrote = true
                                 } else {
                                     toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                 }
@@ -410,6 +411,7 @@ struct ContactView: View {
                         }
                     )
                 }
+                .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
             }
             Section {
                 // Previously two separate swipe-stops ("Message", then the
@@ -435,6 +437,7 @@ struct ContactView: View {
                     .frame(minHeight: 160)
                     .accessibilityLabel(String(localized: "Message"))
                     .accessibilityHint(String(localized: "Required. Minimum 20 characters. \(effectiveType.messagePlaceholder)"))
+                    .rewriteFlash($justRewrote)
                     .onChange(of: message) { _, newValue in
                         handleMessageChange(newValue)
                         guidelines.textChanged(newValue)
@@ -499,12 +502,14 @@ struct ContactView: View {
                 Task {
                     if let result = await intelligence.rewrite(subject: effectiveType.subject, body: message, isTopic: false) {
                         message = result.body
+                        justRewrote = true
                     } else {
                         toast.error(String(localized: "Couldn't rewrite this. Try again."))
                     }
                 }
             } label: {
                 Label("Rewrite", systemImage: "wand.and.stars")
+                    .symbolEffect(.bounce, value: justRewrote)
             }
             .disabled(message.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
             .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
@@ -526,8 +531,7 @@ struct ContactView: View {
     private var reviewSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: stepNumber(.review), total: totalSteps, title: "Review and send", isFocused: $isStepFocused, accentColor: effectiveType.color)
-                backButton
+                WizardStepHeader(title: "Review and send", stepIndex: stepNumber(.review), stepTotal: totalSteps, accentColor: effectiveType.color, onBack: goBack, headerFocus: $isStepFocused)
                 Text("Check your message, then tap Send Message.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -618,7 +622,7 @@ struct ContactView: View {
                 WizardBlockingNote(reasons: reviewBlockingReasons)
                 WizardBottomButton(
                     isSubmitting ? String(localized: "Sending…") : String(localized: "Send Message"),
-                    isEnabled: canSend
+                    isEnabled: canSend, isLoading: isSubmitting
                 ) { Task { await submit() } }
             }
         }
@@ -682,16 +686,6 @@ struct ContactView: View {
     /// directly.
     private func focusStepAfterTransition() {
         Task { await retryAccessibilityFocus(into: $isStepFocused) }
-    }
-
-    /// Step-backward navigation, separated from the toolbar's Cancel button
-    /// so a user can discard the message from any step.
-    private var backButton: some View {
-        Button {
-            goBack()
-        } label: {
-            Label("Back", systemImage: "chevron.backward")
-        }
     }
 
     private func submit() async {

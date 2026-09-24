@@ -69,11 +69,11 @@ struct CommunityDiscussionHeading: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
-            .accessibilityLabel(String(localized: "Community Discussion, \(count) comment\(count == 1 ? "" : "s")"))
+            .accessibilityLabel(String(localized: "Community Discussion, \(commentCountPhrase(count))"))
             .accessibilityAction(named: Text("Thread overview"), onThreadOverview)
 
             if count > 0 {
-                Text("\(count) comment\(count == 1 ? "" : "s")")
+                Text(commentCountPhrase(count))
                     .font(.caption).foregroundStyle(.secondary)
                     .accessibilityHidden(true)
             }
@@ -206,5 +206,29 @@ extension Array {
     func newestSuffix(count n: Int) -> ArraySlice<Element> {
         let clamped = Swift.max(0, Swift.min(n, count))
         return self[(count - clamped)...]
+    }
+}
+
+/// The spoken overview every detail page announces once its thread loads
+/// ("Thread has 12 comments. Most recent comment by Jane, 3 hours ago.
+/// Original post by Sam."). Was six copies of plain English string
+/// building — one per detail page — so VoiceOver read it in English in
+/// every language. One translated copy now; the comment count uses the
+/// catalog's plural variations.
+enum ThreadOverview {
+    static func announce(commentCount: Int, mostRecentAuthor: String?, mostRecentDate: Date?,
+                         originalAuthor: String? = nil, submittedBy: String? = nil) {
+        var parts = [String(localized: "Thread has \(commentCount) comments.")]
+        if let mostRecentAuthor, let mostRecentDate {
+            let when = mostRecentDate.formatted(.relative(presentation: .named))
+            parts.append(String(localized: "Most recent comment by \(mostRecentAuthor), \(when)."))
+        }
+        if let originalAuthor, !originalAuthor.isEmpty {
+            parts.append(String(localized: "Original post by \(originalAuthor)."))
+        }
+        if let submittedBy, !submittedBy.isEmpty {
+            parts.append(String(localized: "Submitted by \(submittedBy)."))
+        }
+        UIAccessibility.post(notification: .announcement, argument: parts.joined(separator: " "))
     }
 }

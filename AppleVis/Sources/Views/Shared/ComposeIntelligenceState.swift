@@ -37,6 +37,24 @@ final class ComposeIntelligenceState: ObservableObject {
         return result
     }
 
+    /// Translates every field that isn't in English, for screens with more
+    /// than one text box. The prompt can be set off by any of them, but
+    /// Translate used to act on one fixed box only — so non-English text in
+    /// the other box stayed as it was. Reported directly.
+    /// Returns false if any translation failed.
+    func translateEach(_ fields: [Binding<String>]) async -> Bool {
+        var succeeded = true
+        for field in fields where IntelligenceService.detectNonEnglish(field.wrappedValue) {
+            if let result = await translate(subject: nil, body: field.wrappedValue, isTopic: false) {
+                field.wrappedValue = result.body
+            } else {
+                succeeded = false
+            }
+        }
+        if succeeded { showTranslatePrompt = false }
+        return succeeded
+    }
+
     func rewrite(subject: String?, body: String, isTopic: Bool) async -> IntelligenceService.DraftRewriteResult? {
         isProcessing = true
         defer { isProcessing = false }
@@ -82,5 +100,36 @@ struct TranslatePromptView: View {
         .padding(10)
         .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// A Rewrite button for a single compose field, for screens that don't
+/// build their own — same look, wording and hint as every wizard's.
+struct DraftRewriteButton: View {
+    @ObservedObject var intelligence: ComposeIntelligenceState
+    @Binding var text: String
+    @Binding var justRewrote: Bool
+
+    @EnvironmentObject private var preferences: PreferencesStore
+    @EnvironmentObject private var toast: ToastStore
+
+    var body: some View {
+        if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+            Button {
+                Task {
+                    if let result = await intelligence.rewrite(subject: nil, body: text, isTopic: false) {
+                        text = result.body
+                        justRewrote = true
+                    } else {
+                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
+                    }
+                }
+            } label: {
+                Label("Rewrite", systemImage: "wand.and.stars")
+                    .symbolEffect(.bounce, value: justRewrote)
+            }
+            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || intelligence.isProcessing)
+            .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
+        }
     }
 }

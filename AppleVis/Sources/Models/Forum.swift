@@ -15,6 +15,7 @@ nonisolated struct ForumTopic: Identifiable, Codable, Hashable, Sendable {
     var isUnread: Bool
     var isFollowing: Bool
     var isSaved: Bool
+    var isPinned: Bool = false
 }
 
 nonisolated struct ForumTopicDetail: Identifiable, Codable, Sendable {
@@ -37,6 +38,12 @@ nonisolated struct ForumTopicDetail: Identifiable, Codable, Sendable {
     let category: String
     let categoryId: String
     var body: String
+    /// Raw source text (Markdown/plain text/whatever the field is actually
+    /// written in) and its Drupal text-format ID — used to pre-fill and
+    /// correctly re-save an edit, as opposed to `body`'s rendered HTML,
+    /// which display uses. See `JsonApiNode`'s `rawTextValue`/`textFormat`.
+    var rawBody: String = ""
+    var bodyFormat: String = drupalDefaultTextFormat
     let url: String
     var isFollowing: Bool
     var isSaved: Bool
@@ -49,6 +56,9 @@ nonisolated struct ForumReply: Identifiable, Codable, Sendable {
     let authorName: String
     let authorId: String
     let body: String
+    /// See `ForumTopicDetail.rawBody`/`bodyFormat`'s doc comment.
+    var rawBody: String = ""
+    var bodyFormat: String = drupalDefaultTextFormat
     let createdAt: Date
     let loveCount: Int
     var isNew: Bool

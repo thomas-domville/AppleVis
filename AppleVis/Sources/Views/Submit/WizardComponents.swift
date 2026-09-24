@@ -1,46 +1,30 @@
 import SwiftUI
 
-/// "Step X of N" indicator shown at the top of each multi-step submission
-/// wizard. Optionally bound to an `@AccessibilityFocusState` so the wizard
-/// can move VoiceOver focus here after Next/Back — previously goNext()/
-/// goBack() only played a sound, leaving focus wherever it was on the
-/// previous step with nothing announcing the step actually changed.
-struct WizardStepIndicator: View {
-    let step: Int
-    let total: Int
-    let title: String
-    var isFocused: AccessibilityFocusState<Bool>.Binding? = nil
-    /// RN's `WizardLayout` shows an animated top progress *stripe* colored
-    /// per-wizard-type in addition to the step dots — this text-only
-    /// indicator had no visual progress cue at all, which is meaningfully
-    /// less informative for low-vision users who don't run VoiceOver.
-    var accentColor: Color? = nil
+/// Brief background tint that fades in then out to confirm an AI rewrite or
+/// translation just changed this field's text — otherwise the text silently
+/// swaps with no visual signal anything happened, easy to miss entirely for
+/// a low-vision user who isn't rereading every word. Flip `trigger` to
+/// `true` right after applying the new text; it resets itself.
+struct RewriteFlash: ViewModifier {
+    @Binding var trigger: Bool
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if total > 0 {
-                GeometryReader { geo in
-                    Capsule()
-                        .fill(Color.secondary.opacity(0.2))
-                        .overlay(alignment: .leading) {
-                            Capsule()
-                                .fill(accentColor ?? Color.accentColor)
-                                .frame(width: geo.size.width * CGFloat(step) / CGFloat(total))
-                        }
+    func body(content: Content) -> some View {
+        content
+            .background(trigger ? Color.accentColor.opacity(0.15) : Color.clear)
+            .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeOut(duration: 0.6), value: trigger)
+            .onChange(of: trigger) { _, newValue in
+                guard newValue else { return }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(600))
+                    trigger = false
                 }
-                .frame(height: 4)
-                .accessibilityHidden(true)
             }
-            Text("Step \(step) of \(total)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(LocalizedStringKey(title))
-                .font(.headline)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "Step \(step) of \(total): \(String(localized: String.LocalizationValue(title)))"))
-        .accessibilityAddTraits(.isHeader)
-        .modifier(OptionalAccessibilityFocus(isFocused: isFocused))
+    }
+}
+
+extension View {
+    func rewriteFlash(_ trigger: Binding<Bool>) -> some View {
+        modifier(RewriteFlash(trigger: trigger))
     }
 }
 
@@ -210,20 +194,32 @@ struct WizardBottomButton: View {
     let title: String
     var isEnabled: Bool = true
     var isProminent: Bool = true
+    /// Swaps the label for a spinner while true — matches the toolbar
+    /// Next/Submit action's own text-swap ("Sending…" etc.) with an actual
+    /// visual indicator alongside it, and matches the same spinner treatment
+    /// Edit/Compose screens' Save/Post buttons already use.
+    var isLoading: Bool = false
     let action: () -> Void
 
-    init(_ title: String, isEnabled: Bool = true, isProminent: Bool = true, action: @escaping () -> Void) {
+    init(_ title: String, isEnabled: Bool = true, isProminent: Bool = true, isLoading: Bool = false, action: @escaping () -> Void) {
         self.title = title
         self.isEnabled = isEnabled
         self.isProminent = isProminent
+        self.isLoading = isLoading
         self.action = action
     }
 
     var body: some View {
-        let label = Text(title)
-            .font(.headline)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 4)
+        let label = Group {
+            if isLoading {
+                ProgressView()
+            } else {
+                Text(title)
+            }
+        }
+        .font(.headline)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 4)
         Group {
             if isProminent {
                 Button(action: action) { label }
@@ -233,6 +229,10 @@ struct WizardBottomButton: View {
                     .buttonStyle(.bordered)
             }
         }
-        .disabled(!isEnabled)
+        .disabled(!isEnabled || isLoading)
+        // Without this, VoiceOver's label while `isLoading` would come from
+        // the bare ProgressView instead of `title` — losing the "Sending…"
+        // (or equivalent) announcement right when it matters most.
+        .accessibilityLabel(title)
     }
 }

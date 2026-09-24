@@ -12,10 +12,14 @@ struct RelativeDateLabel: View {
 
 struct ActivityCountLabel: View {
     let count: Int
+    /// Only ever "comment" at every call site. Kept for source
+    /// compatibility; the text itself now comes from `commentCountPhrase`,
+    /// which is translated with real plural forms — this used to append an
+    /// English "s" to an untranslated noun on every card.
     let noun: String
 
     var body: some View {
-        Text("\(count) \(noun)\(count == 1 ? "" : "s")")
+        Text(commentCountPhrase(count))
             .foregroundStyle(.secondary)
             .font(.caption)
     }

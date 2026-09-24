@@ -146,10 +146,17 @@ struct ResourceDetailView: View {
                     pendingFocusCommentId = nil
                 }
             }
-            .task {
-                guard focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
+            // Keyed on isLoading so this waits for load() to finish: the
+            // page can appear before the new-comment count is known (App
+            // Store enrichment, Follow state), and jumping then found
+            // nothing new and gave up — leaving VoiceOver on the title.
+            // Reported directly.
+            .task(id: isLoading) {
+                guard !isLoading, focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
                 hasAppliedFirstNewCommentFocus = true
-                await jumpToFirstNewComment(proxy: proxy)
+                // Nothing to land on after all — load() skipped the title
+                // for this, so put focus there instead of nowhere.
+                if !(await jumpToFirstNewComment(proxy: proxy)), newCommentCount > 0 { focusTitleAfterLoad() }
             }
             .task {
                 guard let targetCommentId, !hasAppliedTargetCommentFocus else { return }
@@ -188,8 +195,8 @@ struct ResourceDetailView: View {
             }
         }
         .sheet(item: $editingResourceNode) { node in
-            EditNodeSheet(initialTitle: node.title, initialBody: node.body) { newTitle, newBody in
-                try await saveResourceEdit(nodeTypeSuffix: node.nodeTypeSuffix, title: newTitle, body: newBody)
+            EditNodeSheet(initialTitle: node.title, initialBody: node.body, nodeTypeSuffix: node.nodeTypeSuffix) { newTitle, newBody in
+                try await saveResourceEdit(nodeTypeSuffix: node.nodeTypeSuffix, title: newTitle, body: newBody, format: node.format)
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -229,7 +236,8 @@ struct ResourceDetailView: View {
         } else {
             ForEach(Array(detail.comments.enumerated()), id: \.element.id) { index, comment in
                 CommentRow(
-                    authorName: comment.authorName, text: comment.body, date: comment.createdAt,
+                    authorName: comment.authorName, text: comment.body,
+                    rawText: comment.rawBody, bodyFormat: comment.bodyFormat, date: comment.createdAt,
                     index: index, total: detail.comments.count,
                     subject: comment.subject, parentTitle: detail.title, parentURL: detail.url,
                     commentId: comment.id, authorId: comment.authorId, commentType: "comment_node_guides",
@@ -241,7 +249,7 @@ struct ResourceDetailView: View {
                     },
                     onEdit: { newText in
                         guard let idx = self.detail?.comments.firstIndex(where: { $0.id == comment.id }) else { return }
-                        self.detail?.comments[idx] = ResourceComment(id: comment.id, authorName: comment.authorName, authorId: comment.authorId, subject: comment.subject, body: newText, createdAt: comment.createdAt)
+                        self.detail?.comments[idx] = ResourceComment(id: comment.id, authorName: comment.authorName, authorId: comment.authorId, subject: comment.subject, body: newText, rawBody: newText, bodyFormat: comment.bodyFormat, createdAt: comment.createdAt)
                     },
                     onReplyTo: {
                         guard auth.isSignedIn else {
@@ -341,21 +349,21 @@ struct ResourceDetailView: View {
     /// a spoken summary in place of manually reading through every comment.
     private func announceThreadOverview(_ detail: ResourceDetail) {
         let mostRecent = detail.comments.max { $0.createdAt < $1.createdAt }
-        var summary = "Thread has \(detail.comments.count) comment\(detail.comments.count == 1 ? "" : "s")."
-        if let mostRecent {
-            summary += " Most recent comment by \(mostRecent.authorName), \(mostRecent.createdAt.formatted(.relative(presentation: .named)))."
-        }
-        summary += " Original post by \(detail.authorName)."
-        UIAccessibility.post(notification: .announcement, argument: summary)
+        ThreadOverview.announce(
+            commentCount: detail.comments.count,
+            mostRecentAuthor: mostRecent?.authorName,
+            mostRecentDate: mostRecent?.createdAt,
+            originalAuthor: detail.authorName
+        )
     }
 
     private func startEditResource(_ detail: ResourceDetail) {
-        editingResourceNode = EditableNode(title: detail.title, body: detail.body, nodeTypeSuffix: "guides")
+        editingResourceNode = EditableNode(title: detail.title, body: detail.rawBody, format: detail.bodyFormat, nodeTypeSuffix: "guides")
     }
 
-    private func saveResourceEdit(nodeTypeSuffix: String, title: String, body: String) async throws {
+    private func saveResourceEdit(nodeTypeSuffix: String, title: String, body: String, format: String) async throws {
         guard let user = auth.user, let detail else { return }
-        try await APIClient.shared.content.editNode(nodeId: detail.id, nodeType: nodeTypeSuffix, title: title, body: body, csrfToken: user.csrfToken)
+        try await APIClient.shared.content.editNode(nodeId: detail.id, nodeType: nodeTypeSuffix, title: title, body: body, format: format, csrfToken: user.csrfToken)
         toast.success(String(localized: "Guide updated"))
         await load()
     }
@@ -426,7 +434,10 @@ struct ResourceDetailView: View {
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Couldn't load guide." }
         isLoading = false
-        focusTitleAfterLoad()
+        // Opened via "Jump to First New Comment": that comment gets focus
+        // instead. Title focus used to run regardless, and its retries could
+        // pull focus straight back to the title. Reported directly.
+        if !(focusFirstNewCommentOnAppear && newCommentCount > 0) { focusTitleAfterLoad() }
     }
 
     /// VoiceOver lands on the back button after push navigation by default;
@@ -488,15 +499,18 @@ struct ResourceDetailView: View {
     /// "Jump to First New Comment" (ALL-01) — comments arrive chronologically
     /// oldest-first, so the first of the `newCommentCount` most recently
     /// posted comments sits at `comments.count - newCommentCount`.
-    private func jumpToFirstNewComment(proxy: ScrollViewProxy) async {
+    @discardableResult
+    private func jumpToFirstNewComment(proxy: ScrollViewProxy) async -> Bool {
         if hasMoreComments { await ensureAllCommentsLoaded() }
         let comments = self.detail?.comments ?? []
         let targetIndex = comments.count - newCommentCount
-        guard newCommentCount > 0, targetIndex >= 0, targetIndex < comments.count else { return }
+        guard newCommentCount > 0, targetIndex >= 0, targetIndex < comments.count else { return false }
         let targetId = comments[targetIndex].id
         withReduceMotionAwareAnimation { proxy.scrollTo(targetId, anchor: .top) }
-        try? await Task.sleep(for: .milliseconds(400))
-        focusedCommentId = targetId
+        // Retried like the title focus — one assignment after a guessed
+        // delay could miss a row that wasn't laid out yet.
+        await retryAccessibilityFocus(targetId, into: $focusedCommentId)
+        return true
     }
 }
 
@@ -505,6 +519,12 @@ struct ResourceDetailView: View {
 struct CommentRow: View {
     let authorName: String
     let text: String
+    /// Raw source text for Edit's starting text, and the format to save it
+    /// back under — see `JsonApiNode.rawTextValue`/`textFormat`. Only
+    /// meaningful where editing is actually wired up (Guide comments today);
+    /// harmless defaults elsewhere since those call sites pass no `onEdit`.
+    var rawText: String = ""
+    var bodyFormat: String = drupalDefaultTextFormat
     let date: Date
     var index: Int = 0
     var total: Int = 1
@@ -568,8 +588,9 @@ struct CommentRow: View {
     }
 
     private var headerAccessibilityLabel: String {
-        var label = "Comment \(index + 1) of \(total). \(authorName). \(date.formatted(.relative(presentation: .named)))."
-        if let displaySubject { label += " Subject: \(displaySubject)." }
+        var label = String(localized: "Comment \(index + 1) of \(total). \(authorName)")
+            + ". \(date.formatted(.relative(presentation: .named)))."
+        if let displaySubject { label += " " + String(localized: "Subject: \(displaySubject).") }
         return label
     }
 
@@ -671,10 +692,10 @@ struct CommentRow: View {
             Button("Cancel", role: .cancel) {}
         }
         .sheet(isPresented: $showEditSheet) {
-            EditContentSheet(title: "Edit Comment", initialText: text) { newText in
+            EditContentSheet(title: "Edit Comment", initialText: rawText) { newText in
                 guard let user = auth.user, let commentId, let commentType else { return }
                 try await APIClient.shared.content.editComment(
-                    commentType: commentType, commentId: commentId, newBody: newText, format: drupalDefaultTextFormat, csrfToken: user.csrfToken
+                    commentType: commentType, commentId: commentId, newBody: newText, format: bodyFormat, csrfToken: user.csrfToken
                 )
                 onEdit?(newText)
                 toast.success(String(localized: "Comment updated"))
@@ -735,12 +756,14 @@ struct ComposeResourceCommentView: View {
     @State private var commentText: String
     @State private var isSubmitting = false
     @State private var submitError: String?
+    @State private var justRewrote = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
+    @AccessibilityFocusState private var isHeaderFocused: Bool
 
     init(resourceId: String, title: String, quotedComment: ResourceComment? = nil, onPosted: @escaping (ResourceComment) -> Void) {
         self.resourceId = resourceId
@@ -757,6 +780,11 @@ struct ComposeResourceCommentView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
+                WizardStepHeader(
+                    title: "Add Comment", icon: "text.bubble",
+                    stepIndex: 1, stepTotal: 1, headerFocus: $isHeaderFocused
+                )
+                .padding(.top)
                 Text(quotedComment != nil ? "Replying to \(quotedComment!.authorName) — Re: \(title)" : "Re: \(title)")
                     .font(.subheadline).foregroundStyle(.secondary).padding()
                 if intelligence.showTranslatePrompt {
@@ -764,6 +792,7 @@ struct ComposeResourceCommentView: View {
                         Task {
                             if let result = await intelligence.translate(subject: nil, body: commentText, isTopic: false) {
                                 commentText = result.body
+                                justRewrote = true
                             } else {
                                 toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
@@ -783,6 +812,7 @@ struct ComposeResourceCommentView: View {
                             Task {
                                 if let result = await intelligence.rewriteRespectfully(subject: nil, body: commentText, isTopic: false) {
                                     commentText = result.body
+                                    justRewrote = true
                                 } else {
                                     toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                 }
@@ -790,9 +820,11 @@ struct ComposeResourceCommentView: View {
                         }
                     )
                         .padding(.horizontal)
+                        .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
                 }
                 TextEditor(text: $commentText)
                     .padding()
+                    .rewriteFlash($justRewrote)
                     .onChange(of: commentText) { _, newValue in
                         guidelines.textChanged(newValue, isReply: true)
                         intelligence.textChanged(
@@ -801,19 +833,53 @@ struct ComposeResourceCommentView: View {
                             detectionEnabled: preferences.nonEnglishDetectionEnabled
                         )
                     }
+                rewriteButton
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
                 if let err = submitError {
                     Text(err).foregroundStyle(.red).padding()
                 }
             }
             .navigationTitle("Add Comment")
             .navigationBarTitleDisplayMode(.inline)
+            .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut, value: guidelines.topWarning?.id)
+            .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Post") { Task { await submit() } }
-                        .disabled(commentText.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
+                    Button {
+                        Task { await submit() }
+                    } label: {
+                        if isSubmitting {
+                            ProgressView()
+                        } else {
+                            Text("Post")
+                        }
+                    }
+                    .disabled(commentText.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var rewriteButton: some View {
+        if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+            Button {
+                Task {
+                    if let result = await intelligence.rewrite(subject: nil, body: commentText, isTopic: false) {
+                        commentText = result.body
+                        justRewrote = true
+                    } else {
+                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
+                    }
+                }
+            } label: {
+                Label("Rewrite", systemImage: "wand.and.stars")
+                    .symbolEffect(.bounce, value: justRewrote)
+            }
+            .disabled(commentText.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+            .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
         }
     }
 

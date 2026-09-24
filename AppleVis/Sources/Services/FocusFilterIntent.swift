@@ -36,7 +36,7 @@ enum AppleVisNotificationCategory: String, AppEnum {
         .followedTopic: "Followed Topics",
         .newEpisode: "New Episodes",
         .appUpdate: "App Updates",
-        .newResource: "New Resources",
+        .newResource: "New Guides",
         .announcement: "Announcements",
     ]
 }

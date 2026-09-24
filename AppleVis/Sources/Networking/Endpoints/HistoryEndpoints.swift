@@ -32,4 +32,27 @@ struct HistoryEndpoints {
             "history/\(nid)/read", base: .root, body: EmptyBody(), headers: ["X-CSRF-Token": csrfToken]
         )
     }
+
+    /// Speculative — matches the shape proposed to the Drupal contractor
+    /// 2026-09-22 for a bulk "read status for many nodes at once" endpoint.
+    /// The core companion route Drupal normally ships for this
+    /// (`history/get_node_read_timestamps`) 404s on this install (see
+    /// `markRead`'s doc comment), so there's nothing confirmed to build
+    /// against yet — this is our proposed contract, not his. Not wired into
+    /// any UI: exists as a ready-to-use building block so the only change
+    /// needed once he replies is this function's path/response shape, not a
+    /// new call site. Update to match whatever he actually implements.
+    func readStatus(nodeIds: [Int], csrfToken: String) async throws -> [Int: Date] {
+        struct RequestBody: Encodable {
+            let nodeIds: [Int]
+            enum CodingKeys: String, CodingKey { case nodeIds = "node_ids" }
+        }
+        let response: [String: Int] = try await client.post(
+            "history-status", base: .v1, body: RequestBody(nodeIds: nodeIds), headers: ["X-CSRF-Token": csrfToken]
+        )
+        return response.reduce(into: [:]) { result, pair in
+            guard let nid = Int(pair.key), pair.value > 0 else { return }
+            result[nid] = Date(timeIntervalSince1970: Double(pair.value))
+        }
+    }
 }

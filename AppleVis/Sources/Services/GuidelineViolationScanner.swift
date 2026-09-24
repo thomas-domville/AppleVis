@@ -1,11 +1,13 @@
 import Combine
 import Foundation
 
-/// How far back a moderator scan looks. Deliberately just three coarse
+/// How far back a moderator scan looks. Deliberately just a few coarse
 /// options rather than a free date picker — this is meant to be a quick
-/// glance, not an archival search tool.
+/// glance, not an archival search tool. Past Month is the slow one (a busy
+/// month is a few thousand forum replies alone), which is part of why the
+/// screen only scans when Start Scan is tapped rather than on open.
 enum GuidelineScanRange: Int, CaseIterable, Identifiable {
-    case day, threeDays, week
+    case day, threeDays, week, month
 
     var id: Self { self }
 
@@ -14,6 +16,7 @@ enum GuidelineScanRange: Int, CaseIterable, Identifiable {
         case .day: return 1
         case .threeDays: return 3
         case .week: return 7
+        case .month: return 30
         }
     }
 
@@ -30,6 +33,7 @@ enum GuidelineScanRange: Int, CaseIterable, Identifiable {
         case .day: return String(localized: "Past Day")
         case .threeDays: return String(localized: "Past 3 Days")
         case .week: return String(localized: "Past Week")
+        case .month: return String(localized: "Past Month")
         }
     }
 }
@@ -122,15 +126,7 @@ extension GuidelineWarning.Severity {
 /// Mac directory entries and reviews, and bug reports — for possible
 /// guideline violations, for the Guideline Violation Check admin screen.
 ///
-/// Forums use the native `/api/v1/forums/recent` feed (see
-/// `ForumEndpoints.recent`), which is sorted by real last-comment activity —
-/// the only content type with such a feed. Every other type has no
-/// equivalent: JSON:API's `-changed` sort on the node itself doesn't move
-/// when a new comment lands on an old post, so paging a node listing by
-/// "recently changed" would silently miss a fresh, flaggable comment on
-/// month-old content — the exact gap a moderation scan can't afford.
-///
-/// Instead, each of those content types is scanned as two independent,
+/// Every content type, forums included, is scanned as two independent,
 /// cheap direct queries, needing no per-item detail fetch:
 /// 1. `node/<type>?sort=-created` — newly-*created* posts/entries, to catch
 ///    a flaggable root item, using the body already present in the list
@@ -141,12 +137,34 @@ extension GuidelineWarning.Severity {
 ///    the parent post's id/title coming back via `entity_id`'s include,
 ///    the same dynamic-entity-reference include pattern already proven
 ///    live for `FlagEndpoints`'s `flagged_entity`.
+///
+/// Forums used to be the exception: they paged the `/api/v1/forums/recent`
+/// activity feed, then fetched each active topic's full detail to check its
+/// replies. That detail fetch loads replies oldest-first, capped at 100, so
+/// on any topic past 100 replies the newest ones — exactly the ones inside
+/// the scan window — were silently never checked (five such topics were
+/// active on the day this was found). It also went through the app's
+/// 30-minute response cache, and cost one request per active topic. The
+/// comment-bundle query has none of those problems, so forums now use it too.
 @MainActor
 final class GuidelineViolationScanner: ObservableObject {
     @Published private(set) var flags: [GuidelineFlag] = []
     @Published private(set) var isScanning = false
-    @Published private(set) var scannedItemCount = 0
+    /// Root items (topics, posts, entries) actually checked by the last scan.
+    @Published private(set) var scannedPostCount = 0
+    /// Comments/replies/reviews actually checked by the last scan.
+    @Published private(set) var scannedCommentCount = 0
+    /// The range the current results came from — nil until the first scan
+    /// finishes. Kept separately from the screen's picker, which can be
+    /// changed afterward without the results changing with it.
+    @Published private(set) var lastScannedRange: GuidelineScanRange?
     @Published var error: String?
+
+    /// Every item the last scan actually checked. Used to only count forum
+    /// topics plus brand-new other posts — every comment, reply, and review
+    /// was checked but left out, so a day with ~130 new items read as "20
+    /// items scanned." Reported directly.
+    var scannedItemCount: Int { scannedPostCount + scannedCommentCount }
 
     private var currentScanId = UUID()
 
@@ -170,6 +188,7 @@ final class GuidelineViolationScanner: ObservableObject {
     }
 
     private static let streams: [ContentStream] = [
+        ContentStream(kind: .forumTopic, nodeType: "forum", commentBundle: CommentBundle.forumTopic.rawValue),
         ContentStream(kind: .blogPost, nodeType: "blog2", commentBundle: CommentBundle.blogPost.rawValue),
         ContentStream(kind: .resource, nodeType: "guides", commentBundle: CommentBundle.guide.rawValue),
         ContentStream(kind: .podcastEpisode, nodeType: "podcast", commentBundle: CommentBundle.podcastEpisode.rawValue),
@@ -181,28 +200,28 @@ final class GuidelineViolationScanner: ObservableObject {
         ContentStream(kind: .bugReport, nodeType: "os_x_bug_report", commentBundle: CommentBundle.macBugReport.rawValue),
     ]
 
+    /// Safety cap on pages per query (50 items each, so 5,000 items) — well
+    /// above a busy month of forum replies, the largest single stream, while
+    /// still guaranteeing a misbehaving sort can't loop forever.
+    private static let maxPages = 100
+
     func scan(range: GuidelineScanRange) async {
         let scanId = UUID()
         currentScanId = scanId
         isScanning = true
         error = nil
         flags = []
-        scannedItemCount = 0
+        scannedPostCount = 0
+        scannedCommentCount = 0
 
         let cutoff = Calendar.current.date(byAdding: .day, value: -range.days, to: Date()) ?? Date()
 
-        async let topicsTask = Self.recentlyActiveTopics(since: cutoff)
-        async let streamResults = Self.scanStreams(cutoff: cutoff)
-
-        let topics = (try? await topicsTask) ?? []
-        guard currentScanId == scanId else { return }
-        let topicFlags = await Self.scanTopics(topics, cutoff: cutoff)
-        let (streamFlags, streamScannedCount) = await streamResults
+        let result = await Self.scanStreams(cutoff: cutoff)
         guard currentScanId == scanId else { return }
 
-        scannedItemCount = topics.count + streamScannedCount
+        lastScannedRange = range
 
-        if topics.isEmpty, streamScannedCount == 0 {
+        if result.failedQueries == Self.streams.count * 2 {
             // Was a raw string literal — `error: String?` shown via
             // `Text(error)` in GuidelineViolationCheckView, and `Text(String)`
             // doesn't consult the localization catalog at all, unlike
@@ -215,7 +234,9 @@ final class GuidelineViolationScanner: ObservableObject {
             return
         }
 
-        flags = (topicFlags + streamFlags).sorted { a, b in
+        scannedPostCount = result.postCount
+        scannedCommentCount = result.commentCount
+        flags = result.flags.sorted { a, b in
             if a.highestSeverity.sortOrder != b.highestSeverity.sortOrder {
                 return a.highestSeverity.sortOrder < b.highestSeverity.sortOrder
             }
@@ -224,88 +245,7 @@ final class GuidelineViolationScanner: ObservableObject {
         isScanning = false
     }
 
-    // MARK: - Forums
-
-    /// Pages through `forums/recent` (already sorted by last activity, and
-    /// deliberately `appleOnly: false` — this tool covers everything, no
-    /// Home-style content filtering) until a page's topics fall outside the
-    /// window, then stops. Safety-capped at 50 pages so a runaway loop
-    /// can't hang indefinitely if the sort order ever misbehaves.
-    private static func recentlyActiveTopics(since cutoff: Date) async throws -> [ForumTopic] {
-        var results: [ForumTopic] = []
-        var page = 0
-        while page < 50 {
-            let batch = try await APIClient.shared.forums.recent(page: page, appleOnly: false)
-            if batch.isEmpty { break }
-            var reachedCutoff = false
-            for topic in batch {
-                if topic.lastActivityAt < cutoff {
-                    reachedCutoff = true
-                    break
-                }
-                results.append(topic)
-            }
-            if reachedCutoff { break }
-            page += 1
-        }
-        return results
-    }
-
-    /// Bounded concurrency (4 at a time) — fetching every candidate topic's
-    /// full detail at once would be a needless burst against the API for a
-    /// busy week; this stays a reasonable citizen while still being much
-    /// faster than doing them one at a time.
-    private static func scanTopics(_ topics: [ForumTopic], cutoff: Date) async -> [GuidelineFlag] {
-        var results: [GuidelineFlag] = []
-        await withTaskGroup(of: [GuidelineFlag].self) { group in
-            var iterator = topics.makeIterator()
-            let maxConcurrent = 4
-            for _ in 0..<maxConcurrent {
-                guard let topic = iterator.next() else { break }
-                group.addTask { await scanTopic(topic, cutoff: cutoff) }
-            }
-            while let topicFlags = await group.next() {
-                results.append(contentsOf: topicFlags)
-                if let topic = iterator.next() {
-                    group.addTask { await scanTopic(topic, cutoff: cutoff) }
-                }
-            }
-        }
-        return results
-    }
-
-    private static func scanTopic(_ topic: ForumTopic, cutoff: Date) async -> [GuidelineFlag] {
-        guard let detail = try? await APIClient.shared.forums.topicDetail(id: topic.id) else { return [] }
-        var flags: [GuidelineFlag] = []
-
-        if detail.createdAt >= cutoff {
-            let warnings = GuidelinesChecker.check(detail.body)
-            if !warnings.isEmpty {
-                flags.append(GuidelineFlag(
-                    id: "topic-\(detail.id)", kind: .forumTopic, itemId: detail.id, itemTitle: detail.title,
-                    authorName: detail.authorName, excerpt: .excerpt(from: detail.body), body: detail.body,
-                    createdAt: detail.createdAt, isRootItem: true, warnings: warnings,
-                    commentId: nil, commentType: nil, nodeType: "forum"
-                ))
-            }
-        }
-
-        for reply in detail.replies where reply.createdAt >= cutoff {
-            let warnings = GuidelinesChecker.check(reply.body, isReply: true)
-            if !warnings.isEmpty {
-                flags.append(GuidelineFlag(
-                    id: "reply-\(reply.id)", kind: .forumTopic, itemId: detail.id, itemTitle: detail.title,
-                    authorName: reply.authorName, excerpt: .excerpt(from: reply.body), body: reply.body,
-                    createdAt: reply.createdAt, isRootItem: false, warnings: warnings,
-                    commentId: reply.id, commentType: CommentBundle.forumTopic.rawValue, nodeType: nil
-                ))
-            }
-        }
-
-        return flags
-    }
-
-    // MARK: - Every other content type
+    // MARK: - Streams
 
     private struct RawPost {
         let id: String
@@ -324,33 +264,46 @@ final class GuidelineViolationScanner: ObservableObject {
         let body: String
     }
 
-    private static func scanStreams(cutoff: Date) async -> (flags: [GuidelineFlag], scannedCount: Int) {
-        await withTaskGroup(of: (flags: [GuidelineFlag], scannedCount: Int).self) { group in
+    private struct StreamResult {
+        var flags: [GuidelineFlag] = []
+        var postCount = 0
+        var commentCount = 0
+        /// Queries (out of two per stream) that threw — used only to tell
+        /// "everything failed" (show an error) apart from "a quiet day."
+        var failedQueries = 0
+    }
+
+    private static func scanStreams(cutoff: Date) async -> StreamResult {
+        await withTaskGroup(of: StreamResult.self) { group in
             for stream in streams {
                 group.addTask { await scanStream(stream, cutoff: cutoff) }
             }
-            var allFlags: [GuidelineFlag] = []
-            var totalScanned = 0
+            var total = StreamResult()
             for await result in group {
-                allFlags.append(contentsOf: result.flags)
-                totalScanned += result.scannedCount
+                total.flags.append(contentsOf: result.flags)
+                total.postCount += result.postCount
+                total.commentCount += result.commentCount
+                total.failedQueries += result.failedQueries
             }
-            return (allFlags, totalScanned)
+            return total
         }
     }
 
-    private static func scanStream(_ stream: ContentStream, cutoff: Date) async -> (flags: [GuidelineFlag], scannedCount: Int) {
+    private static func scanStream(_ stream: ContentStream, cutoff: Date) async -> StreamResult {
         async let postsTask = recentPosts(nodeType: stream.nodeType, cutoff: cutoff)
         async let commentsTask = recentComments(bundle: stream.commentBundle, cutoff: cutoff)
-        let posts = (try? await postsTask) ?? []
-        let comments = (try? await commentsTask) ?? []
-
-        var flags: [GuidelineFlag] = []
+        var result = StreamResult()
+        let posts: [RawPost]
+        let comments: [RawComment]
+        do { posts = try await postsTask } catch { posts = []; result.failedQueries += 1 }
+        do { comments = try await commentsTask } catch { comments = []; result.failedQueries += 1 }
+        result.postCount = posts.count
+        result.commentCount = comments.count
 
         for post in posts {
             let warnings = GuidelinesChecker.check(post.body)
             if !warnings.isEmpty {
-                flags.append(GuidelineFlag(
+                result.flags.append(GuidelineFlag(
                     id: "\(stream.nodeType)-post-\(post.id)", kind: stream.kind, itemId: post.id, itemTitle: post.title,
                     authorName: post.authorName, excerpt: .excerpt(from: post.body), body: post.body,
                     createdAt: post.createdAt, isRootItem: true, warnings: warnings,
@@ -362,7 +315,7 @@ final class GuidelineViolationScanner: ObservableObject {
         for comment in comments {
             let warnings = GuidelinesChecker.check(comment.body, isReply: true)
             if !warnings.isEmpty {
-                flags.append(GuidelineFlag(
+                result.flags.append(GuidelineFlag(
                     id: "\(stream.commentBundle)-comment-\(comment.id)", kind: stream.kind, itemId: comment.parentId, itemTitle: comment.parentTitle,
                     authorName: comment.authorName, excerpt: .excerpt(from: comment.body), body: comment.body,
                     createdAt: comment.createdAt, isRootItem: false, warnings: warnings,
@@ -371,17 +324,15 @@ final class GuidelineViolationScanner: ObservableObject {
             }
         }
 
-        return (flags, posts.count)
+        return result
     }
 
     /// Newly-created posts/entries for one node bundle, newest first,
-    /// stopping once a page's items fall outside the window. Safety-capped
-    /// at 10 pages (500 items) — recently-*created* content in a single-week
-    /// window is a much smaller set than forums' full recent-activity feed.
+    /// stopping once a page's items fall outside the window.
     private static func recentPosts(nodeType: String, cutoff: Date) async throws -> [RawPost] {
         var results: [RawPost] = []
         var page = 0
-        while page < 10 {
+        while page < maxPages {
             let response = try await APIClient.shared.jsonAPIList(
                 "node/\(nodeType)",
                 query: ["sort": "-created", "include": "uid", "page[limit]": "50", "page[offset]": "\(page * 50)"]
@@ -418,7 +369,7 @@ final class GuidelineViolationScanner: ObservableObject {
     private static func recentComments(bundle: String, cutoff: Date) async throws -> [RawComment] {
         var results: [RawComment] = []
         var page = 0
-        while page < 10 {
+        while page < maxPages {
             let response = try await APIClient.shared.jsonAPIList(
                 "comment/\(bundle)",
                 query: ["sort": "-created", "include": "uid,entity_id", "page[limit]": "50", "page[offset]": "\(page * 50)"]

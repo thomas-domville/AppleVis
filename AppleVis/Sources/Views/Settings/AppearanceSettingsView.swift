@@ -41,7 +41,7 @@ struct AppearanceSettingsView: View {
             }
 
             Section("Card Density") {
-                Text("Controls how much space each item takes up in lists — Comfortable gives every card room to breathe, Compact tightens the spacing so more fit on screen at once.")
+                Text("Controls how much space each item takes up in lists — Comfortable gives every item room to breathe, Compact tightens the spacing so more fit on screen at once.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Picker("Card Density", selection: $preferences.cardDensity) {

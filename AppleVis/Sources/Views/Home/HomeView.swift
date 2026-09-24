@@ -606,7 +606,12 @@ struct HomeView: View {
                 }
 
                 ForEach(visibleItems) { item in
-                    FeedRow(item: item, newCount: vm.newReplyCount(for: item), isNew: newItemIds.contains(item.id)) {
+                    // "NEW" for something posted since the last visit (even
+                    // with a comment count beside it), or for an item with
+                    // new non-comment activity and no count to show.
+                    let newCount = vm.newReplyCount(for: item)
+                    let showsNewBadge = newItemIds.contains(item.id) && (vm.isBrandNew(item) || newCount == 0)
+                    FeedRow(item: item, newCount: newCount, isNew: showsNewBadge) {
                         vm.markAsRead(item)
                     }
                     .id(item.id)
@@ -640,9 +645,11 @@ struct HomeView: View {
                 // uses. Reported directly.
                 ForEach(vm.newItems) { item in
                     let newCount = vm.newReplyCount(for: item)
+                    // Was plain English — never translated.
+                    let newPart = vm.isBrandNew(item) ? ", " + String(localized: "new") : ""
                     let label = newCount > 0
-                        ? "\(item.title), \(newCount) new comment\(newCount == 1 ? "" : "s")"
-                        : "\(item.title), new"
+                        ? "\(item.title)\(newPart), " + String(localized: "\(newCount) new comments")
+                        : "\(item.title), " + String(localized: "new")
                     AccessibilityRotorEntry(label, id: item.id)
                 }
             }
@@ -690,14 +697,14 @@ struct HomeView: View {
     /// heading — lets a VoiceOver user hear a breakdown by content type on
     /// demand instead of having to swipe through every row to gauge it.
     private var feedSummary: String {
-        guard !visibleItems.isEmpty else { return "Feed is empty." }
+        guard !visibleItems.isEmpty else { return String(localized: "Feed is empty.") }
         var counts: [ContentKind: Int] = [:]
         for item in visibleItems { counts[item.kind, default: 0] += 1 }
         let parts = [ContentKind.forumTopic, .podcastEpisode, .appListing, .resource, .blogPost].compactMap { kind -> String? in
             guard let n = counts[kind], n > 0 else { return nil }
-            return "\(n) \(kind.displayNamePlural(n))"
+            return kind.countPhrase(n)
         }
-        return "\(visibleItems.count) item\(visibleItems.count == 1 ? "" : "s"): \(parts.joined(separator: ", "))."
+        return String(localized: "\(String(localized: "\(visibleItems.count) items")): \(ListFormatter.localizedString(byJoining: parts)).")
     }
 }
 
@@ -1720,7 +1727,10 @@ struct FeedRow: View {
             }
         }
         .unreadIndicator(item.isUnread)
-        .accessibilityValue(isNew && newCount == 0 ? "New." : "")
+        // Now also "New." alongside a comment count — a brand-new topic
+        // that already has replies is both, and the row's own label only
+        // carries the count.
+        .accessibilityValue(isNew ? "New." : "")
         // A brand-new, never-visited item has no prior comment-count
         // baseline to diff against, so `newCount` (a *reply-delta*, not a
         // newness flag) is 0 for it even though `isNew` is true — the old

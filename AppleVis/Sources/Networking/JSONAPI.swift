@@ -101,6 +101,26 @@ nonisolated enum JSONValue: Decodable, Sendable {
         self["summary"]?.stringValue
     }
 
+    /// The original source text as written — Markdown, plain text, or raw
+    /// HTML, whatever format the field actually uses — as opposed to
+    /// `richTextValue`, which prefers Drupal's already-rendered `.processed`
+    /// HTML. Editing needs this one: pre-filling an edit field with rendered
+    /// HTML shows the user literal `<p>`/`<a href>` tags instead of the
+    /// source they'd recognize. Display should keep using `richTextValue`.
+    var rawTextValue: String? {
+        self["value"]?.stringValue
+    }
+
+    /// The Drupal text format ID (e.g. "7" for Markdown, "8" for Plain
+    /// Text) this field's `value` is actually written in — must be sent
+    /// back unchanged on edit, or Drupal reinterprets the same raw text
+    /// under a different format and can visibly corrupt it (e.g. Markdown
+    /// source resubmitted as Plain Text shows literal "### heading" instead
+    /// of rendering it).
+    var textFormat: String? {
+        self["format"]?.stringValue
+    }
+
     /// Drupal `path` field: `{ alias, pid, langcode }`.
     var pathAlias: String? {
         self["alias"]?.stringValue
@@ -153,6 +173,28 @@ nonisolated struct JsonApiNode: Decodable, Sendable {
 
     var createdDate: Date { JsonApiNode.parseDrupalDate(attributes["created"]) }
     var changedDate: Date { JsonApiNode.parseDrupalDate(attributes["changed"]) }
+
+    /// When the item last had real activity: its newest comment, from the
+    /// comment-statistics field Drupal includes on every commentable node
+    /// (`comment_node_blog2`, `comment_node_podcast`, …), falling back to
+    /// `changed` when there's none. `changed` alone only moves when the post
+    /// itself is edited — a blog post with fresh comments today but last
+    /// edited six days ago read as "6 days ago" and never counted as new
+    /// activity (2026-09-23, beta-tester report). App entries already did
+    /// this inline; this is the same rule, shared. Pass `commentField` when
+    /// the bundle's field is known; without it, any `comment*` field is used.
+    func lastActivityDate(commentField: String? = nil) -> Date {
+        let timestamps: [Double]
+        if let commentField {
+            timestamps = [attributes[commentField]?["last_comment_timestamp"]?.doubleValue].compactMap { $0 }
+        } else {
+            timestamps = attributes
+                .filter { $0.key.hasPrefix("comment") }
+                .compactMap { $0.value["last_comment_timestamp"]?.doubleValue }
+        }
+        guard let latest = timestamps.max(), latest > 0 else { return changedDate }
+        return Date(timeIntervalSince1970: latest)
+    }
 
     /// Drupal timestamps arrive as Unix-epoch strings/numbers, or occasionally ISO8601.
     /// Falls back to `.distantPast` rather than throwing, since live content is
@@ -333,7 +375,10 @@ enum HTMLText {
     // Compiled once instead of per-call — these run on every forum post/bug
     // report/app listing mapped from a network response, and NSRegularExpression
     // compilation is comparatively expensive to repeat per item.
-    private static let numericEntityRegex = try? NSRegularExpression(pattern: "&#([0-9]+);")
+    // nonisolated(unsafe): read-only after creation (NSRegularExpression is
+    // documented thread-safe), and needed so `decodeEntities` below can be
+    // nonisolated for `String.strippingHTMLTags()`.
+    nonisolated(unsafe) private static let numericEntityRegex = try? NSRegularExpression(pattern: "&#([0-9]+);")
     private static let scriptTagRegex = try? NSRegularExpression(pattern: "<script[\\s\\S]*?</script>")
     private static let styleTagRegex = try? NSRegularExpression(pattern: "<style[\\s\\S]*?</style>")
     private static let anyTagRegex = try? NSRegularExpression(pattern: "<[^>]+>")
@@ -345,7 +390,7 @@ enum HTMLText {
         return regex.stringByReplacingMatches(in: text, range: range, withTemplate: template)
     }
 
-    static func decodeEntities(_ text: String) -> String {
+    nonisolated static func decodeEntities(_ text: String) -> String {
         var result = text
         // Drupal's WYSIWYG editor commonly emits named/numeric entities for
         // smart quotes, dashes, and ellipses — previously only the 7 basic

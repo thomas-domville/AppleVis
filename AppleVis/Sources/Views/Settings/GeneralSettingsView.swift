@@ -68,8 +68,8 @@ struct GeneralSettingsView: View {
                 // controls whether the *visual* new-activity card shows up
                 // in the Home feed at all. Reported directly.
                 Toggle("Welcome Summary", isOn: $preferences.welcomeSummaryEnabled)
-                    .accessibilityHint(String(localized: "Shows a dismissable card on Home summarizing new activity since your last visit."))
-                Text("The dismissable card on Home listing what's new since you were last here — separate from Home Startup Behavior above, which is about what's spoken, not what's shown.")
+                    .accessibilityHint(String(localized: "Shows a short summary at the top of Home of new activity since your last visit."))
+                Text("The short summary at the top of Home listing what's new since you were last here — separate from Home Startup Behavior above, which is about what's spoken, not what's shown.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

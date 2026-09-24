@@ -392,6 +392,8 @@ struct AppEndpoints {
                 buttonLabelling: a["field_labelling"]?.stringValue,
                 usabilityNotes: a["field_usability"]?.stringValue,
                 body: a["body"]?.richTextValue ?? "",
+                rawBody: a["body"]?.rawTextValue ?? "",
+                bodyFormat: a["body"]?.textFormat ?? drupalDefaultTextFormat,
                 reviewedVersion: a["field_version"]?.stringValue,
                 testedOnIOS: a["field_ios_version"]?.stringValue,
                 accessibilityComments: a["field_comments"]?.richTextValue,
@@ -454,6 +456,8 @@ struct AppEndpoints {
                 buttonLabelling: nil,
                 usabilityNotes: a["field_usability_tv"]?.stringValue,
                 body: a["body"]?.richTextValue ?? "",
+                rawBody: a["body"]?.rawTextValue ?? "",
+                bodyFormat: a["body"]?.textFormat ?? drupalDefaultTextFormat,
                 reviewedVersion: nil,
                 testedOnIOS: nil,
                 accessibilityComments: a["field_comments"]?.richTextValue,
@@ -517,6 +521,8 @@ struct AppEndpoints {
                 buttonLabelling: nil,
                 usabilityNotes: a["field_usability_watch"]?.stringValue,
                 body: a["body"]?.richTextValue ?? "",
+                rawBody: a["body"]?.rawTextValue ?? "",
+                bodyFormat: a["body"]?.textFormat ?? drupalDefaultTextFormat,
                 reviewedVersion: a["field_version"]?.stringValue,
                 testedOnIOS: a["field_watchos_version"]?.stringValue,
                 accessibilityComments: a["field_comments"]?.richTextValue,
@@ -583,6 +589,8 @@ struct AppEndpoints {
                 buttonLabelling: nil,
                 usabilityNotes: a["field_usability"]?.stringValue,
                 body: a["body"]?.richTextValue ?? "",
+                rawBody: a["body"]?.rawTextValue ?? "",
+                bodyFormat: a["body"]?.textFormat ?? drupalDefaultTextFormat,
                 reviewedVersion: a["field_version"]?.stringValue,
                 testedOnIOS: a["field_osx_version"]?.stringValue,
                 accessibilityComments: a["field_comments"]?.richTextValue,
@@ -639,7 +647,11 @@ struct AppEndpoints {
     /// (or one that already matched the App Store listing) is left
     /// completely untouched rather than silently rewritten with the same
     /// value. Requested directly, replacing the old all-or-nothing update.
-    func updateAppInformation(detail: AppDetail, metadata: ItunesMetadata, includedFields: Set<String>, csrfToken: String) async throws {
+    /// `devices` — the Supported Devices an editor left ticked in Refresh App
+    /// Details (names: "iPhone", "iPad", "Mac"), written to the site's
+    /// `field_device_used` using the live form's own values. iOS entries
+    /// only; ignored when empty, since the site requires at least one.
+    func updateAppInformation(detail: AppDetail, metadata: ItunesMetadata, includedFields: Set<String>, devices: [String] = [], csrfToken: String) async throws {
         let nodeType = Self.nodeType(for: detail.platform)
         var attributes: [String: AnyEncodable] = [:]
 
@@ -654,6 +666,10 @@ struct AppEndpoints {
             if !description.isEmpty {
                 attributes["body"] = AnyEncodable(RichTextBodyValue(value: description, summary: "", format: drupalDefaultTextFormat))
             }
+        }
+
+        if detail.platform == .ios, includedFields.contains("devices"), !devices.isEmpty {
+            attributes["field_device_used"] = AnyEncodable(devices.map(AppDetail.siteDeviceValue(for:)))
         }
 
         if detail.platform != .tvos {

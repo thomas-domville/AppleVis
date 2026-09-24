@@ -85,15 +85,25 @@ enum ContentSubmissionPolicy {
             #"\b(learn\s+to\s+read|use\s+your\s+brain|you\s+clearly\s+don't\s+know|you\s+obviously\s+don't\s+understand)\b"#,
             #"\b(stop\s+(whining|complaining|crying)|quit\s+(whining|complaining|crying))\b"#,
             #"\b(what\s+is\s+wrong\s+with\s+you|are\s+you\s+serious\s+right\s+now)\b"#,
-            // Only ever reached when the high-severity "you shut up" above
-            // didn't match — catches the ambiguous bare form ("shut up,"
-            // no clear personal target) at a severity that flags it for a
-            // moderator without blocking a post over it outright. See the
-            // high-severity comment above for the false positive that
-            // prompted splitting these.
-            #"\bshut\s+up\b"#,
         ]
         if mediumPatterns.contains(where: { matches(text, $0, caseInsensitive: true) }) {
+            return .medium
+        }
+
+        // Only ever reached when the high-severity "you shut up" above
+        // didn't match — catches the ambiguous bare form ("shut up," no
+        // clear personal target) at a severity that flags it for a
+        // moderator without blocking a post over it outright. See the
+        // high-severity comment above for the false positive that prompted
+        // splitting these. Checked against the text with any "shut up"
+        // aimed at a voice or device already removed (2026-09-23, live
+        // flag): "SHUT UP DANIEL!!!" was someone venting at VoiceOver's
+        // Daniel voice repeating Face ID setup prompts, not at a person —
+        // and on AppleVis, telling VoiceOver, Siri, or a named speech
+        // voice to be quiet is everyday frustration, not a tone problem.
+        // A "shut up" aimed at anyone else is still flagged. Reported
+        // directly.
+        if matches(removingShutUpAtDevice(text), #"\bshut\s+up\b"#, caseInsensitive: true) {
             return .medium
         }
 
@@ -128,6 +138,26 @@ enum ContentSubmissionPolicy {
         }
 
         return nil
+    }
+
+    /// Speech voices, assistants, and devices people commonly tell to "shut
+    /// up" — Apple's built-in VoiceOver/Siri voice names, third-party
+    /// synthesizers, and generic device words. "it" covers "make it shut
+    /// up," where "it" is almost always the phone or its speech.
+    private static let speechTargets = "voiceover|voice\\s+over|siri|daniel|alex|samantha|karen|moira|tessa|fred|serena|arthur|martha|rishi|veena|fiona|eloquence|espeak|vocalizer|the\\s+voice|voice|speech|phone|iphone|ipad|mac|watch|it"
+
+    /// Short linking words allowed between a speech target and "shut up" —
+    /// "VoiceOver to shut up," "Daniel just won't shut up."
+    private static let shutUpLinkingWords = "to|would|will|just|finally|please|should|won't|wouldn't|doesn't|didn't|never|can't|couldn't"
+
+    /// Removes each "shut up" that sits next to a speech voice or device —
+    /// "shut up Daniel," "Siri, shut up," "make it shut up," "VoiceOver to
+    /// shut up" — so the bare "shut up" check only sees ones aimed
+    /// elsewhere. Tested against the real flagged post plus "John, shut
+    /// up"/"Just shut up"/"Tell him to shut up," all of which still flag.
+    private static func removingShutUpAtDevice(_ text: String) -> String {
+        let pattern = "\\b(?:\(speechTargets))(?:[\\s,.:!-]+(?:\(shutUpLinkingWords)))*[\\s,.:!-]*shut\\s+up\\b|\\bshut\\s+up[\\s,.:!-]*(?:\(speechTargets))\\b"
+        return text.replacingOccurrences(of: pattern, with: " ", options: [.regularExpression, .caseInsensitive])
     }
 
     /// Splits `text` into sentence-sized chunks, each ending with (and

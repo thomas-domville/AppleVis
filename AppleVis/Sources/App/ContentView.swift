@@ -137,6 +137,52 @@ struct ContentView: View {
             offerWelcomeTourIfNeeded()
             offerContentTranslationPromptIfNeeded()
         }
+        .overlay(alignment: .top) {
+            if deepLinkRouter.isResolvingLink {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Opening…")
+                        .font(.subheadline)
+                }
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(.regularMaterial, in: Capsule())
+                .padding(.top, 8)
+                // VoiceOver already hears "Opening link…" as an
+                // announcement from DeepLinkRouter; this is the visual cue.
+                .accessibilityHidden(true)
+                .transition(UIAccessibility.isReduceMotionEnabled ? .opacity : .move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeOut(duration: 0.2), value: deepLinkRouter.isResolvingLink)
+        // Every link tapped inside post/comment text (SwiftUI `Text` with
+        // an AttributedString) goes through this. Links to AppleVis content
+        // open on their native screen instead of leaving the app for
+        // Safari; everything else — other websites, App Store links,
+        // AppleVis help pages — keeps the system's normal behavior.
+        //
+        // The native screen opens in ContentView's `pendingContent` sheet,
+        // which can't appear while some *other* sheet is already up (a
+        // topic reached through Profile > Saved, say) — so inside another
+        // sheet, links keep their old Safari behavior rather than silently
+        // doing nothing. Inside the `pendingContent` sheet itself it's
+        // fine: the sheet just swaps to the new item.
+        .environment(\.openURL, OpenURLAction { url in
+            guard AppleVisLinkResolver.destination(for: url) != nil,
+                  deepLinkRouter.pendingContent != nil || !Self.isShowingSheet
+            else { return .systemAction }
+            deepLinkRouter.openAppleVisLink(url) { UIApplication.shared.open($0) }
+            return .handled
+        })
+    }
+
+    /// Whether anything is presented over the main tab view right now.
+    private static var isShowingSheet: Bool {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .rootViewController?
+            .presentedViewController != nil
     }
 
     private var detectedLanguageDisplayName: String {

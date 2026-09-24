@@ -28,7 +28,7 @@ struct EditProfileView: View {
     @AccessibilityFocusState private var isErrorFocused: Bool
     /// Had no initial-load focus at all. Full app-wide focus audit,
     /// requested directly.
-    @AccessibilityFocusState private var isIntroFocused: Bool
+    @AccessibilityFocusState private var isHeaderFocused: Bool
 
     /// Same gate ContactView's Rewrite button uses — bio-drafting is the
     /// same category of "AI helps with what you're writing" feature, not a
@@ -41,11 +41,13 @@ struct EditProfileView: View {
         NavigationStack {
             Form {
                 Section {
+                    WizardStepHeader(
+                        title: "Edit Profile", icon: "person.crop.circle",
+                        stepIndex: 1, stepTotal: 1, headerFocus: $isHeaderFocused
+                    )
                     Text("Profile information is public. Your username and AppleVis ID cannot be changed here.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .accessibilityAddTraits(.isHeader)
-                        .accessibilityFocused($isIntroFocused)
                 }
 
                 Section("Public Identity") {
@@ -215,7 +217,7 @@ struct EditProfileView: View {
         }
         .task {
             await loadCurrentProfile()
-            await retryAccessibilityFocus(into: $isIntroFocused)
+            await retryAccessibilityFocus(into: $isHeaderFocused)
         }
         .sheet(isPresented: $showCountryPicker) {
             CountryPickerSheet(selection: $location)
@@ -378,16 +380,24 @@ private struct BioAssistSheet: View {
     @State private var draft = ""
     @State private var isGenerating = false
     @State private var error: String?
+    @AccessibilityFocusState private var isHeaderFocused: Bool
 
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    WizardStepHeader(
+                        title: "Bio Assist", icon: "sparkles",
+                        stepIndex: 1, stepTotal: 1, headerFocus: $isHeaderFocused
+                    )
+                    Text(draft.isEmpty
+                        ? "Tell me a little about yourself — what you use AppleVis for, your devices or assistive technology, your interests. I'll turn it into a short draft bio you can edit."
+                        : "Here's your draft. You can still edit this after using it."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
                 if draft.isEmpty {
-                    Section {
-                        Text("Tell me a little about yourself — what you use AppleVis for, your devices or assistive technology, your interests. I'll turn it into a short draft bio you can edit.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
                     Section("Your Notes") {
                         TextEditor(text: $notes)
                             .frame(minHeight: 140)
@@ -402,16 +412,12 @@ private struct BioAssistSheet: View {
                     Section("Draft Bio") {
                         Text(draft)
                     }
-                    Section {
-                        Text("You can still edit this after using it.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
                 }
             }
             .themedList(preferences.colors)
             .navigationTitle("Bio Assist")
             .navigationBarTitleDisplayMode(.inline)
+            .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

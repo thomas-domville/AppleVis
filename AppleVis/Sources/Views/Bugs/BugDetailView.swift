@@ -136,10 +136,17 @@ struct BugDetailView: View {
                     pendingFocusCommentId = nil
                 }
             }
-            .task {
-                guard focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
+            // Keyed on isLoading so this waits for load() to finish: the
+            // page can appear before the new-comment count is known (App
+            // Store enrichment, Follow state), and jumping then found
+            // nothing new and gave up — leaving VoiceOver on the title.
+            // Reported directly.
+            .task(id: isLoading) {
+                guard !isLoading, focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
                 hasAppliedFirstNewCommentFocus = true
-                await jumpToFirstNewComment(proxy: proxy)
+                // Nothing to land on after all — load() skipped the title
+                // for this, so put focus there instead of nowhere.
+                if !(await jumpToFirstNewComment(proxy: proxy)), newCommentCount > 0 { focusTitleAfterLoad() }
             }
             .task {
                 guard let targetCommentId, !hasAppliedTargetCommentFocus else { return }
@@ -171,11 +178,14 @@ struct BugDetailView: View {
                 // this page's primary purpose, not a secondary action worth
                 // an extra tap to reach, same reasoning as App Entry's
                 // "Open in App Store."
-                WebLink(destination: Self.feedbackAssistantURL) {
+                WebLink(
+                    destination: Self.feedbackAssistantURL,
+                    hint: String(localized: "Opens Feedback Assistant to file this with Apple directly."),
+                    showsExternalIcon: false
+                ) {
                     Image(systemName: "flag")
                 }
                 .accessibilityLabel(String(localized: "Report to Apple"))
-                .accessibilityHint(String(localized: "Opens Feedback Assistant to file this with Apple directly."))
                 DetailActionsMenu(
                     id: detail.id, entityId: detail.nid, kind: .bugReport, title: detail.title, lastActivityAt: detail.changedAt, url: detail.url,
                     excerpt: .excerpt(from: detail.body),
@@ -188,8 +198,8 @@ struct BugDetailView: View {
             }
         }
         .sheet(item: $editingBugNode) { node in
-            EditNodeSheet(initialTitle: node.title, initialBody: node.body) { newTitle, newBody in
-                try await saveBugReportEdit(nodeTypeSuffix: node.nodeTypeSuffix, title: newTitle, body: newBody)
+            EditNodeSheet(initialTitle: node.title, initialBody: node.body, nodeTypeSuffix: node.nodeTypeSuffix) { newTitle, newBody in
+                try await saveBugReportEdit(nodeTypeSuffix: node.nodeTypeSuffix, title: newTitle, body: newBody, format: node.format)
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -216,7 +226,7 @@ struct BugDetailView: View {
     /// was already fetched (`field_apple_feedback_`) but never displayed or
     /// used anywhere.
     private func feedbackIdRow(_ feedbackId: String) -> some View {
-        WebLink(destination: Self.feedbackAssistantURL) {
+        WebLink(destination: Self.feedbackAssistantURL, showsExternalIcon: false) {
             HStack {
                 Image(systemName: "exclamationmark.bubble").foregroundStyle(Color.accentColor)
                 VStack(alignment: .leading, spacing: 2) {
@@ -343,7 +353,8 @@ struct BugDetailView: View {
             // A fixed width here clipped the label at large accessibility
             // text sizes; minWidth keeps columns aligned at normal sizes
             // without capping how wide the label is allowed to grow.
-            Text(label + ":")
+            // Label was rendered verbatim (Text(String)) — never translated.
+            (Text(LocalizedStringKey(label)) + Text(verbatim: ":"))
                 .font(.caption).fontWeight(.semibold).foregroundStyle(.secondary)
                 .frame(minWidth: 80, alignment: .leading)
             Text(value)
@@ -364,7 +375,7 @@ struct BugDetailView: View {
     }
 
     private func sectionHeading(_ text: String) -> some View {
-        Text(text).font(.headline)
+        Text(LocalizedStringKey(text)).font(.headline)
             .padding(.horizontal)
             .accessibilityAddTraits(.isHeader)
     }
@@ -437,20 +448,20 @@ struct BugDetailView: View {
     /// submitter name (unlike forum topics, blog posts, and resources).
     private func announceThreadOverview(_ detail: BugReportDetail) {
         let mostRecent = detail.comments.max { $0.createdAt < $1.createdAt }
-        var summary = "Thread has \(detail.comments.count) comment\(detail.comments.count == 1 ? "" : "s")."
-        if let mostRecent {
-            summary += " Most recent comment by \(mostRecent.authorName), \(mostRecent.createdAt.formatted(.relative(presentation: .named)))."
-        }
-        UIAccessibility.post(notification: .announcement, argument: summary)
+        ThreadOverview.announce(
+            commentCount: detail.comments.count,
+            mostRecentAuthor: mostRecent?.authorName,
+            mostRecentDate: mostRecent?.createdAt
+        )
     }
 
     private func startEditBugReport(_ detail: BugReportDetail) {
-        editingBugNode = EditableNode(title: detail.title, body: detail.body, nodeTypeSuffix: bugNodeTypeSuffix(for: detail.platform))
+        editingBugNode = EditableNode(title: detail.title, body: detail.rawBody, format: detail.bodyFormat, nodeTypeSuffix: bugNodeTypeSuffix(for: detail.platform))
     }
 
-    private func saveBugReportEdit(nodeTypeSuffix: String, title: String, body: String) async throws {
+    private func saveBugReportEdit(nodeTypeSuffix: String, title: String, body: String, format: String) async throws {
         guard let user = auth.user, let detail else { return }
-        try await APIClient.shared.content.editNode(nodeId: detail.id, nodeType: nodeTypeSuffix, title: title, body: body, csrfToken: user.csrfToken)
+        try await APIClient.shared.content.editNode(nodeId: detail.id, nodeType: nodeTypeSuffix, title: title, body: body, format: format, csrfToken: user.csrfToken)
         toast.success(String(localized: "Bug Report updated"))
         await load()
     }
@@ -521,7 +532,10 @@ struct BugDetailView: View {
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = "Couldn't load bug report." }
         isLoading = false
-        focusTitleAfterLoad()
+        // Opened via "Jump to First New Comment": that comment gets focus
+        // instead. Title focus used to run regardless, and its retries could
+        // pull focus straight back to the title. Reported directly.
+        if !(focusFirstNewCommentOnAppear && newCommentCount > 0) { focusTitleAfterLoad() }
     }
 
     /// VoiceOver lands on the back button after push navigation by default;
@@ -582,15 +596,18 @@ struct BugDetailView: View {
     /// "Jump to First New Comment" (ALL-01) — comments arrive chronologically
     /// oldest-first, so the first of the `newCommentCount` most recently
     /// posted comments sits at `comments.count - newCommentCount`.
-    private func jumpToFirstNewComment(proxy: ScrollViewProxy) async {
+    @discardableResult
+    private func jumpToFirstNewComment(proxy: ScrollViewProxy) async -> Bool {
         if hasMoreComments { await ensureAllCommentsLoaded() }
         let comments = self.detail?.comments ?? []
         let targetIndex = comments.count - newCommentCount
-        guard newCommentCount > 0, targetIndex >= 0, targetIndex < comments.count else { return }
+        guard newCommentCount > 0, targetIndex >= 0, targetIndex < comments.count else { return false }
         let targetId = comments[targetIndex].id
         withReduceMotionAwareAnimation { proxy.scrollTo(targetId, anchor: .top) }
-        try? await Task.sleep(for: .milliseconds(400))
-        focusedCommentId = targetId
+        // Retried like the title focus — one assignment after a guessed
+        // delay could miss a row that wasn't laid out yet.
+        await retryAccessibilityFocus(targetId, into: $focusedCommentId)
+        return true
     }
 }
 
@@ -609,12 +626,14 @@ struct ComposeBugCommentView: View {
     @State private var commentText: String
     @State private var isSubmitting = false
     @State private var submitError: String?
+    @State private var justRewrote = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
+    @AccessibilityFocusState private var isHeaderFocused: Bool
 
     init(platform: BugPlatform, bugId: String, title: String, quotedComment: BugComment? = nil, onPosted: @escaping (BugComment) -> Void) {
         self.platform = platform
@@ -632,6 +651,11 @@ struct ComposeBugCommentView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
+                WizardStepHeader(
+                    title: "Add Comment", icon: "text.bubble",
+                    stepIndex: 1, stepTotal: 1, headerFocus: $isHeaderFocused
+                )
+                .padding(.top)
                 Text(quotedComment != nil ? "Replying to \(quotedComment!.authorName) — Re: \(title)" : "Re: \(title)")
                     .font(.subheadline).foregroundStyle(.secondary).padding()
                 if intelligence.showTranslatePrompt {
@@ -639,6 +663,7 @@ struct ComposeBugCommentView: View {
                         Task {
                             if let result = await intelligence.translate(subject: nil, body: commentText, isTopic: false) {
                                 commentText = result.body
+                                justRewrote = true
                             } else {
                                 toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
@@ -658,6 +683,7 @@ struct ComposeBugCommentView: View {
                             Task {
                                 if let result = await intelligence.rewriteRespectfully(subject: nil, body: commentText, isTopic: false) {
                                     commentText = result.body
+                                    justRewrote = true
                                 } else {
                                     toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                 }
@@ -665,9 +691,11 @@ struct ComposeBugCommentView: View {
                         }
                     )
                         .padding(.horizontal)
+                        .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
                 }
                 TextEditor(text: $commentText)
                     .padding()
+                    .rewriteFlash($justRewrote)
                     .onChange(of: commentText) { _, newValue in
                         guidelines.textChanged(newValue, isReply: true)
                         intelligence.textChanged(
@@ -676,19 +704,53 @@ struct ComposeBugCommentView: View {
                             detectionEnabled: preferences.nonEnglishDetectionEnabled
                         )
                     }
+                rewriteButton
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
                 if let err = submitError {
                     Text(err).foregroundStyle(.red).padding()
                 }
             }
             .navigationTitle("Add Comment")
             .navigationBarTitleDisplayMode(.inline)
+            .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut, value: guidelines.topWarning?.id)
+            .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Post") { Task { await submit() } }
-                        .disabled(commentText.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
+                    Button {
+                        Task { await submit() }
+                    } label: {
+                        if isSubmitting {
+                            ProgressView()
+                        } else {
+                            Text("Post")
+                        }
+                    }
+                    .disabled(commentText.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var rewriteButton: some View {
+        if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+            Button {
+                Task {
+                    if let result = await intelligence.rewrite(subject: nil, body: commentText, isTopic: false) {
+                        commentText = result.body
+                        justRewrote = true
+                    } else {
+                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
+                    }
+                }
+            } label: {
+                Label("Rewrite", systemImage: "wand.and.stars")
+                    .symbolEffect(.bounce, value: justRewrote)
+            }
+            .disabled(commentText.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+            .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
         }
     }
 

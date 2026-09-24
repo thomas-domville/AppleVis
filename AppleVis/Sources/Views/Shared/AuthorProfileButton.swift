@@ -220,7 +220,7 @@ private struct AuthorProfileSheet: View {
             }
             if let profileUrl = profile.profileUrl, let url = URL(string: profileUrl) {
                 Section {
-                    WebLink(destination: url) {
+                    WebLink(destination: url, showsExternalIcon: false) {
                         Label("View Full Profile on AppleVis", systemImage: "arrow.up.right.square")
                     }
                 }
@@ -323,6 +323,12 @@ private struct ContactUserSheet: View {
     @State private var message = ""
     @State private var isSending = false
     @State private var error: String?
+    /// Rewrite only — no Translate to English prompt here: this is a private
+    /// message between two members, who may well share a language other
+    /// than English, and the prompt's "AppleVis posts should be in English"
+    /// doesn't apply. Requested directly.
+    @StateObject private var intelligence = ComposeIntelligenceState()
+    @State private var justRewrote = false
     @AccessibilityFocusState private var isErrorFocused: Bool
     /// Had no initial-load focus at all. Full app-wide focus audit,
     /// requested directly.
@@ -345,6 +351,8 @@ private struct ContactUserSheet: View {
                     TextEditor(text: $message)
                         .frame(minHeight: 160)
                         .accessibilityLabel(String(localized: "Message text editor"))
+                        .rewriteFlash($justRewrote)
+                    DraftRewriteButton(intelligence: intelligence, text: $message, justRewrote: $justRewrote)
                 }
                 if let error {
                     Section {

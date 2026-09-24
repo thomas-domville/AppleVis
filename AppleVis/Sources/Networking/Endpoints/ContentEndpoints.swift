@@ -51,6 +51,8 @@ struct ResourceEndpoints {
             let node = response.data
             let resource = Mappers.resource(node, included: response.included ?? [])
             let body = node.attributes["body"]?.richTextValue ?? ""
+            let rawBody = node.attributes["body"]?.rawTextValue ?? ""
+            let bodyFormat = node.attributes["body"]?.textFormat ?? drupalDefaultTextFormat
 
             // See ForumEndpoints.topicDetail's identical fix for the full
             // reasoning — a `try?`-swallowed comments failure previously
@@ -59,7 +61,7 @@ struct ResourceEndpoints {
             let commentsResponse = try await commentsRes
             let comments = commentsResponse.data.map { n in
                 let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
-                return ResourceComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
+                return ResourceComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, rawBody: c.rawBody, bodyFormat: c.bodyFormat, createdAt: c.createdAt)
             }
 
             return ResourceDetail(
@@ -67,6 +69,7 @@ struct ResourceEndpoints {
                 title: resource.title, kind: resource.kind,
                 authorName: resource.authorName, authorId: resource.authorId,
                 categories: resource.categories, summary: resource.summary, body: body,
+                rawBody: rawBody, bodyFormat: bodyFormat,
                 createdAt: resource.createdAt, updatedAt: resource.updatedAt,
                 commentCount: resource.commentCount, url: resource.url,
                 comments: comments, isSaved: false
@@ -90,7 +93,7 @@ struct ResourceEndpoints {
             headers: ["X-CSRF-Token": csrfToken]
         )
         let c = Mappers.genericComment(response.data, included: response.included ?? [])
-        return ResourceComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
+        return ResourceComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, rawBody: c.rawBody, bodyFormat: c.bodyFormat, createdAt: c.createdAt)
     }
 
     /// Fetches the next page of comments beyond the initial 100 (used by "Load more comments").
@@ -101,7 +104,7 @@ struct ResourceEndpoints {
         )
         return response.data.map { n in
             let c = Mappers.genericComment(n, included: response.included ?? [])
-            return ResourceComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
+            return ResourceComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, rawBody: c.rawBody, bodyFormat: c.bodyFormat, createdAt: c.createdAt)
         }
     }
 }
@@ -142,6 +145,8 @@ struct BlogEndpoints {
             let node = response.data
             let post = Mappers.blog(node, included: response.included ?? [])
             let body = node.attributes["body"]?.richTextValue ?? ""
+            let rawBody = node.attributes["body"]?.rawTextValue ?? ""
+            let bodyFormat = node.attributes["body"]?.textFormat ?? drupalDefaultTextFormat
 
             // See ForumEndpoints.topicDetail's identical fix for the full
             // reasoning — a `try?`-swallowed comments failure previously
@@ -157,6 +162,7 @@ struct BlogEndpoints {
                 id: post.id, nid: node.attributes["drupal_internal__nid"]?.intValue ?? 0,
                 title: post.title, authorName: post.authorName, authorId: post.authorId,
                 publishedAt: post.publishedAt, lastActivityAt: post.lastActivityAt, body: body,
+                rawBody: rawBody, bodyFormat: bodyFormat,
                 commentCount: post.commentCount, url: post.url, comments: comments, isSaved: false
             )
         }
@@ -448,7 +454,7 @@ struct FlagEndpoints {
                 nodeType: node.type,
                 title: node.attributes["title"]?.stringValue ?? "",
                 followedAt: flagging.createdDate,
-                lastActivityAt: node.changedDate,
+                lastActivityAt: node.lastActivityDate(),
                 url: (node.attributes["path"]?.pathAlias).map { "https://www.applevis.com\($0)" } ?? ""
             )
         }

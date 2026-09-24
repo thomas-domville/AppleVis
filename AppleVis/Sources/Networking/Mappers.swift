@@ -99,7 +99,12 @@ enum Mappers {
             url: urlPath,
             isUnread: false,
             isFollowing: PersistenceStore.shared.isFollowed(id: uuid) || FollowStore.shared.isFollowed(uuid),
-            isSaved: PersistenceStore.shared.isSaved(id: uuid)
+            isSaved: PersistenceStore.shared.isSaved(id: uuid),
+            // Not live yet — /api/v1/forums/recent doesn't return this field
+            // on the server today (asked for it 2026-09-22); defaults to
+            // false until the backend adds it, matching how every other item
+            // already displays.
+            isPinned: item["sticky"]?.boolValue ?? false
         )
     }
 
@@ -136,6 +141,8 @@ enum Mappers {
             authorName: authorName,
             authorId: uidId ?? "",
             body: a["comment_body"]?.richTextValue ?? "",
+            rawBody: a["comment_body"]?.rawTextValue ?? "",
+            bodyFormat: a["comment_body"]?.textFormat ?? drupalDefaultTextFormat,
             createdAt: node.createdDate,
             loveCount: 0,
             isNew: false,
@@ -195,8 +202,10 @@ enum Mappers {
             audioUrl: audioUrl,
             duration: 0,
             publishedAt: node.createdDate,
-            lastActivityAt: node.changedDate,
+            lastActivityAt: node.lastActivityDate(commentField: "comment_node_podcast"),
             description: a["body"]?.richTextValue ?? "",
+            rawDescription: a["body"]?.rawTextValue ?? "",
+            bodyFormat: a["body"]?.textFormat ?? drupalDefaultTextFormat,
             artworkUrl: nil,
             transcriptUrl: (transcriptUrl?.isEmpty == false) ? transcriptUrl : nil,
             chapters: chapters,
@@ -451,6 +460,8 @@ enum Mappers {
             authorId: uidId ?? "",
             rating: nil,
             body: a["comment_body"]?.richTextValue ?? "",
+            rawBody: a["comment_body"]?.rawTextValue ?? "",
+            bodyFormat: a["comment_body"]?.textFormat ?? drupalDefaultTextFormat,
             createdAt: node.createdDate
         )
     }
@@ -471,7 +482,7 @@ enum Mappers {
             authorName: authorName,
             authorId: uidId ?? "",
             publishedAt: node.createdDate,
-            lastActivityAt: node.changedDate,
+            lastActivityAt: node.lastActivityDate(commentField: "comment_node_blog2"),
             summary: a["body"]?.richTextSummary ?? a["body"]?.richTextValue ?? "",
             commentCount: a["comment_node_blog2"]?["comment_count"]?.intValue ?? 0,
             url: url,
@@ -481,14 +492,18 @@ enum Mappers {
 
     // MARK: - Generic comments (resource / blog / podcast)
 
-    static func genericComment(_ node: JsonApiNode, included: [JsonApiNode] = []) -> (authorName: String, authorId: String, subject: String, body: String, createdAt: Date) {
+    static func genericComment(_ node: JsonApiNode, included: [JsonApiNode] = []) -> (authorName: String, authorId: String, subject: String, body: String, rawBody: String, bodyFormat: String, createdAt: Date) {
         let a = node.attributes
         let uidId = node.relationshipId("uid")
         let userNode = uidId.flatMap { id in included.first { $0.id == id } }
         let authorName = userNode?.attributes["display_name"]?.stringValue
             ?? userNode?.attributes["name"]?.stringValue
             ?? a["name"]?.stringValue ?? ""
-        return (authorName, uidId ?? "", a["subject"]?.stringValue ?? "", a["comment_body"]?.richTextValue ?? "", node.createdDate)
+        return (
+            authorName, uidId ?? "", a["subject"]?.stringValue ?? "", a["comment_body"]?.richTextValue ?? "",
+            a["comment_body"]?.rawTextValue ?? "", a["comment_body"]?.textFormat ?? drupalDefaultTextFormat,
+            node.createdDate
+        )
     }
 
     // MARK: - Resources / Guides
@@ -520,7 +535,7 @@ enum Mappers {
             categories: categories,
             summary: a["body"]?.richTextSummary ?? a["body"]?.richTextValue ?? "",
             createdAt: node.createdDate,
-            updatedAt: node.changedDate,
+            updatedAt: node.lastActivityDate(commentField: "comment_node_guides"),
             commentCount: a["comment_node_guides"]?["comment_count"]?.intValue ?? 0,
             url: url,
             isSaved: PersistenceStore.shared.isSaved(id: node.id)
@@ -591,6 +606,8 @@ enum Mappers {
             feedbackId: base.feedbackId,
             authorId: node.relationshipId("uid") ?? "",
             body: HTMLText.plainText(fromHTML: a["body"]?.richTextValue ?? ""),
+            rawBody: a["body"]?.rawTextValue ?? "",
+            bodyFormat: a["body"]?.textFormat ?? drupalDefaultTextFormat,
             stepsToReproduce: a["field_steps_to_reproduce"]?.richTextValue.map { HTMLText.plainText(fromHTML: $0) },
             workaround: a["field_workaround"]?.richTextValue.map { HTMLText.plainText(fromHTML: $0) },
             device: a["field_device_s_bug_has_been_enco"]?.stringValue,

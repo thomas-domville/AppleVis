@@ -70,6 +70,7 @@ struct SubmitBlogView: View {
     @State private var blogDraftMinimumAnnounced = false
     @State private var showAccountEmailChange = false
     @State private var emailSuggestionDismissed = false
+    @State private var justRewrote = false
 
     /// Set when opened from the Share Extension with shared text.
     init(prefillText: String? = nil) {
@@ -231,7 +232,7 @@ struct SubmitBlogView: View {
     private var detailsSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 1, total: 3, title: "Title & Category", isFocused: $isStepFocused)
+                WizardStepHeader(title: "Title & Category", stepIndex: 1, stepTotal: 3, headerFocus: $isStepFocused)
                 Text("Submit a blog post draft for the AppleVis editorial team to review. This does not publish immediately — an editor will follow up.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -265,8 +266,7 @@ struct SubmitBlogView: View {
     private var contentSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 2, total: 3, title: "Your Content", isFocused: $isStepFocused)
-                backButton
+                WizardStepHeader(title: "Your Content", stepIndex: 2, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
                 Text("Add your email so our editorial team can reply, then tell us about your post and write or import your draft.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -290,8 +290,10 @@ struct SubmitBlogView: View {
                 Section {
                     TranslatePromptView(isProcessing: intelligence.isProcessing) {
                         Task {
-                            if let result = await intelligence.translate(subject: nil, body: blogDraft, isTopic: false) {
-                                blogDraft = result.body
+                            // The pitch can set off the prompt too, so translate
+                            // whichever box isn't in English. Reported directly.
+                            if await intelligence.translateEach([$pitchMessage, $blogDraft]) {
+                                justRewrote = true
                             } else {
                                 toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
@@ -313,6 +315,7 @@ struct SubmitBlogView: View {
                                 if let result = await intelligence.rewriteRespectfully(subject: title, body: blogDraft, isTopic: true) {
                                     title = result.subject ?? title
                                     blogDraft = result.body
+                                    justRewrote = true
                                 } else {
                                     toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                 }
@@ -320,6 +323,7 @@ struct SubmitBlogView: View {
                         }
                     )
                 }
+                .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
             }
             // The live webform's actual required "Message" field — see the
             // `pitchMessage` property's doc comment. Now gets the same
@@ -330,6 +334,7 @@ struct SubmitBlogView: View {
                     .frame(minHeight: 80)
                     .accessibilityLabel(String(localized: "Why this post would interest AppleVis readers"))
                     .accessibilityHint(String(localized: "Required. Tell us a little about your blog post and why you think it would be of interest and value to the AppleVis community."))
+                    .rewriteFlash($justRewrote)
                     .onChange(of: pitchMessage) { _, newValue in
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
@@ -338,6 +343,8 @@ struct SubmitBlogView: View {
                             detectionEnabled: preferences.nonEnglishDetectionEnabled
                         )
                     }
+                // The draft had Rewrite; this required pitch never did.
+                DraftRewriteButton(intelligence: intelligence, text: $pitchMessage, justRewrote: $justRewrote)
             } header: {
                 Text("Why This Post Would Interest AppleVis Readers")
             } footer: {
@@ -362,6 +369,7 @@ struct SubmitBlogView: View {
                     .frame(minHeight: 200)
                     .accessibilityLabel(String(localized: "Blog Post Draft"))
                     .accessibilityHint(String(localized: "Required. Minimum 50 characters."))
+                    .rewriteFlash($justRewrote)
                     .onChange(of: blogDraft) { _, newValue in
                         handleBlogDraftChange(newValue)
                         guidelines.textChanged(newValue)
@@ -371,6 +379,7 @@ struct SubmitBlogView: View {
                             detectionEnabled: preferences.nonEnglishDetectionEnabled
                         )
                     }
+                rewriteButton
                 HStack {
                     Button {
                         showFileImporter = true
@@ -471,8 +480,7 @@ struct SubmitBlogView: View {
     private var reviewSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused)
-                backButton
+                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
                 Text("Check your details, then tap Submit.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -497,9 +505,31 @@ struct SubmitBlogView: View {
             Section {
                 WizardBottomButton(
                     String(localized: "Submit"),
-                    isEnabled: !isSubmitting && networkMonitor.isConnected
+                    isEnabled: !isSubmitting && networkMonitor.isConnected, isLoading: isSubmitting
                 ) { Task { await submit() } }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var rewriteButton: some View {
+        if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+            Button {
+                Task {
+                    if let result = await intelligence.rewrite(subject: title, body: blogDraft, isTopic: true) {
+                        title = result.subject ?? title
+                        blogDraft = result.body
+                        justRewrote = true
+                    } else {
+                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
+                    }
+                }
+            } label: {
+                Label("Rewrite", systemImage: "wand.and.stars")
+                    .symbolEffect(.bounce, value: justRewrote)
+            }
+            .disabled(blogDraft.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+            .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
         }
     }
 
@@ -513,16 +543,6 @@ struct SubmitBlogView: View {
         SoundPlayer.shared.play(.pickerTick)
         step = Step(rawValue: step.rawValue - 1) ?? .details
         focusStepAfterTransition()
-    }
-
-    /// Step-backward navigation, separated from the toolbar's Cancel button
-    /// so a user can discard the submission from any step.
-    private var backButton: some View {
-        Button {
-            goBack()
-        } label: {
-            Label("Back", systemImage: "chevron.backward")
-        }
     }
 
     /// Was a single guessed 300ms delay — see SubmitAppView's identical fix

@@ -85,6 +85,49 @@ enum FeedItem: Identifiable {
         }
     }
 
+    /// The bare content UUID, without `id`'s kind prefix.
+    var contentId: String {
+        switch self {
+        case .forumTopic(let t):     return t.id
+        case .podcastEpisode(let e): return e.id
+        case .appListing(let a):     return a.id
+        case .resource(let r):       return r.id
+        case .blogPost(let b):       return b.id
+        }
+    }
+
+    /// When the item itself was posted — decides whether a never-opened
+    /// item is brand new since the last visit (see HomeViewModel's feed
+    /// baselines).
+    var createdAt: Date {
+        switch self {
+        case .forumTopic(let t):     return t.createdAt
+        case .podcastEpisode(let e): return e.publishedAt
+        case .appListing(let a):     return a.createdAt
+        case .resource(let r):       return r.createdAt
+        case .blogPost(let b):       return b.publishedAt
+        }
+    }
+
+    /// The JSON:API comment bundle holding this item's comments (reviews,
+    /// for app entries) — used to count exactly how many arrived since a
+    /// given time.
+    var commentBundle: CommentBundle {
+        switch self {
+        case .forumTopic:            return .forumTopic
+        case .podcastEpisode:        return .podcastEpisode
+        case .resource:              return .guide
+        case .blogPost:              return .blogPost
+        case .appListing(let a):
+            switch a.platform {
+            case .ios:     return .iosApp
+            case .macos:   return .macApp
+            case .tvos:    return .tvApp
+            case .watchos: return .watchApp
+            }
+        }
+    }
+
     /// The count backing "new replies since you last saw this item" —
     /// replies/comments for most kinds, reviews for apps (apps have no
     /// comment concept of their own).

@@ -25,6 +25,9 @@ nonisolated struct BlogPostDetail: Identifiable, Codable, Sendable {
     let publishedAt: Date
     let lastActivityAt: Date
     let body: String
+    /// See `ForumTopicDetail.rawBody`/`bodyFormat`'s doc comment.
+    var rawBody: String = ""
+    var bodyFormat: String = drupalDefaultTextFormat
     let commentCount: Int
     let url: String
     var comments: [BlogComment]
@@ -37,6 +40,8 @@ nonisolated struct BlogComment: Identifiable, Codable, Sendable {
     let authorId: String
     let subject: String
     let body: String
+    var rawBody: String = ""
+    var bodyFormat: String = drupalDefaultTextFormat
     let createdAt: Date
 }
 

@@ -14,17 +14,19 @@ struct EditContentSheet: View {
     @State private var text: String
     @State private var isSaving = false
     @State private var error: String?
+    @State private var justRewrote = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var toast: ToastStore
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
-    /// Had no focus management at all — focuses the text editor itself
-    /// rather than a separate heading, matching ComposeTopicView's identical
-    /// reasoning for a single-field edit form: otherwise it silently
-    /// defaults to the back button. Full app-wide focus audit, requested
-    /// directly.
-    @AccessibilityFocusState private var isTextEditorFocused: Bool
+    /// Now focuses the header below, not the text editor — matches how
+    /// every other wizard-style screen in the app (Setup, the Welcome Tour,
+    /// Submit/Contact) focuses its heading first, not straight into a
+    /// field. Previously had no focus management at all and silently
+    /// defaulted to the back button; this is a further refinement of that
+    /// original fix, not a reversal of it.
+    @AccessibilityFocusState private var isHeaderFocused: Bool
 
     init(title: String, initialText: String, isReply: Bool = true, onSave: @escaping (String) async throws -> Void) {
         self.title = title
@@ -36,55 +38,71 @@ struct EditContentSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 0) {
-                if intelligence.showTranslatePrompt {
-                    TranslatePromptView(isProcessing: intelligence.isProcessing) {
-                        Task {
-                            if let result = await intelligence.translate(subject: nil, body: text, isTopic: false) {
-                                text = result.body
-                            } else {
-                                toast.error(String(localized: "Couldn't translate this. Try again."))
-                            }
-                        }
-                    } onDismiss: {
-                        intelligence.dismissTranslatePrompt()
-                    }
-                    .padding(.horizontal)
-                    .padding(.top)
-                }
-                if let warning = guidelines.topWarning {
-                    GuidelinesReminderView(
-                        warning: warning,
-                        draftText: text,
-                        context: title,
-                        onDismiss: { guidelines.dismiss() },
-                        onRewriteRespectfully: {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    WizardStepHeader(
+                        title: title, icon: "text.bubble",
+                        stepIndex: 1, stepTotal: 1, headerFocus: $isHeaderFocused
+                    )
+                    Text("Update your message below, then tap Save.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 24)
+
+                    if intelligence.showTranslatePrompt {
+                        TranslatePromptView(isProcessing: intelligence.isProcessing) {
                             Task {
-                                if let result = await intelligence.rewriteRespectfully(subject: nil, body: text, isTopic: false) {
+                                if let result = await intelligence.translate(subject: nil, body: text, isTopic: false) {
                                     text = result.body
+                                    justRewrote = true
                                 } else {
-                                    toast.error(String(localized: "Couldn't rewrite this. Try again."))
+                                    toast.error(String(localized: "Couldn't translate this. Try again."))
                                 }
                             }
+                        } onDismiss: {
+                            intelligence.dismissTranslatePrompt()
                         }
-                    )
                         .padding(.horizontal)
-                        .padding(.top)
-                }
-                TextEditor(text: $text)
-                    .padding()
-                    .accessibilityFocused($isTextEditorFocused)
-                    .onChange(of: text) { _, newValue in
-                        guidelines.textChanged(newValue, isReply: isReply)
-                        intelligence.textChanged(
-                            newValue,
-                            translationEnabled: preferences.composeTranslationEnabled,
-                            detectionEnabled: preferences.nonEnglishDetectionEnabled
-                        )
                     }
-                if let error {
-                    Text(error).foregroundStyle(.red).padding(.horizontal)
+                    if let warning = guidelines.topWarning {
+                        GuidelinesReminderView(
+                            warning: warning,
+                            draftText: text,
+                            context: title,
+                            onDismiss: { guidelines.dismiss() },
+                            onRewriteRespectfully: {
+                                Task {
+                                    if let result = await intelligence.rewriteRespectfully(subject: nil, body: text, isTopic: false) {
+                                        text = result.body
+                                        justRewrote = true
+                                    } else {
+                                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
+                                    }
+                                }
+                            }
+                        )
+                        .padding(.horizontal)
+                        .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
+                    }
+                    TextEditor(text: $text)
+                        .frame(minHeight: 160)
+                        .padding(.horizontal)
+                        .rewriteFlash($justRewrote)
+                        .onChange(of: text) { _, newValue in
+                            guidelines.textChanged(newValue, isReply: isReply)
+                            intelligence.textChanged(
+                                newValue,
+                                translationEnabled: preferences.composeTranslationEnabled,
+                                detectionEnabled: preferences.nonEnglishDetectionEnabled
+                            )
+                        }
+                    rewriteButton
+                        .padding(.horizontal)
+                    if let error {
+                        Text(error).foregroundStyle(.red).padding(.horizontal)
+                    }
                 }
+                .padding(.top)
             }
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
@@ -93,11 +111,41 @@ struct EditContentSheet: View {
                     Button("Cancel") { SoundPlayer.shared.play(.screenClose); dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { Task { await save() } }
-                        .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving || text == initialText)
+                    Button {
+                        Task { await save() }
+                    } label: {
+                        if isSaving {
+                            ProgressView()
+                        } else {
+                            Text("Save")
+                        }
+                    }
+                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving || text == initialText)
                 }
             }
-            .task { await retryAccessibilityFocus(into: $isTextEditorFocused) }
+            .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut, value: guidelines.topWarning?.id)
+            .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
+        }
+    }
+
+    @ViewBuilder
+    private var rewriteButton: some View {
+        if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+            Button {
+                Task {
+                    if let result = await intelligence.rewrite(subject: nil, body: text, isTopic: false) {
+                        text = result.body
+                        justRewrote = true
+                    } else {
+                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
+                    }
+                }
+            } label: {
+                Label("Rewrite", systemImage: "wand.and.stars")
+                    .symbolEffect(.bounce, value: justRewrote)
+            }
+            .disabled(text.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+            .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
         }
     }
 

@@ -65,6 +65,9 @@ struct EpisodeDetailView: View {
     /// whatever this screen's default landing point is (the title), instead
     /// of back on the button that opened it — reported directly.
     @AccessibilityFocusState private var isTranscriptButtonFocused: Bool
+    @AccessibilityFocusState private var isListenedToolFocused: Bool
+    @State private var isListened = false
+    @State private var positionResetCount = 0
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -78,9 +81,6 @@ struct EpisodeDetailView: View {
         player.queue.contains { $0.id == episode.id }
     }
 
-    private func isEpisodePlayed(_ episode: PodcastEpisode) -> Bool {
-        PersistenceStore.shared.isEpisodePlayed(episode.id)
-    }
 
     var body: some View {
         Group {
@@ -171,10 +171,17 @@ struct EpisodeDetailView: View {
                     pendingFocusCommentId = nil
                 }
             }
-            .task {
-                guard focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
+            // Keyed on isLoading so this waits for load() to finish: the
+            // page can appear before the new-comment count is known (App
+            // Store enrichment, Follow state), and jumping then found
+            // nothing new and gave up — leaving VoiceOver on the title.
+            // Reported directly.
+            .task(id: isLoading) {
+                guard !isLoading, focusFirstNewCommentOnAppear, !hasAppliedFirstNewCommentFocus else { return }
                 hasAppliedFirstNewCommentFocus = true
-                await jumpToFirstNewComment(proxy: proxy)
+                // Nothing to land on after all — load() skipped the title
+                // for this, so put focus there instead of nowhere.
+                if !(await jumpToFirstNewComment(proxy: proxy)), newCommentCount > 0 { focusTitleAfterLoad() }
             }
             .task {
                 guard let targetCommentId, !hasAppliedTargetCommentFocus else { return }
@@ -220,8 +227,8 @@ struct EpisodeDetailView: View {
             }
         }
         .sheet(item: $editingEpisodeNode) { node in
-            EditNodeSheet(initialTitle: node.title, initialBody: node.body) { newTitle, newBody in
-                try await saveEpisodeEdit(nodeTypeSuffix: node.nodeTypeSuffix, title: newTitle, body: newBody)
+            EditNodeSheet(initialTitle: node.title, initialBody: node.body, nodeTypeSuffix: node.nodeTypeSuffix) { newTitle, newBody in
+                try await saveEpisodeEdit(nodeTypeSuffix: node.nodeTypeSuffix, title: newTitle, body: newBody, format: node.format)
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -274,7 +281,7 @@ struct EpisodeDetailView: View {
                 Button {
                     Task { await player.skip(by: -preferences.skipBackInterval) }
                 } label: {
-                    episodeControlLabel(systemImage: "gobackward.\(Int(preferences.skipBackInterval))", title: "Back", subtitle: "\(Int(preferences.skipBackInterval)) sec")
+                    episodeControlLabel(systemImage: "gobackward.\(Int(preferences.skipBackInterval))", title: "Back", subtitle: String(localized: "\(Int(preferences.skipBackInterval)) sec"))
                 }
                 .accessibilityLabel(String(localized: "Skip back \(PodcastDuration.accessibilityLabel(preferences.skipBackInterval))"))
 
@@ -292,7 +299,7 @@ struct EpisodeDetailView: View {
                 Button {
                     Task { await player.skip(by: preferences.skipForwardInterval) }
                 } label: {
-                    episodeControlLabel(systemImage: "goforward.\(Int(preferences.skipForwardInterval))", title: "Forward", subtitle: "\(Int(preferences.skipForwardInterval)) sec")
+                    episodeControlLabel(systemImage: "goforward.\(Int(preferences.skipForwardInterval))", title: "Forward", subtitle: String(localized: "\(Int(preferences.skipForwardInterval)) sec"))
                 }
                 .accessibilityLabel(String(localized: "Skip forward \(PodcastDuration.accessibilityLabel(preferences.skipForwardInterval))"))
             }
@@ -348,30 +355,58 @@ struct EpisodeDetailView: View {
                 }
                 .accessibilityLabel(String(localized: "Play Next"))
 
-                // Toggle, not a one-way "Mark Played" → static "Played" —
-                // matches the Queue button's own toggle pattern just above.
-                // Previously there was no way back once marked, whether you
-                // tapped it by mistake or a synced iCloud state set it.
-                // "Listened" (not "Played") to avoid reading as ambiguous
-                // for audio content. Requested directly.
+                // A reminder that you've already heard this episode, and
+                // nothing more. Was "Mark Listened": a button whose name
+                // changed once pressed, and which also quietly erased your
+                // place in the episode, so it read as a reset button. Now a
+                // plain on/off switch, also shown on episode lists, with
+                // starting over split out into its own Start Over button.
+                // Requested directly.
                 episodeToolButton(
-                    title: isEpisodePlayed(episode) ? "Listened" : "Mark Listened",
-                    subtitle: isEpisodePlayed(episode) ? "Marked" : "Complete",
-                    systemImage: isEpisodePlayed(episode) ? "checkmark.circle.fill" : "checkmark.circle"
+                    title: "Listened",
+                    subtitle: isListened ? "Yes" : "No",
+                    systemImage: isListened ? "checkmark.circle.fill" : "circle"
                 ) {
-                    if isEpisodePlayed(episode) {
+                    if isListened {
                         PersistenceStore.shared.unmarkEpisodePlayed(episode.id)
-                        toast.success(String(localized: "Marked as not listened"))
                     } else {
                         PersistenceStore.shared.markEpisodePlayed(episode.id)
-                        // Marking listened while a resume point is still on
-                        // file would otherwise offer to "Resume from 12:34"
-                        // for an episode you just said you're done with.
-                        player.clearSavedPosition(for: episode.id)
-                        toast.success(String(localized: "Marked as listened"))
                     }
+                    isListened.toggle()
                 }
-                .accessibilityLabel(String(localized: isEpisodePlayed(episode) ? "Listened" : "Mark as Listened"))
+                .accessibilityLabel(String(localized: "Listened"))
+                .accessibilityValue(isListened ? String(localized: "On") : String(localized: "Off"))
+                .accessibilityAddTraits(.isToggle)
+                .accessibilityHint(String(localized: "A reminder that you've already heard this episode."))
+                .accessibilityFocused($isListenedToolFocused)
+
+                // Only while there's a saved place to go back from. Reads
+                // positionResetCount so clearing a saved place (which isn't
+                // published by PlayerStore) redraws the grid right away.
+                let _ = positionResetCount
+                if let resumeAt = player.savedPosition(for: episode.id) {
+                    let isLoadedInPlayer = player.currentEpisode?.id == episode.id
+                    episodeToolButton(
+                        title: "Start Over",
+                        subtitle: isLoadedInPlayer
+                            ? String(localized: "Back to 0:00")
+                            : String(localized: "From \(PodcastDuration.colon(resumeAt))"),
+                        systemImage: "backward.end"
+                    ) {
+                        // Playing keeps playing and paused stays paused, just
+                        // from 0:00; not in the player, it forgets the saved
+                        // place so Play starts from the beginning.
+                        player.clearSavedPosition(for: episode.id)
+                        positionResetCount += 1
+                        UIAccessibility.post(notification: .announcement, argument: String(localized: "Back to the beginning."))
+                        // The tile disappears once there's no saved place,
+                        // so VoiceOver focus needs somewhere to land.
+                        if !isLoadedInPlayer { isListenedToolFocused = true }
+                    }
+                    .accessibilityLabel(String(localized: "Start Over"))
+                    .accessibilityValue(isLoadedInPlayer ? "" : String(localized: "You're at \(Duration.seconds(resumeAt).formatted(.units(allowed: [.hours, .minutes, .seconds], width: .wide)))"))
+                    .accessibilityHint(String(localized: "Plays this episode from the beginning."))
+                }
 
                 episodeToolButton(title: "Now Playing", subtitle: "Open", systemImage: "slider.horizontal.3") {
                     openFullPlayer(for: episode)
@@ -384,6 +419,11 @@ struct EpisodeDetailView: View {
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal)
         .padding(.bottom, 8)
+        // Keeps Listened current when playback finishing (or iCloud)
+        // changes it while this page is open.
+        .onReceive(NotificationCenter.default.publisher(for: PersistenceStore.playedEpisodesDidChange)) { _ in
+            isListened = PersistenceStore.shared.isEpisodePlayed(episode.id)
+        }
     }
 
     private func isPlayingThisEpisode(_ episode: PodcastEpisode) -> Bool {
@@ -427,8 +467,9 @@ struct EpisodeDetailView: View {
         guard isCurrentEpisode(episode), player.position > 0 else {
             return validDuration(episode).map(PodcastDuration.abbreviated) ?? "Episode"
         }
-        let total = player.duration > 0 ? " of \(PodcastDuration.colon(player.duration))" : ""
-        return "\(PodcastDuration.colon(player.position))\(total)"
+        // "of" was English, built in code.
+        guard player.duration > 0 else { return PodcastDuration.colon(player.position) }
+        return String(localized: "\(PodcastDuration.colon(player.position)) of \(PodcastDuration.colon(player.duration))")
     }
 
     private func playAccessibilityLabel(for episode: PodcastEpisode) -> String {
@@ -556,16 +597,20 @@ struct EpisodeDetailView: View {
         }
     }
 
+    // String parameters render verbatim through Text(String) — skipping
+    // the catalog — so these labels and headings never translated.
+    // LocalizedStringKey(...) looks each one up; already-translated or
+    // dynamic values just come back unchanged.
     private func episodeControlLabel(systemImage: String, title: String, subtitle: String) -> some View {
         VStack(spacing: 5) {
             Image(systemName: systemImage)
                 .font(.title3)
                 .foregroundStyle(Color.accentColor)
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.caption2)
                 .fontWeight(.semibold)
                 .lineLimit(1)
-            Text(subtitle)
+            Text(LocalizedStringKey(subtitle))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -588,11 +633,11 @@ struct EpisodeDetailView: View {
                 .foregroundStyle(Color.accentColor)
                 .frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(.caption)
                     .fontWeight(.semibold)
                     .lineLimit(1)
-                Text(subtitle)
+                Text(LocalizedStringKey(subtitle))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -665,7 +710,7 @@ struct EpisodeDetailView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.down.to.line.compact")
-                    Text("\(newCommentCount) new comment\(newCommentCount == 1 ? "" : "s") — Jump to First New Comment")
+                    Text("\(String(localized: "\(newCommentCount) new comments")) — Jump to First New Comment")
                         .font(.subheadline).fontWeight(.medium)
                     Spacer(minLength: 0)
                 }
@@ -677,7 +722,7 @@ struct EpisodeDetailView: View {
             .buttonStyle(.plain)
             .padding(.horizontal)
             .padding(.bottom, 8)
-            .accessibilityLabel(String(localized: "\(newCommentCount) new comment\(newCommentCount == 1 ? "" : "s")"))
+            .accessibilityLabel(String(localized: "\(newCommentCount) new comments"))
             .accessibilityHint(String(localized: "Double-tap to jump to the first new comment."))
         }
     }
@@ -759,7 +804,7 @@ struct EpisodeDetailView: View {
     }
 
     private func sectionHeading(_ text: String) -> some View {
-        Text(text).font(.headline)
+        Text(LocalizedStringKey(text)).font(.headline)
             .padding(.horizontal)
             .padding(.top, 16).padding(.bottom, 4)
             .accessibilityAddTraits(.isHeader)
@@ -900,23 +945,21 @@ struct EpisodeDetailView: View {
     /// a spoken summary in place of manually reading through every comment.
     private func announceThreadOverview() {
         let mostRecent = comments.max { $0.createdAt < $1.createdAt }
-        var summary = "Thread has \(comments.count) comment\(comments.count == 1 ? "" : "s")."
-        if let mostRecent {
-            summary += " Most recent comment by \(mostRecent.authorName), \(mostRecent.createdAt.formatted(.relative(presentation: .named)))."
-        }
-        if let episode {
-            summary += " Original post by \(episode.authorName)."
-        }
-        UIAccessibility.post(notification: .announcement, argument: summary)
+        ThreadOverview.announce(
+            commentCount: comments.count,
+            mostRecentAuthor: mostRecent?.authorName,
+            mostRecentDate: mostRecent?.createdAt,
+            originalAuthor: episode?.authorName
+        )
     }
 
     private func startEditEpisode(_ episode: PodcastEpisode) {
-        editingEpisodeNode = EditableNode(title: episode.title, body: episode.description, nodeTypeSuffix: "podcast")
+        editingEpisodeNode = EditableNode(title: episode.title, body: episode.rawDescription, format: episode.bodyFormat, nodeTypeSuffix: "podcast")
     }
 
-    private func saveEpisodeEdit(nodeTypeSuffix: String, title: String, body: String) async throws {
+    private func saveEpisodeEdit(nodeTypeSuffix: String, title: String, body: String, format: String) async throws {
         guard let user = auth.user, let episode else { return }
-        try await APIClient.shared.content.editNode(nodeId: episode.id, nodeType: nodeTypeSuffix, title: title, body: body, csrfToken: user.csrfToken)
+        try await APIClient.shared.content.editNode(nodeId: episode.id, nodeType: nodeTypeSuffix, title: title, body: body, format: format, csrfToken: user.csrfToken)
         toast.success(String(localized: "Episode updated"))
         await load()
     }
@@ -953,6 +996,7 @@ struct EpisodeDetailView: View {
             let (fetchedEp, fetchedComments) = try await (ep, cms)
             episode = fetchedEp
             comments = fetchedComments
+            isListened = PersistenceStore.shared.isEpisodePlayed(fetchedEp.id)
             resolveAudioMetadataIfNeeded(for: fetchedEp)
             // Was `>= 100` (the page size requested, not what the server
             // actually returns — Drupal JSON:API commonly clamps a
@@ -994,10 +1038,17 @@ struct EpisodeDetailView: View {
         // Retries at each delay rather than a single guessed one — a single
         // attempt could silently go nowhere on a slower device or slower
         // load. Reported directly.
-        if episode != nil {
-            Task {
-                await retryAccessibilityFocus(into: $isTitleFocused)
-            }
+        // Opened via "Jump to First New Comment": that comment gets focus
+        // instead. Title focus used to run regardless, and its retries could
+        // pull focus straight back to the title. Reported directly.
+        if episode != nil, !(focusFirstNewCommentOnAppear && newCommentCount > 0) {
+            focusTitleAfterLoad()
+        }
+    }
+
+    private func focusTitleAfterLoad() {
+        Task {
+            await retryAccessibilityFocus(into: $isTitleFocused)
         }
     }
 
@@ -1080,14 +1131,17 @@ struct EpisodeDetailView: View {
     /// oldest-first (matches "Jump to Last Comment" scrolling to `.last`
     /// for the most recent), so the first of the `newCommentCount` most
     /// recently posted comments sits at `comments.count - newCommentCount`.
-    private func jumpToFirstNewComment(proxy: ScrollViewProxy) async {
+    @discardableResult
+    private func jumpToFirstNewComment(proxy: ScrollViewProxy) async -> Bool {
         if hasMoreComments { await ensureAllCommentsLoaded() }
         let targetIndex = comments.count - newCommentCount
-        guard newCommentCount > 0, targetIndex >= 0, targetIndex < comments.count else { return }
+        guard newCommentCount > 0, targetIndex >= 0, targetIndex < comments.count else { return false }
         let targetId = comments[targetIndex].id
         withReduceMotionAwareAnimation { proxy.scrollTo(targetId, anchor: .top) }
-        try? await Task.sleep(for: .milliseconds(400))
-        focusedCommentId = targetId
+        // Retried like the title focus — one assignment after a guessed
+        // delay could miss a row that wasn't laid out yet.
+        await retryAccessibilityFocus(targetId, into: $focusedCommentId)
+        return true
     }
 }
 
@@ -1198,12 +1252,14 @@ struct ComposePodcastCommentView: View {
     @State private var commentText: String
     @State private var isSubmitting = false
     @State private var submitError: String?
+    @State private var justRewrote = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var preferences: PreferencesStore
     @StateObject private var guidelines = GuidelinesCheckState()
     @StateObject private var intelligence = ComposeIntelligenceState()
+    @AccessibilityFocusState private var isHeaderFocused: Bool
 
     init(episodeId: String, title: String, quotedComment: PodcastComment? = nil, onPosted: @escaping (PodcastComment) -> Void) {
         self.episodeId = episodeId
@@ -1220,6 +1276,11 @@ struct ComposePodcastCommentView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
+                WizardStepHeader(
+                    title: "Add Comment", icon: "text.bubble",
+                    stepIndex: 1, stepTotal: 1, headerFocus: $isHeaderFocused
+                )
+                .padding(.top)
                 Text(quotedComment != nil ? "Replying to \(quotedComment!.authorName) — Re: \(title)" : "Re: \(title)")
                     .font(.subheadline).foregroundStyle(.secondary).padding()
                 if intelligence.showTranslatePrompt {
@@ -1227,6 +1288,7 @@ struct ComposePodcastCommentView: View {
                         Task {
                             if let result = await intelligence.translate(subject: nil, body: commentText, isTopic: false) {
                                 commentText = result.body
+                                justRewrote = true
                             } else {
                                 toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
@@ -1246,6 +1308,7 @@ struct ComposePodcastCommentView: View {
                             Task {
                                 if let result = await intelligence.rewriteRespectfully(subject: nil, body: commentText, isTopic: false) {
                                     commentText = result.body
+                                    justRewrote = true
                                 } else {
                                     toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                 }
@@ -1253,9 +1316,11 @@ struct ComposePodcastCommentView: View {
                         }
                     )
                         .padding(.horizontal)
+                        .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
                 }
                 TextEditor(text: $commentText)
                     .padding()
+                    .rewriteFlash($justRewrote)
                     .onChange(of: commentText) { _, newValue in
                         guidelines.textChanged(newValue, isReply: true)
                         intelligence.textChanged(
@@ -1264,19 +1329,53 @@ struct ComposePodcastCommentView: View {
                             detectionEnabled: preferences.nonEnglishDetectionEnabled
                         )
                     }
+                rewriteButton
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
                 if let err = submitError {
                     Text(err).foregroundStyle(.red).padding()
                 }
             }
             .navigationTitle("Add Comment")
             .navigationBarTitleDisplayMode(.inline)
+            .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut, value: guidelines.topWarning?.id)
+            .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Post") { Task { await submit() } }
-                        .disabled(commentText.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
+                    Button {
+                        Task { await submit() }
+                    } label: {
+                        if isSubmitting {
+                            ProgressView()
+                        } else {
+                            Text("Post")
+                        }
+                    }
+                    .disabled(commentText.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var rewriteButton: some View {
+        if preferences.composeRewriteEnabled && IntelligenceService.isAvailable {
+            Button {
+                Task {
+                    if let result = await intelligence.rewrite(subject: nil, body: commentText, isTopic: false) {
+                        commentText = result.body
+                        justRewrote = true
+                    } else {
+                        toast.error(String(localized: "Couldn't rewrite this. Try again."))
+                    }
+                }
+            } label: {
+                Label("Rewrite", systemImage: "wand.and.stars")
+                    .symbolEffect(.bounce, value: justRewrote)
+            }
+            .disabled(commentText.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
+            .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
         }
     }
 

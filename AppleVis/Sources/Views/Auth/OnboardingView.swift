@@ -19,94 +19,64 @@ struct OnboardingView: View {
     @AccessibilityFocusState private var isStepHeaderFocused: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            chrome
-            Group {
-                switch step {
-                case 0: WelcomeStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
-                case 1: CommunityAgreementStep(onAgree: agreeToCommunityAgreement, onDecline: declineCommunityAgreementAndSkipSignIn, headerFocus: $isStepHeaderFocused)
-                case 2: SignInStep(onNext: nextStep, onSkip: nextStep, headerFocus: $isStepHeaderFocused)
-                case 3: NewActivityDisplayStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
-                case 4: ThemeStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
-                case 5: AppleTopicsStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
-                case 6: LanguageFilterStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
-                case 7: NotificationsStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
-                case 8: ReadyStep(onFinish: finish, headerFocus: $isStepHeaderFocused)
-                default: EmptyView()
-                }
-            }
-            // Cancel used to live in the top chrome row, but it didn't
-            // discard anything — it just accepted whatever hadn't been set
-            // yet and finished, exactly like Skip Setup below, just labeled
-            // and placed like a "get me out of here" affordance on someone's
-            // very first screen. Demoted to a plain text link after each
-            // step's own content instead, next to a plain-language reason
-            // it's safe to tap. Hidden on the last step: by then there's
-            // nothing left to skip. Also hidden on Welcome (step 0): Skip
-            // Setup still finishes onboarding and lets someone use the app,
-            // so it's a form of "continuing" too — it shouldn't be reachable
-            // before the Terms of Service/Privacy Policy agreement on that
-            // step has actually been made via Accept and Get Started.
-            if step > 0 && step < totalSteps - 1 {
-                VStack(spacing: 4) {
-                    Button("Skip Setup") { showSkipConfirm = true }
-                        .font(.subheadline)
-                        .accessibilityHint(String(localized: "Skips the rest of setup."))
-                    Text("You can change any of this later in Settings.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.bottom, 12)
-            }
-        }
-        .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut(duration: 0.3), value: step)
-        .background(preferences.colors.background)
-        // nextStep()/previousStep() already retry-focus the header after a
-        // transition, but nothing did that for the initial appearance, so
-        // VoiceOver defaulted to the chrome row's first focusable element
-        // instead of the Welcome heading on first launch.
-        .task { await retryAccessibilityFocus(into: $isStepHeaderFocused) }
-        .confirmationDialog(
-            "Skip the rest of setup?",
-            isPresented: $showSkipConfirm, titleVisibility: .visible
-        ) {
-            Button("Skip Setup", role: .destructive) { finish() }
-            Button("Continue Setup", role: .cancel) {}
-        } message: {
-            Text("You can change these settings anytime later in Settings.")
-        }
-    }
-
-    /// Persistent Back/progress row shown above every step — RN's shared
-    /// WizardLayout gave every onboarding screen a Back button (once past
-    /// the first step) and a step-progress indicator (both visual dots and
-    /// a "Step X of Y" VoiceOver announcement). None of this existed here:
-    /// there was no way back once you'd advanced, and no sense of progress
-    /// at all.
-    private var chrome: some View {
-        VStack(spacing: 8) {
-            if step > 0 {
-                HStack {
-                    Button(action: previousStep) {
-                        Label("Back", systemImage: "chevron.left")
+        NavigationStack {
+            VStack(spacing: 0) {
+                Group {
+                    switch step {
+                    case 0: WelcomeStep(onNext: nextStep, headerFocus: $isStepHeaderFocused)
+                    case 1: CommunityAgreementStep(onAgree: agreeToCommunityAgreement, onDecline: declineCommunityAgreementAndSkipSignIn, onBack: previousStep, headerFocus: $isStepHeaderFocused)
+                    case 2: SignInStep(onNext: nextStep, onSkip: nextStep, onBack: previousStep, headerFocus: $isStepHeaderFocused)
+                    case 3: NewActivityDisplayStep(onNext: nextStep, onBack: previousStep, headerFocus: $isStepHeaderFocused)
+                    case 4: ThemeStep(onNext: nextStep, onBack: previousStep, headerFocus: $isStepHeaderFocused)
+                    case 5: AppleTopicsStep(onNext: nextStep, onBack: previousStep, headerFocus: $isStepHeaderFocused)
+                    case 6: LanguageFilterStep(onNext: nextStep, onBack: previousStep, headerFocus: $isStepHeaderFocused)
+                    case 7: NotificationsStep(onNext: nextStep, onBack: previousStep, headerFocus: $isStepHeaderFocused)
+                    case 8: ReadyStep(onFinish: finish, onBack: previousStep, headerFocus: $isStepHeaderFocused)
+                    default: EmptyView()
                     }
-                    .accessibilityHint(String(localized: "Returns to the previous step."))
-                    Spacer()
+                }
+                // Cancel used to live in the top chrome row, but it didn't
+                // discard anything — it just accepted whatever hadn't been set
+                // yet and finished, exactly like Skip Setup below, just labeled
+                // and placed like a "get me out of here" affordance on someone's
+                // very first screen. Demoted to a plain text link after each
+                // step's own content instead, next to a plain-language reason
+                // it's safe to tap. Hidden on the last step: by then there's
+                // nothing left to skip. Also hidden on Welcome (step 0): Skip
+                // Setup still finishes onboarding and lets someone use the app,
+                // so it's a form of "continuing" too — it shouldn't be reachable
+                // before the Terms of Service/Privacy Policy agreement on that
+                // step has actually been made via Accept and Get Started.
+                if step > 0 && step < totalSteps - 1 {
+                    VStack(spacing: 4) {
+                        Button("Skip Setup") { showSkipConfirm = true }
+                            .font(.subheadline)
+                            .accessibilityHint(String(localized: "Skips the rest of setup."))
+                        Text("You can change any of this later in Settings.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.bottom, 12)
                 }
             }
-
-            HStack(spacing: 6) {
-                ForEach(0..<totalSteps, id: \.self) { i in
-                    Capsule()
-                        .fill(i == step ? Color.accentColor : Color.secondary.opacity(0.3))
-                        .frame(width: i == step ? 20 : 6, height: 6)
-                }
+            .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut(duration: 0.3), value: step)
+            .background(preferences.colors.background)
+            // nextStep()/previousStep() already retry-focus the header after a
+            // transition, but nothing did that for the initial appearance, so
+            // VoiceOver defaulted to the chrome row's first focusable element
+            // instead of the Welcome heading on first launch.
+            .task { await retryAccessibilityFocus(into: $isStepHeaderFocused) }
+            .confirmationDialog(
+                "Skip the rest of setup?",
+                isPresented: $showSkipConfirm, titleVisibility: .visible
+            ) {
+                Button("Skip Setup", role: .destructive) { finish() }
+                Button("Continue Setup", role: .cancel) {}
+            } message: {
+                Text("You can change these settings anytime later in Settings.")
             }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(String(localized: "Step \(step + 1) of \(totalSteps)"))
+            .navigationTitle("Setup")
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
     }
 
     private func nextStep() {
@@ -194,22 +164,16 @@ private struct WelcomeStep: View {
         ScrollView {
             VStack(spacing: 32) {
                 VStack(spacing: 12) {
-                    Image(systemName: "eye.circle.fill")
-                        .font(.system(size: 72))
-                        .foregroundStyle(Color.accentColor)
-                        .accessibilityHidden(true)
-
-                    Text("Welcome to AppleVis")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .multilineTextAlignment(.center)
-                        .accessibilityAddTraits(.isHeader)
-                        .modifier(OptionalAccessibilityFocus(isFocused: headerFocus))
+                    WizardStepHeader(
+                        title: "Welcome to AppleVis", icon: "eye.circle.fill",
+                        stepIndex: 1, stepTotal: 9, headerFocus: headerFocus
+                    )
 
                     Text("The community for blind and low-vision Apple users.")
-                        .font(.title3)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
                 }
                 .padding(.top, 48)
 
@@ -315,6 +279,7 @@ private struct CommunityAgreementStep: View {
     @EnvironmentObject private var auth: AuthStore
     let onAgree: () -> Void
     let onDecline: () -> Void
+    let onBack: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
 
     var body: some View {
@@ -322,7 +287,8 @@ private struct CommunityAgreementStep: View {
             headerFocus: headerFocus,
             declineHint: String(localized: "Continues using AppleVis without signing in. You can review the agreement again later."),
             onAgree: onAgree,
-            onDecline: onDecline
+            onDecline: onDecline,
+            onBack: onBack
         )
         .onAppear {
             // Matches SignInStep's identical guard just after this step —
@@ -345,6 +311,7 @@ private struct SignInStep: View {
     @EnvironmentObject private var preferences: PreferencesStore
     let onNext: () -> Void
     let onSkip: () -> Void
+    let onBack: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
 
     @State private var username = ""
@@ -355,12 +322,17 @@ private struct SignInStep: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 28) {
-                OnboardingHeader(
-                    icon: "person.crop.circle",
-                    title: "Sign In",
-                    subtitle: "Sign in to post content, track saved items, and sync your activity between the AppleVis app and website. You can skip this and sign in later.",
-                    headerFocus: headerFocus
-                )
+                VStack(spacing: 12) {
+                    WizardStepHeader(
+                        title: "Sign In", icon: "person.crop.circle",
+                        stepIndex: 3, stepTotal: 9, onBack: onBack, headerFocus: headerFocus
+                    )
+                    Text("Sign in to post content, track saved items, and sync your activity between the AppleVis app and website. You can skip this and sign in later.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
 
                 VStack(spacing: 16) {
                     VStack(alignment: .leading, spacing: 6) {
@@ -504,6 +476,7 @@ private struct SignInStep: View {
 private struct NewActivityDisplayStep: View {
     @EnvironmentObject private var preferences: PreferencesStore
     let onNext: () -> Void
+    let onBack: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
 
     // Previously asked whether to remember reading history at all — but
@@ -522,16 +495,21 @@ private struct NewActivityDisplayStep: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 28) {
-                OnboardingHeader(
-                    icon: "bell.badge",
-                    title: "Show What's New?",
-                    subtitle: "Home can highlight what's changed since your last visit — a New view alongside All and Mouse Recap, a quick summary card, and small badges on cards with new activity.",
-                    headerFocus: headerFocus
-                )
+                VStack(spacing: 12) {
+                    WizardStepHeader(
+                        title: "Show What's New?", icon: "bell.badge",
+                        stepIndex: 4, stepTotal: 9, onBack: onBack, headerFocus: headerFocus
+                    )
+                    Text("Home can highlight what's changed since your last visit — a New view alongside All and Mouse Recap, a quick summary at the top, and a small label on anything with new activity.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
 
                 VStack(alignment: .leading, spacing: 12) {
                     Label("A short summary and a New view each time you open Home.", systemImage: "sparkles")
-                    Label("Small badges on cards with new replies or comments.", systemImage: "text.badge.plus")
+                    Label("A small label like \"3 NEW\" on topics and posts with new comments.", systemImage: "text.badge.plus")
                     Label("You can change this anytime in Settings > General.", systemImage: "hand.raised")
                 }
                 .font(.subheadline)
@@ -548,7 +526,7 @@ private struct NewActivityDisplayStep: View {
                             RecommendedBadge()
                             Text("Yes, Show What's New")
                                 .font(.headline)
-                            Text("The default — a New view, badges, and a quick summary on Home.")
+                            Text("The default — a New view, labels, and a quick summary on Home.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -583,20 +561,61 @@ private struct NewActivityDisplayStep: View {
 
 // MARK: - Step 5: Theme
 
+/// Beta-tester feedback: a VoiceOver user would likely skip this step
+/// assuming there's nothing here for them — reasonable, but the step never
+/// said a default was already set, and Continue sat below all 15 themes
+/// (about 20 swipes away). Now the intro says what's already chosen and who
+/// the step can help, a "Continue with …" button sits right under it, and
+/// the default carries a Recommended badge.
 private struct ThemeStep: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    @Environment(\.colorScheme) private var colorScheme
     let onNext: () -> Void
+    let onBack: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
+
+    /// Set once, ever — so going Back to this step after picking System on
+    /// purpose doesn't switch it to High Contrast again.
+    @AppStorage("onboarding.contrastThemeSuggested") private var contrastThemeSuggested = false
+    /// Whether this visit pre-selected a High Contrast theme (drives the
+    /// intro wording and which option gets the Recommended badge).
+    @State private var suggestedHighContrast: AppTheme?
+
+    private var recommendedTheme: AppTheme { suggestedHighContrast ?? .system }
+
+    private var introText: String {
+        if let suggestedHighContrast {
+            return String(localized: "Since Increase Contrast is turned on for your iPhone, we've picked \(suggestedHighContrast.displayName) for you. If that works for you, just continue, or choose another theme below. You can always change this later in Settings.")
+        }
+        return String(localized: "It's already set to System, which matches your iPhone's Light or Dark Mode. If that works for you, just continue. If you have some vision, High Contrast or Midnight can make text easier to read. You can always change this later in Settings.")
+    }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 28) {
-                OnboardingHeader(
-                    icon: "paintbrush",
-                    title: "Choose a Theme",
-                    subtitle: "Pick your preferred colour scheme. You can always change this later in Settings.",
-                    headerFocus: headerFocus
-                )
+                VStack(spacing: 12) {
+                    WizardStepHeader(
+                        title: "Choose a Theme", icon: "paintbrush",
+                        stepIndex: 5, stepTotal: 9, onBack: onBack, headerFocus: headerFocus
+                    )
+                    Text(introText)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+
+                    // Two swipes from the heading instead of ~20 — the full
+                    // list below stays for anyone who wants to browse.
+                    Button(action: onNext) {
+                        Text("Continue with \(preferences.theme.displayName)")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.bordered)
+                    .padding(.horizontal, 24)
+                    .accessibilityHint(String(localized: "Keeps this theme and moves to the next step."))
+                }
 
                 VStack(alignment: .leading, spacing: 20) {
                     ForEach(ThemeGroup.allCases) { group in
@@ -606,8 +625,7 @@ private struct ThemeStep: View {
                             // already-resolved display text and skips catalog
                             // lookup entirely, so these three group headers were
                             // silently never being translated. Same fix as
-                            // OnboardingHeader's title/subtitle for the identical
-                            // problem.
+                            // WizardStepHeader's title for the identical problem.
                             Text(LocalizedStringKey(group.label))
                                 .font(.headline)
                                 .foregroundStyle(.secondary)
@@ -620,6 +638,9 @@ private struct ThemeStep: View {
                                     } label: {
                                         HStack {
                                             VStack(alignment: .leading, spacing: 2) {
+                                                if theme == recommendedTheme {
+                                                    ThemeRecommendedBadge()
+                                                }
                                                 Text(theme.displayName)
                                                     .font(.headline)
                                                     .foregroundStyle(.primary)
@@ -657,8 +678,40 @@ private struct ThemeStep: View {
             }
             .padding(.top, 48)
         }
+        .onAppear(perform: suggestHighContrastIfNeeded)
     }
 
+    /// Someone who's turned on iOS's Increase Contrast has already told
+    /// their iPhone they need more contrast — so if they haven't picked a
+    /// theme yet, start them on the matching High Contrast one instead of
+    /// System. Only ever once, and only while still on the default.
+    private func suggestHighContrastIfNeeded() {
+        guard !contrastThemeSuggested, preferences.theme == .system, UIAccessibility.isDarkerSystemColorsEnabled else { return }
+        contrastThemeSuggested = true
+        let theme: AppTheme = colorScheme == .dark ? .highContrastDark : .highContrastLight
+        preferences.theme = theme
+        suggestedHighContrast = theme
+    }
+}
+
+/// RecommendedBadge (below) is white-on-translucent, built for sitting on a
+/// filled prominent button — on a theme row's plain background it would be
+/// close to invisible. Primary-colored text on a pale accent tint instead:
+/// white on the default accent blue is only ~3.6:1, under the 4.5:1 small
+/// text needs, while primary text keeps full contrast in every theme.
+private struct ThemeRecommendedBadge: View {
+    var body: some View {
+        Text("Recommended")
+            .font(.caption2)
+            .fontWeight(.bold)
+            .textCase(.uppercase)
+            .tracking(0.4)
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background(Color.accentColor.opacity(0.15), in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.accentColor, lineWidth: 1))
+    }
 }
 
 // MARK: - Step 6: Apple Topics
@@ -666,17 +719,23 @@ private struct ThemeStep: View {
 private struct AppleTopicsStep: View {
     @EnvironmentObject private var preferences: PreferencesStore
     let onNext: () -> Void
+    let onBack: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
 
     var body: some View {
         ScrollView {
             VStack(spacing: 28) {
-                OnboardingHeader(
-                    icon: "apps.iphone",
-                    title: "Apple Topics Only?",
-                    subtitle: "Forums on AppleVis include some non-Apple topics too. Want Home and Forums to focus on Apple only?",
-                    headerFocus: headerFocus
-                )
+                VStack(spacing: 12) {
+                    WizardStepHeader(
+                        title: "Apple Topics Only?", icon: "apps.iphone",
+                        stepIndex: 6, stepTotal: 9, onBack: onBack, headerFocus: headerFocus
+                    )
+                    Text("Forums on AppleVis include some non-Apple topics too. Want Home and Forums to focus on Apple only?")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
 
                 VStack(alignment: .leading, spacing: 12) {
                     Label("Apple Related covers Apple products and platforms — iPhone, Mac, Apple Watch, apps, and more.", systemImage: "apps.iphone")
@@ -735,17 +794,23 @@ private struct AppleTopicsStep: View {
 private struct LanguageFilterStep: View {
     @EnvironmentObject private var preferences: PreferencesStore
     let onNext: () -> Void
+    let onBack: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
 
     var body: some View {
         ScrollView {
             VStack(spacing: 28) {
-                OnboardingHeader(
-                    icon: "text.badge.checkmark",
-                    title: "Filter Milder Language?",
-                    subtitle: "AppleVis always blocks strong or explicit language from every post and comment — that never changes. This is just about whether milder language, which the site otherwise allows, shows up masked or spelled out.",
-                    headerFocus: headerFocus
-                )
+                VStack(spacing: 12) {
+                    WizardStepHeader(
+                        title: "Filter Milder Language?", icon: "text.badge.checkmark",
+                        stepIndex: 7, stepTotal: 9, onBack: onBack, headerFocus: headerFocus
+                    )
+                    Text("AppleVis always blocks strong or explicit language from every post and comment — that never changes. This is just about whether milder language, which the site otherwise allows, shows up masked or spelled out.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
 
                 VStack(alignment: .leading, spacing: 12) {
                     Label("Masked text looks like \"s***\" instead of the word spelled out.", systemImage: "text.badge.checkmark")
@@ -805,6 +870,7 @@ private struct NotificationsStep: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var auth: AuthStore
     let onNext: () -> Void
+    let onBack: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
 
     @State private var permissionGranted: Bool? = nil
@@ -812,12 +878,17 @@ private struct NotificationsStep: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 28) {
-                OnboardingHeader(
-                    icon: "bell.badge",
-                    title: "Notifications",
-                    subtitle: "Choose which alerts you'd like to receive. You can update these anytime in Settings.",
-                    headerFocus: headerFocus
-                )
+                VStack(spacing: 12) {
+                    WizardStepHeader(
+                        title: "Notifications", icon: "bell.badge",
+                        stepIndex: 8, stepTotal: 9, onBack: onBack, headerFocus: headerFocus
+                    )
+                    Text("Choose which alerts you'd like to receive. You can update these anytime in Settings.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
 
                 // Matches Settings > Notifications' own "My Activity" grouping
                 // and sign-in gating — previously omitted here entirely, along
@@ -838,11 +909,12 @@ private struct NotificationsStep: View {
                             .accessibilityHint(String(localized: auth.isSignedIn
                                 ? "Get notified when someone replies to your forum topics."
                                 : "Requires signing in."))
-                        NotifToggle("Mentions", isOn: $preferences.notifyMentions)
-                            .disabled(!auth.isSignedIn)
-                            .accessibilityHint(String(localized: auth.isSignedIn
-                                ? "Get notified when someone mentions you in a post or comment."
-                                : "Requires signing in."))
+                        // Mentions shelved (2026-09-23, beta-tester feedback): AppleVis
+                        // has no real @mention feature — typing someone's username
+                        // doesn't notify them — so this promised something the site
+                        // can't deliver. `notifyMentions` and the "mention" push
+                        // category are kept for if the website ever adds real
+                        // mentions; only the switch is hidden.
                         NotifToggle("Followed Topics", isOn: $preferences.notifyFollowedTopics)
                             .disabled(!auth.isSignedIn)
                             .accessibilityHint(String(localized: auth.isSignedIn
@@ -885,7 +957,7 @@ private struct NotificationsStep: View {
                         NotifToggle("New Forum Topics",  isOn: $preferences.notifyNewTopics)
                         NotifToggle("New Podcast Episodes", isOn: $preferences.notifyNewEpisodes)
                         NotifToggle("New App Directory Entries", isOn: $preferences.notifyAppUpdates)
-                        NotifToggle("New Resources", isOn: $preferences.notifyNewResources)
+                        NotifToggle("New Guides", isOn: $preferences.notifyNewResources)
                         NotifToggle("New Comments", isOn: $preferences.notifyNewComments)
                     }
                     .background(preferences.colors.card, in: RoundedRectangle(cornerRadius: 12))
@@ -1045,6 +1117,7 @@ private struct ReadyStep: View {
     @EnvironmentObject private var auth: AuthStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let onFinish: () -> Void
+    let onBack: () -> Void
     let headerFocus: AccessibilityFocusState<Bool>.Binding
     // See WelcomeStep.featureIconWidth — same fixed-vs-scaling mismatch
     // against the adjacent summary text.
@@ -1086,12 +1159,11 @@ private struct ReadyStep: View {
 
         let enabledCategories = [
             auth.isSignedIn && preferences.notifyForumReplies ? "Replies to My Posts" : nil,
-            auth.isSignedIn && preferences.notifyMentions ? "Mentions" : nil,
             auth.isSignedIn && preferences.notifyFollowedTopics ? "Followed Topics" : nil,
             preferences.notifyNewTopics ? "New Forum Topics" : nil,
             preferences.notifyNewEpisodes ? "New Podcast Episodes" : nil,
             preferences.notifyAppUpdates ? "New App Directory Entries" : nil,
-            preferences.notifyNewResources ? "New Resources" : nil,
+            preferences.notifyNewResources ? "New Guides" : nil,
             preferences.notifyNewComments ? "New Comments" : nil,
         ].compactMap { $0 }
         items.append(enabledCategories.isEmpty
@@ -1106,12 +1178,17 @@ private struct ReadyStep: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 32) {
-                OnboardingHeader(
-                    icon: "checkmark.circle.fill",
-                    title: "You're All Set",
-                    subtitle: "AppleVis is ready for you. Here's a summary of your setup:",
-                    headerFocus: headerFocus
-                )
+                VStack(spacing: 12) {
+                    WizardStepHeader(
+                        title: "You're All Set", icon: "checkmark.circle.fill",
+                        stepIndex: 9, stepTotal: 9, onBack: onBack, headerFocus: headerFocus
+                    )
+                    Text("AppleVis is ready for you. Here's a summary of your setup:")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
 
                 VStack(spacing: 12) {
                     ForEach(summaryItems, id: \.text) { item in
@@ -1189,54 +1266,3 @@ private struct RecommendedBadge: View {
     }
 }
 
-// MARK: - Shared header
-
-private struct OnboardingHeader: View {
-    let icon: String
-    let title: String
-    let subtitle: String
-    var headerFocus: AccessibilityFocusState<Bool>.Binding? = nil
-
-    // `title`/`subtitle` are runtime String values (some steps compute them
-    // conditionally on sign-in/VoiceOver state), not string literals —
-    // Text(_ content: String) and String(localized: "\(title)...") both
-    // treat a String argument as already-resolved display text and skip
-    // catalog lookup entirely, so every step header in this wizard was
-    // silently never being translated, catalog entries or not. Wrapping in
-    // LocalizedStringKey/String.LocalizationValue (same fix already used in
-    // WizardComponents.swift for this exact problem) routes it back
-    // through the catalog using the string's own text as the key.
-    private var localizedTitle: String { String(localized: String.LocalizationValue(title)) }
-
-    var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 56))
-                .foregroundStyle(Color.accentColor)
-                .accessibilityHidden(true)
-            // Title and subtitle used to be one combined swipe-stop, with
-            // the full explanation folded into the same spoken label as the
-            // heading — a beta tester found this made the heading read as
-            // long and unclear. Splitting them (matching WelcomeStep's
-            // existing pattern below) gives VoiceOver users a short heading
-            // as one swipe-stop and the explanation as its own, separate
-            // swipe-stop right after it.
-            // No step count folded in here — the chrome row's progress dots
-            // above already announce "Step X of Y" as their own element, so
-            // adding it to the heading too doubled up the same information
-            // on every step. Reported directly.
-            Text(LocalizedStringKey(title))
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .multilineTextAlignment(.center)
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityLabel(localizedTitle)
-                .modifier(OptionalAccessibilityFocus(isFocused: headerFocus))
-            Text(LocalizedStringKey(subtitle))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(.horizontal, 24)
-    }
-}

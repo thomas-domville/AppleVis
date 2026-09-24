@@ -69,7 +69,7 @@ struct DetailActionsMenu: View {
     /// noun ("episode," not "podcast," for a single episode's own page).
     private var reportContext: ReportCommentContext {
         ReportCommentContext(
-            subjectKind: (kind == .podcastEpisode ? "Episode" : kind.displayName).lowercased(),
+            subjectKind: (kind == .podcastEpisode ? "Episode" : kind.englishName).lowercased(),
             authorName: authorName,
             commentExcerpt: excerpt,
             commentDate: lastActivityAt ?? Date(),
@@ -93,7 +93,7 @@ struct DetailActionsMenu: View {
     /// would read as ambiguous about which one it means, the same reasoning
     /// `saveActionNoun` already documents for Save. "Episode" avoids it.
     private var menuAccessibilityLabel: String {
-        let noun = kind == .podcastEpisode ? "Episode" : kind.displayName
+        let noun = kind == .podcastEpisode ? String(localized: "Episode") : kind.displayName
         return String(localized: "\(noun) actions")
     }
 

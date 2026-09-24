@@ -16,15 +16,14 @@ struct GuidelineViolationCheckView: View {
     @StateObject private var scanner = GuidelineViolationScanner()
     @State private var range: GuidelineScanRange = .day
     @State private var showLowSeverity = false
-    @State private var hasScannedOnce = false
     @AccessibilityFocusState private var isTitleFocused: Bool
     /// Shared by whichever status section is currently showing —
-    /// "Scanning recent activity…", the error message, or the results
-    /// summary — since exactly one of them is ever present at a time.
-    /// Without this, tapping Rescan or changing the time range swapped in
-    /// new content nothing ever moved focus to, so a VoiceOver user had no
-    /// indication either action did anything — same gap found and fixed on
-    /// the sibling App Directory Health Check screen's Start Scan button.
+    /// "Scanning…", the error message, or the results summary — since
+    /// exactly one of them is ever present at a time. Focus moves here both
+    /// when a scan starts and when it finishes, so a VoiceOver user hears
+    /// that the scan is running and then hears the result, instead of
+    /// tapping Start Scan and getting silence — same pattern as the sibling
+    /// App Directory Health Check screen.
     @AccessibilityFocusState private var isStatusFocused: Bool
 
     /// Medium+High only by default — `GuidelinesChecker` was tuned to be
@@ -41,25 +40,49 @@ struct GuidelineViolationCheckView: View {
     var body: some View {
         Form {
             Section {
-                Text("Scans recent forum topics, blog posts, guides, podcast episodes, app/TV/Watch/Mac directory entries, bug reports, and their comments and replies — against AppleVis's posting guidelines. Not a substitute for judgment: a flag means \"worth a look,\" not \"definitely a violation.\"")
+                Text("Scans recent forum topics, blog posts, guides, podcast episodes, app/TV/Watch/Mac directory entries, bug reports, and their comments and replies — against AppleVis's posting guidelines. Not a substitute for judgment: a flag means \"worth a look,\" not \"definitely a violation.\" Longer ranges can take a while, so nothing starts until you tap Start Scan.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .accessibilityFocused($isTitleFocused)
 
+                // Menu rather than segmented: four options don't fit a
+                // segmented control at larger text sizes without truncating.
                 Picker("Time Range", selection: $range) {
                     ForEach(GuidelineScanRange.allCases) { r in
                         Text(r.displayName).tag(r)
                     }
                 }
-                .pickerStyle(.segmented)
+                .pickerStyle(.menu)
+                .disabled(scanner.isScanning)
                 .accessibilityHint(String(localized: "Choose how far back to scan."))
+
+                // Scanning used to start by itself on open and again on
+                // every time-range change — fine for a day, but a month-long
+                // scan is slow enough that it should only run on purpose.
+                // Dimmed (disabled) for the whole scan, so it can't be
+                // double-started, and relabeled so VoiceOver reads
+                // "Scanning…, dimmed" if focus lands back on it. Requested
+                // directly.
+                Button {
+                    Task { await scanner.scan(range: range) }
+                } label: {
+                    if scanner.isScanning {
+                        Label("Scanning…", systemImage: "hourglass")
+                    } else {
+                        Label("Start Scan", systemImage: "play.circle")
+                    }
+                }
+                .disabled(scanner.isScanning)
+                .accessibilityLabel(scanner.isScanning
+                    ? String(localized: "Scanning \(range.displayName)")
+                    : String(localized: "Start Scan: \(range.displayName)"))
             }
 
             if scanner.isScanning {
                 Section {
                     HStack {
                         ProgressView()
-                        Text("Scanning recent activity…")
+                        Text("Scanning the \(range.displayName.lowercased())… This can take a minute or more for longer ranges.")
                             .foregroundStyle(.secondary)
                     }
                     .accessibilityElement(children: .combine)
@@ -71,13 +94,22 @@ struct GuidelineViolationCheckView: View {
                         .accessibilityFocused($isStatusFocused)
                     Button("Try Again") { Task { await scanner.scan(range: range) } }
                 }
-            } else {
+            } else if let scannedRange = scanner.lastScannedRange {
                 Section {
-                    HStack {
-                        Text("\(scanner.scannedItemCount) items scanned")
-                        Spacer()
-                        Text("\(visibleFlags.count) flagged")
-                            .fontWeight(.semibold)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("\(scanner.scannedItemCount) items scanned")
+                            Spacer()
+                            Text("\(visibleFlags.count) flagged")
+                                .fontWeight(.semibold)
+                        }
+                        // Breaks the total down so it's clear comments and
+                        // replies are included — the old count left them out
+                        // entirely, which is what made a busy day read as
+                        // "20 items." Also names the range the results came
+                        // from, since the picker can be changed afterward.
+                        Text("\(scannedRange.displayName): \(scanner.scannedPostCount) posts, \(scanner.scannedCommentCount) comments and replies")
+                            .font(.caption)
                     }
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -111,34 +143,12 @@ struct GuidelineViolationCheckView: View {
         .themedList(preferences.colors)
         .navigationTitle("Guideline Violation Check")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    Task { await scanner.scan(range: range) }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .disabled(scanner.isScanning)
-                .accessibilityLabel(String(localized: "Rescan"))
-            }
-        }
-        .onChange(of: range) { _, newRange in
-            Task { await scanner.scan(range: newRange) }
-        }
-        // Guarded on hasScannedOnce so this doesn't compete with the
-        // initial .task's own title-focus retry below during the very
-        // first, automatic scan — only a user-initiated rescan (Rescan
-        // button, changing the time range) should pull focus to the status
-        // section as it changes.
+        // Fires on both transitions: a scan starting (lands on
+        // "Scanning…") and finishing (lands on the error or results).
         .onChange(of: scanner.isScanning) { _, _ in
-            guard hasScannedOnce else { return }
             Task { await retryAccessibilityFocus(into: $isStatusFocused) }
         }
-        .task {
-            await retryAccessibilityFocus(into: $isTitleFocused)
-            await scanner.scan(range: range)
-            hasScannedOnce = true
-        }
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
     }
 }
 

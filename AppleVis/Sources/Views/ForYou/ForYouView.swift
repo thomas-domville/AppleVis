@@ -636,8 +636,8 @@ struct SavedItemsView: View {
         let counts = Dictionary(grouping: items, by: { $0.kind }).mapValues(\.count)
         return CollectionSummaryHeader(
             text: filter == nil
-                ? "\(items.count) item\(items.count == 1 ? "" : "s")"
-                : "\(filtered.count) \(filter!.displayNamePlural(filtered.count))",
+                ? String(localized: "\(items.count) items")
+                : filter!.countPhrase(filtered.count),
             summaryActionName: "Saved summary",
             onSummaryAction: { announceSummary(counts: counts) },
             bulkActionName: filtered.isEmpty ? nil : "Unsave All",
@@ -647,16 +647,18 @@ struct SavedItemsView: View {
 
     private func announceSummary(counts: [ContentKind: Int]) {
         guard !items.isEmpty else {
-            UIAccessibility.post(notification: .announcement, argument: "No saved items.")
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "No saved items."))
             return
         }
         let parts = ContentKind.allCases.compactMap { kind -> String? in
             guard let count = counts[kind], count > 0 else { return nil }
-            return "\(count) \(kind.displayNamePlural(count))"
+            return kind.countPhrase(count)
         }
+        // Plain English interpolation before — never translated. Plural
+        // forms come from the catalog's variations for these keys.
         UIAccessibility.post(
             notification: .announcement,
-            argument: "\(items.count) saved item\(items.count == 1 ? "" : "s"): \(parts.joined(separator: ", "))."
+            argument: String(localized: "\(String(localized: "\(items.count) saved items")): \(ListFormatter.localizedString(byJoining: parts)).")
         )
     }
 

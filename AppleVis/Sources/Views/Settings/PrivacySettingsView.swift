@@ -59,8 +59,12 @@ struct PrivacySettingsView: View {
                         UIApplication.shared.open(url)
                     }
                 } label: {
-                    Label("Notification Privacy Settings", systemImage: "bell.badge.slash")
+                    HStack(spacing: 4) {
+                        Label("Notification Privacy Settings", systemImage: "bell.badge.slash")
+                        ExternalLinkIndicator()
+                    }
                 }
+                .accessibilityHint(String(localized: "Opens this app's notification settings in the Settings app, outside AppleVis."))
 
                 WebLink(destination: URL(string: "https://www.applevis.com/privacy")!) {
                     Label("Privacy Policy", systemImage: "doc.text")

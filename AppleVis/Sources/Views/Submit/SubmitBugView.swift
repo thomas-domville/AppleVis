@@ -48,6 +48,7 @@ struct SubmitBugView: View {
     @State private var descriptionMinimumAnnounced = false
     @State private var showAccountEmailChange = false
     @State private var emailSuggestionDismissed = false
+    @State private var justRewrote = false
 
     private let platforms = ["iOS", "iPadOS", "macOS"]
     private let reproduceOptions = ["Yes, always", "Yes, sometimes", "No"]
@@ -241,7 +242,7 @@ struct SubmitBugView: View {
     private var descriptionSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 1, total: 3, title: "Describe the Bug", isFocused: $isStepFocused)
+                WizardStepHeader(title: "Describe the Bug", stepIndex: 1, stepTotal: 3, headerFocus: $isStepFocused)
                 // Previously framed filing with Apple's Feedback Assistant
                 // as optional ("if you want Apple to see it") — the live
                 // form's own description says the opposite: AppleVis won't
@@ -259,6 +260,7 @@ struct SubmitBugView: View {
                             if let result = await intelligence.translate(subject: title, body: description, isTopic: true) {
                                 title = result.subject ?? title
                                 description = result.body
+                                justRewrote = true
                             } else {
                                 toast.error(String(localized: "Couldn't translate this. Try again."))
                             }
@@ -280,6 +282,7 @@ struct SubmitBugView: View {
                                 if let result = await intelligence.rewriteRespectfully(subject: title, body: description, isTopic: true) {
                                     title = result.subject ?? title
                                     description = result.body
+                                    justRewrote = true
                                 } else {
                                     toast.error(String(localized: "Couldn't rewrite this. Try again."))
                                 }
@@ -287,6 +290,7 @@ struct SubmitBugView: View {
                         }
                     )
                 }
+                .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
             }
             Section("Bug Details") {
                 TextField("Title", text: $title)
@@ -330,6 +334,7 @@ struct SubmitBugView: View {
                     .frame(minHeight: 160)
                     .accessibilityLabel(String(localized: "Description"))
                     .accessibilityHint(String(localized: "Required, minimum 30 characters. The more detail you can share — what happened, what you expected instead, and the exact steps to get there — the easier it is for us to reproduce and track down."))
+                    .rewriteFlash($justRewrote)
                     .onChange(of: description) { _, newValue in
                         handleDescriptionChange(newValue)
                         guidelines.textChanged(newValue)
@@ -378,12 +383,14 @@ struct SubmitBugView: View {
                     if let result = await intelligence.rewrite(subject: title, body: description, isTopic: true) {
                         title = result.subject ?? title
                         description = result.body
+                        justRewrote = true
                     } else {
                         toast.error(String(localized: "Couldn't rewrite this. Try again."))
                     }
                 }
             } label: {
                 Label("Rewrite", systemImage: "wand.and.stars")
+                    .symbolEffect(.bounce, value: justRewrote)
             }
             .disabled(description.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.isProcessing)
             .accessibilityHint(String(localized: "Uses Apple Intelligence to suggest a clearer rewrite of this text."))
@@ -393,8 +400,7 @@ struct SubmitBugView: View {
     private var bugInfoSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 2, total: 3, title: "Environment", isFocused: $isStepFocused)
-                backButton
+                WizardStepHeader(title: "Environment", stepIndex: 2, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
                 Text("Tell us where this happens and the Apple Feedback number you filed it under.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -455,8 +461,7 @@ struct SubmitBugView: View {
     private var reviewSection: some View {
         Group {
             Section {
-                WizardStepIndicator(step: 3, total: 3, title: "Review & Submit", isFocused: $isStepFocused)
-                backButton
+                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
                 Text("Check your details, then tap Submit.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -484,7 +489,7 @@ struct SubmitBugView: View {
             Section {
                 WizardBottomButton(
                     String(localized: "Submit"),
-                    isEnabled: !isSubmitting && networkMonitor.isConnected
+                    isEnabled: !isSubmitting && networkMonitor.isConnected, isLoading: isSubmitting
                 ) { Task { await submit() } }
             }
         }
@@ -511,14 +516,6 @@ struct SubmitBugView: View {
 
     /// Step-backward navigation, separated from the toolbar's Cancel button
     /// so a user can discard the submission from any step.
-    private var backButton: some View {
-        Button {
-            goBack()
-        } label: {
-            Label("Back", systemImage: "chevron.backward")
-        }
-    }
-
     private func submit() async {
         guard let user = auth.user else { return }
         if let message = ContentSubmissionPolicy.blockingMessage(
