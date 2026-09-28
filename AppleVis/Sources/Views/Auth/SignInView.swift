@@ -2,8 +2,12 @@ import SwiftUI
 import UIKit
 
 struct SignInView: View {
+    /// Set when the app is asking the member to sign in again because the
+    /// website ended their session.
+    var expiredReason: AuthStore.ReSignInPrompt.Reason? = nil
     @State private var username = ""
     @State private var password = ""
+    @State private var rememberMe = false
     @State private var isSigningIn = false
     @State private var signInError: String?
     @Environment(\.dismiss) private var dismiss
@@ -19,6 +23,22 @@ struct SignInView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
+                    if let expiredReason {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Please sign in again")
+                                .font(.headline)
+                                .accessibilityAddTraits(.isHeader)
+                                .accessibilityFocused($isIntroFocused)
+                            Text(expiredReason == .whileSending
+                                 ? String(localized: "For your security, AppleVis signs you out every few weeks. Sign in again and what you were sending will go through. Nothing you wrote has been lost.")
+                                 : String(localized: "For your security, AppleVis signs you out every few weeks. Sign in again to keep posting, replying, and saving."))
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
+                    } else {
                     // Benefits card
                     VStack(alignment: .leading, spacing: 12) {
                         Text("With a free AppleVis account you can:")
@@ -42,6 +62,7 @@ struct SignInView: View {
                     }
                     .padding()
                     .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
+                    }
 
                     // Form
                     VStack(spacing: 16) {
@@ -64,6 +85,18 @@ struct SignInView: View {
                                 .onSubmit { Task { await signIn() } }
                                 .accessibilityLabel(String(localized: "Password"))
                                 .accessibilityHint(String(localized: "Enter your AppleVis account password."))
+                        }
+
+                        // Remember me (2026-09-28, requested directly): the
+                        // website signs members out about every three weeks;
+                        // with this on, the app signs them back in by itself.
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle("Remember me", isOn: $rememberMe)
+                                .accessibilityHint(String(localized: "Keeps you signed in on this iPhone."))
+                            Text("The website signs you out every few weeks. With this on, AppleVis signs you back in for you. Your password is kept securely in this iPhone's Keychain and is removed when you sign out.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .accessibilityHidden(true)
                         }
 
                         if let err = signInError {
@@ -117,7 +150,14 @@ struct SignInView: View {
                     Button("Cancel") { dismiss() }
                 }
             }
-            .task { await retryAccessibilityFocus(into: $isIntroFocused) }
+            .task {
+                // Signing in again after the website ended the session: the
+                // username is already known.
+                if expiredReason != nil, username.isEmpty, let name = auth.user?.name {
+                    username = name
+                }
+                await retryAccessibilityFocus(into: $isIntroFocused)
+            }
         }
     }
 
@@ -151,9 +191,12 @@ struct SignInView: View {
         }
         isSigningIn = true
         signInError = nil
-        await auth.signIn(username: name, password: password)
+        await auth.signIn(username: name, password: password, rememberMe: rememberMe)
         isSigningIn = false
-        if auth.isSignedIn {
+        // Checks the sign-in itself worked, not just that someone is signed
+        // in: when signing in again after a session ends, the old account
+        // is still on file, so a wrong password looked like success.
+        if auth.isSignedIn && auth.error == nil {
             toast.success(String(localized: "Signed in as \(auth.user?.name ?? name)"))
             dismiss()
         } else {

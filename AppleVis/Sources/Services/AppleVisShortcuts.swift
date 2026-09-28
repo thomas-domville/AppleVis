@@ -128,6 +128,31 @@ struct ReportBugToAppleVisIntent: AppIntent {
     }
 }
 
+/// Opens Ask the Mouse with the question already asked. Requested
+/// directly (2026-09-28).
+struct AskTheMouseIntent: AppIntent {
+    static var title: LocalizedStringResource = "Ask the AppleVis Mouse"
+    static var description = IntentDescription(
+        "Asks the Mouse a question about AppleVis, the app, or apps and guides on the site."
+    )
+    static var openAppWhenRun: Bool = true
+
+    @Parameter(title: "Question", description: "What you'd like to ask the Mouse.")
+    var question: String
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        var components = URLComponents()
+        components.scheme = "applevis"
+        components.host = "ask"
+        components.queryItems = [URLQueryItem(name: "q", value: question)]
+        if let url = components.url {
+            _ = await UIApplication.shared.open(url)
+        }
+        return .result()
+    }
+}
+
 struct AppleVisShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -225,6 +250,17 @@ struct AppleVisShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Report a Bug",
             systemImageName: "ant.fill"
+        )
+        // The tenth and last shortcut an app is allowed.
+        AppShortcut(
+            intent: AskTheMouseIntent(),
+            phrases: [
+                "Ask the \(.applicationName) Mouse",
+                "Ask \(.applicationName) Mouse a question",
+                "Ask \(.applicationName) a question",
+            ],
+            shortTitle: "Ask the Mouse",
+            systemImageName: "questionmark.bubble.fill"
         )
     }
 }

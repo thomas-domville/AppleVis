@@ -56,6 +56,12 @@ struct IntelligenceSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                Toggle("Smarter Guideline Reminders", isOn: $preferences.guidelineSecondOpinionEnabled)
+                    .accessibilityHint(String(localized: "Uses Apple Intelligence to skip a guideline reminder that doesn't fit your draft."))
+                Text("Guideline reminders look for certain words and patterns. With this on, Apple Intelligence reads your whole draft and skips a reminder that clearly doesn't fit, like one for a friendly thank-you. It never adds reminders, and the checks for strong language and images always apply.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 FeatureInfoRow(
                     icon: "checkmark.bubble",
                     title: String(localized: "Accessibility Consensus"),
@@ -103,7 +109,7 @@ struct IntelligenceSettingsView: View {
 
             Section {
                 Label {
-                    Text("Apple Intelligence is available on iPhone 15 Pro and later, and all iPhone 16 models, running iOS 18.1 or later.")
+                    Text("Apple Intelligence is available on iPhone 15 Pro and later, and all iPhone 16 models, running iOS 26 or later.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } icon: {
@@ -120,6 +126,7 @@ struct IntelligenceSettingsView: View {
                     preferences.composeTranslationEnabled = true
                     preferences.searchTranslationEnabled = true
                     preferences.aiSummariesEnabled = true
+                    preferences.guidelineSecondOpinionEnabled = true
                 }
             }
         }

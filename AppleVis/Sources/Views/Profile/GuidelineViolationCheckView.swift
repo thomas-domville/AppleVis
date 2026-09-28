@@ -16,6 +16,7 @@ struct GuidelineViolationCheckView: View {
     @StateObject private var scanner = GuidelineViolationScanner()
     @State private var range: GuidelineScanRange = .day
     @State private var showLowSeverity = false
+    @State private var hideProbablyFine = false
     @AccessibilityFocusState private var isTitleFocused: Bool
     /// Shared by whichever status section is currently showing —
     /// "Scanning…", the error message, or the results summary — since
@@ -34,7 +35,9 @@ struct GuidelineViolationCheckView: View {
     /// wall of noise. Low severity is still there, just tucked behind a
     /// toggle for anyone who wants the fuller picture.
     private var visibleFlags: [GuidelineFlag] {
-        showLowSeverity ? scanner.flags : scanner.flags.filter { $0.highestSeverity != .low }
+        let bySeverity = showLowSeverity ? scanner.flags : scanner.flags.filter { $0.highestSeverity != .low }
+        guard hideProbablyFine else { return bySeverity }
+        return bySeverity.filter { scanner.opinions[$0.id]?.isRealConcern != false }
     }
 
     var body: some View {
@@ -82,11 +85,33 @@ struct GuidelineViolationCheckView: View {
                 Section {
                     HStack {
                         ProgressView()
-                        Text("Scanning the \(range.displayName.lowercased())… This can take a minute or more for longer ranges.")
-                            .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            if scanner.isStopping {
+                                Text("Stopping…")
+                            } else {
+                                Text("Scanning the \(range.displayName.lowercased())… This can take a minute or more for longer ranges.")
+                            }
+                            // Shows a long scan is moving. Requested directly.
+                            if scanner.itemsCheckedSoFar > 0 {
+                                Text("Items checked so far: \(scanner.itemsCheckedSoFar)")
+                                    .font(.footnote)
+                            }
+                        }
+                        .foregroundStyle(.secondary)
                     }
                     .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.updatesFrequently)
                     .accessibilityFocused($isStatusFocused)
+
+                    // Ends a long scan early and keeps what it's checked so
+                    // far. Requested directly.
+                    Button(role: .destructive) {
+                        scanner.stop()
+                    } label: {
+                        Label("Stop Scan", systemImage: "stop.circle")
+                    }
+                    .disabled(scanner.isStopping)
+                    .accessibilityHint(String(localized: "Stops the scan and shows what's been found so far."))
                 }
             } else if let error = scanner.error {
                 Section {
@@ -110,6 +135,10 @@ struct GuidelineViolationCheckView: View {
                         // from, since the picker can be changed afterward.
                         Text("\(scannedRange.displayName): \(scanner.scannedPostCount) posts, \(scanner.scannedCommentCount) comments and replies")
                             .font(.caption)
+                        if scanner.lastScanWasStopped {
+                            Text("Stopped early. These results cover only what was checked before you stopped.")
+                                .font(.caption)
+                        }
                     }
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -118,6 +147,23 @@ struct GuidelineViolationCheckView: View {
 
                     if scanner.flags.contains(where: { $0.highestSeverity == .low }) {
                         Toggle("Show Low-Severity Items", isOn: $showLowSeverity)
+                    }
+
+                    // Apple Intelligence second opinion, on supported devices.
+                    // Requested directly (2026-09-27).
+                    if scanner.isReviewing {
+                        HStack {
+                            ProgressView()
+                            Text("Apple Intelligence is double-checking flags: \(scanner.reviewedCount) of \(scanner.reviewTotal)")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityAddTraits(.updatesFrequently)
+                    }
+                    if scanner.opinions.values.contains(where: { !$0.isRealConcern }) {
+                        Toggle("Hide Flags Apple Intelligence Thinks Are Fine", isOn: $hideProbablyFine)
+                            .accessibilityHint("Hides flags that Apple Intelligence read in context and judged probably fine. They're still in the scan results.")
                     }
                 }
 
@@ -132,7 +178,7 @@ struct GuidelineViolationCheckView: View {
                             NavigationLink {
                                 GuidelineFlagDestination(flag: flag)
                             } label: {
-                                GuidelineFlagRow(flag: flag)
+                                GuidelineFlagRow(flag: flag, opinion: scanner.opinions[flag.id])
                             }
                             .modifier(GuidelineFlagActions(flag: flag, onHandled: { scanner.removeFlag(id: flag.id) }))
                         }
@@ -174,6 +220,14 @@ private struct GuidelineFlagDestination: View {
 
 private struct GuidelineFlagRow: View {
     let flag: GuidelineFlag
+    var opinion: IntelligenceService.GuidelineSecondOpinion? = nil
+
+    private var opinionText: String? {
+        guard let opinion else { return nil }
+        return opinion.isRealConcern
+            ? "Apple Intelligence agrees: \(opinion.reason)"
+            : "Apple Intelligence thinks this is probably fine: \(opinion.reason)"
+    }
 
     private var severityConfig: (color: Color, label: String) {
         switch flag.highestSeverity {
@@ -218,7 +272,7 @@ private struct GuidelineFlagRow: View {
                 .foregroundStyle(severityConfig.color)
                 .lineLimit(2)
 
-            Text("By \(flag.authorName)")
+            Text(flag.authorIsEditorial ? "By \(flag.authorName), Editorial Team" : "By \(flag.authorName)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -227,10 +281,16 @@ private struct GuidelineFlagRow: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
+
+            if let opinionText {
+                Label(opinionText, systemImage: opinion?.isRealConcern == false ? "checkmark.seal" : "sparkles")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "\(severityConfig.label) severity. \(flag.kindLabel) by \(flag.authorName), in \(flag.itemTitle). Guideline: \(ruleNames). \(flag.excerpt)"))
+        .accessibilityLabel(String(localized: "\(severityConfig.label) severity. \(flag.kindLabel) by \(flag.authorName)\(flag.authorIsEditorial ? ", Editorial Team" : ""), in \(flag.itemTitle). Guideline: \(ruleNames). \(flag.excerpt)") + (opinionText.map { " " + $0 } ?? ""))
     }
 }
 
@@ -376,11 +436,15 @@ private struct GuidelineFlagActions: ViewModifier {
         }
     }
 
-    /// Mirrors CommentRow/ReplyView's own "Share Comment" — plain text
-    /// (author, body), not a URL, since a comment/reply/review has no
-    /// shareable link of its own.
+    /// A full moderation record, not just the post: severity, every rule it
+    /// matched with the checker's explanation, where it was posted and when,
+    /// a link to the exact comment or post, then the text. It used to share
+    /// only "Name on AppleVis:" and the body, so whoever received it
+    /// couldn't tell why it was flagged or find it. Kept in English, like
+    /// the rule names on this screen, since it's usually sent to the
+    /// editorial team. Requested directly.
     private func presentShareSheet() {
-        let message = "\(flag.authorName) on AppleVis:\n\n\(flag.body.strippingHTMLTags())"
+        let message = shareText
         let activityVC = UIActivityViewController(activityItems: [message], applicationActivities: nil)
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
@@ -388,5 +452,29 @@ private struct GuidelineFlagActions: ViewModifier {
             .first { $0.isKeyWindow }?
             .rootViewController?
             .present(activityVC, animated: true)
+    }
+
+    private var shareText: String {
+        func severityName(_ severity: GuidelineWarning.Severity) -> String {
+            switch severity {
+            case .high:   return "High"
+            case .medium: return "Medium"
+            case .low:    return "Low"
+            }
+        }
+        var lines = ["AppleVis guideline check: \(severityName(flag.highestSeverity))"]
+        let byRank = flag.warnings.sorted { $0.severity.sortOrder < $1.severity.sortOrder }
+        lines += byRank.map { "\($0.rule) (\(severityName($0.severity))): \($0.message)" }
+        lines.append("")
+        let when = flag.createdAt.formatted(date: .long, time: .shortened)
+        lines.append(flag.isRootItem
+            ? "\(flag.kindLabel) \"\(flag.itemTitle)\" by \(flag.authorName), \(when)"
+            : "Comment by \(flag.authorName) in \"\(flag.itemTitle)\", \(when)")
+        if let url = flag.url {
+            lines.append(url)
+        }
+        lines.append("")
+        lines.append(flag.body.strippingHTMLTags())
+        return lines.joined(separator: "\n")
     }
 }

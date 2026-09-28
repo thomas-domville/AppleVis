@@ -4,6 +4,9 @@ struct ComposeTopicView: View {
     /// Previously discarded — ForumsBrowseView had no way to show the new
     /// topic or move VoiceOver focus to it without a manual pull-to-refresh.
     var onPosted: (ForumTopic) -> Void = { _ in }
+    /// Ask the Mouse's "Ask in the Forums" starts the topic with the
+    /// person's question as its title, ready to reword.
+    var prefillTitle = ""
 
     @State private var title = ""
     @State private var bodyText = ""
@@ -189,6 +192,7 @@ struct ComposeTopicView: View {
                 }
             }
             .task { await loadCategories() }
+            .task { if title.isEmpty, !prefillTitle.isEmpty { title = String(prefillTitle.prefix(120)) } }
             .task { followOnPost = preferences.notifyForumReplies }
             .confirmationDialog(
                 "Discard this submission?",

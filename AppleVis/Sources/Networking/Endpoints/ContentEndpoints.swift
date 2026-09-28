@@ -16,9 +16,9 @@ struct ResourceEndpoints {
     let client: APIClient
     private static let pageSize = 20
 
-    func list(page: Int = 0, categoryTids: [Int] = []) async throws -> PagedListResult<Resource> {
+    func list(page: Int = 0, categoryTids: [Int] = [], forceRefresh: Bool = false) async throws -> PagedListResult<Resource> {
         let categoryKey = categoryTids.isEmpty ? "" : ":categories:\(categoryTids.sorted())"
-        return try await fetchWithCache(group: .resources, key: "resources:list:\(page)\(categoryKey)") {
+        return try await fetchWithCache(group: .resources, key: "resources:list:\(page)\(categoryKey)", forceRefresh: forceRefresh) {
             var query: [String: String] = [
                 "sort": "-changed", "include": "taxonomy_vocabulary_3,uid",
                 "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)",
@@ -117,8 +117,8 @@ struct BlogEndpoints {
     /// Confirmed live Drupal content type for blog posts.
     private static let contentType = "blog2"
 
-    func list(page: Int = 0) async throws -> PagedListResult<BlogPost> {
-        try await fetchWithCache(group: .blogs, key: "blogs:list:\(page)") {
+    func list(page: Int = 0, forceRefresh: Bool = false) async throws -> PagedListResult<BlogPost> {
+        try await fetchWithCache(group: .blogs, key: "blogs:list:\(page)", forceRefresh: forceRefresh) {
             let response = try await client.jsonAPIList(
                 "node/\(Self.contentType)",
                 query: ["sort": "-changed", "include": "uid", "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)"]

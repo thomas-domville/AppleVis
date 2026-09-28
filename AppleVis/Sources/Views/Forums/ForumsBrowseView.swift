@@ -192,7 +192,7 @@ struct ForumsBrowseView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack {
-                    // Matches Home's own "Add" entry point exactly — same
+                    // Matches Home's own "Post" entry point exactly — same
                     // icon, same label, same always-visible-with-a-hint
                     // reasoning (ComposeTopicView already shows its own
                     // sign-in prompt when opened signed out, so hiding this
@@ -207,7 +207,7 @@ struct ForumsBrowseView: View {
                     })) {
                         Image(systemName: "plus.circle")
                     }
-                    .accessibilityLabel(String(localized: "Add"))
+                    .accessibilityLabel(String(localized: "Post"))
                     .accessibilityHint(auth.isSignedIn
                         ? String(localized: "Create a new forum topic")
                         : String(localized: "Sign in required to create a new forum topic"))

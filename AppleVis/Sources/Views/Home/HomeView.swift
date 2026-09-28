@@ -4,13 +4,31 @@ import SwiftUI
 /// last visit — distinct from "Customize Home," which controls which
 /// content types are fetched in the first place, not which of them show.
 enum HomeFeedFilter: String, CaseIterable, Identifiable {
-    case all, new, mouseRecap
+    // Fetch sits right after New: the same new items, read as grouped
+    // conversations. Requested directly.
+    case all, new, fetch, mouseRecap
     var id: String { rawValue }
+    /// Localized: these were plain String literals shown through
+    /// Text(String) and accessibilityValue, which skip the catalog, so
+    /// "All" and "New" stayed English in every language.
     var label: String {
         switch self {
-        case .all: return "All"
-        case .new: return "New"
-        case .mouseRecap: return "Mouse Recap"
+        case .all: return String(localized: "All")
+        case .new: return String(localized: "New")
+        case .fetch: return String(localized: "Fetch")
+        case .mouseRecap: return String(localized: "Nibbles")
+        }
+    }
+
+    /// What each view shows, in one line: the picker's VoiceOver hint for
+    /// the selected view, and part of the announcement when switching.
+    /// Requested directly.
+    var summary: String {
+        switch self {
+        case .all: return String(localized: "Everything in your Home feed.")
+        case .new: return String(localized: "Only what's changed since your last visit.")
+        case .fetch: return String(localized: "New items with their new comments in full, ready to read.")
+        case .mouseRecap: return String(localized: "The Mouse's best bits from the past week or month.")
         }
     }
 }
@@ -35,6 +53,7 @@ enum HomeFocusTarget: Hashable {
     case summary
     case greeting
     case item(String)
+    case askTheMouse
 }
 
 /// Time-of-day greeting shown on the Home tab's greeting card.
@@ -91,6 +110,7 @@ struct HomeView: View {
     @AppStorage("home.mouseRecapWindow") private var mouseRecapWindow: MouseRecapWindow = .week
     @State private var notificationHistory: [NotificationHistoryItem] = []
     @State private var showComposeTopic = false
+    @State private var showAskTheMouse = false
     @State private var showSubmitApp = false
     @AccessibilityFocusState private var focusTarget: HomeFocusTarget?
     @Environment(\.scenePhase) private var scenePhase
@@ -112,7 +132,7 @@ struct HomeView: View {
             return vm.items
         case .new:
             return vm.newItems
-        case .mouseRecap:
+        case .fetch, .mouseRecap:
             return []
         }
     }
@@ -150,6 +170,19 @@ struct HomeView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack {
+                        // Ask the Mouse comes first on this side, so Post and
+                        // Profile keep their places. Only shown with Apple
+                        // Intelligence. Requested directly (2026-09-28).
+                        if IntelligenceService.isAvailable {
+                            Button {
+                                showAskTheMouse = true
+                            } label: {
+                                MouseMascotView(pose: .plain, size: 28, style: .face, hidesAtAccessibilityTextSizes: false)
+                            }
+                            .accessibilityLabel(String(localized: "Ask the Mouse"))
+                            .accessibilityHint(String(localized: "Ask a question about AppleVis, or find apps, guides, and discussions."))
+                            .accessibilityFocused($focusTarget, equals: .askTheMouse)
+                        }
                         // New Topic and New App Entry are immediate, user-
                         // authored content (same as everything else Home
                         // shows) — unlike Blog/Podcast/Bug submissions,
@@ -185,7 +218,10 @@ struct HomeView: View {
                         } label: {
                             Image(systemName: "plus.circle")
                         }
-                        .accessibilityLabel(String(localized: "Add"))
+                        // "Post", not "Add": matches the website, and VoiceOver's
+                        // "Add" was easy to hear as "Ad" (2026-09-28, beta
+                        // tester feedback).
+                        .accessibilityLabel(String(localized: "Post"))
                         .accessibilityHint(auth.isSignedIn
                             ? String(localized: "Create a new forum topic or app entry")
                             : String(localized: "Sign in required to create a new forum topic or app entry"))
@@ -259,6 +295,11 @@ struct HomeView: View {
             }) {
                 CustomizeHomeView()
             }
+            .sheet(isPresented: $showAskTheMouse, onDismiss: {
+                Task { await retryAccessibilityFocus(.askTheMouse, into: $focusTarget) }
+            }) {
+                AskTheMouseView()
+            }
             .sheet(isPresented: $showComposeTopic, onDismiss: { Task { await vm.load() } }) {
                 ComposeTopicView()
             }
@@ -295,6 +336,11 @@ struct HomeView: View {
             .navigationDestination(for: BlogPost.self) { post in
                 BlogDetailView(postId: post.id)
             }
+            // Fetch's rows: an item's page, or its page opened at one comment.
+            .navigationDestination(for: FetchThreadTarget.self) { FetchDestination(target: $0) }
+        }
+        .onDisappear {
+            if homeFeedFilter == .fetch { leaveFetch() }
         }
         .task {
             await vm.load()
@@ -540,6 +586,8 @@ struct HomeView: View {
                 // fix as PlayerView's playback-speed control (PODCAST-06).
                 // Reported directly.
                 .accessibilityValue(Text(homeFeedFilter.label))
+                // Says what the selected view shows, after a short pause.
+                .accessibilityHint(Text("\(homeFeedFilter.summary) \(String(localized: "Swipe up or down to switch views."))"))
                 // Same swipe-up/down addition as the App Directory/For You
                 // pickers — moves to the next/previous segment in place.
                 .accessibilityAdjustableAction { direction in
@@ -554,22 +602,38 @@ struct HomeView: View {
                 }
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
                 .listRowSeparator(.hidden)
-                .onChange(of: homeFeedFilter) { _, filter in
+                .onChange(of: homeFeedFilter) { oldFilter, filter in
                     SoundPlayer.shared.play(.pickerTick)
+                    if oldFilter == .fetch { leaveFetch() }
+                    // VoiceOver already speaks the new view's name; this adds
+                    // what it shows, plus how many items for New and Fetch.
                     let announcement: String
                     switch filter {
-                    case .all:
-                        announcement = String(localized: "Showing all Home activity.")
-                    case .new:
-                        announcement = String(localized: "\(vm.newItems.count) new activity items.")
-                    case .mouseRecap:
-                        announcement = String(localized: "Showing Mouse Recap.")
+                    case .all, .mouseRecap:
+                        announcement = filter.summary
+                    case .new, .fetch:
+                        let count = String(localized: "\(vm.newItems.count) new activity items.")
+                        announcement = "\(filter.summary) \(count)"
                     }
                     UIAccessibility.post(notification: .announcement, argument: announcement)
                 }
 
+                // What the selected view shows, for sighted and low-vision
+                // users (a segmented control has no hover text). Hidden from
+                // VoiceOver: the picker's hint already says the same thing.
+                // Requested directly.
+                Text(homeFeedFilter.summary)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityHidden(true)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 6, trailing: 16))
+                    .listRowSeparator(.hidden)
+
                 if homeFeedFilter == .mouseRecap {
                     MouseRecapHomeContent(vm: vm, window: $mouseRecapWindow)
+                } else if homeFeedFilter == .fetch {
+                    FetchHomeContent(vm: vm)
                 } else if homeFeedFilter == .new && visibleItems.isEmpty {
                     Text("No new activity since your last visit.")
                         .font(.subheadline).foregroundStyle(.secondary)
@@ -687,6 +751,13 @@ struct HomeView: View {
         }
     }
 
+    /// Leaving Fetch (another view, or another tab): stop Listen to Fetch
+    /// and mark anything read to its end, if that setting is on.
+    private func leaveFetch() {
+        FetchListener.shared.stop()
+        FetchStore.shared.applyFinished(to: vm)
+    }
+
     @AccessibilityRotorContentBuilder
     private func kindRotorContent(_ kind: ContentKind) -> some AccessibilityRotorContent {
         ForEach(visibleItems.filter { $0.kind == kind }) { item in
@@ -764,7 +835,7 @@ private struct MouseRecapHomeContent: View {
                 HStack(spacing: 10) {
                     ProgressView()
                         .controlSize(.small)
-                    Text("Building Mouse Recap...")
+                    Text("Building Nibbles...")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -772,7 +843,7 @@ private struct MouseRecapHomeContent: View {
                 .listRowSeparator(.hidden)
             } else if let error = vm.mouseRecapError, vm.mouseRecap == nil {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("Mouse Recap", systemImage: "sparkles")
+                    Label("Nibbles", systemImage: "sparkles")
                         .font(.headline)
                     Text(error)
                         .font(.subheadline)
@@ -821,7 +892,7 @@ private struct MouseRecapHomeContent: View {
             }
             .pickerStyle(.segmented)
             .accessibilityLabel(String(localized: "Recap window"))
-            .accessibilityHint(String(localized: "Choose how far back Mouse Recap looks."))
+            .accessibilityHint(String(localized: "Choose how far back Nibbles looks."))
             // Explicit value — without it, swiping up/down only played the
             // "value changed" tone with no spoken window name. Same fix as
             // PlayerView's playback-speed control (PODCAST-06). Reported directly.
@@ -839,18 +910,30 @@ private struct MouseRecapHomeContent: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Mouse Recap")
-                    .font(.title3.weight(.bold))
-                    .accessibilityAddTraits(.isHeader)
-                Text(window.label)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Color.accentColor)
-                Text(digest.dateRangeText)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            HStack(alignment: .center, spacing: 14) {
+                // The Mouse itself, reading the week's news. Decorative:
+                // the heading already says whose recap this is.
+                MouseMascotView(pose: .reading, size: 64)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Nibbles")
+                        .font(.title3.weight(.bold))
+                        .accessibilityAddTraits(.isHeader)
+                    // Says what Nibbles is (it was Mouse Recap until 2026.18):
+                    // the Mouse nibbles, Goldie fetches. Requested directly.
+                    Text(window == .week
+                         ? "The Mouse's best bits from the past week."
+                         : "The Mouse's best bits from the past month.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Text(window.label)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                    Text(digest.dateRangeText)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
             }
-            .accessibilityElement(children: .combine)
         }
         .listRowSeparator(.hidden)
         .task(id: "\(window.rawValue)-\(digest.generatedAt.timeIntervalSince1970)") {
@@ -872,8 +955,8 @@ private struct MouseRecapHomeContent: View {
             }
             .newsletterPanel(accent: Color.accentColor, colors: preferences.colors)
 
-            ShareLink(item: digest.shareText(for: window.label, aiBlurbs: aiBlurbs), subject: Text("Mouse Recap")) {
-                Label("Share Mouse Recap", systemImage: "square.and.arrow.up")
+            ShareLink(item: digest.shareText(for: window.label, aiBlurbs: aiBlurbs), subject: Text("Nibbles")) {
+                Label("Share Nibbles", systemImage: "square.and.arrow.up")
             }
         }
         .listRowSeparator(.hidden)
@@ -1204,11 +1287,11 @@ private struct MouseRecapCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "sparkles")
-                .foregroundStyle(Color.accentColor)
-                .accessibilityHidden(true)
+            // Was a generic sparkles icon; now the Mouse's own face, plain
+            // (no prop) at this small size so it stays readable.
+            MouseMascotView(pose: .plain, size: 34, style: .face)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Mouse Recap")
+                Text("Nibbles")
                     .font(.subheadline.weight(.semibold))
                 if isLoading && digest == nil {
                     Text("Building your recap...")
@@ -1247,10 +1330,10 @@ private struct MouseRecapCard: View {
     }
 
     private var accessibilityLabel: String {
-        if isLoading && digest == nil { return String(localized: "Mouse Recap. Building your recap.") }
-        if let error { return String(localized: "Mouse Recap. \(error)") }
-        if let digest { return String(localized: "Mouse Recap. \(digest.countSummary)") }
-        return String(localized: "Mouse Recap. Recent activity summary.")
+        if isLoading && digest == nil { return String(localized: "Nibbles. Building your recap.") }
+        if let error { return String(localized: "Nibbles. \(error)") }
+        if let digest { return String(localized: "Nibbles. \(digest.countSummary)") }
+        return String(localized: "Nibbles. Recent activity summary.")
     }
 }
 
@@ -1265,7 +1348,7 @@ private struct MouseRecapView: View {
     var body: some View {
         Group {
             if vm.isLoadingMouseRecap && vm.mouseRecap == nil {
-                LoadingView(message: "Building Mouse Recap...")
+                LoadingView(message: "Building Nibbles...")
             } else if let error = vm.mouseRecapError, vm.mouseRecap == nil {
                 ErrorView(message: error) { await vm.loadMouseRecap(force: true) }
             } else if let digest = vm.mouseRecap?.scoped(toLastDays: window.rawValue) {
@@ -1278,7 +1361,7 @@ private struct MouseRecapView: View {
                         }
                         .pickerStyle(.segmented)
                         .accessibilityLabel(String(localized: "Recap window"))
-                        .accessibilityHint(String(localized: "Choose how far back Mouse Recap looks."))
+                        .accessibilityHint(String(localized: "Choose how far back Nibbles looks."))
                         // Explicit value — without it, swiping up/down only
                         // played the "value changed" tone with no spoken
                         // window name. Same fix as PlayerView's playback-
@@ -1397,21 +1480,21 @@ private struct MouseRecapView: View {
                 .refreshable { await vm.loadMouseRecap(force: true) }
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        ShareLink(item: digest.shareText(for: window.label), subject: Text("Mouse Recap")) {
+                        ShareLink(item: digest.shareText(for: window.label), subject: Text("Nibbles")) {
                             Image(systemName: "square.and.arrow.up")
                         }
-                        .accessibilityLabel(String(localized: "Share Mouse Recap"))
+                        .accessibilityLabel(String(localized: "Share Nibbles"))
                     }
                 }
             } else {
                 EmptyStateView(
-                    title: "Mouse Recap",
+                    title: "Nibbles",
                     message: "Pull to refresh your recap.",
                     systemImage: "sparkles"
                 )
             }
         }
-        .navigationTitle("Mouse Recap")
+        .navigationTitle("Nibbles")
         .task { await vm.loadMouseRecap() }
     }
 

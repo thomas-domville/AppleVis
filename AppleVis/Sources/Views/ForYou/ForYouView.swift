@@ -268,6 +268,7 @@ struct DownloadsView: View {
                     title: String(localized: "No Downloads"),
                     message: String(localized: "Download episodes for offline playback from any episode's detail page."),
                     systemImage: "arrow.down.circle",
+                    mousePose: .listening,
                     primaryActionLabel: String(localized: "Browse Podcasts"),
                     primaryAction: { showBrowsePodcasts = true }
                 )
@@ -563,6 +564,7 @@ struct SavedItemsView: View {
                         title: "Nothing Saved Yet",
                         message: "Save a topic, app, guide, blog post, or episode and it'll show up here so you can find it again.",
                         systemImage: "bookmark",
+                        mousePose: .bookmarking,
                         primaryActionLabel: "Browse Content",
                         primaryAction: { showBrowseContent = true }
                     )
@@ -968,6 +970,7 @@ struct FollowingView: View {
                     title: String(localized: "Not Following Anything"),
                     message: String(localized: "Follow forum topics to get notified of new replies."),
                     systemImage: "bell",
+                    mousePose: .following,
                     primaryActionLabel: String(localized: "Browse Forums"),
                     primaryAction: { showBrowseForums = true }
                 )
@@ -1157,6 +1160,7 @@ struct RecommendedAppsView: View {
                     title: String(localized: "No Recommendations Yet"),
                     message: String(localized: "When you recommend an app from its App Directory page, it shows up here."),
                     systemImage: "hand.thumbsup",
+                    mousePose: .recommending,
                     primaryActionLabel: String(localized: "Browse App Directory"),
                     primaryAction: { showBrowseApps = true }
                 )

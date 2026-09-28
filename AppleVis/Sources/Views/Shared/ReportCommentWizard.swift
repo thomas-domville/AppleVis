@@ -181,6 +181,11 @@ struct ReportCommentWizard: View {
                             Section { Text(error).foregroundStyle(.red) }
                         }
                     }
+                    // A fresh form per step, so each step opens scrolled to the top and
+                    // its heading exists for VoiceOver to land on. Kept the last step's
+                    // scroll position before, which could leave the heading unloaded.
+                    // Reported directly.
+                    .id(step)
                     .themedList(preferences.colors)
                 }
             }
@@ -195,10 +200,9 @@ struct ReportCommentWizard: View {
                     // step; step-backward navigation moved to its own
                     // in-content button below, matching every other
                     // wizard's convention. Reported directly.
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { requestCancel() }
-                            .accessibilityHint(String(localized: "Cancels and closes this report."))
-                    }
+                    // Back sits beside Cancel now, not in the step header, so VoiceOver
+                    // swipes Cancel, Back, title, Next. Reported directly.
+                    WizardLeadingToolbar(cancelHint: String(localized: "Cancels and closes this report."), onCancel: requestCancel, onBack: step == .reason ? nil : goBack)
                     ToolbarItem(placement: .confirmationAction) {
                         if step == .review {
                             Button(isSubmitting ? "Sending…" : "Send Report") { Task { await submit() } }
@@ -318,7 +322,7 @@ struct ReportCommentWizard: View {
     private var detailsSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "Add any details", stepIndex: stepNumber(.details), stepTotal: totalSteps, accentColor: .red, onBack: goBack, headerFocus: $isStepFocused)
+                WizardStepHeader(title: "Add any details", stepIndex: stepNumber(.details), stepTotal: totalSteps, accentColor: .red, headerFocus: $isStepFocused)
                 Text("Anything else that would help the editorial team review this is optional but appreciated.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -397,7 +401,7 @@ struct ReportCommentWizard: View {
     private var reviewSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "Review and send", stepIndex: stepNumber(.review), stepTotal: totalSteps, accentColor: .red, onBack: goBack, headerFocus: $isStepFocused)
+                WizardStepHeader(title: "Review and send", stepIndex: stepNumber(.review), stepTotal: totalSteps, accentColor: .red, headerFocus: $isStepFocused)
                 Text("Check your report, then tap Send Report.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -469,7 +473,8 @@ struct ReportCommentWizard: View {
     /// for the full reasoning. Full app-wide focus audit, requested
     /// directly.
     private func focusStepAfterTransition() {
-        Task { await retryAccessibilityFocus(into: $isStepFocused) }
+        // Shared timing: see focusWizardStepHeading. Reported directly.
+        Task { await focusWizardStepHeading($isStepFocused) }
     }
 
     /// Step-backward navigation, separated from the toolbar's Cancel button

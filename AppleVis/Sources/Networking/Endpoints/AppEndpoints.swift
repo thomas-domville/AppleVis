@@ -68,7 +68,7 @@ struct AppEndpoints {
             let result = try await categoryListing(platform: platform, categoryId: "\(categoryTid)", page: page, limit: limit, forceRefresh: forceRefresh)
             return PagedListResult(items: result.items, hasMore: result.hasMore)
         }
-        return try await fetchWithCache(group: .apps, key: "apps:list:\(page)") {
+        return try await fetchWithCache(group: .apps, key: "apps:list:\(page)", forceRefresh: forceRefresh) {
             let response = try await client.jsonAPIList(
                 "node/ios_app_directory",
                 query: ["include": "uid", "sort": "-changed", "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)"]
@@ -360,10 +360,6 @@ struct AppEndpoints {
             } catch APIError.unknown(400) {
                 throw APIError.notFound
             }
-            let node = appResponse.data
-            let a = node.attributes
-            let listing = Mappers.app(node, included: appResponse.included ?? [])
-
             // See ForumEndpoints.topicDetail's identical fix for the full
             // reasoning — a `try?`-swallowed comments failure previously
             // looked identical to "genuinely zero comments" and got cached
@@ -371,37 +367,68 @@ struct AppEndpoints {
             let reviewsResponse = try await reviewsRes
             let reviews = reviewsResponse.data.map { Mappers.appReview($0, included: reviewsResponse.included ?? []) }
 
-            return AppDetail(
-                id: listing.id,
-                nid: a["drupal_internal__nid"]?.intValue ?? 0,
-                name: listing.name,
-                developer: listing.developer,
-                platform: listing.platform,
-                category: listing.category,
-                categoryId: listing.categoryId,
-                reviewCount: listing.reviewCount,
-                lastUpdatedAt: listing.lastUpdatedAt,
-                createdAt: listing.createdAt,
-                submittedBy: listing.submittedBy,
-                submitterUid: listing.submitterUid,
-                appStoreUrl: listing.appStoreUrl,
-                iconUrl: listing.iconUrl,
-                price: listing.price,
-                supportedDevices: listing.supportedDevices,
-                voiceOverPerformance: listing.voiceOverPerformance,
-                buttonLabelling: a["field_labelling"]?.stringValue,
-                usabilityNotes: a["field_usability"]?.stringValue,
-                body: a["body"]?.richTextValue ?? "",
-                rawBody: a["body"]?.rawTextValue ?? "",
-                bodyFormat: a["body"]?.textFormat ?? drupalDefaultTextFormat,
-                reviewedVersion: a["field_version"]?.stringValue,
-                testedOnIOS: a["field_ios_version"]?.stringValue,
-                accessibilityComments: a["field_comments"]?.richTextValue,
-                url: listing.url,
-                reviews: reviews,
-                isSaved: false
-            )
+            return Self.iosAppDetail(appResponse.data, included: appResponse.included ?? [], reviews: reviews)
         }
+    }
+
+    /// Builds an iOS entry's detail from its node. Shared by the single
+    /// entry load above and the bulk load below.
+    private static func iosAppDetail(_ node: JsonApiNode, included: [JsonApiNode], reviews: [AppReview]) -> AppDetail {
+        let a = node.attributes
+        let listing = Mappers.app(node, included: included)
+        return AppDetail(
+            id: listing.id,
+            nid: a["drupal_internal__nid"]?.intValue ?? 0,
+            name: listing.name,
+            developer: listing.developer,
+            platform: listing.platform,
+            category: listing.category,
+            categoryId: listing.categoryId,
+            reviewCount: listing.reviewCount,
+            lastUpdatedAt: listing.lastUpdatedAt,
+            createdAt: listing.createdAt,
+            submittedBy: listing.submittedBy,
+            submitterUid: listing.submitterUid,
+            appStoreUrl: listing.appStoreUrl,
+            iconUrl: listing.iconUrl,
+            price: listing.price,
+            supportedDevices: listing.supportedDevices,
+            voiceOverPerformance: listing.voiceOverPerformance,
+            buttonLabelling: a["field_labelling"]?.stringValue,
+            usabilityNotes: a["field_usability"]?.stringValue,
+            body: a["body"]?.richTextValue ?? "",
+            rawBody: a["body"]?.rawTextValue ?? "",
+            bodyFormat: a["body"]?.textFormat ?? drupalDefaultTextFormat,
+            reviewedVersion: a["field_version"]?.stringValue,
+            testedOnIOS: a["field_ios_version"]?.stringValue,
+            accessibilityComments: a["field_comments"]?.richTextValue,
+            url: listing.url,
+            reviews: reviews,
+            isSaved: false,
+            lastCommentAt: listing.lastActivityAt
+        )
+    }
+
+    /// Up to 50 iOS entries in one request, without their reviews. For the
+    /// App Directory Health Check, which only compares an entry's title,
+    /// description, version, and devices. Loading each entry on its own
+    /// cost two requests per app (the entry, plus up to 100 reviews the
+    /// check never reads): about 860 requests to scan Games. This is about
+    /// 9. Not cached, so a scan always sees what's saved right now.
+    /// Verified live 2026-09-25: the site accepts an "id IN (...)" filter
+    /// here. Requested directly.
+    func iosDetailsWithoutReviews(ids: [String]) async throws -> [AppDetail] {
+        guard !ids.isEmpty else { return [] }
+        var query: [String: String] = [
+            "filter[ids][condition][path]": "id",
+            "filter[ids][condition][operator]": "IN",
+            "page[limit]": "50",
+        ]
+        for (index, id) in ids.enumerated() {
+            query["filter[ids][condition][value][\(index)]"] = id
+        }
+        let response = try await client.jsonAPIList("node/ios_app_directory", query: query)
+        return response.data.map { Self.iosAppDetail($0, included: response.included ?? [], reviews: []) }
     }
 
     /// Apple TV's own, much smaller field set — verified live against
@@ -463,7 +490,8 @@ struct AppEndpoints {
                 accessibilityComments: a["field_comments"]?.richTextValue,
                 url: listing.url,
                 reviews: reviews,
-                isSaved: false
+                isSaved: false,
+                lastCommentAt: listing.lastActivityAt
             )
         }
     }
@@ -528,7 +556,8 @@ struct AppEndpoints {
                 accessibilityComments: a["field_comments"]?.richTextValue,
                 url: listing.url,
                 reviews: reviews,
-                isSaved: false
+                isSaved: false,
+                lastCommentAt: listing.lastActivityAt
             )
         }
     }
@@ -597,7 +626,8 @@ struct AppEndpoints {
                 url: listing.url,
                 reviews: reviews,
                 isSaved: false,
-                macUpdateUrl: a["field_link_macupdate"]?["uri"]?.stringValue
+                macUpdateUrl: a["field_link_macupdate"]?["uri"]?.stringValue,
+                lastCommentAt: listing.lastActivityAt
             )
         }
     }
@@ -1249,4 +1279,46 @@ private func parseFlexibleDate(_ text: String) -> Date? {
     }
     if let d = flexibleDateISOWithFractional.date(from: text) { return d }
     return flexibleDateISOPlain.date(from: text)
+}
+
+// MARK: - Ask the Mouse
+
+extension AppEndpoints {
+    /// The iOS App Directory categories, by name, for the model to choose from.
+    static var iOSCategoryNames: [String] { categoryUUIDs.keys.sorted() }
+
+    /// iOS app entries whose title or description mentions `keyword`,
+    /// optionally only those where VoiceOver reads everything and only one
+    /// category. Checked live (2026-09-28): the site handles all three
+    /// filters in one request, so "fully accessible dice games" is a single
+    /// call. Newest activity first.
+    func mouseSearch(keyword: String, fullyAccessibleOnly: Bool, category: String?, limit: Int = 40) async throws -> [AppListing] {
+        var query: [String: String] = [
+            "include": "uid",
+            "sort": "-changed",
+            "page[limit]": "\(limit)",
+        ]
+        let word = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !word.isEmpty {
+            query["filter[words][group][conjunction]"] = "OR"
+            query["filter[title][condition][path]"] = "title"
+            query["filter[title][condition][operator]"] = "CONTAINS"
+            query["filter[title][condition][value]"] = word
+            query["filter[title][condition][memberOf]"] = "words"
+            query["filter[body][condition][path]"] = "body.value"
+            query["filter[body][condition][operator]"] = "CONTAINS"
+            query["filter[body][condition][value]"] = word
+            query["filter[body][condition][memberOf]"] = "words"
+        }
+        if fullyAccessibleOnly {
+            query["filter[voiceover][condition][path]"] = "field_voiceover"
+            query["filter[voiceover][condition][value]"] = "VoiceOver reads all page elements."
+        }
+        if let category, let uuid = Self.categoryUUIDs[category] {
+            query["filter[category][condition][path]"] = "taxonomy_vocabulary_1.id"
+            query["filter[category][condition][value]"] = uuid
+        }
+        let response = try await client.jsonAPIList("node/ios_app_directory", query: query)
+        return response.data.map { Mappers.app($0, included: response.included ?? []) }
+    }
 }

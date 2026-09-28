@@ -164,10 +164,22 @@ private struct WelcomeStep: View {
         ScrollView {
             VStack(spacing: 32) {
                 VStack(spacing: 12) {
+                    // Goldie and the Mouse welcome new members in place of
+                    // the old eye icon. Described once for VoiceOver, pinned
+                    // under the heading so it's read right after it.
+                    // Requested directly.
                     WizardStepHeader(
-                        title: "Welcome to AppleVis", icon: "eye.circle.fill",
+                        title: "Welcome to AppleVis",
+                        artwork: AnyView(WelcomeFriendsView()),
                         stepIndex: 1, stepTotal: 9, headerFocus: headerFocus
                     )
+                    .overlay(alignment: .bottom) {
+                        Color.clear
+                            .frame(width: 1, height: 1)
+                            .accessibilityElement()
+                            .accessibilityLabel(Text("Illustration: Goldie the golden retriever sitting and looking at you, with the Mouse standing by her paws, waving hello."))
+                            .accessibilityAddTraits(.isImage)
+                    }
 
                     Text("The community for blind and low-vision Apple users.")
                         .font(.subheadline)
@@ -502,7 +514,7 @@ private struct NewActivityDisplayStep: View {
                         title: "Show What's New?", icon: "bell.badge",
                         stepIndex: 4, stepTotal: 9, onBack: onBack, headerFocus: headerFocus
                     )
-                    Text("Home can show what's changed since your last visit: a New view alongside All and Mouse Recap, a short summary at the top, and a label on anything with new activity.")
+                    Text("Home can show what's changed since your last visit: a New view alongside All and Nibbles, a short summary at the top, and a label on anything with new activity.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -876,6 +888,35 @@ private struct NotificationsStep: View {
     let headerFocus: AccessibilityFocusState<Bool>.Binding
 
     @State private var permissionGranted: Bool? = nil
+    /// Bumped each time a sound is previewed, so its character hops.
+    @State private var previewHops: [NotificationSound: Int] = [:]
+
+    private func preview(_ sound: NotificationSound) {
+        SoundPlayer.shared.playNotificationPreview(sound)
+        previewHops[sound, default: 0] += 1
+    }
+
+    /// Each sound's little picture: the Mouse for Mouse Squeak and Goldie
+    /// for Golden Retriever Bark, who hop when their sound plays, so each
+    /// sound has a face. Decorative; the row's text says it all.
+    @ViewBuilder
+    private func soundArt(_ sound: NotificationSound) -> some View {
+        Group {
+            switch sound {
+            case .mouseSqueak:
+                MouseMascotView(pose: .plain, size: 40, style: .face, hidesAtAccessibilityTextSizes: false)
+            case .goldenRetrieverBark:
+                GoldieView(size: 40, style: .face, hidesAtAccessibilityTextSizes: false)
+            case .appleCrunch:
+                Image(systemName: "leaf.fill").font(.title3).foregroundStyle(Color.accentColor)
+            case .system:
+                Image(systemName: "bell.fill").font(.title3).foregroundStyle(Color.accentColor)
+            }
+        }
+        .frame(width: 40, height: 40)
+        .modifier(CharacterHop(trigger: previewHops[sound, default: 0]))
+        .accessibilityHidden(true)
+    }
 
     var body: some View {
         ScrollView {
@@ -976,9 +1017,10 @@ private struct NotificationsStep: View {
                         ForEach(NotificationSound.allCases) { sound in
                             let row = Button {
                                 preferences.notificationSound = sound
-                                SoundPlayer.shared.playNotificationPreview(sound)
+                                preview(sound)
                             } label: {
-                                HStack {
+                                HStack(spacing: 12) {
+                                    soundArt(sound)
                                     // `sound.displayName`/`.description` are String
                                     // values, not string literals — Text(_ content:
                                     // String) skips catalog lookup entirely, same
@@ -1024,7 +1066,7 @@ private struct NotificationsStep: View {
                                 // triggering that announcement. Reported directly
                                 // as a workaround for the ducking collision.
                                 row.accessibilityAction(named: Text("Preview")) {
-                                    SoundPlayer.shared.playNotificationPreview(sound)
+                                    preview(sound)
                                 }
                             }
                             if sound != NotificationSound.allCases.last {

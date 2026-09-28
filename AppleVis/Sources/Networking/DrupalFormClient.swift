@@ -46,6 +46,10 @@ enum DrupalFormClient {
     /// and left no trace to tell them apart from, beyond the generic
     /// user-facing "could not load the submission form" string.
     private static func fetchTokens(path: String) async -> FormTokens? {
+        // These website forms rely on the sign-in session directly, so a
+        // session the website has ended is caught here, before sending,
+        // and the member asked to sign in again (2026-09-28).
+        _ = await AuthStore.current?.ensureSessionForSending()
         guard let url = URL(string: "\(base)\(path)") else {
             AppLog.network.error("Invalid form URL for path \(path, privacy: .public)")
             return nil

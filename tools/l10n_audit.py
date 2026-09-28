@@ -46,6 +46,8 @@ TEAM_FACING = [
     ('ReportCommentWizard.swift', r'^\s*You can also report'),
     ('SubmitBlogView.swift', r'Suggested category'),
     ('SubmitPodcastView.swift', r'^Shared from'),
+    # The health check's Share report goes to the editorial team, in English.
+    ('AppEntryHealthCheckView.swift', r'^(AppleVis App Directory check: |App: |App Store now shows: |No longer found on the App Store\.$|AppleVis: |App Store: |Removed from the App Store$|Title Changed$|Minor Title Difference$|Out of date: |Other Details Out of Date$)'),
     ('CommunityDiscussionHeading.swift', r'wrote:|^add new comment$'),
     ('DrupalFormClient.swift', r'^(Content-Disposition|Send message|Turnstile)'),
     ('GuidelineFalsePositiveReporter.swift', r'.'),
@@ -67,7 +69,7 @@ NAMES = re.compile(r'^(iPad( Air| Pro| mini)?|Mac( Pro| Studio| mini)|MacBook( A
                    r'iPod touch|AppleVis Podcast|Ana Domville|Thomas Domville|Michael Hansen|David Goodwin|Be My Eyes|'
                    r'Be My AI|Swift|Apache License 2\.0|Copyright ©.*|Spotlight)$')
 # Text sent to the on-device model, never shown.
-PROMPT_FILES = {'IntelligenceService.swift'}
+PROMPT_FILES = {'MouseKnowledge.swift', 'IntelligenceService.swift'}
 
 BS = chr(92)
 

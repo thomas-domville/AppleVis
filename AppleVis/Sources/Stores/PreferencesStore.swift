@@ -158,6 +158,9 @@ final class PreferencesStore: ObservableObject {
     @AppStorage("intel.composeTranslation") var composeTranslationEnabled = true
     @AppStorage("intel.searchTranslation")  var searchTranslationEnabled = true
     @AppStorage("intel.aiSummaries")        var aiSummariesEnabled = true
+    /// Apple Intelligence double-checks a guideline reminder in context
+    /// before showing it. Read directly by `GuidelinesCheckState`.
+    @AppStorage("intel.guidelineSecondOpinion") var guidelineSecondOpinionEnabled = true
 
     // MARK: - Content Translation
     // Reading-side translation (blog/forum/app/podcast/guide/bug content,

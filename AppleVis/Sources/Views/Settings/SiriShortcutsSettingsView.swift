@@ -83,6 +83,15 @@ struct SiriShortcutsSettingsView: View {
                     detail: String(localized: "Opens straight to the accessibility bug report form."),
                     isSystemFeature: true
                 )
+                if IntelligenceService.isAvailable {
+                    FeatureInfoRow(
+                        icon: "questionmark.bubble",
+                        title: String(localized: "Ask the AppleVis Mouse"),
+                        subtitle: String(localized: "\"Hey Siri, ask the AppleVis Mouse\""),
+                        detail: String(localized: "Siri asks for your question, then the Mouse answers it in AppleVis."),
+                        isSystemFeature: true
+                    )
+                }
             }
         }
         .themedList(preferences.colors)

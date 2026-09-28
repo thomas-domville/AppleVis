@@ -12,12 +12,80 @@ struct AppHealthFlag: Identifiable {
         /// what AppleVis has on file — often means other fields (description,
         /// version) have drifted too and are worth a look.
         case titleChanged(newTitle: String)
+        /// The titles differ only in capitalization, punctuation, spacing,
+        /// or an added or dropped subtitle ("No wifi mini games" vs "No Wifi
+        /// Mini Games"). Still flagged so the entry can be matched exactly,
+        /// but in its own group, since it's rarely urgent. Requested
+        /// directly: minor differences should still appear, not be ignored.
+        case minorTitleDifference(newTitle: String)
+        /// The title still matches, but other App Store details (version,
+        /// description, supported devices) don't. Listed in
+        /// `outdatedFields`. Requested directly.
+        case detailsOutdated
+
+        /// Which results section the flag belongs to, in display order.
+        var group: Group {
+            switch self {
+            case .removed:              return .removed
+            case .titleChanged:         return .titleChanged
+            case .detailsOutdated:      return .detailsOutdated
+            case .minorTitleDifference: return .minorTitleDifference
+            }
+        }
+    }
+
+    enum Group: Int, CaseIterable, Identifiable {
+        case removed, titleChanged, detailsOutdated, minorTitleDifference
+        var id: Self { self }
+    }
+
+    /// One App Store detail, other than the title, that no longer matches.
+    /// Found with the same comparison Refresh App Details uses
+    /// (`AppInfoFieldDiff`), so a row and that sheet always agree.
+    struct OutdatedField: Hashable {
+        let id: String
+        let label: String
+        /// Short values worth reading out (version, devices). `nil` for a
+        /// description, which is too long to repeat in a row.
+        let oldValue: String?
+        let newValue: String?
+
+        /// English name for the shared report, which goes to the editorial team.
+        var englishLabel: String {
+            switch id {
+            case "version":     return "Version"
+            case "description": return "Description"
+            case "devices":     return "Supported Devices"
+            default:            return id
+            }
+        }
     }
 
     let id: String
     let appId: String
     let appName: String
     let kind: Kind
+    /// Every other detail that's out of date, whatever the kind. Empty for
+    /// removed apps and when the entry's details couldn't be loaded.
+    var outdatedFields: [OutdatedField] = []
+    /// The entry's AppleVis page and its stored App Store link, for Share
+    /// and Open in App Store.
+    var appleVisUrl: String = ""
+    var appStoreUrl: String? = nil
+}
+
+/// What the last scan covered, so its results and Try Again survive leaving
+/// the screen.
+enum AppHealthScanScope: Equatable {
+    case recent(AppHealthScanRange)
+    case category(AppCategory)
+
+    var displayName: String {
+        switch self {
+        case .recent(let range):       return range.displayName
+        case .category(let category):  return category.name
+        }
+    }
 }
 
 /// How far back "Recent Activity" looks — entries added to the directory
@@ -70,9 +138,27 @@ enum AppHealthScanRange: Int, CaseIterable, Identifiable {
 /// the full comparison and update. Requested directly.
 @MainActor
 final class AppEntryHealthScanner: ObservableObject {
+    /// Shared so the last results are still there after leaving the screen
+    /// and coming back, instead of needing a fresh scan every time.
+    /// Requested directly.
+    static let shared = AppEntryHealthScanner()
+
     @Published private(set) var flags: [AppHealthFlag] = []
+    /// What the last scan covered and when it finished.
+    @Published private(set) var lastScope: AppHealthScanScope?
+    @Published private(set) var lastScanDate: Date?
     @Published private(set) var isScanning = false
     @Published private(set) var scannedAppCount = 0
+    /// Progress through loading each entry's full details, the slow part
+    /// of a scan, so the Scanning row can say how far along it is.
+    @Published private(set) var detailsChecked = 0
+    @Published private(set) var detailsTotal = 0
+    /// True between Stop and the scan actually winding down.
+    @Published private(set) var isStopping = false
+    /// The last scan was stopped early, so its results cover only part of
+    /// what was asked for.
+    @Published private(set) var lastScanWasStopped = false
+    private var stopRequested = false
     @Published var error: String?
     /// For the "By Category" picker — populated once via `loadCategories()`,
     /// not tied to either scan itself.
@@ -84,6 +170,9 @@ final class AppEntryHealthScanner: ObservableObject {
     /// any plausible undocumented URL-length or per-request limit rather
     /// than tested against one.
     private static let batchSize = 100
+    /// Entries per bulk request to AppleVis. Keeps each request's URL a
+    /// sensible length (every id is in it).
+    private static let siteBatchSize = 50
 
     func loadCategories() async {
         categories = (try? await APIClient.shared.apps.categories(platform: .ios))?
@@ -98,22 +187,46 @@ final class AppEntryHealthScanner: ObservableObject {
         flags.removeAll { $0.id == id }
     }
 
+    /// Ends a long scan early. It finishes the chunk it's on, then shows
+    /// what it found so far. Requested directly.
+    func stop() {
+        guard isScanning, !stopRequested else { return }
+        stopRequested = true
+        isStopping = true
+    }
+
     func scanRecent(range: AppHealthScanRange) async {
         let cutoff = Calendar.current.date(byAdding: .day, value: -range.days, to: Date()) ?? Date()
-        await runScan { try await Self.recentIosListings(cutoff: cutoff) }
+        await runScan(scope: .recent(range)) { try await Self.recentIosListings(cutoff: cutoff) }
     }
 
     func scanCategory(_ category: AppCategory) async {
-        await runScan { try await Self.allListings(categoryTid: category.tid) }
+        await runScan(scope: .category(category)) { try await Self.allListings(categoryTid: category.tid) }
     }
 
-    private func runScan(fetchListings: () async throws -> [AppListing]) async {
+    /// Runs the last scan again — Try Again after an error.
+    func repeatLastScan() async {
+        switch lastScope {
+        case .recent(let range):       await scanRecent(range: range)
+        case .category(let category):  await scanCategory(category)
+        case nil:                      break
+        }
+    }
+
+    private func runScan(scope: AppHealthScanScope, fetchListings: () async throws -> [AppListing]) async {
         let scanId = UUID()
         currentScanId = scanId
         isScanning = true
         error = nil
         flags = []
         scannedAppCount = 0
+        detailsChecked = 0
+        detailsTotal = 0
+        stopRequested = false
+        isStopping = false
+        lastScanWasStopped = false
+        lastScope = scope
+        lastScanDate = nil
 
         let listings: [AppListing]
         do {
@@ -125,21 +238,47 @@ final class AppEntryHealthScanner: ObservableObject {
             // anything but a `LocalizedStringKey` — has to be resolved here.
             self.error = String(localized: "Couldn't load the App Directory. Try again.")
             isScanning = false
+            isStopping = false
             return
         }
         guard currentScanId == scanId else { return }
         scannedAppCount = listings.count
 
-        let results = await Self.checkListings(listings)
+        let outcome = await Self.checkListings(
+            listings,
+            shouldStop: { [weak self] in self?.stopRequested ?? true },
+            onProgress: { [weak self] done, total in
+                guard let self, self.currentScanId == scanId else { return }
+                self.detailsChecked = done
+                self.detailsTotal = total
+            }
+        )
         guard currentScanId == scanId else { return }
+        if outcome.stoppedEarly {
+            // The summary then says how many were really checked.
+            scannedAppCount = outcome.checkedCount
+            lastScanWasStopped = true
+        }
+        stopRequested = false
+        isStopping = false
+        let results = outcome.flags
 
         flags = results.sorted { a, b in
-            let aIsRemoved = if case .removed = a.kind { true } else { false }
-            let bIsRemoved = if case .removed = b.kind { true } else { false }
-            if aIsRemoved != bIsRemoved { return aIsRemoved }
+            if a.kind.group != b.kind.group { return a.kind.group.rawValue < b.kind.group.rawValue }
             return a.appName.localizedCaseInsensitiveCompare(b.appName) == .orderedAscending
         }
+        lastScanDate = Date()
         isScanning = false
+    }
+
+    /// The same test the App Entry page uses before saying an app was
+    /// renamed: ignoring capitalization, punctuation, and spacing, the
+    /// titles match, or one is the other plus a subtitle.
+    nonisolated static func isMinorTitleDifference(_ ours: String, _ theirs: String) -> Bool {
+        func squashed(_ s: String) -> String { s.lowercased().filter { $0.isLetter || $0.isNumber } }
+        let a = squashed(ours), b = squashed(theirs)
+        guard !a.isEmpty, !b.isEmpty else { return false }
+        return a.hasPrefix(b) || b.hasPrefix(a)
     }
 
     /// Pages `node/ios_app_directory` sorted by `-created`, stopping as soon
@@ -190,36 +329,102 @@ final class AppEntryHealthScanner: ObservableObject {
         return results
     }
 
-    private static func checkListings(_ listings: [AppListing]) async -> [AppHealthFlag] {
+    /// Checks entries a chunk at a time: one App Store lookup and one or
+    /// two bulk AppleVis requests per 100 apps. Games (about 430 entries)
+    /// takes about 5 App Store requests and 9 AppleVis requests. It used
+    /// to load every entry one by one, with its reviews, which came to
+    /// hundreds of requests. Working in chunks is also what lets Stop keep
+    /// the results found so far. Requested directly.
+    private static func checkListings(
+        _ listings: [AppListing],
+        shouldStop: () -> Bool,
+        onProgress: (_ done: Int, _ total: Int) -> Void
+    ) async -> (flags: [AppHealthFlag], checkedCount: Int, stoppedEarly: Bool) {
         // Only entries with an actual App Store link can be checked at all.
         let checkable = listings.compactMap { listing -> (listing: AppListing, appStoreId: String)? in
             guard let url = listing.appStoreUrl, let id = extractAppStoreId(url) else { return nil }
             return (listing, id)
         }
 
-        var byId: [String: ItunesMetadata] = [:]
-        for chunk in checkable.chunked(into: batchSize) {
-            let ids = chunk.map(\.appStoreId)
-            let found = await ItunesAPI.batchLookup(appStoreIds: ids)
-            byId.merge(found) { current, _ in current }
-        }
-
         var flags: [AppHealthFlag] = []
-        for entry in checkable {
-            guard let metadata = byId[entry.appStoreId] else {
-                flags.append(AppHealthFlag(id: "removed-\(entry.listing.id)", appId: entry.listing.id, appName: entry.listing.name, kind: .removed))
-                continue
+        var done = 0
+        onProgress(0, checkable.count)
+        for chunk in checkable.chunked(into: batchSize) {
+            if shouldStop() {
+                // Entries with no App Store link count as looked at.
+                return (flags, listings.count - checkable.count + done, true)
             }
-            // Same comparison Refresh App Details uses — this was a plain
-            // string compare, so it flagged titles the app page then said
-            // hadn't changed (an invisible mark, a doubled space, an
-            // encoded "&"). Reported directly.
-            let liveTitle = metadata.appName.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !liveTitle.isEmpty, HTMLText.comparableText(liveTitle) != HTMLText.comparableText(entry.listing.name) {
-                flags.append(AppHealthFlag(id: "title-\(entry.listing.id)", appId: entry.listing.id, appName: entry.listing.name, kind: .titleChanged(newTitle: liveTitle)))
+            async let storeLookup = ItunesAPI.batchLookup(appStoreIds: chunk.map(\.appStoreId))
+            // The directory lists don't include an entry's version or full
+            // description, so the entries themselves are loaded in bulk,
+            // without reviews. If a request fails, those entries still get
+            // the title and removed checks.
+            var details: [String: AppDetail] = [:]
+            for siteChunk in chunk.map(\.listing.id).chunked(into: siteBatchSize) {
+                if let batch = try? await APIClient.shared.apps.iosDetailsWithoutReviews(ids: siteChunk) {
+                    for detail in batch { details[detail.id] = detail }
+                }
             }
+            let byId = await storeLookup
+            for entry in chunk {
+                if let flag = flag(for: entry.listing, metadata: byId[entry.appStoreId], detail: details[entry.listing.id]) {
+                    flags.append(flag)
+                }
+            }
+            done += chunk.count
+            onProgress(done, checkable.count)
         }
-        return flags
+        return (flags, listings.count, false)
+    }
+
+    /// What's wrong with one entry, if anything.
+    private static func flag(for listing: AppListing, metadata: ItunesMetadata?, detail: AppDetail?) -> AppHealthFlag? {
+        guard let metadata else {
+            return AppHealthFlag(
+                id: "removed-\(listing.id)", appId: listing.id, appName: listing.name, kind: .removed,
+                appleVisUrl: listing.url, appStoreUrl: listing.appStoreUrl
+            )
+        }
+        // The link is left out on purpose: this lookup found the app by
+        // the id in the entry's own link, so it's already the right app,
+        // and the App Store's copy of the address carries tracking bits
+        // that would make every entry look out of date. Refresh App
+        // Details still offers it.
+        let outdated: [AppHealthFlag.OutdatedField] = detail.map { detail in
+            AppInfoFieldDiff.build(detail: detail, metadata: metadata)
+                .filter { $0.changed && $0.id != "title" && $0.id != "link" }
+                .map { diff in
+                    let showsValues = diff.id == "version" || diff.id == "devices"
+                    return AppHealthFlag.OutdatedField(
+                        id: diff.id, label: diff.label,
+                        oldValue: showsValues ? diff.oldValue : nil,
+                        newValue: showsValues ? diff.newValue : nil
+                    )
+                }
+        } ?? []
+
+        // Same comparison Refresh App Details uses — this was a plain
+        // string compare, so it flagged titles the app page then said
+        // hadn't changed (an invisible mark, a doubled space, an
+        // encoded "&"). Reported directly.
+        let storedTitle = detail?.name ?? listing.name
+        let liveTitle = metadata.appName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !liveTitle.isEmpty, HTMLText.comparableText(liveTitle) != HTMLText.comparableText(storedTitle) {
+            let kind: AppHealthFlag.Kind = isMinorTitleDifference(storedTitle, liveTitle)
+                ? .minorTitleDifference(newTitle: liveTitle)
+                : .titleChanged(newTitle: liveTitle)
+            return AppHealthFlag(
+                id: "title-\(listing.id)", appId: listing.id, appName: listing.name, kind: kind,
+                outdatedFields: outdated,
+                appleVisUrl: listing.url, appStoreUrl: listing.appStoreUrl
+            )
+        }
+        guard !outdated.isEmpty else { return nil }
+        return AppHealthFlag(
+            id: "details-\(listing.id)", appId: listing.id, appName: listing.name, kind: .detailsOutdated,
+            outdatedFields: outdated,
+            appleVisUrl: listing.url, appStoreUrl: listing.appStoreUrl
+        )
     }
 
     /// Same numeric-id extraction `ItunesAPI` uses internally, duplicated

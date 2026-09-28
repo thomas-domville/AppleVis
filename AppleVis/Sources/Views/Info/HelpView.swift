@@ -7,28 +7,16 @@ struct HelpView: View {
     /// Had no focus management at all. Full app-wide focus audit,
     /// requested directly.
     @AccessibilityFocusState private var isIntroFocused: Bool
+    @AccessibilityFocusState private var isContactFocused: Bool
 
+    @State private var showAskTheMouse = false
+    @AccessibilityFocusState private var isAskTheMouseFocused: Bool
+
+    /// Searches every article's full text, not just titles and summaries,
+    /// so something mentioned only inside an article can be found.
+    /// Changed alongside Ask the Mouse (2026-09-28).
     private var filteredSections: [HelpSection] {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return HelpContent.sections }
-        let lowerQuery = trimmed.lowercased()
-        return HelpContent.sections.compactMap { section in
-            if section.title.lowercased().contains(lowerQuery) {
-                return section
-            }
-            let matchingArticles = section.articles.filter { article in
-                article.title.lowercased().contains(lowerQuery)
-                    || article.summary.lowercased().contains(lowerQuery)
-            }
-            guard !matchingArticles.isEmpty else { return nil }
-            return HelpSection(
-                id: section.id,
-                title: section.title,
-                icon: section.icon,
-                description: section.description,
-                articles: matchingArticles
-            )
-        }
+        MouseKnowledge.filterHelpSections(query)
     }
 
     /// Matches RN's "Read Help Summary" accessibility action format exactly:
@@ -46,11 +34,37 @@ struct HelpView: View {
                 introCard
             }
 
+            if IntelligenceService.isAvailable {
+                Section {
+                    Button {
+                        showAskTheMouse = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            MouseMascotView(pose: .searching, size: 36, style: .face)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Ask the Mouse")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.primary)
+                                Text("Ask in your own words, and the Mouse answers from Help, guides, and the rest of AppleVis.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(String(localized: "Ask the Mouse"))
+                    .accessibilityHint(String(localized: "Ask in your own words, and the Mouse answers from Help, guides, and the rest of AppleVis."))
+                    .accessibilityFocused($isAskTheMouseFocused)
+                }
+            }
+
             Section {
                 TextField("Search help...", text: $query)
                     .autocorrectionDisabled()
                     .accessibilityLabel(String(localized: "Search help"))
-                    .accessibilityHint(String(localized: "Filters help articles by title and summary."))
+                    .accessibilityHint(String(localized: "Searches the text of every help article."))
             }
 
             if filteredSections.isEmpty {
@@ -99,6 +113,7 @@ struct HelpView: View {
                     .padding(.vertical, 2)
                 }
                 .accessibilityLabel(String(localized: "Contact AppleVis"))
+                .accessibilityFocused($isContactFocused)
             }
         }
         .themedList(preferences.colors)
@@ -107,7 +122,15 @@ struct HelpView: View {
         .navigationDestination(for: HelpArticle.self) { article in
             HelpArticleDetailView(article: article)
         }
-        .sheet(isPresented: $showContact) {
+        // Back to the Contact button after sending or cancelling. Reported directly.
+        .sheet(isPresented: $showAskTheMouse, onDismiss: {
+            Task { await retryAccessibilityFocus(into: $isAskTheMouseFocused) }
+        }) {
+            AskTheMouseView()
+        }
+        .sheet(isPresented: $showContact, onDismiss: {
+            Task { await retryAccessibilityFocus(into: $isContactFocused) }
+        }) {
             ContactView()
         }
         .task { await retryAccessibilityFocus(into: $isIntroFocused) }

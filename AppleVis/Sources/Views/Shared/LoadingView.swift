@@ -68,6 +68,9 @@ struct EmptyStateView: View {
     let title: String
     let message: String
     var systemImage: String = "tray"
+    /// When set, the Mouse (in this pose) replaces the symbol above — used
+    /// for a few friendly "nothing here yet" screens in For You.
+    var mousePose: MousePose? = nil
     var primaryActionLabel: String? = nil
     var primaryAction: (() -> Void)? = nil
     var secondaryActionLabel: String? = nil
@@ -81,10 +84,14 @@ struct EmptyStateView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.system(size: 40))
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
+            if let mousePose {
+                MouseMascotView(pose: mousePose, size: 96)
+            } else {
+                Image(systemName: systemImage)
+                    .font(.system(size: 40))
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
             Text(localized(title))
                 .font(.headline)
                 .modifier(OptionalAccessibilityFocus(isFocused: titleFocus))

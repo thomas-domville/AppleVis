@@ -14,7 +14,7 @@ struct ContactView: View {
 
         var label: String {
             switch self {
-            case .bug: return "Bug Report"
+            case .bug: return String(localized: "Bug Report")
             case .feedback: return String(localized: "Feedback")
             case .suggestion: return String(localized: "Suggestion")
             case .general: return String(localized: "General Enquiry")
@@ -163,6 +163,11 @@ struct ContactView: View {
                             Section { Text(error).foregroundStyle(.red) }
                         }
                     }
+                    // A fresh form per step, so each step opens scrolled to the top and
+                    // its heading exists for VoiceOver to land on. Kept the last step's
+                    // scroll position before, which could leave the heading unloaded.
+                    // Reported directly.
+                    .id(step)
                     .themedList(preferences.colors)
                 }
             }
@@ -178,10 +183,9 @@ struct ContactView: View {
                     // navigation moved to its own in-content button below,
                     // matching Submit App/Blog/Bug/Podcast's existing
                     // convention. Reported directly.
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { requestCancel() }
-                            .accessibilityHint(String(localized: "Cancels and closes this form."))
-                    }
+                    // Back sits beside Cancel now, not in the step header, so VoiceOver
+                    // swipes Cancel, Back, title, Next. Reported directly.
+                    WizardLeadingToolbar(onCancel: requestCancel, onBack: step == .type ? nil : goBack)
                     ToolbarItem(placement: .confirmationAction) {
                         if step == .review {
                             Button(isSubmitting ? "Sending…" : "Send Message") { Task { await submit() } }
@@ -304,7 +308,7 @@ struct ContactView: View {
     private var detailsSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "Your Details", stepIndex: stepNumber(.details), stepTotal: totalSteps, accentColor: effectiveType.color, onBack: goBack, headerFocus: $isStepFocused)
+                WizardStepHeader(title: "Your Details", stepIndex: stepNumber(.details), stepTotal: totalSteps, accentColor: effectiveType.color, headerFocus: $isStepFocused)
                 Text("We need your name and email address so we can reply to you.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -354,13 +358,20 @@ struct ContactView: View {
     private var messageSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "Write your message", stepIndex: stepNumber(.message), stepTotal: totalSteps, accentColor: effectiveType.color, onBack: goBack, headerFocus: $isStepFocused)
-                Text("You're sending a \(effectiveType.label). Write as much detail as you like.")
-                    .font(.subheadline).foregroundStyle(.secondary)
+                WizardStepHeader(title: "Write your message", stepIndex: stepNumber(.message), stepTotal: totalSteps, accentColor: effectiveType.color, headerFocus: $isStepFocused)
+                // The type and the "write as much as you like" line used to
+                // be two swipes saying the same thing. Now one row, one
+                // VoiceOver stop. Reported directly.
                 HStack {
-                    Label(effectiveType.label, systemImage: effectiveType.icon)
-                        .foregroundStyle(effectiveType.color)
-                        .font(.subheadline.bold())
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label(effectiveType.label, systemImage: effectiveType.icon)
+                            .foregroundStyle(effectiveType.color)
+                            .font(.subheadline.bold())
+                        Text("Write as much detail as you like.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(String(localized: "\(effectiveType.label). Write as much detail as you like."))
                     // Signed-in users skip straight from Type to Message, so
                     // Back already lands on Type — this button would be an
                     // exact duplicate there. Guests have a Details step in
@@ -471,15 +482,21 @@ struct ContactView: View {
                     .accessibilityHint(String(localized: "Automatically appends your app version, device, and accessibility settings to help diagnose the issue."))
                 }
                 Section {
-                    Label("Tips for a helpful bug report", systemImage: "lightbulb")
-                        .font(.caption.bold())
-                        .foregroundStyle(effectiveType.color)
-                    Text("• Describe the exact steps to reproduce the problem.\n• Say what you expected and what happened instead.\n• Turn on \"Include app and device info\" above to add your version details.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    // One row, one VoiceOver stop. These were two rows with
+                    // the combine/label modifiers on the Section, which a
+                    // Form applies to each row separately, so VoiceOver read
+                    // the whole tip twice. Reported directly.
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Tips for a helpful bug report", systemImage: "lightbulb")
+                            .font(.caption.bold())
+                            .foregroundStyle(effectiveType.color)
+                        Text("• Describe the exact steps to reproduce the problem.\n• Say what you expected and what happened instead.\n• Turn on \"Include app and device info\" above to add your version details.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(String(localized: "Tips for a helpful bug report: describe the exact steps to reproduce the problem, what you expected, and what happened instead. Turn on Include app and device info above to add your version details."))
                 }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(String(localized: "Tips for a helpful bug report: describe the exact steps to reproduce the problem, what you expected, and what happened instead. Turn on Include app and device info above to add your version details."))
             }
             Section {
                 WizardBlockingNote(reasons: messageValid ? [] : [String(localized: "Write at least \(20 - messageLength) more characters to continue.")])
@@ -531,7 +548,7 @@ struct ContactView: View {
     private var reviewSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "Review and send", stepIndex: stepNumber(.review), stepTotal: totalSteps, accentColor: effectiveType.color, onBack: goBack, headerFocus: $isStepFocused)
+                WizardStepHeader(title: "Review and send", stepIndex: stepNumber(.review), stepTotal: totalSteps, accentColor: effectiveType.color, headerFocus: $isStepFocused)
                 Text("Check your message, then tap Send Message.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -685,7 +702,8 @@ struct ContactView: View {
     /// for the full reasoning. Full app-wide focus audit, requested
     /// directly.
     private func focusStepAfterTransition() {
-        Task { await retryAccessibilityFocus(into: $isStepFocused) }
+        // Shared timing: see focusWizardStepHeading. Reported directly.
+        Task { await focusWizardStepHeading($isStepFocused) }
     }
 
     private func submit() async {

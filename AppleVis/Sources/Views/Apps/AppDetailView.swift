@@ -314,7 +314,7 @@ struct AppDetailView: View {
                     .accessibilityLabel(String(localized: "Open on MacUpdate"))
                 }
                 DetailActionsMenu(
-                    id: detail.id, entityId: detail.nid, kind: .appListing, title: detail.name, lastActivityAt: detail.lastUpdatedAt, url: detail.url,
+                    id: detail.id, entityId: detail.nid, kind: .appListing, title: detail.name, lastActivityAt: detail.lastActivityAt, url: detail.url,
                     authorName: detail.submittedBy, excerpt: .excerpt(from: detail.body),
                     isOwnContent: isOwnAppEntry(detail),
                     onAddComment: { showReviewCompose = true },
@@ -341,7 +341,7 @@ struct AppDetailView: View {
         }
         .safeAreaInset(edge: .bottom) {
             ContentDetailActions(
-                id: detail.id, entityId: detail.nid, kind: .appListing, title: detail.name, lastActivityAt: detail.lastUpdatedAt, url: detail.url,
+                id: detail.id, entityId: detail.nid, kind: .appListing, title: detail.name, lastActivityAt: detail.lastActivityAt, url: detail.url,
                 onAddComment: { showReviewCompose = true }
             )
         }
@@ -408,6 +408,7 @@ struct AppDetailView: View {
         guard let user = auth.user, let detail else { return }
         try await APIClient.shared.content.editNode(nodeId: detail.id, nodeType: nodeTypeSuffix, title: title, body: body, format: format, csrfToken: user.csrfToken)
         toast.success(String(localized: "App Entry updated"))
+        NotificationCenter.default.post(name: .appEntryChanged, object: detail.id)
         await load(forceRefresh: true)
     }
 
@@ -416,6 +417,7 @@ struct AppDetailView: View {
         do {
             try await APIClient.shared.content.unpublishNode(nodeId: detail.id, nodeType: appNodeTypeSuffix(for: detail.platform), csrfToken: user.csrfToken)
             toast.success(String(localized: "App Entry unpublished"))
+            NotificationCenter.default.post(name: .appEntryChanged, object: detail.id)
         } catch {
             toast.error(String(localized: "Couldn't unpublish."))
         }
@@ -430,6 +432,7 @@ struct AppDetailView: View {
         do {
             try await APIClient.shared.content.deleteNode(nodeId: detail.id, nodeType: appNodeTypeSuffix(for: detail.platform), csrfToken: user.csrfToken)
             toast.success(String(localized: "App Entry deleted"))
+            NotificationCenter.default.post(name: .appEntryChanged, object: detail.id)
             dismiss()
         } catch {
             toast.error(String(localized: "Couldn't delete."))
@@ -673,7 +676,7 @@ struct AppDetailView: View {
         guard detail.reviewCount > 0 else {
             return String(localized: "Submitted \(submittedDate)")
         }
-        let commentDate = detail.lastUpdatedAt.formatted(.relative(presentation: .named))
+        let commentDate = (detail.lastCommentAt ?? detail.lastUpdatedAt).formatted(.relative(presentation: .named))
         return String(localized: "Submitted \(submittedDate), most recent comment \(commentDate)")
     }
 
@@ -1191,7 +1194,7 @@ struct AppDetailView: View {
                 SpotlightIndexer.index(AppListing(
                     id: detail.id, name: detail.name, developer: detail.developer, platform: detail.platform,
                     category: detail.category, categoryId: detail.categoryId, reviewCount: detail.reviewCount,
-                    lastUpdatedAt: detail.lastUpdatedAt, lastActivityAt: detail.lastUpdatedAt, createdAt: detail.createdAt,
+                    lastUpdatedAt: detail.lastUpdatedAt, lastActivityAt: detail.lastActivityAt, createdAt: detail.createdAt,
                     submittedBy: detail.submittedBy, submitterUid: detail.submitterUid, appStoreUrl: detail.appStoreUrl,
                     iconUrl: detail.iconUrl, price: detail.price, supportedDevices: detail.supportedDevices,
                     voiceOverPerformance: detail.voiceOverPerformance, summary: detail.body, url: detail.url, isSaved: false
@@ -1307,6 +1310,7 @@ struct AppDetailView: View {
                 csrfToken: user.csrfToken
             )
             toast.success(String(localized: "App details refreshed"))
+            NotificationCenter.default.post(name: .appEntryChanged, object: current.id)
             appInfoRefreshRequest = nil
             await load(forceRefresh: true)
         } catch APIError.forbidden {
@@ -1380,12 +1384,16 @@ private extension AppDetail {
             buttonLabelling: buttonLabelling,
             usabilityNotes: usabilityNotes,
             body: body,
+            rawBody: rawBody,
+            bodyFormat: bodyFormat,
             reviewedVersion: reviewedVersion,
             testedOnIOS: testedOnIOS,
             accessibilityComments: accessibilityComments,
             url: url,
             reviews: reviews,
-            isSaved: isSaved
+            isSaved: isSaved,
+            macUpdateUrl: macUpdateUrl,
+            lastCommentAt: lastCommentAt
         )
     }
 }
@@ -1879,4 +1887,11 @@ struct ComposeAppReviewView: View {
         } catch { submitError = String(localized: "Couldn't post comment. Try again.") }
         isSubmitting = false
     }
+}
+
+extension Notification.Name {
+    /// Posted with the app entry's id after this page refreshes, edits,
+    /// unpublishes, or deletes it. The admin App Directory Health Check
+    /// listens, so a row fixed from here is cleared when you come back.
+    static let appEntryChanged = Notification.Name("AppleVis.appEntryChanged")
 }

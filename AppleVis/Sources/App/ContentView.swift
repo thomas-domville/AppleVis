@@ -101,6 +101,19 @@ struct ContentView: View {
         .sheet(item: $deepLinkRouter.pendingSiriDestination) { destination in
             siriDestination(for: destination)
         }
+        .sheet(item: $deepLinkRouter.pendingMouseQuestion) { pending in
+            AskTheMouseView(initialQuestion: pending.text)
+        }
+        .sheet(item: $deepLinkRouter.pendingHelpArticle) { article in
+            NavigationStack {
+                HelpArticleDetailView(article: article)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Close") { deepLinkRouter.pendingHelpArticle = nil }
+                        }
+                    }
+            }
+        }
         .sheet(isPresented: $showWelcomeTourFromPrompt) {
             GuidedExperienceView(experience: GuidedExperienceRegistry.welcome)
         }

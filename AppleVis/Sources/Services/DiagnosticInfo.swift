@@ -79,6 +79,7 @@ enum DiagnosticInfo {
         Locale:            \(Locale.current.identifier)
         Network:           \(isConnected ? "Connected" : "Not Connected")
         Account:           \(accountStatus(isSignedIn: isSignedIn, isEditor: isEditor))
+        Apple Intelligence: \(IntelligenceService.diagnosticStatus)
 
         Accessibility Settings
         VoiceOver:         \(UIAccessibility.isVoiceOverRunning ? "On" : "Off")

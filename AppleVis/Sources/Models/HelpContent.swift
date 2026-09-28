@@ -154,6 +154,7 @@ enum HelpContent {
                             "Enter the same username and password you use on applevis.com.",
                             "Once you're signed in, Profile shows your account tools and a link to your public profile.",
                         ]),
+                        .note("For your security, the AppleVis website signs you out about every three weeks. Turn on Remember me when you sign in, and the app signs you back in for you. Without it, the app asks you to sign in again, and anything you were posting goes through once you have, so nothing you wrote is lost."),
                         .heading("What signing in lets you do"),
                         .bullets([
                             "Post forum topics, replies, and comments.",
@@ -443,6 +444,25 @@ enum HelpContent {
             description: "What's new, search, filters, tags, the app directory, blogs, guides, podcasts, and forums.",
             articles: [
                 HelpArticle(
+                    id: "home-fetch",
+                    title: "Fetch",
+                    summary: "Read everything new, each post with its new comments.",
+                    content: [
+                        .body("Fetch is one of the views at the top of Home, after New. It shows the same new items as New, but grouped for reading. Goldie the golden retriever fetches them for you."),
+                        .body("Each item starts with a heading. A new post comes next, then each new comment in full, oldest first. Swipe through to read everything without opening anything."),
+                        .bullets([
+                            "Forum topics show the whole post. Guides, blog posts, and podcast episodes show the first paragraph. App entries show a short accessibility summary.",
+                            "For an older post with new comments, you hear who posted it and when. Use the Read Original Post action to hear the post itself.",
+                            "Double-tap a comment to open it in its thread. Double-tap a heading to open the item.",
+                            "With VoiceOver, set the rotor to Headings to jump from item to item.",
+                        ]),
+                        .heading("Listen to Fetch"),
+                        .body("Listen to Fetch reads everything aloud, item by item. Use the buttons to pause, skip a comment, or move to the next or previous item. With VoiceOver, a two-finger double tap plays and pauses."),
+                        .heading("Marking items as read"),
+                        .body("Each heading has a Mark as Read action, and Mark All as Read clears everything. If you turn on Mark as Read When Finished, items you've read to the end are marked as read when you leave Fetch."),
+                    ]
+                ),
+                HelpArticle(
                     id: "home-whats-new",
                     title: "Home and What's New",
                     summary: "How AppleVis welcomes you back and helps you catch up.",
@@ -453,7 +473,8 @@ enum HelpContent {
                         .bullets([
                             "All shows everything your feed is set up to include.",
                             "New shows only what's happened since your last visit.",
-                            "Mouse Recap is a weekly or monthly summary of new accessible apps, podcast episodes, popular discussions, guides, and blog posts. You can share it.",
+                            "Fetch shows the same new items, grouped for reading: each post, then its new comments in full. Listen to Fetch reads it all aloud.",
+                            "Nibbles is a weekly or monthly summary of new accessible apps, podcast episodes, popular discussions, guides, and blog posts. You can share it.",
                         ]),
                         .heading("Reading the badges"),
                         .bullets([
@@ -468,7 +489,7 @@ enum HelpContent {
                             "Mark All as Read clears every badge at once.",
                             "Customize Home, at the top left, chooses which content types appear.",
                         ]),
-                        .tip("Add, the plus button at the top right, starts a new forum topic or app entry without going to Discover first."),
+                        .tip("Post, the plus button at the top right, starts a new forum topic or app entry without going to Discover first."),
                         .note("On the anniversary of the day you joined AppleVis, Home shows a short celebration. It appears once a year, around your join date."),
                     ]
                 ),
@@ -712,6 +733,7 @@ enum HelpContent {
                             // purely advisory. Flagged during the Community Agreement
                             // audit; corrected to describe both accurately.
                             "Most guideline reminders are a friendly note that you can dismiss. A few things must be fixed before you can post: image links, strong language, and posts that aren't in English.",
+                            "Milder crude words, and put-downs aimed at another member, get a friendly reminder. You can still post, but it's worth rewording. Disagreeing strongly about an app or a product is fine.",
                             "If AI helped you write something, the community appreciates a short note saying so.",
                         ]),
                         .heading("Reading AppleVis in your own language"),
@@ -814,19 +836,19 @@ enum HelpContent {
                     title: "Submitting a Bug Report",
                     summary: "How to report a new accessibility bug using the three-step guided form.",
                     content: [
-                        .body("If you've found an accessibility bug that isn't in the tracker yet, you can report it from the app. You need to be signed in, and you need to have filed the bug with Apple's Feedback Assistant first. AppleVis doesn't accept reports without it."),
+                        .body("If you've found an accessibility bug that isn't in the tracker yet, you can report it from the app. You need to be signed in. You also need to report the bug to Apple first, using Feedback Assistant. AppleVis only accepts bugs that have already been reported to Apple."),
                         .heading("Before you start"),
                         .bullets([
                             "Check the Bug Tracker to make sure the bug isn't already reported.",
-                            "File it with Apple's Feedback Assistant first, and keep the FB number. You'll need it.",
+                            "Report it to Apple first using Feedback Assistant, at feedbackassistant.apple.com. Apple gives your report a number that starts with FB. Keep that number, because you'll need it.",
                             "Sign in from Profile if you haven't already.",
                         ]),
                         .heading("Step 1: Describe the Bug"),
                         .steps([
                             "Open Discover, go to Contribute, and choose Submit a Bug Report.",
                             "Give it a short, specific title, for example \"VoiceOver skips toolbar buttons in Mail.\"",
-                            "Add your email address in case the team needs to follow up.",
                             "Write a description: what you expected, what happened, and how to reproduce it. The minimum is 30 characters, but more detail helps.",
+                            "Add your email address in case the team needs to follow up.",
                             "Choose Continue.",
                         ]),
                         .tip("Choose Rewrite on this step if you'd like help making your description clearer."),
@@ -835,7 +857,7 @@ enum HelpContent {
                             "Choose the platform: iOS, iPadOS, or macOS.",
                             "Enter the software version where you saw the bug.",
                             "Say whether you can reproduce it reliably.",
-                            "Enter your Apple Feedback number. It must start with \"FB\" and match the report you filed with Apple.",
+                            "Enter the number Apple gave your report. It starts with FB, for example FB12345678. You can find it next to your report in Feedback Assistant. If you haven't reported the bug to Apple yet, choose Open Feedback Assistant on this step.",
                             "Choose how you'd like to be credited if the report helps lead to a fix: by name, by your AppleVis username, or anonymously.",
                             "Choose Continue.",
                         ]),
@@ -863,13 +885,15 @@ enum HelpContent {
                             "Enter a valid email address. The editorial team may reply to follow up.",
                             "Write a few sentences on why this post would interest AppleVis readers. This is required, and it helps the editors understand your idea.",
                             "Write, import, or paste your draft. The minimum is 50 characters.",
-                            "Use Import File to bring in a text or Markdown file from Files or iCloud Drive, or Paste to use what's on your clipboard.",
+                            "Use Import File to bring in a plain text, Markdown, Rich Text, or web page file from Files or iCloud Drive, or Paste to use what's on your clipboard.",
                             "Choose Continue.",
                         ]),
+                        .note("Your draft is sent to the editors as plain text. A Markdown file comes in exactly as written, with its marks such as # for headings, and the editors read it that way. Rich Text and web page files come in as their words only. Paragraphs and lists stay, and each link keeps its address after the link text."),
+                        .tip("Word and Pages documents can't be imported directly. In Word or Pages, export the document as Rich Text and import that, or copy the text and use Paste."),
                         .heading("Step 3: Review and Submit"),
                         .body("Check the title, category, your reason, and your draft, then choose Submit. A thank-you screen confirms it was sent, and the editorial team will follow up with their decision."),
                         .note("The AppleVis editorial team reviews every submission and decides whether to publish it. They'll contact you either way."),
-                        .tip("Cancel is available on every step. On step 2 or the review screen, use Back to return to the previous step without losing your draft."),
+                        .tip("Cancel is at the top left on every step. From step 2, Back is right next to it. Use Back to return to the previous step without losing your draft."),
                         .tip("You can also share text into AppleVis from most other apps. Select the text, choose Share, then choose AppleVis, and the blog form opens with the text already added."),
                     ]
                 ),
@@ -883,7 +907,7 @@ enum HelpContent {
                         .steps([
                             "Open Discover, go to Contribute, and choose Submit a Podcast.",
                             "Describe the episode: what it covers and who it's for. The minimum is 20 characters.",
-                            "Use Choose Audio File to select your episode from Files, iCloud Drive, or another connected storage service.",
+                            "Use Choose Audio File to select your episode from Files, iCloud Drive, or another connected storage service. AppleVis accepts one MP3, M4A, or WAV file, up to 200 MB. For a larger file, share it with a service like Dropbox, then send the link using Contact AppleVis.",
                             "Choose Rewrite if you'd like help with the description.",
                             "Choose Continue once you've written a description and selected a file.",
                         ]),
@@ -921,8 +945,10 @@ enum HelpContent {
                             "Every platform asks for Accessibility Comments. The minimum is 20 characters, but the more you share, the more useful it is to the next person.",
                         ]),
                         .tip("Choose Rewrite under Accessibility Comments if you'd like help with what you've written."),
+                        .body("When you're done, choose Next. Nothing is sent yet. Next takes you to step 3, where you can check everything first."),
                         .heading("Step 3: Review and Submit"),
                         .body("Check everything, then choose Submit. A thank-you screen confirms it was sent. The AppleVis team reviews every submission before it appears in the directory."),
+                        .note("If the app looks like it's already in the App Directory, a warning lists the matching app entries. Choose one to open its page and check. When you go back, your submission is still there."),
                     ]
                 ),
                 HelpArticle(
@@ -1184,6 +1210,7 @@ enum HelpContent {
                             "Accessibility Consensus turns an app's accessibility comments into one short paragraph. Needs Apple Intelligence.",
                             "Rewrite improves your draft before you post it without changing what you mean. Needs Apple Intelligence.",
                             "Translate is offered when your draft or search isn't in English. Needs Apple Intelligence.",
+                            "Smarter Guideline Reminders skips a guideline reminder that clearly doesn't fit your draft. It never adds one. Needs Apple Intelligence.",
                         ]),
                         .note("Apple Intelligence features need an iPhone 15 Pro or later, or any iPhone 16 model, with a recent version of iOS and Apple Intelligence turned on in iOS Settings. See Apple Intelligence Features for details."),
                     ]
@@ -1205,10 +1232,12 @@ enum HelpContent {
                             "\"Hey Siri, open AppleVis saved items\" opens Saved in For You.",
                             "\"Hey Siri, what's new on AppleVis\" speaks a summary of what's new since your last visit.",
                             "\"Hey Siri, report a bug to AppleVis\" opens the accessibility bug report form.",
+                            "\"Hey Siri, ask the AppleVis Mouse\" asks for your question, then opens Ask the Mouse with the answer. This needs Apple Intelligence.",
                         ]),
                         .body("If Siri uses another language, you can say these phrases in that language too."),
                         .heading("Spotlight"),
                         .body("Spotlight can find AppleVis topics, apps, podcasts, and guides from iOS Search. Anything you've opened is added, so it's easy to find again."),
+                        .body("Everything you've saved or followed is added too, even if you saved it on another device. So are the Help articles, so searching iOS for a setting such as Trim Silence finds the article that explains it."),
                     ]
                 ),
                 HelpArticle(
@@ -1220,7 +1249,7 @@ enum HelpContent {
                         .heading("Requirements"),
                         .bullets([
                             "iPhone 15 Pro or later, or any iPhone 16 model.",
-                            "iOS 18.1 or later.",
+                            "iOS 26 or later.",
                             "Apple Intelligence turned on in iOS Settings > Apple Intelligence & Siri.",
                         ]),
                         .heading("What it does in AppleVis"),
@@ -1230,6 +1259,8 @@ enum HelpContent {
                             "Rewrite: improves a reply, comment, or submission draft before you send it, and can draft a bio for your profile.",
                             "Translate: offered when your draft or search isn't in English.",
                             "Guidelines Check: checks your draft for common posting issues and gives friendly suggestions.",
+                            "Smarter Guideline Reminders: reads your whole draft and skips a guideline reminder that clearly doesn't fit, like one for a friendly thank-you. It never adds reminders.",
+                            "Ask the Mouse: answers questions in your own words from Help, guides, the App Directory, and the rest of AppleVis.",
                         ]),
                         .heading("Turning it on or off"),
                         .body("The main switch is in iOS Settings > Apple Intelligence & Siri. It turns Apple Intelligence on for the whole device."),
@@ -1237,6 +1268,46 @@ enum HelpContent {
                         .body("On a device or iOS version without Apple Intelligence, these features aren't shown. The rest of the app works the same without them."),
                         .note("To check whether Apple Intelligence is on, open iOS Settings > Apple Intelligence & Siri. If the switch is there and on, the AppleVis AI features are ready."),
                         .tip("If AI helped with a post, the community appreciates a short note, such as \"Polished with Rewrite\"."),
+                    ]
+                ),
+                HelpArticle(
+                    id: "smart-ask-the-mouse",
+                    title: "Ask the Mouse",
+                    summary: "Ask a question in your own words, and get an answer from Help, guides, the App Directory, and the rest of AppleVis.",
+                    content: [
+                        .body("Ask the Mouse lets you ask a question in your own words. The Mouse searches Help, AppleVis guides, the App Directory, forums, podcasts, blog posts, bug reports, What's New, and your saved items. Then it answers from what it found."),
+                        .body("It needs Apple Intelligence. On a device without it, Ask the Mouse isn't shown, and search works as before."),
+                        .heading("Where to find it"),
+                        .bullets([
+                            "On Home, choose Ask the Mouse at the top right, next to Post. It's shown visually as the Mouse's face.",
+                            "In Help, choose Ask the Mouse at the top of the screen.",
+                            "In Discover, start a search, then choose Ask the Mouse above the results.",
+                            "With Siri, say \"Ask the AppleVis Mouse\", then say your question.",
+                        ]),
+                        .heading("Asking a question"),
+                        .steps([
+                            "Type your question, or choose one of the suggestions.",
+                            "Choose Ask. While the Mouse searches, it shows what it's looking through. With VoiceOver, you hear this if the search takes more than a few seconds.",
+                            "When the answer is ready, you hear a sound and VoiceOver moves to it.",
+                        ]),
+                        .heading("What an answer includes"),
+                        .bullets([
+                            "A short answer, and where it came from, such as a Help article or a guide. Choose the source to read all of it.",
+                            "Take Me There, when a screen can help. It opens that screen.",
+                            "For some settings, an offer to change it for you. Nothing changes until you choose Yes, and you can undo it.",
+                            "Apps it found, grouped by how well they match what you asked, with a line about each.",
+                            "More From AppleVis: related guides, forum topics, podcast episodes, blog posts, and bug reports.",
+                        ]),
+                        .note("Guides and app entries that haven't been updated for a few years are marked, so you know to check that they're still current."),
+                        .heading("Follow-up questions"),
+                        .body("You can keep asking. The Mouse remembers your earlier questions, so a follow-up such as \"And how do I stop it?\" makes sense. Choose Start a New Conversation to begin again."),
+                        .heading("When the Mouse can't find it"),
+                        .body("The Mouse only answers from AppleVis, so it tells you when it can't find something rather than guessing."),
+                        .body("Choose Ask in the Forums to start a forum topic with your question filled in, so the community can help. Search the Web opens DuckDuckGo with your question. Those results aren't from AppleVis."),
+                        .heading("Privacy"),
+                        .body("Apple Intelligence runs on your device. To search AppleVis, the Mouse sends a few search words to the AppleVis website, like any search. Your full question and the answer stay on your device."),
+                        .body("Your recent questions are kept on this device only. You can clear them on the Ask the Mouse screen."),
+                        .tip("Ask the way you'd ask a friend, such as \"Find me a fully accessible dice game\" or \"How do I turn off the sounds?\""),
                     ]
                 ),
                 HelpArticle(

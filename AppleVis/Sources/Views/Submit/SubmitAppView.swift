@@ -23,6 +23,7 @@ struct SubmitAppView: View {
     @StateObject private var intelligence = ComposeIntelligenceState()
     @AccessibilityFocusState private var isStepFocused: Bool
     @AccessibilityFocusState private var isErrorFocused: Bool
+    @AccessibilityFocusState private var duplicateLinkFocus: String?
 
     @State private var step: Step = .search
     /// Previously there was no platform state at all and every search
@@ -398,6 +399,11 @@ struct SubmitAppView: View {
                             }
                         }
                     }
+                    // A fresh form per step, so each step opens scrolled to the top and
+                    // its heading exists for VoiceOver to land on. Kept the last step's
+                    // scroll position before, which could leave the heading unloaded.
+                    // Reported directly.
+                    .id(step)
                     .themedList(preferences.colors)
                 }
             }
@@ -412,9 +418,9 @@ struct SubmitAppView: View {
                 // step-backward navigation moved to its own in-content
                 // button below, matching the Welcome Tour's existing Back
                 // convention. Reported directly.
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { requestCancel() }
-                }
+                // Back sits beside Cancel now, not in the step header, so VoiceOver
+                // swipes Cancel, Back, title, Next. Reported directly.
+                WizardLeadingToolbar(onCancel: requestCancel, onBack: step == .search ? nil : goBack)
                 if auth.isSignedIn && hasAgreedToBeforeYouBegin {
                     ToolbarItem(placement: .confirmationAction) {
                         if step == .review {
@@ -422,8 +428,11 @@ struct SubmitAppView: View {
                                 .disabled(!isValid || isSubmitting || !exactDuplicateMatches.isEmpty || !networkMonitor.isConnected)
                                 .accessibilityHint(networkMonitor.isConnected ? "" : String(localized: "You're offline. Reconnect to submit this."))
                         } else if step == .details {
-                            Button("Review & Submit") { goNext() }
+                            // Was "Review & Submit", which sounded like it would send.
+                            // It only opens the review step. Reported directly.
+                            Button("Next") { goNext() }
                                 .disabled(!isValid)
+                                .accessibilityHint(String(localized: "Goes to step 3, where you can check everything before you submit."))
                         }
                     }
                 }
@@ -821,7 +830,7 @@ struct SubmitAppView: View {
     private var detailsSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "App Details", stepIndex: 2, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
+                WizardStepHeader(title: "App Details", stepIndex: 2, stepTotal: 3, headerFocus: $isStepFocused)
                 Text("Confirm the app's basic details, then describe its accessibility for AppleVis members.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -1072,7 +1081,8 @@ struct SubmitAppView: View {
             }
             Section {
                 WizardBlockingNote(reasons: iosDetailsBlockingReasons)
-                WizardBottomButton(String(localized: "Review & Submit"), isEnabled: isIosValid, action: goNext)
+                WizardBottomButton(String(localized: "Next"), isEnabled: isIosValid, action: goNext)
+                    .accessibilityHint(String(localized: "Goes to step 3, where you can check everything before you submit."))
             }
         }
     }
@@ -1121,7 +1131,7 @@ struct SubmitAppView: View {
     private var tvDetailsSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "App Details", stepIndex: 2, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
+                WizardStepHeader(title: "App Details", stepIndex: 2, stepTotal: 3, headerFocus: $isStepFocused)
                 Text("Confirm the app's basic details, then describe its accessibility for AppleVis members.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -1275,7 +1285,8 @@ struct SubmitAppView: View {
             }
             Section {
                 WizardBlockingNote(reasons: tvDetailsBlockingReasons)
-                WizardBottomButton(String(localized: "Review & Submit"), isEnabled: isTvValid, action: goNext)
+                WizardBottomButton(String(localized: "Next"), isEnabled: isTvValid, action: goNext)
+                    .accessibilityHint(String(localized: "Goes to step 3, where you can check everything before you submit."))
             }
         }
     }
@@ -1311,7 +1322,7 @@ struct SubmitAppView: View {
     private var watchDetailsSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "App Details", stepIndex: 2, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
+                WizardStepHeader(title: "App Details", stepIndex: 2, stepTotal: 3, headerFocus: $isStepFocused)
                 Text("Confirm the app's basic details, then describe its accessibility for AppleVis members.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -1492,7 +1503,8 @@ struct SubmitAppView: View {
             }
             Section {
                 WizardBlockingNote(reasons: watchDetailsBlockingReasons)
-                WizardBottomButton(String(localized: "Review & Submit"), isEnabled: isWatchValid, action: goNext)
+                WizardBottomButton(String(localized: "Next"), isEnabled: isWatchValid, action: goNext)
+                    .accessibilityHint(String(localized: "Goes to step 3, where you can check everything before you submit."))
             }
         }
     }
@@ -1538,7 +1550,7 @@ struct SubmitAppView: View {
     private var macDetailsSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "App Details", stepIndex: 2, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
+                WizardStepHeader(title: "App Details", stepIndex: 2, stepTotal: 3, headerFocus: $isStepFocused)
                 Text("Confirm the app's basic details, then describe its accessibility for AppleVis members.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -1730,7 +1742,8 @@ struct SubmitAppView: View {
             }
             Section {
                 WizardBlockingNote(reasons: macDetailsBlockingReasons)
-                WizardBottomButton(String(localized: "Review & Submit"), isEnabled: isMacValid, action: goNext)
+                WizardBottomButton(String(localized: "Next"), isEnabled: isMacValid, action: goNext)
+                    .accessibilityHint(String(localized: "Goes to step 3, where you can check everything before you submit."))
             }
         }
     }
@@ -1895,7 +1908,8 @@ struct SubmitAppView: View {
     /// instead of reusing that shared helper. Full app-wide focus audit,
     /// requested directly.
     private func focusStepAfterTransition() {
-        Task { await retryAccessibilityFocus(into: $isStepFocused) }
+        // Shared timing: see focusWizardStepHeading. Reported directly.
+        Task { await focusWizardStepHeading($isStepFocused) }
     }
 
     /// Title-contains lookup against the existing directory before this
@@ -1918,10 +1932,26 @@ struct SubmitAppView: View {
         isCheckingDuplicates = false
     }
 
+    /// One row per matching app entry, opening its AppDetailView. Focus
+    /// returns to the same row when you come back.
+    private func existingEntryLink(_ match: AppListing) -> some View {
+        NavigationLink {
+            AppDetailView(appId: match.id, platform: match.platform)
+                .onDisappear {
+                    Task { await retryAccessibilityFocus(into: $duplicateLinkFocus, returningTo: match.id) }
+                }
+        } label: {
+            Label(match.name, systemImage: "app.badge")
+                .font(.subheadline)
+        }
+        .accessibilityFocused($duplicateLinkFocus, equals: match.id)
+        .accessibilityHint(String(localized: "Opens the existing app entry. Your submission stays here when you come back."))
+    }
+
     private var reviewSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
+                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, headerFocus: $isStepFocused)
                 Text("Check your details, then tap Submit.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -1942,20 +1972,15 @@ struct SubmitAppView: View {
                         Text("This app seems to already have an AppleVis app entry. Choose a different app, or open the existing entry.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        ForEach(exactDuplicateMatches) { match in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(match.name)
-                                    .font(.caption.weight(.medium))
-                                if let url = URL(string: match.url) {
-                                    WebLink(destination: url) {
-                                        Text("Open Existing Entry")
-                                    }
-                                    .font(.caption)
-                                }
-                            }
-                        }
                     }
                     .accessibilityElement(children: .combine)
+                    // Each match opens its real app entry page inside this
+                    // form, not the website in the in-app browser. Back
+                    // returns here with the submission untouched. Its own
+                    // row, so VoiceOver can reach each one. Reported directly.
+                    ForEach(exactDuplicateMatches) { match in
+                        existingEntryLink(match)
+                    }
                 }
             } else if !duplicateMatches.isEmpty && !acknowledgedDuplicate {
                 Section {
@@ -1968,15 +1993,17 @@ struct SubmitAppView: View {
                             : String(localized: "\(duplicateMatches.count) app entries already in the directory have a similar name:"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        ForEach(duplicateMatches) { match in
-                            Text(match.name)
-                                .font(.caption.weight(.medium))
-                        }
-                        Button("This is a different app — continue anyway") {
-                            acknowledgedDuplicate = true
-                        }
-                        .font(.caption)
                     }
+                    .accessibilityElement(children: .combine)
+                    // Similar names can be opened too, to check whether it's
+                    // really the same app before continuing. Reported directly.
+                    ForEach(duplicateMatches) { match in
+                        existingEntryLink(match)
+                    }
+                    Button("This is a different app — continue anyway") {
+                        acknowledgedDuplicate = true
+                    }
+                    .font(.caption)
                 }
             }
             Section("From") {
@@ -2036,7 +2063,7 @@ struct SubmitAppView: View {
     private var tvReviewSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
+                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, headerFocus: $isStepFocused)
                 Text("Check your details, then tap Submit.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -2074,7 +2101,7 @@ struct SubmitAppView: View {
     private var watchReviewSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
+                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, headerFocus: $isStepFocused)
                 Text("Check your details, then tap Submit.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -2119,7 +2146,7 @@ struct SubmitAppView: View {
     private var macReviewSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
+                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, headerFocus: $isStepFocused)
                 Text("Check your details, then tap Submit.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }

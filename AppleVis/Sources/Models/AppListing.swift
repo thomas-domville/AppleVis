@@ -73,6 +73,15 @@ nonisolated struct AppDetail: Identifiable, Codable, Sendable {
     /// case. Defaulted so every other platform's `AppDetail(...)` call
     /// site needs no change. Reported directly.
     var macUpdateUrl: String? = nil
+    /// When the newest comment arrived (Drupal's comment statistics
+    /// `last_comment_timestamp`). `lastUpdatedAt` is the node's `changed`
+    /// date, which new comments don't touch — the header used it for "most
+    /// recent comment" and showed "2 weeks ago" on an entry Home correctly
+    /// showed as commented on hours earlier. Reported directly.
+    var lastCommentAt: Date? = nil
+
+    /// Latest activity of any kind: the newest comment, or the last edit.
+    var lastActivityAt: Date { max(lastCommentAt ?? .distantPast, lastUpdatedAt) }
 }
 
 extension AppDetail {

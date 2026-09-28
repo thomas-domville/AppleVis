@@ -26,6 +26,10 @@ struct WizardStepHeader: View {
     /// (`stepIndex`, only passed on checkpoints) without bouncing on every
     /// plain content step too. `nil` (the default) never bounces.
     var iconBounceTrigger: Int? = nil
+    /// Shown beside the icon, the same height, so it adds no extra height
+    /// to the header. The Welcome Tour puts its narrator, the Mouse, here;
+    /// every other wizard leaves it nil.
+    var artwork: AnyView? = nil
     /// 1-based, within `sectionLabel`'s own run if grouped.
     let stepIndex: Int
     let stepTotal: Int
@@ -92,17 +96,24 @@ struct WizardStepHeader: View {
                 .accessibilityHidden(true)
             }
 
-            if let icon {
-                let iconView = Image(systemName: icon)
-                    .font(.system(size: 34))
-                    .foregroundStyle(accentColor)
-                    .frame(width: 72, height: 72)
-                    .background(accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 20))
-                    .accessibilityHidden(true)
-                if let iconBounceTrigger {
-                    iconView.symbolEffect(.bounce, value: iconBounceTrigger)
-                } else {
-                    iconView
+            if icon != nil || artwork != nil {
+                HStack(spacing: 16) {
+                    if let artwork {
+                        artwork
+                    }
+                    if let icon {
+                        let iconView = Image(systemName: icon)
+                            .font(.system(size: 34))
+                            .foregroundStyle(accentColor)
+                            .frame(width: 72, height: 72)
+                            .background(accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 20))
+                            .accessibilityHidden(true)
+                        if let iconBounceTrigger {
+                            iconView.symbolEffect(.bounce, value: iconBounceTrigger)
+                        } else {
+                            iconView
+                        }
+                    }
                 }
             }
 
@@ -114,5 +125,37 @@ struct WizardStepHeader: View {
                 .modifier(OptionalAccessibilityFocus(isFocused: headerFocus))
         }
         .padding(.horizontal, 24)
+    }
+}
+
+/// Cancel and Back together at the top left, for the wizards shown in a
+/// sheet with a navigation bar (Contact, every Submit form, Report a
+/// Comment, Account Security). Back used to sit in the step header just
+/// under Cancel, but VoiceOver reads the whole navigation bar first, so
+/// swiping went Cancel, title, Next, and only then Back. In one group the
+/// swipe order matches what's on screen: Cancel, Back, title, Next.
+/// Cancel stays in the same spot on every step; Back appears from step 2.
+/// Onboarding and the Welcome Tour have no navigation bar, so they keep
+/// the header's own Back button. Reported directly.
+struct WizardLeadingToolbar: ToolbarContent {
+    var cancelHint: String = String(localized: "Cancels and closes this form.")
+    let onCancel: () -> Void
+    /// `nil` on the first step.
+    let onBack: (() -> Void)?
+
+    var body: some ToolbarContent {
+        ToolbarItemGroup(placement: .topBarLeading) {
+            Button("Cancel", action: onCancel)
+                .keyboardShortcut(.cancelAction)
+                .accessibilityHint(cancelHint)
+            if let onBack {
+                Button(action: onBack) {
+                    Label("Back", systemImage: "chevron.backward")
+                        .labelStyle(.titleAndIcon)
+                }
+                .accessibilityLabel(String(localized: "Back"))
+                .accessibilityHint(String(localized: "Returns to the previous step."))
+            }
+        }
     }
 }

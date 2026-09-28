@@ -30,8 +30,18 @@ final class DeepLinkRouter: ObservableObject {
     /// cross-process-callable singleton, so the intent can't compute and
     /// speak the summary itself — it just opens the app and asks Home to).
     @Published var pendingSpeakWhatsNew = false
+    /// Set by the "Ask the AppleVis Mouse" Siri shortcut: ContentView opens
+    /// Ask the Mouse with this question already asked.
+    @Published var pendingMouseQuestion: PendingMouseQuestion?
+
+    /// A Help article chosen from Spotlight; ContentView opens it.
+    @Published var pendingHelpArticle: HelpArticle?
 
     func handleSpotlight(identifier: String) {
+        if let article = SpotlightIndexer.helpArticle(forIdentifier: identifier) {
+            pendingHelpArticle = article
+            return
+        }
         guard let resolved = SpotlightIndexer.parse(identifier: identifier) else { return }
         pendingContent = resolved
     }
@@ -104,6 +114,8 @@ final class DeepLinkRouter: ObservableObject {
             pendingSubmit = .bug
         case "whats-new":
             pendingSpeakWhatsNew = true
+        case "ask":
+            pendingMouseQuestion = PendingMouseQuestion(text: value("q") ?? "")
         case "forums":
             let filter = value("filter").flatMap(ForumFilter.init(rawValue:)) ?? .recent
             pendingSiriDestination = .forums(filter: filter)
@@ -137,6 +149,11 @@ final class DeepLinkRouter: ObservableObject {
             pendingSubmit = .podcastAudio(data: data, fileName: fileName)
         }
     }
+}
+
+struct PendingMouseQuestion: Identifiable {
+    let id = UUID()
+    let text: String
 }
 
 enum ContentOpenIntent {

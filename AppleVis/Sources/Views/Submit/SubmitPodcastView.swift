@@ -117,6 +117,11 @@ struct SubmitPodcastView: View {
                             }
                         }
                     }
+                    // A fresh form per step, so each step opens scrolled to the top and
+                    // its heading exists for VoiceOver to land on. Kept the last step's
+                    // scroll position before, which could leave the heading unloaded.
+                    // Reported directly.
+                    .id(step)
                     .themedList(preferences.colors)
                 }
             }
@@ -130,9 +135,9 @@ struct SubmitPodcastView: View {
                 // of step; step-backward navigation moved to its own
                 // in-content button below, matching Submit App/Blog/Bug's
                 // existing convention. Reported directly.
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { requestCancel() }
-                }
+                // Back sits beside Cancel now, not in the step header, so VoiceOver
+                // swipes Cancel, Back, title, Next. Reported directly.
+                WizardLeadingToolbar(onCancel: requestCancel, onBack: step == .audio ? nil : goBack)
                 if auth.isSignedIn {
                     ToolbarItem(placement: .confirmationAction) {
                         if step == .review {
@@ -147,7 +152,7 @@ struct SubmitPodcastView: View {
                 }
                 }
             }
-            .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.audio], onCompletion: handleFileImport)
+            .fileImporter(isPresented: $showFileImporter, allowedContentTypes: Self.importableAudioTypes, onCompletion: handleFileImport)
         }
         .sheet(isPresented: $showSignIn) {
             SignInView()
@@ -166,7 +171,39 @@ struct SubmitPodcastView: View {
         // goNext()/goBack() ever called focusStepAfterTransition(), so
         // opening this wizard left VoiceOver focus on system default
         // (typically Cancel). Full app-wide focus audit, requested directly.
-        .task { focusStepAfterTransition() }
+        .task {
+            // Audio shared from another app skips the file picker, so it
+            // gets the same format and size check here. Reported directly.
+            if let data = audioFileData, let name = audioFileURL?.lastPathComponent,
+               let problem = Self.audioProblem(fileName: name, byteCount: data.count) {
+                audioFileData = nil
+                audioFileURL = nil
+                toast.error(problem)
+            }
+            focusStepAfterTransition()
+        }
+    }
+
+    /// What the live /podcasts/upload form accepts, checked directly on
+    /// the signed-in form: "One file only. 200 MB limit. Allowed types:
+    /// mp3 m4a wav." The picker used to allow any audio, so a FLAC or an
+    /// oversized file failed only after Submit, with a vague error.
+    /// Drupal counts a megabyte as 1,024 × 1,024 bytes. Reported directly.
+    static let allowedAudioExtensions: Set<String> = ["mp3", "m4a", "wav"]
+    static let maxAudioBytes = 200 * 1024 * 1024
+    static let importableAudioTypes: [UTType] = [.mp3, .mpeg4Audio, .wav]
+        + allowedAudioExtensions.sorted().compactMap { UTType(filenameExtension: $0) }
+
+    /// `nil` when the site will accept the file; otherwise the message to show.
+    static func audioProblem(fileName: String, byteCount: Int) -> String? {
+        let ext = (fileName as NSString).pathExtension.lowercased()
+        if !allowedAudioExtensions.contains(ext) {
+            return String(localized: "AppleVis accepts MP3, M4A, or WAV audio files. Choose a file in one of those formats.")
+        }
+        if byteCount > maxAudioBytes {
+            return String(localized: "This file is larger than 200 MB, the most AppleVis accepts. Share it with a service like Dropbox, then send the link using Contact AppleVis.")
+        }
+        return nil
     }
 
     /// RN confirmed before discarding a filled-out form; Cancel here
@@ -196,8 +233,18 @@ struct SubmitPodcastView: View {
         case .success(let url):
             let didAccess = url.startAccessingSecurityScopedResource()
             defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+            // Check size before loading, so a huge file isn't read into memory.
+            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            if let problem = Self.audioProblem(fileName: url.lastPathComponent, byteCount: size) {
+                toast.error(problem)
+                return
+            }
             guard let data = try? Data(contentsOf: url) else {
                 toast.error(String(localized: "Couldn't read that audio file. Try choosing it again."))
+                return
+            }
+            if let problem = Self.audioProblem(fileName: url.lastPathComponent, byteCount: data.count) {
+                toast.error(problem)
                 return
             }
             audioFileURL = url
@@ -312,12 +359,17 @@ struct SubmitPodcastView: View {
                 rewriteButton
             }
             Section("Audio File") {
+                // Says up front what the site takes, before the picker opens.
+                // Reported directly.
+                Text("AppleVis accepts one MP3, M4A, or WAV audio file, up to 200 MB. For a larger file, share it with a service like Dropbox, then send the link using Contact AppleVis.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 Button {
                     showFileImporter = true
                 } label: {
                     Label(audioFileURL?.lastPathComponent ?? String(localized: "Choose Audio File"), systemImage: "waveform")
                 }
-                .accessibilityHint(String(localized: "Opens the Files app to pick an audio file for this episode."))
+                .accessibilityHint(String(localized: "Opens the Files app to pick an MP3, M4A, or WAV file for this episode."))
             }
             Section {
                 WizardBlockingNote(reasons: audioBlockingReasons)
@@ -365,7 +417,7 @@ struct SubmitPodcastView: View {
     private var reviewSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "Review & Submit", stepIndex: 2, stepTotal: 2, onBack: goBack, headerFocus: $isStepFocused)
+                WizardStepHeader(title: "Review & Submit", stepIndex: 2, stepTotal: 2, headerFocus: $isStepFocused)
                 Text("Check your details, then tap Submit.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -407,7 +459,8 @@ struct SubmitPodcastView: View {
     /// for the full reasoning. Full app-wide focus audit, requested
     /// directly.
     private func focusStepAfterTransition() {
-        Task { await retryAccessibilityFocus(into: $isStepFocused) }
+        // Shared timing: see focusWizardStepHeading. Reported directly.
+        Task { await focusWizardStepHeading($isStepFocused) }
     }
 
     /// Step-backward navigation, separated from the toolbar's Cancel button

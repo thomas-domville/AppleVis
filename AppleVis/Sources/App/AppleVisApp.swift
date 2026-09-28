@@ -107,7 +107,15 @@ struct AppleVisApp: App {
                     ICloudSyncManager.shared.pushSettings()
                 } else if newPhase == .active {
                     Task { await auth.refreshRoles() }
+                    // A sign-in older than the website keeps sessions (about
+                    // 23 days) is checked, and the member asked to sign in
+                    // again before they start writing. Reported directly.
+                    Task { await auth.checkSessionOnOpen() }
                     deepLinkRouter.checkPendingShareExtensionContent()
+                    // Help articles (once per update) and saved and
+                    // followed items go into iOS Spotlight search.
+                    SpotlightIndexer.indexHelpArticlesIfNeeded()
+                    SpotlightIndexer.indexSavedAndFollowed()
                     // Matches standard iOS badge behavior (and RN's own
                     // notifBadge description: "tap the app and the badge
                     // clears") — opening the app clears it.

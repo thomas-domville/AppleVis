@@ -9,8 +9,8 @@ struct PodcastEndpoints {
 
     private static let pageSize = 20
 
-    func episodes(page: Int = 0, sort: PodcastSort = .recent, tagTid: Int? = nil) async throws -> PagedListResult<PodcastEpisode> {
-        try await fetchWithCache(group: .podcasts, key: "podcasts:episodes:\(page):\(sort.drupalSort):\(tagTid ?? -1)") {
+    func episodes(page: Int = 0, sort: PodcastSort = .recent, tagTid: Int? = nil, forceRefresh: Bool = false) async throws -> PagedListResult<PodcastEpisode> {
+        try await fetchWithCache(group: .podcasts, key: "podcasts:episodes:\(page):\(sort.drupalSort):\(tagTid ?? -1)", forceRefresh: forceRefresh) {
             var query: [String: String] = [
                 "sort": sort.drupalSort,
                 "include": "field_podcast,uid,taxonomy_vocabulary_15",

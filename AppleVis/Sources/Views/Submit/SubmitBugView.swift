@@ -134,6 +134,11 @@ struct SubmitBugView: View {
                             }
                         }
                     }
+                    // A fresh form per step, so each step opens scrolled to the top and
+                    // its heading exists for VoiceOver to land on. Kept the last step's
+                    // scroll position before, which could leave the heading unloaded.
+                    // Reported directly.
+                    .id(step)
                     .themedList(preferences.colors)
                 }
             }
@@ -148,9 +153,9 @@ struct SubmitBugView: View {
                 // regardless of step; step-backward navigation moved to its
                 // own in-content button below, matching Submit App/Blog's
                 // existing convention. Reported directly.
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { requestCancel() }
-                }
+                // Back sits beside Cancel now, not in the step header, so VoiceOver
+                // swipes Cancel, Back, title, Next. Reported directly.
+                WizardLeadingToolbar(onCancel: requestCancel, onBack: step == .description ? nil : goBack)
                 if auth.isSignedIn {
                     ToolbarItem(placement: .confirmationAction) {
                         if step == .review {
@@ -250,7 +255,7 @@ struct SubmitBugView: View {
                 // Surfaced here, at the very start of the wizard, rather
                 // than as a surprise once Environment asks for the FB
                 // number. Reported directly.
-                Text("Report an accessibility bug for the community Bug Tracker. Every report must be filed with Apple's Feedback Assistant first, and you'll need the FB number from that report here.")
+                Text("Report an accessibility bug for the community Bug Tracker. Before you start, report the bug to Apple using Feedback Assistant. Apple gives your report a number that starts with FB. You'll need that number on step 2.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             if intelligence.showTranslatePrompt {
@@ -297,21 +302,6 @@ struct SubmitBugView: View {
                     .accessibilityHint(String(localized: "Required."))
             }
             Section {
-                TextField("Your Email", text: $email)
-                    .keyboardType(.emailAddress)
-                    .textInputAutocapitalization(.never)
-                    .accessibilityHint(String(localized: "Required. The AppleVis team may reply to follow up on your report."))
-                    .onChange(of: email) { _, newValue in domainChecker.check(email: newValue) }
-            } header: {
-                Text("Your Email")
-            } footer: {
-                if !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !email.isValidEmailFormat {
-                    Text("Enter a valid email address.")
-                } else {
-                    EmailDomainWarning(checker: domainChecker)
-                }
-            }
-            Section {
                 // Combined label+counter into one live-updating swipe-stop,
                 // and hid the trailing caption from VoiceOver — it's a
                 // verbatim repeat of text already in the field's own hint
@@ -349,6 +339,23 @@ struct SubmitBugView: View {
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
                 rewriteButton
+            }
+            // Email comes after the description now, so the title and the
+            // description it summarises sit together. Reported directly.
+            Section {
+                TextField("Your Email", text: $email)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .accessibilityHint(String(localized: "Required. The AppleVis team may reply to follow up on your report."))
+                    .onChange(of: email) { _, newValue in domainChecker.check(email: newValue) }
+            } header: {
+                Text("Your Email")
+            } footer: {
+                if !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !email.isValidEmailFormat {
+                    Text("Enter a valid email address.")
+                } else {
+                    EmailDomainWarning(checker: domainChecker)
+                }
             }
             Section {
                 WizardBlockingNote(reasons: descriptionBlockingReasons)
@@ -397,11 +404,13 @@ struct SubmitBugView: View {
         }
     }
 
+    private static let feedbackAssistantURL = URL(string: "https://feedbackassistant.apple.com/")!
+
     private var bugInfoSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "Environment", stepIndex: 2, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
-                Text("Tell us where this happens and the Apple Feedback number you filed it under.")
+                WizardStepHeader(title: "Environment", stepIndex: 2, stepTotal: 3, headerFocus: $isStepFocused)
+                Text("Tell us where the bug happens, and enter the number Apple gave your report.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             Section("Where It Happens") {
@@ -419,19 +428,30 @@ struct SubmitBugView: View {
             // It Happens" with the rest) so the policy explanation has
             // room to stand out instead of reading like a minor aside next
             // to Platform/Software Version.
+            // The explanation used to be one vague footer line after the box
+            // ("...filed with Apple's Feedback Assistant. This is kept
+            // confidential."). It now comes first and says where the number
+            // comes from, with a button to get it. The "confidential" claim
+            // was dropped: published bugs show their Feedback ID, so it
+            // couldn't be confirmed. Reported directly.
             Section {
+                Text("AppleVis only accepts bugs that have already been reported to Apple. If you haven't reported this bug yet, choose Open Feedback Assistant, sign in with your Apple Account, and send your report there. Apple then gives your report a number that starts with FB, for example FB12345678. You can find it next to your report in Feedback Assistant. Enter that number below.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Link(destination: Self.feedbackAssistantURL) {
+                    Label("Open Feedback Assistant", systemImage: "arrow.up.right.square")
+                }
+                .accessibilityHint(String(localized: "Opens Apple's Feedback Assistant website, where you can report the bug to Apple."))
                 TextField("Apple Feedback #", text: $appleFeedbackId)
                     .textInputAutocapitalization(.characters)
-                    .accessibilityHint(String(localized: "Required. Starts with FB."))
+                    .accessibilityHint(String(localized: "Required. The number Apple gave your report in Feedback Assistant. It starts with FB."))
                 if !appleFeedbackId.isEmpty && !isAppleFeedbackIdValid {
-                    Text("Should start with \"FB\", matching your Feedback Assistant submission number.")
+                    Text("Feedback numbers start with FB, for example FB12345678.")
                         .font(.caption)
                         .foregroundStyle(preferences.colors.warning)
                 }
             } header: {
                 Text("Apple Feedback #")
-            } footer: {
-                Text("AppleVis does not accept bug reports that haven't first been filed with Apple's Feedback Assistant. This is kept confidential.")
             }
             Section("Recognition") {
                 Picker("Recognize your contribution?", selection: $recognition) {
@@ -461,7 +481,7 @@ struct SubmitBugView: View {
     private var reviewSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
+                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, headerFocus: $isStepFocused)
                 Text("Check your details, then tap Submit.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -511,7 +531,8 @@ struct SubmitBugView: View {
     /// for the full reasoning. Full app-wide focus audit, requested
     /// directly.
     private func focusStepAfterTransition() {
-        Task { await retryAccessibilityFocus(into: $isStepFocused) }
+        // Shared timing: see focusWizardStepHeading. Reported directly.
+        Task { await focusWizardStepHeading($isStepFocused) }
     }
 
     /// Step-backward navigation, separated from the toolbar's Cancel button

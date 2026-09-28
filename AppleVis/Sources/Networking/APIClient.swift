@@ -162,7 +162,7 @@ final class APIClient {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
         request.httpBody = try JSONEncoder().encode(body)
-        return try await perform(request: request)
+        return try await sendWithSessionRecovery(request) { try await self.perform(request: $0, sideEffects: false) }
     }
 
     func postForm<T: Decodable>(_ path: String, base: BaseURL = .root, body: [String: String], headers: [String: String] = [:]) async throws -> T {
@@ -228,7 +228,46 @@ final class APIClient {
 
     /// DELETE a JSON:API resource.
     func jsonAPIDelete(_ path: String, headers: [String: String] = [:]) async throws {
-        try await delete(path, base: .jsonAPI, headers: jsonAPIHeaders(headers))
+        var request = URLRequest(url: buildURL(path: path, base: .jsonAPI, query: [:]))
+        request.httpMethod = "DELETE"
+        jsonAPIHeaders(headers).forEach { request.setValue($1, forHTTPHeaderField: $0) }
+        try await sendWithSessionRecovery(request) { request in
+            let (_, response) = try await self.session.data(for: request)
+            try self.validateStatus(response, sideEffects: false)
+        }
+    }
+
+    /// A plain GET that returns the body and status code, with none of the
+    /// usual status handling. For the website's own session checks.
+    func rawGET(_ path: String, base: BaseURL = .root, query: [String: String] = [:]) async throws -> (Data, Int) {
+        let request = URLRequest(url: buildURL(path: path, base: base, query: query), cachePolicy: .reloadIgnoringLocalAndRemoteCacheData)
+        let (data, response) = try await session.data(for: request)
+        return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
+    }
+
+    /// Every write carries the security token saved at sign-in. If the
+    /// website refuses one (401 or 403), this finds out why before giving
+    /// up: still signed in with a stale token, it fetches a fresh token and
+    /// tries once more; signed out because the session ended (about 23 days
+    /// after sign-in), it asks the member to sign in again and then sends
+    /// it, so nothing they wrote is lost. Reported directly (2026-09-28): a
+    /// beta tester's app submission failed while the app still looked
+    /// signed in.
+    private func sendWithSessionRecovery<T>(_ request: URLRequest, send: (URLRequest) async throws -> T) async throws -> T {
+        do {
+            return try await send(request)
+        } catch let error as APIError where (error == .forbidden || error == .unauthorized)
+                    && request.value(forHTTPHeaderField: "X-CSRF-Token") != nil {
+            guard let freshToken = await Self.authStore?.recoverSession() else {
+                if error == .unauthorized {
+                    await MainActor.run { Self.authStore?.handleSessionExpired() }
+                }
+                throw error
+            }
+            var retry = request
+            retry.setValue(freshToken, forHTTPHeaderField: "X-CSRF-Token")
+            return try await send(retry)
+        }
     }
 
     private func jsonAPIHeaders(_ extra: [String: String]) -> [String: String] {
@@ -250,15 +289,17 @@ final class APIClient {
         request.setValue("application/vnd.api+json", forHTTPHeaderField: "Accept")
         jsonAPIHeaders(headers).forEach { request.setValue($1, forHTTPHeaderField: $0) }
         request.httpBody = try JSONEncoder().encode(JsonApiEnvelope(data: body))
-        return try await performRaw(request: request)
+        return try await sendWithSessionRecovery(request) { try await self.performRaw(request: $0, sideEffects: false) }
     }
 
     // MARK: - Private helpers
 
-    private func perform<T: Decodable>(request: URLRequest) async throws -> T {
+    /// `sideEffects: false` for writes that go through
+    /// `sendWithSessionRecovery`, which decides for itself what a refusal means.
+    private func perform<T: Decodable>(request: URLRequest, sideEffects: Bool = true) async throws -> T {
         do {
             let (data, response) = try await session.data(for: request)
-            try validateStatus(response)
+            try validateStatus(response, sideEffects: sideEffects)
             return try decoder.decode(T.self, from: data)
         } catch let apiError as APIError {
             throw apiError
@@ -277,10 +318,10 @@ final class APIClient {
     /// Same as `perform`, but decodes with `rawDecoder` (no snake_case→camelCase
     /// key conversion) — used for JSON:API responses whose dictionary keys are
     /// Drupal field names that must be looked up verbatim.
-    private func performRaw<T: Decodable>(request: URLRequest) async throws -> T {
+    private func performRaw<T: Decodable>(request: URLRequest, sideEffects: Bool = true) async throws -> T {
         do {
             let (data, response) = try await session.data(for: request)
-            try validateStatus(response)
+            try validateStatus(response, sideEffects: sideEffects)
             if data.isEmpty, let empty = EmptyJSONAPIResponse() as? T {
                 return empty
             }
@@ -299,11 +340,12 @@ final class APIClient {
         }
     }
 
-    private func validateStatus(_ response: URLResponse) throws {
+    private func validateStatus(_ response: URLResponse, sideEffects: Bool = true) throws {
         guard let http = response as? HTTPURLResponse else { return }
         switch http.statusCode {
         case 200...299: return
         case 401:
+            guard sideEffects else { throw APIError.unauthorized }
             Task { @MainActor in
                 guard Self.authStore?.isSignedIn == true else { return }
                 Self.authStore?.handleSessionExpired()
@@ -311,6 +353,7 @@ final class APIClient {
             }
             throw APIError.unauthorized
         case 403:
+            guard sideEffects else { throw APIError.forbidden }
             // A 403 on an otherwise-valid session most often means the
             // user's role changed server-side since we last resolved it
             // (see AuthStore.refreshRoles) — re-sync so a since-demoted

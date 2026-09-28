@@ -75,6 +75,17 @@ struct GuidelineFlag: Identifiable {
     /// for `editNode`/`unpublishNode`/`deleteNode` — set exactly when this
     /// flag is on the root item itself (`commentId`/`commentType` are nil).
     let nodeType: String?
+    /// Website link to exactly this item: a comment's own permalink
+    /// (`/comment/{cid}#comment-{cid}`, which opens the thread at that
+    /// comment) or the post's own page. Included when an admin shares a
+    /// flag, so whoever receives it can open the real thing.
+    var url: String? = nil
+    /// The author is on the AppleVis editorial team (site editor or site
+    /// admin), usually moderating: quoting a remark back or asking people to
+    /// change something. Their tone flags are set aside. Only known when the
+    /// site shares the author's roles with the signed-in admin. Suggested
+    /// directly (2026-09-27).
+    var authorIsEditorial: Bool = false
 
     var highestSeverity: GuidelineWarning.Severity {
         warnings.map(\.severity).min(by: { $0.sortOrder < $1.sortOrder }) ?? .low
@@ -159,6 +170,25 @@ final class GuidelineViolationScanner: ObservableObject {
     /// changed afterward without the results changing with it.
     @Published private(set) var lastScannedRange: GuidelineScanRange?
     @Published var error: String?
+    /// Items checked so far in the scan that's running, for the Scanning
+    /// row's live count.
+    @Published private(set) var itemsCheckedSoFar = 0
+    /// True between Stop and the scan actually winding down.
+    @Published private(set) var isStopping = false
+    /// The last scan was stopped early, so its results cover only part of
+    /// the range.
+    @Published private(set) var lastScanWasStopped = false
+    private var scanTask: Task<StreamResult, Never>?
+
+    /// Apple Intelligence's second opinion on each flag, by flag id, filled
+    /// in after a scan on devices that support it. Only for flags whose
+    /// every rule depends on context (see `GuidelineWarning.allowsSecondOpinion`).
+    /// Requested directly (2026-09-27).
+    @Published private(set) var opinions: [String: IntelligenceService.GuidelineSecondOpinion] = [:]
+    @Published private(set) var isReviewing = false
+    @Published private(set) var reviewedCount = 0
+    @Published private(set) var reviewTotal = 0
+    private var reviewTask: Task<Void, Never>?
 
     /// Every item the last scan actually checked. Used to only count forum
     /// topics plus brand-new other posts — every comment, reply, and review
@@ -205,6 +235,14 @@ final class GuidelineViolationScanner: ObservableObject {
     /// still guaranteeing a misbehaving sort can't loop forever.
     private static let maxPages = 100
 
+    /// Ends a long scan early and keeps what it's checked so far. Each
+    /// content type stops before its next page. Requested directly.
+    func stop() {
+        guard isScanning, !isStopping else { return }
+        isStopping = true
+        scanTask?.cancel()
+    }
+
     func scan(range: GuidelineScanRange) async {
         let scanId = UUID()
         currentScanId = scanId
@@ -213,15 +251,33 @@ final class GuidelineViolationScanner: ObservableObject {
         flags = []
         scannedPostCount = 0
         scannedCommentCount = 0
+        itemsCheckedSoFar = 0
+        isStopping = false
+        lastScanWasStopped = false
+        reviewTask?.cancel()
+        opinions = [:]
+        isReviewing = false
 
         let cutoff = Calendar.current.date(byAdding: .day, value: -range.days, to: Date()) ?? Date()
 
-        let result = await Self.scanStreams(cutoff: cutoff)
+        let progress: @Sendable (Int) -> Void = { [weak self] count in
+            Task { @MainActor in
+                guard let self, self.currentScanId == scanId else { return }
+                self.itemsCheckedSoFar += count
+            }
+        }
+        let task = Task { await Self.scanStreams(cutoff: cutoff, progress: progress) }
+        scanTask = task
+        let result = await task.value
+        scanTask = nil
         guard currentScanId == scanId else { return }
 
+        let wasStopped = isStopping
+        isStopping = false
+        lastScanWasStopped = wasStopped
         lastScannedRange = range
 
-        if result.failedQueries == Self.streams.count * 2 {
+        if !wasStopped, result.failedQueries == Self.streams.count * 2 {
             // Was a raw string literal — `error: String?` shown via
             // `Text(error)` in GuidelineViolationCheckView, and `Text(String)`
             // doesn't consult the localization catalog at all, unlike
@@ -243,6 +299,39 @@ final class GuidelineViolationScanner: ObservableObject {
             return a.createdAt > b.createdAt
         }
         isScanning = false
+        reviewWithAppleIntelligence()
+    }
+
+    /// Asks Apple Intelligence about each context-dependent flag, one at a
+    /// time in the background, so the results can be read straight away. A
+    /// flag counts as probably fine only if every one of its rules is judged
+    /// fine. Never touches flags with a clear-cut or high-severity rule.
+    private func reviewWithAppleIntelligence() {
+        let candidates = flags.filter { !$0.warnings.isEmpty && $0.warnings.allSatisfy(\.allowsSecondOpinion) }
+        guard IntelligenceService.isAvailable, !candidates.isEmpty else { return }
+        reviewedCount = 0
+        reviewTotal = candidates.count
+        isReviewing = true
+        let scanId = currentScanId
+        reviewTask = Task { [weak self] in
+            for flag in candidates {
+                guard !Task.isCancelled else { return }
+                var judged: [IntelligenceService.GuidelineSecondOpinion] = []
+                for warning in flag.warnings {
+                    if let opinion = await IntelligenceService.secondOpinion(on: warning, in: flag.body) {
+                        judged.append(opinion)
+                    }
+                }
+                guard let self, !Task.isCancelled, self.currentScanId == scanId else { return }
+                if judged.count == flag.warnings.count {
+                    let real = judged.first { $0.isRealConcern }
+                    self.opinions[flag.id] = real ?? judged[0]
+                }
+                self.reviewedCount += 1
+            }
+            guard let self, self.currentScanId == scanId else { return }
+            self.isReviewing = false
+        }
     }
 
     // MARK: - Streams
@@ -251,8 +340,10 @@ final class GuidelineViolationScanner: ObservableObject {
         let id: String
         let title: String
         let authorName: String
+        var authorIsEditorial = false
         let createdAt: Date
         let body: String
+        let url: String?
     }
 
     private struct RawComment {
@@ -260,8 +351,18 @@ final class GuidelineViolationScanner: ObservableObject {
         let parentId: String
         let parentTitle: String
         let authorName: String
+        var authorIsEditorial = false
         let createdAt: Date
         let body: String
+        let url: String?
+    }
+
+    /// A node's page on the website: its path alias, or /node/{nid}.
+    private static func websiteURL(for node: JsonApiNode) -> String? {
+        if let alias = node.attributes["path"]?.pathAlias, !alias.isEmpty {
+            return "https://www.applevis.com\(alias)"
+        }
+        return node.attributes["drupal_internal__nid"]?.intValue.map { "https://www.applevis.com/node/\($0)" }
     }
 
     private struct StreamResult {
@@ -273,10 +374,10 @@ final class GuidelineViolationScanner: ObservableObject {
         var failedQueries = 0
     }
 
-    private static func scanStreams(cutoff: Date) async -> StreamResult {
+    private static func scanStreams(cutoff: Date, progress: @escaping @Sendable (Int) -> Void) async -> StreamResult {
         await withTaskGroup(of: StreamResult.self) { group in
             for stream in streams {
-                group.addTask { await scanStream(stream, cutoff: cutoff) }
+                group.addTask { await scanStream(stream, cutoff: cutoff, progress: progress) }
             }
             var total = StreamResult()
             for await result in group {
@@ -289,9 +390,9 @@ final class GuidelineViolationScanner: ObservableObject {
         }
     }
 
-    private static func scanStream(_ stream: ContentStream, cutoff: Date) async -> StreamResult {
-        async let postsTask = recentPosts(nodeType: stream.nodeType, cutoff: cutoff)
-        async let commentsTask = recentComments(bundle: stream.commentBundle, cutoff: cutoff)
+    private static func scanStream(_ stream: ContentStream, cutoff: Date, progress: @escaping @Sendable (Int) -> Void) async -> StreamResult {
+        async let postsTask = recentPosts(nodeType: stream.nodeType, cutoff: cutoff, progress: progress)
+        async let commentsTask = recentComments(bundle: stream.commentBundle, parentNodeType: stream.nodeType, cutoff: cutoff, progress: progress)
         var result = StreamResult()
         let posts: [RawPost]
         let comments: [RawComment]
@@ -301,25 +402,27 @@ final class GuidelineViolationScanner: ObservableObject {
         result.commentCount = comments.count
 
         for post in posts {
-            let warnings = GuidelinesChecker.check(post.body)
+            let warnings = setAsideForEditorial(GuidelinesChecker.check(post.body), editorial: post.authorIsEditorial)
             if !warnings.isEmpty {
                 result.flags.append(GuidelineFlag(
                     id: "\(stream.nodeType)-post-\(post.id)", kind: stream.kind, itemId: post.id, itemTitle: post.title,
                     authorName: post.authorName, excerpt: .excerpt(from: post.body), body: post.body,
                     createdAt: post.createdAt, isRootItem: true, warnings: warnings,
-                    commentId: nil, commentType: nil, nodeType: stream.nodeType
+                    commentId: nil, commentType: nil, nodeType: stream.nodeType, url: post.url,
+                    authorIsEditorial: post.authorIsEditorial
                 ))
             }
         }
 
         for comment in comments {
-            let warnings = GuidelinesChecker.check(comment.body, isReply: true)
+            let warnings = setAsideForEditorial(GuidelinesChecker.check(comment.body, isReply: true), editorial: comment.authorIsEditorial)
             if !warnings.isEmpty {
                 result.flags.append(GuidelineFlag(
                     id: "\(stream.commentBundle)-comment-\(comment.id)", kind: stream.kind, itemId: comment.parentId, itemTitle: comment.parentTitle,
                     authorName: comment.authorName, excerpt: .excerpt(from: comment.body), body: comment.body,
                     createdAt: comment.createdAt, isRootItem: false, warnings: warnings,
-                    commentId: comment.id, commentType: stream.commentBundle, nodeType: nil
+                    commentId: comment.id, commentType: stream.commentBundle, nodeType: nil, url: comment.url,
+                    authorIsEditorial: comment.authorIsEditorial
                 ))
             }
         }
@@ -327,16 +430,44 @@ final class GuidelineViolationScanner: ObservableObject {
         return result
     }
 
+    /// Editorial team posts keep every flag except tone: when they quote a
+    /// remark back or ask people to change something, that's moderation.
+    private static func setAsideForEditorial(_ warnings: [GuidelineWarning], editorial: Bool) -> [GuidelineWarning] {
+        editorial ? warnings.filter { !$0.isToneConcern } : warnings
+    }
+
+    /// True if the included user has the site_editor or site_admin role.
+    /// Drupal's JSON:API puts each role's machine name in the relationship's
+    /// `meta.drupal_internal__target_id`; if roles aren't shared, it's false.
+    private static func isEditorial(_ user: JsonApiNode?) -> Bool {
+        guard let user else { return false }
+        return user.relationshipTargetIds("roles").contains { $0 == "site_editor" || $0 == "site_admin" }
+    }
+
     /// Newly-created posts/entries for one node bundle, newest first,
     /// stopping once a page's items fall outside the window.
-    private static func recentPosts(nodeType: String, cutoff: Date) async throws -> [RawPost] {
+    private static func recentPosts(nodeType: String, cutoff: Date, progress: @Sendable (Int) -> Void) async throws -> [RawPost] {
         var results: [RawPost] = []
         var page = 0
         while page < maxPages {
-            let response = try await APIClient.shared.jsonAPIList(
-                "node/\(nodeType)",
-                query: ["sort": "-created", "include": "uid", "page[limit]": "50", "page[offset]": "\(page * 50)"]
-            )
+            // Stop keeps whatever's been checked; it doesn't throw it away.
+            if Task.isCancelled { break }
+            let response: JsonApiCollectionResponse
+            do {
+                // Only the fields this check reads, not every field on the
+                // post. Verified live 2026-09-25. Requested directly.
+                response = try await APIClient.shared.jsonAPIList(
+                    "node/\(nodeType)",
+                    query: [
+                        "sort": "-created", "include": "uid", "page[limit]": "50", "page[offset]": "\(page * 50)",
+                        "fields[node--\(nodeType)]": "title,body,created,path,drupal_internal__nid,uid",
+                        "fields[user--user]": "display_name,name,roles",
+                    ]
+                )
+            } catch {
+                if Task.isCancelled { break }
+                throw error
+            }
             if response.data.isEmpty { break }
             let included = response.included ?? []
             var reachedCutoff = false
@@ -350,12 +481,15 @@ final class GuidelineViolationScanner: ObservableObject {
                 let userNode = uidId.flatMap { id in included.first { $0.id == id } }
                 let authorName = userNode?.attributes["display_name"]?.stringValue
                     ?? userNode?.attributes["name"]?.stringValue ?? ""
+                progress(1)
                 results.append(RawPost(
                     id: node.id,
                     title: node.attributes["title"]?.stringValue ?? "",
                     authorName: authorName,
+                    authorIsEditorial: isEditorial(userNode),
                     createdAt: created,
-                    body: node.attributes["body"]?.richTextValue ?? ""
+                    body: node.attributes["body"]?.richTextValue ?? "",
+                    url: Self.websiteURL(for: node)
                 ))
             }
             if reachedCutoff { break }
@@ -366,14 +500,30 @@ final class GuidelineViolationScanner: ObservableObject {
 
     /// Newest comments across *every* post of one comment bundle, newest
     /// first, stopping once a page's comments fall outside the window.
-    private static func recentComments(bundle: String, cutoff: Date) async throws -> [RawComment] {
+    private static func recentComments(bundle: String, parentNodeType: String, cutoff: Date, progress: @Sendable (Int) -> Void) async throws -> [RawComment] {
         var results: [RawComment] = []
         var page = 0
         while page < maxPages {
-            let response = try await APIClient.shared.jsonAPIList(
-                "comment/\(bundle)",
-                query: ["sort": "-created", "include": "uid,entity_id", "page[limit]": "50", "page[offset]": "\(page * 50)"]
-            )
+            if Task.isCancelled { break }
+            let response: JsonApiCollectionResponse
+            do {
+                // Only the fields this check reads. The included parent post
+                // used to come back whole, body and all, just for its title;
+                // now it's the title and link. About half the download per
+                // page, verified live 2026-09-25. Requested directly.
+                response = try await APIClient.shared.jsonAPIList(
+                    "comment/\(bundle)",
+                    query: [
+                        "sort": "-created", "include": "uid,entity_id", "page[limit]": "50", "page[offset]": "\(page * 50)",
+                        "fields[comment--\(bundle)]": "comment_body,created,name,drupal_internal__cid,uid,entity_id",
+                        "fields[node--\(parentNodeType)]": "title,path,drupal_internal__nid",
+                        "fields[user--user]": "display_name,name,roles",
+                    ]
+                )
+            } catch {
+                if Task.isCancelled { break }
+                throw error
+            }
             if response.data.isEmpty { break }
             let included = response.included ?? []
             var reachedCutoff = false
@@ -385,10 +535,18 @@ final class GuidelineViolationScanner: ObservableObject {
                 }
                 let c = Mappers.genericComment(node, included: included)
                 let parentId = node.relationshipId("entity_id") ?? ""
-                let parentTitle = included.first { $0.id == parentId }?.attributes["title"]?.stringValue ?? ""
+                let parent = included.first { $0.id == parentId }
+                let parentTitle = parent?.attributes["title"]?.stringValue ?? ""
+                // The comment's own permalink when Drupal gives its number;
+                // otherwise the page it's on.
+                let url = node.attributes["drupal_internal__cid"]?.intValue
+                    .map { "https://www.applevis.com/comment/\($0)#comment-\($0)" }
+                    ?? parent.flatMap(Self.websiteURL(for:))
+                progress(1)
+                let commentUser = node.relationshipId("uid").flatMap { id in included.first { $0.id == id } }
                 results.append(RawComment(
                     id: node.id, parentId: parentId, parentTitle: parentTitle,
-                    authorName: c.authorName, createdAt: created, body: c.body
+                    authorName: c.authorName, authorIsEditorial: isEditorial(commentUser), createdAt: created, body: c.body, url: url
                 ))
             }
             if reachedCutoff { break }

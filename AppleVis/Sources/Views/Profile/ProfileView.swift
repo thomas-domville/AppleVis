@@ -42,10 +42,17 @@ struct ProfileView: View {
             showSignIn: $showSignIn,
             declineHint: String(localized: "Returns to Profile without signing in. You can review the agreement again later.")
         )
-        .sheet(isPresented: $showContact) {
+        // Closing a sheet (sent or cancelled) otherwise drops VoiceOver on
+        // the tab's back button; put it back on the row that opened it.
+        // Reported directly.
+        .sheet(isPresented: $showContact, onDismiss: {
+            Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("contact")) }
+        }) {
             ContactView()
         }
-        .sheet(isPresented: $showWelcomeTour) {
+        .sheet(isPresented: $showWelcomeTour, onDismiss: {
+            Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("welcomeTour")) }
+        }) {
             GuidedExperienceView(experience: GuidedExperienceRegistry.welcome)
         }
     }
@@ -136,6 +143,17 @@ struct ProfileView: View {
                 Label("App Directory Health Check", systemImage: "checkmark.shield")
             }
             .accessibilityFocused($focusTarget, equals: AnyHashable("appHealthCheck"))
+
+            NavigationLink {
+                DormantAccountsView()
+                    .onDisappear {
+                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("neverSignedIn")) }
+                    }
+            } label: {
+                Label("Never Signed In", systemImage: "person.crop.circle.badge.questionmark")
+            }
+            .accessibilityFocused($focusTarget, equals: AnyHashable("neverSignedIn"))
+            .accessibilityHint(String(localized: "Accounts created 30 or more days ago that have never signed in."))
         }
     }
 
@@ -231,6 +249,7 @@ struct ProfileView: View {
             } label: {
                 Label("Replay Welcome Tour", systemImage: "arrow.clockwise")
             }
+            .accessibilityFocused($focusTarget, equals: AnyHashable("welcomeTour"))
             .accessibilityLabel(String(localized: "Replay Welcome Tour"))
             .accessibilityHint(String(localized: "Replays the guided tour of Home, Discover, For You, and Profile & Settings."))
 
@@ -244,6 +263,7 @@ struct ProfileView: View {
             } label: {
                 Label("Contact AppleVis", systemImage: "envelope")
             }
+            .accessibilityFocused($focusTarget, equals: AnyHashable("contact"))
             .accessibilityLabel(String(localized: "Contact AppleVis"))
 
             HStack {

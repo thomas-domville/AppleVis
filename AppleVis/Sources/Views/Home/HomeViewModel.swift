@@ -121,7 +121,7 @@ struct MouseRecapDigest: Codable {
         let visibleForums = Array(forums.prefix(limits.forums))
 
         var lines = [
-            String(localized: "Mouse Recap"),
+            String(localized: "Nibbles"),
             periodName,
             dateRangeText,
             "",
@@ -766,7 +766,7 @@ final class HomeViewModel: ObservableObject {
             // Fetch failed outright — leave the cached digest (if any) on
             // screen rather than clearing it, same as Home's own failed-load
             // handling.
-            mouseRecapError = String(localized: "Couldn't load Mouse Recap. Pull to refresh.")
+            mouseRecapError = String(localized: "Couldn't load Nibbles. Pull to refresh.")
         } else {
             let digest = await enrichMouseRecap(Self.buildMouseRecap(from: result.items, startDate: startDate, endDate: endDate))
             mouseRecap = digest
@@ -826,6 +826,13 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
+    /// Always asks for the live lists (2026-09-28). Home used the saved
+    /// copy of each list for up to 30 minutes (forums) or 6 hours (blogs,
+    /// podcasts, apps, guides), even on pull-to-refresh, so comments that
+    /// arrived in that window weren't counted: a topic you'd opened kept
+    /// its old count and lost its NEW badge while the rows around it kept
+    /// theirs. The saved copy is still the fallback when offline or the
+    /// site is down (see fetchWithCache). Reported directly.
     private func fetchPage(page: Int) async -> (items: [FeedItem], failedSources: [String]) {
         // Read preferences from UserDefaults directly to avoid environment dependency
         let showForums   = UserDefaults.standard.object(forKey: "feed.showForums")   as? Bool ?? true
@@ -844,7 +851,7 @@ final class HomeViewModel: ObservableObject {
                 // before that switcher ever saw them, so choosing "All"
                 // could still silently show only, say, Unread topics with
                 // no visible explanation why. Removed. Requested directly.
-                let topics = try await APIClient.shared.forums.recent(page: page, appleOnly: appleOnly)
+                let topics = try await APIClient.shared.forums.recent(page: page, appleOnly: appleOnly, forceRefresh: true)
                 return topics.map { FeedItem.forumTopic($0) }
               }
             : SourceFetchResult(items: [], failedName: nil)
@@ -853,7 +860,7 @@ final class HomeViewModel: ObservableObject {
         let includeRecentlyCommented = page == 0
         async let podcasts = showPodcasts
             ? fetchSource(name: "Podcasts") {
-                async let listedPage = APIClient.shared.podcasts.episodes(page: page)
+                async let listedPage = APIClient.shared.podcasts.episodes(page: page, forceRefresh: true)
                 async let active = Self.recentlyCommented(
                     enabled: includeRecentlyCommented,
                     bundle: "comment_node_podcast", nodeType: "podcast",
@@ -866,7 +873,7 @@ final class HomeViewModel: ObservableObject {
             : SourceFetchResult(items: [], failedName: nil)
         async let apps = showApps
             ? fetchSource(name: "Apps") {
-                async let listedPage = APIClient.shared.apps.list(page: page)
+                async let listedPage = APIClient.shared.apps.list(page: page, forceRefresh: true)
                 async let active = Self.recentlyCommented(
                     enabled: includeRecentlyCommented,
                     bundle: "comment_node_ios_app_directory", nodeType: "ios_app_directory",
@@ -879,7 +886,7 @@ final class HomeViewModel: ObservableObject {
             : SourceFetchResult(items: [], failedName: nil)
         async let guides = showGuides
             ? fetchSource(name: "Guides") {
-                async let listedPage = APIClient.shared.resources.list(page: page)
+                async let listedPage = APIClient.shared.resources.list(page: page, forceRefresh: true)
                 async let active = Self.recentlyCommented(
                     enabled: includeRecentlyCommented,
                     bundle: "comment_node_guides", nodeType: "guides",
@@ -892,7 +899,7 @@ final class HomeViewModel: ObservableObject {
             : SourceFetchResult(items: [], failedName: nil)
         async let blogs = showBlogs
             ? fetchSource(name: "Blogs") {
-                async let listedPage = APIClient.shared.blogs.list(page: page)
+                async let listedPage = APIClient.shared.blogs.list(page: page, forceRefresh: true)
                 async let active = Self.recentlyCommented(
                     enabled: includeRecentlyCommented,
                     bundle: "comment_node_blog2", nodeType: "blog2",
@@ -953,9 +960,14 @@ final class HomeViewModel: ObservableObject {
 
     /// Appends the recently-commented items the regular list didn't
     /// already have — the list's own copy wins when both have one.
+    /// Merges the "just got comments" items into a listed page. When an
+    /// item is in both, the recently-commented copy wins: it's read live,
+    /// so its comment count and latest activity are the current ones. The
+    /// listed copy used to win, keeping an older count. Order doesn't
+    /// matter here; Home sorts by latest activity afterwards.
     private static func adding(_ extra: [FeedItem], to listed: [FeedItem]) -> [FeedItem] {
-        let listedIds = Set(listed.map(\.id))
-        return listed + extra.filter { !listedIds.contains($0.id) }
+        let extraIds = Set(extra.map(\.id))
+        return extra + listed.filter { !extraIds.contains($0.id) }
     }
 
     private func fetchMouseRecapItems(since startDate: Date) async -> MouseRecapFetchResult {

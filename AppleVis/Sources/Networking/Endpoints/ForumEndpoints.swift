@@ -14,8 +14,8 @@ struct ForumEndpoints {
     /// Sorted by last-comment activity via the native `/api/v1/forums/recent`
     /// endpoint — matches the website's own sort order (JSON:API `-changed`
     /// sort does not, since it doesn't account for new comments on old topics).
-    func recent(page: Int = 0, appleOnly: Bool = false) async throws -> [ForumTopic] {
-        try await fetchWithCache(group: .forums, key: "forums:list:\(appleOnly):\(page)") {
+    func recent(page: Int = 0, appleOnly: Bool = false, forceRefresh: Bool = false) async throws -> [ForumTopic] {
+        try await fetchWithCache(group: .forums, key: "forums:list:\(appleOnly):\(page)", forceRefresh: forceRefresh) {
             var queryItems = [URLQueryItem(name: "page", value: "\(page)")]
             if appleOnly {
                 queryItems += Self.nonAppleTids.map { URLQueryItem(name: "apple_only[]", value: "\($0)") }

@@ -167,6 +167,11 @@ struct AccountSecurityWizard: View {
                             }
                         }
                     }
+                    // A fresh form per step, so each step opens scrolled to the top and
+                    // its heading exists for VoiceOver to land on. Kept the last step's
+                    // scroll position before, which could leave the heading unloaded.
+                    // Reported directly.
+                    .id(step)
                     .themedList(preferences.colors)
                 }
             }
@@ -181,10 +186,9 @@ struct AccountSecurityWizard: View {
                     // regardless of step; step-backward navigation moved to
                     // its own in-content button below, matching every other
                     // wizard's convention. Reported directly.
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { requestCancel() }
-                            .accessibilityHint(String(localized: "Cancels and closes this form."))
-                    }
+                    // Back sits beside Cancel now, not in the step header, so VoiceOver
+                    // swipes Cancel, Back, title, Next. Reported directly.
+                    WizardLeadingToolbar(onCancel: requestCancel, onBack: step == .verify ? nil : goBack)
                     ToolbarItem(placement: .confirmationAction) {
                         if step == .review {
                             Button(isSubmitting ? "Saving…" : "Save Changes") { Task { await submit() } }
@@ -248,7 +252,7 @@ struct AccountSecurityWizard: View {
                 WizardStepHeader(
                     title: mode == .password ? "Choose a New Password" : "Enter Your New Email",
                     stepIndex: 2, stepTotal: totalSteps,
-                    accentColor: mode.color, onBack: goBack, headerFocus: $isStepFocused
+                    accentColor: mode.color, headerFocus: $isStepFocused
                 )
                 Text(mode == .password
                     ? String(localized: "Enter a new password meeting the requirements below, then confirm it.")
@@ -340,7 +344,7 @@ struct AccountSecurityWizard: View {
     private var reviewSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "Review and Save", stepIndex: 3, stepTotal: totalSteps, accentColor: mode.color, onBack: goBack, headerFocus: $isStepFocused)
+                WizardStepHeader(title: "Review and Save", stepIndex: 3, stepTotal: totalSteps, accentColor: mode.color, headerFocus: $isStepFocused)
                 Text("Check your change, then tap Save Changes.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -394,7 +398,8 @@ struct AccountSecurityWizard: View {
     /// for the full reasoning. Full app-wide focus audit, requested
     /// directly.
     private func focusStepAfterTransition() {
-        Task { await retryAccessibilityFocus(into: $isStepFocused) }
+        // Shared timing: see focusWizardStepHeading. Reported directly.
+        Task { await focusWizardStepHeading($isStepFocused) }
     }
 
     /// Step-backward navigation, separated from the toolbar's Cancel button
@@ -415,6 +420,7 @@ struct AccountSecurityWizard: View {
             switch mode {
             case .password:
                 try await APIClient.shared.account.changePassword(uuid: user.uuid, csrfToken: freshToken, newPassword: newPassword)
+                AuthStore.current?.updateRememberedPassword(newPassword)
             case .email:
                 try await APIClient.shared.account.changeEmail(uuid: user.uuid, csrfToken: freshToken, newEmail: newEmail)
             }

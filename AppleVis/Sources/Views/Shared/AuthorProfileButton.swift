@@ -88,7 +88,7 @@ struct AuthorProfileButton: View {
     }
 }
 
-private struct AuthorProfileSheet: View {
+struct AuthorProfileSheet: View {
     let authorId: String
     let fallbackName: String
 

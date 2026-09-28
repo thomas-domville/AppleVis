@@ -158,16 +158,33 @@ struct SubmitBlogView: View {
                             }
                         }
                     }
+                    // A fresh form per step, so each step opens scrolled to the top and
+                    // its heading exists for VoiceOver to land on. Kept the last step's
+                    // scroll position before, which could leave the heading unloaded.
+                    // Reported directly.
+                    .id(step)
                     .themedList(preferences.colors)
                 }
             }
             .navigationTitle("Submit a Blog Post")
             .navigationBarTitleDisplayMode(.inline)
+            // Was attached to step 2 only, so Cancel on step 1 or the review
+            // step did nothing until Back reached step 2, where the stored
+            // question suddenly appeared. Reported directly.
+            .confirmationDialog(
+                "Discard this submission?",
+                isPresented: $showDiscardConfirm, titleVisibility: .visible
+            ) {
+                Button("Discard", role: .destructive) { SoundPlayer.shared.play(.screenClose); dismiss() }
+                Button("Keep Editing", role: .cancel) {}
+            } message: {
+                Text("Your progress will be discarded.")
+            }
             .toolbar {
                 if !submitted {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { requestCancel() }
-                }
+                // Back sits beside Cancel now, not in the step header, so VoiceOver
+                // swipes Cancel, Back, title, Next. Reported directly.
+                WizardLeadingToolbar(onCancel: requestCancel, onBack: step == .details ? nil : goBack)
                 if auth.isSignedIn {
                     ToolbarItem(placement: .confirmationAction) {
                         if step == .review {
@@ -266,7 +283,7 @@ struct SubmitBlogView: View {
     private var contentSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "Your Content", stepIndex: 2, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
+                WizardStepHeader(title: "Your Content", stepIndex: 2, stepTotal: 3, headerFocus: $isStepFocused)
                 Text("Add your email so our editorial team can reply, then tell us about your post and write or import your draft.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -386,7 +403,7 @@ struct SubmitBlogView: View {
                     } label: {
                         Label("Import File", systemImage: "doc.text")
                     }
-                    .accessibilityHint(String(localized: "Replaces the draft with the contents of a text file."))
+                    .accessibilityHint(String(localized: "Replaces the draft with the text of a plain text, Markdown, Rich Text, or web page file."))
 
                     Spacer()
 
@@ -398,22 +415,18 @@ struct SubmitBlogView: View {
                     .accessibilityHint(String(localized: "Replaces the draft with the contents of the clipboard."))
                 }
                 .buttonStyle(.borderless)
+                // Says up front which files work, so nobody picks a Word
+                // file and wonders why it's greyed out. Reported directly.
+                Text("Import works with plain text (.txt), Markdown (.md), Rich Text (.rtf), and web page (.html) files. For a Word or Pages document, export it as Rich Text first, or copy the text and use Paste.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section {
                 WizardBlockingNote(reasons: contentBlockingReasons)
                 WizardBottomButton(String(localized: "Next"), isEnabled: contentValid, action: goNext)
             }
         }
-        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.plainText, .text, .rtf], onCompletion: handleFileImport)
-        .confirmationDialog(
-            "Discard this submission?",
-            isPresented: $showDiscardConfirm, titleVisibility: .visible
-        ) {
-            Button("Discard", role: .destructive) { SoundPlayer.shared.play(.screenClose); dismiss() }
-            Button("Keep Editing", role: .cancel) {}
-        } message: {
-            Text("Your progress will be discarded.")
-        }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: Self.importableTypes, onCompletion: handleFileImport)
     }
 
     /// RN confirmed before discarding a filled-out form; Cancel here
@@ -452,20 +465,71 @@ struct SubmitBlogView: View {
         }
     }
 
-    /// `allowedContentTypes` on the file importer includes `.rtf`, but a
-    /// plain `String(contentsOf:encoding:.utf8)` read — which RTF's own
-    /// text-based markup doesn't fail on — produces raw `{\rtf1\ansi...}`
-    /// control-code text instead of the actual document content. Decodes
-    /// through `NSAttributedString` for `.rtf` specifically; every other
-    /// allowed type keeps the plain UTF-8 read. Reported directly.
+    /// Only the formats the import can turn into readable text. `.text`
+    /// used to be here too, which let people pick CSV, JSON, code, and
+    /// other files that came in as junk. Markdown is listed by extension as
+    /// well, because some cloud storage apps don't label .md files as
+    /// plain text. Word and Pages can't be read on iPhone, so the note
+    /// under Import tells people to export as Rich Text. Reported directly.
+    static let importableTypes: [UTType] = [.plainText, .rtf, .html]
+        + ["md", "markdown"].compactMap { UTType(filenameExtension: $0) }
+
+    /// Turns an imported file into plain draft text. The draft is sent to
+    /// the editors exactly as written, so:
+    /// - Rich Text and web pages go through `NSAttributedString` to drop
+    ///   their formatting codes and tags. Paragraphs and list bullets stay,
+    ///   and each link keeps its address in brackets after the link text,
+    ///   so no links are lost.
+    /// - Plain text and Markdown come in as they are. Markdown's own marks
+    ///   (# headings, **bold**) stay, and the editors read them as written.
+    /// - Text that isn't UTF-8 (older Windows or Mac files) is tried in the
+    ///   encoding the file declares, then Windows Latin, before giving up.
+    /// Reported directly.
+    @MainActor
     static func decodeTextFile(at url: URL) -> String? {
-        if url.pathExtension.lowercased() == "rtf" {
-            guard let data = try? Data(contentsOf: url),
-                  let attributed = try? NSAttributedString(data: data, options: [.documentType: NSAttributedString.DocumentType.rtf], documentAttributes: nil)
-            else { return nil }
-            return attributed.string
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        switch url.pathExtension.lowercased() {
+        case "rtf":
+            return attributedText(from: data, type: .rtf)
+        case "html", "htm":
+            return attributedText(from: data, type: .html)
+        default:
+            return plainText(from: data, url: url)
         }
-        return try? String(contentsOf: url, encoding: .utf8)
+    }
+
+    @MainActor
+    private static func attributedText(from data: Data, type: NSAttributedString.DocumentType) -> String? {
+        var options: [NSAttributedString.DocumentReadingOptionKey: Any] = [.documentType: type]
+        if type == .html {
+            options[.characterEncoding] = String.Encoding.utf8.rawValue
+        }
+        guard let attributed = try? NSAttributedString(data: data, options: options, documentAttributes: nil) else { return nil }
+        let text = NSMutableString(string: attributed.string)
+        // Work backwards so earlier ranges stay valid as addresses go in.
+        var links: [(NSRange, String)] = []
+        attributed.enumerateAttribute(.link, in: NSRange(location: 0, length: attributed.length)) { value, range, _ in
+            let address = (value as? URL)?.absoluteString ?? (value as? String)
+            if let address, !address.isEmpty { links.append((range, address)) }
+        }
+        for (range, address) in links.reversed() {
+            let linkText = text.substring(with: range).trimmingCharacters(in: .whitespacesAndNewlines)
+            // A bare address shown as its own link text doesn't need repeating.
+            if linkText == address || "mailto:\(linkText)" == address { continue }
+            text.insert(" (\(address))", at: range.location + range.length)
+        }
+        // Pictures come through as invisible placeholder characters; drop them.
+        let result = (text as String)
+            .replacingOccurrences(of: "\u{FFFC}", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return result.isEmpty ? nil : result
+    }
+
+    private static func plainText(from data: Data, url: URL) -> String? {
+        if let utf8 = String(data: data, encoding: .utf8) { return utf8 }
+        var detected = String.Encoding.utf8
+        if let declared = try? String(contentsOf: url, usedEncoding: &detected) { return declared }
+        return String(data: data, encoding: .windowsCP1252)
     }
 
     private func pasteFromClipboard() {
@@ -480,7 +544,7 @@ struct SubmitBlogView: View {
     private var reviewSection: some View {
         Group {
             Section {
-                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, onBack: goBack, headerFocus: $isStepFocused)
+                WizardStepHeader(title: "Review & Submit", stepIndex: 3, stepTotal: 3, headerFocus: $isStepFocused)
                 Text("Check your details, then tap Submit.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -550,7 +614,8 @@ struct SubmitBlogView: View {
     /// across every multi-step wizard). Full app-wide focus audit,
     /// requested directly.
     private func focusStepAfterTransition() {
-        Task { await retryAccessibilityFocus(into: $isStepFocused) }
+        // Shared timing: see focusWizardStepHeading. Reported directly.
+        Task { await focusWizardStepHeading($isStepFocused) }
     }
 
     private func submit() async {

@@ -88,17 +88,26 @@ func retryAccessibilityFocus(
     // since the repeated state mutation has no benefit for sighted/mouse
     // interaction but can race with a concurrent tap.
     guard UIAccessibility.isVoiceOverRunning else { return }
-    var everFocused = false
+    // Clear any leftover `true` first. The same binding is often shared by
+    // a row that has just gone away (a wizard's old step heading, or the
+    // Guideline Violation Check's "Scanning…" row, replaced by its results
+    // summary when the scan ends). A leftover `true` from that old row
+    // would look like "already focused" below, and focus would never move.
+    binding.wrappedValue = false
     for delayMs in delaysMs {
         try? await Task.sleep(for: .milliseconds(delayMs))
-        // Once we've successfully focused this element, a later `false`
-        // means the user/VoiceOver moved away on their own — stop
-        // re-forcing focus back onto it mid-interaction (see the generic
-        // overload above for why that's disruptive).
-        if everFocused && !binding.wrappedValue { return }
+        // Focus is on the element: done. Leaving it alone from here means a
+        // user who swipes on is never pulled back (see the generic overload
+        // above for why that's disruptive).
+        if binding.wrappedValue { return }
+        // Not there yet: try again. This used to stop after the first
+        // attempt whether or not focus had actually landed, treating a
+        // failed attempt as the user moving away. When the first try came
+        // too early (a closing keyboard, a new step still loading),
+        // VoiceOver stayed on Cancel or the top of the screen. Reported
+        // directly: wizard step headings not getting focus.
         binding.wrappedValue = false
         binding.wrappedValue = true
-        everFocused = true
     }
 }
 
@@ -132,4 +141,19 @@ func retryAccessibilityFocus<T: Hashable>(
         binding.wrappedValue = nil
         binding.wrappedValue = rowTarget
     }
+}
+
+/// Moves VoiceOver to a wizard's new step heading, fast. Every wizard used
+/// its own copy of this with fixed waits of 0.5, 0.85, and 1.25 seconds,
+/// which added up to a 2 to 3 second pause before focus landed. VoiceOver
+/// users expect it to be near instant. Reported directly.
+///
+/// Closes the keyboard first, because VoiceOver grabs whatever is under a
+/// closing keyboard. If a keyboard was open, the first try waits for its
+/// close animation (about a third of a second); otherwise it tries almost
+/// at once. Either way it stops as soon as focus lands.
+@MainActor
+func focusWizardStepHeading(_ binding: AccessibilityFocusState<Bool>.Binding) async {
+    let keyboardWasOpen = UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    await retryAccessibilityFocus(into: binding, delaysMs: keyboardWasOpen ? [350, 150, 250, 400] : [100, 150, 250, 400])
 }

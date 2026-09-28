@@ -71,10 +71,27 @@ struct GuidedExperienceView: View {
                         WizardStepHeader(
                             sectionLabel: step.chapterTitle, title: step.title, icon: step.icon,
                             iconBounceTrigger: isCheckpoint ? stepIndex : nil,
+                            // The tour's narrator, in a pose for each
+                            // chapter. Decorative for VoiceOver here; it's
+                            // described once, just below, on the first step.
+                            artwork: AnyView(MouseMascotView(pose: MousePose.forTourChapter(step.chapterTitle))),
                             stepIndex: chapterProgress.index, stepTotal: chapterProgress.total,
                             onBack: isFirstStep ? nil : { goToStep(stepIndex - 1) },
                             headerFocus: $isHeadingFocused
                         )
+                        // Pinned to the bottom of the header so VoiceOver
+                        // reads it right after the step heading, before the
+                        // first paragraph. Once only: repeating it every
+                        // step would just add swipes.
+                        .overlay(alignment: .bottom) {
+                            if step.id == "welcome-intro" {
+                                Color.clear
+                                    .frame(width: 1, height: 1)
+                                    .accessibilityElement()
+                                    .accessibilityLabel(Text("Illustration: the Mouse, your guide, waving hello."))
+                                    .accessibilityAddTraits(.isImage)
+                            }
+                        }
 
                         // (Now split by paragraph — see bodyChunks.) Every
                         // step.body used to be one long unbroken block of

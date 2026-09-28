@@ -90,7 +90,7 @@ enum GuidedExperienceRegistry {
             // MARK: Home
             GuidedExperienceStep(
                 id: "home-overview", chapterTitle: "Home", title: "Home", icon: "house",
-                body: "We'll start with Home. It shows what's happened since you last checked AppleVis, including new forum replies, app entries, podcast episodes, guides, and blog posts.\n\nAt the top are two buttons. Customize Home, shown visually as a small sliders icon, lets you choose what appears in your feed. Add, shown visually as a plus sign in a circle, lets you post a new forum topic or app entry. You'll need to sign in first if you haven't already.\n\nOver the next few steps, I'll show you how to customize the feed, the different ways to view what's new, and the actions available for each type of content."
+                body: "We'll start with Home. It shows what's happened since you last checked AppleVis, including new forum replies, app entries, podcast episodes, guides, and blog posts.\n\nAt the top are two buttons. Customize Home, shown visually as a small sliders icon, lets you choose what appears in your feed. Post, shown visually as a plus sign in a circle, lets you start a new forum topic or app entry. You'll need to sign in first if you haven't already. On a device with Apple Intelligence, there's also Ask the Mouse, shown visually as the Mouse's face. It answers questions about AppleVis in your own words.\n\nOver the next few steps, I'll show you how to customize the feed, the different ways to view what's new, and the actions available for each type of content."
             ),
             GuidedExperienceStep(
                 id: "home-customize", chapterTitle: "Home", title: "Customize Your Feed", icon: "slider.horizontal.3",
@@ -104,11 +104,11 @@ enum GuidedExperienceRegistry {
             ),
             GuidedExperienceStep(
                 id: "home-welcome-message", chapterTitle: "Home", title: "Home Welcome Options", icon: "text.bubble",
-                body: "Depending on your settings, opening Home can play a short spoken welcome or a fuller spoken summary of what's new since your last visit. You can change this under Home Startup Behavior in Settings, including turning it off completely.\n\nHome can also show a short summary of new activity at the top, which you can dismiss. Activating the summary takes you directly to the first new item. It has its own setting, separate from the spoken welcome, so you can turn either one on or off independently.\n\nBelow the summary is a switcher with three views: All, New, and Mouse Recap. I'll explain those next."
+                body: "Depending on your settings, opening Home can play a short spoken welcome or a fuller spoken summary of what's new since your last visit. You can change this under Home Startup Behavior in Settings, including turning it off completely.\n\nHome can also show a short summary of new activity at the top, which you can dismiss. Activating the summary takes you directly to the first new item. It has its own setting, separate from the spoken welcome, so you can turn either one on or off independently.\n\nBelow the summary is a switcher with three views: All, New, and Nibbles. I'll explain those next."
             ),
             GuidedExperienceStep(
-                id: "home-all-new-recap", chapterTitle: "Home", title: "All, New, and Mouse Recap", icon: "rectangle.3.group",
-                body: "All shows everything currently in your feed, based on the content types you selected in Customize Home.\n\nNew shows only the content that has changed since your last visit, so you don't have to go through items you've already seen.\n\nMouse Recap is a curated, newsletter-style summary of recent activity, grouped into apps, podcasts, forums, blogs, and guides. You can choose either the Past Week or Past Month.\n\nIf you want a quick way to catch up without going through the full feed, Mouse Recap gives you a summary of what happened during that period."
+                id: "home-all-new-recap", chapterTitle: "Home", title: "All, New, Fetch, and Nibbles", icon: "rectangle.3.group",
+                body: "All shows everything currently in your feed, based on the content types you selected in Customize Home.\n\nNew shows only the content that has changed since your last visit, so you don't have to go through items you've already seen.\n\nFetch shows the same new items, grouped for reading. Each post comes with its new comments in full, so you can swipe straight through without opening anything. Goldie the golden retriever fetches them for you, and Listen to Fetch can read it all aloud.\n\nNibbles is a curated, newsletter-style summary of recent activity, grouped into apps, podcasts, forums, blogs, and guides. You can choose either the Past Week or Past Month.\n\nIf you want a quick way to catch up without going through the full feed, Nibbles gives you a summary of what happened during that period."
             ),
             GuidedExperienceStep(
                 id: "home-card-actions", chapterTitle: "Home", title: "Item Actions", icon: "hand.tap",
@@ -128,7 +128,7 @@ enum GuidedExperienceRegistry {
             ),
             GuidedExperienceStep(
                 id: "home-checkpoint", chapterTitle: "Home", title: "That's Home!", icon: "arrow.right.circle",
-                body: "That's Home! We've covered the feed, customizing what it shows, the All, New, and Mouse Recap views, item actions, and each type of detail page.\n\nYou can continue to Discover or leave the tour for a while and explore Home.",
+                body: "That's Home! We've covered the feed, customizing what it shows, the All, New, Fetch, and Nibbles views, item actions, and each type of detail page.\n\nYou can continue to Discover or leave the tour for a while and explore Home.",
                 continueLabel: "Continue to Discover",
                 secondaryActions: [
                     GuidedExperienceSecondaryAction(label: "Explore Home Now", kind: .exploreScreen(.home)),

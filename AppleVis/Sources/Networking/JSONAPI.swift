@@ -171,6 +171,13 @@ nonisolated struct JsonApiNode: Decodable, Sendable {
         (relationships[name]?["data"]?.arrayValue ?? []).compactMap { $0["id"]?.stringValue }
     }
 
+    /// A to-many relationship's Drupal machine names, from each item's
+    /// `meta.drupal_internal__target_id`. Used for config entities such as
+    /// user roles ("site_editor"), whose JSON:API ids are opaque UUIDs.
+    func relationshipTargetIds(_ name: String) -> [String] {
+        (relationships[name]?["data"]?.arrayValue ?? []).compactMap { $0["meta"]?["drupal_internal__target_id"]?.stringValue }
+    }
+
     var createdDate: Date { JsonApiNode.parseDrupalDate(attributes["created"]) }
     var changedDate: Date { JsonApiNode.parseDrupalDate(attributes["changed"]) }
 

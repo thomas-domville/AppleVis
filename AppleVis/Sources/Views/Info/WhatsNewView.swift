@@ -191,9 +191,162 @@ struct ChangeItem: Identifiable {
     let title: String
     let description: String
 
-    static let currentVersion = "2026.17"
+    static let currentVersion = "2026.18"
 
     static let current: [ChangeItem] = [
+        ChangeItem(
+            systemImage: "questionmark.bubble",
+            tag: .new,
+            title: "Ask the Mouse",
+            description: "Ask a question in your own words, and the Mouse answers from Help, AppleVis guides, the App Directory, and the rest of AppleVis. Ask how to do something, find a fully accessible app, or look for a discussion. Answers say where they came from, and the Mouse can take you to the right screen or, with your OK, change a setting for you. If it can't find something, it suggests asking the community in the Forums. Find it on Home next to Post, at the top of Help, above Discover search results, or say \"Ask the AppleVis Mouse\" to Siri. It needs Apple Intelligence and runs on your device. Requested directly."
+        ),
+        ChangeItem(
+            systemImage: "magnifyingglass",
+            tag: .improved,
+            title: "Help Search Reads Whole Articles",
+            description: "Searching in Help used to look only at article titles and summaries, so something mentioned inside an article couldn't be found. It now searches the full text of every article."
+        ),
+        ChangeItem(
+            systemImage: "magnifyingglass.circle",
+            tag: .improved,
+            title: "Spotlight Finds Help and Your Saved Items",
+            description: "iOS Search now finds AppleVis Help articles, so searching for a setting such as Trim Silence brings up the article that explains it. Everything you've saved or followed is found too, even if you saved it on another device. Choose a result to open it in AppleVis. Requested directly."
+        ),
+        ChangeItem(
+            systemImage: "text.below.photo",
+            tag: .improved,
+            title: "Home's Views Now Say What They Show",
+            description: "Each of Home's views, All, New, Fetch, and Nibbles, now has a short description under the picker, such as \"Only what's changed since your last visit.\" With VoiceOver, you hear it as a hint on the picker and again when you switch views. In other languages, the names All and New were also shown in English. They're now translated."
+        ),
+        ChangeItem(
+            systemImage: "sparkles",
+            tag: .improved,
+            title: "Mouse Recap Is Now Nibbles",
+            description: "Mouse Recap has a new name: Nibbles. It's still the Mouse's bite-sized roundup of the best new apps, podcasts, discussions, guides, and blog posts from the past week or month. You'll find it at the top of Home, right after Fetch. The Mouse nibbles, and Goldie fetches."
+        ),
+        ChangeItem(
+            systemImage: "newspaper",
+            tag: .new,
+            title: "Fetch: Everything New, Ready to Read",
+            description: "Home has a new view called Fetch, right after New. Goldie the golden retriever fetches everything new, with each post followed by its new comments in full. Swipe straight through to read it all without opening anything, or double-tap a comment to open it in its thread. With VoiceOver, the Headings rotor jumps from item to item. Listen to Fetch reads everything aloud, and you can pause, skip a comment, or move between items. Suggested directly."
+        ),
+        ChangeItem(
+            systemImage: "face.smiling",
+            tag: .new,
+            title: "Meet the Mouse and Goldie",
+            description: "The Mouse, who guides you through the Welcome Tour and gives Nibbles its name, is now a little character you can see. You'll find the Mouse in each chapter of the tour, at the top of Nibbles, and on a few empty screens in For You. Goldie the golden retriever, the friend behind the Golden Retriever Bark sound, joins the Mouse on the first Setup screen. When you preview Mouse Squeak or Golden Retriever Bark in Setup, that character hops. With VoiceOver, each picture is described once and skipped after that, so it adds no extra swipes. With Reduce Motion on, both stay still."
+        ),
+        ChangeItem(
+            systemImage: "text.bubble",
+            tag: .improved,
+            title: "Guideline Reminders Catch More Unkind Wording",
+            description: "The guideline reminders missed some strong language, such as other forms of the f-word and censored spellings. These now need changing before you post, like other strong language. Milder crude words, and put-downs aimed at another member, now get a friendly reminder while you write. You can still post, but it's worth rewording. Strong disagreement about an app or a product is still welcome. Just mentioning your own website or podcast, like \"I was editing my website,\" no longer counts as self-promotion."
+        ),
+        ChangeItem(
+            systemImage: "key",
+            tag: .new,
+            title: "Remember Me When You Sign In",
+            description: "The sign-in screen has a new Remember me switch. The AppleVis website signs you out about every three weeks. With Remember me on, the app signs you back in for you, so you stay signed in. Your password is kept securely in your iPhone's Keychain, only on that iPhone, and it's removed when you sign out. If you change your password in the app, it's updated too. Suggested directly."
+        ),
+        ChangeItem(
+            systemImage: "plus.circle",
+            tag: .improved,
+            title: "The Add Button Is Now Called Post",
+            description: "The plus button at the top of Home and Forums, which starts a new topic or app entry, is now called Post instead of Add. It matches the AppleVis website, and with VoiceOver, Add could sound like Ad. Suggested directly."
+        ),
+        ChangeItem(
+            systemImage: "person.badge.key",
+            tag: .fixed,
+            title: "Signing In Again Is Now Easy",
+            description: "For your security, the AppleVis website signs you out about every three weeks. The app didn't notice, so a reply, a post, or an app submission could fail with a confusing error. Now the app asks you to sign in again, and what you were sending goes through afterwards. Nothing you wrote is lost. When you open the app after a few weeks away, it checks too, so you can sign in before you start writing. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "arrow.clockwise",
+            tag: .fixed,
+            title: "NEW Badges on Home Keep Up with New Comments",
+            description: "Home sometimes showed an older copy of the latest activity, for up to half an hour for forum topics and several hours for blog posts, podcasts, and app entries. Pulling down to refresh didn't help. So a topic could get new comments without showing a NEW badge, while the items around it did. Home now always gets the latest activity, and uses the saved copy only when you're offline. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "sparkles",
+            tag: .new,
+            title: "Smarter Guideline Reminders with Apple Intelligence",
+            description: "On iPhones with Apple Intelligence, guideline reminders are now double-checked before you see them. Apple Intelligence reads your whole draft and skips a reminder that clearly doesn’t fit, like a tone reminder on a friendly thank-you. It never adds reminders, and the checks for strong language and images always apply. It all happens on your iPhone. You can turn it off in Settings > Intelligence > Smarter Guideline Reminders. Suggested directly."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.bubble",
+            tag: .improved,
+            title: "Fewer Unneeded Guideline Reminders",
+            description: "The guideline reminders you see while writing were checked against a month of real AppleVis posts, and most false alarms are gone. Friendly or excited posts no longer get tone or punctuation reminders. Asking several questions about one subject no longer counts as several topics. Mentioning a survey is fine; only asking people to take one needs approval. Sharing an email address on purpose, like a developer’s TestFlight contact, gets a gentle note instead of a privacy warning. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "clock.arrow.circlepath",
+            tag: .fixed,
+            title: "App Entries Show When the Latest Comment Came In",
+            description: "An app entry's page said its most recent comment was from when the entry itself was last edited. A comment from a few hours ago could show as 2 weeks ago, even though Home showed it as new. The page now shows when the newest comment really came in. Saving or following an app entry also records its real latest activity. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "text.cursor",
+            tag: .fixed,
+            title: "Forms Move VoiceOver to Each New Step",
+            description: "In Contact Us, when you went from writing your message to the preview, VoiceOver focus didn't move to the preview heading. The same could happen in Submit an App, Submit a Blog Post, Submit a Podcast, Submit a Bug Report, when reporting a post or comment, and in the account security steps. The keyboard now closes first, and VoiceOver moves to the new step's heading. In Contact Us, the bug report tips on the message step were also read twice. They're now one item. The type you chose and the line under it are also one item now. Focus also moves almost at once now, instead of after a pause of 2 to 3 seconds. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "arrow.uturn.backward",
+            tag: .fixed,
+            title: "Closing a Form Returns You to Where You Were",
+            description: "After you sent or cancelled Contact AppleVis, VoiceOver went to the top of the screen instead of the Contact AppleVis button. VoiceOver now goes back to the button you used. This works from Profile, Discover, and Help. It also works for the Submit buttons in Discover, and for Replay Welcome Tour in Profile. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "chevron.backward",
+            tag: .improved,
+            title: "Back Is Now Next to Cancel in Forms",
+            description: "In Contact AppleVis, the Submit forms, reporting a post or comment, and the account security steps, Back was below Cancel. With VoiceOver, you had to swipe past the title and Next to reach it. Back is now right next to Cancel at the top of the screen. Swiping goes Cancel, Back, the title, then Next. Cancel stays in the same place on every step. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "doc.text",
+            tag: .improved,
+            title: "Better File Import for Blog Drafts",
+            description: "In Submit a Blog Post, Import File now works with plain text, Markdown, Rich Text, and web page files. A note under Import lists them. Web pages come in as readable text, not HTML tags, and links keep their addresses. Rich Text keeps its links too. Text files from older Windows and Mac apps now import instead of failing. Files that don't import well, like spreadsheets and code, can no longer be chosen. For a Word or Pages document, export it as Rich Text first, or copy the text and use Paste. Suggested directly."
+        ),
+        ChangeItem(
+            systemImage: "xmark.circle",
+            tag: .fixed,
+            title: "Cancel Works on Every Step of Submit a Blog Post",
+            description: "On the first and last steps of Submit a Blog Post, Cancel did nothing. Then, when you went Back to step 2, you were asked whether to discard your submission, even though you hadn't just chosen Cancel. Cancel now asks right away on every step. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "arrow.up.arrow.down",
+            tag: .improved,
+            title: "Your Email Comes After the Description in Bug Reports",
+            description: "In Submit a Bug Report, the email box sat between the title and the description. It now comes after the description, so the title and description are together. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "number",
+            tag: .improved,
+            title: "Clearer Help With Your Apple Feedback Number",
+            description: "In Submit a Bug Report, the note about the Apple Feedback number was hard to follow. It now explains that AppleVis only accepts bugs you've already reported to Apple, and where your number comes from. A new Open Feedback Assistant button takes you to Apple's website to report the bug. The note now comes before the box, so you hear it first. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "waveform",
+            tag: .improved,
+            title: "Submit a Podcast Says Which Audio Files Work",
+            description: "In Submit a Podcast, a note before Choose Audio File now says what AppleVis accepts: one MP3, M4A, or WAV file, up to 200 MB. Other formats can no longer be chosen. A file that's too large is caught when you choose it, not after you submit. This also applies to audio shared into AppleVis from another app. For a larger file, share it with a service like Dropbox, then send the link using Contact AppleVis. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "arrow.right.circle",
+            tag: .improved,
+            title: "In Submit an App, Next Replaces Review & Submit",
+            description: "On step 2 of Submit an App, the button was called Review & Submit, which sounded like it would send your submission. It only took you to the review step. It's now called Next, like the other forms, and its hint says it goes to step 3 so you can check everything first. Nothing is sent until you choose Submit on the review step. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "app.badge",
+            tag: .improved,
+            title: "Existing App Entries Open in the App",
+            description: "When you submit an app that may already be in the App Directory, the review step lists the matching app entries. Choosing one used to open the AppleVis website in a browser. It now opens the app entry's own page in the app, and when you go back, your submission is still there and VoiceOver returns to the entry you chose. Entries with a similar name can now be opened too, so you can check before continuing. Reported directly."
+        ),
+    ]
+
+    static let archivedFrom2026_17: [ChangeItem] = [
         ChangeItem(
             systemImage: "hand.thumbsup",
             tag: .new,
@@ -868,6 +1021,8 @@ struct HistorySection: Identifiable {
     let items: [ChangeItem]
 
     static let all: [HistorySection] = [
+        HistorySection(title: "Also in 2026.17", items: ChangeItem.archivedFrom2026_17),
+        HistorySection(title: "Also in 2026.16", items: ChangeItem.archivedFrom2026_16),
         HistorySection(title: "Also in 2026.15", items: ChangeItem.archivedFrom2026_15),
         HistorySection(title: "Also in 2026.14", items: ChangeItem.archivedFrom2026_14),
     ]

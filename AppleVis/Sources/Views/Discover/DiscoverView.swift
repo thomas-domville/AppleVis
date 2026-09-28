@@ -29,6 +29,9 @@ struct DiscoverView: View {
     @State private var searchResults: SearchResults?
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
+    /// The search text handed to Ask the Mouse, when the row above the
+    /// results is chosen.
+    @State private var mouseQuestion: MouseQuestion?
     @State private var showSubmitApp = false
     @State private var showSubmitBlog = false
     @State private var showSubmitBug = false
@@ -77,6 +80,22 @@ struct DiscoverView: View {
                             .padding(.horizontal)
                             .padding(.top, 8)
                         }
+                        if IntelligenceService.isAvailable {
+                            Button {
+                                mouseQuestion = MouseQuestion(text: searchText)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    MouseMascotView(pose: .searching, size: 28, style: .face)
+                                    Text("Ask the Mouse about “\(searchText)”")
+                                        .font(.subheadline)
+                                        .multilineTextAlignment(.leading)
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(.horizontal)
+                                .padding(.vertical, 10)
+                            }
+                            .accessibilityHint(String(localized: "The Mouse answers in plain words, using Help, guides, and the rest of AppleVis."))
+                        }
                         SearchResultsView(
                             results: searchResults, isSearching: isSearching,
                             onRetry: { runSearch(searchText) },
@@ -86,6 +105,9 @@ struct DiscoverView: View {
                 }
             }
             .navigationTitle("Discover")
+            .sheet(item: $mouseQuestion) { item in
+                AskTheMouseView(initialQuestion: item.text)
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink(destination: ProfileView()
@@ -183,11 +205,13 @@ struct DiscoverView: View {
             .navigationDestination(for: BugReport.self) { bug in
                 BugDetailView(bugId: bug.id)
             }
-            .sheet(isPresented: $showSubmitApp) { SubmitAppView() }
-            .sheet(isPresented: $showSubmitBlog) { SubmitBlogView() }
-            .sheet(isPresented: $showSubmitBug) { SubmitBugView() }
-            .sheet(isPresented: $showSubmitPodcast) { SubmitPodcastView() }
-            .sheet(isPresented: $showContact) { ContactView() }
+            // Closing a form (sent or cancelled) returns VoiceOver to the
+            // row that opened it, not the top of the screen. Reported directly.
+            .sheet(isPresented: $showSubmitApp, onDismiss: { restoreFocus(to: Self.contributeFocusID("square.grid.2x2")) }) { SubmitAppView() }
+            .sheet(isPresented: $showSubmitBlog, onDismiss: { restoreFocus(to: Self.contributeFocusID("newspaper")) }) { SubmitBlogView() }
+            .sheet(isPresented: $showSubmitBug, onDismiss: { restoreFocus(to: Self.contributeFocusID("ant")) }) { SubmitBugView() }
+            .sheet(isPresented: $showSubmitPodcast, onDismiss: { restoreFocus(to: Self.contributeFocusID("mic")) }) { SubmitPodcastView() }
+            .sheet(isPresented: $showContact, onDismiss: { restoreFocus(to: Self.contributeFocusID("envelope")) }) { ContactView() }
         }
     }
 
@@ -546,6 +570,8 @@ struct DiscoverView: View {
         }
     }
 
+    private static func contributeFocusID(_ icon: String) -> AnyHashable { AnyHashable("contribute.\(icon)") }
+
     private func contributeRow(_ title: String, icon: String, requiresSignIn: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack {
@@ -560,6 +586,7 @@ struct DiscoverView: View {
             }
             .padding()
         }
+        .accessibilityFocused($focusTarget, equals: Self.contributeFocusID(icon))
     }
 }
 
@@ -638,4 +665,9 @@ struct HubSectionHeader: View {
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
     }
+}
+
+private struct MouseQuestion: Identifiable {
+    let text: String
+    var id: String { text }
 }

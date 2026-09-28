@@ -1,0 +1,5 @@
+month.json
+hits.json
+__pycache__/
+month*.json
+misses.txt

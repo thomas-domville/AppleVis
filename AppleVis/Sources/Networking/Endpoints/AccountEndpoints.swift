@@ -23,9 +23,15 @@ struct AccountEndpoints {
     /// Signs in via Drupal's REST Simple Auth login endpoint, then resolves the
     /// account's JSON:API UUID and Drupal roles with follow-up requests — the
     /// login response itself does not include roles.
-    func signIn(username: String, password: String) async throws -> AuthUser {
-        struct Body: Encodable { let name: String; let pass: String }
-        let body = Body(name: username, pass: password)
+    ///
+    /// `rememberMe` is sent as the website's own "Remember me" field
+    /// (`persistent_login`). The site ignores it for app sign-ins today
+    /// (checked 2026-09-28; only its CAPTCHA-protected web form honours it),
+    /// but once it doesn't, the site keeps the member signed in itself and
+    /// AuthStore stops storing the password.
+    func signIn(username: String, password: String, rememberMe: Bool = false) async throws -> AuthUser {
+        struct Body: Encodable { let name: String; let pass: String; let persistent_login: Int? }
+        let body = Body(name: username, pass: password, persistent_login: rememberMe ? 1 : nil)
         let response: SignInResponse
         do {
             response = try await login(body: body)
@@ -111,6 +117,26 @@ struct AccountEndpoints {
             attributes: ["mail": AnyEncodable(newEmail)],
             headers: ["X-CSRF-Token": csrfToken]
         )
+    }
+
+    /// Whether the website still has this device signed in (Drupal core's
+    /// /user/login_status, which answers 1 or 0). Nil when it couldn't be
+    /// reached, so a network blip is never mistaken for being signed out.
+    func sessionIsActive() async -> Bool? {
+        guard let (data, status) = try? await client.rawGET("user/login_status", query: ["_format": "json"]),
+              status == 200 else { return nil }
+        let answer = String(decoding: data, as: UTF8.self).trimmingCharacters(in: CharacterSet(charactersIn: "\" \n\r\t"))
+        if answer == "1" { return true }
+        if answer == "0" { return false }
+        return nil
+    }
+
+    /// A fresh security token for the current session (Drupal core's
+    /// /session/token), for when the one saved at sign-in has gone stale.
+    func sessionToken() async -> String? {
+        guard let (data, status) = try? await client.rawGET("session/token"), status == 200 else { return nil }
+        let token = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        return token.isEmpty ? nil : token
     }
 
     private func login(body: some Encodable) async throws -> SignInResponse {

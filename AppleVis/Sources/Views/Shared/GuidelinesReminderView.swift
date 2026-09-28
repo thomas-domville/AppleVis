@@ -175,6 +175,14 @@ final class GuidelinesCheckState: ObservableObject {
     private var dismissedIds: Set<String> = []
     private var lastAnnouncedId: String?
     private var checkTask: Task<Void, Never>?
+    /// Second opinions already asked for, so typing on after a reminder
+    /// doesn't re-ask about the same draft.
+    private var opinionCache: [String: IntelligenceService.GuidelineSecondOpinion] = [:]
+
+    /// Settings > Intelligence > Smarter Guideline Reminders. On by default.
+    private static var secondOpinionEnabled: Bool {
+        UserDefaults.standard.object(forKey: "intel.guidelineSecondOpinion") as? Bool ?? true
+    }
 
     /// `isReply` — see `GuidelinesChecker.check(_:isReply:)`'s doc comment;
     /// forwarded as-is, defaulting to false (a new topic/post/entry).
@@ -188,15 +196,28 @@ final class GuidelinesCheckState: ObservableObject {
             try? await Task.sleep(for: .milliseconds(1500))
             guard !Task.isCancelled, let self else { return }
             var visible = GuidelinesChecker.check(text, isReply: isReply).filter { !self.dismissedIds.contains($0.id) }
-            // AI-assisted second pass — existed but was never called
-            // anywhere. Only runs when the rule-based check found nothing,
-            // matching its own doc comment ("only flags obvious violations
-            // the rules missed"), so a rule hit isn't delayed by an extra
-            // on-device model round-trip.
-            if visible.isEmpty && IntelligenceService.isAvailable {
-                let aiWarnings = await IntelligenceService.checkAgainstGuidelinesAI(text)
+            // Apple Intelligence second opinion (2026-09-27): the rules spot
+            // a possible issue, then the on-device model reads the whole
+            // draft and skips a reminder that clearly doesn't fit ("thanks
+            // for explaining it clearly!"). It can't add reminders, and the
+            // clear-cut rules (strong language, images, and so on) never get
+            // one. Used to ask the model to find problems on its own when
+            // the rules found none, which could invent reminders in
+            // untranslated wording. Requested directly.
+            if Self.secondOpinionEnabled && IntelligenceService.isAvailable && !visible.isEmpty {
+                var top: GuidelineWarning?
+                for warning in visible {
+                    guard !Task.isCancelled else { return }
+                    if warning.allowsSecondOpinion,
+                       let opinion = await self.opinion(on: warning, in: text),
+                       !opinion.isRealConcern {
+                        continue
+                    }
+                    top = warning
+                    break
+                }
                 guard !Task.isCancelled else { return }
-                visible = aiWarnings.filter { !self.dismissedIds.contains($0.id) }
+                visible = top.map { [$0] } ?? []
             }
             self.topWarning = visible.first
             if let top = visible.first, top.id != self.lastAnnouncedId {
@@ -204,6 +225,14 @@ final class GuidelinesCheckState: ObservableObject {
                 UIAccessibility.post(notification: .announcement, argument: String(localized: "Guideline reminder: \(String(localized: String.LocalizationValue(top.rule))). \(String(localized: String.LocalizationValue(top.message)))"))
             }
         }
+    }
+
+    private func opinion(on warning: GuidelineWarning, in text: String) async -> IntelligenceService.GuidelineSecondOpinion? {
+        let key = "\(warning.id)|\(text.hashValue)"
+        if let cached = opinionCache[key] { return cached }
+        let opinion = await IntelligenceService.secondOpinion(on: warning, in: text)
+        if let opinion { opinionCache[key] = opinion }
+        return opinion
     }
 
     func dismiss() {

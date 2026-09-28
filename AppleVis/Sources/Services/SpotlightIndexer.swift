@@ -68,4 +68,69 @@ enum SpotlightIndexer {
     static func index(_ bug: BugReport) {
         index(kind: .bugReport, id: bug.id, title: bug.title, contentDescription: "\(bug.platform.displayName) · \(bug.status.displayName) · \(bug.summary)", url: bug.url)
     }
+
+    // MARK: - Help, saved, and followed (2026-09-28)
+
+    private static let helpDomain = "help"
+    private static let helpIndexedVersionKey = "spotlight.helpIndexedVersion"
+
+    static func helpIdentifier(_ articleId: String) -> String { "applevis.help.\(articleId)" }
+
+    /// The Help article a Spotlight result points to, if it's one.
+    static func helpArticle(forIdentifier identifier: String) -> HelpArticle? {
+        let prefix = "applevis.help."
+        guard identifier.hasPrefix(prefix) else { return nil }
+        let id = String(identifier.dropFirst(prefix.count))
+        return MouseKnowledge.allHelpArticles.first { $0.id == id }
+    }
+
+    /// Puts every Help article in Spotlight, so searching iOS for "Trim
+    /// Silence" finds the article that explains it. Only redone when the
+    /// app's build changes, since Help only changes with an update. Kept
+    /// on sign-out: it's the app's own text, not anyone's history.
+    /// Requested directly.
+    static func indexHelpArticlesIfNeeded() {
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+        guard UserDefaults.standard.string(forKey: helpIndexedVersionKey) != build else { return }
+        let items = MouseKnowledge.allHelpArticles.map { article -> CSSearchableItem in
+            let attributes = CSSearchableItemAttributeSet(contentType: UTType.text)
+            attributes.title = article.title
+            attributes.contentDescription = article.summary
+            attributes.textContent = MouseKnowledge.helpArticleText(article)
+            attributes.keywords = ["AppleVis", "Help"]
+            return CSSearchableItem(uniqueIdentifier: helpIdentifier(article.id), domainIdentifier: helpDomain, attributeSet: attributes)
+        }
+        let index = CSSearchableIndex.default()
+        index.deleteSearchableItems(withDomainIdentifiers: [helpDomain]) { _ in
+            index.indexSearchableItems(items) { error in
+                if error == nil { UserDefaults.standard.set(build, forKey: helpIndexedVersionKey) }
+            }
+        }
+    }
+
+    /// Saved and followed items, so Spotlight finds them even if they were
+    /// saved or followed on another device and never opened on this one.
+    /// Uses the same identifiers as everything else, so tapping one opens
+    /// it in the app, and sign-out clears them with the rest.
+    @MainActor
+    static func indexSavedAndFollowed() {
+        let saved = PersistenceStore.shared.savedItems().map { item in
+            searchableItem(kind: item.kind, id: item.id, title: item.title,
+                           contentDescription: String(localized: "Saved in AppleVis"), url: nil)
+        }
+        let followed = PersistenceStore.shared.followedItems().map { item in
+            searchableItem(kind: item.kind, id: item.id, title: item.title,
+                           contentDescription: String(localized: "Followed in AppleVis"), url: item.url)
+        }
+        guard !(saved.isEmpty && followed.isEmpty) else { return }
+        CSSearchableIndex.default().indexSearchableItems(saved + followed)
+    }
+
+    private static func searchableItem(kind: ContentKind, id: String, title: String, contentDescription: String, url: String?) -> CSSearchableItem {
+        let attributes = CSSearchableItemAttributeSet(contentType: UTType.text)
+        attributes.title = title
+        attributes.contentDescription = contentDescription
+        if let url, let contentURL = URL(string: url) { attributes.contentURL = contentURL }
+        return CSSearchableItem(uniqueIdentifier: identifier(kind: kind, id: id), domainIdentifier: kind.rawValue, attributeSet: attributes)
+    }
 }

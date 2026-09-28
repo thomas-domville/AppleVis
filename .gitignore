@@ -27,3 +27,6 @@ xcuserdata/
 *.ipa
 *.dSYM.zip
 *.dSYM
+
+# Python
+__pycache__/

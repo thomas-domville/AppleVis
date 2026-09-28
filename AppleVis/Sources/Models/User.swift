@@ -4,9 +4,16 @@ struct AuthUser: Codable {
     let uid: String
     var uuid: String
     let name: String
-    let csrfToken: String
+    /// Replaced when the site hands out a fresh one (see
+    /// `AuthStore.recoverSession`).
+    var csrfToken: String
     let logoutToken: String
     var roles: [String]
+    /// When this sign-in happened. The website ends a session about 23 days
+    /// after sign-in (checked 2026-09-28), so the app checks with it once a
+    /// sign-in is older than that. Nil for sessions saved before this
+    /// existed, which are checked on the next open.
+    var signedInAt: Date? = nil
     /// The account's email on the AppleVis website, resolved from the same
     /// `user--user` JSON:API resource `resolveAccountDetails` already reads
     /// roles from. Nil for any session cached before this field existed
