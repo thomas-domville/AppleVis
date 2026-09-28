@@ -26,14 +26,14 @@ struct ContentKindTests {
 
     @Test("app entry pluralizes irregularly")
     func appEntryPluralization() {
-        #expect(ContentKind.appListing.displayNamePlural(1) == "app entry")
-        #expect(ContentKind.appListing.displayNamePlural(2) == "app entries")
-        #expect(ContentKind.appListing.displayNamePlural(18) == "app entries")
+        #expect(ContentKind.appListing.countPhrase(1) == "1 app entry")
+        #expect(ContentKind.appListing.countPhrase(2) == "2 app entries")
+        #expect(ContentKind.appListing.countPhrase(18) == "18 app entries")
     }
 
     @Test("other kinds pluralize with a trailing 's'")
     func regularPluralization() {
-        #expect(ContentKind.forumTopic.displayNamePlural(1) == "topic")
-        #expect(ContentKind.forumTopic.displayNamePlural(2) == "topics")
+        #expect(ContentKind.forumTopic.countPhrase(1) == "1 topic")
+        #expect(ContentKind.forumTopic.countPhrase(2) == "2 topics")
     }
 }

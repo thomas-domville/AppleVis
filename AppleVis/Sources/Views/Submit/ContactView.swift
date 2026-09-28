@@ -137,106 +137,142 @@ struct ContactView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if submitted {
-                    ThankYouView(
-                        icon: "envelope",
-                        heading: "Message sent!",
-                        message: "Thanks for getting in touch. We've received your message. We reply to urgent issues as soon as we can, and to other questions within one business day.",
-                        doneLabel: "Back to Profile",
-                        onDone: { dismiss() }
-                    ) {
-                        if isSignedIn, !emailSuggestionDismissed,
-                           AccountEmailUpdateSuggestion.applies(usedEmail: email, accountEmail: auth.user?.email) {
-                            AccountEmailUpdateSuggestion(isDismissed: $emailSuggestionDismissed, showEmailChangeWizard: $showAccountEmailChange)
-                        }
+            wizardContent
+                .navigationTitle("Contact AppleVis")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { toolbarContent }
+                .confirmationDialog(
+                    discardConfirmTitle,
+                    isPresented: $showDiscardConfirm,
+                    titleVisibility: .visible
+                ) {
+                    Button("Discard", role: .destructive) {
+                        SoundPlayer.shared.play(.screenClose)
+                        dismiss()
                     }
-                } else {
-                    Form {
-                        switch step {
-                        case .type:    typeSection
-                        case .details: detailsSection
-                        case .message: messageSection
-                        case .review:  reviewSection
-                        }
-                        if let error {
-                            Section { Text(error).foregroundStyle(.red) }
-                        }
-                    }
-                    // A fresh form per step, so each step opens scrolled to the top and
-                    // its heading exists for VoiceOver to land on. Kept the last step's
-                    // scroll position before, which could leave the heading unloaded.
-                    // Reported directly.
-                    .id(step)
-                    .themedList(preferences.colors)
+                    Button(step == .type ? "Keep Going" : "Keep Editing", role: .cancel) {}
+                } message: {
+                    Text(discardConfirmMessage)
                 }
-            }
-            .navigationTitle("Contact AppleVis")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if !submitted {
-                    // Previously showed "Back" (not "Cancel") on every step
-                    // past Contact Type, leaving no way to actually leave
-                    // the form from Details, Message, or Review without
-                    // stepping backward through every screen first. Cancel
-                    // now stays put regardless of step; step-backward
-                    // navigation moved to its own in-content button below,
-                    // matching Submit App/Blog/Bug/Podcast's existing
-                    // convention. Reported directly.
-                    // Back sits beside Cancel now, not in the step header, so VoiceOver
-                    // swipes Cancel, Back, title, Next. Reported directly.
-                    WizardLeadingToolbar(onCancel: requestCancel, onBack: step == .type ? nil : goBack)
-                    ToolbarItem(placement: .confirmationAction) {
-                        if step == .review {
-                            Button(isSubmitting ? "Sending…" : "Send Message") { Task { await submit() } }
-                                .disabled(!canSend)
-                                .accessibilityHint(networkMonitor.isConnected ? "" : String(localized: "You're offline. Reconnect to send this."))
+                .sheet(isPresented: $showAccountEmailChange) {
+                    AccountSecurityWizard(mode: .email, initialEmail: email)
+                }
+                .onAppear {
+                    if name.isEmpty { name = auth.user?.name ?? "" }
+                    // A signed-in user's account email is already known
+                    // (AuthUser.email) — no reason to make them retype it. A
+                    // signed-out guest gets their last-typed email back instead,
+                    // saved in submit() below, so returning guests don't have to
+                    // retype it either. Reported directly.
+                    if email.isEmpty {
+                        if isSignedIn {
+                            email = auth.user?.email ?? ""
                         } else {
-                            Button("Next") { goNext() }
-                                .disabled(!canGoNext)
+                            email = preferences.lastGuestEmail
                         }
                     }
+                    if contactType == nil { contactType = initialType }
+                    // Step 1 previously got no explicit focus at all — only
+                    // goNext()/goBack() ever called focusStepAfterTransition(),
+                    // so opening this wizard left VoiceOver focus on system
+                    // default (typically Cancel). Full app-wide focus audit,
+                    // requested directly.
+                    focusStepAfterTransition()
                 }
-            }
-            .confirmationDialog(
-                step == .type ? "Cancel contact?" : "Discard this message?",
-                isPresented: $showDiscardConfirm,
-                titleVisibility: .visible
+        }
+    }
+
+    // Broken out of `body` into smaller named pieces — a single giant
+    // NavigationStack + Group/if-else + toolbar + confirmationDialog
+    // expression here triggered a Swift type-checker crash ("failed to
+    // produce diagnostic for expression"), reproduced identically across
+    // every wizard sharing this shell (AccountSecurityWizard,
+    // ReportCommentWizard, SubmitAppView/BlogView/BugView/PodcastView).
+    // Splitting the view tree into smaller expressions keeps each one
+    // small enough for the compiler.
+    @ViewBuilder
+    private var wizardContent: some View {
+        if submitted {
+            ThankYouView(
+                icon: "envelope",
+                heading: "Message sent!",
+                message: "Thanks for getting in touch. We've received your message. We reply to urgent issues as soon as we can, and to other questions within one business day.",
+                doneLabel: "Back to Profile",
+                onDone: { dismiss() }
             ) {
-                Button("Discard", role: .destructive) {
-                    SoundPlayer.shared.play(.screenClose)
-                    dismiss()
+                if isSignedIn, !emailSuggestionDismissed,
+                   AccountEmailUpdateSuggestion.applies(usedEmail: email, accountEmail: auth.user?.email) {
+                    AccountEmailUpdateSuggestion(isDismissed: $emailSuggestionDismissed, showEmailChangeWizard: $showAccountEmailChange)
                 }
-                Button(step == .type ? "Keep Going" : "Keep Editing", role: .cancel) {}
-            } message: {
-                Text(step == .type ? "Your selections will be discarded." : "Your contact support message will be discarded.")
             }
-            .sheet(isPresented: $showAccountEmailChange) {
-                AccountSecurityWizard(mode: .email, initialEmail: email)
-            }
-            .onAppear {
-                if name.isEmpty { name = auth.user?.name ?? "" }
-                // A signed-in user's account email is already known
-                // (AuthUser.email) — no reason to make them retype it. A
-                // signed-out guest gets their last-typed email back instead,
-                // saved in submit() below, so returning guests don't have to
-                // retype it either. Reported directly.
-                if email.isEmpty {
-                    if isSignedIn {
-                        email = auth.user?.email ?? ""
-                    } else {
-                        email = preferences.lastGuestEmail
-                    }
+        } else {
+            Form {
+                switch step {
+                case .type:    typeSection
+                case .details: detailsSection
+                case .message: messageSection
+                case .review:  reviewSection
                 }
-                if contactType == nil { contactType = initialType }
-                // Step 1 previously got no explicit focus at all — only
-                // goNext()/goBack() ever called focusStepAfterTransition(),
-                // so opening this wizard left VoiceOver focus on system
-                // default (typically Cancel). Full app-wide focus audit,
-                // requested directly.
-                focusStepAfterTransition()
+                if let error {
+                    Section { Text(error).foregroundStyle(.red) }
+                }
+            }
+            // A fresh form per step, so each step opens scrolled to the top and
+            // its heading exists for VoiceOver to land on. Kept the last step's
+            // scroll position before, which could leave the heading unloaded.
+            // Reported directly.
+            .id(step)
+            .themedList(preferences.colors)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        if !submitted {
+            // Previously showed "Back" (not "Cancel") on every step
+            // past Contact Type, leaving no way to actually leave
+            // the form from Details, Message, or Review without
+            // stepping backward through every screen first. Cancel
+            // now stays put regardless of step; step-backward
+            // navigation moved to its own in-content button below,
+            // matching Submit App/Blog/Bug/Podcast's existing
+            // convention. Reported directly.
+            // Back sits beside Cancel now, not in the step header, so VoiceOver
+            // swipes Cancel, Back, title, Next. Reported directly.
+            WizardLeadingToolbar(onCancel: requestCancel, onBack: backAction)
+            ToolbarItem(placement: .confirmationAction) {
+                confirmationActionButton
             }
         }
+    }
+
+    private var backAction: (() -> Void)? {
+        if step == .type {
+            return nil
+        }
+        return goBack
+    }
+
+    @ViewBuilder
+    private var confirmationActionButton: some View {
+        if step == .review {
+            Button(isSubmitting ? "Sending…" : "Send Message") { Task { await submit() } }
+                .disabled(!canSend)
+                .accessibilityHint(networkMonitor.isConnected ? "" : String(localized: "You're offline. Reconnect to send this."))
+        } else {
+            Button("Next") { goNext() }
+                .disabled(!canGoNext)
+        }
+    }
+
+    private var discardConfirmTitle: String {
+        step == .type ? String(localized: "Cancel contact?") : String(localized: "Discard this message?")
+    }
+
+    private var discardConfirmMessage: String {
+        step == .type
+            ? String(localized: "Your selections will be discarded.")
+            : String(localized: "Your contact support message will be discarded.")
     }
 
     private var canGoNext: Bool {

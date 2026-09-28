@@ -91,68 +91,11 @@ struct SubmitPodcastView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if submitted {
-                    ThankYouView(
-                        icon: "mic",
-                        heading: "You did it — thanks!",
-                        message: "Your podcast has been sent to our team. Thank you for sharing it. We'll let you know when it's ready to appear on AppleVis.",
-                        doneLabel: "Done",
-                        onDone: { dismiss() }
-                    )
-                } else if !auth.isSignedIn {
-                    signInRequiredView
-                } else {
-                    Form {
-                        switch step {
-                        case .audio:  audioSection
-                        case .review: reviewSection
-                        }
-                        if let error {
-                            Section {
-                                Text(error)
-                                    .foregroundStyle(.red)
-                                    .accessibilityAddTraits(.isHeader)
-                                    .accessibilityFocused($isErrorFocused)
-                            }
-                        }
-                    }
-                    // A fresh form per step, so each step opens scrolled to the top and
-                    // its heading exists for VoiceOver to land on. Kept the last step's
-                    // scroll position before, which could leave the heading unloaded.
-                    // Reported directly.
-                    .id(step)
-                    .themedList(preferences.colors)
-                }
-            }
-            .navigationTitle("Submit a Podcast")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if !submitted {
-                // Previously showed "Back" (not "Cancel") on Review, leaving
-                // no way to actually leave the wizard from that step without
-                // stepping backward first. Cancel now stays put regardless
-                // of step; step-backward navigation moved to its own
-                // in-content button below, matching Submit App/Blog/Bug's
-                // existing convention. Reported directly.
-                // Back sits beside Cancel now, not in the step header, so VoiceOver
-                // swipes Cancel, Back, title, Next. Reported directly.
-                WizardLeadingToolbar(onCancel: requestCancel, onBack: step == .audio ? nil : goBack)
-                if auth.isSignedIn {
-                    ToolbarItem(placement: .confirmationAction) {
-                        if step == .review {
-                            Button("Submit") { Task { await submit() } }
-                                .disabled(isSubmitting || !networkMonitor.isConnected)
-                                .accessibilityHint(networkMonitor.isConnected ? "" : String(localized: "You're offline. Reconnect to submit this."))
-                        } else {
-                            Button("Next") { goNext() }
-                                .disabled(!audioValid)
-                        }
-                    }
-                }
-                }
-            }
-            .fileImporter(isPresented: $showFileImporter, allowedContentTypes: Self.importableAudioTypes, onCompletion: handleFileImport)
+            wizardContent
+                .navigationTitle("Submit a Podcast")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { toolbarContent }
+                .fileImporter(isPresented: $showFileImporter, allowedContentTypes: Self.importableAudioTypes, onCompletion: handleFileImport)
         }
         .sheet(isPresented: $showSignIn) {
             SignInView()
@@ -181,6 +124,88 @@ struct SubmitPodcastView: View {
                 toast.error(problem)
             }
             focusStepAfterTransition()
+        }
+    }
+
+    // Broken out of `body` into smaller named pieces — a single giant
+    // NavigationStack + Group/if-else + toolbar expression here triggered a
+    // Swift type-checker crash ("failed to produce diagnostic for
+    // expression"), reproduced identically across every wizard sharing this
+    // shell (AccountSecurityWizard, ContactView, ReportCommentWizard,
+    // SubmitAppView/BlogView/BugView). Splitting the view tree into smaller
+    // expressions keeps each one small enough for the compiler.
+    @ViewBuilder
+    private var wizardContent: some View {
+        if submitted {
+            ThankYouView(
+                icon: "mic",
+                heading: "You did it — thanks!",
+                message: "Your podcast has been sent to our team. Thank you for sharing it. We'll let you know when it's ready to appear on AppleVis.",
+                doneLabel: "Done",
+                onDone: { dismiss() }
+            )
+        } else if !auth.isSignedIn {
+            signInRequiredView
+        } else {
+            Form {
+                switch step {
+                case .audio:  audioSection
+                case .review: reviewSection
+                }
+                if let error {
+                    Section {
+                        Text(error)
+                            .foregroundStyle(.red)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityFocused($isErrorFocused)
+                    }
+                }
+            }
+            // A fresh form per step, so each step opens scrolled to the top and
+            // its heading exists for VoiceOver to land on. Kept the last step's
+            // scroll position before, which could leave the heading unloaded.
+            // Reported directly.
+            .id(step)
+            .themedList(preferences.colors)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        if !submitted {
+            // Previously showed "Back" (not "Cancel") on Review, leaving
+            // no way to actually leave the wizard from that step without
+            // stepping backward first. Cancel now stays put regardless
+            // of step; step-backward navigation moved to its own
+            // in-content button below, matching Submit App/Blog/Bug's
+            // existing convention. Reported directly.
+            // Back sits beside Cancel now, not in the step header, so VoiceOver
+            // swipes Cancel, Back, title, Next. Reported directly.
+            WizardLeadingToolbar(onCancel: requestCancel, onBack: backAction)
+            if auth.isSignedIn {
+                ToolbarItem(placement: .confirmationAction) {
+                    confirmationActionButton
+                }
+            }
+        }
+    }
+
+    private var backAction: (() -> Void)? {
+        if step == .audio {
+            return nil
+        }
+        return goBack
+    }
+
+    @ViewBuilder
+    private var confirmationActionButton: some View {
+        if step == .review {
+            Button("Submit") { Task { await submit() } }
+                .disabled(isSubmitting || !networkMonitor.isConnected)
+                .accessibilityHint(networkMonitor.isConnected ? "" : String(localized: "You're offline. Reconnect to submit this."))
+        } else {
+            Button("Next") { goNext() }
+                .disabled(!audioValid)
         }
     }
 

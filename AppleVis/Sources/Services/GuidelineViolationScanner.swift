@@ -261,7 +261,7 @@ final class GuidelineViolationScanner: ObservableObject {
         let cutoff = Calendar.current.date(byAdding: .day, value: -range.days, to: Date()) ?? Date()
 
         let progress: @Sendable (Int) -> Void = { [weak self] count in
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 guard let self, self.currentScanId == scanId else { return }
                 self.itemsCheckedSoFar += count
             }

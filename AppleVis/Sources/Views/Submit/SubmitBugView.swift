@@ -102,74 +102,10 @@ struct SubmitBugView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if submitted {
-                    ThankYouView(
-                        icon: "ladybug",
-                        heading: "You did it — thanks!",
-                        message: "Your report has been sent to our team. Thank you for helping make apps more accessible for everyone.",
-                        doneLabel: "Done",
-                        onDone: { dismiss() }
-                    ) {
-                        if !emailSuggestionDismissed,
-                           AccountEmailUpdateSuggestion.applies(usedEmail: email, accountEmail: auth.user?.email) {
-                            AccountEmailUpdateSuggestion(isDismissed: $emailSuggestionDismissed, showEmailChangeWizard: $showAccountEmailChange)
-                        }
-                    }
-                } else if !auth.isSignedIn {
-                    signInRequiredView
-                } else {
-                    Form {
-                        switch step {
-                        case .description: descriptionSection
-                        case .bugInfo:     bugInfoSection
-                        case .review:      reviewSection
-                        }
-                        if let error {
-                            Section {
-                                Text(error)
-                                    .foregroundStyle(.red)
-                                    .accessibilityAddTraits(.isHeader)
-                                    .accessibilityFocused($isErrorFocused)
-                            }
-                        }
-                    }
-                    // A fresh form per step, so each step opens scrolled to the top and
-                    // its heading exists for VoiceOver to land on. Kept the last step's
-                    // scroll position before, which could leave the heading unloaded.
-                    // Reported directly.
-                    .id(step)
-                    .themedList(preferences.colors)
-                }
-            }
-            .navigationTitle("Submit a Bug Report")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if !submitted {
-                // Previously showed "Back" (not "Cancel") on every step past
-                // Describe the Bug, leaving no way to actually leave the
-                // wizard from Environment or Review without stepping
-                // backward through every screen first. Cancel now stays put
-                // regardless of step; step-backward navigation moved to its
-                // own in-content button below, matching Submit App/Blog's
-                // existing convention. Reported directly.
-                // Back sits beside Cancel now, not in the step header, so VoiceOver
-                // swipes Cancel, Back, title, Next. Reported directly.
-                WizardLeadingToolbar(onCancel: requestCancel, onBack: step == .description ? nil : goBack)
-                if auth.isSignedIn {
-                    ToolbarItem(placement: .confirmationAction) {
-                        if step == .review {
-                            Button("Submit") { Task { await submit() } }
-                                .disabled(isSubmitting || !networkMonitor.isConnected)
-                                .accessibilityHint(networkMonitor.isConnected ? "" : String(localized: "You're offline. Reconnect to submit this."))
-                        } else {
-                            Button("Next") { goNext() }
-                                .disabled(step == .description ? !descriptionValid : !bugInfoValid)
-                        }
-                    }
-                }
-                }
-            }
+            wizardContent
+                .navigationTitle("Submit a Bug Report")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { toolbarContent }
         }
         .sheet(isPresented: $showSignIn) {
             SignInView()
@@ -200,6 +136,95 @@ struct SubmitBugView: View {
                 email = acctEmail
             }
             focusStepAfterTransition()
+        }
+    }
+
+    // Broken out of `body` into smaller named pieces — a single giant
+    // NavigationStack + Group/if-else + toolbar expression here triggered a
+    // Swift type-checker crash ("failed to produce diagnostic for
+    // expression"), reproduced identically across every wizard sharing this
+    // shell (AccountSecurityWizard, ContactView, ReportCommentWizard,
+    // SubmitAppView/BlogView/PodcastView). Splitting the view tree into
+    // smaller expressions keeps each one small enough for the compiler.
+    @ViewBuilder
+    private var wizardContent: some View {
+        if submitted {
+            ThankYouView(
+                icon: "ladybug",
+                heading: "You did it — thanks!",
+                message: "Your report has been sent to our team. Thank you for helping make apps more accessible for everyone.",
+                doneLabel: "Done",
+                onDone: { dismiss() }
+            ) {
+                if !emailSuggestionDismissed,
+                   AccountEmailUpdateSuggestion.applies(usedEmail: email, accountEmail: auth.user?.email) {
+                    AccountEmailUpdateSuggestion(isDismissed: $emailSuggestionDismissed, showEmailChangeWizard: $showAccountEmailChange)
+                }
+            }
+        } else if !auth.isSignedIn {
+            signInRequiredView
+        } else {
+            Form {
+                switch step {
+                case .description: descriptionSection
+                case .bugInfo:     bugInfoSection
+                case .review:      reviewSection
+                }
+                if let error {
+                    Section {
+                        Text(error)
+                            .foregroundStyle(.red)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityFocused($isErrorFocused)
+                    }
+                }
+            }
+            // A fresh form per step, so each step opens scrolled to the top and
+            // its heading exists for VoiceOver to land on. Kept the last step's
+            // scroll position before, which could leave the heading unloaded.
+            // Reported directly.
+            .id(step)
+            .themedList(preferences.colors)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        if !submitted {
+            // Previously showed "Back" (not "Cancel") on every step past
+            // Describe the Bug, leaving no way to actually leave the
+            // wizard from Environment or Review without stepping
+            // backward through every screen first. Cancel now stays put
+            // regardless of step; step-backward navigation moved to its
+            // own in-content button below, matching Submit App/Blog's
+            // existing convention. Reported directly.
+            // Back sits beside Cancel now, not in the step header, so VoiceOver
+            // swipes Cancel, Back, title, Next. Reported directly.
+            WizardLeadingToolbar(onCancel: requestCancel, onBack: backAction)
+            if auth.isSignedIn {
+                ToolbarItem(placement: .confirmationAction) {
+                    confirmationActionButton
+                }
+            }
+        }
+    }
+
+    private var backAction: (() -> Void)? {
+        if step == .description {
+            return nil
+        }
+        return goBack
+    }
+
+    @ViewBuilder
+    private var confirmationActionButton: some View {
+        if step == .review {
+            Button("Submit") { Task { await submit() } }
+                .disabled(isSubmitting || !networkMonitor.isConnected)
+                .accessibilityHint(networkMonitor.isConnected ? "" : String(localized: "You're offline. Reconnect to submit this."))
+        } else {
+            Button("Next") { goNext() }
+                .disabled(step == .description ? !descriptionValid : !bugInfoValid)
         }
     }
 

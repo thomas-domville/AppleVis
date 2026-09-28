@@ -253,7 +253,7 @@ final class APIClient {
     /// it, so nothing they wrote is lost. Reported directly (2026-09-28): a
     /// beta tester's app submission failed while the app still looked
     /// signed in.
-    private func sendWithSessionRecovery<T>(_ request: URLRequest, send: (URLRequest) async throws -> T) async throws -> T {
+    private nonisolated func sendWithSessionRecovery<T>(_ request: URLRequest, send: (URLRequest) async throws -> T) async throws -> T {
         do {
             return try await send(request)
         } catch let error as APIError where (error == .forbidden || error == .unauthorized)
@@ -296,7 +296,7 @@ final class APIClient {
 
     /// `sideEffects: false` for writes that go through
     /// `sendWithSessionRecovery`, which decides for itself what a refusal means.
-    private func perform<T: Decodable>(request: URLRequest, sideEffects: Bool = true) async throws -> T {
+    private nonisolated func perform<T: Decodable>(request: URLRequest, sideEffects: Bool = true) async throws -> T {
         do {
             let (data, response) = try await session.data(for: request)
             try validateStatus(response, sideEffects: sideEffects)
@@ -318,7 +318,7 @@ final class APIClient {
     /// Same as `perform`, but decodes with `rawDecoder` (no snake_case→camelCase
     /// key conversion) — used for JSON:API responses whose dictionary keys are
     /// Drupal field names that must be looked up verbatim.
-    private func performRaw<T: Decodable>(request: URLRequest, sideEffects: Bool = true) async throws -> T {
+    private nonisolated func performRaw<T: Decodable>(request: URLRequest, sideEffects: Bool = true) async throws -> T {
         do {
             let (data, response) = try await session.data(for: request)
             try validateStatus(response, sideEffects: sideEffects)
@@ -340,7 +340,7 @@ final class APIClient {
         }
     }
 
-    private func validateStatus(_ response: URLResponse, sideEffects: Bool = true) throws {
+    private nonisolated func validateStatus(_ response: URLResponse, sideEffects: Bool = true) throws {
         guard let http = response as? HTTPURLResponse else { return }
         switch http.statusCode {
         case 200...299: return

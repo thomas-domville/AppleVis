@@ -374,7 +374,7 @@ enum CommentBundle: String {
     }
 }
 
-struct EmptyJSONAPIResponse: Decodable {}
+nonisolated struct EmptyJSONAPIResponse: Decodable {}
 
 // MARK: - Text helpers (mirror src/services/api.ts textFromHtml/decodeHtml)
 
@@ -386,12 +386,12 @@ enum HTMLText {
     // `String.strippingHTMLTags()`. No `(unsafe)` needed — NSRegularExpression
     // is Sendable.
     nonisolated private static let numericEntityRegex = try? NSRegularExpression(pattern: "&#([0-9]+);")
-    private static let scriptTagRegex = try? NSRegularExpression(pattern: "<script[\\s\\S]*?</script>")
-    private static let styleTagRegex = try? NSRegularExpression(pattern: "<style[\\s\\S]*?</style>")
-    private static let anyTagRegex = try? NSRegularExpression(pattern: "<[^>]+>")
-    private static let whitespaceRunRegex = try? NSRegularExpression(pattern: "\\s+")
+    nonisolated private static let scriptTagRegex = try? NSRegularExpression(pattern: "<script[\\s\\S]*?</script>")
+    nonisolated private static let styleTagRegex = try? NSRegularExpression(pattern: "<style[\\s\\S]*?</style>")
+    nonisolated private static let anyTagRegex = try? NSRegularExpression(pattern: "<[^>]+>")
+    nonisolated private static let whitespaceRunRegex = try? NSRegularExpression(pattern: "\\s+")
 
-    private static func replace(_ regex: NSRegularExpression?, in text: String, with template: String) -> String {
+    nonisolated private static func replace(_ regex: NSRegularExpression?, in text: String, with template: String) -> String {
         guard let regex else { return text }
         let range = NSRange(text.startIndex..., in: text)
         return regex.stringByReplacingMatches(in: text, range: range, withTemplate: template)
@@ -430,7 +430,7 @@ enum HTMLText {
         return result
     }
 
-    static func plainText(fromHTML html: String) -> String {
+    nonisolated static func plainText(fromHTML html: String) -> String {
         var text = html
         text = replace(scriptTagRegex, in: text, with: " ")
         text = replace(styleTagRegex, in: text, with: " ")

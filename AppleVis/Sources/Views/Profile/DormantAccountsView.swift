@@ -54,8 +54,8 @@ final class DormantAccountStore: ObservableObject {
     /// accounts): 10 minutes found almost nothing, while 30 minutes found 6
     /// bursts totalling 34 accounts, the largest 19 on one afternoon, which
     /// looks like a spam wave. Requested directly.
-    static let burstGap: TimeInterval = 30 * 60
-    static let burstMinimum = 3
+    nonisolated static let burstGap: TimeInterval = 30 * 60
+    nonisolated static let burstMinimum = 3
 
     nonisolated static func markBursts(_ accounts: [DormantAccount]) -> [DormantAccount] {
         let sorted = accounts.sorted { $0.createdAt < $1.createdAt }

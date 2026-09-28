@@ -341,112 +341,19 @@ struct SubmitAppView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if submitted {
-                    // Of the seven ThankYouView completions, this is the one
-                    // genuine milestone — a new listing headed for the
-                    // directory, not a routine message send — so it's the
-                    // only one that earns the bigger confetti flourish on
-                    // top of the shared bounce every wizard now gets.
-                    ThankYouView(
-                        icon: "app.badge",
-                        heading: "You did it — thanks!",
-                        message: "Your submission has been sent to our team. Thank you for describing this app's accessibility. We'll let you know when it's ready to appear in the directory.",
-                        doneLabel: "Done",
-                        onDone: { dismiss() }
-                    )
-                    .overlay {
-                        if !reduceMotion {
-                            ConfettiView()
-                        }
-                    }
-                } else if !auth.isSignedIn {
-                    signInRequiredView
-                } else if !hasAgreedToBeforeYouBegin {
-                    beforeYouBeginView
-                } else {
-                    Form {
-                        switch step {
-                        case .search:
-                            searchSection
-                        case .details:
-                            switch platform {
-                            case .tvos:    tvDetailsSection
-                            case .watchos: watchDetailsSection
-                            case .macos:   macDetailsSection
-                            case .ios:     detailsSection
-                            }
-                        case .review:
-                            switch platform {
-                            case .tvos:    tvReviewSection
-                            case .watchos: watchReviewSection
-                            case .macos:   macReviewSection
-                            case .ios:     reviewSection
-                            }
-                            if !networkMonitor.isConnected {
-                                Section {
-                                    OfflineComposeNotice()
-                                }
-                                .listRowSeparator(.hidden)
-                            }
-                        }
-                        if let error {
-                            Section {
-                                Text(error)
-                                    .foregroundStyle(.red)
-                                    .accessibilityAddTraits(.isHeader)
-                                    .accessibilityFocused($isErrorFocused)
-                            }
-                        }
-                    }
-                    // A fresh form per step, so each step opens scrolled to the top and
-                    // its heading exists for VoiceOver to land on. Kept the last step's
-                    // scroll position before, which could leave the heading unloaded.
-                    // Reported directly.
-                    .id(step)
-                    .themedList(preferences.colors)
+            wizardContent
+                .navigationTitle("Submit an App")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { toolbarContent }
+                .confirmationDialog(
+                    "Discard this submission?",
+                    isPresented: $showDiscardConfirm, titleVisibility: .visible
+                ) {
+                    Button("Discard", role: .destructive) { SoundPlayer.shared.play(.screenClose); dismiss() }
+                    Button("Keep Editing", role: .cancel) {}
+                } message: {
+                    Text("Your progress will be discarded.")
                 }
-            }
-            .navigationTitle("Submit an App")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if !submitted {
-                // Previously showed "Back" (not "Cancel") on every step past
-                // search, leaving no way to actually leave the wizard from
-                // Details or Review without stepping backward through every
-                // screen first. Cancel now stays put regardless of step;
-                // step-backward navigation moved to its own in-content
-                // button below, matching the Welcome Tour's existing Back
-                // convention. Reported directly.
-                // Back sits beside Cancel now, not in the step header, so VoiceOver
-                // swipes Cancel, Back, title, Next. Reported directly.
-                WizardLeadingToolbar(onCancel: requestCancel, onBack: step == .search ? nil : goBack)
-                if auth.isSignedIn && hasAgreedToBeforeYouBegin {
-                    ToolbarItem(placement: .confirmationAction) {
-                        if step == .review {
-                            Button("Submit") { Task { await submit() } }
-                                .disabled(!isValid || isSubmitting || !exactDuplicateMatches.isEmpty || !networkMonitor.isConnected)
-                                .accessibilityHint(networkMonitor.isConnected ? "" : String(localized: "You're offline. Reconnect to submit this."))
-                        } else if step == .details {
-                            // Was "Review & Submit", which sounded like it would send.
-                            // It only opens the review step. Reported directly.
-                            Button("Next") { goNext() }
-                                .disabled(!isValid)
-                                .accessibilityHint(String(localized: "Goes to step 3, where you can check everything before you submit."))
-                        }
-                    }
-                }
-                }
-            }
-            .confirmationDialog(
-                "Discard this submission?",
-                isPresented: $showDiscardConfirm, titleVisibility: .visible
-            ) {
-                Button("Discard", role: .destructive) { SoundPlayer.shared.play(.screenClose); dismiss() }
-                Button("Keep Editing", role: .cancel) {}
-            } message: {
-                Text("Your progress will be discarded.")
-            }
         }
         .sheet(isPresented: $showSignIn) { SignInView() }
         .communityAgreementGate(showCommunityAgreement: $showCommunityAgreement, showSignIn: $showSignIn)
@@ -459,6 +366,125 @@ struct SubmitAppView: View {
             // straight to a later step. Full app-wide focus audit,
             // requested directly.
             focusStepAfterTransition()
+        }
+    }
+
+    // Broken out of `body` into smaller named pieces — a single giant
+    // NavigationStack + Group/if-else + toolbar + confirmationDialog
+    // expression here triggered a Swift type-checker crash ("failed to
+    // produce diagnostic for expression"), reproduced identically across
+    // every wizard sharing this shell (AccountSecurityWizard, ContactView,
+    // ReportCommentWizard, SubmitBlogView/BugView/PodcastView). Splitting
+    // the view tree into smaller expressions keeps each one small enough
+    // for the compiler.
+    @ViewBuilder
+    private var wizardContent: some View {
+        if submitted {
+            // Of the seven ThankYouView completions, this is the one
+            // genuine milestone — a new listing headed for the
+            // directory, not a routine message send — so it's the
+            // only one that earns the bigger confetti flourish on
+            // top of the shared bounce every wizard now gets.
+            ThankYouView(
+                icon: "app.badge",
+                heading: "You did it — thanks!",
+                message: "Your submission has been sent to our team. Thank you for describing this app's accessibility. We'll let you know when it's ready to appear in the directory.",
+                doneLabel: "Done",
+                onDone: { dismiss() }
+            )
+            .overlay {
+                if !reduceMotion {
+                    ConfettiView()
+                }
+            }
+        } else if !auth.isSignedIn {
+            signInRequiredView
+        } else if !hasAgreedToBeforeYouBegin {
+            beforeYouBeginView
+        } else {
+            Form {
+                switch step {
+                case .search:
+                    searchSection
+                case .details:
+                    switch platform {
+                    case .tvos:    tvDetailsSection
+                    case .watchos: watchDetailsSection
+                    case .macos:   macDetailsSection
+                    case .ios:     detailsSection
+                    }
+                case .review:
+                    switch platform {
+                    case .tvos:    tvReviewSection
+                    case .watchos: watchReviewSection
+                    case .macos:   macReviewSection
+                    case .ios:     reviewSection
+                    }
+                    if !networkMonitor.isConnected {
+                        Section {
+                            OfflineComposeNotice()
+                        }
+                        .listRowSeparator(.hidden)
+                    }
+                }
+                if let error {
+                    Section {
+                        Text(error)
+                            .foregroundStyle(.red)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityFocused($isErrorFocused)
+                    }
+                }
+            }
+            // A fresh form per step, so each step opens scrolled to the top and
+            // its heading exists for VoiceOver to land on. Kept the last step's
+            // scroll position before, which could leave the heading unloaded.
+            // Reported directly.
+            .id(step)
+            .themedList(preferences.colors)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        if !submitted {
+            // Previously showed "Back" (not "Cancel") on every step past
+            // search, leaving no way to actually leave the wizard from
+            // Details or Review without stepping backward through every
+            // screen first. Cancel now stays put regardless of step;
+            // step-backward navigation moved to its own in-content
+            // button below, matching the Welcome Tour's existing Back
+            // convention. Reported directly.
+            // Back sits beside Cancel now, not in the step header, so VoiceOver
+            // swipes Cancel, Back, title, Next. Reported directly.
+            WizardLeadingToolbar(onCancel: requestCancel, onBack: backAction)
+            if auth.isSignedIn && hasAgreedToBeforeYouBegin {
+                ToolbarItem(placement: .confirmationAction) {
+                    confirmationActionButton
+                }
+            }
+        }
+    }
+
+    private var backAction: (() -> Void)? {
+        if step == .search {
+            return nil
+        }
+        return goBack
+    }
+
+    @ViewBuilder
+    private var confirmationActionButton: some View {
+        if step == .review {
+            Button("Submit") { Task { await submit() } }
+                .disabled(!isValid || isSubmitting || !exactDuplicateMatches.isEmpty || !networkMonitor.isConnected)
+                .accessibilityHint(networkMonitor.isConnected ? "" : String(localized: "You're offline. Reconnect to submit this."))
+        } else if step == .details {
+            // Was "Review & Submit", which sounded like it would send.
+            // It only opens the review step. Reported directly.
+            Button("Next") { goNext() }
+                .disabled(!isValid)
+                .accessibilityHint(String(localized: "Goes to step 3, where you can check everything before you submit."))
         }
     }
 

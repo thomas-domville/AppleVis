@@ -126,79 +126,22 @@ struct SubmitBlogView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if submitted {
-                    ThankYouView(
-                        icon: "doc.text",
-                        heading: "You did it — thanks!",
-                        message: "Your draft has been sent to our editorial team. Thank you for writing for AppleVis. We'll be in touch soon with our decision.",
-                        doneLabel: "Done",
-                        onDone: { dismiss() }
-                    ) {
-                        if !emailSuggestionDismissed,
-                           AccountEmailUpdateSuggestion.applies(usedEmail: email, accountEmail: auth.user?.email) {
-                            AccountEmailUpdateSuggestion(isDismissed: $emailSuggestionDismissed, showEmailChangeWizard: $showAccountEmailChange)
-                        }
-                    }
-                } else if !auth.isSignedIn {
-                    signInRequiredView
-                } else {
-                    Form {
-                        switch step {
-                        case .details: detailsSection
-                        case .content: contentSection
-                        case .review:  reviewSection
-                        }
-                        if let error {
-                            Section {
-                                Text(error)
-                                    .foregroundStyle(.red)
-                                    .accessibilityAddTraits(.isHeader)
-                                    .accessibilityFocused($isErrorFocused)
-                            }
-                        }
-                    }
-                    // A fresh form per step, so each step opens scrolled to the top and
-                    // its heading exists for VoiceOver to land on. Kept the last step's
-                    // scroll position before, which could leave the heading unloaded.
-                    // Reported directly.
-                    .id(step)
-                    .themedList(preferences.colors)
+            wizardContent
+                .navigationTitle("Submit a Blog Post")
+                .navigationBarTitleDisplayMode(.inline)
+                // Was attached to step 2 only, so Cancel on step 1 or the review
+                // step did nothing until Back reached step 2, where the stored
+                // question suddenly appeared. Reported directly.
+                .confirmationDialog(
+                    "Discard this submission?",
+                    isPresented: $showDiscardConfirm, titleVisibility: .visible
+                ) {
+                    Button("Discard", role: .destructive) { SoundPlayer.shared.play(.screenClose); dismiss() }
+                    Button("Keep Editing", role: .cancel) {}
+                } message: {
+                    Text("Your progress will be discarded.")
                 }
-            }
-            .navigationTitle("Submit a Blog Post")
-            .navigationBarTitleDisplayMode(.inline)
-            // Was attached to step 2 only, so Cancel on step 1 or the review
-            // step did nothing until Back reached step 2, where the stored
-            // question suddenly appeared. Reported directly.
-            .confirmationDialog(
-                "Discard this submission?",
-                isPresented: $showDiscardConfirm, titleVisibility: .visible
-            ) {
-                Button("Discard", role: .destructive) { SoundPlayer.shared.play(.screenClose); dismiss() }
-                Button("Keep Editing", role: .cancel) {}
-            } message: {
-                Text("Your progress will be discarded.")
-            }
-            .toolbar {
-                if !submitted {
-                // Back sits beside Cancel now, not in the step header, so VoiceOver
-                // swipes Cancel, Back, title, Next. Reported directly.
-                WizardLeadingToolbar(onCancel: requestCancel, onBack: step == .details ? nil : goBack)
-                if auth.isSignedIn {
-                    ToolbarItem(placement: .confirmationAction) {
-                        if step == .review {
-                            Button("Submit") { Task { await submit() } }
-                                .disabled(isSubmitting || !networkMonitor.isConnected)
-                                .accessibilityHint(networkMonitor.isConnected ? "" : String(localized: "You're offline. Reconnect to submit this."))
-                        } else {
-                            Button("Next") { goNext() }
-                                .disabled(step == .details ? !detailsValid : !contentValid)
-                        }
-                    }
-                }
-                }
-            }
+                .toolbar { toolbarContent }
         }
         .sheet(isPresented: $showSignIn) {
             SignInView()
@@ -220,6 +163,89 @@ struct SubmitBlogView: View {
                 email = acctEmail
             }
             focusStepAfterTransition()
+        }
+    }
+
+    // Broken out of `body` into smaller named pieces — a single giant
+    // NavigationStack + Group/if-else + toolbar + confirmationDialog
+    // expression here triggered a Swift type-checker crash ("failed to
+    // produce diagnostic for expression"), reproduced identically across
+    // every wizard sharing this shell (AccountSecurityWizard, ContactView,
+    // ReportCommentWizard, SubmitAppView/BugView/PodcastView). Splitting the
+    // view tree into smaller expressions keeps each one small enough for
+    // the compiler.
+    @ViewBuilder
+    private var wizardContent: some View {
+        if submitted {
+            ThankYouView(
+                icon: "doc.text",
+                heading: "You did it — thanks!",
+                message: "Your draft has been sent to our editorial team. Thank you for writing for AppleVis. We'll be in touch soon with our decision.",
+                doneLabel: "Done",
+                onDone: { dismiss() }
+            ) {
+                if !emailSuggestionDismissed,
+                   AccountEmailUpdateSuggestion.applies(usedEmail: email, accountEmail: auth.user?.email) {
+                    AccountEmailUpdateSuggestion(isDismissed: $emailSuggestionDismissed, showEmailChangeWizard: $showAccountEmailChange)
+                }
+            }
+        } else if !auth.isSignedIn {
+            signInRequiredView
+        } else {
+            Form {
+                switch step {
+                case .details: detailsSection
+                case .content: contentSection
+                case .review:  reviewSection
+                }
+                if let error {
+                    Section {
+                        Text(error)
+                            .foregroundStyle(.red)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityFocused($isErrorFocused)
+                    }
+                }
+            }
+            // A fresh form per step, so each step opens scrolled to the top and
+            // its heading exists for VoiceOver to land on. Kept the last step's
+            // scroll position before, which could leave the heading unloaded.
+            // Reported directly.
+            .id(step)
+            .themedList(preferences.colors)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        if !submitted {
+            // Back sits beside Cancel now, not in the step header, so VoiceOver
+            // swipes Cancel, Back, title, Next. Reported directly.
+            WizardLeadingToolbar(onCancel: requestCancel, onBack: backAction)
+            if auth.isSignedIn {
+                ToolbarItem(placement: .confirmationAction) {
+                    confirmationActionButton
+                }
+            }
+        }
+    }
+
+    private var backAction: (() -> Void)? {
+        if step == .details {
+            return nil
+        }
+        return goBack
+    }
+
+    @ViewBuilder
+    private var confirmationActionButton: some View {
+        if step == .review {
+            Button("Submit") { Task { await submit() } }
+                .disabled(isSubmitting || !networkMonitor.isConnected)
+                .accessibilityHint(networkMonitor.isConnected ? "" : String(localized: "You're offline. Reconnect to submit this."))
+        } else {
+            Button("Next") { goNext() }
+                .disabled(step == .details ? !detailsValid : !contentValid)
         }
     }
 

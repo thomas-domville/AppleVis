@@ -156,97 +156,122 @@ struct ReportCommentWizard: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if submitted {
-                    ThankYouView(
-                        icon: "flag",
-                        heading: "Report sent!",
-                        message: String(localized: "Thanks for helping keep AppleVis welcoming. The editorial team will review this \(displayedSubjectKind.lowercased()) and follow up by email if needed."),
-                        doneLabel: "Done",
-                        onDone: { dismiss() }
-                    ) {
-                        if isSignedIn, !emailSuggestionDismissed,
-                           AccountEmailUpdateSuggestion.applies(usedEmail: email, accountEmail: auth.user?.email) {
-                            AccountEmailUpdateSuggestion(isDismissed: $emailSuggestionDismissed, showEmailChangeWizard: $showAccountEmailChange)
-                        }
-                    }
-                } else {
-                    Form {
-                        switch step {
-                        case .reason:  reasonSection
-                        case .details: detailsSection
-                        case .review:  reviewSection
-                        }
-                        if let error {
-                            Section { Text(error).foregroundStyle(.red) }
-                        }
-                    }
-                    // A fresh form per step, so each step opens scrolled to the top and
-                    // its heading exists for VoiceOver to land on. Kept the last step's
-                    // scroll position before, which could leave the heading unloaded.
-                    // Reported directly.
-                    .id(step)
-                    .themedList(preferences.colors)
+            wizardContent
+                .navigationTitle(navigationTitleText)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { toolbarContent }
+                .disabled(isSubmitting)
+                .confirmationDialog(
+                    "Discard this report?", isPresented: $showDiscardConfirm, titleVisibility: .visible
+                ) {
+                    Button("Discard", role: .destructive) { dismiss() }
+                    Button("Keep Going", role: .cancel) {}
+                } message: {
+                    Text("Your report will not be sent.")
                 }
-            }
-            .navigationTitle(navigationTitleText)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if !submitted {
-                    // Previously showed "Back" (not "Cancel") on every step
-                    // past Reason, leaving no way to actually leave the
-                    // wizard from Details or Review without stepping
-                    // backward first. Cancel now stays put regardless of
-                    // step; step-backward navigation moved to its own
-                    // in-content button below, matching every other
-                    // wizard's convention. Reported directly.
-                    // Back sits beside Cancel now, not in the step header, so VoiceOver
-                    // swipes Cancel, Back, title, Next. Reported directly.
-                    WizardLeadingToolbar(cancelHint: String(localized: "Cancels and closes this report."), onCancel: requestCancel, onBack: step == .reason ? nil : goBack)
-                    ToolbarItem(placement: .confirmationAction) {
-                        if step == .review {
-                            Button(isSubmitting ? "Sending…" : "Send Report") { Task { await submit() } }
-                                .disabled(!canSend)
+                .sheet(isPresented: $showAccountEmailChange) {
+                    AccountSecurityWizard(mode: .email, initialEmail: email)
+                }
+                .onAppear {
+                    if name.isEmpty { name = auth.user?.name ?? "" }
+                    // A signed-in user's account email is already known
+                    // (AuthUser.email) — no reason to make them retype it. A
+                    // signed-out guest gets their last-typed email back instead,
+                    // saved in submit() below, so returning guests don't have to
+                    // retype it either. Matches the same fix in ContactView.
+                    if email.isEmpty {
+                        if isSignedIn {
+                            email = auth.user?.email ?? ""
                         } else {
-                            Button("Next") { goNext() }
-                                .disabled(!canGoNext)
+                            email = preferences.lastGuestEmail
                         }
                     }
+                    // Step 1 previously got no explicit focus at all — only
+                    // goNext()/goBack() ever called focusStepAfterTransition(),
+                    // so opening this wizard left VoiceOver focus on system
+                    // default (typically Cancel). Full app-wide focus audit,
+                    // requested directly.
+                    focusStepAfterTransition()
                 }
-            }
-            .disabled(isSubmitting)
-            .confirmationDialog(
-                "Discard this report?", isPresented: $showDiscardConfirm, titleVisibility: .visible
+        }
+    }
+
+    // Broken out of `body` into smaller named pieces — a single giant
+    // NavigationStack + Group/if-else + toolbar + confirmationDialog
+    // expression here triggered a Swift type-checker crash ("failed to
+    // produce diagnostic for expression"), reproduced identically across
+    // every wizard sharing this shell (AccountSecurityWizard, ContactView,
+    // SubmitAppView/BlogView/BugView/PodcastView). Splitting the view tree
+    // into smaller expressions keeps each one small enough for the compiler.
+    @ViewBuilder
+    private var wizardContent: some View {
+        if submitted {
+            ThankYouView(
+                icon: "flag",
+                heading: "Report sent!",
+                message: String(localized: "Thanks for helping keep AppleVis welcoming. The editorial team will review this \(displayedSubjectKind.lowercased()) and follow up by email if needed."),
+                doneLabel: "Done",
+                onDone: { dismiss() }
             ) {
-                Button("Discard", role: .destructive) { dismiss() }
-                Button("Keep Going", role: .cancel) {}
-            } message: {
-                Text("Your report will not be sent.")
-            }
-            .sheet(isPresented: $showAccountEmailChange) {
-                AccountSecurityWizard(mode: .email, initialEmail: email)
-            }
-            .onAppear {
-                if name.isEmpty { name = auth.user?.name ?? "" }
-                // A signed-in user's account email is already known
-                // (AuthUser.email) — no reason to make them retype it. A
-                // signed-out guest gets their last-typed email back instead,
-                // saved in submit() below, so returning guests don't have to
-                // retype it either. Matches the same fix in ContactView.
-                if email.isEmpty {
-                    if isSignedIn {
-                        email = auth.user?.email ?? ""
-                    } else {
-                        email = preferences.lastGuestEmail
-                    }
+                if isSignedIn, !emailSuggestionDismissed,
+                   AccountEmailUpdateSuggestion.applies(usedEmail: email, accountEmail: auth.user?.email) {
+                    AccountEmailUpdateSuggestion(isDismissed: $emailSuggestionDismissed, showEmailChangeWizard: $showAccountEmailChange)
                 }
-                // Step 1 previously got no explicit focus at all — only
-                // goNext()/goBack() ever called focusStepAfterTransition(),
-                // so opening this wizard left VoiceOver focus on system
-                // default (typically Cancel). Full app-wide focus audit,
-                // requested directly.
-                focusStepAfterTransition()
             }
+        } else {
+            Form {
+                switch step {
+                case .reason:  reasonSection
+                case .details: detailsSection
+                case .review:  reviewSection
+                }
+                if let error {
+                    Section { Text(error).foregroundStyle(.red) }
+                }
+            }
+            // A fresh form per step, so each step opens scrolled to the top and
+            // its heading exists for VoiceOver to land on. Kept the last step's
+            // scroll position before, which could leave the heading unloaded.
+            // Reported directly.
+            .id(step)
+            .themedList(preferences.colors)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        if !submitted {
+            // Previously showed "Back" (not "Cancel") on every step
+            // past Reason, leaving no way to actually leave the
+            // wizard from Details or Review without stepping
+            // backward first. Cancel now stays put regardless of
+            // step; step-backward navigation moved to its own
+            // in-content button below, matching every other
+            // wizard's convention. Reported directly.
+            // Back sits beside Cancel now, not in the step header, so VoiceOver
+            // swipes Cancel, Back, title, Next. Reported directly.
+            WizardLeadingToolbar(cancelHint: String(localized: "Cancels and closes this report."), onCancel: requestCancel, onBack: backAction)
+            ToolbarItem(placement: .confirmationAction) {
+                confirmationActionButton
+            }
+        }
+    }
+
+    private var backAction: (() -> Void)? {
+        if step == .reason {
+            return nil
+        }
+        return goBack
+    }
+
+    @ViewBuilder
+    private var confirmationActionButton: some View {
+        if step == .review {
+            Button(isSubmitting ? "Sending…" : "Send Report") { Task { await submit() } }
+                .disabled(!canSend)
+        } else {
+            Button("Next") { goNext() }
+                .disabled(!canGoNext)
         }
     }
 

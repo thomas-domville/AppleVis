@@ -353,7 +353,7 @@ private struct AppHealthFlagRow: View {
     /// Only what actually differs, e.g. "Version 3.4 on the App Store, 3.2
     /// on AppleVis. Description".
     private var outdatedText: String {
-        flag.outdatedFields.map(Self.summary).joined(separator: ". ")
+        flag.outdatedFields.map { Self.summary($0) }.joined(separator: ". ")
     }
 
     private static func summary(_ field: AppHealthFlag.OutdatedField) -> String {

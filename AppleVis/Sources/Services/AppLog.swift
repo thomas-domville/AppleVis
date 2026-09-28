@@ -6,7 +6,7 @@ import os
 /// failure had no trace to debug from, in DEBUG or Release. `os.Logger`
 /// output shows up in Console.app/sysdiagnose without needing print()
 /// left in Release builds, and categories let it be filtered per subsystem.
-enum AppLog {
+nonisolated enum AppLog {
     static let sync = Logger(subsystem: "com.applevis.AppleVisSwift", category: "sync")
     static let auth = Logger(subsystem: "com.applevis.AppleVisSwift", category: "auth")
     static let persistence = Logger(subsystem: "com.applevis.AppleVisSwift", category: "persistence")

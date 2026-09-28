@@ -139,87 +139,131 @@ struct AccountSecurityWizard: View {
         }
     }
 
+    // Pre-resolved for the same reason as PasswordStrength.label/Mode.title
+    // above — an inline ternary of localized strings here previously
+    // triggered a Swift type-checker crash ("failed to produce diagnostic
+    // for expression") inside the surrounding ThankYouView(...) call.
+    private var thankYouHeading: String {
+        mode == .password ? "Password updated!" : "Email address updated!"
+    }
+
+    private var thankYouMessage: String {
+        mode == .password
+            ? String(localized: "Your AppleVis password has been changed. You'll need it the next time you sign in on another device.")
+            : String(localized: "Your AppleVis account email has been updated to \(newEmail).")
+    }
+
+    private var discardConfirmMessage: String {
+        mode == .password
+            ? String(localized: "Your password change will be discarded.")
+            : String(localized: "Your email change will be discarded.")
+    }
+
     var body: some View {
         NavigationStack {
-            Group {
-                if submitted {
-                    ThankYouView(
-                        icon: mode.icon,
-                        heading: mode == .password ? "Password updated!" : "Email address updated!",
-                        message: mode == .password
-                            ? String(localized: "Your AppleVis password has been changed. You'll need it the next time you sign in on another device.")
-                            : String(localized: "Your AppleVis account email has been updated to \(newEmail)."),
-                        doneLabel: "Done",
-                        onDone: { dismiss() }
-                    )
-                } else {
-                    Form {
-                        switch step {
-                        case .verify:   verifySection
-                        case .newValue: newValueSection
-                        case .review:   reviewSection
-                        }
-                        if let error {
-                            Section {
-                                Text(error)
-                                    .foregroundStyle(.red)
-                                    .accessibilityFocused($isErrorFocused)
-                            }
-                        }
+            wizardContent
+                .navigationTitle(mode.title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { toolbarContent }
+                .disabled(isSubmitting)
+                .confirmationDialog(
+                    "Discard changes?", isPresented: $showDiscardConfirm, titleVisibility: .visible
+                ) {
+                    Button("Discard", role: .destructive) { dismiss() }
+                    Button("Keep Editing", role: .cancel) {}
+                } message: {
+                    Text(discardConfirmMessage)
+                }
+                // Step 1 previously got no explicit focus at all — only
+                // goNext()/goBack() ever called focusStepAfterTransition(), so
+                // opening this wizard left VoiceOver focus on system default
+                // (typically Cancel). Full app-wide focus audit, requested
+                // directly.
+                .task {
+                    if mode == .email, newEmail.isEmpty, let initialEmail {
+                        newEmail = initialEmail
                     }
-                    // A fresh form per step, so each step opens scrolled to the top and
-                    // its heading exists for VoiceOver to land on. Kept the last step's
-                    // scroll position before, which could leave the heading unloaded.
-                    // Reported directly.
-                    .id(step)
-                    .themedList(preferences.colors)
+                    focusStepAfterTransition()
                 }
-            }
-            .navigationTitle(mode.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if !submitted {
-                    // Previously showed "Back" (not "Cancel") on every step
-                    // past Confirm Your Password, leaving no way to actually
-                    // leave the wizard from New Value or Review without
-                    // stepping backward first. Cancel now stays put
-                    // regardless of step; step-backward navigation moved to
-                    // its own in-content button below, matching every other
-                    // wizard's convention. Reported directly.
-                    // Back sits beside Cancel now, not in the step header, so VoiceOver
-                    // swipes Cancel, Back, title, Next. Reported directly.
-                    WizardLeadingToolbar(onCancel: requestCancel, onBack: step == .verify ? nil : goBack)
-                    ToolbarItem(placement: .confirmationAction) {
-                        if step == .review {
-                            Button(isSubmitting ? "Saving…" : "Save Changes") { Task { await submit() } }
-                                .disabled(isSubmitting)
-                        } else {
-                            Button("Next") { goNext() }
-                                .disabled(!canGoNext)
-                        }
+        }
+    }
+
+    // Broken out of `body` into its own computed property (along with
+    // `toolbarContent` below and the `thankYouHeading`/`thankYouMessage`/
+    // `discardConfirmMessage` properties above) after a single giant `body`
+    // expression here — NavigationStack + Group/if-else + toolbar +
+    // confirmationDialog all chained together — triggered a Swift
+    // type-checker crash ("failed to produce diagnostic for expression").
+    // Splitting the view tree into smaller named pieces keeps each
+    // individual expression small enough for the compiler.
+    @ViewBuilder
+    private var wizardContent: some View {
+        if submitted {
+            ThankYouView(
+                icon: mode.icon,
+                heading: thankYouHeading,
+                message: thankYouMessage,
+                doneLabel: "Done",
+                onDone: { dismiss() }
+            )
+        } else {
+            Form {
+                switch step {
+                case .verify:   verifySection
+                case .newValue: newValueSection
+                case .review:   reviewSection
+                }
+                if let error {
+                    Section {
+                        Text(error)
+                            .foregroundStyle(.red)
+                            .accessibilityFocused($isErrorFocused)
                     }
                 }
             }
-            .disabled(isSubmitting)
-            .confirmationDialog(
-                "Discard changes?", isPresented: $showDiscardConfirm, titleVisibility: .visible
-            ) {
-                Button("Discard", role: .destructive) { dismiss() }
-                Button("Keep Editing", role: .cancel) {}
-            } message: {
-                Text(mode == .password ? String(localized: "Your password change will be discarded.") : String(localized: "Your email change will be discarded."))
+            // A fresh form per step, so each step opens scrolled to the top and
+            // its heading exists for VoiceOver to land on. Kept the last step's
+            // scroll position before, which could leave the heading unloaded.
+            // Reported directly.
+            .id(step)
+            .themedList(preferences.colors)
+        }
+    }
+
+    private var backAction: (() -> Void)? {
+        if step == .verify {
+            return nil
+        }
+        return goBack
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        if !submitted {
+            // Previously showed "Back" (not "Cancel") on every step
+            // past Confirm Your Password, leaving no way to actually
+            // leave the wizard from New Value or Review without
+            // stepping backward first. Cancel now stays put
+            // regardless of step; step-backward navigation moved to
+            // its own in-content button below, matching every other
+            // wizard's convention. Reported directly.
+            // Back sits beside Cancel now, not in the step header, so VoiceOver
+            // swipes Cancel, Back, title, Next. Reported directly.
+            WizardLeadingToolbar(onCancel: requestCancel, onBack: backAction)
+            ToolbarItem(placement: .confirmationAction) {
+                confirmationActionButton
             }
-            // Step 1 previously got no explicit focus at all — only
-            // goNext()/goBack() ever called focusStepAfterTransition(), so
-            // opening this wizard left VoiceOver focus on system default
-            // (typically Cancel). Full app-wide focus audit, requested
-            // directly.
-            .task {
-                if mode == .email, newEmail.isEmpty, let initialEmail {
-                    newEmail = initialEmail
-                }
-                focusStepAfterTransition()
-            }
+        }
+    }
+
+    @ViewBuilder
+    private var confirmationActionButton: some View {
+        if step == .review {
+            Button(isSubmitting ? "Saving…" : "Save Changes") { Task { await submit() } }
+                .disabled(isSubmitting)
+        } else {
+            Button("Next") { goNext() }
+                .disabled(!canGoNext)
         }
     }
 
