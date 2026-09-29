@@ -154,6 +154,14 @@ struct AppEntryHealthCheckView: View {
             } else if scanner.scannedAppCount > 0 {
                 Section {
                     VStack(alignment: .leading, spacing: 4) {
+                        // When nothing's found, the message is part of the
+                        // summary VoiceOver lands on after a scan, so it's
+                        // heard straight away rather than one swipe further
+                        // down. Reported directly (2026-09-28).
+                        if scanner.flags.isEmpty {
+                            Text("Nothing flagged — every entry matches the App Store.")
+                                .fontWeight(.semibold)
+                        }
                         HStack {
                             Text("\(scanner.scannedAppCount) apps checked")
                             Spacer()
@@ -175,12 +183,7 @@ struct AppEntryHealthCheckView: View {
                     .accessibilityFocused($isStatusFocused)
                 }
 
-                if scanner.flags.isEmpty {
-                    Section {
-                        Text("Nothing flagged — every entry matches the App Store.")
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
+                if !scanner.flags.isEmpty {
                     // One section per kind of problem, most urgent first:
                     // removed apps usually need action; title changes are
                     // usually a quick refresh; minor differences can wait.

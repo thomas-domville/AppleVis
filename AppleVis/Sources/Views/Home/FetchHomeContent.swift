@@ -28,6 +28,11 @@ struct FetchHomeContent: View {
     @ObservedObject private var listener = FetchListener.shared
     @ObservedObject private var store = FetchStore.shared
     @AppStorage("fetch.markReadAtEnd") private var markReadAtEnd = false
+    /// One focus for all of Fetch: a heading ("heading.<id>"), a preview
+    /// ("preview.<id>"), a comment (its id), the header, or All Caught Up.
+    /// Shared so marking something read can move VoiceOver on to what's
+    /// next, even in another item.
+    @AccessibilityFocusState private var focus: String?
 
     private var groups: [FetchListener.Group] {
         vm.newItems.map { FetchListener.Group(item: $0, newCount: vm.newReplyCount(for: $0), isBrandNew: vm.isBrandNew($0)) }
@@ -35,20 +40,27 @@ struct FetchHomeContent: View {
 
     var body: some View {
         header
+            .id(FetchHeadingsRotor.headerID)
             .listRowSeparator(.hidden)
             .modifier(FetchMagicTap(groups: groups))
+            .modifier(FetchHeadingsRotor(groups: groups))
 
         if vm.newItems.isEmpty {
             caughtUp
                 .listRowSeparator(.hidden)
         } else {
             ForEach(groups, id: \.item.id) { group in
-                FetchGroupRows(group: group, isFinished: store.finishedIds.contains(group.item.id), isBeingRead: listener.currentItemId == group.item.id) {
-                    if markReadAtEnd { store.finishedIds.insert(group.item.id) }
-                } onMarkRead: {
-                    vm.markAsRead(group.item)
-                }
+                FetchGroupRows(
+                    group: group,
+                    isFinished: store.finishedIds.contains(group.item.id),
+                    isBeingRead: listener.currentItemId == group.item.id,
+                    onReachedEnd: { if markReadAtEnd { store.finishedIds.insert(group.item.id) } },
+                    onMarkRead: { markRead(group) },
+                    focus: $focus,
+                    onMarkReadThrough: { comment, content in markRead(group, through: comment, in: content) }
+                )
                 .modifier(FetchMagicTap(groups: groups))
+                .modifier(FetchHeadingsRotor(groups: groups))
             }
         }
     }
@@ -68,6 +80,7 @@ struct FetchHomeContent: View {
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityElement(children: .combine)
+                .accessibilityFocused($focus, equals: FetchHeadingsRotor.headerID)
             }
 
             listenControls
@@ -162,8 +175,77 @@ struct FetchHomeContent: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
         .accessibilityElement(children: .combine)
+        .accessibilityFocused($focus, equals: Self.caughtUpID)
     }
 
+    // MARK: Marking read
+
+    private static let caughtUpID = "fetch.caughtUp"
+
+    /// The whole item: it leaves Fetch, and VoiceOver moves to the next
+    /// item's heading (or the one before, or All Caught Up), instead of
+    /// losing its place when the item disappears. Requested directly.
+    private func markRead(_ group: FetchListener.Group) {
+        let target = focusTarget(replacing: group.item)
+        store.finishedIds.remove(group.item.id)
+        vm.markAsRead(group.item)
+        moveFocus(to: target)
+    }
+
+    /// "Mark Read Up to Here": this comment and the ones before it are
+    /// read; newer ones stay, and VoiceOver moves to the first of them.
+    /// On the last comment, the whole item is read. Kept on this device,
+    /// like all read status. Requested directly.
+    private func markRead(_ group: FetchListener.Group, through comment: FetchComment, in content: FetchContent) {
+        guard let index = content.comments.firstIndex(where: { $0.id == comment.id }) else { return }
+        let remaining = content.comments.count - index - 1
+        guard remaining > 0 else { markRead(group); return }
+        let shownCount = group.isBrandNew ? group.item.commentCount : group.newCount
+        store.keepNewest(remaining, of: group.item, from: shownCount)
+        vm.markRead(group.item, leavingUnread: remaining)
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "Marked as read. \(String(localized: "\(remaining) new comments")) left."))
+        moveFocus(to: content.comments[index + 1].id)
+    }
+
+    private func focusTarget(replacing item: FeedItem) -> String {
+        let ids = groups.map(\.item.id)
+        guard let index = ids.firstIndex(of: item.id) else { return Self.caughtUpID }
+        if index + 1 < ids.count { return "heading.\(ids[index + 1])" }
+        if index > 0 { return "heading.\(ids[index - 1])" }
+        return Self.caughtUpID
+    }
+
+    private func moveFocus(to target: String) {
+        // Cleared first: the row that had focus is gone, and the helper
+        // stops if focus still names somewhere else.
+        focus = nil
+        Task { await retryAccessibilityFocus(target, into: $focus, delaysMs: [450, 750, 1100]) }
+    }
+}
+
+/// VoiceOver's Headings rotor only finds headings that have been built, and
+/// Home's list only builds rows near the screen, so an item further down
+/// Fetch couldn't be reached by heading until you'd swiped close to it.
+/// While VoiceOver is anywhere in Fetch, this Headings rotor lists every
+/// item, on screen or not, and moves straight to it. Home's other views
+/// keep the usual Headings rotor. Reported directly (2026-09-28).
+private struct FetchHeadingsRotor: ViewModifier {
+    let groups: [FetchListener.Group]
+    static let headerID = "fetch.header"
+
+    static func headingID(_ item: FeedItem) -> String { "fetch.heading.\(item.id)" }
+
+    func body(content: Content) -> some View {
+        content.accessibilityRotor(.headings) {
+            AccessibilityRotorEntry(String(localized: "Fetch"), id: Self.headerID)
+            ForEach(groups, id: \.item.id) { group in
+                AccessibilityRotorEntry(
+                    FetchText.heading(group.item, newCount: group.newCount, isBrandNew: group.isBrandNew),
+                    id: Self.headingID(group.item)
+                )
+            }
+        }
+    }
 }
 
 /// Magic Tap (two-finger double tap) plays and pauses Listen to Fetch from
@@ -215,13 +297,14 @@ private struct FetchGroupRows: View {
     let isBeingRead: Bool
     let onReachedEnd: () -> Void
     let onMarkRead: () -> Void
+    /// Fetch's shared focus. Also the row VoiceOver returns to after coming
+    /// back from the page it opened.
+    let focus: AccessibilityFocusState<String?>.Binding
+    let onMarkReadThrough: (FetchComment, FetchContent) -> Void
 
     @ObservedObject private var store = FetchStore.shared
     @State private var showsOriginal = false
     @State private var replyingTo: FetchComment?
-    /// The row VoiceOver returns to after coming back from the page it
-    /// opened: "heading", "preview", or a comment's id.
-    @AccessibilityFocusState private var focusedRow: String?
 
     private var item: FeedItem { group.item }
     /// A brand-new item's comments are all new to you.
@@ -229,6 +312,7 @@ private struct FetchGroupRows: View {
 
     var body: some View {
         headingRow
+            .id(FetchHeadingsRotor.headingID(item))
             .task { await store.load(item, newCount: commentCount) }
             .sheet(item: $replyingTo) { comment in
                 replySheet(for: comment)
@@ -278,18 +362,18 @@ private struct FetchGroupRows: View {
         NavigationLink {
             FetchDestination(target: target)
                 .onDisappear {
-                    Task { await retryAccessibilityFocus(into: $focusedRow, returningTo: rowId) }
+                    Task { await retryAccessibilityFocus(into: focus, returningTo: rowId) }
                 }
         } label: {
             label()
         }
-        .accessibilityFocused($focusedRow, equals: rowId)
+        .accessibilityFocused(focus, equals: rowId)
     }
 
     // MARK: Rows
 
     private var headingRow: some View {
-        link(item.fetchTarget, rowId: "heading") {
+        link(item.fetchTarget, rowId: "heading.\(item.id)") {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(item.kind.displayName)
@@ -334,9 +418,14 @@ private struct FetchGroupRows: View {
         // unpublished item leaves Fetch.
         .contentActions(
             id: item.contentId, entityId: item.nid ?? 0, kind: item.kind, title: item.title,
-            lastActivityAt: item.lastActivityAt, url: item.fetchURL, currentCommentCount: item.commentCount,
+            lastActivityAt: item.lastActivityAt, url: item.fetchURL,
             authorId: loadedContent?.authorId, onContentDeleted: onMarkRead
-        )
+        ) {
+            Button(action: onMarkRead) {
+                Label("Mark as Read", systemImage: "checkmark.circle")
+            }
+            .accessibilityHidden(true)
+        }
     }
 
     private var loadedContent: FetchContent? {
@@ -345,7 +434,7 @@ private struct FetchGroupRows: View {
     }
 
     private func previewRow(_ content: FetchContent) -> some View {
-        link(item.fetchTarget, rowId: "preview") {
+        link(item.fetchTarget, rowId: "preview.\(item.id)") {
             VStack(alignment: .leading, spacing: 4) {
                 Text(content.preview)
                     .font(.body)
@@ -408,6 +497,7 @@ private struct FetchGroupRows: View {
         .modifier(FetchCommentActions(
             comment: comment, item: item,
             onReply: { replyingTo = comment },
+            onMarkReadThrough: { if let content = loadedContent { onMarkReadThrough(comment, content) } },
             onRemoved: { store.removeComment(comment.id, item: item, newCount: commentCount) },
             onEdited: { store.updateComment(comment.id, newText: $0, item: item, newCount: commentCount) }
         ))
@@ -441,6 +531,8 @@ private struct FetchCommentActions: ViewModifier {
     let comment: FetchComment
     let item: FeedItem
     let onReply: () -> Void
+    /// "Mark Read Up to Here": this comment and the ones before it.
+    let onMarkReadThrough: () -> Void
     let onRemoved: () -> Void
     let onEdited: (String) -> Void
 
@@ -461,6 +553,7 @@ private struct FetchCommentActions: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .accessibilityAction(named: Text("Mark Read Up to Here")) { onMarkReadThrough() }
             .modifier(ConditionalAccessibilityAction(isActive: auth.isSignedIn, name: "Reply to this Comment") { onReply() })
             .accessibilityAction(named: Text("Copy Comment Text")) { copyText() }
             .accessibilityAction(named: Text("Share Comment")) { share() }
@@ -469,6 +562,11 @@ private struct FetchCommentActions: ViewModifier {
             .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Unpublish Comment") { showUnpublishConfirm = true })
             .modifier(ConditionalAccessibilityAction(isActive: canEdit, name: "Delete Comment") { showDeleteConfirm = true })
             .voiceOverAwareSwipeActions {
+                Button(action: onMarkReadThrough) {
+                    Label("Mark Read Up to Here", systemImage: "checkmark.circle")
+                }
+                .tint(.green)
+            } trailing: {
                 if auth.isSignedIn {
                     Button(action: onReply) {
                         Label("Reply to this Comment", systemImage: "arrowshape.turn.up.left")
@@ -477,6 +575,9 @@ private struct FetchCommentActions: ViewModifier {
                 }
             }
             .contextMenu {
+                Button(action: onMarkReadThrough) {
+                    Label("Mark Read Up to Here", systemImage: "checkmark.circle")
+                }
                 if auth.isSignedIn {
                     Button(action: onReply) {
                         Label("Reply to this Comment", systemImage: "arrowshape.turn.up.left")

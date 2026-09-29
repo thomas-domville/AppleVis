@@ -654,7 +654,11 @@ struct SubmitAppView: View {
         payload.appName = meta.appName
         payload.appVersion = meta.version
         payload.category = meta.category
-        payload.osVersion = meta.minimumOsVersion
+        // The site's "iOS Version" field is the iOS the app was tested on
+        // (checked live, 2026-09-28: members enter 26.6.1, 27.0, and so on),
+        // not the App Store's minimum, which this used to fill in.
+        // Reported directly.
+        payload.osVersion = UIDevice.current.systemVersion
         payload.appStoreDescription = meta.appStoreDescription
         // Pre-selects the devices this app actually supports, per the App
         // Store listing — a helpful default, not a claim about which ones
@@ -748,6 +752,12 @@ struct SubmitAppView: View {
                     ForEach([AppPlatform.ios, .macos, .tvos, .watchos]) { Text(LocalizedStringKey($0.displayName)).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                // One adjustable item for VoiceOver. A segmented picker otherwise
+                // exposes each segment separately ("All, 1 of 4, selected"), so the
+                // hint and swipe up/down on the picker were never reached.
+                // Reported directly (2026-09-28).
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(String(localized: "Platform"))
                 .onChange(of: platform) { _, _ in
                     searchResults = []
                     Task { await search() }
@@ -870,7 +880,6 @@ struct SubmitAppView: View {
                     WizardReviewRow(label: "App Store URL", value: payload.appStoreUrl)
                     WizardReviewRow(label: "Version", value: payload.appVersion)
                     WizardReviewRow(label: "Category", value: payload.category)
-                    WizardReviewRow(label: "Minimum OS Version", value: payload.osVersion)
                 } else {
                     // "Enter Details Manually" — no App Store data to trust,
                     // so these stay real input fields.
@@ -887,14 +896,28 @@ struct SubmitAppView: View {
                         ForEach(categories, id: \.self) { Text(LocalizedStringKey($0)).tag($0) }
                     }
                     .accessibilityHint(String(localized: "Required."))
-                    TextField("Minimum iOS Version", text: $payload.osVersion)
-                        .accessibilityHint(String(localized: "Required."))
                 }
             } header: {
                 Text("App Details")
             } footer: {
                 if isMetadataFromAppStore {
                     Text("Pulled automatically from the App Store listing.")
+                }
+            }
+
+            // Not from the App Store: the iOS you tested on, so it's always
+            // editable. Filled in from this device.
+            Section {
+                TextField("iOS Version Tested", text: $payload.osVersion)
+                    .keyboardType(.numbersAndPunctuation)
+                    .autocorrectionDisabled()
+                    .accessibilityHint(String(localized: "Required. The iOS version you tested the app on."))
+            } footer: {
+                Text("Filled in with this device's iOS version. Change it if you tested on another device.")
+            }
+            .onAppear {
+                if payload.osVersion.trimmingCharacters(in: .whitespaces).isEmpty {
+                    payload.osVersion = UIDevice.current.systemVersion
                 }
             }
 
@@ -1125,7 +1148,7 @@ struct SubmitAppView: View {
             reasons.append(String(localized: "Choose a category to continue."))
         }
         if payload.osVersion.trimmingCharacters(in: .whitespaces).isEmpty {
-            reasons.append(String(localized: "Enter the minimum iOS version to continue."))
+            reasons.append(String(localized: "Enter the iOS version you tested on to continue."))
         }
         if payload.appStoreDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             reasons.append(String(localized: "Enter the app's description to continue."))
@@ -2042,7 +2065,7 @@ struct SubmitAppView: View {
                 WizardReviewRow(label: "Version", value: payload.appVersion)
                 WizardReviewRow(label: "Price", value: payload.price)
                 WizardReviewRow(label: "Category", value: payload.category)
-                WizardReviewRow(label: "Minimum OS Version", value: payload.osVersion)
+                WizardReviewRow(label: "iOS Version Tested", value: payload.osVersion)
                 WizardReviewRow(
                     label: "App Supports",
                     value: deviceOptions.filter { payload.supportedDevices.contains($0.value) }.map(\.label).joined(separator: ", ")

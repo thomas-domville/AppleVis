@@ -24,6 +24,18 @@ struct MouseRecapDigest: Codable {
     let resources: [Resource]
     let blogs: [BlogPost]
     let forumExcerpts: [String: String]
+    /// Every topic active in the period, busiest first, so a narrower
+    /// period (Past Week) can be ranked again on its own.
+    let forumCandidates: [ForumTopic]
+    /// When each forum comment in the period was posted, by topic. Popular
+    /// discussions are ranked by comments posted in the period, not by
+    /// their all-time totals: a 200-comment topic with one new comment used
+    /// to outrank a new topic with 40 comments this week. Reported directly
+    /// (2026-09-28).
+    let forumCommentDates: [String: [Date]]
+
+    static let forumLimit = 8
+    private static let forumCandidateLimit = 40
 
     init(
         startDate: Date,
@@ -34,7 +46,9 @@ struct MouseRecapDigest: Codable {
         forums: [ForumTopic],
         resources: [Resource],
         blogs: [BlogPost],
-        forumExcerpts: [String: String] = [:]
+        forumExcerpts: [String: String] = [:],
+        forumCandidates: [ForumTopic] = [],
+        forumCommentDates: [String: [Date]] = [:]
     ) {
         self.startDate = startDate
         self.endDate = endDate
@@ -45,10 +59,13 @@ struct MouseRecapDigest: Codable {
         self.resources = resources
         self.blogs = blogs
         self.forumExcerpts = forumExcerpts
+        self.forumCandidates = forumCandidates
+        self.forumCommentDates = forumCommentDates
     }
 
     private enum CodingKeys: String, CodingKey {
         case startDate, endDate, generatedAt, apps, podcasts, forums, resources, blogs, forumExcerpts
+        case forumCandidates, forumCommentDates
     }
 
     init(from decoder: Decoder) throws {
@@ -62,6 +79,34 @@ struct MouseRecapDigest: Codable {
         resources = try container.decode([Resource].self, forKey: .resources)
         blogs = try container.decode([BlogPost].self, forKey: .blogs)
         forumExcerpts = try container.decodeIfPresent([String: String].self, forKey: .forumExcerpts) ?? [:]
+        forumCandidates = try container.decodeIfPresent([ForumTopic].self, forKey: .forumCandidates) ?? []
+        forumCommentDates = try container.decodeIfPresent([String: [Date]].self, forKey: .forumCommentDates) ?? [:]
+    }
+
+    /// Comments posted on `topic` within this digest's period, or nil when
+    /// the per-comment dates couldn't be loaded.
+    func commentsInPeriod(_ topic: ForumTopic) -> Int? {
+        guard !forumCommentDates.isEmpty else { return nil }
+        return (forumCommentDates[topic.id] ?? []).filter { $0 >= startDate }.count
+    }
+
+    /// Busiest in the period first, then most recently active. Without
+    /// comment dates, falls back to all-time comment counts.
+    static func rankForums(_ topics: [ForumTopic], commentDates: [String: [Date]], since start: Date) -> [ForumTopic] {
+        guard !commentDates.isEmpty else {
+            return topics.sorted {
+                if $0.replyCount != $1.replyCount { return $0.replyCount > $1.replyCount }
+                return $0.lastActivityAt > $1.lastActivityAt
+            }
+        }
+        let counts = Dictionary(uniqueKeysWithValues: topics.map { topic in
+            (topic.id, (commentDates[topic.id] ?? []).filter { $0 >= start }.count)
+        })
+        return topics.sorted {
+            let a = counts[$0.id] ?? 0, b = counts[$1.id] ?? 0
+            if a != b { return a > b }
+            return $0.lastActivityAt > $1.lastActivityAt
+        }
     }
 
     var isEmpty: Bool {
@@ -79,13 +124,18 @@ struct MouseRecapDigest: Codable {
     /// One entry per non-empty section, each a whole translatable phrase with
     /// real plural forms — the old version glued an English noun onto the
     /// count ("3 " + "podcast episodes"), which no other language could follow.
+    /// In the order the sections appear: apps, podcasts, blog, guides,
+    /// then discussions. Discussions used to come third and blog posts
+    /// last, so the summary didn't match what you then swiped through.
+    /// Blog posts count only the Blog section, not the App Pick of the
+    /// Month, which has its own section. Reported directly (2026-09-28).
     private var countParts: [String] {
         [
             apps.isEmpty ? nil : String(localized: "\(apps.count) accessible apps"),
             podcasts.isEmpty ? nil : String(localized: "\(podcasts.count) podcast episodes"),
-            forums.isEmpty ? nil : String(localized: "\(forums.count) popular discussions"),
+            standardBlogs.isEmpty ? nil : String(localized: "\(standardBlogs.count) blog posts"),
             resources.isEmpty ? nil : String(localized: "\(resources.count) guides and tutorials"),
-            blogs.isEmpty ? nil : String(localized: "\(blogs.count) blog posts"),
+            forums.isEmpty ? nil : String(localized: "\(forums.count) popular discussions"),
         ].compactMap { $0 }
     }
 
@@ -271,6 +321,7 @@ struct MouseRecapDigest: Codable {
         return [
             topic.category.isEmpty ? "" : topic.category,
             topic.authorName.isEmpty ? "" : String(localized: "By \(topic.authorName)"),
+            commentsInPeriod(topic).map { $0 == topic.replyCount ? "" : String(localized: "\($0) new comments") } ?? "",
             String(localized: "\(topic.replyCount) comments"),
             String(localized: "Active \(active)"),
         ].filter { !$0.isEmpty }
@@ -389,13 +440,10 @@ struct MouseRecapDigest: Codable {
     /// client-side date filter over data already on hand. Each list stays in
     /// its already-sorted order, so this is a pure truncation, not a re-rank.
     ///
-    /// One accepted tradeoff: `forums` was already capped to the top
-    /// `mouseRecapForumLimit` topics for the WIDE window before this runs, so
-    /// scoping down can only ever narrow that set further (or leave it
-    /// unchanged) — it can't surface a topic that was popular specifically
-    /// within the narrow window but didn't make the wide window's top slice.
-    /// Simpler than re-fetching or re-ranking per window, and the cases it
-    /// misses are edge cases, not the common path.
+    /// Popular discussions are the exception: they're ranked again for the
+    /// narrower period from `forumCandidates`, by comments posted in that
+    /// period. They used to be the month's top 8 cut down, so the busiest
+    /// topics of the week could be missing. Reported directly.
     func scoped(toLastDays days: Int) -> MouseRecapDigest {
         let newStart = Calendar.current.date(byAdding: .day, value: -days, to: endDate) ?? endDate.addingTimeInterval(-TimeInterval(days) * 24 * 60 * 60)
         guard newStart > startDate else { return self }
@@ -405,16 +453,38 @@ struct MouseRecapDigest: Codable {
             generatedAt: generatedAt,
             apps: apps.filter { $0.createdAt >= newStart },
             podcasts: podcasts.filter { $0.publishedAt >= newStart },
-            forums: forums.filter { $0.lastActivityAt >= newStart },
+            forums: Array(Self.rankForums(
+                (forumCandidates.isEmpty ? forums : forumCandidates).filter { $0.lastActivityAt >= newStart },
+                commentDates: forumCommentDates, since: newStart
+            ).prefix(Self.forumLimit)),
             resources: resources.filter { $0.createdAt >= newStart },
             blogs: blogs.filter { $0.publishedAt >= newStart || $0.lastActivityAt >= newStart },
-            forumExcerpts: forumExcerpts
+            forumExcerpts: forumExcerpts,
+            forumCandidates: forumCandidates,
+            forumCommentDates: forumCommentDates
         )
     }
 }
 
 @MainActor
 final class HomeViewModel: ObservableObject {
+    /// Mark as Read from an item's own actions (touch and hold, or its
+    /// VoiceOver action) saves the read status elsewhere; this picks it up
+    /// so the item leaves New and Fetch straight away.
+    private var markedReadObserver: AnyCancellable?
+
+    init() {
+        markedReadObserver = NotificationCenter.default.publisher(for: .itemMarkedRead)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.itemVisits = PersistenceStore.shared.allItemVisits()
+                    self.recomputeNewActivity()
+                }
+            }
+    }
+
     @Published private(set) var items: [FeedItem] = []
     @Published private(set) var isLoading = false
     @Published private(set) var error: String?
@@ -475,7 +545,7 @@ final class HomeViewModel: ObservableObject {
     private static let mouseRecapPodcastLimit = 5
     private static let mouseRecapBlogLimit = 6
     private static let mouseRecapResourceLimit = 6
-    private static let mouseRecapForumLimit = 8
+    private static let mouseRecapForumLimit = MouseRecapDigest.forumLimit
     /// The boundary a never-individually-visited item is compared against
     /// — captured once per load() (see `advanceVisitBoundaryIfNeeded`) so
     /// it stays fixed for the whole current sitting rather than drifting
@@ -715,6 +785,16 @@ final class HomeViewModel: ObservableObject {
         UIAccessibility.post(notification: .announcement, argument: String(localized: "Marked as read."))
     }
 
+    /// Fetch's "Mark Read Up to Here": everything but the newest
+    /// `remaining` comments counts as read. The item stays new until those
+    /// are read too. Requested directly (2026-09-28).
+    func markRead(_ item: FeedItem, leavingUnread remaining: Int) {
+        let seen = max(0, item.commentCount - remaining)
+        PersistenceStore.shared.stampItemVisit(id: item.id, commentCount: seen)
+        itemVisits[item.id] = PersistenceStore.ItemVisit(seenAt: Date(), commentCount: seen)
+        recomputeNewActivity()
+    }
+
     func markAllAsRead(_ itemsToMark: [FeedItem]) {
         guard !itemsToMark.isEmpty else { return }
         for item in itemsToMark {
@@ -759,6 +839,7 @@ final class HomeViewModel: ObservableObject {
 
         let endDate = Date()
         let startDate = Calendar.current.date(byAdding: .day, value: -Self.mouseRecapMaxDays, to: endDate) ?? endDate.addingTimeInterval(-TimeInterval(Self.mouseRecapMaxDays) * 24 * 60 * 60)
+        async let commentDates = Self.forumCommentDates(since: startDate)
         let result = await fetchMouseRecapItems(since: startDate)
 
         failedMouseRecapSourceNames = result.failedSources
@@ -768,7 +849,9 @@ final class HomeViewModel: ObservableObject {
             // handling.
             mouseRecapError = String(localized: "Couldn't load Nibbles. Pull to refresh.")
         } else {
-            let digest = await enrichMouseRecap(Self.buildMouseRecap(from: result.items, startDate: startDate, endDate: endDate))
+            let digest = await enrichMouseRecap(Self.buildMouseRecap(
+                from: result.items, startDate: startDate, endDate: endDate, forumCommentDates: await commentDates
+            ))
             mouseRecap = digest
             PersistenceStore.shared.saveMouseRecapDigest(digest)
         }
@@ -780,7 +863,10 @@ final class HomeViewModel: ObservableObject {
         guard !digest.forums.isEmpty else { return digest }
         var excerpts = digest.forumExcerpts
 
-        for topic in digest.forums.prefix(Self.mouseRecapForumLimit) where excerpts[topic.id] == nil {
+        let week = digest.scoped(toLastDays: MouseRecapWindow.week.rawValue).forums
+        var picks = Array(digest.forums.prefix(Self.mouseRecapForumLimit))
+        picks += week.filter { topic in !picks.contains { $0.id == topic.id } }
+        for topic in picks where excerpts[topic.id] == nil {
             guard let detail = try? await APIClient.shared.forums.topicDetail(id: topic.id) else { continue }
             let excerpt = digest.excerpt(from: detail.body, fallback: "", maxLength: 420)
             if !excerpt.isEmpty {
@@ -797,8 +883,60 @@ final class HomeViewModel: ObservableObject {
             forums: digest.forums,
             resources: digest.resources,
             blogs: digest.blogs,
-            forumExcerpts: excerpts
+            forumExcerpts: excerpts,
+            forumCandidates: digest.forumCandidates,
+            forumCommentDates: digest.forumCommentDates
         )
+    }
+
+    /// When each forum comment since `start` was posted, by topic: one
+    /// listing of the period's comments (about 11 requests for a busy week,
+    /// checked live 2026-09-28), fetched four pages at a time, instead of
+    /// one count per topic. Empty if it fails, and Nibbles falls back to
+    /// all-time comment counts.
+    private static func forumCommentDates(since start: Date) async -> [String: [Date]] {
+        let pageSize = 50
+        let maxPages = 120
+        var dates: [String: [Date]] = [:]
+        var page = 0
+        while page < maxPages {
+            let batch = Array(page..<min(page + 4, maxPages))
+            let pages: [(Int, [(String, Date)]?)] = await withTaskGroup(of: (Int, [(String, Date)]?).self) { group in
+                for index in batch {
+                    group.addTask {
+                        let response = try? await APIClient.shared.jsonAPIList(
+                            "comment/comment_forum",
+                            query: [
+                                "filter[since][condition][path]": "created",
+                                "filter[since][condition][operator]": ">",
+                                "filter[since][condition][value]": "\(Int(start.timeIntervalSince1970))",
+                                "fields[comment--comment_forum]": "created,entity_id",
+                                "sort": "created",
+                                "page[limit]": "\(pageSize)",
+                                "page[offset]": "\(index * pageSize)",
+                            ]
+                        )
+                        return (index, response.map { $0.data.compactMap { node in
+                            node.relationshipIds("entity_id").first.map { ($0, node.createdDate) }
+                        } })
+                    }
+                }
+                var collected: [(Int, [(String, Date)]?)] = []
+                for await result in group { collected.append(result) }
+                return collected.sorted { $0.0 < $1.0 }
+            }
+            var reachedEnd = false
+            for (_, entries) in pages {
+                // A missing page would leave out the newest comments, so rank
+                // by all-time totals instead of from a partial count.
+                guard let entries else { return [:] }
+                for (topicId, date) in entries { dates[topicId, default: []].append(date) }
+                if entries.count < pageSize { reachedEnd = true }
+            }
+            if reachedEnd { break }
+            page += batch.count
+        }
+        return dates
     }
 
     // MARK: - Private
@@ -1036,7 +1174,7 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
-    private static func buildMouseRecap(from items: [FeedItem], startDate: Date, endDate: Date) -> MouseRecapDigest {
+    private static func buildMouseRecap(from items: [FeedItem], startDate: Date, endDate: Date, forumCommentDates: [String: [Date]] = [:]) -> MouseRecapDigest {
         let apps = items.compactMap { item -> AppListing? in
             guard case .appListing(let app) = item,
                   app.createdAt >= startDate,
@@ -1054,15 +1192,12 @@ final class HomeViewModel: ObservableObject {
         .sorted { $0.publishedAt > $1.publishedAt }
         .prefix(Self.mouseRecapPodcastLimit)
 
-        let forums = items.compactMap { item -> ForumTopic? in
+        let activeTopics = items.compactMap { item -> ForumTopic? in
             guard case .forumTopic(let topic) = item, topic.lastActivityAt >= startDate else { return nil }
             return topic
         }
-        .sorted {
-            if $0.replyCount != $1.replyCount { return $0.replyCount > $1.replyCount }
-            return $0.lastActivityAt > $1.lastActivityAt
-        }
-        .prefix(Self.mouseRecapForumLimit)
+        let rankedTopics = MouseRecapDigest.rankForums(activeTopics, commentDates: forumCommentDates, since: startDate)
+        let forums = rankedTopics.prefix(Self.mouseRecapForumLimit)
 
         let resources = items.compactMap { item -> Resource? in
             guard case .resource(let resource) = item, resource.createdAt >= startDate else { return nil }
@@ -1091,7 +1226,9 @@ final class HomeViewModel: ObservableObject {
             podcasts: Array(podcasts),
             forums: Array(forums),
             resources: Array(resources),
-            blogs: Array(blogs)
+            blogs: Array(blogs),
+            forumCandidates: Array(rankedTopics.prefix(40)),
+            forumCommentDates: forumCommentDates
         )
     }
 

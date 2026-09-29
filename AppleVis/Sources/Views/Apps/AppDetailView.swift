@@ -372,8 +372,11 @@ struct AppDetailView: View {
     private func refreshAppDetailsMenuItem(_ detail: AppDetail) -> some View {
         if canUpdateAppInformation(detail), let itunesMetadata {
             Button {
-                let diffs = AppInfoFieldDiff.build(detail: siteDetail ?? detail, metadata: itunesMetadata)
-                selectedAppInfoFieldIDs = Set(diffs.filter(\.changed).map(\.id))
+                let diffs = AppInfoFieldDiff.build(
+                    detail: siteDetail ?? detail, metadata: itunesMetadata,
+                    testedOnThisDevice: UIDevice.current.systemVersion
+                )
+                selectedAppInfoFieldIDs = Set(diffs.filter { $0.changed && $0.startsSelected }.map(\.id))
                 selectedAppInfoDevices = Set(diffs.first { $0.id == "devices" }?.deviceChoices ?? [])
                 appInfoRefreshRequest = AppInfoRefreshRequest(diffs: diffs)
             } label: {
@@ -1307,6 +1310,7 @@ struct AppDetailView: View {
             try await APIClient.shared.apps.updateAppInformation(
                 detail: current, metadata: metadata, includedFields: selectedAppInfoFieldIDs,
                 devices: ["iPhone", "iPad", "Mac"].filter(selectedAppInfoDevices.contains),
+                testedOnIOS: UIDevice.current.systemVersion,
                 csrfToken: user.csrfToken
             )
             toast.success(String(localized: "App details refreshed"))

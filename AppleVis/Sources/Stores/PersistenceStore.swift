@@ -10,6 +10,7 @@ final class PersistenceStore {
     static let shared = PersistenceStore()
 
     private let savedKey = "applevis.saved.v1"
+    private let savedMouseAnswersKey = "applevis.savedMouseAnswers.v1"
     private let followedKey = "applevis.followed.v1"
     private let notificationHistoryKey = "applevis.notificationHistory.v1"
     private let notificationHistoryLimit = 20
@@ -73,6 +74,28 @@ final class PersistenceStore {
         var items = savedItems()
         items.removeAll { $0.id == id }
         persist(items, key: savedKey)
+        if sync { Task { @MainActor in ICloudSyncManager.shared.pushSavedItems() } }
+    }
+
+    // MARK: - Saved Ask the Mouse answers
+
+    func savedMouseAnswers() -> [SavedMouseAnswer] {
+        load(key: savedMouseAnswersKey) ?? []
+    }
+
+    /// Same `sync` meaning as `save(_:sync:)`.
+    func saveMouseAnswer(_ answer: SavedMouseAnswer, sync: Bool = true) {
+        var answers = savedMouseAnswers()
+        guard !answers.contains(where: { $0.id == answer.id }) else { return }
+        answers.insert(answer, at: 0)
+        persist(answers, key: savedMouseAnswersKey)
+        if sync { Task { @MainActor in ICloudSyncManager.shared.pushSavedItems() } }
+    }
+
+    func unsaveMouseAnswer(id: String, sync: Bool = true) {
+        var answers = savedMouseAnswers()
+        answers.removeAll { $0.id == id }
+        persist(answers, key: savedMouseAnswersKey)
         if sync { Task { @MainActor in ICloudSyncManager.shared.pushSavedItems() } }
     }
 
@@ -431,6 +454,7 @@ final class PersistenceStore {
     /// despite its own confirmation dialog explicitly promising it would.
     func clearAllLocalData() {
         defaults.removeObject(forKey: savedKey)
+        defaults.removeObject(forKey: savedMouseAnswersKey)
         defaults.removeObject(forKey: followedKey)
         defaults.removeObject(forKey: notificationHistoryKey)
         defaults.removeObject(forKey: seenTopicsKey)

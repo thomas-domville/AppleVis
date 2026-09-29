@@ -681,7 +681,10 @@ struct AppEndpoints {
     /// Details (names: "iPhone", "iPad", "Mac"), written to the site's
     /// `field_device_used` using the live form's own values. iOS entries
     /// only; ignored when empty, since the site requires at least one.
-    func updateAppInformation(detail: AppDetail, metadata: ItunesMetadata, includedFields: Set<String>, devices: [String] = [], csrfToken: String) async throws {
+    /// `testedOnIOS` — this device's iOS, written to the site's
+    /// `field_ios_version` ("iOS Version", the iOS it was tested on) when
+    /// "iosTested" is included. iOS entries only.
+    func updateAppInformation(detail: AppDetail, metadata: ItunesMetadata, includedFields: Set<String>, devices: [String] = [], testedOnIOS: String? = nil, csrfToken: String) async throws {
         let nodeType = Self.nodeType(for: detail.platform)
         var attributes: [String: AnyEncodable] = [:]
 
@@ -696,6 +699,11 @@ struct AppEndpoints {
             if !description.isEmpty {
                 attributes["body"] = AnyEncodable(RichTextBodyValue(value: description, summary: "", format: drupalDefaultTextFormat))
             }
+        }
+
+        if detail.platform == .ios, includedFields.contains(AppInfoFieldDiff.iosTestedID),
+           let testedOnIOS = testedOnIOS?.trimmingCharacters(in: .whitespacesAndNewlines), !testedOnIOS.isEmpty {
+            attributes["field_ios_version"] = AnyEncodable(testedOnIOS)
         }
 
         if detail.platform == .ios, includedFields.contains("devices"), !devices.isEmpty {

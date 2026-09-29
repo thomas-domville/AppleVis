@@ -181,10 +181,24 @@ struct DormantAccountsView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .accessibilityFocused($isTitleFocused)
+            }
+
+            // Filters first, then Start Scan, so they can be set before
+            // scanning. They only narrow the list already found, so they
+            // also apply straight away after a scan. Requested directly
+            // (2026-09-28).
+            Section {
+                agePicker
+                Toggle("Sign-Up Bursts Only", isOn: $store.burstsOnly)
+                    .accessibilityHint(String(localized: "Shows only accounts created in a quick burst, which often means spam."))
+                    .onChange(of: store.burstsOnly) { _, _ in announceCount() }
+            }
+
+            Section {
                 Button {
                     startScan()
                 } label: {
-                    Label("Start Scan", systemImage: "play.circle")
+                    Label(store.hasScanned ? "Scan Again" : "Start Scan", systemImage: "play.circle")
                 }
                 .disabled(store.isScanning || store.isBulkDeleting)
             }
@@ -209,14 +223,20 @@ struct DormantAccountsView: View {
                 }
             } else if store.hasScanned {
                 Section {
-                    agePicker
-                    Toggle("Sign-Up Bursts Only", isOn: $store.burstsOnly)
-                        .accessibilityHint(String(localized: "Shows only accounts created in a quick burst, which often means spam."))
-                        .onChange(of: store.burstsOnly) { _, _ in announceCount() }
-                }
-
-                Section {
                     VStack(alignment: .leading, spacing: 4) {
+                        // When nothing's found, the message is part of the
+                        // summary VoiceOver lands on after a scan, so it's
+                        // heard straight away rather than one swipe further
+                        // down. Reported directly (2026-09-28).
+                        if store.accounts.isEmpty {
+                            Text("No accounts to review. Everyone older than 30 days has signed in at least once.")
+                                .fontWeight(.semibold)
+                        } else if store.visibleAccounts.isEmpty {
+                            Text(store.burstsOnly
+                                 ? "No accounts match. Choose a shorter age or turn off Sign-Up Bursts Only."
+                                 : "No accounts are that old. Choose a shorter age.")
+                                .fontWeight(.semibold)
+                        }
                         Text(String(localized: "\(store.visibleAccounts.count) accounts"))
                             .fontWeight(.semibold)
                         if let date = store.lastScanDate {
@@ -230,19 +250,7 @@ struct DormantAccountsView: View {
                     .accessibilityFocused($isStatusFocused)
                 }
 
-                if store.accounts.isEmpty {
-                    Section {
-                        Text("No accounts to review. Everyone older than 30 days has signed in at least once.")
-                            .foregroundStyle(.secondary)
-                    }
-                } else if store.visibleAccounts.isEmpty {
-                    Section {
-                        Text(store.burstsOnly
-                             ? "No accounts match. Choose a shorter age or turn off Sign-Up Bursts Only."
-                             : "No accounts are that old. Choose a shorter age.")
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
+                if !store.visibleAccounts.isEmpty {
                     bulkDeleteSection
 
                     Section {
@@ -350,11 +358,18 @@ struct DormantAccountsView: View {
 
     /// Speaks the new count after a filter changes the list out of view.
     private func announceCount() {
+        // Nothing to count until a scan has run.
+        guard store.hasScanned else { return }
         let count = store.visibleAccounts.count
         Task {
             // After VoiceOver has spoken the control's new value.
             try? await Task.sleep(for: .milliseconds(700))
-            UIAccessibility.post(notification: .announcement, argument: String(localized: "\(count) accounts"))
+            // With nothing left, say why and what to try, not just "0 accounts".
+            let message = count > 0 ? String(localized: "\(count) accounts")
+                : store.burstsOnly
+                    ? String(localized: "No accounts match. Choose a shorter age or turn off Sign-Up Bursts Only.")
+                    : String(localized: "No accounts are that old. Choose a shorter age.")
+            UIAccessibility.post(notification: .announcement, argument: message)
         }
     }
 

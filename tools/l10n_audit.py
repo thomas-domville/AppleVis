@@ -55,6 +55,10 @@ TEAM_FACING = [
     ('CloudflareBypass.swift', r'.'),
     ('EpisodeDetailView.swift', r'^(episode|podcast|audio) transcript'),
     ('ContactView.swift', r'^App (Bug Report|Feedback|Suggestion|Enquiry)$'),
+    # search engine brand names
+    ('PreferencesStore.swift', r'^(DuckDuckGo|Google|Bing|Ecosia)$'),
+    # source labels handed to the on-device model by Ask the Mouse
+    ('AskTheMouse.swift', r"^(Members' comments on the guide|Forum discussion among members)"),
     # item kinds handed to the on-device model for Mouse Recap blurbs
     ('Mappers.swift', r'^macOS '),
     ('ReportCommentWizard.swift', r' Report: '),

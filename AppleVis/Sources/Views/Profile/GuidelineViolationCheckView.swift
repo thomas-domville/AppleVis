@@ -122,6 +122,14 @@ struct GuidelineViolationCheckView: View {
             } else if let scannedRange = scanner.lastScannedRange {
                 Section {
                     VStack(alignment: .leading, spacing: 4) {
+                        // When nothing's found, the message is part of the
+                        // summary VoiceOver lands on after a scan, so it's
+                        // heard straight away rather than one swipe further
+                        // down. Reported directly (2026-09-28).
+                        if visibleFlags.isEmpty {
+                            Text("No flagged content in this range.")
+                                .fontWeight(.semibold)
+                        }
                         HStack {
                             Text("\(scanner.scannedItemCount) items scanned")
                             Spacer()
@@ -167,12 +175,7 @@ struct GuidelineViolationCheckView: View {
                     }
                 }
 
-                if visibleFlags.isEmpty {
-                    Section {
-                        Text("No flagged content in this range.")
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
+                if !visibleFlags.isEmpty {
                     Section {
                         ForEach(visibleFlags) { flag in
                             NavigationLink {
@@ -214,6 +217,61 @@ private struct GuidelineFlagDestination: View {
         case .podcastEpisode: EpisodeDetailView(episodeId: flag.itemId, targetCommentId: flag.commentId)
         case .appListing:     AppDetailView(appId: flag.itemId, targetCommentId: flag.commentId)
         case .bugReport:      BugDetailView(bugId: flag.itemId, targetCommentId: flag.commentId)
+        }
+    }
+}
+
+/// How much of a flagged item the row shows. Comments are usually short,
+/// so they're shown and read in full; posts, which can be very long, get a
+/// longer preview. Anything cut short offers Read Full Text. Rows used to
+/// stop at 300 characters for everything. Requested directly (2026-09-28).
+extension GuidelineFlag {
+    var previewLimit: Int { isRootItem ? 500 : 2000 }
+    var fullText: String { body.strippingHTMLTags().trimmingCharacters(in: .whitespacesAndNewlines) }
+    var previewText: String { String.excerpt(from: body, limit: previewLimit) }
+    var isPreviewShortened: Bool { fullText.count > previewLimit }
+}
+
+/// The whole flagged text on its own screen, one paragraph per element so
+/// VoiceOver can move through a long post a paragraph at a time.
+private struct GuidelineFlagFullText: View {
+    let flag: GuidelineFlag
+    @Environment(\.dismiss) private var dismiss
+    @AccessibilityFocusState private var isTitleFocused: Bool
+
+    private var paragraphs: [String] {
+        flag.fullText.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(flag.itemTitle)
+                        .font(.headline)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityFocused($isTitleFocused)
+                    Text("\(flag.kindLabel) by \(flag.authorName)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in
+                        Text(paragraph)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Full Text")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .task { await retryAccessibilityFocus(into: $isTitleFocused) }
         }
     }
 }
@@ -277,10 +335,10 @@ private struct GuidelineFlagRow: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
 
-            Text(flag.excerpt)
+            Text(flag.previewText)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-                .lineLimit(2)
+                .lineLimit(flag.isRootItem ? 4 : 8)
 
             if let opinionText {
                 Label(opinionText, systemImage: opinion?.isRealConcern == false ? "checkmark.seal" : "sparkles")
@@ -290,7 +348,7 @@ private struct GuidelineFlagRow: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "\(severityConfig.label) severity. \(flag.kindLabel) by \(flag.authorName)\(flag.authorIsEditorial ? ", Editorial Team" : ""), in \(flag.itemTitle). Guideline: \(ruleNames). \(flag.excerpt)") + (opinionText.map { " " + $0 } ?? ""))
+        .accessibilityLabel(String(localized: "\(severityConfig.label) severity. \(flag.kindLabel) by \(flag.authorName)\(flag.authorIsEditorial ? ", Editorial Team" : ""), in \(flag.itemTitle). Guideline: \(ruleNames). \(flag.previewText)") + (opinionText.map { " " + $0 } ?? ""))
     }
 }
 
@@ -311,6 +369,7 @@ private struct GuidelineFlagActions: ViewModifier {
     @State private var showEditSheet = false
     @State private var showUnpublishConfirm = false
     @State private var showDeleteConfirm = false
+    @State private var showFullText = false
 
     /// Root items get the stronger "entire" wording — see the delete
     /// confirmation's `message:` closure for why.
@@ -327,6 +386,15 @@ private struct GuidelineFlagActions: ViewModifier {
             // see VoiceOverAwareSwipeActions's doc comment. The accessibility
             // actions below are the real path for them.
             .voiceOverAwareSwipeActions {
+                if flag.isPreviewShortened {
+                    Button {
+                        showFullText = true
+                    } label: {
+                        Label("Read Full Text", systemImage: "doc.plaintext")
+                    }
+                    .tint(.indigo)
+                }
+            } trailing: {
                 Button(role: .destructive) {
                     showDeleteConfirm = true
                 } label: {
@@ -351,10 +419,12 @@ private struct GuidelineFlagActions: ViewModifier {
                 }
                 .tint(.gray)
             }
+            .modifier(ConditionalAccessibilityAction(isActive: flag.isPreviewShortened, name: "Read Full Text") { showFullText = true })
             .accessibilityAction(named: Text("Edit \(flag.kindLabel)")) { showEditSheet = true }
             .accessibilityAction(named: Text("Unpublish \(flag.kindLabel)")) { showUnpublishConfirm = true }
             .accessibilityAction(named: Text("Delete \(flag.kindLabel)")) { showDeleteConfirm = true }
             .accessibilityAction(named: Text("Share \(flag.kindLabel)")) { presentShareSheet() }
+            .sheet(isPresented: $showFullText) { GuidelineFlagFullText(flag: flag) }
             .confirmationDialog(
                 "Unpublish this \(flag.kindLabel.lowercased())?", isPresented: $showUnpublishConfirm, titleVisibility: .visible
             ) {

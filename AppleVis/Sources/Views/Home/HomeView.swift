@@ -126,6 +126,14 @@ struct HomeView: View {
     /// new since the last visit when the "New" segment is selected. Distinct
     /// from the "Customize Home" menu, which controls which content TYPES
     /// are fetched at all, not which of the fetched items are shown.
+    static let activityHeadingID = "home.activityHeading"
+
+    /// Was a ternary of two literals, which made it a plain String that
+    /// skipped translation.
+    private var activityHeadingTitle: String {
+        homeFeedFilter == .new ? String(localized: "New Activity") : String(localized: "Latest Activity")
+    }
+
     private var visibleItems: [FeedItem] {
         switch homeFeedFilter {
         case .all:
@@ -581,6 +589,12 @@ struct HomeView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                // One adjustable item for VoiceOver. A segmented picker otherwise
+                // exposes each segment separately ("All, 1 of 4, selected"), so the
+                // hint and swipe up/down on the picker were never reached.
+                // Reported directly (2026-09-28).
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(String(localized: "Home Feed"))
                 // Explicit value — without it, swiping up/down only played
                 // the "value changed" tone with no spoken filter name. Same
                 // fix as PlayerView's playback-speed control (PODCAST-06).
@@ -642,7 +656,7 @@ struct HomeView: View {
 
                 if !visibleItems.isEmpty {
                     HStack {
-                        Text(homeFeedFilter == .new ? "New Activity" : "Latest Activity")
+                        Text(activityHeadingTitle)
                             .font(.footnote.weight(.bold))
                             .foregroundStyle(.secondary)
                             .textCase(.uppercase)
@@ -652,7 +666,7 @@ struct HomeView: View {
                             // all-caps-rendered string gets spelled out
                             // letter-by-letter instead of read as a word.
                             // An explicit label bypasses the transformed text.
-                            .accessibilityLabel(homeFeedFilter == .new ? "New Activity" : "Latest Activity")
+                            .accessibilityLabel(activityHeadingTitle)
                             .accessibilityAction(named: Text("Feed summary")) {
                                 UIAccessibility.post(notification: .announcement, argument: feedSummary)
                             }
@@ -668,6 +682,8 @@ struct HomeView: View {
                     }
                     .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 4, trailing: 16))
                     .listRowSeparator(.hidden)
+                    .id(Self.activityHeadingID)
+                    .modifier(ActivityHeadingRotor(title: activityHeadingTitle))
                 }
 
                 ForEach(visibleItems) { item in
@@ -681,6 +697,7 @@ struct HomeView: View {
                     }
                     .id(item.id)
                     .accessibilityFocused($focusTarget, equals: .item(item.id))
+                    .modifier(ActivityHeadingRotor(title: activityHeadingTitle))
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 }
 
@@ -740,6 +757,20 @@ struct HomeView: View {
             // onTap just above, and the same reasoning: scrolling alone
             // doesn't move VoiceOver's cursor, and a single fixed delay isn't
             // reliable before the target row has actually laid out.
+            // An item marked read leaves New; VoiceOver moves to the item
+            // that followed it (or the one before), instead of losing its
+            // place. Only when VoiceOver was on that item or had lost focus.
+            // Requested directly (2026-09-28).
+            .onChange(of: vm.newItems.map(\.id)) { oldIds, newIds in
+                guard homeFeedFilter == .new else { return }
+                let removed = oldIds.filter { !newIds.contains($0) }
+                guard removed.count == 1, let index = oldIds.firstIndex(of: removed[0]) else { return }
+                if let current = focusTarget, current != .item(removed[0]) { return }
+                let following = oldIds[(index + 1)...].first(where: newIds.contains)
+                guard let next = following ?? oldIds[..<index].last(where: newIds.contains) else { return }
+                focusTarget = nil
+                Task { await retryAccessibilityFocus(.item(next), into: $focusTarget, delaysMs: [450, 750, 1100]) }
+            }
             .onChange(of: pendingResumeFocusItemId) { _, id in
                 guard let id else { return }
                 pendingResumeFocusItemId = nil
@@ -891,6 +922,11 @@ private struct MouseRecapHomeContent: View {
                 }
             }
             .pickerStyle(.segmented)
+            // One adjustable item for VoiceOver. A segmented picker otherwise
+            // exposes each segment separately ("All, 1 of 4, selected"), so the
+            // hint and swipe up/down on the picker were never reached.
+            // Reported directly (2026-09-28).
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel(String(localized: "Recap window"))
             .accessibilityHint(String(localized: "Choose how far back Nibbles looks."))
             // Explicit value — without it, swiping up/down only played the
@@ -1360,6 +1396,11 @@ private struct MouseRecapView: View {
                             }
                         }
                         .pickerStyle(.segmented)
+                        // One adjustable item for VoiceOver. A segmented picker otherwise
+                        // exposes each segment separately ("All, 1 of 4, selected"), so the
+                        // hint and swipe up/down on the picker were never reached.
+                        // Reported directly (2026-09-28).
+                        .accessibilityElement(children: .ignore)
                         .accessibilityLabel(String(localized: "Recap window"))
                         .accessibilityHint(String(localized: "Choose how far back Nibbles looks."))
                         // Explicit value — without it, swiping up/down only
@@ -1801,6 +1842,13 @@ struct FeedRow: View {
     var isNew: Bool = false
     var onMarkRead: (() -> Void)? = nil
 
+    /// The row's own actions already include Mark as Read when the saved
+    /// read status shows new comments. This one is only added when they
+    /// don't, so the Actions rotor never lists it twice.
+    private var rowOffersMarkAsRead: Bool {
+        PersistenceStore.shared.newReplyCount(kind: item.kind, id: item.contentId, currentCount: item.commentCount) > 0
+    }
+
     var body: some View {
         Group {
             switch item {
@@ -1822,8 +1870,23 @@ struct FeedRow: View {
         // `newCount > 0`-only gate meant a "NEW" card had no way to be
         // marked read at all until it happened to also pick up a reply.
         // Reported directly: a card marked New offered no Mark as Read action.
-        .modifier(ConditionalAccessibilityAction(isActive: (isNew || newCount > 0) && onMarkRead != nil, name: "Mark as Read") {
+        .modifier(ConditionalAccessibilityAction(isActive: (isNew || newCount > 0) && onMarkRead != nil && !rowOffersMarkAsRead, name: "Mark as Read") {
             onMarkRead?()
         })
+    }
+}
+
+/// Home's list only builds rows near the screen, so once you'd scrolled far
+/// down All or New, the Latest Activity heading no longer existed for
+/// VoiceOver and the Headings rotor couldn't go back up to it. While
+/// VoiceOver is on that heading or any item under it, this Headings rotor
+/// always offers it. Reported directly (2026-09-29).
+private struct ActivityHeadingRotor: ViewModifier {
+    let title: String
+
+    func body(content: Content) -> some View {
+        content.accessibilityRotor(.headings) {
+            AccessibilityRotorEntry(title, id: HomeView.activityHeadingID)
+        }
     }
 }

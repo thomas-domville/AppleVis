@@ -12,6 +12,10 @@ struct ResourceDetailView: View {
     /// flagged comment — see `ForumTopicDetailView.targetCommentId` for the
     /// full reasoning.
     var targetCommentId: String? = nil
+    /// Opened from Ask the Mouse: the paragraph the answer came from,
+    /// where the guide opens instead of the top. Requested directly
+    /// (2026-09-29).
+    var focusText: String? = nil
     @State private var hasAppliedTargetCommentFocus = false
     @State private var detail: ResourceDetail?
     @State private var isLoading = true
@@ -116,7 +120,8 @@ struct ResourceDetailView: View {
                         showTableOfContents: true,
                         contentKind: "resource",
                         contentId: detail.id,
-                        field: "body"
+                        field: "body",
+                        focusText: focusText
                     )
                     .environment(\.contentScrollProxy, proxy)
                     .padding(.horizontal)

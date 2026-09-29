@@ -105,12 +105,14 @@ struct GeneralSettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                // One adjustable item for VoiceOver. A segmented picker otherwise
+                // exposes each segment separately ("All, 1 of 4, selected"), so the
+                // hint and swipe up/down on the picker were never reached.
+                // Reported directly (2026-09-28).
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(String(localized: "Web Links"))
+                .accessibilityValue(Text(preferences.webBrowsingMode.displayName))
                 .accessibilityHint(String(localized: "Controls whether web links open inside AppleVis or in your default browser."))
-                // See Home Startup Behavior above for the full reasoning —
-                // a persistent .accessibilityValue() here duplicated what
-                // the control already announces natively on plain focus.
-                // Swapped for a one-shot announcement fired only right
-                // after an adjustment.
                 .accessibilityAdjustableAction { direction in
                     guard let idx = WebBrowsingMode.allCases.firstIndex(of: preferences.webBrowsingMode) else { return }
                     switch direction {
@@ -120,8 +122,32 @@ struct GeneralSettingsView: View {
                         preferences.webBrowsingMode = WebBrowsingMode.allCases[(idx - 1 + WebBrowsingMode.allCases.count) % WebBrowsingMode.allCases.count]
                     @unknown default: break
                     }
-                    UIAccessibility.post(notification: .announcement, argument: preferences.webBrowsingMode.displayName)
                 }
+            }
+
+            Section {
+                Picker("Web Search", selection: $preferences.webSearchEngine) {
+                    ForEach(WebSearchEngine.allCases) { engine in
+                        Text(verbatim: engine.displayName).tag(engine)
+                    }
+                }
+                .pickerStyle(.menu)
+                .accessibilityValue(Text(verbatim: preferences.webSearchEngine.displayName))
+                .accessibilityHint(String(localized: "The search engine Search the Web uses in Ask the Mouse."))
+                .accessibilityAdjustableAction { direction in
+                    let all = WebSearchEngine.allCases
+                    guard let idx = all.firstIndex(of: preferences.webSearchEngine) else { return }
+                    switch direction {
+                    case .increment: preferences.webSearchEngine = all[(idx + 1) % all.count]
+                    case .decrement: preferences.webSearchEngine = all[(idx - 1 + all.count) % all.count]
+                    @unknown default: break
+                    }
+                }
+                Text("Used by Search the Web in Ask the Mouse. Results open the way Web Links is set above.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Web Search")
             }
 
             Section("Tips") {

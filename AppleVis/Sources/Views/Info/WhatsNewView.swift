@@ -191,9 +191,114 @@ struct ChangeItem: Identifiable {
     let title: String
     let description: String
 
-    static let currentVersion = "2026.18"
+    static let currentVersion = "2026.19"
 
     static let current: [ChangeItem] = [
+        ChangeItem(
+            systemImage: "text.magnifyingglass",
+            tag: .improved,
+            title: "Ask the Mouse Answers More Questions",
+            description: "When the best parts of a guide don't answer your question, the Mouse now reads the rest of the guide and its comments, a part at a time. Answers with steps are numbered, and each step is read on its own. You Might Also Ask suggests questions to ask next. The first answer comes sooner, and if Apple Intelligence can't answer, the Mouse tells you why. On screen, the answer appears as it's written."
+        ),
+        ChangeItem(
+            systemImage: "bubble.left.and.text.bubble.right",
+            tag: .improved,
+            title: "Ask the Mouse Gets a Friendlier Look",
+            description: "Ask the Mouse now looks more like a chat with the Mouse. The whole Mouse greets you with a little hop, your question sits in a small bubble, and each answer appears in a speech bubble with the Mouse beside it. While searching, the Mouse holds what it's looking through, such as a book for Help. Sources and results have icons for their type, the Mouse cheers when an answer helped, and saved answers show the Mouse's face. None of it changes what VoiceOver reads, and it all stays still with Reduce Motion on."
+        ),
+        ChangeItem(
+            systemImage: "list.bullet.indent",
+            tag: .accessibility,
+            title: "Headings Reach Back to the Top of Home's Lists",
+            description: "In Home's All and New views, once you'd scrolled far down, the Headings rotor couldn't go back up to the Latest Activity or New Activity heading. It now can, from anywhere in the list. That heading was also always in English, and now appears in your language. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "text.line.first.and.arrowtriangle.forward",
+            tag: .accessibility,
+            title: "Read Long Mouse Answers a Part at a Time",
+            description: "With VoiceOver, a long Ask the Mouse answer, such as the answer to What's new?, was one long item. Swipe up or down on it to choose Ungroup Answer, and each paragraph, or each sentence of a single long paragraph, becomes its own item. That's easier to follow, especially on a braille display. Group Answer joins it back together. Short answers stay as one item. Requested directly."
+        ),
+        ChangeItem(
+            systemImage: "text.magnifyingglass",
+            tag: .new,
+            title: "Ask the Mouse Answers From Every Result",
+            description: "Results under More From AppleVis now each come with a line saying what that page tells you about your question, so you don't have to open every guide to find out. Pages that don't answer it are left out, and pages that say the same thing are listed together. If the main answer comes up empty but a result has it, that becomes the answer. Commands and gestures are copied exactly, guides written for an older iOS are marked, and opening a guide from an answer takes you straight to the paragraph it came from. You can also tell the Mouse whether an answer helped, and the same question asked again within an hour is answered straight away. Requested directly."
+        ),
+        ChangeItem(
+            systemImage: "arrow.counterclockwise",
+            tag: .improved,
+            title: "Start Over Is Right After Ask",
+            description: "In Ask the Mouse, Start a New Conversation was at the very bottom, after every answer, and sounded like it started a forum topic. It's now called Start Over and sits right after Ask. It clears the answers on screen so your next question starts fresh, and keeps your saved answers and recent questions. Each recent question can now be removed on its own, and recent questions sync with your other devices through iCloud when Saved Items sync is on. Suggested directly."
+        ),
+        ChangeItem(
+            systemImage: "globe",
+            tag: .new,
+            title: "Choose the Search Engine for Search the Web",
+            description: "Search the Web in Ask the Mouse always used DuckDuckGo. Settings > General now has Web Search, where you can choose DuckDuckGo, Google, Bing, or Ecosia. Results open the way your Web Links setting says: in AppleVis or in your default browser. Requested directly."
+        ),
+        ChangeItem(
+            systemImage: "bookmark",
+            tag: .new,
+            title: "Copy, Share, and Save Mouse Answers",
+            description: "Each Ask the Mouse answer now has actions: Copy Answer, Copy Answer with Sources, Share Answer, Open Source, Save Answer, and Ask a Follow-Up. With VoiceOver, swipe up or down on the answer. Otherwise, touch and hold it. Saved answers appear in For You > Saved under Mouse Answers and sync with iCloud. Apps in an answer can be saved and shared too, and Need More Help? is now a heading, so you can jump to Ask in the Forums. Requested directly."
+        ),
+        ChangeItem(
+            systemImage: "person.2.wave.2",
+            tag: .improved,
+            title: "Ask the Mouse Includes Members' Tips",
+            description: "When the Mouse answers from a guide, it now also reads members' comments on that guide, where people often add tips or note what's changed. For questions about Apple devices or people's experiences, it also reads a matching forum discussion. Help and guides come first, and when part of an answer comes from members, the Mouse says so. Suggested directly."
+        ),
+        ChangeItem(
+            systemImage: "questionmark.bubble",
+            tag: .fixed,
+            title: "Ask the Mouse Shows Only Related Results",
+            description: "Asking the Mouse what's new in the app also listed forum topics and podcasts under More From AppleVis that had nothing to do with the question. Questions about the app's What's New, your settings, or your saved items are now answered from the app alone. For other questions, More From AppleVis only lists results whose titles or descriptions match what you asked. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "switch.2",
+            tag: .accessibility,
+            title: "View Switchers Now Say What Each View Shows",
+            description: "With VoiceOver, the switchers like All, New, Fetch, and Nibbles on Home were read one option at a time, such as \"All, 1 of 4, selected\". Their descriptions and swipe up or down to change views never came through. Each switcher is now one item: you hear its name, the current choice, and a short description, and swipe up or down to change it. This covers Home, Nibbles' Past Week and Past Month, Card Density, Web Links, and the Platform choice in Submit an App. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "bubble.left.and.bubble.right",
+            tag: .fixed,
+            title: "Nibbles Picks This Week's Busiest Discussions",
+            description: "Nibbles chose its popular discussions by how many comments each topic had ever received, so a long-running topic with one new comment could outrank a new one with dozens this week. It now picks the topics with the most comments during the week or month you're viewing. Past Week is also chosen on its own, instead of being cut down from the month's list. Each discussion shows how many new comments it had. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "iphone",
+            tag: .fixed,
+            title: "Submit an App Records the iOS You Tested On",
+            description: "The iOS Version field on an app entry is the iOS it was tested on, but Submit an App filled it in with the oldest iOS the app supports. It's now called iOS Version Tested and is filled in with your device's iOS version. You can change it if you tested on another device. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "list.number",
+            tag: .fixed,
+            title: "Nibbles' Summary Matches the Order You Read It",
+            description: "The summary at the top of Nibbles listed what's inside in a different order from the sections below it: discussions came third and blog posts last. It now follows the sections: apps, podcast episodes, blog posts, guides, then discussions. The blog post count also no longer includes the App Pick of the Month, which has its own section. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.circle.badge.xmark",
+            tag: .fixed,
+            title: "Mark as Read Clears Items From New Right Away",
+            description: "In New, using Mark as Read from an item's touch-and-hold menu didn't remove the item until Home reloaded. With VoiceOver, some items also listed Mark as Read twice in the Actions rotor, and one of them had the same problem. The item now leaves New straight away, Mark as Read is listed once, and VoiceOver moves to the next item. Reported directly."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.circle",
+            tag: .improved,
+            title: "Mark Fetch Items and Comments as Read",
+            description: "In Fetch, Mark as Read on an item's heading now removes the item straight away, and VoiceOver moves to the next item instead of losing its place. It's also in the touch-and-hold menu. A new Mark Read Up to Here, on each comment, marks that comment and the ones before it as read, so only newer comments stay. Swipe right on a comment to use it, or find it in the Actions rotor. Suggested directly."
+        ),
+        ChangeItem(
+            systemImage: "list.bullet.indent",
+            tag: .accessibility,
+            title: "Headings Reach Every Item in Fetch",
+            description: "In Fetch, VoiceOver's Headings rotor only found items near where you were, so you had to swipe up or down before you could jump to an item further away. It now lists every item in Fetch and goes straight to the one you choose. Reported directly."
+        ),
+    ]
+
+    static let archivedFrom2026_18: [ChangeItem] = [
         ChangeItem(
             systemImage: "questionmark.bubble",
             tag: .new,
@@ -1021,6 +1126,7 @@ struct HistorySection: Identifiable {
     let items: [ChangeItem]
 
     static let all: [HistorySection] = [
+        HistorySection(title: "Also in 2026.18", items: ChangeItem.archivedFrom2026_18),
         HistorySection(title: "Also in 2026.17", items: ChangeItem.archivedFrom2026_17),
         HistorySection(title: "Also in 2026.16", items: ChangeItem.archivedFrom2026_16),
         HistorySection(title: "Also in 2026.15", items: ChangeItem.archivedFrom2026_15),

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Wraps a computed `[AppInfoFieldDiff]` as a single Identifiable value so
 /// AppDetailView can drive its sheet with `.sheet(item:)` instead of
@@ -31,6 +32,12 @@ struct AppInfoFieldDiff: Identifiable {
     /// sets, so order never counts as a change.
     var currentDevices: [String] = []
     var deviceChoices: [String] = []
+    /// Whether the sheet starts with this change switched on.
+    var startsSelected = true
+    /// A short line under the row, such as a warning.
+    var note: String?
+
+    static let iosTestedID = "iosTested"
 
     /// Compares what the text actually says, not how it's laid out. The
     /// AppleVis side arrives as Drupal's rendered HTML flattened to one
@@ -42,6 +49,7 @@ struct AppInfoFieldDiff: Identifiable {
     /// directly.
     var changed: Bool {
         if id == "devices" { return Set(currentDevices) != Set(deviceChoices) }
+        if id == Self.iosTestedID { return !Self.sameVersion(oldValue, newValue) }
         return Self.comparable(oldValue) != Self.comparable(newValue)
     }
 
@@ -57,7 +65,36 @@ struct AppInfoFieldDiff: Identifiable {
     /// there's no permitted way to get that distinction automatically (see
     /// the price brainstorm this replaces). Discussed directly; out of
     /// scope until there's a real way to resolve it.
-    static func build(detail: AppDetail, metadata: ItunesMetadata) -> [AppInfoFieldDiff] {
+    /// "26.2" as numbers, or nil for anything else ("27 beta 8", "27..0").
+    static func versionParts(_ text: String) -> [Int]? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = trimmed.split(separator: ".", omittingEmptySubsequences: false)
+        guard !trimmed.isEmpty, parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isNumber) }) else { return nil }
+        return parts.compactMap { Int($0) }
+    }
+
+    /// "27" and "27.0" are the same version; anything unreadable differs.
+    static func sameVersion(_ a: String, _ b: String) -> Bool {
+        guard let x = versionParts(a), let y = versionParts(b) else { return false }
+        let count = max(x.count, y.count)
+        return (x + Array(repeating: 0, count: count - x.count)) == (y + Array(repeating: 0, count: count - y.count))
+    }
+
+    static func isOlder(_ a: String, than b: String) -> Bool {
+        guard let x = versionParts(a), let y = versionParts(b) else { return false }
+        for index in 0..<max(x.count, y.count) {
+            let left = index < x.count ? x[index] : 0, right = index < y.count ? y[index] : 0
+            if left != right { return left < right }
+        }
+        return false
+    }
+
+    /// `testedOnThisDevice`: also offer to set the entry's "iOS Version"
+    /// (the iOS it was tested on) to this device's iOS. Only Refresh App
+    /// Details on an entry's page asks for it; the admin Health Check
+    /// doesn't, or every entry tested on another iOS would look outdated.
+    /// Requested directly (2026-09-28).
+    static func build(detail: AppDetail, metadata: ItunesMetadata, testedOnThisDevice: String? = nil) -> [AppInfoFieldDiff] {
         var diffs: [AppInfoFieldDiff] = []
 
         let newTitle = metadata.appName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -104,6 +141,22 @@ struct AppInfoFieldDiff: Identifiable {
                 newValue: ListFormatter.localizedString(byJoining: choices),
                 currentDevices: current, deviceChoices: choices
             ))
+        }
+
+        // iPhone and iPad entries only: this device can't tell what an
+        // Apple Watch or Mac is running. An older iOS than the one on file
+        // is still offered, but starts switched off, so a newer version
+        // isn't replaced by accident.
+        if detail.platform == .ios, let deviceVersion = testedOnThisDevice, !deviceVersion.isEmpty {
+            let onFile = (detail.testedOnIOS ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let older = isOlder(deviceVersion, than: onFile)
+            var diff = AppInfoFieldDiff(
+                id: iosTestedID, label: String(localized: "iOS Version Tested"), systemImage: "iphone",
+                oldValue: onFile, newValue: deviceVersion
+            )
+            diff.startsSelected = !older
+            diff.note = older ? String(localized: "This device has an older iOS than the one on file.") : nil
+            diffs.append(diff)
         }
 
         return diffs
@@ -232,13 +285,18 @@ struct UpdateAppInfoSheet: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
+                if let note = diff.note {
+                    Text(note)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .accessibilityLabel(Text(diff.label))
-        .accessibilityValue(Text(selectedFieldIDs.contains(diff.id)
+        .accessibilityValue(Text((selectedFieldIDs.contains(diff.id)
             ? String(localized: "On. Was \(truncated(diff.oldValue, limit: 200)), now \(truncated(diff.newValue, limit: 200)).")
             : String(localized: "Off. Was \(truncated(diff.oldValue, limit: 200)), now \(truncated(diff.newValue, limit: 200)).")
-        ))
+        ) + (diff.note.map { " " + $0 } ?? "")))
         .accessibilityHint(String(localized: "Double tap to include or skip this detail."))
     }
 

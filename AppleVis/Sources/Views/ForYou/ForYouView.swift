@@ -523,21 +523,82 @@ struct SavedItemsView: View {
     @State private var isLoading = false
     @State private var error: String?
     @State private var filter: ContentKind?
+    /// Saved Ask the Mouse answers, and whether the filter is set to them.
+    /// They're their own saved type, alongside the content kinds.
+    /// Requested directly (2026-09-28).
+    @State private var answers: [SavedMouseAnswer] = []
+    @State private var showsAnswersOnly = false
     @State private var showUnsaveAllConfirm = false
     @State private var showBrowseContent = false
     @AccessibilityFocusState private var summaryFocused: Bool
+
+    /// One saved thing in the list: an item, or a Mouse answer.
+    private enum Entry: Identifiable {
+        case item(SavedItem)
+        case answer(SavedMouseAnswer)
+        var id: String {
+            switch self {
+            case .item(let item): return "item-\(item.id)"
+            case .answer(let answer): return "answer-\(answer.id)"
+            }
+        }
+        var savedAt: Date {
+            switch self {
+            case .item(let item): return item.savedAt
+            case .answer(let answer): return answer.savedAt
+            }
+        }
+    }
+
+    /// The filter's choices: everything, one content kind, or Mouse answers.
+    private enum Choice: Hashable {
+        case all, kind(ContentKind), answers
+        var name: String {
+            switch self {
+            case .all: return String(localized: "All Saved Items")
+            case .kind(let kind): return kind.savedFilterName
+            case .answers: return String(localized: "Mouse Answers")
+            }
+        }
+    }
+
+    private var choice: Binding<Choice> {
+        Binding(
+            get: { showsAnswersOnly ? .answers : (filter.map { .kind($0) } ?? .all) },
+            set: { newValue in
+                switch newValue {
+                case .all: filter = nil; showsAnswersOnly = false
+                case .kind(let kind): filter = kind; showsAnswersOnly = false
+                case .answers: filter = nil; showsAnswersOnly = true
+                }
+            }
+        )
+    }
+
+    private var choices: [Choice] { [.all] + ContentKind.allCases.map { .kind($0) } + [.answers] }
 
     /// Saved has no server concept and needs no sign-in (see
     /// ContentActionsModifier) — this used to gate the whole screen behind
     /// `auth.isSignedIn` even though Save itself works while signed out,
     /// so a signed-out user could save items they could then never see.
-    init(initialFilter: ContentKind? = nil) {
+    init(initialFilter: ContentKind? = nil, showsMouseAnswers: Bool = false) {
         _filter = State(initialValue: initialFilter)
+        _showsAnswersOnly = State(initialValue: showsMouseAnswers)
     }
 
     var filtered: [SavedItem] {
+        if showsAnswersOnly { return [] }
         guard let f = filter else { return items }
         return items.filter { $0.kind == f }
+    }
+
+    private var filteredAnswers: [SavedMouseAnswer] {
+        showsAnswersOnly || filter == nil ? answers : []
+    }
+
+    /// Newest first, items and answers together.
+    private var entries: [Entry] {
+        (filtered.map(Entry.item) + filteredAnswers.map(Entry.answer)).sorted { $0.savedAt > $1.savedAt }
     }
 
     var body: some View {
@@ -546,18 +607,18 @@ struct SavedItemsView: View {
                 LoadingView()
             } else if let error {
                 ErrorView(message: error) { await load() }
-            } else if filtered.isEmpty {
+            } else if entries.isEmpty {
                 // Distinguishes "you have other saved items, just none of
                 // this filtered kind" from "you have nothing saved at all"
                 // (FORYOU-08) — previously both showed the identical
                 // generic empty state with no way back to "show everything."
-                if filter != nil && !items.isEmpty {
+                if (filter != nil || showsAnswersOnly) && !(items.isEmpty && answers.isEmpty) {
                     EmptyStateView(
                         title: "No Saved Items of This Kind",
                         message: "You have other saved items — clear the filter to see them.",
                         systemImage: "bookmark",
                         primaryActionLabel: "Clear Filter",
-                        primaryAction: { filter = nil }
+                        primaryAction: { filter = nil; showsAnswersOnly = false }
                     )
                 } else {
                     EmptyStateView(
@@ -595,10 +656,15 @@ struct SavedItemsView: View {
             filterPicker
             summaryHeader
                 .accessibilityFocused($summaryFocused)
-            ForEach(filtered) { item in
-                rowView(for: item)
+            ForEach(entries) { entry in
+                switch entry {
+                case .item(let item):
+                    rowView(for: item)
+                case .answer(let answer):
+                    SavedMouseAnswerRow(answer: answer) { removeAnswer(answer) }
+                }
             }
-            if !filtered.isEmpty {
+            if !entries.isEmpty {
                 Button("Unsave All", role: .destructive) { showUnsaveAllConfirm = true }
                     .frame(maxWidth: .infinity)
             }
@@ -610,7 +676,7 @@ struct SavedItemsView: View {
         .onAppear { tips.show(UIAccessibility.isVoiceOverRunning ? .savedRotorActions : .savedQuickActions) }
         .refreshable { await load(); SoundPlayer.shared.play(.refresh) }
         .confirmationDialog(
-            String(localized: "Unsave all \(filtered.count) items?"),
+            String(localized: "Unsave all \(entries.count) items?"),
             isPresented: $showUnsaveAllConfirm, titleVisibility: .visible
         ) {
             Button("Unsave All", role: .destructive) { unsaveAll() }
@@ -637,30 +703,33 @@ struct SavedItemsView: View {
     private var summaryHeader: some View {
         let counts = Dictionary(grouping: items, by: { $0.kind }).mapValues(\.count)
         return CollectionSummaryHeader(
-            text: filter == nil
-                ? String(localized: "\(items.count) items")
-                : filter!.countPhrase(filtered.count),
+            text: showsAnswersOnly
+                ? String(localized: "\(answers.count) Mouse answers")
+                : filter == nil
+                    ? String(localized: "\(items.count + answers.count) items")
+                    : filter!.countPhrase(filtered.count),
             summaryActionName: String(localized: "Saved summary"),
             onSummaryAction: { announceSummary(counts: counts) },
-            bulkActionName: filtered.isEmpty ? nil : String(localized: "Unsave All"),
-            onBulkAction: filtered.isEmpty ? nil : { showUnsaveAllConfirm = true }
+            bulkActionName: entries.isEmpty ? nil : String(localized: "Unsave All"),
+            onBulkAction: entries.isEmpty ? nil : { showUnsaveAllConfirm = true }
         )
     }
 
     private func announceSummary(counts: [ContentKind: Int]) {
-        guard !items.isEmpty else {
+        guard !(items.isEmpty && answers.isEmpty) else {
             UIAccessibility.post(notification: .announcement, argument: String(localized: "No saved items."))
             return
         }
-        let parts = ContentKind.allCases.compactMap { kind -> String? in
+        var parts = ContentKind.allCases.compactMap { kind -> String? in
             guard let count = counts[kind], count > 0 else { return nil }
             return kind.countPhrase(count)
         }
+        if !answers.isEmpty { parts.append(String(localized: "\(answers.count) Mouse answers")) }
         // Plain English interpolation before — never translated. Plural
         // forms come from the catalog's variations for these keys.
         UIAccessibility.post(
             notification: .announcement,
-            argument: String(localized: "\(String(localized: "\(items.count) saved items")): \(ListFormatter.localizedString(byJoining: parts)).")
+            argument: String(localized: "\(String(localized: "\(items.count + answers.count) saved items")): \(ListFormatter.localizedString(byJoining: parts)).")
         )
     }
 
@@ -669,10 +738,9 @@ struct SavedItemsView: View {
             Label("Show", systemImage: "line.3.horizontal.decrease.circle")
                 .foregroundStyle(.secondary)
             Spacer()
-            Picker("Show Saved Items", selection: $filter) {
-                Text("All Saved Items").tag(nil as ContentKind?)
-                ForEach(ContentKind.allCases, id: \.self) { kind in
-                    Text(kind.savedFilterName).tag(kind as ContentKind?)
+            Picker("Show Saved Items", selection: choice) {
+                ForEach(choices, id: \.self) { option in
+                    Text(option.name).tag(option)
                 }
             }
             .pickerStyle(.menu)
@@ -680,17 +748,17 @@ struct SavedItemsView: View {
             // Explicit value — without it, swiping up/down only played the
             // "value changed" tone with no spoken filter name. Same fix as
             // PlayerView's playback-speed control (PODCAST-06). Reported directly.
-            .accessibilityValue(Text(filter?.savedFilterName ?? String(localized: "All Saved Items")))
+            .accessibilityValue(Text(choice.wrappedValue.name))
             // Same swipe-up/down addition as the Section/Platform pickers —
             // moves to the next/previous filter without opening the menu.
             .accessibilityAdjustableAction { direction in
-                let options: [ContentKind?] = [nil] + ContentKind.allCases
-                guard let idx = options.firstIndex(where: { $0 == filter }) else { return }
+                let options = choices
+                guard let idx = options.firstIndex(of: choice.wrappedValue) else { return }
                 switch direction {
                 case .increment:
-                    filter = options[(idx + 1) % options.count]
+                    choice.wrappedValue = options[(idx + 1) % options.count]
                 case .decrement:
-                    filter = options[(idx - 1 + options.count) % options.count]
+                    choice.wrappedValue = options[(idx - 1 + options.count) % options.count]
                 @unknown default: break
                 }
             }
@@ -707,11 +775,19 @@ struct SavedItemsView: View {
         focusSummaryAfterDelay()
     }
 
+    private func removeAnswer(_ answer: SavedMouseAnswer) {
+        answers.removeAll { $0.id == answer.id }
+        focusSummaryAfterDelay()
+    }
+
     private func unsaveAll() {
         let toRemove = Set(filtered.map(\.id))
         for id in toRemove { PersistenceStore.shared.unsave(id: id) }
         items.removeAll { toRemove.contains($0.id) }
-        toast.success(String(localized: "Removed \(toRemove.count) items from Saved"))
+        let answersToRemove = Set(filteredAnswers.map(\.id))
+        for id in answersToRemove { PersistenceStore.shared.unsaveMouseAnswer(id: id) }
+        answers.removeAll { answersToRemove.contains($0.id) }
+        toast.success(String(localized: "Removed \(toRemove.count + answersToRemove.count) items from Saved"))
         UIAccessibility.post(notification: .announcement, argument: String(localized: "Removed saved items."))
         focusSummaryAfterDelay()
     }
@@ -727,6 +803,7 @@ struct SavedItemsView: View {
 
     private func load() async {
         items = PersistenceStore.shared.savedItems()
+        answers = PersistenceStore.shared.savedMouseAnswers()
         await enrichPodcastEpisodes()
     }
 

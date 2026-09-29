@@ -105,6 +105,18 @@ final class FetchStore: ObservableObject {
 
     static func key(_ item: FeedItem, newCount: Int) -> String { "\(item.id)#\(newCount)" }
 
+    /// After "Mark Read Up to Here": the same item with only its newest
+    /// `count` comments, stored under its new count, so the group updates
+    /// at once instead of reloading.
+    func keepNewest(_ count: Int, of item: FeedItem, from oldCount: Int) {
+        guard case .loaded(let content)? = states[Self.key(item, newCount: oldCount)] else { return }
+        states[Self.key(item, newCount: count)] = .loaded(FetchContent(
+            author: content.author, postedAt: content.postedAt, preview: content.preview,
+            previewIsExcerpt: content.previewIsExcerpt, comments: Array(content.comments.suffix(count)),
+            authorId: content.authorId
+        ))
+    }
+
     func state(for item: FeedItem, newCount: Int) -> FetchLoadState? {
         states[Self.key(item, newCount: newCount)]
     }

@@ -137,6 +137,30 @@ enum MouseKnowledge {
         return picked.sorted().map { paragraphs[$0] }.joined(separator: "\n")
     }
 
+    /// The single paragraph (or line, for lists and tables) that best
+    /// matches, for landing on it when the page opens.
+    static func bestParagraph(in text: String, terms: [String]) -> String? {
+        let lines = text.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { $0.count >= 12 }
+        return lines.map { ($0, score(title: "", body: $0, terms: terms)) }
+            .filter { $0.1 > 0 }
+            .max { $0.1 < $1.1 }?.0
+    }
+
+    /// The best-matching sentence, word for word, when Apple Intelligence
+    /// can't write a line.
+    static func bestSentence(in text: String, terms: [String]) -> String? {
+        var sentences: [String] = []
+        text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: .bySentences) { sentence, _, _, _ in
+            if let sentence = sentence?.trimmingCharacters(in: .whitespacesAndNewlines), sentence.count >= 12 {
+                sentences.append(sentence)
+            }
+        }
+        guard let best = sentences.map({ ($0, score(title: "", body: $0, terms: terms)) }).filter({ $0.1 > 0 }).max(by: { $0.1 < $1.1 })?.0 else { return nil }
+        return best.count > 240 ? String(best.prefix(240)) + "…" : best
+    }
+
     // MARK: - What's New and Tips
 
     struct Note: Identifiable, Hashable {

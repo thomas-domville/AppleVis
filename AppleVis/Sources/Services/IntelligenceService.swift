@@ -308,6 +308,27 @@ enum IntelligenceService {
         let answered: Bool
         let text: String
         let sourceIds: [String]
+        /// The steps to follow, in order, when the answer is a how-to.
+        /// `text` is then a short introduction to them.
+        var steps: [String] = []
+        /// Two or three questions the person might ask next.
+        var followUps: [String] = []
+    }
+
+    /// Why Apple Intelligence couldn't answer, when it's worth telling the
+    /// person. Requested directly (2026-09-29).
+    enum MouseFailure: Sendable, Equatable {
+        /// Apple's safety check stopped it, sometimes by mistake.
+        case blocked
+        /// The question's language isn't supported yet.
+        case unsupportedLanguage
+        /// Too many requests at once.
+        case busy
+    }
+
+    struct MouseAnswerResult: Sendable {
+        var answer: MouseAnswer?
+        var failure: MouseFailure?
     }
 
     struct MouseItem: Sendable {
@@ -328,8 +349,46 @@ enum IntelligenceService {
     You are the Mouse, the friendly helper in the AppleVis app. AppleVis is a community of blind, DeafBlind, \
     low vision, and sighted people who share how well Apple devices and apps work with accessibility features \
     like VoiceOver. You are warm, brief, and plain-spoken. You only use the information you are given, and you \
-    never make up apps, steps, settings, or facts.
+    never make up apps, steps, settings, or facts. Copy commands, gestures, key combinations, Braille dot \
+    patterns, keyboard shortcuts, and setting names exactly as the source writes them; never reword them.
     """
+
+    private static let mousePlanInstructions = mouseInstructions + """
+     Work out what the person wants and plan the searches. Search phrases are always in English, \
+    even if the question isn't. Use none when nothing fits. whatsNew means changes to this AppleVis \
+    app itself; news about iOS, Apple, or other apps is appleHowTo or communityDiscussion.
+    """
+
+    /// A planning session loaded ahead of time by `prewarmMouse()`.
+    nonisolated(unsafe) private static var warmPlanSession: AnyObject?
+
+    /// Loads the model as soon as Ask the Mouse opens, so the first
+    /// question doesn't wait for it. Requested directly (2026-09-29).
+    static func prewarmMouse() {
+        guard #available(iOS 26.0, *), isAvailable, warmPlanSession == nil else { return }
+        let session = LanguageModelSession(instructions: mousePlanInstructions)
+        session.prewarm()
+        warmPlanSession = session
+    }
+
+    /// Why a generation failed, in the terms the person is told.
+    @available(iOS 26.0, *)
+    private static func mouseFailure(_ error: Error) -> MouseFailure? {
+        guard let error = error as? LanguageModelSession.GenerationError else { return nil }
+        switch error {
+        case .guardrailViolation: return .blocked
+        case .unsupportedLanguageOrLocale: return .unsupportedLanguage
+        case .rateLimited, .concurrentRequests: return .busy
+        default: return nil
+        }
+    }
+
+    @available(iOS 26.0, *)
+    private static func isTooLong(_ error: Error) -> Bool {
+        guard let error = error as? LanguageModelSession.GenerationError,
+              case .exceededContextWindowSize = error else { return false }
+        return true
+    }
 
     /// Works out what the question is asking for and turns it into searches.
     /// `earlier` holds the last question or two, so follow-ups like "and how
@@ -352,10 +411,10 @@ enum IntelligenceService {
         \(switches)
         """
         do {
-            let session = LanguageModelSession(instructions: mouseInstructions + """
-             Work out what the person wants and plan the searches. Search phrases are always in English, \
-            even if the question isn't. Use none when nothing fits.
-            """)
+            // The session loaded when the screen opened, used once.
+            let warm = warmPlanSession as? LanguageModelSession
+            warmPlanSession = nil
+            let session = warm ?? LanguageModelSession(instructions: mousePlanInstructions)
             let result = try await session.respond(to: prompt, generating: MousePlanOutput.self).content
             var plan = MousePlan()
             plan.kind = MousePlan.Kind(rawValue: result.kind) ?? .other
@@ -378,31 +437,117 @@ enum IntelligenceService {
 
     /// Answers only from `sources`, in the question's language. Says it
     /// couldn't answer rather than guessing.
-    static func mouseAnswer(to question: String, earlier: [String], sources: [MouseSource]) async -> MouseAnswer? {
-        guard #available(iOS 26.0, *), isAvailable, !sources.isEmpty else { return nil }
+    ///
+    /// `onPartial` gets the answer as it's written, for the screen only.
+    /// When the sources are too long for the model, it tries again with
+    /// each one shortened, rather than giving up. Requested directly
+    /// (2026-09-29).
+    static func mouseAnswer(
+        to question: String, earlier: [String], sources: [MouseSource], iOSVersion: String = "",
+        onPartial: (@MainActor @Sendable (String) -> Void)? = nil
+    ) async -> MouseAnswerResult {
+        guard #available(iOS 26.0, *), isAvailable, !sources.isEmpty else { return MouseAnswerResult() }
+        var current = sources
+        for attempt in 0..<3 {
+            do {
+                let answer = try await streamMouseAnswer(to: question, earlier: earlier, sources: current,
+                                                         iOSVersion: iOSVersion, onPartial: onPartial)
+                return MouseAnswerResult(answer: answer)
+            } catch {
+                if isTooLong(error), attempt < 2 {
+                    AppLog.intelligence.info("Mouse answer too long; shortening sources")
+                    current = current.map { MouseSource(id: $0.id, title: $0.title, text: String($0.text.prefix($0.text.count * 3 / 5))) }
+                    continue
+                }
+                AppLog.intelligence.error("Mouse answer failed: \(error, privacy: .private)")
+                return MouseAnswerResult(failure: mouseFailure(error))
+            }
+        }
+        return MouseAnswerResult()
+    }
+
+    /// The answer so far, as it would be shown: the introduction, then the
+    /// numbered steps.
+    static func mouseAnswerText(_ answer: String, steps: [String]) -> String {
+        let steps = steps.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        guard !steps.isEmpty else { return answer }
+        let numbered = steps.enumerated().map { "\($0.offset + 1). \($0.element)" }
+        return ([answer.trimmingCharacters(in: .whitespacesAndNewlines)] + numbered)
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+    }
+
+    @available(iOS 26.0, *)
+    private static func streamMouseAnswer(
+        to question: String, earlier: [String], sources: [MouseSource], iOSVersion: String,
+        onPartial: (@MainActor @Sendable (String) -> Void)?
+    ) async throws -> MouseAnswer {
         let listed = sources.map { "[\($0.id)] \($0.title)\n\($0.text)" }.joined(separator: "\n\n")
         let history = earlier.isEmpty ? "" : "Earlier questions: " + earlier.joined(separator: " / ") + "\n\n"
+        // Sources written for the person's own iOS version come first.
+        // Requested directly (2026-09-29).
+        let version = iOSVersion.isEmpty ? "" : "The person uses iOS \(iOSVersion). When sources disagree, prefer what fits that version.\n\n"
         let prompt = """
-        \(history)Question: \(question)
+        \(version)\(history)Question: \(question)
 
         Sources:
         \(listed)
         """
+        let session = LanguageModelSession(instructions: mouseInstructions + """
+         Answer the question using only the sources. Keep it to the main steps or facts, in one to four \
+        short sentences, and write in the same language as the question. Speak to the person as "you". \
+        When the answer is steps to follow, write a short introduction as the answer and put each step, \
+        in order, in steps. If the sources don't answer it, say so and don't guess. Prefer Help and guides. \
+        Members' comments and forum discussions are advice from community members: use them when they add \
+        something useful or the other sources don't answer, and then say so, for example "A member suggests…".
+        """)
+        // Streamed, so the answer can appear as it's written. Only the
+        // finished answer is given to VoiceOver.
+        let stream = session.streamResponse(to: prompt, generating: MouseAnswerOutput.self)
+        var latest: MouseAnswerOutput.PartiallyGenerated?
+        for try await snapshot in stream {
+            latest = snapshot.content
+            if let onPartial {
+                await onPartial(mouseAnswerText(snapshot.content.answer ?? "", steps: snapshot.content.steps ?? []))
+            }
+        }
+        let known = Set(sources.map(\.id))
+        let text = (latest?.answer ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let steps = (latest?.steps ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        let answered = (latest?.answered ?? false) && !(text.isEmpty && steps.isEmpty)
+        return MouseAnswer(
+            answered: answered,
+            text: text,
+            sourceIds: (latest?.sourceIds ?? []).filter { known.contains($0) },
+            steps: answered ? steps : [],
+            followUps: answered
+                ? (latest?.followUps ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+                : []
+        )
+    }
+
+    /// One result's answer to the question: a short line written only from
+    /// that page's matching passage, or "doesn't answer" so the result can
+    /// be dropped. Nil when Apple Intelligence can't run or fails.
+    /// Requested directly (2026-09-29).
+    static func mouseResultLine(question: String, title: String, passage: String) async -> (answers: Bool, line: String)? {
+        guard #available(iOS 26.0, *), isAvailable, !passage.isEmpty else { return nil }
+        let prompt = """
+        Question: \(question)
+
+        Page: \(title)
+        \(passage)
+        """
         do {
             let session = LanguageModelSession(instructions: mouseInstructions + """
-             Answer the question using only the sources. Keep it to the main steps or facts, in one to four \
-            short sentences, and write in the same language as the question. Speak to the person as "you". \
-            If the sources don't answer it, say so and don't guess.
+             Read this one page and say what it tells the person about their question, in one short sentence, \
+            in the same language as the question. If it doesn't answer the question, say so.
             """)
-            let result = try await session.respond(to: prompt, generating: MouseAnswerOutput.self).content
-            let known = Set(sources.map(\.id))
-            return MouseAnswer(
-                answered: result.answered && !result.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                text: result.answer.trimmingCharacters(in: .whitespacesAndNewlines),
-                sourceIds: result.sourceIds.filter { known.contains($0) }
-            )
+            let result = try await session.respond(to: prompt, generating: MouseResultLineOutput.self).content
+            let line = result.line.trimmingCharacters(in: .whitespacesAndNewlines)
+            return (result.answers && !line.isEmpty, line)
         } catch {
-            AppLog.intelligence.error("Mouse answer failed: \(error, privacy: .private)")
+            AppLog.intelligence.error("Mouse result line failed: \(error, privacy: .private)")
             return nil
         }
     }
@@ -511,10 +656,14 @@ private struct MousePlanOutput {
 private struct MouseAnswerOutput {
     @Guide(description: "True if the sources answer the question.")
     var answered: Bool
-    @Guide(description: "The answer in one to four short, warm, plain sentences, only from the sources. Empty if they don't answer it.")
+    @Guide(description: "The answer in one to four short, warm, plain sentences, only from the sources. When it's steps to follow, one short sentence introducing them. Empty if they don't answer it.")
     var answer: String
+    @Guide(description: "When the answer is steps to follow in order, each step as one short instruction, in order, copying commands and setting names exactly. Otherwise empty.", .maximumCount(8))
+    var steps: [String]
     @Guide(description: "The ids, in square brackets in the sources, of the sources the answer used, without the brackets.")
     var sourceIds: [String]
+    @Guide(description: "Two or three short questions the person might ask next about the same subject, worded as they would ask them, in the same language as the question. Empty if the sources don't answer it.", .maximumCount(3))
+    var followUps: [String]
 }
 
 @available(iOS 26.0, *)
@@ -538,4 +687,13 @@ private struct MousePickOutput {
     var group: String
     @Guide(description: "One short sentence about it, under 20 words, from its own text only.")
     var blurb: String
+}
+
+@available(iOS 26.0, *)
+@Generable
+private struct MouseResultLineOutput {
+    @Guide(description: "True if the page answers the question.")
+    var answers: Bool
+    @Guide(description: "One short sentence, under 30 words, saying what the page tells the person about their question. Copy commands, gestures, and setting names exactly. Empty if it doesn't answer.")
+    var line: String
 }

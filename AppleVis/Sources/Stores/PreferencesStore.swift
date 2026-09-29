@@ -49,6 +49,10 @@ final class PreferencesStore: ObservableObject {
     var accentColor: Color { theme.accentColor(systemIsDark: systemIsDark) }
     @AppStorage("appearance.cardDensity") var cardDensity: CardDensity = .comfortable
     @AppStorage("browsing.webMode") var webBrowsingMode: WebBrowsingMode = .inApp
+    /// The search engine Ask the Mouse's Search the Web uses. iOS doesn't
+    /// tell apps which engine Safari uses, so it's chosen here.
+    /// Requested directly (2026-09-28).
+    @AppStorage("browsing.webSearchEngine") var webSearchEngine: WebSearchEngine = .duckDuckGo
 
     // MARK: - Home feed filters
     @AppStorage("feed.showForums")   var showForums   = true
@@ -375,6 +379,34 @@ enum WebBrowsingMode: String, CaseIterable, Identifiable {
         case .inApp:    return String(localized: "In-App Browser")
         case .external: return String(localized: "Default Browser")
         }
+    }
+}
+
+enum WebSearchEngine: String, CaseIterable, Identifiable {
+    case duckDuckGo, google, bing, ecosia
+    var id: String { rawValue }
+
+    /// Brand names, the same in every language.
+    var displayName: String {
+        switch self {
+        case .duckDuckGo: return "DuckDuckGo"
+        case .google: return "Google"
+        case .bing: return "Bing"
+        case .ecosia: return "Ecosia"
+        }
+    }
+
+    func searchURL(for query: String) -> URL? {
+        let base: String
+        switch self {
+        case .duckDuckGo: base = "https://duckduckgo.com/"
+        case .google: base = "https://www.google.com/search"
+        case .bing: base = "https://www.bing.com/search"
+        case .ecosia: base = "https://www.ecosia.org/search"
+        }
+        var components = URLComponents(string: base)
+        components?.queryItems = [URLQueryItem(name: "q", value: query)]
+        return components?.url
     }
 }
 

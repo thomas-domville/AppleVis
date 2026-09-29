@@ -252,8 +252,14 @@ struct SegmentedHTMLView: View {
     var contentKind: String? = nil
     var contentId: String? = nil
     var field: String = "body"
+    /// Ask the Mouse: the start of the paragraph an answer came from. The
+    /// page opens there, with VoiceOver on it, instead of at the top.
+    /// Requested directly (2026-09-29).
+    var focusText: String? = nil
 
     @EnvironmentObject private var preferences: PreferencesStore
+    @Environment(\.contentScrollProxy) private var scrollProxy
+    @AccessibilityFocusState private var focusedSegment: Int?
     @State private var expanded = false
     /// Defaults to showing the translation (not the original) once one
     /// exists — matches the whole point of turning auto-translate on.
@@ -285,9 +291,11 @@ struct SegmentedHTMLView: View {
             if hasActiveTranslation {
                 TranslationBanner(showOriginal: $showOriginal)
             }
-            ForEach(visible) { segment in
+            ForEach(Array(visible.enumerated()), id: \.element.id) { index, segment in
                 segmentView(segment)
                     .id(segment.id)
+                    .background(Color.clear.id("segment-\(index)"))
+                    .accessibilityFocused($focusedSegment, equals: index)
             }
             if shouldCollapse {
                 // expandLabel is a String — Button(String) skips the catalog.
@@ -297,6 +305,24 @@ struct SegmentedHTMLView: View {
         }
         .accessibilityElement(children: .contain)
         .task(id: translationTaskId) { await resolveTranslationIfNeeded() }
+        .task(id: focusText) { await focusMatchingSegment() }
+    }
+
+    /// Finds the paragraph `focusText` came from, opens the full content if
+    /// it's past the cut-off, scrolls to it, and moves VoiceOver there.
+    private func focusMatchingSegment() async {
+        guard let focusText, !focusText.isEmpty else { return }
+        func normalized(_ text: String) -> String {
+            text.lowercased().split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+        }
+        let all = allSegments
+        let full = normalized(focusText)
+        let keys = [String(full.prefix(60)), String(full.prefix(30))].filter { !$0.isEmpty }
+        guard let index = keys.lazy.compactMap({ key in all.firstIndex { normalized($0.plainText).contains(key) } }).first else { return }
+        if let limit = collapsedSegmentLimit, index >= limit { expanded = true }
+        try? await Task.sleep(for: .milliseconds(600))
+        withReduceMotionAwareAnimation { scrollProxy?.scrollTo("segment-\(index)", anchor: .top) }
+        await retryAccessibilityFocus(index, into: $focusedSegment, delaysMs: [400, 700, 1100])
     }
 
     private var hasActiveTranslation: Bool {

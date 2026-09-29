@@ -82,6 +82,17 @@ final class ICloudSyncManager {
             merged += local.filter { !mergedIds.contains($0.id) }
             setJSON(merged, key: "icloud.saved")
             writeIdShadow(Set(merged.map(\.id)), key: "icloud.saved.shadow")
+
+            // Saved Ask the Mouse answers, the same way.
+            let localAnswers = PersistenceStore.shared.savedMouseAnswers()
+            let answerShadow = readIdShadow(key: "icloud.savedAnswers.shadow")
+            let cloudAnswers: [SavedMouseAnswer] = getJSON(key: "icloud.savedAnswers") ?? []
+            let answersRemoved = answerShadow.subtracting(Set(localAnswers.map(\.id)))
+            var mergedAnswers = cloudAnswers.filter { !answersRemoved.contains($0.id) }
+            let mergedAnswerIds = Set(mergedAnswers.map(\.id))
+            mergedAnswers += localAnswers.filter { !mergedAnswerIds.contains($0.id) }
+            setJSON(mergedAnswers, key: "icloud.savedAnswers")
+            writeIdShadow(Set(mergedAnswers.map(\.id)), key: "icloud.savedAnswers.shadow")
         }
         if isSyncEnabled("sync.followedItems") {
             let local = PersistenceStore.shared.followedItems()
@@ -175,9 +186,30 @@ final class ICloudSyncManager {
 
     /// Call once at launch (after setting `player`) to adopt anything synced
     /// from another device.
+    /// Ask the Mouse's recent questions: the newest list wins, so a removal
+    /// or Clear on one device reaches the others. Rides on the Saved Items
+    /// switch, like saved Mouse answers.
+    func pushMouseRecentQuestions() {
+        guard isSyncEnabled("sync.savedItems") else { return }
+        let local = MouseRecentQuestions.load()
+        if let cloud: MouseRecentQuestions = getJSON(key: "icloud.mouseRecent"), cloud.updatedAt > local.updatedAt { return }
+        setJSON(local, key: "icloud.mouseRecent")
+        store.synchronize()
+        touchLastSyncDate()
+    }
+
+    private func pullMouseRecentQuestions() {
+        guard isSyncEnabled("sync.savedItems"),
+              let cloud: MouseRecentQuestions = getJSON(key: "icloud.mouseRecent"),
+              cloud.updatedAt > MouseRecentQuestions.load().updatedAt
+        else { return }
+        MouseRecentQuestions.save(cloud)
+    }
+
     func pullAll() {
         guard UserDefaults.standard.object(forKey: "sync.iCloud") as? Bool ?? true else { return }
         pullSavedItems()
+        pullMouseRecentQuestions()
         if let player {
             pullPodcastPositions { player.applyPulledPositions($0) }
             pullQueue { player.applyPulledQueue($0) }
@@ -222,6 +254,18 @@ final class ICloudSyncManager {
                 PersistenceStore.shared.unsave(id: id, sync: false)
             }
             writeIdShadow(Set(PersistenceStore.shared.savedItems().map(\.id)), key: "icloud.saved.shadow")
+        }
+        if isSyncEnabled("sync.savedItems"), let cloud: [SavedMouseAnswer] = getJSON(key: "icloud.savedAnswers") {
+            let shadow = readIdShadow(key: "icloud.savedAnswers.shadow")
+            let localIds = Set(PersistenceStore.shared.savedMouseAnswers().map(\.id))
+            let (toAdd, toRemove) = Self.reconcileIds(cloud: Set(cloud.map(\.id)), local: localIds, shadow: shadow)
+            for answer in cloud where toAdd.contains(answer.id) {
+                PersistenceStore.shared.saveMouseAnswer(answer, sync: false)
+            }
+            for id in toRemove {
+                PersistenceStore.shared.unsaveMouseAnswer(id: id, sync: false)
+            }
+            writeIdShadow(Set(PersistenceStore.shared.savedMouseAnswers().map(\.id)), key: "icloud.savedAnswers.shadow")
         }
         if isSyncEnabled("sync.followedItems"), let cloud: [FollowedItem] = getJSON(key: "icloud.followed") {
             let shadow = readIdShadow(key: "icloud.followed.shadow")

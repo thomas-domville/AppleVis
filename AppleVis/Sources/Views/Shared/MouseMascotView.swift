@@ -140,6 +140,10 @@ enum MousePose: Hashable {
     case listening     // Downloads
     case tinkering     // Profile & Settings
     case celebrating   // All Set
+    case asking        // Ask the Mouse
+    /// Any prop, by SF Symbol name: Ask the Mouse changes it with each
+    /// search step (a book for Help, a newspaper for guides, and so on).
+    case holding(String)
     case plain
 
     var prop: String? {
@@ -153,6 +157,8 @@ enum MousePose: Hashable {
         case .listening:      return "headphones"
         case .tinkering:      return "wrench.adjustable.fill"
         case .celebrating:    return "party.popper.fill"
+        case .asking:         return "questionmark.bubble.fill"
+        case .holding(let symbol): return symbol
         }
     }
 
@@ -207,7 +213,23 @@ struct MouseMascotView: View {
             Group {
                 switch style {
                 case .fullFigure: fullFigure
-                case .face: head(center: CGPoint(x: 0.5 * size, y: 0.56 * size), diameter: 0.72 * size)
+                case .face:
+                    ZStack {
+                        head(center: CGPoint(x: 0.5 * size, y: 0.56 * size), diameter: 0.72 * size)
+                        // The face shows its pose's prop as a little badge,
+                        // so it can say what the Mouse is doing too.
+                        // Requested directly (2026-09-29).
+                        if let prop = pose.prop, size >= 28 {
+                            Image(systemName: prop)
+                                .font(.system(size: 0.24 * size, weight: .semibold))
+                                .foregroundStyle(Color.accentColor)
+                                .frame(width: 0.4 * size, height: 0.4 * size)
+                                .background(Circle().fill(Color(.systemBackground)))
+                                .overlay(Circle().stroke(CharacterStyle.ink.opacity(0.35), lineWidth: max(1, line * 0.6)))
+                                .symbolEffect(.bounce, value: propBounce)
+                                .position(x: 0.84 * size, y: 0.84 * size)
+                        }
+                    }
                 }
             }
             .frame(width: size, height: size)

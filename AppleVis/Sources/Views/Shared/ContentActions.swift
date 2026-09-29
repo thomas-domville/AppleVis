@@ -451,7 +451,14 @@ struct ContentActionsModifier: ViewModifier {
 
     private func markAsRead() {
         guard let currentCommentCount else { return }
-        PersistenceStore.shared.stampItemVisit(id: FeedItem.visitKey(kind: kind, contentId: id), commentCount: currentCommentCount)
+        let key = FeedItem.visitKey(kind: kind, contentId: id)
+        PersistenceStore.shared.stampItemVisit(id: key, commentCount: currentCommentCount)
+        // Same as Home's own Mark as Read: a topic also loses its unread
+        // marker in Forums.
+        if kind == .forumTopic { PersistenceStore.shared.markTopicSeen(id: id) }
+        // Home updates New and Fetch straight away. It used to only notice
+        // on its next reload, so the item stayed listed. Reported directly.
+        NotificationCenter.default.post(name: .itemMarkedRead, object: key)
         UIAccessibility.post(notification: .announcement, argument: String(localized: "Marked as read."))
     }
 
@@ -842,6 +849,12 @@ struct ConditionalAccessibilityAction: ViewModifier {
             content
         }
     }
+}
+
+extension Notification.Name {
+    /// Posted with an item's visit key when Mark as Read is used from its
+    /// own actions, so Home can drop it from New and Fetch at once.
+    static let itemMarkedRead = Notification.Name("AppleVis.itemMarkedRead")
 }
 
 /// Attaches `.swipeActions` only while VoiceOver is off.
