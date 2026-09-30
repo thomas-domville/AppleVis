@@ -37,7 +37,14 @@ struct GuidelineViolationCheckView: View {
     private var visibleFlags: [GuidelineFlag] {
         let bySeverity = showLowSeverity ? scanner.flags : scanner.flags.filter { $0.highestSeverity != .low }
         guard hideProbablyFine else { return bySeverity }
-        return bySeverity.filter { scanner.opinions[$0.id]?.isRealConcern != false }
+        return bySeverity.filter { !scanner.isProbablyFine($0) }
+    }
+
+    /// How many flags the Hide switch would hide, among those shown by
+    /// severity.
+    private var probablyFineCount: Int {
+        (showLowSeverity ? scanner.flags : scanner.flags.filter { $0.highestSeverity != .low })
+            .filter(scanner.isProbablyFine).count
     }
 
     var body: some View {
@@ -169,9 +176,19 @@ struct GuidelineViolationCheckView: View {
                         .accessibilityElement(children: .combine)
                         .accessibilityAddTraits(.updatesFrequently)
                     }
-                    if scanner.opinions.values.contains(where: { !$0.isRealConcern }) {
-                        Toggle("Hide Flags Apple Intelligence Thinks Are Fine", isOn: $hideProbablyFine)
+                    // Off shows every flag the rules found; on shows what's
+                    // left after Apple Intelligence's second look. Says how
+                    // many it hides, and VoiceOver hears the new count when
+                    // it's switched. Reported directly (2026-09-30).
+                    if scanner.flags.contains(where: scanner.isProbablyFine) {
+                        Toggle("Hide Flags Apple Intelligence Thinks Are Fine (\(probablyFineCount))", isOn: $hideProbablyFine)
                             .accessibilityHint("Hides flags that Apple Intelligence read in context and judged probably fine. They're still in the scan results.")
+                            .onChange(of: hideProbablyFine) { _, hide in
+                                let message = hide
+                                    ? "Hid \(probablyFineCount) flags. \(visibleFlags.count) flagged."
+                                    : "Showing all flags. \(visibleFlags.count) flagged."
+                                UIAccessibility.post(notification: .announcement, argument: message)
+                            }
                     }
                 }
 
@@ -181,7 +198,7 @@ struct GuidelineViolationCheckView: View {
                             NavigationLink {
                                 GuidelineFlagDestination(flag: flag)
                             } label: {
-                                GuidelineFlagRow(flag: flag, opinion: scanner.opinions[flag.id])
+                                GuidelineFlagRow(flag: flag, opinions: scanner.opinions[flag.id] ?? [:])
                             }
                             .modifier(GuidelineFlagActions(flag: flag, onHandled: { scanner.removeFlag(id: flag.id) }))
                         }
@@ -278,13 +295,23 @@ private struct GuidelineFlagFullText: View {
 
 private struct GuidelineFlagRow: View {
     let flag: GuidelineFlag
-    var opinion: IntelligenceService.GuidelineSecondOpinion? = nil
+    /// Apple Intelligence's verdict on each context-dependent rule, by rule id.
+    var opinions: [String: IntelligenceService.GuidelineSecondOpinion] = [:]
+
+    /// One line per judged rule, named when the flag has more than one.
+    private var opinionLines: [(id: String, text: String, isFine: Bool)] {
+        flag.warnings.compactMap { warning in
+            guard let opinion = opinions[warning.id] else { return nil }
+            let verdict = opinion.isRealConcern
+                ? "Apple Intelligence agrees: \(opinion.reason)"
+                : "Apple Intelligence thinks this is probably fine: \(opinion.reason)"
+            return (warning.id, flag.warnings.count > 1 ? "\(warning.rule): \(verdict)" : verdict, !opinion.isRealConcern)
+        }
+    }
 
     private var opinionText: String? {
-        guard let opinion else { return nil }
-        return opinion.isRealConcern
-            ? "Apple Intelligence agrees: \(opinion.reason)"
-            : "Apple Intelligence thinks this is probably fine: \(opinion.reason)"
+        let lines = opinionLines.map(\.text)
+        return lines.isEmpty ? nil : lines.joined(separator: " ")
     }
 
     private var severityConfig: (color: Color, label: String) {
@@ -340,8 +367,8 @@ private struct GuidelineFlagRow: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(flag.isRootItem ? 4 : 8)
 
-            if let opinionText {
-                Label(opinionText, systemImage: opinion?.isRealConcern == false ? "checkmark.seal" : "sparkles")
+            ForEach(opinionLines, id: \.id) { line in
+                Label(line.text, systemImage: line.isFine ? "checkmark.seal" : "sparkles")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

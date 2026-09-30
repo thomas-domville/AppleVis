@@ -205,9 +205,7 @@ struct BlogDetailView: View {
         )
 
         if detail.comments.isEmpty {
-            Text("No comments yet.")
-                .font(.subheadline).foregroundStyle(.secondary)
-                .padding(.horizontal)
+            NoCommentsYet(onAddComment: { showCompose = true })
         } else {
             ForEach(Array(detail.comments.enumerated()), id: \.element.id) { index, comment in
                 CommentRow(

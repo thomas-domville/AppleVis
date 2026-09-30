@@ -413,14 +413,16 @@ enum WebSearchEngine: String, CaseIterable, Identifiable {
 enum ForumFilter: String, CaseIterable, Identifiable {
     case recent, new, unread, sinceLastVisit, following, saved
     var id: String { rawValue }
+    // Translated: these were plain English, so the forum filter menu
+    // read in English in every language. Found 2026-09-30.
     var displayName: String {
         switch self {
-        case .recent:         return "Recent"
-        case .new:             return "New"
-        case .unread:          return "Unread"
-        case .sinceLastVisit: return "Since Last Visit"
-        case .following:       return "Following"
-        case .saved:           return "Saved"
+        case .recent:         return String(localized: "Recent")
+        case .new:             return String(localized: "New")
+        case .unread:          return String(localized: "Unread")
+        case .sinceLastVisit: return String(localized: "Since Last Visit")
+        case .following:       return String(localized: "Following")
+        case .saved:           return String(localized: "Saved")
         }
     }
     /// Following/Saved come from local persistence rather than the "recent" feed,
@@ -430,10 +432,10 @@ enum ForumFilter: String, CaseIterable, Identifiable {
     var filterDescription: String? {
         switch self {
         case .recent, .new:   return nil
-        case .sinceLastVisit: return "Topics that changed since you last opened AppleVis."
-        case .unread:          return "Topics you have not opened yet on this device."
-        case .following:       return "Topics you are following. Saved locally and synced via iCloud."
-        case .saved:           return "Topics you saved for later. Synced via iCloud."
+        case .sinceLastVisit: return String(localized: "Topics that changed since you last opened AppleVis.")
+        case .unread:          return String(localized: "Topics you have not opened yet on this device.")
+        case .following:       return String(localized: "Topics you are following. Saved locally and synced via iCloud.")
+        case .saved:           return String(localized: "Topics you saved for later. Synced via iCloud.")
         }
     }
 }

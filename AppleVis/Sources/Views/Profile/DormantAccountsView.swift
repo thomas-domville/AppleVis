@@ -472,9 +472,25 @@ struct DormantAccountsView: View {
         }
     }
 
+    /// Exactly how long ago, in calendar years, months, and days (the two
+    /// largest that apply), and the date: "1 year, 9 months ago, on
+    /// January 3, 2025". The relative wording used before rounded, so an
+    /// account 1 year and 9 months old was read as 2 years. Reported
+    /// directly (2026-09-30).
+    private static func createdText(_ date: Date) -> String {
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: date, to: Date())
+        let formatter = DateComponentsFormatter()
+        formatter.unitsStyle = .full
+        formatter.allowedUnits = [.year, .month, .day]
+        formatter.maximumUnitCount = 2
+        formatter.calendar = Calendar.current
+        let age = formatter.string(from: parts) ?? date.formatted(.relative(presentation: .named))
+        let day = date.formatted(date: .long, time: .omitted)
+        return String(localized: "Created \(age) ago, on \(day)")
+    }
+
     private func detailText(_ account: DormantAccount) -> String {
-        let created = account.createdAt.formatted(.relative(presentation: .named))
-        var text = String(localized: "Created \(created) · Never signed in")
+        var text = String(localized: "\(Self.createdText(account.createdAt)) · Never signed in")
         if account.isBlocked { text = String(localized: "\(text) · Blocked") }
         if account.burstSize > 0 {
             let group = String(localized: "\(account.burstSize) accounts")
@@ -488,7 +504,7 @@ struct DormantAccountsView: View {
         if account.username != account.displayName && !account.username.isEmpty {
             parts.append(String(localized: "username \(account.username)"))
         }
-        parts.append(String(localized: "Created \(account.createdAt.formatted(.relative(presentation: .named)))"))
+        parts.append(Self.createdText(account.createdAt))
         parts.append(String(localized: "Never signed in"))
         if account.isBlocked { parts.append(String(localized: "Blocked")) }
         if account.burstSize > 0 {

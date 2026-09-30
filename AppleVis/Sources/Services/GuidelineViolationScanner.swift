@@ -180,11 +180,22 @@ final class GuidelineViolationScanner: ObservableObject {
     @Published private(set) var lastScanWasStopped = false
     private var scanTask: Task<StreamResult, Never>?
 
-    /// Apple Intelligence's second opinion on each flag, by flag id, filled
-    /// in after a scan on devices that support it. Only for flags whose
-    /// every rule depends on context (see `GuidelineWarning.allowsSecondOpinion`).
-    /// Requested directly (2026-09-27).
-    @Published private(set) var opinions: [String: IntelligenceService.GuidelineSecondOpinion] = [:]
+    /// Apple Intelligence's second opinion on each rule of each flag, by
+    /// flag id then rule id, filled in after a scan on devices that support
+    /// it. Only for rules that depend on context (see
+    /// `GuidelineWarning.allowsSecondOpinion`). Each rule is judged on its
+    /// own, so a flag that also has a clear-cut rule still gets a verdict on
+    /// its context-dependent ones; it used to get none. Requested directly
+    /// (2026-09-27, per rule 2026-09-30).
+    @Published private(set) var opinions: [String: [String: IntelligenceService.GuidelineSecondOpinion]] = [:]
+
+    /// Apple Intelligence judged every rule on this flag fine. Never true
+    /// for a flag with a clear-cut or high-severity rule, since those are
+    /// never judged.
+    func isProbablyFine(_ flag: GuidelineFlag) -> Bool {
+        guard let judged = opinions[flag.id], !flag.warnings.isEmpty else { return false }
+        return flag.warnings.allSatisfy { judged[$0.id]?.isRealConcern == false }
+    }
     @Published private(set) var isReviewing = false
     @Published private(set) var reviewedCount = 0
     @Published private(set) var reviewTotal = 0
@@ -302,12 +313,13 @@ final class GuidelineViolationScanner: ObservableObject {
         reviewWithAppleIntelligence()
     }
 
-    /// Asks Apple Intelligence about each context-dependent flag, one at a
-    /// time in the background, so the results can be read straight away. A
-    /// flag counts as probably fine only if every one of its rules is judged
-    /// fine. Never touches flags with a clear-cut or high-severity rule.
+    /// Asks Apple Intelligence about each context-dependent rule on each
+    /// flag, one flag at a time in the background, so the results can be
+    /// read straight away. A flag counts as probably fine only if every one
+    /// of its rules is judged fine, so a clear-cut or high-severity rule
+    /// always keeps it.
     private func reviewWithAppleIntelligence() {
-        let candidates = flags.filter { !$0.warnings.isEmpty && $0.warnings.allSatisfy(\.allowsSecondOpinion) }
+        let candidates = flags.filter { $0.warnings.contains(where: \.allowsSecondOpinion) }
         guard IntelligenceService.isAvailable, !candidates.isEmpty else { return }
         reviewedCount = 0
         reviewTotal = candidates.count
@@ -316,17 +328,14 @@ final class GuidelineViolationScanner: ObservableObject {
         reviewTask = Task { [weak self] in
             for flag in candidates {
                 guard !Task.isCancelled else { return }
-                var judged: [IntelligenceService.GuidelineSecondOpinion] = []
-                for warning in flag.warnings {
+                var judged: [String: IntelligenceService.GuidelineSecondOpinion] = [:]
+                for warning in flag.warnings where warning.allowsSecondOpinion {
                     if let opinion = await IntelligenceService.secondOpinion(on: warning, in: flag.body) {
-                        judged.append(opinion)
+                        judged[warning.id] = opinion
                     }
                 }
                 guard let self, !Task.isCancelled, self.currentScanId == scanId else { return }
-                if judged.count == flag.warnings.count {
-                    let real = judged.first { $0.isRealConcern }
-                    self.opinions[flag.id] = real ?? judged[0]
-                }
+                if !judged.isEmpty { self.opinions[flag.id] = judged }
                 self.reviewedCount += 1
             }
             guard let self, self.currentScanId == scanId else { return }

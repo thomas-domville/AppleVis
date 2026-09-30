@@ -195,6 +195,12 @@ struct ChangeItem: Identifiable {
 
     static let current: [ChangeItem] = [
         ChangeItem(
+            systemImage: "bubble.left.and.text.bubble.right",
+            tag: .improved,
+            title: "Start the Conversation",
+            description: "A forum topic with no replies yet now shows its Community Discussion section, like every other page. Wherever there are no comments yet, a friendly line says so, with a button to be the first to comment or reply."
+        ),
+        ChangeItem(
             systemImage: "gauge.with.dots.needle.67percent",
             tag: .new,
             title: "Listening Speed for Listen to Fetch",

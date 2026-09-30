@@ -131,15 +131,17 @@ enum HelpContent {
                     summary: "How Home, Discover, For You, and Profile fit together.",
                     content: [
                         .heading("Home"),
-                        .body("Home is the first screen you see. It shows a welcome, a summary of what's happened since your last visit, and a shortcut back to where you left off. Customize Home, at the top left, lets you choose which content types appear in your feed. Add, at the top right, starts a new forum topic or app entry."),
+                        .body("Home is the first screen you see. It shows a welcome, a summary of what's happened since your last visit, and a shortcut back to where you left off. Customize Home, at the top left, lets you choose which content types appear in your feed. Post, at the top right, starts a new forum topic or app entry, and Ask the Mouse, next to it, answers questions in your own words."),
+                        .body("Home has four views: All, New, Fetch, and Nibbles. Choose one at the top of Home."),
                         .heading("Discover"),
                         .body("Discover contains the rest of AppleVis: Forums, the AppleVis Blog, Guides, Podcasts, the App Directory, the Bug Tracker, Be My Eyes, RSS Feeds, and search. The ways to contribute to AppleVis are here too."),
                         .heading("For You"),
                         .body("For You only shows what you've chosen to keep. It has five sections: Saved, Following, Recommended, Queue, and Downloads."),
                         .heading("Profile and Settings"),
                         .body("Profile and Settings isn't a separate tab. Use the Profile and Settings button in the toolbar on Home, Discover, or For You."),
-                        .body("My Account is where you manage your sign-in. You can edit your profile and bio, change your password or email address, or sign out."),
-                        .body("Settings controls how AppleVis looks, sounds, and behaves, including appearance, accessibility, sounds and haptics, notifications, podcasts, privacy, and Apple Intelligence features. Help and Contact AppleVis are also here."),
+                        .body("Choose your name at the top of Profile to open My Account. There you can edit your profile and bio, change your password or email address, or sign out."),
+                        .body("Settings controls how AppleVis looks, sounds, and behaves, including appearance, accessibility, sounds and haptics, notifications, podcasts, privacy, and Apple Intelligence features."),
+                        .body("Help, What's New, Replay Welcome Tour, and Contact AppleVis are in the About AppleVis section of Profile and Settings."),
                         .body("To message another member, open their profile. Private messages aren't sent from your own account screen."),
                     ]
                 ),
@@ -164,7 +166,7 @@ enum HelpContent {
                             "Get notifications about the activity you care about.",
                         ]),
                         .heading("Changing your password or email"),
-                        .body("You can update your account without leaving the app. In Profile, choose Change Password or Change Email Address. Each one is a short guided process: confirm your current password, enter the new value, and review it before saving."),
+                        .body("You can update your account without leaving the app. In Profile, choose your name to open My Account, then choose Change Password or Change Email Address. Each one is a short guided process: confirm your current password, enter the new value, and review it before saving."),
                         .note("The app never stores your password. AppleVis keeps a secure session token in the iOS Keychain instead."),
                     ]
                 ),
@@ -270,7 +272,7 @@ enum HelpContent {
                         .steps([
                             "Sign in from Profile.",
                             "Open the forum topic, blog post, guide, podcast episode, or app page you want to respond to.",
-                            "Choose Reply, Add Comment, or New Topic.",
+                            "Choose Reply or Comment. To start a new topic, choose Post on Home. If nobody has commented yet, choose Be the First to Comment, or Be the First to Reply on a forum topic.",
                             "Write your draft.",
                             "Choose Rewrite if you'd like help with the wording or tone before you post.",
                             "If your draft isn't in English, AppleVis offers to translate it.",
@@ -498,7 +500,7 @@ enum HelpContent {
                             "Mark All as Read clears every badge at once.",
                             "Customize Home, at the top left, chooses which content types appear.",
                         ]),
-                        .tip("Post, the plus button at the top right, starts a new forum topic or app entry without going to Discover first."),
+                        .tip("Post, the plus button at the top right, starts a new forum topic or app entry without going to Discover first. Ask the Mouse, next to it, answers questions in your own words."),
                         .note("On the anniversary of the day you joined AppleVis, Home shows a short celebration. It appears once a year, around your join date."),
                     ]
                 ),
@@ -653,7 +655,7 @@ enum HelpContent {
                         .body("For You isn't a recommendation feed. It only shows things you chose to save, follow, recommend, queue, or download."),
                         .heading("The five sections"),
                         .bullets([
-                            "Saved: topics, apps, guides, blog posts, and episodes you've bookmarked. You can filter by content type.",
+                            "Saved: topics, apps, guides, blog posts, and episodes you've bookmarked, and answers you've saved from Ask the Mouse. You can filter by content type, including Mouse Answers.",
                             "Following: items you're keeping up with. If notifications are on, you're told when there's new activity.",
                             "Recommended: apps you've given a public thumbs-up. Swipe on one to remove it.",
                             "Queue: podcast episodes lined up to play in order. You can reorder or remove them.",
@@ -682,7 +684,7 @@ enum HelpContent {
                 HelpArticle(
                     id: "search-overview",
                     title: "Using Search",
-                    summary: "Find discussions, apps, guides, podcast episodes, bug reports, and Help from one place.",
+                    summary: "Find discussions, apps, guides, blog posts, podcast episodes, and bug reports from one place.",
                     content: [
                         .body("Search is the quickest way to find something when you know roughly what you're looking for. Use the search field at the top of Discover."),
                         .heading("How results are grouped"),
@@ -697,6 +699,7 @@ enum HelpContent {
                         .tip("If your search isn't in English, AppleVis may offer to translate it. Search works best in English."),
                         .body("A search can be up to 150 characters, which is plenty for a few words. Short searches find the most. Searching the App Directory has the same limit. When you're close to it, VoiceOver says how many characters are left. Anything longer is shortened, and AppleVis tells you."),
                         .note("VoiceOver first reads a short summary, such as \"12 results found in 4 categories.\" Each section heading gives more detail."),
+                        .body("With Apple Intelligence, Ask the Mouse appears above the results. Choose it to ask your search as a question and get an answer."),
                     ],
                     contentType: .guide
                 ),
@@ -715,7 +718,8 @@ enum HelpContent {
                     content: [
                         .bullets([
                             "Use Forums in Discover to browse topics.",
-                            "Filter by Recent, New, Unread, Following, or Saved.",
+                            "Use the filter menu to show Recent, New, Unread, Since Last Visit, Following, or Saved topics.",
+                            "For Recent, New, Unread, and Since Last Visit, you can also choose Apple Related or Non-Apple Related topics, and a category.",
                             "When you follow a topic, it appears in For You > Following, and you can be notified about new replies.",
                             "Your Home Feed settings control which content types appear on Home and whether they're limited to Apple topics.",
                             "Settings > Notifications controls which of these send you a notification.",
@@ -745,10 +749,12 @@ enum HelpContent {
                             "Most guideline reminders are a friendly note that you can dismiss. A few things must be fixed before you can post: image links, strong language, and posts that aren't in English.",
                             "Milder crude words, and put-downs aimed at another member, get a friendly reminder. You can still post, but it's worth rewording. Disagreeing strongly about an app or a product is fine.",
                             "If AI helped you write something, the community appreciates a short note saying so.",
+                            "With Apple Intelligence, Smarter Guideline Reminders reads your whole draft and skips a reminder that clearly doesn't fit. Turn it off in Settings > Intelligence.",
+                            "If a reminder seems wrong, choose This Doesn't Seem Right to tell the editorial team, so the checker can improve. This needs you to be signed in.",
                         ]),
                         .heading("Reading AppleVis in your own language"),
                         .body("AppleVis is written and moderated in English. It's the one shared language that lets the whole community talk in the same place, and lets the editorial team review everything that's posted."),
-                        .body("You don't have to read it in English. Turn on Auto-Translate in Settings, and blog posts, forum topics, app entries, podcast episodes, guides, bug reports, comments, and Help can be translated into your language on your device."),
+                        .body("You don't have to read it in English. Turn on Auto-Translate Content in Settings > Content Translation, and blog posts, forum topics, app entries, podcast episodes, guides, bug reports, comments, and Help can be translated into your language on your device."),
                         .bullets([
                             "Translation happens on your iPhone. Nothing you read is sent to an outside server.",
                             "Translation is automatic but not perfect. Look for the small \"Translated\" note, and choose Show Original to see the English text.",
@@ -821,6 +827,8 @@ enum HelpContent {
                             "Choose Edit Comment.",
                             "Edit the text and choose Save.",
                         ]),
+                        .heading("Topics and entries you posted"),
+                        .body("To edit a forum topic, blog post, or other item you posted, open it and choose the actions menu at the top right. Choose Edit, for example Edit Forum Topic."),
                         .note("Edits appear straight away. You don't need to reload the page."),
                         .tip("Choose Rewrite if you'd like help with the tone before you save your edit."),
                         .tip("With VoiceOver, you can also reach Edit from the Actions rotor."),
@@ -838,6 +846,7 @@ enum HelpContent {
                             "Choose Delete Comment.",
                             "Choose Delete to confirm.",
                         ]),
+                        .body("To delete a forum topic or other item you posted, open it, choose the actions menu at the top right, and choose Delete."),
                         .warning("Deleting is permanent and can't be undone. If you only want to change the wording, use Edit instead."),
                     ]
                 ),
@@ -859,7 +868,7 @@ enum HelpContent {
                             "Give it a short, specific title, for example \"VoiceOver skips toolbar buttons in Mail.\"",
                             "Write a description: what you expected, what happened, and how to reproduce it. The minimum is 30 characters, but more detail helps.",
                             "Add your email address in case the team needs to follow up.",
-                            "Choose Continue.",
+                            "Choose Next.",
                         ]),
                         .tip("Choose Rewrite on this step if you'd like help making your description clearer."),
                         .heading("Step 2: Environment"),
@@ -869,7 +878,7 @@ enum HelpContent {
                             "Say whether you can reproduce it reliably.",
                             "Enter the number Apple gave your report. It starts with FB, for example FB12345678. You can find it next to your report in Feedback Assistant. If you haven't reported the bug to Apple yet, choose Open Feedback Assistant on this step.",
                             "Choose how you'd like to be credited if the report helps lead to a fix: by name, by your AppleVis username, or anonymously.",
-                            "Choose Continue.",
+                            "Choose Next.",
                         ]),
                         .heading("Step 3: Review and Submit"),
                         .body("Check everything, then choose Submit. A thank-you screen confirms it was sent, and the AppleVis team takes it from there."),
@@ -888,7 +897,7 @@ enum HelpContent {
                             "Open Discover, go to Contribute, and choose Submit a Blog Post.",
                             "Give your post a clear title.",
                             "Choose the category that fits best.",
-                            "Choose Continue.",
+                            "Choose Next.",
                         ]),
                         .heading("Step 2: Your Content"),
                         .steps([
@@ -896,7 +905,7 @@ enum HelpContent {
                             "Write a few sentences on why this post would interest AppleVis readers. This is required, and it helps the editors understand your idea.",
                             "Write, import, or paste your draft. The minimum is 50 characters.",
                             "Use Import File to bring in a plain text, Markdown, Rich Text, or web page file from Files or iCloud Drive, or Paste to use what's on your clipboard.",
-                            "Choose Continue.",
+                            "Choose Next.",
                         ]),
                         .note("Your draft is sent to the editors as plain text. A Markdown file comes in exactly as written, with its marks such as # for headings, and the editors read it that way. Rich Text and web page files come in as their words only. Paragraphs and lists stay, and each link keeps its address after the link text."),
                         .tip("Word and Pages documents can't be imported directly. In Word or Pages, export the document as Rich Text and import that, or copy the text and use Paste."),
@@ -919,7 +928,7 @@ enum HelpContent {
                             "Describe the episode: what it covers and who it's for. The minimum is 20 characters.",
                             "Use Choose Audio File to select your episode from Files, iCloud Drive, or another connected storage service. AppleVis accepts one MP3, M4A, or WAV file, up to 200 MB. For a larger file, share it with a service like Dropbox, then send the link using Contact AppleVis.",
                             "Choose Rewrite if you'd like help with the description.",
-                            "Choose Continue once you've written a description and selected a file.",
+                            "Choose Next once you've written a description and selected a file.",
                         ]),
                         .heading("Step 2: Review and Submit"),
                         .body("Check your description and the file you selected, then choose Submit. Keep the app open while it uploads. A thank-you screen confirms it was sent, and the team will follow up."),
@@ -942,10 +951,10 @@ enum HelpContent {
                         .heading("Step 1: Find the App"),
                         .steps([
                             "Open Discover, go to Contribute, and choose Submit an App.",
-                            "Confirm the two checkboxes on the Before You Begin screen.",
+                            "Confirm the two checkboxes on the Before You Begin screen, then choose Continue.",
                             "Choose the platform: iPhone and iPad, Mac, Apple Watch, or Apple TV.",
                             "Search by name or paste an App Store link. If the app isn't on the App Store, which is the case for some Mac apps, choose Enter Details Manually.",
-                            "Select the right result and choose Continue.",
+                            "Select the right result and choose Next.",
                         ]),
                         .heading("Step 2: App Details"),
                         .body("What you fill in depends on the platform. Confirm the details taken from the App Store, then describe the app's accessibility."),
@@ -1004,6 +1013,7 @@ enum HelpContent {
                             "Review everything and choose Send Report.",
                         ]),
                         .note("You don't need to be signed in to report a comment. If you are, your name is filled in for you."),
+                        .body("To report a whole forum topic, app entry, blog post, guide, bug report, or podcast episode, open it, choose the actions menu at the top right, and choose Report. The same form opens."),
                         .tip("Reporting a comment doesn't remove it straight away. It asks the editorial team to review it."),
                     ],
                     contentType: .guide
@@ -1050,7 +1060,7 @@ enum HelpContent {
                             "AirPods: double-tap to play or pause. With a queue, the next-track gesture skips to the next episode, and previous-track restarts the current one.",
                             "Control Center shows Now Playing, with artwork, title, and controls.",
                         ]),
-                        .tip("Adjust playback in Settings > Podcasts: speed, skip intervals, auto-play, Trim Silence, Voice Boost, an equalizer (Flat, Speech, Bass Boost, or Treble Boost), a sleep timer, and resume rewind."),
+                        .tip("Adjust playback in Settings > Podcasts: speed, skip intervals, auto-play, Trim Silence, Voice Boost, an equaliser (Flat, Speech Clarity, Bass Boost, or Treble Boost), a sleep timer, resume rewind, and Auto-Download and Auto-Delete for downloads."),
                     ]
                 ),
                 HelpArticle(
@@ -1122,6 +1132,8 @@ enum HelpContent {
                             "Web Search: the search engine Search the Web uses in Ask the Mouse. Choose DuckDuckGo, Google, Bing, or Ecosia. Results open the way Web Links is set.",
                             "Links in posts and comments to other AppleVis pages, such as a forum topic, app entry, guide, blog post, podcast episode, or bug report, open in the app instead of a browser.",
                             "AppleVis Tips: short tips that appear from time to time to save you a step.",
+                            "Show What's New on Home: whether Home shows the New view, the summary, and new-activity badges.",
+                            "Filter Profanity: masks milder crude words in what you read. It's on by default. See Filtering Language You See.",
                         ]),
                         .tip("VoiceOver Detail Level is in Settings > Accessibility, because it controls how much VoiceOver reads."),
                     ]
@@ -1149,9 +1161,9 @@ enum HelpContent {
                     summary: "What syncs through iCloud, and how your account and data on this device are handled.",
                     content: [
                         .bullets([
-                            "Saved & Sync controls what syncs through iCloud: Saved Items, Following, Podcast Position, Podcast Queue, Read History, and Settings & Preferences. Each has its own switch.",
+                            "Saved & Sync controls what syncs through iCloud. Turn on Enable iCloud Sync, then choose what to sync: Saved Items, Following, Podcast Position, Podcast Queue, Read History, and Settings & Preferences. Saved Items includes your saved Mouse answers and recent questions for Ask the Mouse.",
                             "Privacy explains what AppleVis collects (only your email address, username, and a push notification token) and how your session is secured. There's no advertising tracking.",
-                            "Show What's New on Home controls whether Home shows the New view, the summary, and new-activity badges. Your reading history is still kept on your device, so turning this off only makes Home quieter.",
+                            "Show What's New on Home, in Settings > General, controls whether Home shows the New view, the summary, and new-activity badges. Your reading history is still kept on your device, so turning this off only makes Home quieter.",
                             "Clear All Local Data removes cached content, downloads, saved items, and reading history from this device. Your account, iCloud data, and app settings aren't affected.",
                         ]),
                         .note("Apple Intelligence features work entirely on your device. No post, comment, or search text is sent to a server."),
@@ -1170,7 +1182,7 @@ enum HelpContent {
                             "Cache retention: 3, 6, or 12 months, or Keep Forever. This is how long cached content is kept before it's removed automatically.",
                         ]),
                         .steps([
-                            "Open Settings > Storage and Cache.",
+                            "Open Settings > Storage & Cache.",
                             "Check how much space downloads and the cache are using.",
                             "Use Clear Cached Content to remove cached content. Downloads and saved items are kept.",
                             "Use Clear Downloaded Episodes to remove all downloads, or remove single episodes from For You > Downloads.",
@@ -1224,7 +1236,7 @@ enum HelpContent {
                             "Translate is offered when your draft or search isn't in English. Needs Apple Intelligence.",
                             "Smarter Guideline Reminders skips a guideline reminder that clearly doesn't fit your draft. It never adds one. Needs Apple Intelligence.",
                         ]),
-                        .note("Apple Intelligence features need an iPhone 15 Pro or later, or any iPhone 16 model, with a recent version of iOS and Apple Intelligence turned on in iOS Settings. See Apple Intelligence Features for details."),
+                        .note("Apple Intelligence features need an iPhone 15 Pro, iPhone 15 Pro Max, or any iPhone 16 or iPhone 17 model, with iOS 26 or later and Apple Intelligence turned on in iOS Settings. See Apple Intelligence Features for details."),
                     ]
                 ),
                 HelpArticle(
@@ -1246,7 +1258,7 @@ enum HelpContent {
                             "\"Hey Siri, report a bug to AppleVis\" opens the accessibility bug report form.",
                             "\"Hey Siri, ask the AppleVis Mouse\" asks for your question, then opens Ask the Mouse with the answer. This needs Apple Intelligence.",
                         ]),
-                        .body("If Siri uses another language, you can say these phrases in that language too."),
+                        .body("If Siri uses another language, you can say these phrases in that language too. Settings > Siri & Shortcuts lists every phrase."),
                         .heading("Spotlight"),
                         .body("Spotlight can find AppleVis topics, apps, podcasts, and guides from iOS Search. Anything you've opened is added, so it's easy to find again."),
                         .body("Everything you've saved or followed is added too, even if you saved it on another device. So are the Help articles, so searching iOS for a setting such as Trim Silence finds the article that explains it."),
@@ -1260,7 +1272,7 @@ enum HelpContent {
                         .body("AppleVis uses Apple Intelligence for several AI features. They all run on your device, and no text or content is sent to a server."),
                         .heading("Requirements"),
                         .bullets([
-                            "iPhone 15 Pro or later, or any iPhone 16 model.",
+                            "iPhone 15 Pro, iPhone 15 Pro Max, or any iPhone 16 or iPhone 17 model.",
                             "iOS 26 or later.",
                             "Apple Intelligence turned on in iOS Settings > Apple Intelligence & Siri.",
                         ]),
@@ -1424,7 +1436,7 @@ enum HelpContent {
                     summary: "Quick checks for iCloud sync and push notifications.",
                     content: [
                         .bullets([
-                            "Make sure iCloud Sync is on in Settings > Saved & Sync.",
+                            "Make sure Enable iCloud Sync is on in Settings > Saved & Sync, along with the switch for what you want to sync.",
                             "Make sure both devices are signed in with the same Apple Account.",
                             "Make sure notifications are allowed for AppleVis in iOS Settings.",
                             "Make sure the notification type you want is turned on in AppleVis Settings > Notifications.",
@@ -1442,7 +1454,7 @@ enum HelpContent {
                             "If playback seems stuck, pause and play again, or open the episode page and choose Play.",
                             "If search results aren't what you expect, try fewer words. If your search isn't in English, let AppleVis translate it.",
                             "If the app is too bright, too crowded, or has too much movement, check Appearance and iOS Display & Text Size.",
-                            "If AppleVis is using a lot of storage, check Settings > Storage and Cache.",
+                            "If AppleVis is using a lot of storage, check Settings > Storage & Cache.",
                             "If a download fails, check your connection and try again from the episode page or Downloads. Unfinished downloads are removed automatically.",
                             "If content isn't updating, pull down to refresh. If you expect it to sync from another device, check Settings > Saved & Sync.",
                             "If you can't find something you saved, open For You > Saved and check the Show picker. It may be filtered to one content type.",
@@ -1460,7 +1472,7 @@ enum HelpContent {
                         .steps([
                             "Open Profile and choose Contact AppleVis, or open Help and go to the Contact section.",
                             "Choose the kind of message: App Bug Report, App Feedback, App Suggestion, or App Enquiry. The subject is filled in for you.",
-                            "Choose Continue.",
+                            "Choose Next.",
                         ]),
                         .heading("Step 2: Your contact details (only when signed out)"),
                         .body("If you're not signed in, enter your name and email address so the team can reply. If you're signed in, this step is skipped."),
@@ -1470,7 +1482,7 @@ enum HelpContent {
                             "Type your message.",
                             "If you chose App Bug Report, a switch appears for including app and device information. Turn it on to add your app version, device model, and accessibility settings such as VoiceOver automatically.",
                             "Rewrite and Translate to English are available if you'd like help with your message.",
-                            "Choose Continue.",
+                            "Choose Next.",
                         ]),
                         .heading("Final step: Review and send"),
                         .steps([

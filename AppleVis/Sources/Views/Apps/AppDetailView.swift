@@ -1041,9 +1041,7 @@ struct AppDetailView: View {
         )
 
         if detail.reviews.isEmpty {
-            Text("No comments yet — be the first!")
-                .font(.subheadline).foregroundStyle(.secondary)
-                .padding(.horizontal).padding(.vertical, 8)
+            NoCommentsYet(onAddComment: { showReviewCompose = true })
         } else {
             ForEach(Array(detail.reviews.enumerated()), id: \.element.id) { index, review in
                 AppReviewRow(

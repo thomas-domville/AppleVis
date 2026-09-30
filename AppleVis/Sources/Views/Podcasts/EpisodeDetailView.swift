@@ -893,9 +893,7 @@ struct EpisodeDetailView: View {
         )
 
         if comments.isEmpty {
-            Text("No comments yet.")
-                .font(.subheadline).foregroundStyle(.secondary)
-                .padding(.horizontal).padding(.vertical, 8)
+            NoCommentsYet(onAddComment: { showCompose = true })
         } else {
             ForEach(Array(comments.enumerated()), id: \.element.id) { index, comment in
                 CommentRow(

@@ -224,16 +224,21 @@ struct ForumTopicDetailView: View {
 
                     Divider()
 
-                    // Replies
-                    if !detail.replies.isEmpty {
-                        CommunityDiscussionHeading(
-                            count: detail.replyCount,
-                            onThreadOverview: { announceThreadOverview(detail) },
-                            onJumpToLast: { Task { await jumpToLastReply(proxy: proxy) } },
-                            newCount: newReplyCountForHeading,
-                            onJumpToFirstNew: { Task { await jumpToFirstNewReply(proxy: proxy) } }
-                        )
-                        .onAppear { tips.show(.forumRotorActions) }
+                    // Replies. The heading shows even with none, like every
+                    // other detail page, with a friendly line and a button
+                    // to reply first. Requested directly (2026-09-30).
+                    CommunityDiscussionHeading(
+                        count: detail.replyCount,
+                        onThreadOverview: { announceThreadOverview(detail) },
+                        onJumpToLast: { Task { await jumpToLastReply(proxy: proxy) } },
+                        newCount: newReplyCountForHeading,
+                        onJumpToFirstNew: { Task { await jumpToFirstNewReply(proxy: proxy) } }
+                    )
+                    .onAppear { if !detail.replies.isEmpty { tips.show(.forumRotorActions) } }
+                    if detail.replies.isEmpty {
+                        NoCommentsYet(onAddComment: { showReplyCompose = true },
+                                      buttonTitle: String(localized: "Be the First to Reply"))
+                    } else {
 
                         if preferences.aiSummariesEnabled && IntelligenceService.isAvailable {
                             summarizeSection(detail)

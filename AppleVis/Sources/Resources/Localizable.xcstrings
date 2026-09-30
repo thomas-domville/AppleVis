@@ -471149,6 +471149,965 @@
           }
         }
       }
+    },
+    "Be the First to Reply" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "كن أول من يرد"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als Erste:r antworten"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Γίνε ο πρώτος που απαντά"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sé el primero en responder"
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اولین پاسخ را بدهید"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soyez le premier à répondre"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "היו הראשונים להגיב"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "सबसे पहले जवाब दें"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jadilah yang Pertama Membalas"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rispondi per primo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最初に返信する"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "처음으로 답글 달기"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reageer als eerste"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Odpowiedz jako pierwszy"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seja o primeiro a responder"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ответить первым"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Svara först"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ตอบกลับเป็นคนแรก"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İlk Yanıtı Siz Verin"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відповісти першим"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hãy là người trả lời đầu tiên"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抢先回复"
+          }
+        }
+      }
+    },
+    "Be the First to Comment" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "كن أول من يعلّق"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als Erste:r kommentieren"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Γίνε ο πρώτος που σχολιάζει"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sé el primero en comentar"
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اولین نظر را بدهید"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soyez le premier à commenter"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "היו הראשונים לכתוב תגובה"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "सबसे पहले टिप्पणी करें"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jadilah yang Pertama Berkomentar"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commenta per primo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最初にコメントする"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "처음으로 댓글 달기"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plaats als eerste een reactie"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skomentuj jako pierwszy"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seja o primeiro a comentar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Прокомментировать первым"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kommentera först"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "แสดงความคิดเห็นเป็นคนแรก"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İlk Yorumu Siz Yapın"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Прокоментувати першим"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hãy là người bình luận đầu tiên"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抢先评论"
+          }
+        }
+      }
+    },
+    "No comments yet. Share your thoughts and start the conversation." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا توجد تعليقات بعد. شارك رأيك وابدأ النقاش."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Kommentare. Teile deine Gedanken und beginne das Gespräch."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Δεν υπάρχουν σχόλια ακόμη. Μοιράσου τις σκέψεις σου και ξεκίνα τη συζήτηση."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no hay comentarios. Comparte lo que piensas y empieza la conversación."
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هنوز نظری نیست. نظرتان را بگویید و گفت‌وگو را شروع کنید."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun commentaire pour l’instant. Partagez votre avis et lancez la conversation."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "אין תגובות עדיין. שתפו את מחשבותיכם והתחילו את השיחה."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अभी कोई टिप्पणी नहीं है। अपने विचार साझा करें और बातचीत शुरू करें।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Belum ada komentar. Bagikan pendapat Anda dan mulai percakapan."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ancora nessun commento. Condividi cosa ne pensi e avvia la conversazione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだコメントはありません。感想を共有して、会話を始めましょう。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 댓글이 없습니다. 생각을 나누고 대화를 시작해 보세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nog geen reacties. Deel wat je denkt en begin het gesprek."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie ma jeszcze komentarzy. Podziel się swoimi przemyśleniami i rozpocznij rozmowę."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda não há comentários. Compartilhe o que você pensa e comece a conversa."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Комментариев пока нет. Поделитесь мыслями и начните разговор."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inga kommentarer än. Dela dina tankar och starta samtalet."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ยังไม่มีความคิดเห็น แบ่งปันความคิดของคุณและเริ่มบทสนทนา"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Henüz yorum yok. Düşüncelerinizi paylaşın ve sohbeti başlatın."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Коментарів поки немає. Поділіться думками й почніть розмову."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chưa có bình luận nào. Hãy chia sẻ suy nghĩ của bạn và bắt đầu cuộc trò chuyện."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有评论。分享你的想法，开始交流吧。"
+          }
+        }
+      }
+    },
+    "Start the Conversation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ابدأ النقاش"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beginne das Gespräch"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ξεκίνα τη συζήτηση"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empieza la conversación"
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "گفت‌وگو را شروع کنید"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lancez la conversation"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "התחילו את השיחה"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "बातचीत शुरू करें"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mulai Percakapan"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avvia la conversazione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会話を始めましょう"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "대화를 시작하세요"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Begin het gesprek"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rozpocznij rozmowę"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comece a conversa"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Начните разговор"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starta samtalet"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เริ่มบทสนทนา"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sohbeti Başlatın"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Почніть розмову"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bắt đầu cuộc trò chuyện"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始交流"
+          }
+        }
+      }
+    },
+    "A forum topic with no replies yet now shows its Community Discussion section, like every other page. Wherever there are no comments yet, a friendly line says so, with a button to be the first to comment or reply." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أصبح موضوع المنتدى الذي لا ردود عليه بعد يعرض قسم «نقاش المجتمع» مثل كل الصفحات الأخرى. وحيثما لا توجد تعليقات بعد، يوضح سطر ودود ذلك، مع زر لتكون أول من يعلّق أو يرد."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Forenthema ohne Antworten zeigt jetzt seinen Bereich Community-Diskussion, wie jede andere Seite. Wo es noch keine Kommentare gibt, sagt eine freundliche Zeile das, mit einer Taste, um als Erste:r zu kommentieren oder zu antworten."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ένα θέμα φόρουμ χωρίς απαντήσεις δείχνει πλέον την ενότητα Συζήτηση κοινότητας, όπως κάθε άλλη σελίδα. Όπου δεν υπάρχουν ακόμη σχόλια, μια φιλική γραμμή το λέει, με ένα κουμπί για να σχολιάσεις ή να απαντήσεις πρώτος."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un tema del foro sin respuestas ahora muestra su sección Conversación de la comunidad, como cualquier otra página. Donde aún no hay comentarios, una línea amable lo indica, con un botón para ser el primero en comentar o responder."
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "موضوع انجمنی که هنوز پاسخی ندارد اکنون مانند هر صفحه دیگری بخش «گفت‌وگوی انجمن» را نشان می‌دهد. هر جا هنوز نظری نیست، یک خط دوستانه این را می‌گوید و دکمه‌ای برای اولین نظر یا پاسخ دارد."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un sujet du forum sans réponse affiche désormais sa section Discussion de la communauté, comme toutes les autres pages. Là où il n’y a pas encore de commentaire, une ligne sympathique le dit, avec un bouton pour commenter ou répondre en premier."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "נושא בפורום שעדיין אין בו תגובות מציג עכשיו את אזור דיון הקהילה, כמו כל דף אחר. היכן שעדיין אין תגובות, שורה ידידותית אומרת זאת, עם כפתור להגיב או לענות ראשונים."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "जिस फ़ोरम विषय पर अभी कोई जवाब नहीं है, वह अब हर दूसरे पेज की तरह अपना समुदाय चर्चा भाग दिखाता है। जहाँ अभी कोई टिप्पणी नहीं है, वहाँ एक दोस्ताना पंक्ति यह बताती है, साथ में सबसे पहले टिप्पणी या जवाब देने का बटन है।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Topik forum yang belum dibalas kini menampilkan bagian Diskusi Komunitas, seperti halaman lainnya. Di mana belum ada komentar, satu baris ramah memberitahukannya, dengan tombol untuk menjadi yang pertama berkomentar atau membalas."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un argomento del forum senza risposte ora mostra la sezione Discussione della community, come ogni altra pagina. Dove non ci sono ancora commenti, una riga cordiale lo dice, con un pulsante per commentare o rispondere per primo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ返信がないフォーラムのトピックにも、ほかのページと同じようにコミュニティのディスカッションが表示されるようになりました。コメントがまだない場所では、やさしい一文でそれを伝え、最初にコメントや返信をするボタンを表示します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 답글이 없는 포럼 주제도 이제 다른 페이지처럼 커뮤니티 토론 섹션을 보여 줍니다. 아직 댓글이 없는 곳에는 친근한 안내 문장과 함께 처음으로 댓글이나 답글을 다는 버튼이 표시됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Een forumonderwerp zonder reacties toont nu het gedeelte Communitydiscussie, net als elke andere pagina. Waar nog geen reacties zijn, zegt een vriendelijke regel dat, met een knop om als eerste te reageren."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wątek na forum bez odpowiedzi pokazuje teraz sekcję Dyskusja społeczności, tak jak każda inna strona. Tam, gdzie nie ma jeszcze komentarzy, mówi o tym przyjazne zdanie, z przyciskiem, by skomentować lub odpowiedzieć jako pierwszy."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um tópico do fórum ainda sem respostas agora mostra a seção Conversa da comunidade, como todas as outras páginas. Onde ainda não há comentários, uma frase simpática avisa, com um botão para ser o primeiro a comentar ou responder."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тема форума без ответов теперь показывает раздел «Обсуждение сообщества», как и любая другая страница. Где комментариев пока нет, об этом сообщает дружелюбная строка с кнопкой, чтобы первым прокомментировать или ответить."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ett forumämne utan svar visar nu avsnittet Communitydiskussion, precis som alla andra sidor. Där det inte finns några kommentarer än säger en vänlig rad det, med en knapp för att kommentera eller svara först."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "หัวข้อฟอรัมที่ยังไม่มีการตอบกลับจะแสดงส่วนการสนทนาของชุมชนเหมือนหน้าอื่นๆ ในที่ที่ยังไม่มีความคิดเห็น จะมีข้อความเป็นมิตรบอกไว้ พร้อมปุ่มให้แสดงความคิดเห็นหรือตอบกลับเป็นคนแรก"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Henüz yanıt almamış bir forum konusu artık diğer tüm sayfalar gibi Topluluk Tartışması bölümünü gösteriyor. Henüz yorum olmayan yerlerde samimi bir satır bunu belirtiyor ve ilk yorumu ya da yanıtı yazmanız için bir düğme sunuyor."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тема форуму без відповідей тепер показує розділ «Обговорення спільноти», як і будь-яка інша сторінка. Де коментарів поки немає, про це каже дружній рядок із кнопкою, щоб першим прокоментувати чи відповісти."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chủ đề diễn đàn chưa có trả lời giờ hiển thị phần Thảo luận cộng đồng như mọi trang khác. Ở nơi chưa có bình luận, một dòng thân thiện cho biết điều đó, kèm nút để bạn là người đầu tiên bình luận hoặc trả lời."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有回复的论坛话题现在也会像其他页面一样显示社区讨论部分。在还没有评论的地方，会有一句友好的提示，并附上抢先评论或回复的按钮。"
+          }
+        }
+      }
+    },
+    "Created %@ ago, on %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أُنشئ قبل %1$@، في %2$@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erstellt vor %1$@, am %2$@"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Δημιουργήθηκε πριν από %1$@, στις %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Creada hace %1$@, el %2$@"
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ پیش ساخته شد، در %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créé il y a %1$@, le %2$@"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "נוצר לפני %1$@, ב-%2$@"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ पहले बनाया गया, %2$@ को"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dibuat %1$@ lalu, pada %2$@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Creato %1$@ fa, il %2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@前（%2$@）に作成"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 전(%2$@)에 생성됨"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ geleden aangemaakt, op %2$@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utworzono %1$@ temu, %2$@"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Criada há %1$@, em %2$@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Создан %1$@ назад, %2$@"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skapat för %1$@ sedan, den %2$@"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "สร้างเมื่อ %1$@ที่แล้ว วันที่ %2$@"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ önce, %2$@ tarihinde oluşturuldu"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Створено %1$@ тому, %2$@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tạo %1$@ trước, vào %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建于 %1$@前（%2$@）"
+          }
+        }
+      }
+    },
+    "%@ · Never signed in" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · لم يسجّل الدخول قط"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Nie angemeldet"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Δεν έχει συνδεθεί ποτέ"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Nunca inició sesión"
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · هرگز وارد نشده"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Jamais connecté"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · מעולם לא התחבר"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · कभी साइन इन नहीं किया"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Belum pernah masuk"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Mai effettuato l’accesso"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · サインイン履歴なし"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 로그인한 적 없음"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Nooit ingelogd"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Nigdy się nie zalogował"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Nunca iniciou sessão"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Ни разу не входил"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Aldrig inloggad"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · ไม่เคยลงชื่อเข้าใช้"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Hiç oturum açmadı"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Жодного разу не входив"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Chưa từng đăng nhập"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 从未登录"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

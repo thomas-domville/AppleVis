@@ -114,6 +114,40 @@ struct CommunityDiscussionHeading: View {
     }
 }
 
+/// Under Community Discussion when nobody has commented yet: a friendly
+/// line and a button to start the conversation. Every detail page shows
+/// it, so an empty discussion is never a missing one. Forum topics used to
+/// leave the section out entirely. Requested directly (2026-09-30).
+struct NoCommentsYet: View {
+    let onAddComment: () -> Void
+    /// "Be the First to Reply" on forum topics.
+    var buttonTitle: String = String(localized: "Be the First to Comment")
+
+    @EnvironmentObject private var auth: AuthStore
+    @EnvironmentObject private var toast: ToastStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("No comments yet. Share your thoughts and start the conversation.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Button {
+                guard auth.isSignedIn else {
+                    toast.warning(String(localized: "Sign in to add a new comment."))
+                    return
+                }
+                onAddComment()
+            } label: {
+                Label(buttonTitle, systemImage: "bubble.left.and.text.bubble.right")
+                    .font(.subheadline.weight(.medium))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+    }
+}
+
 /// Applies `.accessibilityFocused(_:equals:)` only when a binding is
 /// provided — lets ReplyView/CommentRow opt into being a "Jump to Last
 /// Comment" landing target without every call site needing to supply one.
@@ -218,7 +252,9 @@ extension Array {
 enum ThreadOverview {
     static func announce(commentCount: Int, mostRecentAuthor: String?, mostRecentDate: Date?,
                          originalAuthor: String? = nil, submittedBy: String? = nil) {
-        var parts = [String(localized: "Thread has \(commentCount) comments.")]
+        var parts = [commentCount == 0
+                     ? String(localized: "No comments yet.")
+                     : String(localized: "Thread has \(commentCount) comments.")]
         if let mostRecentAuthor, let mostRecentDate {
             let when = mostRecentDate.formatted(.relative(presentation: .named))
             parts.append(String(localized: "Most recent comment by \(mostRecentAuthor), \(when)."))
