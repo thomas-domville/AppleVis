@@ -37,6 +37,9 @@ struct AppBrowseView: View {
         .refreshable { await load(); SoundPlayer.shared.play(.refresh) }
         .onChange(of: platform) { _, _ in Task { await load() } }
         .searchable(text: $searchText, prompt: "Search apps")
+        .inputLimit($searchText, maximum: InputLimit.searchMaximum, warnWithin: 20) {
+            toast.warning(InputLimit.searchShortened)
+        }
         .onChange(of: searchText) { _, newValue in runSearch(newValue) }
     }
 

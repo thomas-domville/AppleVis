@@ -123,6 +123,9 @@ struct DiscoverView: View {
                 }
             }
             .searchable(text: $searchText, prompt: "Search AppleVis")
+            .inputLimit($searchText, maximum: InputLimit.searchMaximum, warnWithin: 20) {
+                toast.warning(InputLimit.searchShortened)
+            }
             .applySearchFocus($isSearchFieldFocused)
             .onChange(of: searchText) { _, newValue in runSearch(newValue) }
             .task {

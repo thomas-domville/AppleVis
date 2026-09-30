@@ -24,6 +24,12 @@ struct AskTheMouseView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var question = ""
+    /// The question was cut to the limit; says so under the field.
+    @State private var wasShortened = false
+
+    private static var shortenedMessage: String {
+        String(localized: "Questions can be up to 300 characters, so yours was shortened. Try asking it more briefly.")
+    }
     @State private var searchStartedAt: Date?
     @State private var sheetPlace: MousePlace?
     @State private var forumQuestion: ForumQuestion?
@@ -172,6 +178,21 @@ struct AskTheMouseView: View {
                 .submitLabel(.search)
                 .onSubmit(ask)
                 .accessibilityHint(String(localized: "Ask in your own words, then choose Ask."))
+                // A question longer than this can crowd out what the Mouse
+                // reads to answer it. Requested directly (2026-09-30).
+                .inputLimit($question, maximum: AskTheMouse.maxQuestionLength, warnWithin: 50) {
+                    wasShortened = true
+                    UIAccessibility.post(notification: .announcement, argument: Self.shortenedMessage)
+                }
+            if wasShortened {
+                Text(Self.shortenedMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if AskTheMouse.maxQuestionLength - question.count <= 50 {
+                Text(InputLimit.remaining(AskTheMouse.maxQuestionLength - question.count))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Button {
                 ask()
             } label: {
@@ -851,6 +872,7 @@ struct AskTheMouseView: View {
         isFieldFocused = false
         searchStartedAt = Date()
         question = ""
+        wasShortened = false
         mouse.ask(text)
         UIAccessibility.post(notification: .announcement, argument: String(localized: "The Mouse is searching."))
     }

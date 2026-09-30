@@ -454,10 +454,12 @@ enum HelpContent {
                             "Forum topics show the whole post. Guides, blog posts, and podcast episodes show the first paragraph. App entries show a short accessibility summary.",
                             "For an older post with new comments, you hear who posted it and when. Use the Read Original Post action to hear the post itself.",
                             "Double-tap a comment to open it in its thread. Double-tap a heading to open the item.",
+                            "A long post or comment is split at its paragraphs into several parts, so you swipe through it a part at a time. The first part says who wrote it. At larger text sizes, the parts are shorter.",
                             "With VoiceOver, set the rotor to Headings to jump from item to item.",
                         ]),
                         .heading("Listen to Fetch"),
                         .body("Listen to Fetch reads everything aloud, item by item. Use the buttons to pause, skip a comment, or move to the next or previous item. With VoiceOver, a two-finger double tap plays and pauses."),
+                        .body("Listening Speed, just below, sets how fast it reads. My Settings, the first choice, uses the voice and speed you chose for VoiceOver, or for Spoken Content in Settings > Accessibility if you don't use VoiceOver. You can also choose Slow, Normal, Fast, Faster, or Fastest. With VoiceOver, swipe up or down on Listening Speed to change it. If you change it while listening, the current sentence starts again at the new speed."),
                         .heading("Marking items as read"),
                         .bullets([
                             "Mark as Read, on an item's heading, marks the item and all its new comments as read. The item leaves Fetch, and VoiceOver moves to the next item.",
@@ -693,6 +695,7 @@ enum HelpContent {
                             "Bug Reports: accessibility bugs in the tracker.",
                         ]),
                         .tip("If your search isn't in English, AppleVis may offer to translate it. Search works best in English."),
+                        .body("A search can be up to 150 characters, which is plenty for a few words. Short searches find the most. Searching the App Directory has the same limit. When you're close to it, VoiceOver says how many characters are left. Anything longer is shortened, and AppleVis tells you."),
                         .note("VoiceOver first reads a short summary, such as \"12 results found in 4 categories.\" Each section heading gives more detail."),
                     ],
                     contentType: .guide
@@ -1299,6 +1302,7 @@ enum HelpContent {
                             "Choose Ask. While the Mouse searches, it shows what it's looking through. With VoiceOver, you hear this if the search takes more than a few seconds.",
                             "When the answer is ready, you hear a sound and VoiceOver moves to it.",
                         ]),
+                        .body("A question can be up to 300 characters, which is plenty for a detailed question. When you're close, a line under the question field says how many characters are left, and VoiceOver says it once. A longer question, typed or pasted, is shortened, and the Mouse tells you. Shorter questions get the best answers, because the Mouse has more room to read what it found."),
                         .body("On screen, the answer appears as the Mouse writes it. VoiceOver waits for the finished answer, so it never reads half a sentence."),
                         .body("If the best parts of a guide don't answer your question, the Mouse takes a closer look. It reads the rest of the guide, its members' comments, and any matching forum discussion a part at a time, and answers from the parts that help. This can take a little longer, and you can choose Stop at any time."),
                         .heading("What an answer includes"),

@@ -468645,6 +468645,2510 @@
           }
         }
       }
+    },
+    "Questions can be up to 300 characters, so yours was shortened. Try asking it more briefly." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يمكن أن يصل السؤال إلى 300 حرف، لذلك تم اختصار سؤالك. جرّب أن تسأل باختصار أكثر."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fragen können bis zu 300 Zeichen lang sein, deshalb wurde deine gekürzt. Versuche, sie kürzer zu stellen."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Οι ερωτήσεις μπορούν να έχουν έως 300 χαρακτήρες, οπότε η δική σου συντομεύτηκε. Δοκίμασε να τη διατυπώσεις πιο σύντομα."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las preguntas pueden tener hasta 300 caracteres, así que la tuya se acortó. Prueba a preguntarlo de forma más breve."
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سؤال‌ها می‌توانند تا ۳۰۰ نویسه باشند، پس سؤال شما کوتاه شد. آن را کوتاه‌تر بپرسید."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les questions peuvent faire jusqu’à 300 caractères, la vôtre a donc été raccourcie. Essayez de la poser plus brièvement."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "שאלה יכולה להיות באורך של עד 300 תווים, ולכן השאלה שלך קוצרה. נסו לשאול בקצרה יותר."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "सवाल 300 अक्षरों तक के हो सकते हैं, इसलिए आपका सवाल छोटा कर दिया गया। इसे और संक्षेप में पूछकर देखें।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pertanyaan bisa sampai 300 karakter, jadi pertanyaan Anda dipersingkat. Coba tanyakan dengan lebih singkat."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le domande possono avere fino a 300 caratteri, quindi la tua è stata accorciata. Prova a chiederla in modo più breve."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "質問は300文字までなので、短くしました。もっと簡潔に聞いてみてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "질문은 300자까지 가능해서 질문을 줄였습니다. 더 짧게 질문해 보세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vragen kunnen maximaal 300 tekens lang zijn, dus die van jou is ingekort. Probeer het korter te vragen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pytania mogą mieć do 300 znaków, więc twoje zostało skrócone. Spróbuj zapytać krócej."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As perguntas podem ter até 300 caracteres, então a sua foi encurtada. Tente perguntar de forma mais breve."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вопрос может быть длиной до 300 символов, поэтому ваш вопрос сокращён. Попробуйте спросить короче."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frågor kan vara upp till 300 tecken, så din har kortats. Försök fråga lite kortare."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "คำถามยาวได้สูงสุด 300 ตัวอักษร คำถามของคุณจึงถูกตัดให้สั้นลง ลองถามให้สั้นกว่านี้"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sorular en fazla 300 karakter olabilir, bu yüzden sorunuz kısaltıldı. Daha kısa sormayı deneyin."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запитання може мати до 300 символів, тому ваше запитання скорочено. Спробуйте запитати коротше."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Câu hỏi có thể dài tối đa 300 ký tự, nên câu hỏi của bạn đã được rút gọn. Hãy thử hỏi ngắn gọn hơn."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "问题最多可有 300 个字符，所以你的问题已被缩短。请试着问得更简洁一些。"
+          }
+        }
+      }
+    },
+    "Searches can be up to 150 characters, so yours was shortened." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يمكن أن يصل البحث إلى 150 حرفًا، لذلك تم اختصار بحثك."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suchen können bis zu 150 Zeichen lang sein, deshalb wurde deine gekürzt."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Οι αναζητήσεις μπορούν να έχουν έως 150 χαρακτήρες, οπότε η δική σου συντομεύτηκε."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las búsquedas pueden tener hasta 150 caracteres, así que la tuya se acortó."
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جست‌وجو می‌تواند تا ۱۵۰ نویسه باشد، پس جست‌وجوی شما کوتاه شد."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les recherches peuvent faire jusqu’à 150 caractères, la vôtre a donc été raccourcie."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "חיפוש יכול להיות באורך של עד 150 תווים, ולכן החיפוש שלך קוצר."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "खोज 150 अक्षरों तक की हो सकती है, इसलिए आपकी खोज छोटी कर दी गई।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pencarian bisa sampai 150 karakter, jadi pencarian Anda dipersingkat."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le ricerche possono avere fino a 150 caratteri, quindi la tua è stata accorciata."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "検索は150文字までなので、短くしました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "검색어는 150자까지 가능해서 검색어를 줄였습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoekopdrachten kunnen maximaal 150 tekens lang zijn, dus die van jou is ingekort."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wyszukiwanie może mieć do 150 znaków, więc twoje zostało skrócone."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As buscas podem ter até 150 caracteres, então a sua foi encurtada."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поисковый запрос может быть длиной до 150 символов, поэтому ваш запрос сокращён."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sökningar kan vara upp till 150 tecken, så din har kortats."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "คำค้นหายาวได้สูงสุด 150 ตัวอักษร คำค้นหาของคุณจึงถูกตัดให้สั้นลง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aramalar en fazla 150 karakter olabilir, bu yüzden aramanız kısaltıldı."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пошуковий запит може мати до 150 символів, тому ваш запит скорочено."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm kiếm có thể dài tối đa 150 ký tự, nên nội dung tìm kiếm của bạn đã được rút gọn."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索最多可有 150 个字符，所以你的搜索已被缩短。"
+          }
+        }
+      }
+    },
+    "Question and Search Lengths" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "طول الأسئلة وعمليات البحث"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Länge von Fragen und Suchen"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Μήκος ερωτήσεων και αναζητήσεων"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Longitud de preguntas y búsquedas"
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "طول سؤال‌ها و جست‌وجوها"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Longueur des questions et des recherches"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "אורך שאלות וחיפושים"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "सवालों और खोजों की लंबाई"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Panjang Pertanyaan dan Pencarian"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lunghezza di domande e ricerche"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "質問と検索の長さ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "질문 및 검색어 길이"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lengte van vragen en zoekopdrachten"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Długość pytań i wyszukiwań"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tamanho de perguntas e buscas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Длина вопросов и поисковых запросов"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Längd på frågor och sökningar"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ความยาวของคำถามและคำค้นหา"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soru ve Arama Uzunlukları"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Довжина запитань і пошукових запитів"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Độ dài câu hỏi và tìm kiếm"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "问题和搜索的长度"
+          }
+        }
+      }
+    },
+    "Questions to the Mouse can be up to 300 characters, and searches in Discover and the App Directory up to 150. When you're close to the limit, VoiceOver says how many characters are left. Anything longer is shortened, and you're told. When Apple Intelligence can't plan a search, the Mouse now sends only your question's main words to the AppleVis website, never the whole question." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يمكن أن تصل أسئلة الفأر إلى 300 حرف، وعمليات البحث في «اكتشف» ودليل التطبيقات إلى 150. عندما تقترب من الحد، يخبرك VoiceOver بعدد الأحرف المتبقية. ويُختصر أي نص أطول مع إعلامك بذلك. وعندما لا يستطيع Apple Intelligence تخطيط البحث، يرسل الفأر الآن الكلمات الرئيسية فقط من سؤالك إلى موقع AppleVis، وليس السؤال كاملًا أبدًا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fragen an die Maus können bis zu 300 Zeichen lang sein, Suchen in Entdecken und im App-Verzeichnis bis zu 150. Kurz vor dem Limit sagt VoiceOver, wie viele Zeichen übrig sind. Längeres wird gekürzt, und du erfährst es. Wenn Apple Intelligence keine Suche planen kann, schickt die Maus jetzt nur die wichtigsten Wörter deiner Frage an die AppleVis-Website, nie die ganze Frage."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Οι ερωτήσεις στο Ποντίκι μπορούν να έχουν έως 300 χαρακτήρες και οι αναζητήσεις στην Ανακάλυψη και στον Κατάλογο εφαρμογών έως 150. Όταν πλησιάζεις το όριο, το VoiceOver λέει πόσοι χαρακτήρες απομένουν. Ό,τι είναι μεγαλύτερο συντομεύεται και ενημερώνεσαι. Όταν το Apple Intelligence δεν μπορεί να σχεδιάσει αναζήτηση, το Ποντίκι στέλνει πλέον μόνο τις βασικές λέξεις της ερώτησής σου στον ιστότοπο του AppleVis, ποτέ ολόκληρη την ερώτηση."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las preguntas al Ratón pueden tener hasta 300 caracteres, y las búsquedas en Descubrir y en el Directorio de apps hasta 150. Cuando te acercas al límite, VoiceOver dice cuántos caracteres quedan. Lo que sea más largo se acorta, y se te avisa. Cuando Apple Intelligence no puede planear una búsqueda, el Ratón ahora envía al sitio web de AppleVis solo las palabras clave de tu pregunta, nunca la pregunta completa."
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سؤال‌ها از موس می‌توانند تا ۳۰۰ نویسه و جست‌وجوها در «کاوش» و فهرست برنامه‌ها تا ۱۵۰ نویسه باشند. وقتی به حد نزدیک می‌شوید، VoiceOver می‌گوید چند نویسه باقی مانده است. متن بلندتر کوتاه می‌شود و به شما اطلاع داده می‌شود. وقتی Apple Intelligence نتواند جست‌وجو را برنامه‌ریزی کند، موس اکنون فقط کلمه‌های اصلی سؤال شما را به وب‌سایت AppleVis می‌فرستد، هرگز کل سؤال را."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les questions à la Souris peuvent faire jusqu’à 300 caractères, et les recherches dans Découvrir et l’annuaire des apps jusqu’à 150. Près de la limite, VoiceOver indique le nombre de caractères restants. Tout texte plus long est raccourci, et vous en êtes informé. Quand Apple Intelligence ne peut pas préparer une recherche, la Souris n’envoie désormais au site AppleVis que les mots principaux de votre question, jamais la question entière."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "שאלות לעכבר יכולות להיות באורך של עד 300 תווים, וחיפושים בגילוי ובמדריך האפליקציות עד 150. כשמתקרבים למגבלה, VoiceOver אומר כמה תווים נותרו. טקסט ארוך יותר מקוצר, ומודיעים לך על כך. כש-Apple Intelligence לא יכול לתכנן חיפוש, העכבר שולח עכשיו לאתר AppleVis רק את המילים העיקריות בשאלה, אף פעם לא את השאלה כולה."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "माउस से सवाल 300 अक्षरों तक और खोजें व ऐप डायरेक्टरी में खोजें 150 अक्षरों तक हो सकती हैं। सीमा के पास पहुँचने पर VoiceOver बताता है कि कितने अक्षर बचे हैं। इससे लंबा टेक्स्ट छोटा कर दिया जाता है और आपको बताया जाता है। जब Apple Intelligence खोज की योजना नहीं बना पाता, तो माउस अब AppleVis वेबसाइट पर आपके सवाल के केवल मुख्य शब्द भेजता है, पूरा सवाल कभी नहीं।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pertanyaan ke Mouse bisa sampai 300 karakter, dan pencarian di Jelajahi serta Direktori App sampai 150. Saat Anda mendekati batas, VoiceOver menyebutkan sisa karakter. Teks yang lebih panjang dipersingkat, dan Anda diberi tahu. Saat Apple Intelligence tidak dapat merencanakan pencarian, Mouse kini hanya mengirim kata-kata utama pertanyaan Anda ke situs AppleVis, tidak pernah seluruh pertanyaan."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le domande al Mouse possono avere fino a 300 caratteri e le ricerche in Scopri e nella Directory delle app fino a 150. Quando ti avvicini al limite, VoiceOver dice quanti caratteri restano. Il testo più lungo viene accorciato e te lo si dice. Quando Apple Intelligence non riesce a pianificare una ricerca, il Mouse ora invia al sito di AppleVis solo le parole principali della domanda, mai la domanda intera."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マウスへの質問は300文字まで、「見つける」とアプリディレクトリでの検索は150文字までになりました。上限に近づくと、残りの文字数を VoiceOver が伝えます。それより長い場合は短くされ、そのことが知らされます。Apple Intelligence が検索を計画できないとき、マウスは AppleVis の Web サイトに質問全体ではなく主な単語だけを送るようになりました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "마우스에게 하는 질문은 300자까지, 둘러보기와 앱 디렉터리 검색은 150자까지 가능합니다. 한도에 가까워지면 VoiceOver가 남은 글자 수를 알려 줍니다. 더 긴 내용은 줄이고 그 사실을 알려 드립니다. Apple Intelligence가 검색을 계획하지 못하면, 이제 마우스는 질문 전체가 아닌 주요 단어만 AppleVis 웹사이트로 보냅니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vragen aan de Muis kunnen maximaal 300 tekens lang zijn, en zoekopdrachten in Ontdek en de App-directory maximaal 150. Als je bijna aan de grens zit, zegt VoiceOver hoeveel tekens er over zijn. Wat langer is, wordt ingekort, en dat hoor je. Als Apple Intelligence geen zoekopdracht kan plannen, stuurt de Muis nu alleen de belangrijkste woorden van je vraag naar de AppleVis-website, nooit de hele vraag."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pytania do Myszki mogą mieć do 300 znaków, a wyszukiwania w Odkrywaj i katalogu aplikacji do 150. Gdy zbliżasz się do limitu, VoiceOver mówi, ile znaków zostało. Dłuższy tekst jest skracany i dostajesz o tym informację. Gdy Apple Intelligence nie może zaplanować wyszukiwania, Myszka wysyła teraz do witryny AppleVis tylko najważniejsze słowa pytania, nigdy całe pytanie."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As perguntas ao Mouse podem ter até 300 caracteres, e as buscas em Descobrir e no Diretório de apps até 150. Quando você se aproxima do limite, o VoiceOver diz quantos caracteres restam. O que for mais longo é encurtado, e você é avisado. Quando o Apple Intelligence não consegue planejar uma busca, o Mouse agora envia ao site do AppleVis só as palavras principais da sua pergunta, nunca a pergunta inteira."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вопросы Мышонку могут быть длиной до 300 символов, а поисковые запросы в «Обзоре» и каталоге приложений — до 150. Когда вы приближаетесь к пределу, VoiceOver сообщает, сколько символов осталось. Более длинный текст сокращается, и вам об этом сообщают. Если Apple Intelligence не может спланировать поиск, Мышонок теперь отправляет на сайт AppleVis только главные слова вашего вопроса, а не весь вопрос."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frågor till Musen kan vara upp till 300 tecken, och sökningar i Upptäck och appkatalogen upp till 150. När du närmar dig gränsen säger VoiceOver hur många tecken som är kvar. Längre text kortas, och du får veta det. När Apple Intelligence inte kan planera en sökning skickar Musen nu bara de viktigaste orden i din fråga till AppleVis webbplats, aldrig hela frågan."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "คำถามถึง Mouse ยาวได้สูงสุด 300 ตัวอักษร และการค้นหาในสำรวจและไดเรกทอรีแอปยาวได้สูงสุด 150 ตัวอักษร เมื่อใกล้ถึงขีดจำกัด VoiceOver จะบอกจำนวนตัวอักษรที่เหลือ ข้อความที่ยาวกว่านั้นจะถูกตัดให้สั้นลงและแจ้งให้คุณทราบ เมื่อ Apple Intelligence วางแผนการค้นหาไม่ได้ ตอนนี้ Mouse จะส่งเฉพาะคำหลักในคำถามของคุณไปยังเว็บไซต์ AppleVis ไม่ส่งทั้งคำถาม"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fare'ye sorular en fazla 300 karakter, Keşfet ve Uygulama Dizini'ndeki aramalar en fazla 150 karakter olabilir. Sınıra yaklaştığınızda VoiceOver kaç karakter kaldığını söyler. Daha uzun metinler kısaltılır ve size bildirilir. Apple Intelligence bir arama planlayamadığında Fare artık AppleVis web sitesine sorunuzun tamamını değil, yalnızca ana sözcüklerini gönderir."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запитання до Мишеняти можуть мати до 300 символів, а пошукові запити в «Огляді» та каталозі програм — до 150. Коли ви наближаєтеся до межі, VoiceOver каже, скільки символів лишилося. Довший текст скорочується, і вам про це повідомляють. Якщо Apple Intelligence не може спланувати пошук, Мишеня тепер надсилає на сайт AppleVis лише головні слова запитання, а не все запитання."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Câu hỏi gửi Mouse có thể dài tối đa 300 ký tự, còn tìm kiếm trong Khám phá và Thư mục ứng dụng tối đa 150 ký tự. Khi gần đến giới hạn, VoiceOver cho biết còn bao nhiêu ký tự. Nội dung dài hơn sẽ được rút gọn và bạn sẽ được thông báo. Khi Apple Intelligence không thể lên kế hoạch tìm kiếm, giờ Mouse chỉ gửi các từ chính trong câu hỏi của bạn đến trang web AppleVis, không bao giờ gửi cả câu hỏi."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "向 Mouse 提问最多可有 300 个字符，在“发现”和 App 目录中搜索最多可有 150 个字符。接近上限时，VoiceOver 会告诉你还剩多少字符。更长的内容会被缩短，并会告知你。当 Apple Intelligence 无法规划搜索时，Mouse 现在只会把问题中的主要词语发送到 AppleVis 网站，绝不会发送整个问题。"
+          }
+        }
+      }
+    },
+    "%lld characters left" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "variations" : {
+            "plural" : {
+              "zero" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "لم يتبقَّ أي حرف"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "بقي حرف واحد"
+                }
+              },
+              "two" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "بقي حرفان"
+                }
+              },
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "بقيت %lld أحرف"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "بقي %lld حرفًا"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "بقي %lld حرف"
+                }
+              }
+            }
+          }
+        },
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Noch %lld Zeichen"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Noch %lld Zeichen"
+                }
+              }
+            }
+          }
+        },
+        "el" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Απομένει %lld χαρακτήρας"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Απομένουν %lld χαρακτήρες"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld character left"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld characters left"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Queda %lld carácter"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Quedan %lld caracteres"
+                }
+              }
+            }
+          }
+        },
+        "fa" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld نویسه باقی مانده"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld نویسه باقی مانده"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld caractère restant"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld caractères restants"
+                }
+              }
+            }
+          }
+        },
+        "he" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "נותר תו אחד"
+                }
+              },
+              "two" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "נותרו %lld תווים"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "נותרו %lld תווים"
+                }
+              }
+            }
+          }
+        },
+        "hi" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld अक्षर बाकी"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld अक्षर बाकी"
+                }
+              }
+            }
+          }
+        },
+        "id" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld karakter lagi"
+                }
+              }
+            }
+          }
+        },
+        "it" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Resta %lld carattere"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Restano %lld caratteri"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "残り%lld文字"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld자 남음"
+                }
+              }
+            }
+          }
+        },
+        "nl" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Nog %lld teken"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Nog %lld tekens"
+                }
+              }
+            }
+          }
+        },
+        "pl" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Został %lld znak"
+                }
+              },
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Zostały %lld znaki"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Zostało %lld znaków"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Zostało %lld znaku"
+                }
+              }
+            }
+          }
+        },
+        "pt" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Resta %lld caractere"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Restam %lld caracteres"
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Остался %lld символ"
+                }
+              },
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Осталось %lld символа"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Осталось %lld символов"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Осталось %lld символа"
+                }
+              }
+            }
+          }
+        },
+        "sv" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tecken kvar"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tecken kvar"
+                }
+              }
+            }
+          }
+        },
+        "th" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "เหลือ %lld ตัวอักษร"
+                }
+              }
+            }
+          }
+        },
+        "tr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld karakter kaldı"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld karakter kaldı"
+                }
+              }
+            }
+          }
+        },
+        "uk" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Залишився %lld символ"
+                }
+              },
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Залишилося %lld символи"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Залишилося %lld символів"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Залишилося %lld символу"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Còn %lld ký tự"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "还剩 %lld 个字符"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Swiping Through Long Posts in Fetch" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التنقل عبر المنشورات الطويلة في «جلب»"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lange Beiträge in Fetch durchblättern"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Περιήγηση σε μεγάλες αναρτήσεις στο Fetch"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recorrer publicaciones largas en Fetch"
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "پیمایش پست‌های طولانی در Fetch"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parcourir les longues publications dans Fetch"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מעבר בין פוסטים ארוכים ב-Fetch"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetch में लंबी पोस्ट पढ़ना"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menelusuri Postingan Panjang di Fetch"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scorrere i post lunghi in Fetch"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetch で長い投稿を順に読む"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetch에서 긴 글 넘겨 읽기"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Door lange berichten in Fetch vegen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przeglądanie długich postów w Fetch"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Percorrer posts longos no Fetch"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чтение длинных публикаций в Fetch"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Svepa genom långa inlägg i Fetch"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เลื่อนอ่านโพสต์ยาวใน Fetch"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetch'te Uzun Gönderilerde Gezinme"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Гортання довгих дописів у Fetch"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vuốt qua bài đăng dài trong Fetch"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Fetch 中浏览长帖子"
+          }
+        }
+      }
+    },
+    "A long post or comment in Fetch is now split at its paragraphs into several parts, so VoiceOver no longer jumps past the rest of Fetch to the tab bar. An empty item that VoiceOver stopped on with a click after some posts is gone." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أصبح المنشور أو التعليق الطويل في Fetch يُقسَّم عند فقراته إلى عدة أجزاء، فلم يعد VoiceOver يقفز متجاوزًا بقية Fetch إلى شريط علامات التبويب. وأُزيل عنصر فارغ كان VoiceOver يتوقف عنده مع نقرة بعد بعض المنشورات."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein langer Beitrag oder Kommentar in Fetch wird jetzt an seinen Absätzen in mehrere Teile geteilt, sodass VoiceOver nicht mehr über den Rest von Fetch hinweg zur Tableiste springt. Ein leeres Element, bei dem VoiceOver nach manchen Beiträgen mit einem Klick hielt, ist weg."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Μια μεγάλη ανάρτηση ή σχόλιο στο Fetch χωρίζεται πλέον στις παραγράφους του σε πολλά μέρη, ώστε το VoiceOver να μην πηδά πια πέρα από το υπόλοιπο Fetch στη γραμμή καρτελών. Ένα κενό στοιχείο όπου το VoiceOver σταματούσε με ένα κλικ μετά από κάποιες αναρτήσεις αφαιρέθηκε."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una publicación o comentario largo en Fetch ahora se divide por párrafos en varias partes, así que VoiceOver ya no salta el resto de Fetch hasta la barra de pestañas. Se eliminó un elemento vacío en el que VoiceOver se detenía con un clic después de algunas publicaciones."
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "یک پست یا نظر طولانی در Fetch اکنون در پاراگراف‌هایش به چند بخش تقسیم می‌شود، پس VoiceOver دیگر از بقیه Fetch به نوار زبانه‌ها نمی‌پرد. یک مورد خالی که VoiceOver پس از برخی پست‌ها با صدای کلیک روی آن می‌ایستاد حذف شد."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une longue publication ou un long commentaire dans Fetch est désormais découpé par paragraphes en plusieurs parties, et VoiceOver ne saute plus le reste de Fetch jusqu’à la barre d’onglets. Un élément vide sur lequel VoiceOver s’arrêtait avec un clic après certaines publications a disparu."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "פוסט או תגובה ארוכים ב-Fetch מחולקים עכשיו לפי הפסקאות לכמה חלקים, כך ש-VoiceOver כבר לא קופץ מעבר לשאר Fetch אל סרגל הכרטיסיות. פריט ריק ש-VoiceOver נעצר עליו בקליק אחרי חלק מהפוסטים הוסר."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetch में लंबी पोस्ट या टिप्पणी अब अपने अनुच्छेदों पर कई हिस्सों में बँट जाती है, इसलिए VoiceOver अब बाकी Fetch को छोड़कर टैब बार पर नहीं कूदता। कुछ पोस्ट के बाद एक खाली आइटम, जिस पर VoiceOver क्लिक की आवाज़ के साथ रुकता था, हटा दिया गया है।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Postingan atau komentar panjang di Fetch kini dibagi per paragraf menjadi beberapa bagian, sehingga VoiceOver tidak lagi melompati sisa Fetch ke bar tab. Item kosong tempat VoiceOver berhenti dengan bunyi klik setelah beberapa postingan sudah dihapus."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un post o commento lungo in Fetch ora viene diviso ai paragrafi in più parti, così VoiceOver non salta più il resto di Fetch fino alla barra dei pannelli. È stato rimosso un elemento vuoto su cui VoiceOver si fermava con un clic dopo alcuni post."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetch の長い投稿やコメントは段落ごとに複数の部分に分かれるようになり、VoiceOver が Fetch の残りを飛ばしてタブバーに移動することがなくなりました。一部の投稿の後で VoiceOver がクリック音とともに止まっていた空の項目もなくなりました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetch의 긴 글이나 댓글이 이제 단락 단위로 여러 부분으로 나뉘어, VoiceOver가 Fetch의 나머지를 건너뛰고 탭 막대로 이동하지 않습니다. 일부 글 뒤에서 VoiceOver가 딸깍 소리와 함께 멈추던 빈 항목도 없앴습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Een lang bericht of een lange reactie in Fetch wordt nu bij de alinea’s in meerdere delen gesplitst, zodat VoiceOver niet meer voorbij de rest van Fetch naar de tabbalk springt. Een leeg onderdeel waarop VoiceOver na sommige berichten met een klik stopte, is weg."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Długi post lub komentarz w Fetch jest teraz dzielony w miejscach akapitów na kilka części, więc VoiceOver nie przeskakuje już reszty Fetch na pasek kart. Usunięto pusty element, na którym VoiceOver zatrzymywał się z kliknięciem po niektórych postach."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um post ou comentário longo no Fetch agora é dividido nos parágrafos em várias partes, então o VoiceOver não pula mais o resto do Fetch até a barra de abas. Um item vazio em que o VoiceOver parava com um clique depois de alguns posts foi removido."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Длинная публикация или комментарий в Fetch теперь делится по абзацам на несколько частей, поэтому VoiceOver больше не перескакивает остальную часть Fetch к панели вкладок. Убран пустой элемент, на котором VoiceOver останавливался со щелчком после некоторых публикаций."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ett långt inlägg eller en lång kommentar i Fetch delas nu vid styckena upp i flera delar, så att VoiceOver inte längre hoppar förbi resten av Fetch till flikfältet. Ett tomt objekt som VoiceOver stannade på med ett klick efter vissa inlägg är borta."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "โพสต์หรือความคิดเห็นยาวใน Fetch จะถูกแบ่งตามย่อหน้าเป็นหลายส่วน VoiceOver จึงไม่ข้ามส่วนที่เหลือของ Fetch ไปที่แถบแท็บอีกต่อไป และได้นำรายการว่างที่ VoiceOver หยุดพร้อมเสียงคลิกหลังบางโพสต์ออกแล้ว"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetch'teki uzun bir gönderi veya yorum artık paragraflarından birkaç parçaya bölünüyor; böylece VoiceOver artık Fetch'in geri kalanını atlayıp sekme çubuğuna gitmiyor. Bazı gönderilerden sonra VoiceOver'ın tık sesiyle durduğu boş bir öğe kaldırıldı."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Довгий допис або коментар у Fetch тепер ділиться за абзацами на кілька частин, тож VoiceOver більше не перестрибує решту Fetch до панелі вкладок. Прибрано порожній елемент, на якому VoiceOver зупинявся з клацанням після деяких дописів."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bài đăng hoặc bình luận dài trong Fetch giờ được chia theo đoạn thành nhiều phần, nên VoiceOver không còn nhảy qua phần còn lại của Fetch đến thanh tab. Một mục trống mà VoiceOver dừng lại kèm tiếng tách sau một số bài đăng đã được loại bỏ."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetch 中的长帖子或评论现在会按段落分成几部分，VoiceOver 不再跳过 Fetch 的其余内容直接到标签栏。某些帖子后 VoiceOver 会伴随咔嗒声停留的空白项目也已移除。"
+          }
+        }
+      }
+    },
+    "My Settings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إعداداتي"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meine Einstellungen"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Οι ρυθμίσεις μου"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mis ajustes"
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تنظیمات من"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mes réglages"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ההגדרות שלי"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "मेरी सेटिंग्स"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pengaturan Saya"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le mie impostazioni"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自分の設定"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "내 설정"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mijn instellingen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moje ustawienia"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meus ajustes"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мои настройки"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mina inställningar"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "การตั้งค่าของฉัน"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ayarlarım"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мої налаштування"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cài đặt của tôi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我的设置"
+          }
+        }
+      }
+    },
+    "Slow" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بطيء"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Langsam"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Αργά"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lenta"
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "آهسته"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lente"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "איטי"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "धीमी"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lambat"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lenta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "遅い"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "느리게"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Langzaam"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wolno"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lenta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Медленно"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Långsam"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ช้า"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yavaş"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повільно"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chậm"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "慢"
+          }
+        }
+      }
+    },
+    "Fast" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سريع"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schnell"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Γρήγορα"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rápida"
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سریع"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rapide"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מהיר"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "तेज़"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cepat"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Veloce"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "速い"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "빠르게"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snel"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Szybko"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rápida"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Быстро"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snabb"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เร็ว"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hızlı"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Швидко"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhanh"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快"
+          }
+        }
+      }
+    },
+    "Faster" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أسرع"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schneller"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Πιο γρήγορα"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Más rápida"
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سریع‌تر"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus rapide"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מהיר יותר"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "और तेज़"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lebih Cepat"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Più veloce"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もっと速い"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "더 빠르게"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sneller"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Szybciej"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mais rápida"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Быстрее"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snabbare"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เร็วขึ้น"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Daha Hızlı"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Швидше"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhanh hơn"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更快"
+          }
+        }
+      }
+    },
+    "Fastest" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الأسرع"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Am schnellsten"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Πολύ γρήγορα"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La más rápida"
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سریع‌ترین"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Très rapide"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הכי מהיר"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "सबसे तेज़"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tercepat"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Velocissima"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最速"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가장 빠르게"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snelst"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Najszybciej"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A mais rápida"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Очень быстро"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snabbast"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เร็วที่สุด"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En Hızlı"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Найшвидше"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhanh nhất"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最快"
+          }
+        }
+      }
+    },
+    "Listening Speed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سرعة الاستماع"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hörgeschwindigkeit"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ταχύτητα ανάγνωσης"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Velocidad de escucha"
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سرعت شنیدن"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vitesse d’écoute"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מהירות ההקראה"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "सुनने की गति"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kecepatan Mendengarkan"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Velocità di ascolto"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み上げ速度"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "듣기 속도"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luistersnelheid"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Szybkość czytania"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Velocidade de leitura"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скорость чтения"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uppläsningshastighet"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ความเร็วในการฟัง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dinleme Hızı"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Швидкість читання"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tốc độ nghe"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "朗读速度"
+          }
+        }
+      }
+    },
+    "My Settings uses the voice and speed you chose for VoiceOver or Spoken Content. Swipe up or down to change it." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تستخدم «إعداداتي» الصوت والسرعة اللذين اخترتهما لـ VoiceOver أو «المحتوى المنطوق». اسحب لأعلى أو لأسفل لتغييرها."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meine Einstellungen nutzt die Stimme und Geschwindigkeit, die du für VoiceOver oder Gesprochene Inhalte gewählt hast. Streiche nach oben oder unten, um sie zu ändern."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Οι ρυθμίσεις μου χρησιμοποιούν τη φωνή και την ταχύτητα που επέλεξες για το VoiceOver ή το Εκφωνούμενο περιεχόμενο. Σάρωσε πάνω ή κάτω για αλλαγή."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mis ajustes usa la voz y la velocidad que elegiste para VoiceOver o Contenido leído. Desliza hacia arriba o abajo para cambiarla."
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«تنظیمات من» از صدا و سرعتی استفاده می‌کند که برای VoiceOver یا «محتوای گفتاری» انتخاب کرده‌اید. برای تغییر، تند به بالا یا پایین بکشید."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mes réglages utilise la voix et la vitesse choisies pour VoiceOver ou Contenu énoncé. Balayez vers le haut ou le bas pour la modifier."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "״ההגדרות שלי״ משתמש בקול ובמהירות שבחרת ל-VoiceOver או לתוכן מדובר. החליקו למעלה או למטה כדי לשנות."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "मेरी सेटिंग्स वह आवाज़ और गति इस्तेमाल करती है जो आपने VoiceOver या बोली गई सामग्री के लिए चुनी है। बदलने के लिए ऊपर या नीचे स्वाइप करें।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pengaturan Saya memakai suara dan kecepatan yang Anda pilih untuk VoiceOver atau Konten Lisan. Gesek ke atas atau ke bawah untuk mengubahnya."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le mie impostazioni usa la voce e la velocità scelte per VoiceOver o Contenuto letto ad alta voce. Scorri in alto o in basso per cambiarla."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「自分の設定」では、VoiceOver または読み上げコンテンツで選んだ声と速度を使います。上下にスワイプして変更できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "내 설정은 VoiceOver 또는 음성 콘텐츠에서 선택한 음성과 속도를 사용합니다. 위나 아래로 쓸어서 변경하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mijn instellingen gebruikt de stem en snelheid die je voor VoiceOver of Gesproken materiaal hebt gekozen. Veeg omhoog of omlaag om het te wijzigen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moje ustawienia używają głosu i szybkości wybranych dla VoiceOver lub Mówionej zawartości. Przesuń w górę lub w dół, aby zmienić."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meus ajustes usa a voz e a velocidade que você escolheu para o VoiceOver ou o Conteúdo Falado. Deslize para cima ou para baixo para mudar."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Мои настройки» используют голос и скорость, выбранные для VoiceOver или «Устного контента». Смахните вверх или вниз, чтобы изменить."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mina inställningar använder rösten och hastigheten du valt för VoiceOver eller Uppläst innehåll. Svep uppåt eller nedåt för att ändra."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "การตั้งค่าของฉันใช้เสียงและความเร็วที่คุณเลือกไว้สำหรับ VoiceOver หรือเนื้อหาที่พูด ปัดขึ้นหรือลงเพื่อเปลี่ยน"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ayarlarım, VoiceOver veya Seslendirilen İçerik için seçtiğiniz sesi ve hızı kullanır. Değiştirmek için yukarı veya aşağı kaydırın."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Мої налаштування» використовують голос і швидкість, вибрані для VoiceOver або «Озвученого вмісту». Змахніть угору чи вниз, щоб змінити."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cài đặt của tôi dùng giọng và tốc độ bạn đã chọn cho VoiceOver hoặc Nội dung được đọc. Vuốt lên hoặc xuống để thay đổi."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“我的设置”使用你为 VoiceOver 或“朗读内容”选择的语音和速度。向上或向下轻扫可更改。"
+          }
+        }
+      }
+    },
+    "Listening Speed for Listen to Fetch" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سرعة الاستماع في «استمع إلى Fetch»"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hörgeschwindigkeit für „Fetch anhören“"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ταχύτητα ανάγνωσης για την Ακρόαση του Fetch"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Velocidad de escucha para Escuchar Fetch"
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سرعت شنیدن برای «گوش دادن به Fetch»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vitesse d’écoute pour Écouter Fetch"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מהירות הקראה להאזנה ל-Fetch"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetch सुनें के लिए सुनने की गति"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kecepatan Mendengarkan untuk Dengarkan Fetch"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Velocità di ascolto per Ascolta Fetch"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「Fetch を聞く」の読み上げ速度"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetch 듣기의 듣기 속도"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luistersnelheid voor Luister naar Fetch"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Szybkość czytania w Słuchaj Fetch"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Velocidade de leitura para Ouvir o Fetch"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скорость чтения для «Слушать Fetch»"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uppläsningshastighet för Lyssna på Fetch"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ความเร็วในการฟังสำหรับฟัง Fetch"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetch'i Dinle için Dinleme Hızı"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Швидкість читання для «Слухати Fetch»"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tốc độ nghe cho Nghe Fetch"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“收听 Fetch”的朗读速度"
+          }
+        }
+      }
+    },
+    "Listen to Fetch now reads in the voice and speed you chose for VoiceOver or Spoken Content. To change it, use Listening Speed in Fetch and choose Slow, Normal, Fast, Faster, or Fastest. If you change it while listening, the current sentence starts again at the new speed." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أصبح «استمع إلى Fetch» يقرأ بالصوت والسرعة اللذين اخترتهما لـ VoiceOver أو «المحتوى المنطوق». لتغييرها، استخدم «سرعة الاستماع» في Fetch واختر بطيء أو عادي أو سريع أو أسرع أو الأسرع. وإذا غيّرتها أثناء الاستماع، تبدأ الجملة الحالية من جديد بالسرعة الجديدة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„Fetch anhören“ liest jetzt mit der Stimme und Geschwindigkeit, die du für VoiceOver oder Gesprochene Inhalte gewählt hast. Zum Ändern nutze Hörgeschwindigkeit in Fetch und wähle Langsam, Normal, Schnell, Schneller oder Am schnellsten. Änderst du sie beim Zuhören, beginnt der aktuelle Satz neu im neuen Tempo."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Η Ακρόαση του Fetch διαβάζει πλέον με τη φωνή και την ταχύτητα που επέλεξες για το VoiceOver ή το Εκφωνούμενο περιεχόμενο. Για αλλαγή, χρησιμοποίησε την Ταχύτητα ανάγνωσης στο Fetch και διάλεξε Αργά, Κανονικά, Γρήγορα, Πιο γρήγορα ή Πολύ γρήγορα. Αν την αλλάξεις ενώ ακούς, η τρέχουσα πρόταση ξεκινά ξανά με τη νέα ταχύτητα."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escuchar Fetch ahora lee con la voz y la velocidad que elegiste para VoiceOver o Contenido leído. Para cambiarla, usa Velocidad de escucha en Fetch y elige Lenta, Normal, Rápida, Más rápida o La más rápida. Si la cambias mientras escuchas, la frase actual vuelve a empezar a la nueva velocidad."
+          }
+        },
+        "fa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«گوش دادن به Fetch» اکنون با صدا و سرعتی می‌خواند که برای VoiceOver یا «محتوای گفتاری» انتخاب کرده‌اید. برای تغییر، از «سرعت شنیدن» در Fetch استفاده کنید و آهسته، عادی، سریع، سریع‌تر یا سریع‌ترین را انتخاب کنید. اگر هنگام گوش دادن آن را تغییر دهید، جمله فعلی با سرعت جدید از نو شروع می‌شود."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écouter Fetch lit désormais avec la voix et la vitesse choisies pour VoiceOver ou Contenu énoncé. Pour la modifier, utilisez Vitesse d’écoute dans Fetch et choisissez Lente, Normale, Rapide, Plus rapide ou Très rapide. Si vous la changez pendant l’écoute, la phrase en cours reprend à la nouvelle vitesse."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ההאזנה ל-Fetch מקריאה עכשיו בקול ובמהירות שבחרת ל-VoiceOver או לתוכן מדובר. כדי לשנות, השתמשו במהירות ההקראה ב-Fetch ובחרו איטי, רגיל, מהיר, מהיר יותר או הכי מהיר. אם משנים אותה בזמן ההאזנה, המשפט הנוכחי מתחיל מחדש במהירות החדשה."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetch सुनें अब उस आवाज़ और गति में पढ़ता है जो आपने VoiceOver या बोली गई सामग्री के लिए चुनी है। बदलने के लिए Fetch में सुनने की गति का उपयोग करें और धीमी, सामान्य, तेज़, और तेज़ या सबसे तेज़ चुनें। सुनते समय बदलने पर मौजूदा वाक्य नई गति से फिर शुरू होता है।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dengarkan Fetch kini membaca dengan suara dan kecepatan yang Anda pilih untuk VoiceOver atau Konten Lisan. Untuk mengubahnya, gunakan Kecepatan Mendengarkan di Fetch lalu pilih Lambat, Normal, Cepat, Lebih Cepat, atau Tercepat. Jika Anda mengubahnya saat mendengarkan, kalimat saat ini dimulai lagi dengan kecepatan baru."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ascolta Fetch ora legge con la voce e la velocità scelte per VoiceOver o Contenuto letto ad alta voce. Per cambiarla, usa Velocità di ascolto in Fetch e scegli Lenta, Normale, Veloce, Più veloce o Velocissima. Se la cambi durante l’ascolto, la frase in corso ricomincia alla nuova velocità."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「Fetch を聞く」は、VoiceOver または読み上げコンテンツで選んだ声と速度で読み上げるようになりました。変更するには Fetch の「読み上げ速度」で、遅い、標準、速い、もっと速い、最速から選びます。聞いている途中で変えると、今の文が新しい速度で最初から読まれます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetch 듣기가 이제 VoiceOver 또는 음성 콘텐츠에서 선택한 음성과 속도로 읽어 줍니다. 바꾸려면 Fetch에서 듣기 속도를 사용해 느리게, 보통, 빠르게, 더 빠르게, 가장 빠르게 중에서 선택하세요. 듣는 도중에 바꾸면 현재 문장이 새 속도로 다시 시작됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luister naar Fetch leest nu met de stem en snelheid die je voor VoiceOver of Gesproken materiaal hebt gekozen. Wijzig het met Luistersnelheid in Fetch en kies Langzaam, Normaal, Snel, Sneller of Snelst. Wijzig je het tijdens het luisteren, dan begint de huidige zin opnieuw op de nieuwe snelheid."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Słuchaj Fetch czyta teraz głosem i z szybkością wybranymi dla VoiceOver lub Mówionej zawartości. Aby to zmienić, użyj Szybkości czytania w Fetch i wybierz Wolno, Normalnie, Szybko, Szybciej lub Najszybciej. Jeśli zmienisz ją podczas słuchania, bieżące zdanie zacznie się od nowa w nowym tempie."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Ouvir o Fetch agora lê com a voz e a velocidade que você escolheu para o VoiceOver ou o Conteúdo Falado. Para mudar, use Velocidade de leitura no Fetch e escolha Lenta, Normal, Rápida, Mais rápida ou A mais rápida. Se mudar enquanto ouve, a frase atual recomeça na nova velocidade."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Слушать Fetch» теперь читает голосом и со скоростью, выбранными для VoiceOver или «Устного контента». Чтобы изменить, используйте «Скорость чтения» в Fetch и выберите «Медленно», «Обычно», «Быстро», «Быстрее» или «Очень быстро». Если изменить её во время прослушивания, текущее предложение начнётся заново с новой скоростью."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lyssna på Fetch läser nu med rösten och hastigheten du valt för VoiceOver eller Uppläst innehåll. Ändra med Uppläsningshastighet i Fetch och välj Långsam, Normal, Snabb, Snabbare eller Snabbast. Om du ändrar medan du lyssnar börjar den aktuella meningen om i den nya hastigheten."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ฟัง Fetch จะอ่านด้วยเสียงและความเร็วที่คุณเลือกไว้สำหรับ VoiceOver หรือเนื้อหาที่พูด หากต้องการเปลี่ยน ให้ใช้ความเร็วในการฟังใน Fetch แล้วเลือก ช้า ปกติ เร็ว เร็วขึ้น หรือเร็วที่สุด ถ้าเปลี่ยนระหว่างฟัง ประโยคปัจจุบันจะเริ่มใหม่ด้วยความเร็วใหม่"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetch'i Dinle artık VoiceOver veya Seslendirilen İçerik için seçtiğiniz ses ve hızla okuyor. Değiştirmek için Fetch'teki Dinleme Hızı'nı kullanıp Yavaş, Normal, Hızlı, Daha Hızlı veya En Hızlı'yı seçin. Dinlerken değiştirirseniz geçerli cümle yeni hızla yeniden başlar."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Слухати Fetch» тепер читає голосом і зі швидкістю, вибраними для VoiceOver або «Озвученого вмісту». Щоб змінити, скористайтеся «Швидкістю читання» у Fetch і виберіть «Повільно», «Звичайно», «Швидко», «Швидше» або «Найшвидше». Якщо змінити її під час слухання, поточне речення почнеться знову з новою швидкістю."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nghe Fetch giờ đọc bằng giọng và tốc độ bạn đã chọn cho VoiceOver hoặc Nội dung được đọc. Để thay đổi, dùng Tốc độ nghe trong Fetch và chọn Chậm, Bình thường, Nhanh, Nhanh hơn hoặc Nhanh nhất. Nếu đổi trong lúc nghe, câu hiện tại sẽ bắt đầu lại với tốc độ mới."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“收听 Fetch”现在使用你为 VoiceOver 或“朗读内容”选择的语音和速度朗读。要更改，请在 Fetch 中使用“朗读速度”，选择慢、正常、快、更快或最快。收听时更改，当前句子会以新速度重新开始。"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

@@ -28,6 +28,7 @@ struct FetchHomeContent: View {
     @ObservedObject private var listener = FetchListener.shared
     @ObservedObject private var store = FetchStore.shared
     @AppStorage("fetch.markReadAtEnd") private var markReadAtEnd = false
+    @AppStorage(ListenSpeed.storageKey) private var listenSpeed: ListenSpeed = .mySettings
     /// One focus for all of Fetch: a heading ("heading.<id>"), a preview
     /// ("preview.<id>"), a comment (its id), the header, or All Caught Up.
     /// Shared so marking something read can move VoiceOver on to what's
@@ -84,6 +85,7 @@ struct FetchHomeContent: View {
             }
 
             listenControls
+            speedPicker
 
             Toggle("Mark as Read When Finished", isOn: $markReadAtEnd)
                 .font(.subheadline)
@@ -158,6 +160,31 @@ struct FetchHomeContent: View {
                 .font(.subheadline)
             }
         }
+    }
+
+    /// How fast Listen to Fetch reads; swipe up or down with VoiceOver. A
+    /// change mid-read starts the current sentence again at the new speed.
+    /// Requested directly (2026-09-30).
+    private var speedPicker: some View {
+        Picker("Listening Speed", selection: $listenSpeed) {
+            ForEach(ListenSpeed.allCases) { speed in
+                Text(speed.name).tag(speed)
+            }
+        }
+        .pickerStyle(.menu)
+        .font(.subheadline)
+        .accessibilityValue(Text(listenSpeed.name))
+        .accessibilityHint(String(localized: "My Settings uses the voice and speed you chose for VoiceOver or Spoken Content. Swipe up or down to change it."))
+        .accessibilityAdjustableAction { direction in
+            let all = ListenSpeed.allCases
+            guard let idx = all.firstIndex(of: listenSpeed) else { return }
+            switch direction {
+            case .increment: if idx + 1 < all.count { listenSpeed = all[idx + 1] }
+            case .decrement: if idx > 0 { listenSpeed = all[idx - 1] }
+            @unknown default: break
+            }
+        }
+        .onChange(of: listenSpeed) { _, _ in listener.speedChanged() }
     }
 
     // MARK: All caught up
@@ -303,6 +330,7 @@ private struct FetchGroupRows: View {
     let onMarkReadThrough: (FetchComment, FetchContent) -> Void
 
     @ObservedObject private var store = FetchStore.shared
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var showsOriginal = false
     @State private var replyingTo: FetchComment?
 
@@ -320,19 +348,18 @@ private struct FetchGroupRows: View {
 
         switch store.state(for: item, newCount: commentCount) {
         case .loaded(let content)?:
+            // With no new comments, the post is the end of the item. This
+            // used to be an empty, invisible row, which VoiceOver stopped
+            // on with a click. Reported directly (2026-09-30).
             if group.isBrandNew {
-                previewRow(content)
+                previewRows(content, isEnd: content.comments.isEmpty)
             } else {
                 originalPostRow(content)
-                if showsOriginal { previewRow(content) }
+                    .onAppear { if content.comments.isEmpty { onReachedEnd() } }
+                if showsOriginal { previewRows(content, isEnd: false) }
             }
             ForEach(Array(content.comments.enumerated()), id: \.element.id) { index, comment in
-                commentRow(comment)
-                    .onAppear { if index == content.comments.count - 1 { onReachedEnd() } }
-            }
-            if content.comments.isEmpty {
-                Color.clear.frame(height: 0).listRowSeparator(.hidden)
-                    .onAppear(perform: onReachedEnd)
+                commentRows(comment, isEnd: index == content.comments.count - 1)
             }
         case .failed?:
             HStack {
@@ -433,21 +460,54 @@ private struct FetchGroupRows: View {
         return nil
     }
 
-    private func previewRow(_ content: FetchContent) -> some View {
-        link(item.fetchTarget, rowId: "preview.\(item.id)") {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(content.preview)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                if content.previewIsExcerpt {
-                    Text("Continues. Double-tap to read the rest.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+    // MARK: Long text in parts
+
+    /// Longest row, in characters. A row taller than the screen stopped
+    /// VoiceOver: the list hadn't built the next row yet, so a swipe right
+    /// jumped past the rest of Fetch to the tab bar. Long posts and
+    /// comments are now split at paragraphs into rows of about half a
+    /// screen, shorter at larger text sizes. Reported directly (2026-09-30).
+    private var pieceLength: Int {
+        switch typeSize {
+        case .accessibility3, .accessibility4, .accessibility5: return 200
+        case .accessibility1, .accessibility2: return 350
+        default: return 700
+        }
+    }
+
+    private func pieces(_ text: String) -> [String] {
+        let parts = TextSegmentation.pieces(text, maxLength: pieceLength)
+        return parts.isEmpty ? [text] : parts
+    }
+
+    /// The first part keeps the row's own id, so focus returns and Mark Read
+    /// Up to Here still land on it.
+    private static func pieceId(_ base: String, _ index: Int) -> String {
+        index == 0 ? base : "\(base)#\(index)"
+    }
+
+    @ViewBuilder
+    private func previewRows(_ content: FetchContent, isEnd: Bool) -> some View {
+        let parts = pieces(content.preview)
+        ForEach(Array(parts.enumerated()), id: \.offset) { index, part in
+            let isLast = index == parts.count - 1
+            link(item.fetchTarget, rowId: Self.pieceId("preview.\(item.id)", index)) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(part)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                    if isLast, content.previewIsExcerpt {
+                        Text("Continues. Double-tap to read the rest.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
+            .padding(.leading, 20)
+            .accessibilityElement(children: .combine)
+            .listRowSeparator(isLast ? .automatic : .hidden)
+            .onAppear { if isLast, isEnd { onReachedEnd() } }
         }
-        .padding(.leading, 20)
-        .accessibilityElement(children: .combine)
     }
 
     private func originalPostRow(_ content: FetchContent) -> some View {
@@ -463,22 +523,37 @@ private struct FetchGroupRows: View {
             }
     }
 
-    private func commentRow(_ comment: FetchComment) -> some View {
+    /// One comment: its first part says who wrote it; a long comment goes
+    /// on in the rows after, each with the same actions.
+    @ViewBuilder
+    private func commentRows(_ comment: FetchComment, isEnd: Bool) -> some View {
+        let parts = pieces(comment.text)
+        ForEach(Array(parts.enumerated()), id: \.offset) { index, part in
+            let isLast = index == parts.count - 1
+            commentRow(comment, part: part, index: index, isLast: isLast)
+                .listRowSeparator(isLast ? .automatic : .hidden)
+                .onAppear { if isLast, isEnd { onReachedEnd() } }
+        }
+    }
+
+    private func commentRow(_ comment: FetchComment, part: String, index: Int, isLast: Bool) -> some View {
         let target = FetchThreadTarget(kind: item.kind, contentId: item.contentId, platform: item.fetchTarget.platform, commentId: comment.id)
-        return link(target, rowId: comment.id) {
+        return link(target, rowId: Self.pieceId(comment.id, index)) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(FetchText.commentHeader(comment))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                if let replyingTo = comment.replyingTo {
-                    Text(String(localized: "Replying to \(replyingTo)."))
-                        .font(.caption)
+                if index == 0 {
+                    Text(FetchText.commentHeader(comment))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
+                    if let replyingTo = comment.replyingTo {
+                        Text(String(localized: "Replying to \(replyingTo)."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                Text(comment.text)
+                Text(part)
                     .font(.body)
                     .foregroundStyle(.primary)
-                if comment.isTruncated {
+                if isLast, comment.isTruncated {
                     Text("Continues. Double-tap to read the rest.")
                         .font(.caption)
                         .foregroundStyle(.secondary)

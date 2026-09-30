@@ -115,8 +115,14 @@ final class AskTheMouse: ObservableObject {
 
     var isBusy: Bool { turns.first?.isSearching ?? false }
 
+    /// The longest question, in characters. Real questions run about 50 to
+    /// 150; much longer ones crowd out the sources Apple Intelligence reads
+    /// to answer. Siri and Discover questions are held to it too.
+    /// Requested directly (2026-09-30).
+    static let maxQuestionLength = 300
+
     func ask(_ rawQuestion: String) {
-        let question = rawQuestion.trimmingCharacters(in: .whitespacesAndNewlines)
+        let question = String(rawQuestion.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maxQuestionLength))
         guard !question.isEmpty, !isBusy else { return }
         // Newest first, so the latest answer sits right under the question field.
         let earlier = turns.prefix(2).map(\.question)
@@ -195,10 +201,14 @@ final class AskTheMouse: ObservableObject {
     // MARK: - Running a question
 
     private func run(_ question: String, earlier: [String], turnId: UUID) async {
+        // Without a plan, only the question's main words go to the website,
+        // never the whole question, as Help promises. It used to send the
+        // question as typed. Found 2026-09-30.
+        let fallback = Self.searchWords(question)
         let plan = await IntelligenceService.mousePlan(for: question, earlier: earlier)
-            ?? IntelligenceService.MousePlan(searchPhrases: [question])
+            ?? IntelligenceService.MousePlan(searchPhrases: [fallback])
         if Task.isCancelled { return }
-        let phrases = plan.searchPhrases.isEmpty ? [question] : plan.searchPhrases
+        let phrases = plan.searchPhrases.isEmpty ? [fallback] : plan.searchPhrases
         let words = MouseKnowledge.terms(([question] + phrases).joined(separator: " "))
 
         // On the device: instant.
@@ -560,6 +570,13 @@ final class AskTheMouse: ObservableObject {
         }
     }
 
+    /// Up to six of the question's main words, for a site search when
+    /// Apple Intelligence couldn't plan one.
+    static func searchWords(_ question: String) -> String {
+        let words = MouseKnowledge.terms(question).prefix(6).joined(separator: " ")
+        return words.isEmpty ? String(question.prefix(60)) : words
+    }
+
     /// Two lines saying the same thing: mostly the same words.
     static func sameAnswer(_ a: String, _ b: String) -> Bool {
         let x = Set(MouseKnowledge.terms(a)), y = Set(MouseKnowledge.terms(b))
@@ -598,38 +615,9 @@ final class AskTheMouse: ObservableObject {
         return found
     }
 
-    /// Paragraphs gathered into parts of about `partLength` characters; a
-    /// paragraph longer than that is cut at sentence ends.
+    /// Paragraphs gathered into parts of about `partLength` characters.
     static func parts(of text: String) -> [String] {
-        var paragraphs: [String] = []
-        for paragraph in text.components(separatedBy: "\n") {
-            let trimmed = paragraph.trimmingCharacters(in: .whitespaces)
-            guard !trimmed.isEmpty else { continue }
-            if trimmed.count <= partLength {
-                paragraphs.append(trimmed)
-            } else {
-                var piece = ""
-                for sentence in TextSegmentation.sentenceGroups(trimmed, groupSize: 1) {
-                    if !piece.isEmpty, piece.count + sentence.count > partLength {
-                        paragraphs.append(piece)
-                        piece = ""
-                    }
-                    piece += (piece.isEmpty ? "" : " ") + String(sentence.prefix(partLength))
-                }
-                if !piece.isEmpty { paragraphs.append(piece) }
-            }
-        }
-        var parts: [String] = []
-        var current = ""
-        for paragraph in paragraphs {
-            if !current.isEmpty, current.count + paragraph.count + 1 > partLength {
-                parts.append(current)
-                current = ""
-            }
-            current += (current.isEmpty ? "" : "\n") + paragraph
-        }
-        if !current.isEmpty { parts.append(current) }
-        return parts
+        TextSegmentation.pieces(text, maxLength: partLength)
     }
 
     // MARK: - Steps

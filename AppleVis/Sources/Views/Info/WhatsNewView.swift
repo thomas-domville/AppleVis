@@ -195,6 +195,24 @@ struct ChangeItem: Identifiable {
 
     static let current: [ChangeItem] = [
         ChangeItem(
+            systemImage: "gauge.with.dots.needle.67percent",
+            tag: .new,
+            title: "Listening Speed for Listen to Fetch",
+            description: "Listen to Fetch now reads in the voice and speed you chose for VoiceOver or Spoken Content. To change it, use Listening Speed in Fetch and choose Slow, Normal, Fast, Faster, or Fastest. If you change it while listening, the current sentence starts again at the new speed."
+        ),
+        ChangeItem(
+            systemImage: "text.alignleft",
+            tag: .fixed,
+            title: "Swiping Through Long Posts in Fetch",
+            description: "A long post or comment in Fetch is now split at its paragraphs into several parts, so VoiceOver no longer jumps past the rest of Fetch to the tab bar. An empty item that VoiceOver stopped on with a click after some posts is gone."
+        ),
+        ChangeItem(
+            systemImage: "character.cursor.ibeam",
+            tag: .improved,
+            title: "Question and Search Lengths",
+            description: "Questions to the Mouse can be up to 300 characters, and searches in Discover and the App Directory up to 150. When you're close to the limit, VoiceOver says how many characters are left. Anything longer is shortened, and you're told. When Apple Intelligence can't plan a search, the Mouse now sends only your question's main words to the AppleVis website, never the whole question."
+        ),
+        ChangeItem(
             systemImage: "text.magnifyingglass",
             tag: .improved,
             title: "Ask the Mouse Answers More Questions",
