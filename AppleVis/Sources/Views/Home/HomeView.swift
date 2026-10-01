@@ -242,44 +242,7 @@ struct HomeView: View {
                 }
             }
             .refreshable {
-                // announceWelcomeIfNeeded() only ever fires once per
-                // session (see hasAnnouncedWelcome), so a manual
-                // pull-to-refresh otherwise gets nothing but a non-speech
-                // chime — a VoiceOver user has no way to tell the refresh
-                // even happened, let alone whether it found anything.
-                // Reported directly: users couldn't tell a refresh that
-                // found nothing new from one that silently failed.
-                let previousLoadedAt = vm.lastLoadedAt
-                await vm.load()
-                await vm.loadMouseRecap(force: true)
-                notificationHistory = PersistenceStore.shared.notificationHistory()
-                SoundPlayer.shared.play(.refresh)
-
-                // lastLoadedAt only advances on a genuinely successful
-                // load (see HomeViewModel.load()), so an unchanged value
-                // here means the refresh failed outright — the
-                // OfflineBanner/SourceErrorBanner already covers that
-                // case, and announcing "no new activity" over a failure
-                // would be actively misleading.
-                guard vm.lastLoadedAt != previousLoadedAt else { return }
-
-                // Deliberately not gated on homeStartupBehavior == .quiet
-                // like announceWelcomeIfNeeded() — that preference is
-                // about suppressing the unsolicited on-launch greeting,
-                // not about withholding feedback from an action the user
-                // just explicitly took.
-                if !vm.newItems.isEmpty && !vm.isNewActivityDismissed {
-                    UIAccessibility.post(notification: .announcement, argument: vm.newActivitySummary)
-                    // Welcome Summary being off hides the card this would
-                    // otherwise focus (see feedList below) — the spoken
-                    // announcement above still always fires for an
-                    // explicit user action like this, only the focus
-                    // target changes to something that actually exists.
-                    let focusAfterRefresh: HomeFocusTarget = preferences.welcomeSummaryEnabled ? .summary : .greeting
-                    Task { await retryAccessibilityFocus(focusAfterRefresh, into: $focusTarget) }
-                } else {
-                    UIAccessibility.post(notification: .announcement, argument: String(localized: "No new activity since your last visit."))
-                }
+                await refreshAndAnnounce()
             }
             .onReceive(keyCommands.refreshRequested) { Task { await vm.load() } }
             // Returning to the foreground while on some other tab
@@ -288,11 +251,21 @@ struct HomeView: View {
             // they'll get a normal load next time they actually switch to
             // Home. Reported directly: nothing refreshed Home at all before
             // this, no matter how long the app sat backgrounded.
+            //
+            // When it does fire, it now shares refreshAndAnnounce() with
+            // pull-to-refresh instead of silently calling vm.load() alone —
+            // returning via the Home Screen/app switcher left VoiceOver
+            // focus to fall back on the system default (typically the
+            // leading nav bar button) with no announcement at all, no
+            // matter which of the four filter views (All/New/Fetch/Nibbles)
+            // was showing, since a silent reload re-diffs the shared list
+            // out from under whatever VoiceOver was focused on. Reported
+            // directly.
             .onChange(of: scenePhase) { _, newPhase in
                 guard newPhase == .active, keyCommands.selectedTab == 0 else { return }
                 let isStale = vm.lastLoadedAt.map { Date().timeIntervalSince($0) > Self.staleThreshold } ?? true
                 guard isStale else { return }
-                Task { await vm.load() }
+                Task { await refreshAndAnnounce() }
             }
             .overlay(alignment: .top) { ToastOverlay() }
             .sheet(isPresented: $showCustomizeHome, onDismiss: {
@@ -779,6 +752,52 @@ struct HomeView: View {
                     await retryAccessibilityFocus(.item(id), into: $focusTarget, delaysMs: [150, 350, 600, 900])
                 }
             }
+        }
+    }
+
+    /// Reloads Home and gives VoiceOver the same feedback regardless of
+    /// what triggered the reload (manual pull-to-refresh, or returning to
+    /// the foreground on a stale Home) or which of the four filter views
+    /// (All/New/Fetch/Nibbles) happens to be selected — all share this one
+    /// `feedList`/`ScrollViewReader`, so a silent reload re-diffs the list
+    /// out from under VoiceOver's focus no matter which filter is showing.
+    /// Was pull-to-refresh-only, so returning from the background left
+    /// focus to fall back on the system default (typically the leading nav
+    /// bar button) with no announcement at all. Reported directly.
+    private func refreshAndAnnounce() async {
+        // announceWelcomeIfNeeded() only ever fires once per session (see
+        // hasAnnouncedWelcome), so a reload otherwise gets nothing but a
+        // non-speech chime — a VoiceOver user has no way to tell the
+        // refresh even happened, let alone whether it found anything.
+        // Reported directly: users couldn't tell a refresh that found
+        // nothing new from one that silently failed.
+        let previousLoadedAt = vm.lastLoadedAt
+        await vm.load()
+        await vm.loadMouseRecap(force: true)
+        notificationHistory = PersistenceStore.shared.notificationHistory()
+        SoundPlayer.shared.play(.refresh)
+
+        // lastLoadedAt only advances on a genuinely successful load (see
+        // HomeViewModel.load()), so an unchanged value here means the
+        // refresh failed outright — the OfflineBanner/SourceErrorBanner
+        // already covers that case, and announcing "no new activity" over
+        // a failure would be actively misleading.
+        guard vm.lastLoadedAt != previousLoadedAt else { return }
+
+        // Deliberately not gated on homeStartupBehavior == .quiet like
+        // announceWelcomeIfNeeded() — that preference is about suppressing
+        // the unsolicited on-launch greeting, not about withholding
+        // feedback from a reload the user is actively looking at.
+        if !vm.newItems.isEmpty && !vm.isNewActivityDismissed {
+            UIAccessibility.post(notification: .announcement, argument: vm.newActivitySummary)
+            // Welcome Summary being off hides the card this would
+            // otherwise focus (see feedList below) — the spoken
+            // announcement above still always fires, only the focus
+            // target changes to something that actually exists.
+            let focusAfterRefresh: HomeFocusTarget = preferences.welcomeSummaryEnabled ? .summary : .greeting
+            Task { await retryAccessibilityFocus(focusAfterRefresh, into: $focusTarget) }
+        } else {
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "No new activity since your last visit."))
         }
     }
 
