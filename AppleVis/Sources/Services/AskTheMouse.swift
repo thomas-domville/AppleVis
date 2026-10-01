@@ -714,7 +714,7 @@ final class AskTheMouse: ObservableObject {
     static func isOld(_ date: Date) -> Bool { Date().timeIntervalSince(date) > oldAfter }
 
     /// A guide's text and its members' comments (author, text).
-    struct GuideRead: Sendable {
+    nonisolated struct GuideRead: Sendable {
         var text = ""
         var comments: [(String, String)] = []
     }

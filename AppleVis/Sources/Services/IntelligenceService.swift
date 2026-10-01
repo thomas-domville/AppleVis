@@ -508,7 +508,7 @@ enum IntelligenceService {
         for try await snapshot in stream {
             latest = snapshot.content
             if let onPartial {
-                await onPartial(mouseAnswerText(snapshot.content.answer ?? "", steps: snapshot.content.steps ?? []))
+                onPartial(mouseAnswerText(snapshot.content.answer ?? "", steps: snapshot.content.steps ?? []))
             }
         }
         let known = Set(sources.map(\.id))
