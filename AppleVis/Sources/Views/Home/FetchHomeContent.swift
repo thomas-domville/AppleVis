@@ -578,8 +578,9 @@ private struct FetchGroupRows: View {
         // Reply (quoting this comment, without leaving Fetch), Copy, Share,
         // Report, and Edit / Unpublish / Delete where allowed.
         .modifier(FetchCommentActions(
-            comment: comment, item: item, isLastInGroup: isLast,
+            comment: comment, item: item,
             onReply: { replyingTo = comment },
+            isLastInGroup: isLast,
             onMarkReadThrough: { if let content = loadedContent { onMarkReadThrough(comment, content) } },
             onRemoved: { store.removeComment(comment.id, item: item, newCount: commentCount) },
             onEdited: { store.updateComment(comment.id, newText: $0, item: item, newCount: commentCount) }
