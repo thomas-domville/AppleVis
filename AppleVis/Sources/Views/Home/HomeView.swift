@@ -562,31 +562,11 @@ struct HomeView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                // One adjustable item for VoiceOver. A segmented picker otherwise
-                // exposes each segment separately ("All, 1 of 4, selected"), so the
-                // hint and swipe up/down on the picker were never reached.
-                // Reported directly (2026-09-28).
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(String(localized: "Home Feed"))
-                // Explicit value — without it, swiping up/down only played
-                // the "value changed" tone with no spoken filter name. Same
-                // fix as PlayerView's playback-speed control (PODCAST-06).
-                // Reported directly.
-                .accessibilityValue(Text(homeFeedFilter.label))
-                // Says what the selected view shows, after a short pause.
-                .accessibilityHint(Text("\(homeFeedFilter.summary) \(String(localized: "Swipe up or down to switch views."))"))
-                // Same swipe-up/down addition as the App Directory/For You
-                // pickers — moves to the next/previous segment in place.
-                .accessibilityAdjustableAction { direction in
-                    guard let idx = HomeFeedFilter.allCases.firstIndex(of: homeFeedFilter) else { return }
-                    switch direction {
-                    case .increment:
-                        homeFeedFilter = HomeFeedFilter.allCases[(idx + 1) % HomeFeedFilter.allCases.count]
-                    case .decrement:
-                        homeFeedFilter = HomeFeedFilter.allCases[(idx - 1 + HomeFeedFilter.allCases.count) % HomeFeedFilter.allCases.count]
-                    @unknown default: break
-                    }
-                }
+                // Each view is its own VoiceOver item again: swipe right from
+                // All to New, Fetch, and Nibbles, and double-tap one ("All,
+                // selected, 1 of 4"). It was briefly one adjustable item so a
+                // hint could say what each view shows; choosing a view still
+                // announces that below. Requested directly (2026-10-01).
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
                 .listRowSeparator(.hidden)
                 .onChange(of: homeFeedFilter) { oldFilter, filter in

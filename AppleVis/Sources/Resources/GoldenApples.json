@@ -1,0 +1,982 @@
+[
+ {
+  "key": "id:6476859317",
+  "name": "PiccyBot",
+  "year": 2025,
+  "award": "Best App",
+  "status": "winner"
+ },
+ {
+  "key": "id:6529525011",
+  "name": "Core Quest",
+  "year": 2025,
+  "award": "Best Game",
+  "status": "winner"
+ },
+ {
+  "key": "id:6743055907",
+  "name": "Dungeons",
+  "year": 2025,
+  "award": "Best Game",
+  "status": "winner"
+ },
+ {
+  "key": "id:6476980907",
+  "name": "Ally - Accessible AI Assistant",
+  "year": 2025,
+  "award": "Best App",
+  "status": "honorable mention"
+ },
+ {
+  "key": "id:6749671821",
+  "name": "Innosearch AI",
+  "year": 2025,
+  "award": "Best App",
+  "status": "honorable mention"
+ },
+ {
+  "key": "id:1630468596",
+  "name": "Art of Fauna: Cozy Puzzles",
+  "year": 2025,
+  "award": "Best Game",
+  "status": "honorable mention"
+ },
+ {
+  "key": "id:1052641617",
+  "name": "Land of Livia",
+  "year": 2025,
+  "award": "Best Game",
+  "status": "honorable mention"
+ },
+ {
+  "key": "path:/apps/ios/productivity/ally-accessible-ai-assistant",
+  "name": "Ally - Accessible AI Assistant",
+  "year": 2025,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/lifestyle/day-one-daily-journal-diary",
+  "name": "Day One: Daily Journal & Diary",
+  "year": 2025,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/utilities/echobox-player",
+  "name": "EchoBox Player",
+  "year": 2025,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/utilities/elevenreader-read-text-aloud",
+  "name": "ElevenReader - Read Text Aloud",
+  "year": 2025,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/music/eter-streaming-internet-radio",
+  "name": "Eter: Streaming Internet Radio",
+  "year": 2025,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/shopping/innosearch-ai",
+  "name": "Innosearch AI",
+  "year": 2025,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/productivity/piccybot",
+  "name": "PiccyBot",
+  "year": 2025,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/social-networking/ramblio",
+  "name": "Ramblio",
+  "year": 2025,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/social-networking/tapestry-iconfactory",
+  "name": "Tapestry by Iconfactory",
+  "year": 2025,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/weather/weather-gods",
+  "name": "Weather Gods",
+  "year": 2025,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/art-fauna-cozy-puzzles",
+  "name": "Art of Fauna: Cozy Puzzles",
+  "year": 2025,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/adventure-fate-core-quest",
+  "name": "Core Quest",
+  "year": 2025,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/adventure-fate-dungeons",
+  "name": "Dungeons",
+  "year": 2025,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/home-quest-idle-adventure",
+  "name": "Home Quest - Idle Adventure",
+  "year": 2025,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/joker-poker-texas-frenzy",
+  "name": "Joker Poker - Texas Frenzy",
+  "year": 2025,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/land-livia",
+  "name": "Land of Livia",
+  "year": 2025,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/lane-defender-haptic-arcade",
+  "name": "Lane Defender: Haptic Arcade",
+  "year": 2025,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/books/lenguard",
+  "name": "Lenguard",
+  "year": 2025,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/magical-maintenance-mystery-0",
+  "name": "Magical Maintenance Mystery",
+  "year": 2025,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/ryft-timely-manor",
+  "name": "RYFT : A Timely Manor",
+  "year": 2025,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/super-race-grand-prix",
+  "name": "Super Race Grand Prix",
+  "year": 2025,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "id:999062298",
+  "name": "Seeing AI",
+  "year": 2024,
+  "award": "Best App",
+  "status": "winner"
+ },
+ {
+  "key": "id:1555459868",
+  "name": "Dawncaster: Deckbuilding RPG",
+  "year": 2024,
+  "award": "Best Game",
+  "status": "winner"
+ },
+ {
+  "key": "id:6476859317",
+  "name": "PiccyBot",
+  "year": 2024,
+  "award": "Best App",
+  "status": "honorable mention"
+ },
+ {
+  "key": "id:6450388413",
+  "name": "VoiceVista",
+  "year": 2024,
+  "award": "Best App",
+  "status": "honorable mention"
+ },
+ {
+  "key": "id:6502510097",
+  "name": "AudioCat",
+  "year": 2024,
+  "award": "Best Game",
+  "status": "honorable mention"
+ },
+ {
+  "key": "id:6478794947",
+  "name": "Brailliance - Learn Braille",
+  "year": 2024,
+  "award": "Best Game",
+  "status": "honorable mention"
+ },
+ {
+  "key": "path:/apps/ios/productivity/1password-password-manager",
+  "name": "1Password: Password Manager",
+  "year": 2024,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/entertainment/anytime-podcast-player",
+  "name": "Anytime Podcast Player",
+  "year": 2024,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/productivity/drafts",
+  "name": "Drafts",
+  "year": 2024,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/social-networking/mona-mastodon",
+  "name": "Mona for Mastodon",
+  "year": 2024,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/navigation/oko-cross-streets-maps",
+  "name": "Oko - Cross streets and Maps",
+  "year": 2024,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/productivity/piccybot",
+  "name": "PiccyBot",
+  "year": 2024,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/utilities/seeing-ai",
+  "name": "Seeing AI",
+  "year": 2024,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/music/tape-it-pro-audio-recorder",
+  "name": "Tape It - Pro Audio Recorder",
+  "year": 2024,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "id:572688855",
+  "name": "Todoist: To Do List & Calendar",
+  "year": 2024,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/navigation/voicevista",
+  "name": "VoiceVista",
+  "year": 2024,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/adventure-fate-lost-island",
+  "name": "Adventure to Fate Lost Island",
+  "year": 2024,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/audiocat",
+  "name": "AudioCat",
+  "year": 2024,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/azmar-quest-old-school-rpg",
+  "name": "Azmar Quest (Old School RPG)",
+  "year": 2024,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "id:6468274110",
+  "name": "Conjury",
+  "year": 2024,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/eldrum-untold-text-rpg",
+  "name": "Eldrum: Untold - Text RPG",
+  "year": 2024,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/home-quest-idle-adventure",
+  "name": "Home Quest - Idle Adventure",
+  "year": 2024,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/land-livia-epic-fantasy",
+  "name": "Land of Livia: An Epic Fantasy",
+  "year": 2024,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/round-logic",
+  "name": "Round Logic",
+  "year": 2024,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "id:905177575",
+  "name": "Be My Eyes",
+  "year": 2023,
+  "award": "Best App",
+  "status": "winner"
+ },
+ {
+  "key": "id:1027546326",
+  "name": "Timecrest",
+  "year": 2023,
+  "award": "Best Game",
+  "status": "winner"
+ },
+ {
+  "key": "id:6444921132",
+  "name": "Zanagrams",
+  "year": 2023,
+  "award": "Best Game",
+  "status": "winner"
+ },
+ {
+  "key": "id:1138219998",
+  "name": "BookPlayer",
+  "year": 2023,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "id:1605201737",
+  "name": "Bookshare Reader",
+  "year": 2023,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "id:1430599061",
+  "name": "Dystopia for Reddit",
+  "year": 2023,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "id:1268632314",
+  "name": "Envision AI",
+  "year": 2023,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "id:1659154653",
+  "name": "Mona for Mastodon",
+  "year": 2023,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "id:1583614988",
+  "name": "OKO - AI copilot for the blind",
+  "year": 2023,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "id:6444577668",
+  "name": "Please Don't Rain",
+  "year": 2023,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "id:999062298",
+  "name": "Seeing AI",
+  "year": 2023,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "id:6450388413",
+  "name": "VoiceVista",
+  "year": 2023,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "id:1041512978",
+  "name": "Weather Gods",
+  "year": 2023,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "id:6444258289",
+  "name": "Brave Brain: Trivia Quiz Game",
+  "year": 2023,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "id:6444378324",
+  "name": "FruitPot 2",
+  "year": 2023,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "id:1502985046",
+  "name": "Purple Friday",
+  "year": 2023,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "id:1231955010",
+  "name": "Six Ages 2: Lights Going Out",
+  "year": 2023,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "id:1639116371",
+  "name": "SoundEcho",
+  "year": 2023,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "id:1508525481",
+  "name": "Space Wave Race",
+  "year": 2023,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "id:6444380323",
+  "name": "Study with Subwords",
+  "year": 2023,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/productivity/envision-ai",
+  "name": "Envision AI (iOS)",
+  "year": 2022,
+  "award": "Best App",
+  "status": "winner"
+ },
+ {
+  "key": "path:/apps/ios/games/evidence-111",
+  "name": "Evidence 111",
+  "year": 2022,
+  "award": "Best Game",
+  "status": "winner"
+ },
+ {
+  "key": "path:/apps/ios/news/apollo-reddit",
+  "name": "Apollo for Reddit (iOS)",
+  "year": 2022,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/food-drink/menus4all",
+  "name": "Menus4All (iOS)",
+  "year": 2022,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/health-fitness/revision-fitness",
+  "name": "ReVision Fitness (iOS)",
+  "year": 2022,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/social-networking/spring-twitter",
+  "name": "Spring for Twitter (iOS/macOS)",
+  "year": 2022,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/productivity/voice-reader-speech-central",
+  "name": "Voice Reader Speech Central (iOS/macOS)",
+  "year": 2022,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/utilities/espeak-ng",
+  "name": "eSpeak-NG (iOS/macOS)",
+  "year": 2022,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/ancient-board-game-collection",
+  "name": "Ancient Board Game Collection",
+  "year": 2022,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/bc4000-civilization-model",
+  "name": "BC4000 - Civilization Model",
+  "year": 2022,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/ddheroes-dragon-dungeon-hero",
+  "name": "DDHeroes - Dragon Dungeon Hero",
+  "year": 2022,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/eldrum-red-tide",
+  "name": "Eldrum: Red tide",
+  "year": 2022,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/dragon-cave",
+  "name": "To the Dragon Cave",
+  "year": 2022,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/utilities/backpack-studio",
+  "name": "Backpack Studio",
+  "year": 2021,
+  "award": "Best App",
+  "status": "winner"
+ },
+ {
+  "key": "path:/apps/ios/games/swordy-quest-rpg-adventure",
+  "name": "Swordy Quest: An RPG Adventure",
+  "year": 2021,
+  "award": "Best Game",
+  "status": "winner"
+ },
+ {
+  "key": "path:/apps/ios/navigation/goodmaps-outdoors",
+  "name": "GoodMaps Outdoors",
+  "year": 2021,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/mac/music/mp3tag",
+  "name": "Mp3tag (Mac)",
+  "year": 2021,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/utilities/nvdaremote",
+  "name": "NVDARemote",
+  "year": 2021,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/news/netnewswire-rss-reader",
+  "name": "NetNewsWire: RSS Reader (iOS and Mac)",
+  "year": 2021,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/navigation/seeingassistant-move",
+  "name": "SeeingAssistant-Move",
+  "year": 2021,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/music/soundlab-audio-editor",
+  "name": "SoundLab Audio Editor (formerly AudioRoom)",
+  "year": 2021,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/productivity/super-lidar-lidar-blind",
+  "name": "Super Lidar - Lidar for Blind",
+  "year": 2021,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/productivity/voice-ocr-document-reader",
+  "name": "Voice: OCR Document Reader",
+  "year": 2021,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/western-drama",
+  "name": "A Western Drama",
+  "year": 2021,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/blind-drive",
+  "name": "Blind Drive",
+  "year": 2021,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/home-quest-idle-adventure",
+  "name": "Home Quest - Idle Adventure",
+  "year": 2021,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/palabra-cadabra-anagram-game",
+  "name": "Palabra Cadabra: The Anagram Game",
+  "year": 2021,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/mac/games/perilous-marathon",
+  "name": "Perilous marathon (Mac)",
+  "year": 2021,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/sonar-islands",
+  "name": "Sonar Islands",
+  "year": 2021,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/space-wave-race",
+  "name": "Space Wave Race",
+  "year": 2021,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/timecrest",
+  "name": "Timecrest",
+  "year": 2021,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/battlefruit",
+  "name": "battlefruit",
+  "year": 2021,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/weather/weather-gods",
+  "name": "Weather Gods",
+  "year": 2020,
+  "award": "Best App",
+  "status": "winner"
+ },
+ {
+  "key": "path:/apps/ios/games/untold-rpg",
+  "name": "Untold RPG",
+  "year": 2020,
+  "award": "Best Game",
+  "status": "winner"
+ },
+ {
+  "key": "path:/apps/ios/books/bard-mobile",
+  "name": "BARD Mobile",
+  "year": 2020,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/navigation/blindsquare",
+  "name": "BlindSquare",
+  "year": 2020,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/music/goldwave",
+  "name": "GoldWave",
+  "year": 2020,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/news/nfb-newsline-mobile",
+  "name": "NFB-NEWSLINE® Mobile",
+  "year": 2020,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/news/netnewswire-rss-reader",
+  "name": "NetNewsWire: RSS Reader",
+  "year": 2020,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/productivity/speech-central-voice-reader",
+  "name": "Speech Central: Voice Reader",
+  "year": 2020,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/productivity/supersense-ai-blind",
+  "name": "Supersense - AI for Blind",
+  "year": 2020,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/productivity/voice-ocr-document-reader",
+  "name": "Voice: OCR Document Reader",
+  "year": 2020,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/news/lire-rss-reader",
+  "name": "lire: RSS Reader",
+  "year": 2020,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/detectives-demise",
+  "name": "A Detective's Demise",
+  "year": 2020,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/blind-quest",
+  "name": "Blind Quest",
+  "year": 2020,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/circus-master-s-revenge",
+  "name": "Circus Master's Revenge",
+  "year": 2020,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/doing-it-right",
+  "name": "Doing It Right",
+  "year": 2020,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/home-quest-idle-adventure",
+  "name": "Home Quest - Idle Adventure",
+  "year": 2020,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/knight-commander",
+  "name": "Knight Commander",
+  "year": 2020,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/nicolas-eymerich-demon",
+  "name": "Nicolas Eymerich - The Demon",
+  "year": 2020,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/utilities/seeing-ai",
+  "name": "Seeing AI",
+  "year": 2019,
+  "award": "Best App",
+  "status": "winner"
+ },
+ {
+  "key": "path:/apps/ios/games/dice-world",
+  "name": "Dice World",
+  "year": 2019,
+  "award": "Best Game",
+  "status": "winner"
+ },
+ {
+  "key": "path:/apps/ios/utilities/cash-reader-bill-identifier",
+  "name": "Cash Reader: Bill Identifier",
+  "year": 2019,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/music/dolby-record-audio-video",
+  "name": "Dolby On: Record Audio & Video",
+  "year": 2019,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/mac/utilities/rocket",
+  "name": "Rocket",
+  "year": 2019,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/medical/scriptalk-mobile",
+  "name": "ScripTalk Mobile",
+  "year": 2019,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/productivity/shortcuts",
+  "name": "Shortcuts",
+  "year": 2019,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/productivity/voice-dream-scanner",
+  "name": "Voice Dream Scanner",
+  "year": 2019,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/productivity/voice-ocr-document-reader",
+  "name": "Voice: OCR Document Reader",
+  "year": 2019,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/weather/weather-gods",
+  "name": "Weather Gods",
+  "year": 2019,
+  "award": "Best App",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/alt-frequencies",
+  "name": "Alt-Frequencies",
+  "year": 2019,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/audiowizards",
+  "name": "Audio Wizards",
+  "year": 2019,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/backgammon-buddies",
+  "name": "Backgammon with Buddies",
+  "year": 2019,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/bitlife",
+  "name": "BitLife",
+  "year": 2019,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/circus-master-s-revenge",
+  "name": "Circus Master’s Revenge",
+  "year": 2019,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/tank-battle-endless-gunner",
+  "name": "Tank Battle Endless Gunner",
+  "year": 2019,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/texas-hold-em",
+  "name": "Texas Hold’em",
+  "year": 2019,
+  "award": "Best Game",
+  "status": "nominee"
+ },
+ {
+  "key": "path:/apps/ios/games/venture-zone-global",
+  "name": "Venture Zone Global",
+  "year": 2019,
+  "award": "Best Game",
+  "status": "nominee"
+ }
+]

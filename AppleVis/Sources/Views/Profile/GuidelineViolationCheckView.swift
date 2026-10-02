@@ -16,7 +16,13 @@ struct GuidelineViolationCheckView: View {
     @StateObject private var scanner = GuidelineViolationScanner()
     @State private var range: GuidelineScanRange = .day
     @State private var showLowSeverity = false
-    @State private var hideProbablyFine = false
+    /// Off: exactly what the rules caught. On: Apple Intelligence's verdict
+    /// on each flag, with the ones it thinks are probably fine listed in
+    /// their own section. Always shown after a scan, so the rules-only and
+    /// reviewed results can be compared. It used to be a Hide switch that
+    /// only appeared once a flag had been cleared, so it often seemed
+    /// missing. Requested directly (2026-10-01).
+    @State private var showAIReview = false
     @AccessibilityFocusState private var isTitleFocused: Bool
     /// Shared by whichever status section is currently showing —
     /// "Scanning…", the error message, or the results summary — since
@@ -34,17 +40,42 @@ struct GuidelineViolationCheckView: View {
     /// would flag a lot of harmless stuff and turn a quick glance into a
     /// wall of noise. Low severity is still there, just tucked behind a
     /// toggle for anyone who wants the fuller picture.
-    private var visibleFlags: [GuidelineFlag] {
-        let bySeverity = showLowSeverity ? scanner.flags : scanner.flags.filter { $0.highestSeverity != .low }
-        guard hideProbablyFine else { return bySeverity }
-        return bySeverity.filter { !scanner.isProbablyFine($0) }
+    private var flagsBySeverity: [GuidelineFlag] {
+        showLowSeverity ? scanner.flags : scanner.flags.filter { $0.highestSeverity != .low }
     }
 
-    /// How many flags the Hide switch would hide, among those shown by
-    /// severity.
+    /// The flags that still stand: all of them with the review off.
+    private var visibleFlags: [GuidelineFlag] {
+        guard showAIReview else { return flagsBySeverity }
+        return flagsBySeverity.filter { !scanner.isProbablyFine($0) }
+    }
+
+    /// With the review on, the flags Apple Intelligence thinks are fine.
+    private var probablyFineFlags: [GuidelineFlag] {
+        showAIReview ? flagsBySeverity.filter(scanner.isProbablyFine) : []
+    }
+
     private var probablyFineCount: Int {
-        (showLowSeverity ? scanner.flags : scanner.flags.filter { $0.highestSeverity != .low })
-            .filter(scanner.isProbablyFine).count
+        flagsBySeverity.filter(scanner.isProbablyFine).count
+    }
+
+    /// Flags with at least one rule Apple Intelligence double-checks.
+    private var reviewableCount: Int {
+        flagsBySeverity.filter { $0.warnings.contains(where: \.allowsSecondOpinion) }.count
+    }
+
+    /// Where the review stands, under the switch.
+    private var reviewStatus: String {
+        if scanner.isReviewing {
+            return "Apple Intelligence is double-checking flags: \(scanner.reviewedCount) of \(scanner.reviewTotal)"
+        }
+        if reviewableCount == 0 {
+            return "None of these flags are the kind Apple Intelligence double-checks. Strong language, links, images, and high-severity flags always stand as the rules found them."
+        }
+        if probablyFineCount == 0 {
+            return "Apple Intelligence checked \(reviewableCount) flags and agrees with all of them."
+        }
+        return "Apple Intelligence checked \(reviewableCount) flags and thinks \(probablyFineCount) are probably fine."
     }
 
     var body: some View {
@@ -133,8 +164,11 @@ struct GuidelineViolationCheckView: View {
                         // summary VoiceOver lands on after a scan, so it's
                         // heard straight away rather than one swipe further
                         // down. Reported directly (2026-09-28).
-                        if visibleFlags.isEmpty {
+                        if flagsBySeverity.isEmpty {
                             Text("No flagged content in this range.")
+                                .fontWeight(.semibold)
+                        } else if visibleFlags.isEmpty {
+                            Text("Apple Intelligence thinks every flag is probably fine.")
                                 .fontWeight(.semibold)
                         }
                         HStack {
@@ -164,44 +198,58 @@ struct GuidelineViolationCheckView: View {
                         Toggle("Show Low-Severity Items", isOn: $showLowSeverity)
                     }
 
-                    // Apple Intelligence second opinion, on supported devices.
-                    // Requested directly (2026-09-27).
-                    if scanner.isReviewing {
-                        HStack {
-                            ProgressView()
-                            Text("Apple Intelligence is double-checking flags: \(scanner.reviewedCount) of \(scanner.reviewTotal)")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                        .accessibilityElement(children: .combine)
-                        .accessibilityAddTraits(.updatesFrequently)
-                    }
-                    // Off shows every flag the rules found; on shows what's
-                    // left after Apple Intelligence's second look. Says how
-                    // many it hides, and VoiceOver hears the new count when
-                    // it's switched. Reported directly (2026-09-30).
-                    if scanner.flags.contains(where: scanner.isProbablyFine) {
-                        Toggle("Hide Flags Apple Intelligence Thinks Are Fine (\(probablyFineCount))", isOn: $hideProbablyFine)
-                            .accessibilityHint("Hides flags that Apple Intelligence read in context and judged probably fine. They're still in the scan results.")
-                            .onChange(of: hideProbablyFine) { _, hide in
-                                let message = hide
-                                    ? "Hid \(probablyFineCount) flags. \(visibleFlags.count) flagged."
-                                    : "Showing all flags. \(visibleFlags.count) flagged."
-                                UIAccessibility.post(notification: .announcement, argument: message)
+                    // Apple Intelligence's second look, on supported devices.
+                    if IntelligenceService.isAvailable {
+                        if !flagsBySeverity.isEmpty {
+                            Toggle("Apple Intelligence Review", isOn: $showAIReview)
+                                .accessibilityHint("Off shows everything the rules caught. On shows Apple Intelligence's verdict on each flag, and lists the ones it thinks are probably fine separately.")
+                                .onChange(of: showAIReview) { _, on in
+                                    let message = on
+                                        ? "Apple Intelligence Review on. \(visibleFlags.count) flagged, \(probablyFineFlags.count) probably fine."
+                                        : "Showing what the rules caught. \(visibleFlags.count) flagged."
+                                    UIAccessibility.post(notification: .announcement, argument: message)
+                                }
+                            HStack {
+                                if scanner.isReviewing { ProgressView() }
+                                Text(reviewStatus)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
                             }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityAddTraits(scanner.isReviewing ? .updatesFrequently : [])
+                        }
+                    } else {
+                        Text("Apple Intelligence isn't available on this device, so this shows what the rules caught.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
                 }
 
                 if !visibleFlags.isEmpty {
                     Section {
                         ForEach(visibleFlags) { flag in
-                            NavigationLink {
-                                GuidelineFlagDestination(flag: flag)
-                            } label: {
-                                GuidelineFlagRow(flag: flag, opinions: scanner.opinions[flag.id] ?? [:])
-                            }
-                            .modifier(GuidelineFlagActions(flag: flag, onHandled: { scanner.removeFlag(id: flag.id) }))
+                            flagLink(flag)
                         }
+                    } header: {
+                        if showAIReview {
+                            Text("Still Flagged (\(visibleFlags.count))")
+                                .accessibilityAddTraits(.isHeader)
+                        }
+                    }
+                }
+
+                // The false flags, by Apple Intelligence's reading, kept
+                // in view rather than hidden.
+                if !probablyFineFlags.isEmpty {
+                    Section {
+                        ForEach(probablyFineFlags) { flag in
+                            flagLink(flag)
+                        }
+                    } header: {
+                        Text("Apple Intelligence Thinks These Are Fine (\(probablyFineFlags.count))")
+                            .accessibilityAddTraits(.isHeader)
+                    } footer: {
+                        Text("Read in context, these look fine. Give them a quick look before moving on.")
                     }
                 }
             }
@@ -215,6 +263,15 @@ struct GuidelineViolationCheckView: View {
             Task { await retryAccessibilityFocus(into: $isStatusFocused) }
         }
         .task { await retryAccessibilityFocus(into: $isTitleFocused) }
+    }
+
+    private func flagLink(_ flag: GuidelineFlag) -> some View {
+        NavigationLink {
+            GuidelineFlagDestination(flag: flag)
+        } label: {
+            GuidelineFlagRow(flag: flag, opinions: showAIReview ? (scanner.opinions[flag.id] ?? [:]) : [:])
+        }
+        .modifier(GuidelineFlagActions(flag: flag, onHandled: { scanner.removeFlag(id: flag.id) }))
     }
 }
 
@@ -256,6 +313,15 @@ private struct GuidelineFlagFullText: View {
     @Environment(\.dismiss) private var dismiss
     @AccessibilityFocusState private var isTitleFocused: Bool
 
+    /// A paragraph holding one of the flag's lines, marked in Read Full
+    /// Text. Requested directly (2026-10-01).
+    private func isFlagged(_ paragraph: String) -> Bool {
+        flag.triggers.values.contains { line in
+            let start = String(line.replacingOccurrences(of: "…", with: "").prefix(40))
+            return !start.isEmpty && paragraph.contains(start)
+        }
+    }
+
     private var paragraphs: [String] {
         flag.fullText.components(separatedBy: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -274,9 +340,13 @@ private struct GuidelineFlagFullText: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in
+                        let flagged = isFlagged(paragraph)
                         Text(paragraph)
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(flagged ? 6 : 0)
+                            .background(flagged ? Color.orange.opacity(0.15) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+                            .accessibilityLabel(flagged ? "Flagged text. \(paragraph)" : paragraph)
                     }
                 }
                 .padding()
@@ -309,6 +379,15 @@ private struct GuidelineFlagRow: View {
         }
     }
 
+    /// The line behind each rule, named by rule when there's more than one.
+    private var triggerLines: [(id: String, text: String)] {
+        flag.warnings.compactMap { warning in
+            guard let line = flag.triggers[warning.id] else { return nil }
+            let quoted = "\u{201C}\(line)\u{201D}"
+            return (warning.id, flag.warnings.count > 1 ? "\(warning.rule): \(quoted)" : "Flagged text: \(quoted)")
+        }
+    }
+
     private var opinionText: String? {
         let lines = opinionLines.map(\.text)
         return lines.isEmpty ? nil : lines.joined(separator: " ")
@@ -320,6 +399,19 @@ private struct GuidelineFlagRow: View {
         case .medium: return (Color(red: 0.706, green: 0.325, blue: 0.035), String(localized: "Medium"))
         case .low:    return (Color(red: 0.020, green: 0.412, blue: 0.631), String(localized: "Low"))
         }
+    }
+
+    /// Said before the post's text, so it's clear where the flagged line
+    /// ends and the post begins: "Full text" when VoiceOver reads all of
+    /// it, "Preview" when it's cut short and Read Full Text has the rest.
+    /// Requested directly (2026-10-01).
+    private var previewWord: String {
+        flag.isPreviewShortened ? "Preview" : "Full text"
+    }
+
+    /// The flagged lines as VoiceOver reads them, before the preview.
+    private var triggerLinesSpoken: String {
+        triggerLines.map { $0.text + ". " }.joined()
     }
 
     private var ruleNames: String {
@@ -357,11 +449,28 @@ private struct GuidelineFlagRow: View {
                 .foregroundStyle(severityConfig.color)
                 .lineLimit(2)
 
+            // The line in question, so a long post's problem is easy to
+            // find, followed by the preview. Requested directly (2026-10-01).
+            ForEach(triggerLines, id: \.id) { line in
+                Label(line.text, systemImage: "text.quote")
+                    .font(.footnote)
+                    .foregroundStyle(.primary)
+                    .padding(6)
+                    .background(severityConfig.color.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+            }
+
             Text(flag.authorIsEditorial ? "By \(flag.authorName), Editorial Team" : "By \(flag.authorName)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
 
+            // On screen it's always a few lines, so always "Preview".
+            // VoiceOver reads the whole preview, so it hears "Full text"
+            // when nothing was cut (see `previewWord`).
+            Text("Preview")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             Text(flag.previewText)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -375,7 +484,7 @@ private struct GuidelineFlagRow: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "\(severityConfig.label) severity. \(flag.kindLabel) by \(flag.authorName)\(flag.authorIsEditorial ? ", Editorial Team" : ""), in \(flag.itemTitle). Guideline: \(ruleNames). \(flag.previewText)") + (opinionText.map { " " + $0 } ?? ""))
+        .accessibilityLabel(String(localized: "\(severityConfig.label) severity. \(flag.kindLabel) by \(flag.authorName)\(flag.authorIsEditorial ? ", Editorial Team" : ""), in \(flag.itemTitle). Guideline: \(ruleNames). \(triggerLinesSpoken)\(previewWord): \(flag.previewText)") + (opinionText.map { " " + $0 } ?? ""))
     }
 }
 

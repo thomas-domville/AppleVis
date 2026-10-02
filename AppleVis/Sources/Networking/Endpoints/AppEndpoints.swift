@@ -1300,33 +1300,102 @@ extension AppEndpoints {
     /// category. Checked live (2026-09-28): the site handles all three
     /// filters in one request, so "fully accessible dice games" is a single
     /// call. Newest activity first.
-    func mouseSearch(keyword: String, fullyAccessibleOnly: Bool, category: String?, limit: Int = 40) async throws -> [AppListing] {
+    /// iPhone and iPad apps whose names contain `name`, for Ask the Mouse
+    /// looking up one app. Names only: searching descriptions too buried
+    /// "instagram" under newer apps that merely mention Instagram. Found
+    /// testing (2026-10-01).
+    func mouseFindByName(_ name: String, limit: Int = 20) async throws -> [AppListing] {
+        // A name of one or two letters, like X, is in almost every title, so
+        // look for titles starting with it instead ("X [Formerly Twitter]").
+        let isShort = name.count <= 2
+        let query: [String: String] = [
+            "include": "uid",
+            "sort": "-changed",
+            "page[limit]": "\(limit)",
+            "filter[title][condition][path]": "title",
+            "filter[title][condition][operator]": isShort ? "STARTS_WITH" : "CONTAINS",
+            "filter[title][condition][value]": isShort ? name + " " : name,
+        ]
+        let response = try await client.jsonAPIList("node/ios_app_directory", query: query)
+        return response.data.map { Mappers.app($0, included: response.included ?? []) }
+    }
+
+    /// `platform` picks which App Directory to search: each is its own
+    /// content type with its own accessibility field and categories. It
+    /// was iPhone and iPad only, so a Mac or Apple Watch question got
+    /// iPhone apps. Requested directly (2026-10-01).
+    func mouseSearch(keyword: String, fullyAccessibleOnly: Bool, category: String?, platform: AppPlatform = .ios, limit: Int = 40) async throws -> [AppListing] {
         var query: [String: String] = [
             "include": "uid",
             "sort": "-changed",
             "page[limit]": "\(limit)",
         ]
-        let word = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !word.isEmpty {
+        // Up to four keywords, separated by commas ("card, solitaire,
+        // poker"); an app matches any of them in its name or description.
+        // One word missed card games named for their game, like Ears
+        // BlackJack. Requested directly (2026-10-01).
+        var all = keyword.split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        // A short word matches inside other words ("car" in "card",
+        // "scary", "care"), and the site sends back at most 50 apps, so it
+        // crowds out real matches: Blind Drive never came back for car
+        // games. Kept only when it's the only word. Found testing
+        // (2026-10-01).
+        if all.contains(where: { $0.count >= 4 }) { all.removeAll { $0.count < 4 } }
+        let words = all.prefix(4)
+        if !words.isEmpty {
             query["filter[words][group][conjunction]"] = "OR"
-            query["filter[title][condition][path]"] = "title"
-            query["filter[title][condition][operator]"] = "CONTAINS"
-            query["filter[title][condition][value]"] = word
-            query["filter[title][condition][memberOf]"] = "words"
-            query["filter[body][condition][path]"] = "body.value"
-            query["filter[body][condition][operator]"] = "CONTAINS"
-            query["filter[body][condition][value]"] = word
-            query["filter[body][condition][memberOf]"] = "words"
+            for (index, word) in words.enumerated() {
+                query["filter[title\(index)][condition][path]"] = "title"
+                query["filter[title\(index)][condition][operator]"] = "CONTAINS"
+                query["filter[title\(index)][condition][value]"] = word
+                query["filter[title\(index)][condition][memberOf]"] = "words"
+                query["filter[body\(index)][condition][path]"] = "body.value"
+                query["filter[body\(index)][condition][operator]"] = "CONTAINS"
+                query["filter[body\(index)][condition][value]"] = word
+                query["filter[body\(index)][condition][memberOf]"] = "words"
+            }
         }
+        // Fully accessible, in each directory's own words (checked live
+        // on 2026-10-01).
         if fullyAccessibleOnly {
-            query["filter[voiceover][condition][path]"] = "field_voiceover"
-            query["filter[voiceover][condition][value]"] = "VoiceOver reads all page elements."
+            switch platform {
+            case .ios:
+                query["filter[voiceover][condition][path]"] = "field_voiceover"
+                query["filter[voiceover][condition][value]"] = "VoiceOver reads all page elements."
+            case .macos:
+                query["filter[voiceover][condition][path]"] = "field_usability"
+                query["filter[voiceover][condition][operator]"] = "STARTS_WITH"
+                query["filter[voiceover][condition][value]"] = "The app is fully accessible"
+            case .watchos:
+                query["filter[voiceover][condition][path]"] = "field_usability_watch"
+                query["filter[voiceover][condition][value]"] = "Fully Accessible"
+            case .tvos:
+                query["filter[voiceover][condition][path]"] = "field_usability_tv"
+                query["filter[voiceover][condition][value]"] = "Fully Accessible"
+            }
         }
-        if let category, let uuid = Self.categoryUUIDs[category] {
+        let categories: [String: String]
+        switch platform {
+        case .ios: categories = Self.categoryUUIDs
+        case .macos: categories = Self.macCategoryUUIDs
+        case .watchos: categories = Self.watchCategoryUUIDs
+        case .tvos: categories = Self.tvCategoryUUIDs
+        }
+        if let category, let uuid = categories[category] {
             query["filter[category][condition][path]"] = "taxonomy_vocabulary_1.id"
             query["filter[category][condition][value]"] = uuid
         }
-        let response = try await client.jsonAPIList("node/ios_app_directory", query: query)
-        return response.data.map { Mappers.app($0, included: response.included ?? []) }
+        let response = try await client.jsonAPIList("node/\(platform.drupalBundle)", query: query)
+        let included = response.included ?? []
+        return response.data.map { node in
+            switch platform {
+            case .ios: return Mappers.app(node, included: included)
+            case .macos: return Mappers.macApp(node, included: included)
+            case .watchos: return Mappers.watchApp(node, included: included)
+            case .tvos: return Mappers.tvApp(node, included: included)
+            }
+        }
     }
 }

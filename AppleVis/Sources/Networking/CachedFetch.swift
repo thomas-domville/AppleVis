@@ -32,7 +32,11 @@ func fetchWithCache<T: Codable & Sendable>(
     }
 
     do {
-        let result = try await fetch()
+        // A forced refresh skips the phone's HTTP cache too, or it could
+        // still get a response from up to a minute before.
+        let result = forceRefresh
+            ? try await HTTPCacheBypass.$isOn.withValue(true) { try await fetch() }
+            : try await fetch()
         ContentCache.shared.set(result, key: key)
         await ApiHealthMonitor.shared.markUp(group)
         NetworkStatusStore.shared.markHealthy(group)

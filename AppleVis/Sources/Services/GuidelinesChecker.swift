@@ -34,6 +34,28 @@ struct GuidelineWarning: Identifiable, Equatable {
 }
 
 enum GuidelinesChecker {
+    /// The sentence that set off `ruleId`, so a long flagged post shows
+    /// the line in question. Found by checking each sentence on its own,
+    /// then each pair of neighbouring sentences, since some rules need two
+    /// signals. Nil for a one-sentence post (the preview is the line), and
+    /// for rules that look at the post as a whole, such as one topic per
+    /// post. For the admin Guideline Violation Check. Requested directly
+    /// (2026-10-01).
+    static func triggeringText(for ruleId: String, in body: String, isReply: Bool) -> String? {
+        let plain = HTMLText.plainText(fromHTML: body)
+        let sentences = TextSegmentation.sentenceGroups(plain, groupSize: 1)
+        guard sentences.count > 1 else { return nil }
+        func fires(_ text: String) -> Bool {
+            check(text, isReply: isReply).contains { $0.id == ruleId }
+        }
+        if let sentence = sentences.first(where: fires) { return sentence }
+        for index in sentences.indices.dropLast() {
+            let pair = sentences[index] + " " + sentences[index + 1]
+            if fires(pair) { return pair }
+        }
+        return nil
+    }
+
     /// `isReply` — true for a comment/reply/review on existing content,
     /// false (default) for a new topic/post/entry's own body. Only affects
     /// "One Topic Per Post" below, which is meaningless applied to a reply:

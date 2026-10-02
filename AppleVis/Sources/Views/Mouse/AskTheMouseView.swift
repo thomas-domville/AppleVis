@@ -9,6 +9,11 @@ enum MouseRoute: Hashable {
     case whatsNew
     case place(MousePlace)
     case saved(ContentKind, String)
+    /// About Me, Past Conversations, and one past conversation.
+    /// Requested directly (2026-10-01).
+    case aboutMe
+    case pastConversations
+    case conversation(String)
 }
 
 /// Ask the Mouse: ask anything about AppleVis in your own words. Answers
@@ -52,6 +57,10 @@ struct AskTheMouseView: View {
     @State private var toggledTurns: Set<UUID> = []
     /// Makes the Mouse hop: on arrival, and when an answer helped.
     @State private var hop = 0
+    /// Questions already suggested to the editorial team, by turn, and the
+    /// one being sent.
+    @State private var suggestedTurns: Set<UUID> = []
+    @State private var suggestingTurn: UUID?
 
     private struct ForumQuestion: Identifiable {
         let text: String
@@ -89,6 +98,7 @@ struct AskTheMouseView: View {
                     if mouse.turns.isEmpty {
                         suggestionsSection
                         recentSection
+                        memorySection
                         savedAnswersSection
                     }
                     ForEach(mouse.turns) { turn in
@@ -135,6 +145,8 @@ struct AskTheMouseView: View {
             .task {
                 // Loads Apple Intelligence now, so the first answer is quicker.
                 IntelligenceService.prewarmMouse()
+                // Conversations synced from another device since last time.
+                mouse.reloadConversations()
                 if let initialQuestion, !initialQuestion.isEmpty, mouse.turns.isEmpty {
                     question = initialQuestion
                     ask()
@@ -276,6 +288,45 @@ struct AskTheMouseView: View {
         UIAccessibility.post(notification: .announcement, argument: String(localized: "Removed from Recent Questions."))
     }
 
+    /// About Me, and Past Conversations once there are any. Requested
+    /// directly (2026-10-01).
+    private var memorySection: some View {
+        Section {
+            NavigationLink(value: MouseRoute.aboutMe) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label(String(localized: "About Me"), systemImage: "person.crop.circle")
+                    Text(aboutMeSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+            }
+            if !mouse.conversations.isEmpty {
+                NavigationLink(value: MouseRoute.pastConversations) {
+                    Label(String(localized: "Past Conversations (\(mouse.conversations.count))"), systemImage: "clock.arrow.circlepath")
+                }
+            }
+        }
+    }
+
+    /// Re-read each time the screen draws, so a change in About Me shows
+    /// on the way back.
+    private var aboutMeSummary: String {
+        let profile = MouseProfile.load()
+        return profile.isEmpty ? String(localized: "Tell the Mouse which devices and features you use.") : profile.summary
+    }
+
+    /// Reopens a past conversation here, ready for a follow-up.
+    private func continueConversation(_ conversation: MouseConversation) {
+        mouse.restore(conversation)
+        path = NavigationPath()
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "Conversation reopened. Ask a follow-up, or choose Start Over."))
+        if let latest = mouse.turns.first {
+            let target = answerFocus(latest)
+            Task { await retryAccessibilityFocus(target, into: $focus, delaysMs: [900, 1300, 1800]) }
+        }
+    }
+
     @ViewBuilder
     private var savedAnswersSection: some View {
         if !savedAnswerIds.isEmpty {
@@ -313,10 +364,11 @@ struct AskTheMouseView: View {
                 Button(String(localized: "Stop"), role: .cancel) { mouse.stop() }
             } else {
                 answerRow(turn)
+                clarifyRows(turn)
                 sourceRows(turn)
                 actionRows(turn)
                 followUpRows(turn)
-                if turn.answered {
+                if turn.answered, !turn.isRestored {
                     feedbackRows(turn)
                 }
             }
@@ -335,8 +387,30 @@ struct AskTheMouseView: View {
 
         if turn.step == nil {
             appSections(turn)
+            otherSourcesSection(turn)
             moreSection(turn)
-            communitySection(turn)
+            // Asking back what a question means isn't an answer to get more
+            // help with.
+            if turn.clarifyChoices.isEmpty {
+                communitySection(turn)
+            }
+        }
+    }
+
+    /// "Did you mean…": the questions a vague one might mean, to choose
+    /// from. Only on the latest answer. Requested directly (2026-10-01).
+    @ViewBuilder
+    private func clarifyRows(_ turn: MouseTurn) -> some View {
+        if !turn.clarifyChoices.isEmpty, turn.id == mouse.turns.first?.id, !mouse.isBusy {
+            ForEach(turn.clarifyChoices, id: \.self) { choice in
+                Button {
+                    question = choice
+                    ask()
+                } label: {
+                    Label(choice, systemImage: "questionmark.bubble")
+                }
+                .accessibilityHint(String(localized: "Asks this instead."))
+            }
         }
     }
 
@@ -393,6 +467,16 @@ struct AskTheMouseView: View {
         if let intro = turn.appsIntro, turn.answered { return intro }
         if turn.switchOffer != nil { return String(localized: "I can change that for you.") }
         if turn.answered { return String(localized: "Here's what I found on AppleVis.") }
+        // Nothing on AppleVis, but a page outside it covers this: say so,
+        // so the person knows the answer is one step away under Need More
+        // Help. Found testing "How do I take a screenshot on my iPad?"
+        // (2026-10-01).
+        if let link = turn.appleLink, !turn.isOffTopic {
+            return String(localized: "I couldn't find that on AppleVis, but \(link.providerName) has a page about it: \(link.title). You'll find it under Need More Help.")
+        }
+        if let entry = turn.catalogLink, !turn.isOffTopic {
+            return String(localized: "I couldn't find that on AppleVis, but \("Apple Support") has a page about it: \(entry.title). You'll find it under Need More Help.")
+        }
         return String(localized: "I couldn't find that on AppleVis. The community might know, so you could ask in the Forums.")
     }
 
@@ -462,22 +546,23 @@ struct AskTheMouseView: View {
 
     /// Where the answer came from, including any apps it listed.
     private func sources(for turn: MouseTurn) -> [SavedMouseAnswer.Source] {
-        var list: [SavedMouseAnswer.Source] = []
-        list += turn.helpUsed.map { .init(kind: .help, title: $0.title, helpArticleId: $0.id) }
-        list += turn.guidesUsed.map { .init(kind: .guide, title: $0.title, url: $0.url, contentId: $0.id) }
-        list += turn.commentsUsedOn.map { .init(kind: .guideComments, title: $0.title, url: $0.url, contentId: $0.id) }
-        list += turn.forumsUsed.map { .init(kind: .forum, title: $0.title, url: $0.url, contentId: $0.id) }
-        list += turn.notesUsed.map { .init(kind: $0.id.hasPrefix("whatsnew:") ? .whatsNew : .tip, title: $0.title) }
-        list += (turn.mainApps + turn.relatedApps).prefix(10).map { .init(kind: .app, title: $0.app.name, url: $0.app.url, contentId: $0.app.id) }
-        return list
+        turn.savedSources
     }
 
     private func openFirstSource(_ turn: MouseTurn) {
         if let article = turn.helpUsed.first { path.append(MouseRoute.help(article.id)) }
         else if let guide = turn.guidesUsed.first ?? turn.commentsUsedOn.first { path.append(MouseRoute.guide(guide.id, focusText: turn.guideFocus[guide.id])) }
         else if let topic = turn.forumsUsed.first { path.append(topic) }
+        else if let bug = turn.bugsUsed.first { path.append(bug) }
+        else if let episode = turn.podcastsUsed.first { path.append(episode) }
+        else if let app = turn.appCommentsUsedOn.first { path.append(app) }
+        else if let post = turn.blogsUsed.first { path.append(post) }
         else if turn.notesUsed.contains(where: { $0.id.hasPrefix("whatsnew:") }) { path.append(MouseRoute.whatsNew) }
         else if let app = turn.mainApps.first?.app ?? turn.relatedApps.first?.app { path.append(app) }
+        else if let source = turn.restoredSources.first {
+            if let kind = source.contentKind, let id = source.contentId { path.append(MouseRoute.saved(kind, id)) }
+            else if source.kind == .help, let id = source.helpArticleId { path.append(MouseRoute.help(id)) }
+        }
     }
 
     private func toggleSave(_ turn: MouseTurn) {
@@ -502,6 +587,17 @@ struct AskTheMouseView: View {
 
     @ViewBuilder
     private func sourceRows(_ turn: MouseTurn) -> some View {
+        // A reopened conversation's sources, as they were saved.
+        ForEach(turn.restoredSources, id: \.self) { source in
+            MouseSourceLink(source: source)
+        }
+        // The settings the Mouse checked, opening that screen.
+        // Requested directly (2026-10-01).
+        if let place = turn.setupChecked {
+            NavigationLink(value: MouseRoute.place(place)) {
+                sourceLabel(kind: String(localized: "I checked your app settings"), title: place.name, note: nil, icon: "gearshape.fill", tint: .gray)
+            }
+        }
         ForEach(turn.helpUsed) { article in
             NavigationLink(value: MouseRoute.help(article.id)) {
                 sourceLabel(kind: String(localized: "From Help"), title: article.title, note: nil, icon: "book.fill", tint: .teal)
@@ -510,11 +606,13 @@ struct AskTheMouseView: View {
         ForEach(turn.guidesUsed) { guide in
             NavigationLink(value: MouseRoute.guide(guide.id, focusText: turn.guideFocus[guide.id])) {
                 sourceLabel(
-                    kind: String(localized: "From a guide"), title: guide.title,
+                    kind: turn.isNearMiss ? String(localized: "Closest match, a guide") : String(localized: "From a guide"), title: guide.title,
                     icon: "doc.text.fill", tint: ContentKind.resource.accentColor,
-                    note: turn.versionNotes["guide-\(guide.id)"] ?? (AskTheMouse.isOld(guide.updatedAt)
-                        ? String(localized: "Last updated in \(String(Calendar.current.component(.year, from: guide.updatedAt))), so some steps may have changed.")
-                        : nil))
+                    note: [Self.posted(guide.createdAt),
+                           turn.versionNotes["guide-\(guide.id)"] ?? (AskTheMouse.isOld(guide.updatedAt)
+                               ? String(localized: "Last updated in \(String(Calendar.current.component(.year, from: guide.updatedAt))), so some steps may have changed.")
+                               : nil)]
+                        .compactMap { $0 }.joined(separator: " "))
             }
         }
         ForEach(turn.commentsUsedOn) { guide in
@@ -524,7 +622,37 @@ struct AskTheMouseView: View {
         }
         ForEach(turn.forumsUsed) { topic in
             NavigationLink(value: topic) {
-                sourceLabel(kind: String(localized: "From a forum discussion"), title: topic.title, note: nil, icon: "bubble.left.and.bubble.right.fill", tint: ContentKind.forumTopic.accentColor)
+                sourceLabel(kind: turn.isNearMiss ? String(localized: "Closest match, a forum discussion") : String(localized: "From a forum discussion"),
+                            title: topic.title, note: Self.posted(topic.createdAt), icon: "bubble.left.and.bubble.right.fill", tint: ContentKind.forumTopic.accentColor)
+            }
+        }
+        // Known bugs, podcast episodes, and members' comments on an app.
+        // Requested directly (2026-10-01).
+        ForEach(turn.bugsUsed) { bug in
+            NavigationLink(value: bug) {
+                sourceLabel(kind: String(localized: "From the Bug Tracker"), title: bug.title,
+                            note: bug.status == .active
+                                ? String(localized: "Still active. Reported \(bug.createdAt.formatted(.dateTime.month(.wide).year())).")
+                                : String(localized: "Fixed. Reported \(bug.createdAt.formatted(.dateTime.month(.wide).year()))."),
+                            icon: "ant.fill", tint: ContentKind.bugReport.accentColor)
+            }
+        }
+        ForEach(turn.podcastsUsed) { episode in
+            NavigationLink(value: episode) {
+                sourceLabel(kind: String(localized: "From a podcast episode"), title: episode.title,
+                            note: Self.posted(episode.publishedAt), icon: "headphones", tint: ContentKind.podcastEpisode.accentColor)
+            }
+        }
+        ForEach(turn.blogsUsed) { post in
+            NavigationLink(value: post) {
+                sourceLabel(kind: String(localized: "From the AppleVis blog"), title: post.title,
+                            note: Self.posted(post.publishedAt), icon: "newspaper.fill", tint: ContentKind.blogPost.accentColor)
+            }
+        }
+        ForEach(turn.appCommentsUsedOn) { app in
+            NavigationLink(value: app) {
+                sourceLabel(kind: String(localized: "From members' comments on an app entry"), title: app.name,
+                            note: nil, icon: "person.2.fill", tint: ContentKind.appListing.accentColor)
             }
         }
         ForEach(turn.notesUsed) { note in
@@ -694,17 +822,117 @@ struct AskTheMouseView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                // Honors and popularity: the community's own picks, and how
+                // much members have to say. Requested directly (2026-10-01).
+                if let honor = picked.honor {
+                    Label(honor, systemImage: "trophy.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if let line = Self.popularityLine(picked) {
+                    Text(line)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .accessibilityElement(children: .combine)
         }
+    }
+
+    // MARK: - Other sources that answer it
+
+    /// A result that answered the question, for Other Sources.
+    private enum OtherSource: Identifiable {
+        case guide(Resource), forum(ForumTopic), blog(BlogPost), podcast(PodcastEpisode), bug(BugReport)
+
+        var id: String {
+            switch self {
+            case .guide(let g): return g.id
+            case .forum(let t): return t.id
+            case .blog(let b): return b.id
+            case .podcast(let e): return e.id
+            case .bug(let b): return b.id
+            }
+        }
+    }
+
+    /// Every result with its own answer, newest first. Requested directly
+    /// (2026-10-01): the answer, its source, then other sources, saying
+    /// whether each agrees.
+    private func otherSources(_ turn: MouseTurn) -> [OtherSource] {
+        var list: [OtherSource] = []
+        list += turn.moreGuides.filter { turn.resultNotes[$0.id] != nil }.map(OtherSource.guide)
+        list += turn.forums.filter { turn.resultNotes[$0.id] != nil }.map(OtherSource.forum)
+        list += turn.blogs.filter { turn.resultNotes[$0.id] != nil }.map(OtherSource.blog)
+        list += turn.podcasts.filter { turn.resultNotes[$0.id] != nil }.map(OtherSource.podcast)
+        list += turn.bugs.filter { turn.resultNotes[$0.id] != nil }.map(OtherSource.bug)
+        return list.sorted { (turn.resultNotes[$0.id]?.date ?? .distantPast) > (turn.resultNotes[$1.id]?.date ?? .distantPast) }
+    }
+
+    @ViewBuilder
+    private func otherSourcesSection(_ turn: MouseTurn) -> some View {
+        let sources = otherSources(turn)
+        if !sources.isEmpty {
+            Section {
+                ForEach(sources) { source in
+                    otherSourceRow(source, turn: turn)
+                }
+            } header: {
+                Text(turn.answered && !turn.isNearMiss ? String(localized: "Other Sources, Newest First") : String(localized: "What I Found, Newest First"))
+                    .accessibilityAddTraits(.isHeader)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func otherSourceRow(_ source: OtherSource, turn: MouseTurn) -> some View {
+        let note = turn.resultNotes[source.id]
+        switch source {
+        case .guide(let guide):
+            resultRow(kind: String(localized: "Guide"), icon: "doc.text.fill", tint: ContentKind.resource.accentColor, title: guide.title, note: note,
+                      route: MouseRoute.guide(guide.id, focusText: turn.guideFocus[guide.id]))
+                .contentActions(id: guide.id, entityId: guide.nid ?? 0, kind: .resource, title: guide.title, url: guide.url)
+        case .forum(let topic):
+            resultRow(kind: String(localized: "Forum Topic"), icon: "bubble.left.and.bubble.right.fill", tint: ContentKind.forumTopic.accentColor, title: topic.title, note: note, route: topic)
+                .contentActions(id: topic.id, entityId: topic.nid ?? 0, kind: .forumTopic, title: topic.title, url: topic.url)
+        case .blog(let post):
+            resultRow(kind: String(localized: "Blog Post"), icon: "newspaper.fill", tint: ContentKind.blogPost.accentColor, title: post.title, note: note, route: post)
+                .contentActions(id: post.id, entityId: post.nid ?? 0, kind: .blogPost, title: post.title, url: post.url)
+        case .podcast(let episode):
+            resultRow(kind: String(localized: "Podcast Episode"), icon: "headphones", tint: ContentKind.podcastEpisode.accentColor, title: episode.title, note: note, route: episode)
+                .contentActions(id: episode.id, entityId: episode.nid, kind: .podcastEpisode, title: episode.title, url: episode.url)
+        case .bug(let bug):
+            resultRow(kind: String(localized: "Bug Report"), icon: "ant.fill", tint: ContentKind.bugReport.accentColor, title: bug.title, note: note, route: bug)
+        }
+    }
+
+    /// "Posted March 2017."
+    static func posted(_ date: Date) -> String {
+        String(localized: "Posted \(date.formatted(.dateTime.month(.wide).year())).")
+    }
+
+    /// "Recommended by 12 members. 14 member comments."
+    static func popularityLine(_ picked: MouseTurn.PickedApp) -> String? {
+        var parts: [String] = []
+        if let count = picked.recommendations, count > 0 {
+            parts.append(String(localized: "Recommended by \(count) members."))
+        }
+        if picked.app.reviewCount > 0 {
+            parts.append(String(localized: "\(picked.app.reviewCount) member comments."))
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
     }
 
     // MARK: - Everything else it found
 
     @ViewBuilder
     private func moreSection(_ turn: MouseTurn) -> some View {
-        let hasMore = !turn.moreGuides.isEmpty || !turn.forums.isEmpty || !turn.podcasts.isEmpty
-            || !turn.blogs.isEmpty || !turn.bugs.isEmpty || !turn.otherApps.isEmpty || !turn.saved.isEmpty
+        // Results with their own answer are in Other Sources; once the
+        // Mouse has read them, only the rest stay here.
+        let unanswered: (String) -> Bool = { turn.resultNotes[$0] == nil }
+        let hasMore = turn.moreGuides.contains { unanswered($0.id) } || turn.forums.contains { unanswered($0.id) }
+            || turn.podcasts.contains { unanswered($0.id) } || turn.blogs.contains { unanswered($0.id) }
+            || turn.bugs.contains { unanswered($0.id) } || !turn.otherApps.isEmpty || !turn.saved.isEmpty
         if hasMore {
             Section {
                 ForEach(turn.saved) { item in
@@ -716,23 +944,23 @@ struct AskTheMouseView: View {
                 ForEach(MouseFeedback.groupOrder(), id: \.self) { group in
                     switch group {
                     case "guide":
-                        ForEach(turn.moreGuides) { guide in
+                        ForEach(turn.moreGuides.filter { unanswered($0.id) }) { guide in
                             resultRow(kind: String(localized: "Guide"), icon: "doc.text.fill", tint: ContentKind.resource.accentColor, title: guide.title, note: turn.resultNotes[guide.id],
                                       route: MouseRoute.guide(guide.id, focusText: turn.guideFocus[guide.id]))
                                 .contentActions(id: guide.id, entityId: guide.nid ?? 0, kind: .resource, title: guide.title, url: guide.url)
                         }
                     case "forum":
-                        ForEach(turn.forums) { topic in
+                        ForEach(turn.forums.filter { unanswered($0.id) }) { topic in
                             resultRow(kind: String(localized: "Forum Topic"), icon: "bubble.left.and.bubble.right.fill", tint: ContentKind.forumTopic.accentColor, title: topic.title, note: turn.resultNotes[topic.id], route: topic)
                                 .contentActions(id: topic.id, entityId: topic.nid ?? 0, kind: .forumTopic, title: topic.title, url: topic.url)
                         }
                     case "blog":
-                        ForEach(turn.blogs) { post in
+                        ForEach(turn.blogs.filter { unanswered($0.id) }) { post in
                             resultRow(kind: String(localized: "Blog Post"), icon: "newspaper.fill", tint: ContentKind.blogPost.accentColor, title: post.title, note: turn.resultNotes[post.id], route: post)
                                 .contentActions(id: post.id, entityId: post.nid ?? 0, kind: .blogPost, title: post.title, url: post.url)
                         }
                     case "podcast":
-                        ForEach(turn.podcasts) { episode in
+                        ForEach(turn.podcasts.filter { unanswered($0.id) }) { episode in
                             resultRow(kind: String(localized: "Podcast Episode"), icon: "headphones", tint: ContentKind.podcastEpisode.accentColor, title: episode.title, note: turn.resultNotes[episode.id], route: episode)
                                 .contentActions(id: episode.id, entityId: episode.nid, kind: .podcastEpisode, title: episode.title, url: episode.url)
                         }
@@ -741,7 +969,7 @@ struct AskTheMouseView: View {
                     }
                 }
                 ForEach(turn.otherApps) { AppListingRow(app: $0) }
-                ForEach(turn.bugs) { bug in
+                ForEach(turn.bugs.filter { unanswered($0.id) }) { bug in
                     resultRow(kind: String(localized: "Bug Report"), icon: "ant.fill", tint: ContentKind.bugReport.accentColor, title: bug.title, note: turn.resultNotes[bug.id], route: bug)
                 }
             } header: {
@@ -751,6 +979,16 @@ struct AskTheMouseView: View {
                      : String(localized: "More From AppleVis"))
                     .accessibilityAddTraits(.isHeader)
             }
+        }
+    }
+
+    /// "Says the same: " or "Says something different: " before a result's
+    /// line, when there's an answer to compare it with.
+    static func agreementPrefix(_ note: MouseTurn.ResultNote) -> String {
+        switch note.agreement {
+        case .same?: return String(localized: "Says the same:") + " "
+        case .different?: return String(localized: "Says something different:") + " "
+        case nil: return ""
         }
     }
 
@@ -773,8 +1011,13 @@ struct AskTheMouseView: View {
                     .font(.subheadline)
                     .fontWeight(.semibold)
                 if let note {
-                    Text(note.isQuote ? "\u{201C}\(note.line)\u{201D}" : note.line)
+                    Text(Self.agreementPrefix(note) + (note.isQuote ? "\u{201C}\(note.line)\u{201D}" : note.line))
                         .font(.subheadline)
+                    if let date = note.date {
+                        Text(Self.posted(date))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     if !note.alsoIn.isEmpty {
                         Text(String(localized: "Also in: \(ListFormatter.localizedString(byJoining: note.alsoIn))"))
                             .font(.caption)
@@ -839,18 +1082,100 @@ struct AskTheMouseView: View {
     /// asking it, not the editorial team. Requested directly.
     private func communitySection(_ turn: MouseTurn) -> some View {
         Section {
-            Button {
-                forumQuestion = ForumQuestion(text: turn.question)
-            } label: {
-                Label(String(localized: "Ask in the Forums"), systemImage: "bubble.left.and.bubble.right")
+            // Apple's own page on the subject, when one covers it: a plain
+            // link the person reads themselves. Requested directly
+            // (2026-10-01).
+            if let link = turn.appleLink {
+                Button {
+                    openLink(link.url)
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label(link.label, systemImage: link.provider == .apple ? "apple.logo" : "arrow.up.forward.square")
+                        Text(String(localized: "From \(link.providerName), not AppleVis"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
             }
-            .accessibilityHint(String(localized: "Starts a new forum topic with your question filled in."))
-            Button {
-                searchTheWeb(turn.question)
-            } label: {
-                Label(String(localized: "Search the Web"), systemImage: "globe")
+            // A page from Apple's user guides, when none of the hand-picked
+            // ones fits. Requested directly (2026-10-01).
+            if let entry = turn.catalogLink, let url = entry.url {
+                Button {
+                    openLink(url)
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label(String(localized: "Apple's Guide: \(entry.label)"), systemImage: "apple.logo")
+                        Text(String(localized: "From \("Apple Support"), not AppleVis"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
             }
-            .accessibilityHint(String(localized: "Opens \(preferences.webSearchEngine.displayName) with your question. These results aren't from AppleVis."))
+            // Apple's own search, for any Apple question, so there's always
+            // an Apple path even when no hand-picked page fits.
+            if turn.isAppleTopic, !turn.isOffTopic,
+               let url = MouseAppleLink.appleSupportSearch(turn.webQuery.isEmpty ? turn.question : turn.webQuery) {
+                let query = turn.webQuery.isEmpty ? turn.question : turn.webQuery
+                Button {
+                    openLink(url)
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label(String(localized: "Search Apple Support"), systemImage: "apple.logo")
+                        Text(String(localized: "Searches for: \(query)"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+                .accessibilityHint(String(localized: "Opens Apple Support's own search. These results are from Apple, not AppleVis."))
+            }
+            // Sends just the question to the editorial team when the Mouse
+            // couldn't answer it well, so missing guides get written.
+            // Signed-in members only, and only when they choose to.
+            // Requested directly (2026-10-01).
+            if !turn.isOffTopic, auth.user?.email != nil,
+               !turn.answered || turn.isNearMiss || turn.feedback == false {
+                if suggestedTurns.contains(turn.id) {
+                    Label(String(localized: "Suggested. Thank you!"), systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Button {
+                        suggestTopic(turn)
+                    } label: {
+                        Label(suggestingTurn == turn.id ? String(localized: "Sending…") : String(localized: "Suggest This Topic to AppleVis"),
+                              systemImage: "lightbulb")
+                    }
+                    .disabled(suggestingTurn != nil)
+                    .accessibilityHint(String(localized: "Sends your question to the AppleVis editorial team, so they know a guide is needed. Only your question, name, and email are sent."))
+                }
+            }
+            // Not offered for an off-topic question: the forums are for
+            // Apple and accessibility.
+            if !turn.isOffTopic {
+                Button {
+                    forumQuestion = ForumQuestion(text: turn.question)
+                } label: {
+                    Label(String(localized: "Ask in the Forums"), systemImage: "bubble.left.and.bubble.right")
+                }
+                .accessibilityHint(String(localized: "Starts a new forum topic with your question filled in."))
+            }
+            // A sharper search than the question as typed, when Apple
+            // Intelligence wrote one, and it says what it will search for.
+            let webQuery = turn.webQuery.isEmpty ? turn.question : turn.webQuery
+            Button {
+                searchTheWeb(webQuery)
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label(String(localized: "Search the Web"), systemImage: "globe")
+                    Text(String(localized: "Searches for: \(webQuery)"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+            }
+            .accessibilityHint(String(localized: "Opens \(preferences.webSearchEngine.displayName). These results aren't from AppleVis."))
         } header: {
             // A heading, so the Headings rotor reaches these straight from
             // the answer. Requested directly (2026-09-28).
@@ -894,9 +1219,33 @@ struct AskTheMouseView: View {
         Task { await retryAccessibilityFocus(target, into: $focus) }
     }
 
+    private func suggestTopic(_ turn: MouseTurn) {
+        guard let user = auth.user, let email = user.email, suggestingTurn == nil else { return }
+        suggestingTurn = turn.id
+        let outcome: MouseGapReporter.Outcome = turn.feedback == false ? .notHelpful : turn.isNearMiss ? .nearMiss : .notFound
+        let titles = sources(for: turn).map { "\($0.kindLabel): \($0.title)" }
+        Task {
+            let ok = await MouseGapReporter.report(question: turn.question, outcome: outcome, sourceTitles: titles,
+                                                   reporterName: user.name, reporterEmail: email)
+            suggestingTurn = nil
+            if ok {
+                suggestedTurns.insert(turn.id)
+                SoundPlayer.shared.play(.success)
+                UIAccessibility.post(notification: .announcement, argument: String(localized: "Suggested. Thank you! The editorial team will see your question."))
+            } else {
+                UIAccessibility.post(notification: .announcement, argument: String(localized: "Couldn't send that. Try again."))
+            }
+        }
+    }
+
     private func searchTheWeb(_ text: String) {
         // The engine chosen in Settings > General > Web Search.
         guard let url = preferences.webSearchEngine.searchURL(for: text) else { return }
+        openLink(url)
+    }
+
+    /// Opens a page the way Settings > General > Web Links says.
+    private func openLink(_ url: URL) {
         switch preferences.webBrowsingMode {
         case .inApp: webSearch = WebSearch(url: url)
         case .external: UIApplication.shared.open(url)
@@ -937,6 +1286,12 @@ struct AskTheMouseView: View {
             case .blogPost: BlogDetailView(postId: id)
             case .bugReport: BugDetailView(bugId: id)
             }
+        case .aboutMe:
+            MouseAboutMeView()
+        case .pastConversations:
+            MousePastConversationsView(mouse: mouse)
+        case .conversation(let id):
+            MouseConversationView(conversationId: id, mouse: mouse, onContinue: continueConversation)
         }
     }
 

@@ -228,9 +228,12 @@ final class AppEntryHealthScanner: ObservableObject {
         lastScope = scope
         lastScanDate = nil
 
+        // Everything the scan reads comes live from the site, not the
+        // phone's copy from up to a minute before, so entries just
+        // refreshed aren't flagged again. Reported directly (2026-10-02).
         let listings: [AppListing]
         do {
-            listings = try await fetchListings()
+            listings = try await HTTPCacheBypass.$isOn.withValue(true) { try await fetchListings() }
         } catch {
             guard currentScanId == scanId else { return }
             // `Text(error)` in AppEntryHealthCheckView shows this as a plain
@@ -244,7 +247,7 @@ final class AppEntryHealthScanner: ObservableObject {
         guard currentScanId == scanId else { return }
         scannedAppCount = listings.count
 
-        let outcome = await Self.checkListings(
+        let outcome = await HTTPCacheBypass.$isOn.withValue(true) { await Self.checkListings(
             listings,
             shouldStop: { [weak self] in self?.stopRequested ?? true },
             onProgress: { [weak self] done, total in
@@ -252,7 +255,7 @@ final class AppEntryHealthScanner: ObservableObject {
                 self.detailsChecked = done
                 self.detailsTotal = total
             }
-        )
+        ) }
         guard currentScanId == scanId else { return }
         if outcome.stoppedEarly {
             // The summary then says how many were really checked.

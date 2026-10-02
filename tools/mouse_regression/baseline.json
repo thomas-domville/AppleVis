@@ -1,0 +1,1036 @@
+{
+ "guide-gestures": {
+  "passed": true,
+  "top": [
+   "VoiceOver Gestures for use with a Multi-Touch Trackpad on MacOS",
+   "A Complete List of iOS and iPadOS Gestures Available to VoiceOver Users",
+   "How To Use Gestures Instead of Buttons for Home, Notifications, and More",
+   "Tips for Taking Full Advantage of VoiceOver in Your App",
+   "Toggling VoiceOver On and Off Using the Accessibility Shortcut on iOS and iPadOS"
+  ],
+  "error": null
+ },
+ "guide-braille-commands": {
+  "passed": true,
+  "top": [
+   "Using a Braille Display on iOS: an Introduction",
+   "A Guide to Braille Screen Input on iOS and iPadOS",
+   "A Deep Dive into VoiceOver Utility On Mac",
+   "Basic Terminology for Apple Accessibility",
+   "a Deep dive into VoiceOver settings for iOS and iPadOS"
+  ],
+  "error": null
+ },
+ "guide-bsi": {
+  "passed": true,
+  "top": [
+   "A Guide to Braille Screen Input on iOS and iPadOS",
+   "Directly editing text under Braille Screen Input without moving the rotor",
+   "Using a Braille Display on iOS: an Introduction",
+   "Basic Terminology for Apple Accessibility",
+   "a Deep dive into VoiceOver settings for iOS and iPadOS"
+  ],
+  "error": null
+ },
+ "guide-rotor": {
+  "passed": true,
+  "top": [
+   "iDevice Primer 103: What is the rotor for and how do I use it?",
+   "A Complete List of iOS and iPadOS Gestures Available to VoiceOver Users",
+   "VoiceOver Gestures for use with a Multi-Touch Trackpad on MacOS",
+   "a Deep dive into VoiceOver settings for iOS and iPadOS",
+   "Text Selection"
+  ],
+  "error": null
+ },
+ "guide-restart": {
+  "passed": true,
+  "top": [
+   "The Lure of the Siren Song: Or How to do a Forced Restart on the iPhone 8",
+   "A Guide to Cleaning and Speeding up Your Slow Mac",
+   "Using a Braille Display on iOS: an Introduction"
+  ],
+  "error": null
+ },
+ "guide-screen-recognition": {
+  "passed": false,
+  "top": [
+   "a Deep dive into VoiceOver settings for iOS and iPadOS",
+   "Reading PDF documents on Mac with VoiceOver  ",
+   "A Beginner's Guide to Using iOS with VoiceOver",
+   "A Guide to Touch ID and Passcode settings for iOS and iPadOS",
+   "A Deep Dive into VoiceOver Utility On Mac"
+  ],
+  "error": null
+ },
+ "guide-shortcuts": {
+  "passed": true,
+  "top": [
+   "a guide to creating and running shortcuts on iOS and macOS",
+   "Quickly Translate Text on the fly Using a Shortcut",
+   "Don't Click It, Just Press It: A Guide to Creating Custom Keyboard Shortcuts On macOS",
+   "Taking Control of the Camera Control! A Guide for Running Any Shortcut with the Camera Control on iPhone 16",
+   "General Keyboard Shortcut Commands for macOS"
+  ],
+  "error": null
+ },
+ "guide-watch-vo": {
+  "passed": false,
+  "top": [
+   "Basic Terminology for Apple Accessibility",
+   "How Apple Devices Can Work Better Together with Continuity Features",
+   "How to Access Audio Described DVDs on Your Mac",
+   "iOS Device Primer 105: How do I answer, Manage, and End a Phone Call?",
+   "A Beginner's Guide to Using iOS with VoiceOver"
+  ],
+  "error": null
+ },
+ "guide-mac-vo": {
+  "passed": true,
+  "top": [
+   "Increasing Responsiveness of Voiceover on a Mac",
+   "Getting VoiceOver Help on Your Mac",
+   "How to use Mac with VoiceOver (A beginners guide)",
+   "Reading PDF documents on Mac with VoiceOver  ",
+   "A Deep Dive into VoiceOver Utility On Mac"
+  ],
+  "error": null
+ },
+ "guide-voice-control": {
+  "passed": false,
+  "top": [
+   "Taking Control of the Camera Control! A Guide for Running Any Shortcut with the Camera Control on iPhone 16",
+   "a Deep dive into VoiceOver settings for iOS and iPadOS",
+   "A Deep Dive into VoiceOver Utility On Mac",
+   "Double Tap the Status Bar to Scroll to the Top",
+   "Tips for Taking Full Advantage of VoiceOver in Your App"
+  ],
+  "error": null
+ },
+ "guide-switch-control": {
+  "passed": false,
+  "top": [
+   "VoiceOver Quick Tip: Two Ways of Double Tapping",
+   "Instructional: This is how you install Windows 11 on Mac using Parallels. V2.0",
+   "A Guide to Multitasking in iPadOS",
+   "JAWS hotkey fix for VMWare Fusion and macOS Sierra on a laptop",
+   "a Deep dive into VoiceOver settings for iOS and iPadOS"
+  ],
+  "error": null
+ },
+ "guide-magnifier": {
+  "passed": false,
+  "top": [
+   "Turning your MacBook into a CCTV using your iPhone",
+   "Taking Control of the Camera Control! A Guide for Running Any Shortcut with the Camera Control on iPhone 16",
+   "Working with the iOS User Guide",
+   "Accessible Audio and EBooks For Free",
+   "VoiceOver Keyboard Shortcuts for MacOS"
+  ],
+  "error": null
+ },
+ "guide-zoom": {
+  "passed": false,
+  "top": [
+   "Turning your MacBook into a CCTV using your iPhone",
+   "Basic Terminology for Apple Accessibility",
+   "A Blind Legend - Getting Started",
+   "Working with the iOS User Guide",
+   "Intro to iOS Accessibility for Blind and Low Vision Users"
+  ],
+  "error": null
+ },
+ "guide-detection": {
+  "passed": false,
+  "top": [
+   "A Guide to Braille Screen Input on iOS and iPadOS",
+   "Taking Control of the Camera Control! A Guide for Running Any Shortcut with the Camera Control on iPhone 16",
+   "Turning your MacBook into a CCTV using your iPhone",
+   "Quick tip: taking videos of a computer monitor",
+   "a Deep dive into VoiceOver settings for iOS and iPadOS"
+  ],
+  "error": null
+ },
+ "guide-door": {
+  "passed": false,
+  "top": [
+   "a Deep dive into VoiceOver settings for iOS and iPadOS"
+  ],
+  "error": null
+ },
+ "guide-back-tap": {
+  "passed": false,
+  "top": [
+   "Finding Your Way Home in a (Home) Buttonless World: Using an iOS Device Without a Home Button",
+   "Navigating Bookmarks in Safari on iOS 26: A VoiceOver-Friendly Guide",
+   "A Guide to the new on-device view assistant for the blind by Privacy AI",
+   "Text Selection",
+   "Mail app: general layout, and how to read, send, and manage messages"
+  ],
+  "error": null
+ },
+ "guide-keyboard": {
+  "passed": true,
+  "top": [
+   "VoiceOver Keyboard Shortcuts for MacOS",
+   "A Complete List of VoiceOver Keyboard Shortcuts Available on macOS",
+   "Don't Touch it, Type it! A VoiceOver User's Guide to Using a QWERTY Bluetooth Keyboard",
+   "Getting VoiceOver Help on Your Mac",
+   "General Keyboard Shortcut Commands for macOS"
+  ],
+  "error": null
+ },
+ "guide-handwriting": {
+  "passed": false,
+  "top": [
+   "iDevice Primer 103: What is the rotor for and how do I use it?",
+   "Intro to iOS Accessibility for Blind and Low Vision Users",
+   "a Deep dive into VoiceOver settings for iOS and iPadOS"
+  ],
+  "error": null
+ },
+ "guide-typing": {
+  "passed": true,
+  "top": [
+   "Don't Touch it, Type it! A VoiceOver User's Guide to Using a QWERTY Bluetooth Keyboard",
+   "Typing with Vertical Navigation on iOS",
+   "Getting VoiceOver Help on Your Mac",
+   "A Beginner's Guide to Using iOS with VoiceOver",
+   "a Guide to Verbosity Options in macOS VoiceOver"
+  ],
+  "error": null
+ },
+ "guide-safari": {
+  "passed": true,
+  "top": [
+   "Navigating Bookmarks in Safari on iOS 26: A VoiceOver-Friendly Guide",
+   "Getting Started with Safari on macOS",
+   "A Guide to Multitasking in iPadOS",
+   "Guide for quentin c's playroom on iOs using Safari",
+   "VoiceOver Keyboard Shortcuts for MacOS"
+  ],
+  "error": null
+ },
+ "guide-mail": {
+  "passed": true,
+  "top": [
+   "The Mac's Mail app Explained",
+   "Mail app: general layout, and how to read, send, and manage messages",
+   "A Guide To Interactive Notifications in iOs",
+   "Tips for Taking Full Advantage of VoiceOver in Your App",
+   "Double Tap the Status Bar to Scroll to the Top"
+  ],
+  "error": null
+ },
+ "guide-messages": {
+  "passed": true,
+  "top": [
+   "The Mac's Messages App Explained",
+   "Sharing data from a text message",
+   "Mail app: general layout, and how to read, send, and manage messages",
+   "The VoiceOver User's Guide to 3D Touch on the iPhone 6S",
+   "VoiceOver Portable Preferences++"
+  ],
+  "error": null
+ },
+ "guide-camera": {
+  "passed": false,
+  "top": [
+   "Quick tip: taking videos of a computer monitor",
+   "A Guide to the new on-device view assistant for the blind by Privacy AI",
+   "A Beginner's Guide to Using iOS with VoiceOver",
+   "The Lure of the Siren Song: Or How to do a Forced Restart on the iPhone 8",
+   "a Deep dive into VoiceOver settings for iOS and iPadOS"
+  ],
+  "error": null
+ },
+ "guide-face-id": {
+  "passed": false,
+  "top": [
+   "A Guide to Touch ID and Passcode settings for iOS and iPadOS",
+   "A Beginner's Guide to Using iOS with VoiceOver",
+   "A Guide to Braille Screen Input on iOS and iPadOS",
+   "Finding Your Way Home in a (Home) Buttonless World: Using an iOS Device Without a Home Button",
+   "A Guide to the new on-device view assistant for the blind by Privacy AI"
+  ],
+  "error": null
+ },
+ "guide-apple-pay": {
+  "passed": false,
+  "top": [
+   "Siri Tips & Settings",
+   "A Guide to Information Security and Privacy on macOS",
+   "iOS App VoiceOver Accessibility Teaching and Testing Plan",
+   "A Guide to iMessage Apps for iOS",
+   "A Guide to Touch ID and Passcode settings for iOS and iPadOS"
+  ],
+  "error": null
+ },
+ "guide-find-my": {
+  "passed": false,
+  "top": [
+   "iCloud Explained"
+  ],
+  "error": null
+ },
+ "guide-carplay": {
+  "passed": false,
+  "top": [
+   "a guide to creating and running shortcuts on iOS and macOS"
+  ],
+  "error": null
+ },
+ "guide-apple-tv": {
+  "passed": false,
+  "top": [
+   "Basic Terminology for Apple Accessibility",
+   "A Beginner's Guide to Using iOS with VoiceOver",
+   "A VoiceOver User's Guide to Xcode",
+   "A Guide to Cleaning and Speeding up Your Slow Mac",
+   "How to Access Audio Described DVDs on Your Mac"
+  ],
+  "error": null
+ },
+ "guide-homepod": {
+  "passed": false,
+  "top": [
+   "iCloud Explained"
+  ],
+  "error": null
+ },
+ "guide-airpods": {
+  "passed": false,
+  "top": [
+   "iOS Device Primer 105: How do I answer, Manage, and End a Phone Call?",
+   "Add Widgets to Your Desktop in macOS Sonoma",
+   "a guide to creating and running shortcuts on iOS and macOS",
+   "A Guide to EveryCord: An iOS 11 Screen Recorder",
+   "a Guide to Verbosity Options in macOS VoiceOver"
+  ],
+  "error": null
+ },
+ "guide-setup": {
+  "passed": false,
+  "top": [
+   "a Deep dive into VoiceOver settings for iOS and iPadOS",
+   "A Complete List of iOS and iPadOS Gestures Available to VoiceOver Users",
+   "A Guide to Touch ID and Passcode settings for iOS and iPadOS",
+   "Finding Your Way Home in a (Home) Buttonless World: Using an iOS Device Without a Home Button",
+   "A Beginner's Guide to Using iOS with VoiceOver"
+  ],
+  "error": null
+ },
+ "guide-vo-settings": {
+  "passed": true,
+  "top": [
+   "a Deep dive into VoiceOver settings for iOS and iPadOS",
+   "a Guide to Verbosity Options in macOS VoiceOver",
+   "VoiceOver Gestures for use with a Multi-Touch Trackpad on MacOS",
+   "Using your custom VoiceOver preferences at the Login window",
+   "A Complete List of iOS and iPadOS Gestures Available to VoiceOver Users"
+  ],
+  "error": null
+ },
+ "guide-voices": {
+  "passed": true,
+  "top": [
+   "A Deep Dive into VoiceOver Utility On Mac",
+   "a Deep dive into VoiceOver settings for iOS and iPadOS",
+   "Intro to iOS Accessibility for Blind and Low Vision Users",
+   "Playing Chess on the Mac",
+   "A Guide to Using Audio Hijack with VoiceOver"
+  ],
+  "error": null
+ },
+ "guide-ducking": {
+  "passed": true,
+  "top": [
+   "A Guide to Using Audio Hijack with VoiceOver",
+   "a Deep dive into VoiceOver settings for iOS and iPadOS",
+   "A Deep Dive into VoiceOver Utility On Mac",
+   "iOS App VoiceOver Accessibility Teaching and Testing Plan"
+  ],
+  "error": null
+ },
+ "guide-dictation": {
+  "passed": true,
+  "top": [
+   "iOS Siri and Dictation Command List",
+   "Navigating Bookmarks in Safari on iOS 26: A VoiceOver-Friendly Guide",
+   "Siri Tips & Settings",
+   "A Complete List of iOS and iPadOS Gestures Available to VoiceOver Users",
+   "iOS Device Primer 105: How do I answer, Manage, and End a Phone Call?"
+  ],
+  "error": null
+ },
+ "guide-siri": {
+  "passed": true,
+  "top": [
+   "Siri Tips & Settings",
+   "iOS Siri and Dictation Command List",
+   "Intro to iOS Accessibility for Blind and Low Vision Users",
+   "A Deep Dive into VoiceOver Utility On Mac",
+   "a Deep dive into VoiceOver settings for iOS and iPadOS"
+  ],
+  "error": null
+ },
+ "guide-focus": {
+  "passed": false,
+  "top": [
+   " A guide on beating a few minutes of glory on every difficulty level",
+   "A Complete List of iOS and iPadOS Gestures Available to VoiceOver Users",
+   "Dragging and dropping apps with iOS 12.1.1 and VoiceOver",
+   "Quick tip: taking videos of a computer monitor",
+   "How to Add Folders to the Dock on iOS"
+  ],
+  "error": null
+ },
+ "guide-notifications": {
+  "passed": false,
+  "top": [
+   "VoiceOver Keyboard Shortcuts for MacOS",
+   "A Complete List of VoiceOver Keyboard Shortcuts Available on macOS",
+   "a Deep dive into VoiceOver settings for iOS and iPadOS",
+   "A Guide to Cleaning and Speeding up Your Slow Mac",
+   "a Guide to Verbosity Options in macOS VoiceOver"
+  ],
+  "error": null
+ },
+ "guide-books": {
+  "passed": false,
+  "top": [
+   "Working with the iOS User Guide",
+   "Third edition of Personal Power: Getting The Most from iOS as a Totally Blind User",
+   "Why I'm still on a Mac: a guide for skeptics and those who feel that grass may be greener with Windows",
+   "iOS Siri and Dictation Command List",
+   "Don't Touch it, Type it! A VoiceOver User's Guide to Using a QWERTY Bluetooth Keyboard"
+  ],
+  "error": null
+ },
+ "guide-maps": {
+  "passed": false,
+  "top": [
+   "A Complete List of VoiceOver Keyboard Shortcuts Available on macOS",
+   "Instructional: This is how you install Windows 11 on Mac using Parallels. V2.0",
+   "Siri Tips & Settings",
+   "A Complete List of iOS and iPadOS Gestures Available to VoiceOver Users",
+   "iOS App VoiceOver Accessibility Teaching and Testing Plan"
+  ],
+  "error": null
+ },
+ "forum-braille-display": {
+  "passed": true,
+  "top": [
+   "Please Recommend Braille Display",
+   "Recommended braille displays that support Chinese braille input an output on iOS",
+   "Braille Display recommendations ",
+   "Braille Display recommendation",
+   "Recommendations on Where to Go to Learn About Consumer Product Satisfaction Ratings After Purchasing Braille Displays?"
+  ],
+  "error": null
+ },
+ "forum-which-iphone": {
+  "passed": true,
+  "top": [
+   "Which iPhone Should I Buy?",
+   "iPhone 6 Or iPhone 6 Plus?",
+   "What phone should I buy? Legally blind",
+   "Apple Books and reading with the Polaris Mini",
+   "Some questions about braille displays"
+  ],
+  "error": null
+ },
+ "forum-ios-bug": {
+  "passed": true,
+  "top": [
+   "VoiceOver seek slider bug in Files app on iOS 26.1 Beta",
+   "Bug: Voiceover reads user comments twice in Safari under iOS 26.3",
+   "Critical VoiceOver Bug in iOS 26.1: Swiping Fails to Find Elements (e.g., \"Cancel\" buttons)",
+   "New bug in iOS 26.4 that was unheard of in the past",
+   "any more problems with voiceover in iOS 26.1?"
+  ],
+  "error": null
+ },
+ "forum-mac-windows": {
+  "passed": true,
+  "top": [
+   "looking for optimal tools for university",
+   "currently macOS user for school, thinking about jaws and voiceover moving forward for officeapps, coding skills etc. which shall i buy?",
+   "Safari \"Not Responding\" bug... now spreading to Visual Studio Code?",
+   "Dolphin Screen Reader",
+   "I'm sick of the inconsistent behaviour in Numbers"
+  ],
+  "error": null
+ },
+ "forum-watch-worth": {
+  "passed": true,
+  "top": [
+   "Descriptive Video and Netflicks/iTunes",
+   "Apple tv, never put up with inaccessible pay tv guides or tv websites ever again, complete review and a few tips to get started",
+   "Apple Watch: What it actually does for you.",
+   "Accessible chords and tabs service?",
+   "Perks pretty cool game for iphone and android"
+  ],
+  "error": null
+ },
+ "forum-glasses": {
+  "passed": true,
+  "top": [
+   "Meta Ray-Ban Glasses Questions",
+   "Apple possibly considering Meta Ray-Ban like glasses ",
+   "Buying Meta Ray-Ban Glasses",
+   "Enabling Look and ask with Meta AI on Ray-Ban Meta smart glasses",
+   "Embrace the Future with Ray-Ban Meta Smart Glasses: A Gateway to Seamless Communication"
+  ],
+  "error": null
+ },
+ "forum-be-my-eyes": {
+  "passed": true,
+  "top": [
+   "Be My Eyes",
+   "be my eyes and audio",
+   "Be My Eyes on the Mac?",
+   "Be My Eyes Feedback",
+   "Be My Eyes for Mac"
+  ],
+  "error": null
+ },
+ "forum-seeing-ai": {
+  "passed": true,
+  "top": [
+   "Seeing AI",
+   "Seeing AI and new AI abilities",
+   "The Seeing AI App.",
+   "Seeing AI ",
+   "Seeing AI Product Recognition"
+  ],
+  "error": null
+ },
+ "forum-gps": {
+  "passed": true,
+  "top": [
+   "Are there any difinitive guides on Blind oriented gps app for IPhone?",
+   "Seeing eye GPS, will it ever be available in the UK?",
+   "GPS designed for Low Vision/Blind",
+   "Intuitive navigation GPS app for a UK user",
+   "Using the Navigon Application for the IPhone "
+  ],
+  "error": null
+ },
+ "forum-audio-games": {
+  "passed": true,
+  "top": [
+   "Audio games for iPad",
+   "Audio games on Mac.",
+   "Games similar to Godville and/or games with narrative+audio",
+   "Audio games for iPhone 4 ",
+   "Finding the games in the audio game hub"
+  ],
+  "error": null
+ },
+ "forum-podcast-app": {
+  "passed": true,
+  "top": [
+   "looking for accessible podcasting app ",
+   "I am looking for a new podcasts app",
+   "Accessible podcasting tools in Mac",
+   "what's the definitive podcasts app these days?",
+   "Podcast chapters in the native iOS podcast app"
+  ],
+  "error": null
+ },
+ "forum-banking": {
+  "passed": true,
+  "top": [
+   "Accessible banking apps",
+   "Most Accessible Banking Apps, or experiences with Ally Bank?",
+   "Looking for accessible banking apps in Australia",
+   "The farmington bank mobile app is not accessible with VoiceOver",
+   "Bank of America app no longer accessible with voiceover"
+  ],
+  "error": null
+ },
+ "forum-uber": {
+  "passed": true,
+  "top": [
+   "Accessibility and Uber",
+   "Uber and Lyft Apps: How Accessible are They?",
+   "Please share your Uber app accessibility experiences.",
+   "uber app is it fixed?",
+   "Uber, Center Map pin, accessibility"
+  ],
+  "error": null
+ },
+ "forum-kindle": {
+  "passed": true,
+  "top": [
+   "ISSUE WITH KINDLE AND/OR VOICEOVER",
+   "Kindle App Not Working With VoiceOver?",
+   "VoiceOver on Kindle is wrecked since update",
+   "Annoying VoiceOver Bug in Kindle App",
+   "Kindle and reading time with voiceover"
+  ],
+  "error": null
+ },
+ "forum-netflix": {
+  "passed": true,
+  "top": [
+   "Problems with Audio Description on Netflix",
+   " Netflix audio description ",
+   "Audio Description & Netflix",
+   "Question about netflix and audio description ",
+   " how to enable audio  descriptions on Netflix "
+  ],
+  "error": null
+ },
+ "blog-ios26": {
+  "passed": true,
+  "top": [
+   "Apple Releases iOS 26.1 and iPadOS 26.1 with accessibility enhancements, new language support for Live Translation, and more",
+   "What's New in iOS 26 Accessibility for Blind and DeafBlind Users",
+   "Apple Releases iOS 26.4 and iPadOS 26.4 with New Emoji, Generative AI Features for Apple Music, Accessibility Enhancements, and More",
+   "Apple Releases iOS 26.4.2 and iPadOS 26.4.2",
+   "Apple Releases iOS 26.3 and iPadOS 26.3"
+  ],
+  "error": null
+ },
+ "blog-ios18": {
+  "passed": true,
+  "top": [
+   "iOS 18 and iPadOS 18 Accessibility: A Summary of VoiceOver and braille issues and improvements",
+   "What's new in iOS 18 accessibility for blind and DeafBlind users",
+   "Apple Releases iOS 18.2.1 and iPadOS 18.2.1 with Bug Fixes",
+   "Apple Releases iOS 18.7.7 and iPadOS 18.7.7 with fix for \"DarkSword\" vulnerability",
+   "Apple Releases iOS 18.4.1, iPadOS 18.4.1, macOS Sequoia 15.4.1, and tvOS 18.4.1"
+  ],
+  "error": null
+ },
+ "blog-macos": {
+  "passed": true,
+  "top": [
+   "Apple Previews Accessibility Enhancements Coming with macOS Catalina, iPadOS, and iOS 13",
+   "Apple Previews New Accessibility Features Set to Come Later this Year in iOS, watchOS, tvOS, and macOS",
+   "The New Features, Changes, and Accessibility Bugs in macOS Mojave for Blind and Low Vision Users",
+   "Apple Releases macOS Monterey 12.6 and macOS Big Sur 11.7 With Security Updates",
+   "Apple Releases macOS Ventura 13.6 and macOS Monterey 12.7"
+  ],
+  "error": null
+ },
+ "blog-watchos": {
+  "passed": true,
+  "top": [
+   "Apple Releases watchOS 8.0.1; Bringing a Fix for Accessibility Settings Not Being Available for Some Apple Watch Series 3 Users",
+   "Apple Previews New Accessibility Features Set to Come Later this Year in iOS, watchOS, tvOS, and macOS",
+   "Apple Releases watchOS 3, Bringing a Range of Enhancements and New Features to the Apple Watch",
+   "Apple Releases watchOS 2.2, Bringing Support for Pairing Multiple Apple Watches with a Single iPhone",
+   "Apple Releases watchOS 7.0.2 with fixes for battery, ECG app"
+  ],
+  "error": null
+ },
+ "blog-golden-apples": {
+  "passed": true,
+  "top": [
+   "Announcing the AppleVis Golden Apples of 2013",
+   "Announcing the AppleVis Golden Apples of 2012",
+   "Announcing the AppleVis Golden Apples of 2014",
+   "AppleVis Announces Winners of the 2025 Golden Apple Awards",
+   "[CLOSED] Cast Your Votes Now for the AppleVis Golden Apples of 2022"
+  ],
+  "error": null
+ },
+ "blog-wwdc": {
+  "passed": true,
+  "top": [
+   "WWDC update 1: access for the visually impaired is demonstrated",
+   "Join AppleVis for coverage of Apple's WWDC26 Keynote and announcements",
+   "WWDC 23 Keynote: Apple Unveils Platform Updates and Introduces Apple Vision Pro Headset and New Macs",
+   "Join Us This Week for Coverage and Analysis of Apple's WWDC 2025 Keynote and Announcements",
+   "WWDC is around the corner and the App Store is down"
+  ],
+  "error": null
+ },
+ "blog-gaad": {
+  "passed": true,
+  "top": [
+   "Participate in  Global Accessibility Awareness Day",
+   "Participate in Global Accessibility Awareness Day by Reaching Out to iOS and OS X Developers",
+   "Join us in Marking Global Accessibility Awareness Day by Reaching Out to iOS and OS X Developers",
+   "Why is Accessibility Important? Written for Global Accessibility Awareness Day, May 17",
+   "Apple to Mark Global Accessibility Awareness Day with Special In-Store Events and Updated App Store Collections"
+  ],
+  "error": null
+ },
+ "blog-review": {
+  "passed": true,
+  "top": [
+   "iPhone 16e Review: An Excellent 'Basic' iPhone",
+   "iPhone 16 Pro Max: A Review and Some Thoughts on Which Model to Buy",
+   "iPhone X Review: There are Some Adjustments and Compromises, but I Can’t Imagine Going Back",
+   "What Accessibility Means To Me",
+   "Apple Watch Review: A Device I Don't Need but Wouldn't Want to be Without"
+  ],
+  "error": null
+ },
+ "bug-mail": {
+  "passed": true,
+  "top": [
+   "VoiceOver Scroll Gestures Do Not Work in Messages in the Mail App",
+   "When viewing an interactive notification from the Mail app, the context menu items “Delete” and “Mark Read” may on occasions not function when located by swiping"
+  ],
+  "error": null
+ },
+ "bug-safari": {
+  "passed": true,
+  "top": [
+   "Using the VoiceOver rotor to navigate the History tab in Safari by Heading is inconsistent and unreliable",
+   "VoiceOver focus can be unstable in Safari webpages, HTML views, and some apps",
+   "VoiceOver users cannot access any websites listed under “Siri Suggestions” in Safari",
+   "if you have Safari configured so that its address bar is at the top of the screen, you cannot use a Bluetooth keyboard or braille display's keyboard to enter text in to the address bar",
+   "Intermittent failure of VoiceOver double-tap and triple-tap gestures"
+  ],
+  "error": null
+ },
+ "bug-braille": {
+  "passed": true,
+  "top": [
+   "Braille displays will disconnect when in Airplane Mode and you lock the screen",
+   "When invoking the Notification Center, many connected braille displays will become disconnected"
+  ],
+  "error": null
+ },
+ "bug-focus": {
+  "passed": true,
+  "top": [
+   "VoiceOver focus will occasionally jump to the Status Bar when swiping through the screen",
+   "VoiceOver focus will at times spontaneously ‘jump’ to the first element on the screen",
+   "VoiceOver focus may jump to the first UI element on the screen after you have interacted with another element on the screen",
+   "VoiceOver focus may spontaneously jump to another UI element, most typically soon after opening a screen, menu or modal",
+   "VoiceOver focus jumps to an unexpected location in the list of emails in the Mail app after taking an action such as delete, mark as unread or move."
+  ],
+  "error": null
+ },
+ "bug-watch": {
+  "passed": true,
+  "top": [
+   "When using Sleep mode with iPhone and Apple Watch and alarm is set to go off on the Watch, the iPhone wakes up and VoiceOver speaks just before the Watch alarm starts",
+   "VoiceOver May 'Lag' or Feel Less Responsive",
+   "Intermittent failure of VoiceOver double-tap and triple-tap gestures",
+   "The scent with Siri message in an iMessage is not properly labeled to voiceover users",
+   "In WhatsApp, the message actions menu, which includes reactions, disappears before you can interact with it if using VoiceOver"
+  ],
+  "error": null
+ },
+ "bug-mac-safari": {
+  "passed": true,
+  "top": [
+   "VoiceOver may not always see Safari's Reader as active",
+   "Safari and WebKit Applications Can Become Unresponsive When Using VoiceOver",
+   "VoiceOver does not speak the contents of headings on Youtube.com in Safari",
+   "Cannot view the outputs of chats on ChatGPT.com in Safari using VoiceOver",
+   "Back Command in Safari Sometimes Results in Useless Page to VoiceOver"
+  ],
+  "error": null
+ },
+ "podcast-shortcuts": {
+  "passed": true,
+  "top": [
+   "How to Use Siri Shortcuts Part 3: The Library",
+   "How to Use Siri Shortcuts Part 2: The Gallery",
+   "How to Use Siri Shortcuts in iOS, Part 1: The Basics",
+   "Creating a FaceTime Shortcut to Speed Up Calling Your Selected Contacts",
+   "How to Assign Custom Keyboard Shortcuts to Menu Bar Commands in macOS"
+  ],
+  "error": null
+ },
+ "podcast-watch": {
+  "passed": true,
+  "top": [
+   "Apple Watch 101: A Demonstration of the Watch App on the iPhone After it has Paired with an Apple Watch",
+   "Apple Watch 101: Making And Receiving Calls On The Watch",
+   "Apple Watch 101: Turning The Watch On And Off",
+   "Apple Watch 101: Changing Watch Bands",
+   "Apple Watch 101: An Introduction To Siri On The Watch"
+  ],
+  "error": null
+ },
+ "podcast-braille": {
+  "passed": true,
+  "top": [
+   "A walkthrough of connecting the Braille Actilino smart braille display to an iOS device",
+   "iFeelit: an introduction to using braille displays on iOS (the 2021 edition)",
+   "Quick Tip: Assigning a braille display command to tell the time on iOS ",
+   "How to Use Sound Curtain for Braille Display Users on iOS and iPadOS",
+   "Quick Tip: Moving Apps Around Your Home Screen With a Braille Display"
+  ],
+  "error": null
+ },
+ "podcast-mac": {
+  "passed": true,
+  "top": [
+   "Mac Basics #1: Starting VoiceOver",
+   "Mac Basics #11: How to Create and Rename Folders on the Mac with VoiceOver",
+   "Mac Basics #2: How to Familiarize Yourself with the Keyboard on a Mac using VoiceOver",
+   "Mac Basics #25: An Overview of the VoiceOver Navigation Options",
+   "Mac Basics #16: How to Unmute Speech if VoiceOver is Running"
+  ],
+  "error": null
+ },
+ "apps-card": {
+  "passed": true,
+  "top": [
+   "Scratch Mancer: Card Roguelike",
+   "Kodou - Swipe & Connect",
+   "Pegfall: Bounce Roguelite",
+   "‎Game-board",
+   "Cyphr City"
+  ],
+  "error": null
+ },
+ "apps-car": {
+  "passed": true,
+  "top": [
+   "Survive Alone - Survival Sim",
+   "LifePop - Life Simulator ",
+   "Seeing Dogs",
+   "uTalk - Learn 150+ Languages 4+",
+   "Capti Voice"
+  ],
+  "error": null
+ },
+ "apps-dice": {
+  "passed": true,
+  "top": [
+   "VoiceGammon",
+   "Card World: Rummy Hearts & Gin",
+   "General's Gambit",
+   "‎Dice World: Multiplayer Fun",
+   "Dice Only"
+  ],
+  "error": null
+ },
+ "apps-word": {
+  "passed": true,
+  "top": [
+   "Scratch Mancer: Card Roguelike",
+   "Verbena",
+   "WordBopper",
+   "Wordvoyance",
+   "Black Ink crosswords"
+  ],
+  "error": null
+ },
+ "apps-trivia": {
+  "passed": true,
+  "top": [
+   "Brainclash - Trivia Battle",
+   "AI Note Taker – VoicePen ",
+   "Human Body Facts 1000 Fun Quiz",
+   "Kahoot! Play & Create Quizzes ",
+   "Trailhead GO"
+  ],
+  "error": null
+ },
+ "apps-chess": {
+  "passed": true,
+  "top": [
+   "Chess Meets Necromancy",
+   "No Wifi Mini Games",
+   "Cyphr City",
+   "General's Gambit",
+   "Medieval Life - Life Simulator"
+  ],
+  "error": null
+ },
+ "apps-weather": {
+  "passed": true,
+  "top": [
+   "Final Fortress",
+   "Pomagotchi - Virtual Pom Pet & Mini Games",
+   "Sonarpad",
+   "NOAA Weather Radio",
+   "Survive Alone - Survival Sim"
+  ],
+  "error": null
+ },
+ "apps-ocr": {
+  "passed": true,
+  "top": [
+   "Intersector",
+   "Radien: Network Toolbox",
+   "TagFit, organize your things",
+   "TagCraft",
+   "Severe Weather Guardian"
+  ],
+  "error": null
+ },
+ "apps-navigation": {
+  "passed": true,
+  "top": [
+   "wayfound: walk & remember",
+   "MBraille",
+   "Vox libri",
+   "One Line Journal App",
+   "Intersector"
+  ],
+  "error": null
+ },
+ "apps-banking": {
+  "passed": true,
+  "top": [
+   "Venmo",
+   "PayPal - Pay, Send, Save",
+   "BMO Digital Banking",
+   "Tappy Guide",
+   "Revolut: Send, spend and save"
+  ],
+  "error": null
+ },
+ "apps-mac-text": {
+  "passed": true,
+  "top": [
+   "Day One 2 Journal + Notes",
+   "Pro Audio Converter",
+   "Calca",
+   "Bean",
+   "TextMate"
+  ],
+  "error": null
+ },
+ "apps-mac-audio": {
+  "passed": true,
+  "top": [
+   "Farrago",
+   "Maestral",
+   "Phone Play (for iPhone & iPad)",
+   "noted: bring notes and audio together",
+   "Audio Hijack"
+  ],
+  "error": null
+ },
+ "apps-watch-fitness": {
+  "passed": true,
+  "top": [
+   "ECHO Watch Heart Rate Monitor",
+   "adidas Training by Runtastic",
+   "Streamlets",
+   "Seven - 7 Minute Workout",
+   "Fitbit Coach"
+  ],
+  "error": null
+ },
+ "apps-watch-weather": {
+  "passed": true,
+  "top": [
+   "CARROT Weather",
+   "AroundMe",
+   "Personal Diary App (Journal)"
+  ],
+  "error": null
+ },
+ "apps-tv-streaming": {
+  "passed": true,
+  "top": [
+   "YES İPTV Player",
+   "iPlayTV",
+   "Calm Radio - Online streaming with relaxing music",
+   "Funny or Die",
+   "TVPlayer watch live and catchup TV"
+  ],
+  "error": null
+ },
+ "name-instagram": {
+  "passed": true,
+  "top": [
+   "instagram",
+   "Threads, an Instagram app "
+  ],
+  "error": null
+ },
+ "name-threads": {
+  "passed": true,
+  "top": [
+   "‎Roads Audio: Voice Threads ",
+   "Threads, an Instagram app "
+  ],
+  "error": null
+ },
+ "name-x": {
+  "passed": true,
+  "top": [
+   "X [Formerly Twitter]"
+  ],
+  "error": null
+ },
+ "name-twitter": {
+  "passed": true,
+  "top": [
+   "X [Formerly Twitter]"
+  ],
+  "error": null
+ },
+ "name-uber": {
+  "passed": true,
+  "top": [
+   "Uber - Request a ride",
+   "Uber Eats: Food Delivery"
+  ],
+  "error": null
+ },
+ "name-spotify": {
+  "passed": true,
+  "top": [
+   "Spotify: Music and Podcasts",
+   "Spotify for Podcasters",
+   "Spotify Live"
+  ],
+  "error": null
+ },
+ "name-whatsapp": {
+  "passed": true,
+  "top": [
+   "WhatsApp Messenger"
+  ],
+  "error": null
+ },
+ "name-seeing-ai": {
+  "passed": true,
+  "top": [
+   "Seeing AI"
+  ],
+  "error": null
+ },
+ "name-kindle": {
+  "passed": true,
+  "top": [
+   "Amazon Kindle"
+  ],
+  "error": null
+ },
+ "name-netflix": {
+  "passed": true,
+  "top": [
+   "Netflix Puzzled",
+   "Netflix"
+  ],
+  "error": null
+ },
+ "name-be-my-eyes": {
+  "passed": true,
+  "top": [
+   "Be My Eyes"
+  ],
+  "error": null
+ },
+ "name-voice-dream": {
+  "passed": true,
+  "top": [
+   "Voice Dream - Natural Reader "
+  ],
+  "error": null
+ },
+ "name-lyft": {
+  "passed": true,
+  "top": [],
+  "error": null
+ }
+}

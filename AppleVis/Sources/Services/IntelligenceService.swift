@@ -284,6 +284,10 @@ enum IntelligenceService {
     struct MousePlan: Sendable {
         enum Kind: String, Sendable {
             case howToUseApp, findApps, appleHowTo, communityDiscussion, changeSetting, whatsNew, savedItems, other
+            /// Nothing to do with Apple, accessibility, or AppleVis, such
+            /// as cars or recipes. Answered with a friendly redirect, and
+            /// nothing is searched. Requested directly (2026-10-01).
+            case offTopic
         }
         var kind: Kind = .other
         /// Short English phrases for the site's search.
@@ -291,9 +295,30 @@ enum IntelligenceService {
         var appKeyword = ""
         var fullyAccessibleOnly = false
         var appCategory: String?
+        /// Which App Directory to search for apps.
+        var appPlatform: AppPlatform = .ios
         var place: MousePlace?
         var mouseSwitch: MouseSwitch?
         var turnOn = true
+        /// A sharper search for Search the Web: the device and feature
+        /// named, in English.
+        var webQuery = ""
+        /// A page outside AppleVis that covers the question, if one does.
+        var appleLink: MouseAppleLink?
+        /// Or a page from Apple's user guides, chosen from the candidates.
+        var catalogLink: MouseAppleCatalog.Entry?
+        /// An essential AppleVis guide on the subject, always read.
+        var essentialGuide: MouseEssentialGuide?
+        /// The one app the question asks about by name, if any.
+        var appName = ""
+        /// Read the person's own settings on `place`'s screen, for "why
+        /// doesn't…" questions about the app. Requested directly (2026-10-01).
+        var checkSetup = false
+        /// When the question can't be understood, such as "How do I turn it
+        /// off?" with nothing before it: what to ask back, and two or three
+        /// questions they might mean. Requested directly (2026-10-01).
+        var clarify = ""
+        var clarifyChoices: [String] = []
     }
 
     /// One thing the Mouse can quote from: a Help article, part of a
@@ -313,6 +338,8 @@ enum IntelligenceService {
         var steps: [String] = []
         /// Two or three questions the person might ask next.
         var followUps: [String] = []
+        /// When nothing answers it: what came close, and how it differs.
+        var nearMiss = ""
     }
 
     /// Why Apple Intelligence couldn't answer, when it's worth telling the
@@ -345,18 +372,27 @@ enum IntelligenceService {
         let picks: [(id: String, isMain: Bool, blurb: String)]
     }
 
+    // Speaks as the Mouse, warmly, answer first. Requested directly (2026-10-01).
     private static let mouseInstructions = """
     You are the Mouse, the friendly helper in the AppleVis app. AppleVis is a community of blind, DeafBlind, \
     low vision, and sighted people who share how well Apple devices and apps work with accessibility features \
-    like VoiceOver. You are warm, brief, and plain-spoken. You only use the information you are given, and you \
-    never make up apps, steps, settings, or facts. Copy commands, gestures, key combinations, Braille dot \
-    patterns, keyboard shortcuts, and setting names exactly as the source writes them; never reword them.
+    like VoiceOver. You are warm, brief, and plain-spoken, and you speak as yourself, the Mouse, in the first \
+    person: "I found this in a guide." Lead with the answer itself, said warmly, with no openers like "Great \
+    question". When it genuinely helps, end with one short, practical tip. You only use the information you are \
+    given, and you never make up apps, steps, settings, or facts. Copy commands, gestures, key combinations, \
+    Braille dot patterns, keyboard shortcuts, and setting names exactly as the source writes them; never reword \
+    them.
     """
 
     private static let mousePlanInstructions = mouseInstructions + """
      Work out what the person wants and plan the searches. Search phrases are always in English, \
     even if the question isn't. Use none when nothing fits. whatsNew means changes to this AppleVis \
-    app itself; news about iOS, Apple, or other apps is appleHowTo or communityDiscussion.
+    app itself; news about iOS, Apple, or other apps is appleHowTo or communityDiscussion. Make one of the \
+    search phrases the broader topic, the way AppleVis guides are titled, such as "VoiceOver gestures" for a \
+    gesture question or "braille display commands" for a braille question. offTopic is only for questions \
+    with nothing to do with Apple products, accessibility, assistive technology, blindness or low vision, or \
+    AppleVis, such as cars, sports, or recipes. Questions about accessibility or assistive technology in \
+    general are on topic, even without Apple. When unsure, it is not offTopic.
     """
 
     /// A planning session loaded ahead of time by `prewarmMouse()`.
@@ -393,14 +429,16 @@ enum IntelligenceService {
     /// Works out what the question is asking for and turns it into searches.
     /// `earlier` holds the last question or two, so follow-ups like "and how
     /// do I stop it?" make sense.
-    static func mousePlan(for question: String, earlier: [String]) async -> MousePlan? {
+    static func mousePlan(for question: String, earlier: [String], catalog: [MouseAppleCatalog.Entry] = [], aboutMe: String = "") async -> MousePlan? {
         guard #available(iOS 26.0, *), isAvailable else { return nil }
         let places = MousePlace.allCases.map { "\($0.rawValue): \($0.modelDescription)" }.joined(separator: "\n")
         let switches = MouseSwitch.allCases.map { "\($0.rawValue): \($0.modelDescription)" }.joined(separator: "\n")
         let categories = AppEndpoints.iOSCategoryNames.joined(separator: ", ")
         let history = earlier.isEmpty ? "" : "Earlier questions in this conversation:\n" + earlier.joined(separator: "\n") + "\n\n"
+        // When the question doesn't name a device, the person's own.
+        let profile = aboutMe.isEmpty ? "" : aboutMe + " When the question doesn't name a device, plan for theirs.\n\n"
         let prompt = """
-        \(history)Question: \(question)
+        \(profile)\(history)Question: \(question)
 
         App Directory categories: \(categories)
 
@@ -409,6 +447,15 @@ enum IntelligenceService {
 
         Settings that can be switched on or off:
         \(switches)
+
+        Helpful pages outside AppleVis:
+        \(MouseAppleLink.allCases.map { "\($0.rawValue): \($0.modelDescription)" }.joined(separator: "\n"))
+
+        Apple user guide pages:
+        \(catalog.enumerated().map { "catalog-\($0.offset): \($0.element.t) (\($0.element.d))" }.joined(separator: "\n"))
+
+        Essential AppleVis guides:
+        \(MouseEssentialGuide.allCases.map { "\($0.rawValue): \($0.modelDescription)" }.joined(separator: "\n"))
         """
         do {
             // The session loaded when the screen opened, used once.
@@ -425,9 +472,27 @@ enum IntelligenceService {
             plan.appKeyword = result.appKeyword.trimmingCharacters(in: .whitespacesAndNewlines)
             plan.fullyAccessibleOnly = result.fullyAccessibleOnly
             plan.appCategory = AppEndpoints.iOSCategoryNames.first { $0.caseInsensitiveCompare(result.appCategory) == .orderedSame }
+            switch result.appPlatform {
+            case "mac": plan.appPlatform = .macos
+            case "watch": plan.appPlatform = .watchos
+            case "tv": plan.appPlatform = .tvos
+            default: plan.appPlatform = .ios
+            }
             plan.place = MousePlace(rawValue: result.place)
             plan.mouseSwitch = MouseSwitch(rawValue: result.switchId)
             plan.turnOn = result.turnOn
+            plan.webQuery = result.webQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+            plan.appleLink = MouseAppleLink(rawValue: result.appleLink)
+            if result.appleLink.hasPrefix("catalog-"), let index = Int(result.appleLink.dropFirst("catalog-".count)), catalog.indices.contains(index) {
+                plan.catalogLink = catalog[index]
+            }
+            plan.essentialGuide = MouseEssentialGuide(rawValue: result.essentialGuide)
+            plan.appName = result.appName.trimmingCharacters(in: .whitespacesAndNewlines)
+            plan.checkSetup = result.checkSetup
+            plan.clarify = result.clarify.trimmingCharacters(in: .whitespacesAndNewlines)
+            plan.clarifyChoices = result.clarifyChoices
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty && $0.caseInsensitiveCompare(question) != .orderedSame }
             return plan
         } catch {
             AppLog.intelligence.error("Mouse plan failed: \(error, privacy: .private)")
@@ -443,7 +508,7 @@ enum IntelligenceService {
     /// each one shortened, rather than giving up. Requested directly
     /// (2026-09-29).
     static func mouseAnswer(
-        to question: String, earlier: [String], sources: [MouseSource], iOSVersion: String = "",
+        to question: String, earlier: [String], sources: [MouseSource], iOSVersion: String = "", aboutMe: String = "",
         onPartial: (@MainActor @Sendable (String) -> Void)? = nil
     ) async -> MouseAnswerResult {
         guard #available(iOS 26.0, *), isAvailable, !sources.isEmpty else { return MouseAnswerResult() }
@@ -451,7 +516,7 @@ enum IntelligenceService {
         for attempt in 0..<3 {
             do {
                 let answer = try await streamMouseAnswer(to: question, earlier: earlier, sources: current,
-                                                         iOSVersion: iOSVersion, onPartial: onPartial)
+                                                         iOSVersion: iOSVersion, aboutMe: aboutMe, onPartial: onPartial)
                 return MouseAnswerResult(answer: answer)
             } catch {
                 if isTooLong(error), attempt < 2 {
@@ -479,7 +544,7 @@ enum IntelligenceService {
 
     @available(iOS 26.0, *)
     private static func streamMouseAnswer(
-        to question: String, earlier: [String], sources: [MouseSource], iOSVersion: String,
+        to question: String, earlier: [String], sources: [MouseSource], iOSVersion: String, aboutMe: String,
         onPartial: (@MainActor @Sendable (String) -> Void)?
     ) async throws -> MouseAnswer {
         let listed = sources.map { "[\($0.id)] \($0.title)\n\($0.text)" }.joined(separator: "\n\n")
@@ -487,8 +552,11 @@ enum IntelligenceService {
         // Sources written for the person's own iOS version come first.
         // Requested directly (2026-09-29).
         let version = iOSVersion.isEmpty ? "" : "The person uses iOS \(iOSVersion). When sources disagree, prefer what fits that version.\n\n"
+        // About Me: lead with the person's own device and way of using it
+        // when the question doesn't say. Requested directly (2026-10-01).
+        let profile = aboutMe.isEmpty ? "" : aboutMe + " When the question doesn't say which device or method, and the sources cover theirs, lead with that.\n\n"
         let prompt = """
-        \(version)\(history)Question: \(question)
+        \(profile)\(version)\(history)Question: \(question)
 
         Sources:
         \(listed)
@@ -499,7 +567,18 @@ enum IntelligenceService {
         When the answer is steps to follow, write a short introduction as the answer and put each step, \
         in order, in steps. If the sources don't answer it, say so and don't guess. Prefer Help and guides. \
         Members' comments and forum discussions are advice from community members: use them when they add \
-        something useful or the other sources don't answer, and then say so, for example "A member suggests…".
+        something useful or the other sources don't answer, and then say so, for example "A member suggests…". \
+        Only use a source that is about the same device as the question (iPhone, iPad, Mac, Apple Watch, or \
+        Apple TV) and the same way of using it (a braille display, Braille Screen Input, a keyboard, or touch \
+        gestures). A source about a different device or method doesn't answer the question, even if it uses \
+        the same words; mention it in nearMiss instead. Bug reports are known accessibility bugs from \
+        the AppleVis Bug Tracker: when one matches, say it's a known bug, whether it's still active or fixed and \
+        in which version, and give any workaround. Members' comments on an app entry say how accessible members \
+        found that app: sum up what they report, mention how recent the comments are, and say it's members' \
+        experience. If that app isn't the one the person asked about, don't use it. A source about the person's own \
+        AppleVis app settings, checked on their device just now, is fact: when a setting explains the problem, say \
+        which one, that it's on or off, and where to change it. A podcast episode's transcript is people talking: use it when it explains the answer. iPhone and iPad work the same way, so a source \
+        about one answers a question about the other unless it says otherwise.
         """)
         // Streamed, so the answer can appear as it's written. Only the
         // finished answer is given to VoiceOver.
@@ -522,7 +601,8 @@ enum IntelligenceService {
             steps: answered ? steps : [],
             followUps: answered
                 ? (latest?.followUps ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-                : []
+                : [],
+            nearMiss: answered ? "" : (latest?.nearMiss ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         )
     }
 
@@ -530,10 +610,15 @@ enum IntelligenceService {
     /// that page's matching passage, or "doesn't answer" so the result can
     /// be dropped. Nil when Apple Intelligence can't run or fails.
     /// Requested directly (2026-09-29).
-    static func mouseResultLine(question: String, title: String, passage: String) async -> (answers: Bool, line: String)? {
+    ///
+    /// With `answer`, also says whether the page agrees with it, so other
+    /// sources can be marked "Says the same" or "Says something different".
+    /// Requested directly (2026-10-01).
+    static func mouseResultLine(question: String, title: String, passage: String, answer: String? = nil) async -> (answers: Bool, line: String, agreement: String)? {
         guard #available(iOS 26.0, *), isAvailable, !passage.isEmpty else { return nil }
+        let given = answer.map { "\n\nThe answer already given: \($0)" } ?? ""
         let prompt = """
-        Question: \(question)
+        Question: \(question)\(given)
 
         Page: \(title)
         \(passage)
@@ -545,7 +630,7 @@ enum IntelligenceService {
             """)
             let result = try await session.respond(to: prompt, generating: MouseResultLineOutput.self).content
             let line = result.line.trimmingCharacters(in: .whitespacesAndNewlines)
-            return (result.answers && !line.isEmpty, line)
+            return (result.answers && !line.isEmpty, line, answer == nil ? "none" : result.agreement)
         } catch {
             AppLog.intelligence.error("Mouse result line failed: \(error, privacy: .private)")
             return nil
@@ -633,22 +718,38 @@ private struct GuidelineVerdict {
 @available(iOS 26.0, *)
 @Generable
 private struct MousePlanOutput {
-    @Guide(description: "What the person wants.", .anyOf(["howToUseApp", "findApps", "appleHowTo", "communityDiscussion", "changeSetting", "whatsNew", "savedItems", "other"]))
+    @Guide(description: "What the person wants.", .anyOf(["howToUseApp", "findApps", "appleHowTo", "communityDiscussion", "changeSetting", "whatsNew", "savedItems", "other", "offTopic"]))
     var kind: String
     @Guide(description: "One to three short English search phrases for the AppleVis website, including other common ways to word it. No filler words.")
     var searchPhrases: [String]
-    @Guide(description: "When finding apps: one English word likely to appear in the app's description, such as dice, weather, or podcast. Otherwise empty.")
+    @Guide(description: "When finding apps: one to three English words, separated by commas, likely to appear in the app's name or description, such as card, solitaire, poker for card games, or dice for dice games. Avoid short words found inside other words: for car games use racing, driving rather than car. Otherwise empty.")
     var appKeyword: String
     @Guide(description: "True only if the person asked for apps that are fully, totally, or completely accessible.")
     var fullyAccessibleOnly: Bool
     @Guide(description: "When finding apps: one App Directory category name from the list, or none.")
     var appCategory: String
+    @Guide(description: "When finding apps: the device they're for. mac for a Mac, watch for Apple Watch, tv for Apple TV, otherwise ios.", .anyOf(["ios", "mac", "watch", "tv"]))
+    var appPlatform: String
     @Guide(description: "The id of the one screen that would help most, from the list, or none.")
     var place: String
     @Guide(description: "When the person wants a setting changed: the id of that setting from the list, or none.")
     var switchId: String
     @Guide(description: "When a setting is chosen: true to turn it on, false to turn it off.")
     var turnOn: Bool
+    @Guide(description: "A short English web search for the question, naming the Apple device and the feature, such as iPhone VoiceOver braille display command Control Center. Empty when offTopic.")
+    var webQuery: String
+    @Guide(description: "The id of the one page outside AppleVis from either list that covers the question: a helpful page or an Apple user guide page (catalog-…). Prefer the most specific page for the device asked about; for Be My Eyes questions a Be My Eyes page; for someone just starting to learn VoiceOver, a Hadley lesson. When no specific page fits, the user guide for the Apple device the question is about. none when offTopic or nothing fits.")
+    var appleLink: String
+    @Guide(description: "The id of the one essential AppleVis guide from the list whose subject the question is about, or none.")
+    var essentialGuide: String
+    @Guide(description: "When the question asks about one specific app by name, such as how accessible it is, the app's name. Otherwise empty.")
+    var appName: String
+    @Guide(description: "True only when the person asks why something in this AppleVis app isn't working as expected, or how their own AppleVis settings are set, such as why they don't get notifications or why sounds don't play. Then place is that settings screen.")
+    var checkSetup: Bool
+    @Guide(description: "Almost always empty. Only when the question can't be understood even with the earlier questions, because it doesn't say what it's about, such as How do I turn it off? with no earlier question: one short, warm question asking what they mean, in the same language as the question.")
+    var clarify: String
+    @Guide(description: "Only when asking what they mean: two or three complete questions they might mean, worded as they would ask them, in the same language as the question. Otherwise empty.", .maximumCount(3))
+    var clarifyChoices: [String]
 }
 
 @available(iOS 26.0, *)
@@ -656,12 +757,14 @@ private struct MousePlanOutput {
 private struct MouseAnswerOutput {
     @Guide(description: "True if the sources answer the question.")
     var answered: Bool
-    @Guide(description: "The answer in one to four short, warm, plain sentences, only from the sources. When it's steps to follow, one short sentence introducing them. Empty if they don't answer it.")
+    @Guide(description: "The answer in one to four short, warm, plain sentences, speaking as the Mouse, only from the sources. When it's steps to follow, one short sentence introducing them. Empty if they don't answer it.")
     var answer: String
     @Guide(description: "When the answer is steps to follow in order, each step as one short instruction, in order, copying commands and setting names exactly. Otherwise empty.", .maximumCount(8))
     var steps: [String]
     @Guide(description: "The ids, in square brackets in the sources, of the sources the answer used, without the brackets.")
     var sourceIds: [String]
+    @Guide(description: "Only when the sources don't answer it: one or two warm sentences saying you couldn't find exactly that on AppleVis, then what was close and how it differs, such as a Mac shortcut instead of an iPhone one, or Braille Screen Input instead of a braille display. Empty when the sources answer it or nothing is close.")
+    var nearMiss: String
     @Guide(description: "Two or three short questions the person might ask next about the same subject, worded as they would ask them, in the same language as the question. Empty if the sources don't answer it.", .maximumCount(3))
     var followUps: [String]
 }
@@ -696,4 +799,6 @@ private struct MouseResultLineOutput {
     var answers: Bool
     @Guide(description: "One short sentence, under 30 words, saying what the page tells the person about their question. Copy commands, gestures, and setting names exactly. Empty if it doesn't answer.")
     var line: String
+    @Guide(description: "When an answer already given is shown: same if the page says the same, different if it says something different, none if no answer was given or the page doesn't answer.", .anyOf(["same", "different", "none"]))
+    var agreement: String
 }

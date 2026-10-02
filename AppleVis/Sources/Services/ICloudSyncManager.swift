@@ -198,6 +198,26 @@ final class ICloudSyncManager {
         touchLastSyncDate()
     }
 
+    /// Ask the Mouse's past conversations: the newest list wins, like
+    /// recent questions, and also rides on the Saved Items switch.
+    /// Requested directly (2026-10-01).
+    func pushMouseConversations() {
+        guard isSyncEnabled("sync.savedItems") else { return }
+        let local = MouseConversationHistory.load()
+        if let cloud: MouseConversationHistory = getJSON(key: "icloud.mouseConversations"), cloud.updatedAt > local.updatedAt { return }
+        setJSON(local, key: "icloud.mouseConversations")
+        store.synchronize()
+        touchLastSyncDate()
+    }
+
+    private func pullMouseConversations() {
+        guard isSyncEnabled("sync.savedItems"),
+              let cloud: MouseConversationHistory = getJSON(key: "icloud.mouseConversations"),
+              cloud.updatedAt > MouseConversationHistory.load().updatedAt
+        else { return }
+        MouseConversationHistory.save(cloud)
+    }
+
     private func pullMouseRecentQuestions() {
         guard isSyncEnabled("sync.savedItems"),
               let cloud: MouseRecentQuestions = getJSON(key: "icloud.mouseRecent"),
@@ -210,6 +230,7 @@ final class ICloudSyncManager {
         guard UserDefaults.standard.object(forKey: "sync.iCloud") as? Bool ?? true else { return }
         pullSavedItems()
         pullMouseRecentQuestions()
+        pullMouseConversations()
         if let player {
             pullPodcastPositions { player.applyPulledPositions($0) }
             pullQueue { player.applyPulledQueue($0) }

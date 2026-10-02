@@ -35,8 +35,8 @@ struct PodcastEndpoints {
         }
     }
 
-    func episode(id: String) async throws -> PodcastEpisode {
-        try await fetchWithCache(group: .podcasts, key: "podcasts:detail:\(id)") {
+    func episode(id: String, forceRefresh: Bool = false) async throws -> PodcastEpisode {
+        try await fetchWithCache(group: .podcasts, key: "podcasts:detail:\(id)", forceRefresh: forceRefresh) {
             let response = try await client.remapping400ToNotFound {
                 try await client.jsonAPISingle(
                     "node/podcast/\(id)",

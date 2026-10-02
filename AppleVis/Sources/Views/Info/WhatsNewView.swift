@@ -191,9 +191,90 @@ struct ChangeItem: Identifiable {
     let title: String
     let description: String
 
-    static let currentVersion = "2026.19"
+    static let currentVersion = "2026.20"
 
     static let current: [ChangeItem] = [
+        ChangeItem(
+            systemImage: "checkmark.bubble",
+            tag: .fixed,
+            title: "Fetch Remembers What You've Read",
+            description: "On a busy topic, comments you had marked as read could come back in Fetch with the new ones. Fetch now always loads the latest comments. Mark Read Up to Here counts from the comments Fetch actually shows."
+        ),
+        ChangeItem(
+            systemImage: "dog",
+            tag: .fixed,
+            title: "No More 0 New Comments in Fetch",
+            description: "Fetch and New no longer list a post with 0 new comments. A post that was only edited is left out. And a new comment is now counted, even when another comment on the post was removed."
+        ),
+        ChangeItem(
+            systemImage: "person.crop.circle.badge.checkmark",
+            tag: .new,
+            title: "Ask the Mouse Gets to Know You",
+            description: "Tell the Mouse which devices and features you use in About Me. When a question doesn't say, it leads with the answer for your setup. Past Conversations keeps your last 10 conversations, so you can read one again or carry on from it. About Me stays on this device."
+        ),
+        ChangeItem(
+            systemImage: "sparkle.magnifyingglass",
+            tag: .improved,
+            title: "Smarter Ask the Mouse Answers",
+            description: "When a question is too vague, such as How do I turn it off?, the Mouse asks what you mean and offers a few choices. For a question like Why don't I get notifications?, it checks your AppleVis settings, without changing them. Guides that answered your questions well are read first next time. A saved answer now says when a guide or discussion it came from has changed, and offers to ask again."
+        ),
+        ChangeItem(
+            systemImage: "text.bubble",
+            tag: .improved,
+            title: "Ask the Mouse Understands More Questions",
+            description: "Ask the Mouse now finds apps for the Mac, Apple Watch, and Apple TV, not just iPhone and iPad. Questions about one app, such as Instagram, find the right app entry. News questions can be answered from AppleVis blog posts. It also understands voice over written as two words, brail, and British spellings, follow-up questions like And on the Mac?, and questions asked in other languages."
+        ),
+        ChangeItem(
+            systemImage: "hand.raised",
+            tag: .improved,
+            title: "Clearer App Privacy Details",
+            description: "Privacy details now explain more clearly what AppleVis handles, what stays on your device, and what can be sent or synced. App Store privacy declarations were also updated for the app and Share Extension."
+        ),
+        ChangeItem(
+            systemImage: "trophy",
+            tag: .improved,
+            title: "Golden Apples and Member Favorites in Ask the Mouse",
+            description: "When you ask the Mouse for apps, AppleVis Golden Apple winners, honorable mentions, and nominees from 2019 on now say so and come first among equally good matches, followed by the apps members have talked about most. Each app shows how many member comments it has. For questions answered in the forums, the Mouse now prefers a discussion members have actually replied to."
+        ),
+        ChangeItem(
+            systemImage: "signpost.right",
+            tag: .new,
+            title: "Ask the Mouse Always Has Somewhere to Send You",
+            description: "For any question about an Apple device, Need More Help? now offers Search Apple Support, and the Mouse can link to the right page from Apple's user guides for iPhone, iPad, Apple Watch, Mac, AirPods, and Apple TV. When the Mouse couldn't answer, signed-in members can choose Suggest This Topic to AppleVis to send just the question to the editorial team, so missing guides get written."
+        ),
+        ChangeItem(
+            systemImage: "books.vertical",
+            tag: .improved,
+            title: "Ask the Mouse Knows Where to Look",
+            description: "For common subjects like VoiceOver gestures, braille, and keyboards, the Mouse now always reads AppleVis's essential guide on the subject. It also checks the Bug Tracker when something isn't working, reads what members say about an app you name, and uses podcast transcripts. When AppleVis doesn't have the answer, it can point you to Apple's guide for your device, a Be My Eyes help page, or Hadley's free VoiceOver lessons."
+        ),
+        ChangeItem(
+            systemImage: "arrow.up.forward.square",
+            tag: .improved,
+            title: "Ask the Mouse Points You Further",
+            description: "When AppleVis doesn't have the answer, Need More Help? can now offer Apple's own guide on the subject, such as Apple's list of braille display commands. Search the Web uses a clearer search the Mouse writes for you, and shows what it will search for. Questions that have nothing to do with Apple, accessibility, or AppleVis get a friendly note instead of a search."
+        ),
+        ChangeItem(
+            systemImage: "text.magnifyingglass",
+            tag: .improved,
+            title: "Ask the Mouse Finds the Right Guide",
+            description: "The Mouse now searches every way of wording your question at once, and reads the guides that actually mention what you asked about, so a question like What does a three-finger double tap do? finds the complete gesture list. Answers come in the Mouse's own warm voice, with when each source was posted, and other sources are listed newest first, each saying whether it agrees. When it finds only something close, like a Mac shortcut for an iPhone question, it tells you that honestly instead of passing it off as the answer."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.circle",
+            tag: .improved,
+            title: "Marking Things as Read in Fetch",
+            description: "In Fetch, Mark This Group as Read, on an item's heading or its last comment, clears the post and all its new comments. VoiceOver says Group marked as read, then moves to the next group, even far down the list. It used to be left in the wrong place."
+        ),
+        ChangeItem(
+            systemImage: "rectangle.split.3x1",
+            tag: .accessibility,
+            title: "Home's Views Are Separate Items Again",
+            description: "With VoiceOver, All, New, Fetch, and Nibbles at the top of Home are separate items again. Swipe right to move from one to the next, and double-tap to choose one. Choosing a view still tells you what it shows."
+        ),
+    ]
+
+    static let archivedFrom2026_19: [ChangeItem] = [
         ChangeItem(
             systemImage: "bubble.left.and.text.bubble.right",
             tag: .improved,
@@ -209,8 +290,8 @@ struct ChangeItem: Identifiable {
         ChangeItem(
             systemImage: "text.alignleft",
             tag: .fixed,
-            title: "Swiping Through Long Posts in Fetch",
-            description: "A long post or comment in Fetch is now split at its paragraphs into several parts, so VoiceOver no longer jumps past the rest of Fetch to the tab bar. An empty item that VoiceOver stopped on with a click after some posts is gone."
+            title: "No More Empty Stop in Fetch",
+            description: "After a post with no new comments, VoiceOver used to stop on an empty item with a click. That empty item is gone."
         ),
         ChangeItem(
             systemImage: "character.cursor.ibeam",
@@ -1150,6 +1231,7 @@ struct HistorySection: Identifiable {
     let items: [ChangeItem]
 
     static let all: [HistorySection] = [
+        HistorySection(title: "Also in 2026.19", items: ChangeItem.archivedFrom2026_19),
         HistorySection(title: "Also in 2026.18", items: ChangeItem.archivedFrom2026_18),
         HistorySection(title: "Also in 2026.17", items: ChangeItem.archivedFrom2026_17),
         HistorySection(title: "Also in 2026.16", items: ChangeItem.archivedFrom2026_16),

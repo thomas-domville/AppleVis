@@ -77,6 +77,13 @@ struct FetchContent {
     let comments: [FetchComment]
     /// The post's author, for owner-only Edit and Delete on forum topics.
     var authorId: String = ""
+    /// How many comments come before the first one shown: the ones already
+    /// read. "Mark Read Up to Here" counts from this, not from Home's
+    /// total, which can be behind what was just loaded.
+    var seenBefore: Int = 0
+
+    /// Every comment up to and including the last one shown.
+    var throughCount: Int { seenBefore + comments.count }
 }
 
 enum FetchLoadState {
@@ -103,17 +110,21 @@ final class FetchStore: ObservableObject {
     @Published var finishedIds: Set<String> = []
     private var inFlight: [String: Task<FetchContent?, Never>] = [:]
 
-    static func key(_ item: FeedItem, newCount: Int) -> String { "\(item.id)#\(newCount)" }
+    /// The item's total comments are part of the key. With only the new
+    /// count, a topic with 3 new comments in the morning and 3 different
+    /// new ones that afternoon reused the morning's, so comments already
+    /// read came back. Reported directly (2026-10-02).
+    static func key(_ item: FeedItem, newCount: Int) -> String { "\(item.id)#\(item.commentCount)#\(newCount)" }
 
-    /// After "Mark Read Up to Here": the same item with only its newest
-    /// `count` comments, stored under its new count, so the group updates
-    /// at once instead of reloading.
-    func keepNewest(_ count: Int, of item: FeedItem, from oldCount: Int) {
+    /// After "Mark Read Up to Here": the same item with only the comments
+    /// after the one marked, stored under its new count, so the group
+    /// updates at once instead of reloading.
+    func keepAfter(_ index: Int, of item: FeedItem, from oldCount: Int, newCount: Int) {
         guard case .loaded(let content)? = states[Self.key(item, newCount: oldCount)] else { return }
-        states[Self.key(item, newCount: count)] = .loaded(FetchContent(
+        states[Self.key(item, newCount: newCount)] = .loaded(FetchContent(
             author: content.author, postedAt: content.postedAt, preview: content.preview,
-            previewIsExcerpt: content.previewIsExcerpt, comments: Array(content.comments.suffix(count)),
-            authorId: content.authorId
+            previewIsExcerpt: content.previewIsExcerpt, comments: Array(content.comments.dropFirst(index + 1)),
+            authorId: content.authorId, seenBefore: content.seenBefore + index + 1
         ))
     }
 
@@ -140,7 +151,13 @@ final class FetchStore: ObservableObject {
     func applyFinished(to vm: HomeViewModel) {
         guard !finishedIds.isEmpty else { return }
         for item in vm.newItems where finishedIds.contains(item.id) {
-            vm.markAsRead(item)
+            // Through the last comment loaded, which can be past Home's count.
+            let shown = vm.isBrandNew(item) ? item.commentCount : vm.newReplyCount(for: item)
+            if case .loaded(let content)? = states[Self.key(item, newCount: shown)] {
+                vm.markAsRead(item, through: content.throughCount)
+            } else {
+                vm.markAsRead(item)
+            }
         }
         finishedIds = []
     }
@@ -166,7 +183,8 @@ final class FetchStore: ObservableObject {
         guard case .loaded(let content) = states[key] else { return }
         states[key] = .loaded(FetchContent(
             author: content.author, postedAt: content.postedAt, preview: content.preview,
-            previewIsExcerpt: content.previewIsExcerpt, comments: change(content.comments), authorId: content.authorId
+            previewIsExcerpt: content.previewIsExcerpt, comments: change(content.comments), authorId: content.authorId,
+            seenBefore: content.seenBefore
         ))
     }
 
@@ -188,13 +206,24 @@ enum FetchLoader {
     /// Longest forum post shown whole before it's cut short.
     static let postLimit = 4000
 
+    /// Always read live, and paged up to at least the count Home has.
+    /// Fetch takes the newest comments from the end of the list, so a
+    /// saved copy of a busy topic, missing its latest replies, showed
+    /// replies you'd already read in their place. A detail page is reused
+    /// for up to 5 minutes, or, when the site can't be reached, up to two
+    /// days. Reported directly (2026-10-02): older comments came back with
+    /// the new ones on one busy topic after marking it read.
     @MainActor
     static func load(_ item: FeedItem, newCount: Int) async throws -> FetchContent {
         let api = APIClient.shared
+        // Comments already read: everything before the new ones. Comments
+        // after them are shown too, even ones that arrived since Home last
+        // refreshed, so "Mark Read Up to Here" can count them properly.
+        let seen = max(0, item.commentCount - newCount)
         switch item {
         case .forumTopic(let topic):
-            let detail = try await api.forums.topicDetail(id: topic.id)
-            let replies = try await newest(newCount, loaded: detail.replies, total: detail.replyCount) {
+            let detail = try await api.forums.topicDetail(id: topic.id, forceRefresh: true)
+            let (replies, before) = try await unread(newCount, after: seen, loaded: detail.replies, total: max(detail.replyCount, item.commentCount)) {
                 try await api.forums.moreReplies(topicId: topic.id, offset: $0)
             }
             // Authors of every reply loaded, to name who a reply answers.
@@ -203,64 +232,71 @@ enum FetchLoader {
             return FetchContent(
                 author: detail.authorName, postedAt: detail.createdAt, preview: post, previewIsExcerpt: cut,
                 comments: replies.map { comment($0.id, $0.authorName, $0.createdAt, $0.body, source: .forum($0), replyingTo: $0.parentId.flatMap { byId[$0] }) },
-                authorId: detail.authorId
+                authorId: detail.authorId, seenBefore: before
             )
 
         case .blogPost(let post):
-            let detail = try await api.blogs.detail(id: post.id)
-            let comments = try await newest(newCount, loaded: detail.comments, total: detail.commentCount) {
+            let detail = try await api.blogs.detail(id: post.id, forceRefresh: true)
+            let (comments, before) = try await unread(newCount, after: seen, loaded: detail.comments, total: max(detail.commentCount, item.commentCount)) {
                 try await api.blogs.moreComments(blogId: post.id, offset: $0)
             }
             let (excerpt, cut) = firstParagraph(detail.body)
             return FetchContent(
                 author: detail.authorName, postedAt: detail.publishedAt, preview: excerpt, previewIsExcerpt: cut,
-                comments: comments.map { comment($0.id, $0.authorName, $0.createdAt, $0.body, source: .blog($0)) }
+                comments: comments.map { comment($0.id, $0.authorName, $0.createdAt, $0.body, source: .blog($0)) },
+                seenBefore: before
             )
 
         case .resource(let resource):
-            let detail = try await api.resources.detail(id: resource.id)
-            let comments = try await newest(newCount, loaded: detail.comments, total: detail.commentCount) {
+            let detail = try await api.resources.detail(id: resource.id, forceRefresh: true)
+            let (comments, before) = try await unread(newCount, after: seen, loaded: detail.comments, total: max(detail.commentCount, item.commentCount)) {
                 try await api.resources.moreComments(resourceId: resource.id, offset: $0)
             }
             let (excerpt, cut) = firstParagraph(detail.body)
             return FetchContent(
                 author: detail.authorName, postedAt: detail.createdAt, preview: excerpt, previewIsExcerpt: cut,
-                comments: comments.map { comment($0.id, $0.authorName, $0.createdAt, $0.body, source: .resource($0)) }
+                comments: comments.map { comment($0.id, $0.authorName, $0.createdAt, $0.body, source: .resource($0)) },
+                seenBefore: before
             )
 
         case .podcastEpisode(let episode):
-            async let fullEpisode = api.podcasts.episode(id: episode.id)
+            async let fullEpisode = api.podcasts.episode(id: episode.id, forceRefresh: true)
             let firstComments = newCount > 0 ? try await api.podcasts.comments(episodeId: episode.id) : []
             let full = try await fullEpisode
-            let comments = try await newest(newCount, loaded: firstComments, total: full.commentCount) {
+            let (comments, before) = try await unread(newCount, after: seen, loaded: firstComments, total: max(full.commentCount, item.commentCount)) {
                 try await api.podcasts.moreComments(episodeId: episode.id, offset: $0)
             }
             let (excerpt, cut) = firstParagraph(full.description)
             return FetchContent(
                 author: full.authorName, postedAt: full.publishedAt, preview: excerpt, previewIsExcerpt: cut,
-                comments: comments.map { comment($0.id, $0.authorName, $0.createdAt, $0.body, source: .podcast($0)) }
+                comments: comments.map { comment($0.id, $0.authorName, $0.createdAt, $0.body, source: .podcast($0)) },
+                seenBefore: before
             )
 
         case .appListing(let app):
-            let detail = try await api.apps.detail(id: app.id, platform: app.platform)
-            let reviews = try await newest(newCount, loaded: detail.reviews, total: detail.reviewCount) {
+            let detail = try await api.apps.detail(id: app.id, platform: app.platform, forceRefresh: true)
+            let (reviews, before) = try await unread(newCount, after: seen, loaded: detail.reviews, total: max(detail.reviewCount, item.commentCount)) {
                 try await api.apps.moreReviews(appId: app.id, offset: $0, platform: app.platform)
             }
             return FetchContent(
                 author: detail.submittedBy, postedAt: detail.createdAt, preview: appSummary(detail), previewIsExcerpt: true,
-                comments: reviews.map { comment($0.id, $0.authorName, $0.createdAt, $0.body, source: .app($0)) }
+                comments: reviews.map { comment($0.id, $0.authorName, $0.createdAt, $0.body, source: .app($0)) },
+                seenBefore: before
             )
         }
     }
 
     // MARK: Paging
 
-    /// The newest `count` comments, oldest first. Comments arrive oldest
-    /// first, so this pages forward until everything up to `total` is in
-    /// hand (capped, as a safety net), then keeps the last `count`.
+    /// The unread comments, oldest first: everything after the first
+    /// `seen`. Comments arrive oldest first, so this pages forward until
+    /// everything up to `total` is in hand (capped, as a safety net). Any
+    /// that arrived since Home's count are included. If fewer came back
+    /// than expected (a comment removed), it falls back to the newest
+    /// `count`, as before.
     @MainActor
-    static func newest<T>(_ count: Int, loaded: [T], total: Int, more: (Int) async throws -> [T]) async throws -> [T] {
-        guard count > 0 else { return [] }
+    static func unread<T>(_ count: Int, after seen: Int, loaded: [T], total: Int, more: (Int) async throws -> [T]) async throws -> (comments: [T], seenBefore: Int) {
+        guard count > 0 else { return ([], seen) }
         var all = loaded
         var pages = 0
         while all.count < total && pages < 40 {
@@ -269,7 +305,9 @@ enum FetchLoader {
             all += batch
             pages += 1
         }
-        return Array(all.suffix(count))
+        return all.count >= seen + count
+            ? (Array(all.dropFirst(seen)), seen)
+            : (Array(all.suffix(count)), max(0, all.count - count))
     }
 
     // MARK: Text

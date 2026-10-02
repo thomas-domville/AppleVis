@@ -86,6 +86,10 @@ struct GuidelineFlag: Identifiable {
     /// site shares the author's roles with the signed-in admin. Suggested
     /// directly (2026-09-27).
     var authorIsEditorial: Bool = false
+    /// The line that set off each rule, by rule id, when it can be found:
+    /// shown above the preview so a long post's problem is easy to spot.
+    /// Requested directly (2026-10-01).
+    var triggers: [String: String] = [:]
 
     var highestSeverity: GuidelineWarning.Severity {
         warnings.map(\.severity).min(by: { $0.sortOrder < $1.sortOrder }) ?? .low
@@ -418,7 +422,8 @@ final class GuidelineViolationScanner: ObservableObject {
                     authorName: post.authorName, excerpt: .excerpt(from: post.body), body: post.body,
                     createdAt: post.createdAt, isRootItem: true, warnings: warnings,
                     commentId: nil, commentType: nil, nodeType: stream.nodeType, url: post.url,
-                    authorIsEditorial: post.authorIsEditorial
+                    authorIsEditorial: post.authorIsEditorial,
+                    triggers: Self.triggers(warnings, in: post.body, isReply: false)
                 ))
             }
         }
@@ -431,12 +436,24 @@ final class GuidelineViolationScanner: ObservableObject {
                     authorName: comment.authorName, excerpt: .excerpt(from: comment.body), body: comment.body,
                     createdAt: comment.createdAt, isRootItem: false, warnings: warnings,
                     commentId: comment.id, commentType: stream.commentBundle, nodeType: nil, url: comment.url,
-                    authorIsEditorial: comment.authorIsEditorial
+                    authorIsEditorial: comment.authorIsEditorial,
+                    triggers: Self.triggers(warnings, in: comment.body, isReply: true)
                 ))
             }
         }
 
         return result
+    }
+
+    /// The line behind each rule, shortened to a readable length.
+    private static func triggers(_ warnings: [GuidelineWarning], in body: String, isReply: Bool) -> [String: String] {
+        var found: [String: String] = [:]
+        for warning in warnings {
+            if let text = GuidelinesChecker.triggeringText(for: warning.id, in: body, isReply: isReply) {
+                found[warning.id] = text.count > 300 ? String(text.prefix(300)) + "…" : text
+            }
+        }
+        return found
     }
 
     /// Editorial team posts keep every flag except tone: when they quote a

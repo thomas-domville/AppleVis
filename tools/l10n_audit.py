@@ -51,14 +51,24 @@ TEAM_FACING = [
     ('CommunityDiscussionHeading.swift', r'wrote:|^add new comment$'),
     ('DrupalFormClient.swift', r'^(Content-Disposition|Send message|Turnstile)'),
     ('GuidelineFalsePositiveReporter.swift', r'.'),
+    ('MouseGapReporter.swift', r'.'),
     ('APIClient.swift', r'^Cannot parse date'),
     ('CloudflareBypass.swift', r'.'),
     ('EpisodeDetailView.swift', r'^(episode|podcast|audio) transcript'),
     ('ContactView.swift', r'^App (Bug Report|Feedback|Suggestion|Enquiry)$'),
     # search engine brand names
     ('PreferencesStore.swift', r'^(DuckDuckGo|Google|Bing|Ecosia)$'),
+    # device keys matching MouseAppleCatalog.json's data
+    ('MouseAppleCatalog.swift', r'^(iPad|iPhone|Apple Watch|AirPods|Apple TV|Mac|Mac VoiceOver)$'),
     # source labels handed to the on-device model by Ask the Mouse
-    ('AskTheMouse.swift', r"^(Members' comments on the guide|Forum discussion among members)"),
+    ('AskTheMouse.swift', r"^(Members' comments on the guide|Forum discussion among members|Known bug in the AppleVis Bug Tracker|Members' comments on the app entry|AppleVis podcast episode \(people talking\)|AppleVis blog post|The person's own AppleVis app settings|still active$|First seen in: |Fixed in: |No member comments yet\.$)"),
+    ('GoldenApples.swift', r'^honorable mention$'),
+    # About Me as told to the on-device model (MouseProfile.modelText)
+    ('MouseMemory.swift', r'^(a braille display|a keyboard|hearing devices|About the person \(from their About Me\): )$'),
+    # server values the App Directory filters match exactly
+    ('AppEndpoints.swift', r'^(The app is fully accessible|Fully Accessible)$'),
+    # honors and popularity notes handed to the on-device model
+    ('AskTheMouse.swift', r'(^AppleVis Golden Apple .*, |member comments$|^recommended by )'),
     # item kinds handed to the on-device model for Mouse Recap blurbs
     ('Mappers.swift', r'^macOS '),
     ('ReportCommentWizard.swift', r' Report: '),
@@ -71,9 +81,9 @@ TEAM_FACING_ARGS = {'GuidelinesReminderView(context: String)', 'GuidelinesRemind
 # Product and people names, licence text.
 NAMES = re.compile(r'^(iPad( Air| Pro| mini)?|Mac( Pro| Studio| mini)|MacBook( Air| Pro)|HomePod mini|AirPods( Max| Pro)|'
                    r'iPod touch|AppleVis Podcast|Ana Domville|Thomas Domville|Michael Hansen|David Goodwin|Be My Eyes|'
-                   r'Be My AI|Swift|Apache License 2\.0|Copyright ©.*|Spotlight)$')
+                   r'Be My AI|Apple Support|Swift|Apache License 2\.0|Copyright ©.*|Spotlight)$')
 # Text sent to the on-device model, never shown.
-PROMPT_FILES = {'MouseKnowledge.swift', 'IntelligenceService.swift'}
+PROMPT_FILES = {'MouseKnowledge.swift', 'IntelligenceService.swift', 'MouseAppleLink.swift', 'MouseEssentialGuide.swift', 'MouseSetupCheck.swift'}
 
 BS = chr(92)
 

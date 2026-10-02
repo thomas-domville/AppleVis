@@ -19,7 +19,7 @@ struct PrivacySettingsView: View {
                 InfoCard(
                     icon: "person.text.rectangle",
                     title: String(localized: "What We Collect"),
-                    text: String(localized: "AppleVis collects your email address and username for your account, and a device push token for notifications.")
+                    text: String(localized: "When you sign in or contribute, AppleVis handles your account details, optional public profile, posts and comments, reports, and a device push token if you enable notifications.")
                 )
                 InfoCard(
                     icon: "key.icloud",
@@ -33,18 +33,18 @@ struct PrivacySettingsView: View {
                 )
                 InfoCard(
                     icon: "icloud.slash",
-                    title: String(localized: "Analytics Are Anonymous"),
-                    text: String(localized: "Usage analytics are aggregated and never linked to your account or device identity.")
+                    title: String(localized: "No In-App Analytics"),
+                    text: String(localized: "The app contains no third-party advertising or analytics SDKs. AppleVis servers still receive the information needed to sign you in, load content, and complete actions you request.")
                 )
                 InfoCard(
                     icon: "lock.icloud",
-                    title: String(localized: "iCloud Sync Is End-to-End"),
-                    text: String(localized: "Data synced via iCloud uses Apple's end-to-end encryption. AppleVis cannot read it.")
+                    title: String(localized: "Private iCloud Sync"),
+                    text: String(localized: "If you turn on sync, selected saved items, playback information, reading history, and preferences are stored in your private iCloud account. AppleVis does not operate that storage.")
                 )
                 InfoCard(
                     icon: "cpu",
                     title: String(localized: "On-Device AI"),
-                    text: String(localized: "Smart features powered by AI run on your device using Apple Intelligence. Content is not sent to external servers.")
+                    text: String(localized: "The app's Apple Intelligence features run on your device. Content you choose to publish or send is still submitted to AppleVis servers to complete that request.")
                 )
                 InfoCard(
                     icon: "envelope.badge.shield.half.filled",

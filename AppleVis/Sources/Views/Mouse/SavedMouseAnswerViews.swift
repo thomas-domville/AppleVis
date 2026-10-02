@@ -79,6 +79,9 @@ struct SavedMouseAnswerView: View {
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @Environment(\.dismiss) private var dismiss
     @AccessibilityFocusState private var isQuestionFocused: Bool
+    /// Guides updated, and topics replied to, since the answer was saved.
+    @State private var changes: [String] = []
+    @State private var askingAgain = false
 
     var body: some View {
         List {
@@ -92,6 +95,24 @@ struct SavedMouseAnswerView: View {
                 Text(String(localized: "Saved \(answer.savedAt.formatted(date: .abbreviated, time: .omitted))"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            // The answer is a snapshot, so say when what it came from has
+            // changed, and offer to ask again. Requested directly (2026-10-01).
+            if !changes.isEmpty {
+                Section {
+                    ForEach(changes, id: \.self) { change in
+                        Text(change)
+                    }
+                    Button {
+                        askingAgain = true
+                    } label: {
+                        Label(String(localized: "Ask the Mouse Again"), systemImage: "arrow.clockwise")
+                    }
+                    .accessibilityHint(String(localized: "Asks the same question, so the answer uses the latest pages."))
+                } header: {
+                    Text("Changed Since You Saved")
+                }
             }
 
             if !answer.sources.isEmpty {
@@ -121,7 +142,39 @@ struct SavedMouseAnswerView: View {
         .themedList(preferences.colors)
         .navigationTitle("Mouse Answer")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await retryAccessibilityFocus(into: $isQuestionFocused) }
+        .task {
+            await retryAccessibilityFocus(into: $isQuestionFocused)
+            await checkForChanges()
+        }
+        .sheet(isPresented: $askingAgain) {
+            AskTheMouseView(initialQuestion: answer.question)
+        }
+    }
+
+    /// Looks at the guides and forum topics the answer used (the first
+    /// four), and notes any updated or replied to since it was saved.
+    private func checkForChanges() async {
+        var notes: [String] = []
+        var seen = Set<String>()
+        let pages = answer.sources.filter { source in
+            guard let id = source.contentId, [.guide, .guideComments, .forum].contains(source.kind) else { return false }
+            return seen.insert(id).inserted
+        }
+        for source in pages.prefix(4) {
+            guard let id = source.contentId else { continue }
+            if source.kind == .forum {
+                if let topic = try? await APIClient.shared.forums.topic(id: id), topic.lastActivityAt > answer.savedAt {
+                    notes.append(String(localized: "The forum discussion \"\(source.title)\" has new replies."))
+                }
+            } else if let guide = try? await APIClient.shared.resources.detail(id: id), guide.updatedAt > answer.savedAt {
+                notes.append(String(localized: "The guide \"\(source.title)\" was updated on \(guide.updatedAt.formatted(date: .long, time: .omitted))."))
+            }
+        }
+        guard !Task.isCancelled, !notes.isEmpty else { return }
+        changes = notes
+        // After the question has been read, not over it.
+        try? await Task.sleep(for: .milliseconds(1500))
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "Something this answer came from has changed since you saved it."))
     }
 
     @ViewBuilder

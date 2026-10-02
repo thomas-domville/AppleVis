@@ -272,6 +272,16 @@ final class PersistenceStore {
         load(key: itemVisitsKey) ?? [:]
     }
 
+    /// Replaces visits whose new-comment count turned out to be wrong
+    /// (see `HomeViewModel.reconcileVisitedActivity`), in one write.
+    func correctItemVisits(_ corrected: [String: ItemVisit]) {
+        guard !corrected.isEmpty else { return }
+        var visits = allItemVisits()
+        for (id, visit) in corrected { visits[id] = visit }
+        persist(visits, key: itemVisitsKey)
+        Task { @MainActor in ICloudSyncManager.shared.pushReadHistory() }
+    }
+
     func stampItemVisit(id: String, commentCount: Int, seenAt: Date = Date()) {
         var visits = allItemVisits()
         visits[id] = ItemVisit(seenAt: seenAt, commentCount: commentCount)

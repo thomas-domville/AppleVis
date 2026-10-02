@@ -133,7 +133,7 @@ final class APIClient {
 
     func get<T: Decodable>(_ path: String, base: BaseURL = .v1, query: [String: String] = [:], headers: [String: String] = [:]) async throws -> T {
         let url = buildURL(path: path, base: base, query: query)
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: url, cachePolicy: HTTPCacheBypass.policy)
         headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
         return try await perform(request: request)
     }
@@ -143,7 +143,7 @@ final class APIClient {
     /// which a `[String: String]` dictionary can't represent.
     func get<T: Decodable>(_ path: String, base: BaseURL = .v1, queryItems: [URLQueryItem], headers: [String: String] = [:]) async throws -> T {
         let url = buildURL(path: path, base: base, queryItems: queryItems)
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: url, cachePolicy: HTTPCacheBypass.policy)
         headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
         return try await perform(request: request)
     }
@@ -188,14 +188,14 @@ final class APIClient {
 
     /// GET a JSON:API collection (list) endpoint, e.g. `/node/forum`.
     func jsonAPIList(_ path: String, query: [String: String] = [:], headers: [String: String] = [:]) async throws -> JsonApiCollectionResponse {
-        var request = URLRequest(url: buildURL(path: path, base: .jsonAPI, query: query))
+        var request = URLRequest(url: buildURL(path: path, base: .jsonAPI, query: query), cachePolicy: HTTPCacheBypass.policy)
         jsonAPIHeaders(headers).forEach { request.setValue($1, forHTTPHeaderField: $0) }
         return try await performRaw(request: request)
     }
 
     /// GET a single JSON:API resource endpoint, e.g. `/node/forum/{id}`.
     func jsonAPISingle(_ path: String, query: [String: String] = [:], headers: [String: String] = [:]) async throws -> JsonApiSingleResponse {
-        var request = URLRequest(url: buildURL(path: path, base: .jsonAPI, query: query))
+        var request = URLRequest(url: buildURL(path: path, base: .jsonAPI, query: query), cachePolicy: HTTPCacheBypass.policy)
         jsonAPIHeaders(headers).forEach { request.setValue($1, forHTTPHeaderField: $0) }
         return try await performRaw(request: request)
     }

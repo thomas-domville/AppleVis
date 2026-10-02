@@ -35,8 +35,8 @@ struct ResourceEndpoints {
     }
 
     /// Fetches the guide with full body and its comments (bundle: comment_node_guides).
-    func detail(id: String) async throws -> ResourceDetail {
-        try await fetchWithCache(group: .resources, key: "resources:detail:\(id)") {
+    func detail(id: String, forceRefresh: Bool = false) async throws -> ResourceDetail {
+        try await fetchWithCache(group: .resources, key: "resources:detail:\(id)", forceRefresh: forceRefresh) {
             async let resourceRes = client.jsonAPISingle("node/guides/\(id)", query: ["include": "uid"])
             async let commentsRes = client.jsonAPIList(
                 "comment/comment_node_guides",
@@ -129,8 +129,8 @@ struct BlogEndpoints {
     }
 
     /// Fetches the blog post with full body and its comments (bundle: comment_node_blog2).
-    func detail(id: String) async throws -> BlogPostDetail {
-        try await fetchWithCache(group: .blogs, key: "blogs:detail:\(id)") {
+    func detail(id: String, forceRefresh: Bool = false) async throws -> BlogPostDetail {
+        try await fetchWithCache(group: .blogs, key: "blogs:detail:\(id)", forceRefresh: forceRefresh) {
             async let postRes = client.jsonAPISingle("node/\(Self.contentType)/\(id)", query: ["include": "uid"])
             async let commentsRes = client.jsonAPIList(
                 "comment/comment_node_\(Self.contentType)",
@@ -316,6 +316,30 @@ struct BugReportEndpoints {
 struct SearchEndpoints {
     let client: APIClient
     private static let solrIndexPath = "index/solr_site_index"
+
+    /// Only guides and forum topics, for Ask the Mouse's extra wordings of
+    /// a question: two requests instead of seven, since answers come from
+    /// guides and discussions. Requested directly (2026-10-01).
+    func guidesAndForums(_ text: String) async throws -> SearchResults {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return SearchResults(forums: [], apps: [], guides: [], blogs: [], podcasts: [], bugs: []) }
+        async let forumsRes = client.jsonAPIList(
+            Self.solrIndexPath,
+            query: ["filter[fulltext]": trimmed, "filter[type]": "forum", "include": "uid,taxonomy_forums", "page[limit]": "10"]
+        )
+        async let guidesRes = client.jsonAPIList(
+            Self.solrIndexPath,
+            query: ["filter[fulltext]": trimmed, "filter[type]": "guides", "page[limit]": "10"]
+        )
+        let forumsResult = try? await forumsRes
+        let guidesResult = try? await guidesRes
+        return SearchResults(
+            forums: forumsResult.map { r in r.data.map { Mappers.forum($0, included: r.included ?? []) } } ?? [],
+            apps: [],
+            guides: guidesResult.map { r in r.data.map { Mappers.resource($0, included: r.included ?? []) } } ?? [],
+            blogs: [], podcasts: [], bugs: []
+        )
+    }
 
     func query(_ text: String) async throws -> SearchResults {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)

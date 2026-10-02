@@ -183,6 +183,25 @@ struct AppEntryHealthCheckView: View {
                     .accessibilityFocused($isStatusFocused)
                 }
 
+                // Refresh App Details for many entries at once, changing
+                // only what's chosen and really different on each.
+                // Removed apps have nothing to refresh from. Requested
+                // directly (2026-10-02).
+                let refreshable = scanner.flags.filter { $0.kind.group != .removed }
+                if !refreshable.isEmpty {
+                    Section {
+                        NavigationLink {
+                            AppHealthBulkRefreshView(flags: refreshable) { flag in
+                                scanner.removeFlag(id: flag.id)
+                            }
+                        } label: {
+                            Label(String(localized: "Refresh in Bulk (\(refreshable.count))"), systemImage: "arrow.triangle.2.circlepath.circle")
+                        }
+                    } footer: {
+                        Text("Refresh App Details for several entries at once. Each one only changes what's different on the App Store.")
+                    }
+                }
+
                 if !scanner.flags.isEmpty {
                     // One section per kind of problem, most urgent first:
                     // removed apps usually need action; title changes are
@@ -611,13 +630,18 @@ private struct AppHealthFlagActions: ViewModifier {
             toast.error(String(localized: "Couldn't load the App Store details. Try again."))
             return
         }
-        let diffs = AppInfoFieldDiff.build(detail: detail, metadata: metadata)
+        // The same choices as Refresh App Details on the entry's page,
+        // including the iOS Version Tested check against this device. Only
+        // the scan leaves that out, so it doesn't flag every entry tested
+        // on another iOS. Reported directly (2026-10-02).
+        let diffs = AppInfoFieldDiff.build(detail: detail, metadata: metadata, testedOnThisDevice: UIDevice.current.systemVersion)
         guard diffs.contains(where: \.changed) else {
-            toast.success(String(localized: "This app entry already matches the App Store."))
+            // Says why the entry left the list, since nothing opens.
+            toast.success(String(localized: "This app entry already matches the App Store, so it's been cleared from the list."))
             onHandled()
             return
         }
-        selectedFieldIDs = Set(diffs.filter(\.changed).map(\.id))
+        selectedFieldIDs = Set(diffs.filter { $0.changed && $0.startsSelected }.map(\.id))
         selectedDevices = Set(diffs.first { $0.id == "devices" }?.deviceChoices ?? [])
         refreshDetail = detail
         refreshMetadata = metadata
@@ -632,6 +656,7 @@ private struct AppHealthFlagActions: ViewModifier {
             try await APIClient.shared.apps.updateAppInformation(
                 detail: detail, metadata: metadata, includedFields: selectedFieldIDs,
                 devices: ["iPhone", "iPad", "Mac"].filter(selectedDevices.contains),
+                testedOnIOS: UIDevice.current.systemVersion,
                 csrfToken: user.csrfToken
             )
             toast.success(String(localized: "App details refreshed"))

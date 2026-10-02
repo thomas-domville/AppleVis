@@ -10,6 +10,18 @@ struct SavedMouseAnswer: Identifiable, Codable, Hashable {
     struct Source: Codable, Hashable {
         enum Kind: String, Codable {
             case help, guide, guideComments, forum, whatsNew, tip, app
+            /// Added 2026-10-01: known bugs, podcast transcripts, and
+            /// members' comments on an app entry.
+            case bug, podcast, appComments, blog
+            /// Added 2026-10-01: the person's own app settings, checked.
+            case settings
+
+            /// An unknown kind, from a newer version on another device,
+            /// reads as a guide rather than failing the whole list.
+            init(from decoder: Decoder) throws {
+                let raw = try decoder.singleValueContainer().decode(String.self)
+                self = Kind(rawValue: raw) ?? .guide
+            }
         }
         let kind: Kind
         let title: String
@@ -28,6 +40,11 @@ struct SavedMouseAnswer: Identifiable, Codable, Hashable {
             case .whatsNew: return String(localized: "What's New")
             case .tip: return String(localized: "Tip")
             case .app: return String(localized: "App Entry")
+            case .bug: return String(localized: "Bug Report")
+            case .podcast: return String(localized: "Podcast Episode")
+            case .appComments: return String(localized: "Members' comments on an app entry")
+            case .blog: return String(localized: "Blog Post")
+            case .settings: return String(localized: "Your app settings")
             }
         }
 
@@ -36,7 +53,10 @@ struct SavedMouseAnswer: Identifiable, Codable, Hashable {
             switch kind {
             case .guide, .guideComments: return .resource
             case .forum: return .forumTopic
-            case .app: return .appListing
+            case .app, .appComments: return .appListing
+            case .bug: return .bugReport
+            case .podcast: return .podcastEpisode
+            case .blog: return .blogPost
             default: return nil
             }
         }
@@ -47,6 +67,8 @@ struct SavedMouseAnswer: Identifiable, Codable, Hashable {
     let answer: String
     let sources: [Source]
     let savedAt: Date
+    /// Whether the Mouse found an answer; kept for Past Conversations.
+    var answered: Bool? = nil
 
     /// Question, answer, and sources as plain text, for Copy and Share.
     var shareText: String {

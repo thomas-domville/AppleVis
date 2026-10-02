@@ -252,7 +252,11 @@ enum ItunesAPI {
     private static func lookupMetadata(appStoreId id: String, entity: String, fallbackAppStoreUrl: String, country: String) async -> ItunesMetadataLookupResult {
         guard let url = URL(string: "https://itunes.apple.com/lookup?id=\(id)&entity=\(entity)&country=\(country)") else { return .failed }
 
-        var request = URLRequest(url: url)
+        // Never the phone's saved copy: Apple allows reusing a lookup for a
+        // day, so the Health Check's batch lookup and Refresh App Details'
+        // single one could be hours apart, and disagree right after an app
+        // update. Reported directly (2026-10-02).
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         let data: Data
@@ -362,7 +366,7 @@ enum ItunesAPI {
               let url = URL(string: "https://itunes.apple.com/lookup?id=\(appStoreIds.joined(separator: ","))&entity=\(entity)&country=\(country)")
         else { return [:] }
 
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         guard let (data, response) = try? await URLSession.shared.data(for: request),

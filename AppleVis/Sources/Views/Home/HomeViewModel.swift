@@ -711,7 +711,7 @@ final class HomeViewModel: ObservableObject {
             }
         }
 
-        let newSince = await Self.commentCountsSince(boundary, for: needsExactCount)
+        let newSince = await Self.commentCountsSince(Dictionary(uniqueKeysWithValues: needsExactCount.map { ($0.id, boundary) }), for: needsExactCount)
         for item in needsExactCount {
             let arrived = newSince[item.id] ?? 1
             additions[item.id] = .init(firstSeenAt: now, commentCount: max(0, item.commentCount - arrived), isNewItem: false)
@@ -719,27 +719,64 @@ final class HomeViewModel: ObservableObject {
 
         PersistenceStore.shared.addFeedBaselines(additions)
         feedBaselines = PersistenceStore.shared.allFeedBaselines()
+        await reconcileVisitedActivity(for: items)
     }
 
-    /// How many comments each item received after `date`, keyed by
-    /// `FeedItem.id`. Items whose query fails are left out. Four at a time,
-    /// matching the app's other bounded fan-outs.
-    private static func commentCountsSince(_ date: Date, for items: [FeedItem]) async -> [String: Int] {
+    /// An item you've opened counts as new when it's had activity since
+    /// then, and its "N new comments" is today's total minus the total when
+    /// you opened it. Those two can disagree: an edit moves the activity
+    /// time with no new comment, and a removed comment hides a new one in
+    /// the total. Either way the item showed "0 new comments" in Fetch and
+    /// New, with nothing to read. Reported directly (2026-10-02): an app
+    /// entry posted a week before, which really had one new comment.
+    ///
+    /// For just those items, the site is asked how many comments arrived
+    /// since your visit (one small query each, as for unopened items), and
+    /// the visit is corrected: the real number new, or nothing new when it
+    /// was only an edit. If the site can't be reached, it's left as it was.
+    private func reconcileVisitedActivity(for items: [FeedItem]) async {
+        let unclear = items.filter { item in
+            guard let visit = itemVisits[item.id] else { return false }
+            return visit.seenAt < item.lastActivityAt && newReplyCount(for: item) == 0
+        }
+        guard !unclear.isEmpty else { return }
+        var since: [String: Date] = [:]
+        for item in unclear { since[item.id] = itemVisits[item.id]?.seenAt }
+        let arrived = await Self.commentCountsSince(since, for: unclear)
+        var corrected: [String: PersistenceStore.ItemVisit] = [:]
+        for item in unclear {
+            guard let visit = itemVisits[item.id], let count = arrived[item.id] else { continue }
+            // A moment later than the visit, so this corrected copy wins
+            // over the uncorrected one when read history syncs.
+            corrected[item.id] = count > 0
+                ? .init(seenAt: visit.seenAt.addingTimeInterval(0.001), commentCount: max(0, item.commentCount - count))
+                : .init(seenAt: max(item.lastActivityAt, visit.seenAt.addingTimeInterval(0.001)), commentCount: item.commentCount)
+        }
+        guard !corrected.isEmpty else { return }
+        PersistenceStore.shared.correctItemVisits(corrected)
+        itemVisits = PersistenceStore.shared.allItemVisits()
+    }
+
+    /// How many comments each item received after its date in `dates`
+    /// (by `FeedItem.id`), keyed by `FeedItem.id`. Items whose query fails
+    /// are left out. Four at a time, matching the app's other bounded
+    /// fan-outs.
+    private static func commentCountsSince(_ dates: [String: Date], for items: [FeedItem]) async -> [String: Int] {
         guard !items.isEmpty else { return [:] }
-        // Plain strings only, so nothing main-actor-isolated crosses into
+        // Plain values only, so nothing main-actor-isolated crosses into
         // the child tasks.
-        let requests = items.map { (id: $0.id, bundle: $0.commentBundle.rawValue, contentId: $0.contentId) }
+        let requests = items.map { (id: $0.id, bundle: $0.commentBundle.rawValue, contentId: $0.contentId, date: dates[$0.id] ?? .distantPast) }
         var results: [String: Int] = [:]
         await withTaskGroup(of: (String, Int?).self) { group in
             var iterator = requests.makeIterator()
             for _ in 0..<4 {
                 guard let r = iterator.next() else { break }
-                group.addTask { (r.id, try? await commentCountSince(date, bundle: r.bundle, contentId: r.contentId)) }
+                group.addTask { (r.id, try? await commentCountSince(r.date, bundle: r.bundle, contentId: r.contentId)) }
             }
             while let (id, count) = await group.next() {
                 if let count { results[id] = count }
                 if let r = iterator.next() {
-                    group.addTask { (r.id, try? await commentCountSince(date, bundle: r.bundle, contentId: r.contentId)) }
+                    group.addTask { (r.id, try? await commentCountSince(r.date, bundle: r.bundle, contentId: r.contentId)) }
                 }
             }
         }
@@ -775,9 +812,12 @@ final class HomeViewModel: ObservableObject {
     /// per-item "Mark as Read" action — previously the only way for an item
     /// to leave the New view was for the global last-visit timestamp to
     /// advance past it, with no way to dismiss a single item on its own.
-    func markAsRead(_ item: FeedItem) {
-        PersistenceStore.shared.stampItemVisit(id: item.id, commentCount: item.commentCount)
-        itemVisits[item.id] = PersistenceStore.ItemVisit(seenAt: Date(), commentCount: item.commentCount)
+    /// `through`: how many comments were read, when Fetch loaded more than
+    /// Home's count.
+    func markAsRead(_ item: FeedItem, through: Int? = nil) {
+        let count = max(item.commentCount, through ?? 0)
+        PersistenceStore.shared.stampItemVisit(id: item.id, commentCount: count)
+        itemVisits[item.id] = PersistenceStore.ItemVisit(seenAt: Date(), commentCount: count)
         if case .forumTopic(let topic) = item {
             PersistenceStore.shared.markTopicSeen(id: topic.id)
         }
@@ -785,11 +825,10 @@ final class HomeViewModel: ObservableObject {
         UIAccessibility.post(notification: .announcement, argument: String(localized: "Marked as read."))
     }
 
-    /// Fetch's "Mark Read Up to Here": everything but the newest
-    /// `remaining` comments counts as read. The item stays new until those
-    /// are read too. Requested directly (2026-09-28).
-    func markRead(_ item: FeedItem, leavingUnread remaining: Int) {
-        let seen = max(0, item.commentCount - remaining)
+    /// Fetch's "Mark Read Up to Here": the first `seen` comments count as
+    /// read. The item stays new until the rest are read too. Requested
+    /// directly (2026-09-28).
+    func markRead(_ item: FeedItem, seenCount seen: Int) {
         PersistenceStore.shared.stampItemVisit(id: item.id, commentCount: seen)
         itemVisits[item.id] = PersistenceStore.ItemVisit(seenAt: Date(), commentCount: seen)
         recomputeNewActivity()

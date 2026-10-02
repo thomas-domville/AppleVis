@@ -84,8 +84,8 @@ struct ForumEndpoints {
         return Mappers.forum(response.data, included: response.included ?? [])
     }
 
-    func topicDetail(id: String) async throws -> ForumTopicDetail {
-        try await fetchWithCache(group: .forums, key: "forums:detail:\(id)") {
+    func topicDetail(id: String, forceRefresh: Bool = false) async throws -> ForumTopicDetail {
+        try await fetchWithCache(group: .forums, key: "forums:detail:\(id)", forceRefresh: forceRefresh) {
             async let topicRes = client.jsonAPISingle("node/forum/\(id)", query: ["include": "uid,taxonomy_forums"])
             async let commentsRes = client.jsonAPIList(
                 "comment/comment_forum",
