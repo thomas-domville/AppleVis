@@ -101,6 +101,8 @@ struct ContactView: View {
     @State private var email = ""
     @State private var message = ""
     @State private var includeSysInfo = false
+    @ObservedObject private var postingProblems = PostingProblemLog.shared
+    @State private var includePostingProblem = true
     @State private var declarationAgreed = false
     @State private var isSubmitting = false
     @State private var submitted = false
@@ -136,7 +138,7 @@ struct ContactView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             wizardContent
                 .navigationTitle("Contact AppleVis")
                 .navigationBarTitleDisplayMode(.inline)
@@ -496,6 +498,20 @@ struct ContactView: View {
                     }
                 rewriteButton
             }
+            // Offered after a post didn't go through, so the note of what
+            // the site said reaches us without anyone copying it by hand.
+            if postingProblems.forContact != nil {
+                Section {
+                    Toggle(isOn: $includePostingProblem) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Include details of the post that didn't go through").font(.subheadline.bold())
+                            Text("Adds when it happened and what the site said, so we can see exactly what went wrong. Nothing you wrote is included.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityHint(String(localized: "Adds a short note of what went wrong with your last post, without anything you wrote."))
+                }
+            }
             if effectiveType == .bug {
                 Section {
                     // Previously appended just two lines (app version, iOS
@@ -764,6 +780,10 @@ struct ContactView: View {
                 isSignedIn: auth.isSignedIn,
                 isEditor: auth.user?.isAdmin ?? false
             )
+        }
+
+        if includePostingProblem, let problem = postingProblems.forContact {
+            finalMessage += "\n\n" + problem.report
         }
 
         let result = await DrupalFormClient.submitContact(

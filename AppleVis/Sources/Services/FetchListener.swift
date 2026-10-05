@@ -56,6 +56,8 @@ final class FetchListener: NSObject, ObservableObject {
         let item: FeedItem
         let newCount: Int
         let isBrandNew: Bool
+        /// See `HomeViewModel.newCommentsSince`.
+        var since: Date? = nil
     }
 
     @Published private(set) var status: Status = .idle
@@ -189,7 +191,7 @@ final class FetchListener: NSObject, ObservableObject {
         }
         let group = groups[groupIndex]
         currentItemId = group.item.id
-        let content = await FetchStore.shared.load(group.item, newCount: group.isBrandNew ? group.item.commentCount : group.newCount)
+        let content = await FetchStore.shared.load(group.item, newCount: group.isBrandNew ? group.item.commentCount : group.newCount, since: group.since)
         guard status != .idle, groupIndex < groups.count, groups[groupIndex].item.id == group.item.id else { return }
         segments = Self.segments(for: group, content: content)
         segmentIndex = 0

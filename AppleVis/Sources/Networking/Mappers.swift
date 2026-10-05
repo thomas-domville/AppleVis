@@ -45,7 +45,8 @@ enum Mappers {
             url: url,
             isUnread: false,
             isFollowing: PersistenceStore.shared.isFollowed(id: node.id) || FollowStore.shared.isFollowed(node.id),
-            isSaved: PersistenceStore.shared.isSaved(id: node.id)
+            isSaved: PersistenceStore.shared.isSaved(id: node.id),
+            isPinned: a["sticky"]?.boolValue ?? false
         )
     }
 
@@ -100,10 +101,8 @@ enum Mappers {
             isUnread: false,
             isFollowing: PersistenceStore.shared.isFollowed(id: uuid) || FollowStore.shared.isFollowed(uuid),
             isSaved: PersistenceStore.shared.isSaved(id: uuid),
-            // Not live yet — /api/v1/forums/recent doesn't return this field
-            // on the server today (asked for it 2026-09-22); defaults to
-            // false until the backend adds it, matching how every other item
-            // already displays.
+            // Drupal sends sticky as "1" or "0". A fresh response also
+            // removes the pin when the website unpins the topic.
             isPinned: item["sticky"]?.boolValue ?? false
         )
     }
@@ -486,7 +485,8 @@ enum Mappers {
             summary: a["body"]?.richTextSummary ?? a["body"]?.richTextValue ?? "",
             commentCount: a["comment_node_blog2"]?["comment_count"]?.intValue ?? 0,
             url: url,
-            isSaved: PersistenceStore.shared.isSaved(id: node.id)
+            isSaved: PersistenceStore.shared.isSaved(id: node.id),
+            isPinned: a["sticky"]?.boolValue ?? false
         )
     }
 

@@ -25,8 +25,8 @@ struct SoundsHapticsSettingsView: View {
 
             Section("Sounds") {
                 Toggle("Confirmation Sounds", isOn: $preferences.confirmationSoundsEnabled)
-                    .accessibilityHint(String(localized: "Plays a sound for notifications, saving, downloads finishing, and podcast play and pause."))
-                Text("Plays a sound for moments worth noticing — saving, downloads finishing, notifications, and podcast play and pause.")
+                    .accessibilityHint(String(localized: "Plays a sound for notifications, saving, downloads finishing, podcast play and pause, and Ask the Mouse searching with VoiceOver."))
+                Text("Plays a sound for moments worth noticing — saving, downloads finishing, notifications, podcast play and pause, and a soft tick while Ask the Mouse searches with VoiceOver.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

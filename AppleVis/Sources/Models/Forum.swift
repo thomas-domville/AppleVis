@@ -48,6 +48,9 @@ nonisolated struct ForumTopicDetail: Identifiable, Codable, Sendable {
     var isFollowing: Bool
     var isSaved: Bool
     var replies: [ForumReply]
+    /// Pinned on the website. Optional so details saved before this existed
+    /// still load.
+    var isPinned: Bool? = nil
 }
 
 nonisolated struct ForumReply: Identifiable, Codable, Sendable {

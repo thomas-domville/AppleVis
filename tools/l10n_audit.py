@@ -31,8 +31,9 @@ LANGS = ['ar', 'de', 'el', 'es', 'fa', 'fr', 'he', 'hi', 'id', 'it', 'ja', 'ko',
 
 # Help articles are translated at runtime by Auto-Translate, by design.
 DESIGN_EXEMPT_FILES = {'HelpContent.swift'}
-# Support report e-mailed to the AppleVis team; stays English on purpose.
-TEAM_FACING_FILES = {'DiagnosticInfo.swift'}
+# Support report e-mailed to the AppleVis team, and text the app adds to
+# posts on the English-language website; both stay English on purpose.
+TEAM_FACING_FILES = {'DiagnosticInfo.swift', 'SiteText.swift'}
 # Phrase lists used to *detect* English in drafts; only the shown messages count.
 DETECTION_FILES = {'GuidelinesChecker.swift', 'ContentSubmissionPolicy.swift'}
 DETECTION_UI_LABELS = {'message', 'rule', 'label', 'title', 'hint'}

@@ -29,6 +29,7 @@ struct ContentTranslationSettingsView: View {
 
                 NavigationLink {
                     ContentLanguagePickerView()
+                        .settingsDoneButton()
                 } label: {
                     HStack {
                         Text("Translation Language")

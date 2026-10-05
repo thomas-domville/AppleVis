@@ -121,7 +121,8 @@ struct BlogEndpoints {
         try await fetchWithCache(group: .blogs, key: "blogs:list:\(page)", forceRefresh: forceRefresh) {
             let response = try await client.jsonAPIList(
                 "node/\(Self.contentType)",
-                query: ["sort": "-changed", "include": "uid", "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)"]
+                // Pinned posts first, then by activity, like Forums.
+                query: ["sort": "-sticky,-changed", "include": "uid", "page[limit]": "\(Self.pageSize)", "page[offset]": "\(page * Self.pageSize)"]
             )
             let items = response.data.map { Mappers.blog($0, included: response.included ?? []) }
             return PagedListResult(items: items, hasMore: response.hasNextPage)
@@ -163,7 +164,8 @@ struct BlogEndpoints {
                 title: post.title, authorName: post.authorName, authorId: post.authorId,
                 publishedAt: post.publishedAt, lastActivityAt: post.lastActivityAt, body: body,
                 rawBody: rawBody, bodyFormat: bodyFormat,
-                commentCount: post.commentCount, url: post.url, comments: comments, isSaved: false
+                commentCount: post.commentCount, url: post.url, comments: comments, isSaved: false,
+                isPinned: post.isPinned ?? false
             )
         }
     }
@@ -341,9 +343,16 @@ struct SearchEndpoints {
         )
     }
 
-    func query(_ text: String) async throws -> SearchResults {
+    /// `relaxBugVersions`: Ask the Mouse's searches drop version numbers
+    /// for bug reports only. Reports rarely mention the version in their
+    /// text, and the site needs every word to match, so "macOS 27
+    /// VoiceOver bug" found no reports at all. Discover keeps the exact
+    /// words people type. Found testing live questions (2026-10-05).
+    func query(_ text: String, relaxBugVersions: Bool = false) async throws -> SearchResults {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return SearchResults(forums: [], apps: [], guides: [], blogs: [], podcasts: [], bugs: []) }
+        let withoutVersions = trimmed.split(separator: " ").filter { !$0.contains(where: \.isNumber) }.joined(separator: " ")
+        let bugText = relaxBugVersions && !withoutVersions.isEmpty ? withoutVersions : trimmed
 
         async let forumsRes = client.jsonAPIList(
             Self.solrIndexPath,
@@ -367,11 +376,11 @@ struct SearchEndpoints {
         )
         async let iosBugsRes = client.jsonAPIList(
             Self.solrIndexPath,
-            query: ["filter[fulltext]": trimmed, "filter[type]": "ios_bug_report", "page[limit]": "10"]
+            query: ["filter[fulltext]": bugText, "filter[type]": "ios_bug_report", "page[limit]": "10"]
         )
         async let macBugsRes = client.jsonAPIList(
             Self.solrIndexPath,
-            query: ["filter[fulltext]": trimmed, "filter[type]": "os_x_bug_report", "page[limit]": "10"]
+            query: ["filter[fulltext]": bugText, "filter[type]": "os_x_bug_report", "page[limit]": "10"]
         )
 
         var failed: [String] = []
@@ -462,11 +471,7 @@ struct FlagEndpoints {
     /// inside this app, so anyone who followed something on the website
     /// first saw nothing here.
     func followedItems(uid: String, csrfToken: String) async throws -> [FollowedItem] {
-        let response = try await client.jsonAPIList(
-            "flagging/subscribe_node",
-            query: ["filter[uid.id]": uid, "include": "flagged_entity", "sort": "-created"],
-            headers: ["X-CSRF-Token": csrfToken]
-        )
+        let response = try await ownFlags(bundle: "subscribe_node", uid: uid, token: csrfToken)
         let included = response.included ?? []
         return response.data.compactMap { flagging in
             guard let entityId = flagging.relationshipId("flagged_entity"),
@@ -486,13 +491,7 @@ struct FlagEndpoints {
 
     /// Unfollow requires resolving the flagging entity's own id first, then deleting it.
     func unfollow(nodeUuid: String, token: String) async throws {
-        let list = try await client.jsonAPIList(
-            "flagging/subscribe_node",
-            query: ["filter[flagged_entity.id]": nodeUuid],
-            headers: ["X-CSRF-Token": token]
-        )
-        guard let flagging = list.data.first else { return }
-        try await client.jsonAPIDelete("flagging/subscribe_node/\(flagging.id)", headers: ["X-CSRF-Token": token])
+        try await removeOwnFlag(bundle: "subscribe_node", nodeUuid: nodeUuid, token: token)
     }
 
     /// "Recommend This App" — confirmed live against the site's own
@@ -514,13 +513,30 @@ struct FlagEndpoints {
     }
 
     func unrecommend(nodeUuid: String, token: String) async throws {
-        let list = try await client.jsonAPIList(
-            "flagging/recommend",
-            query: ["filter[flagged_entity.id]": nodeUuid],
-            headers: ["X-CSRF-Token": token]
-        )
-        guard let flagging = list.data.first else { return }
-        try await client.jsonAPIDelete("flagging/recommend/\(flagging.id)", headers: ["X-CSRF-Token": token])
+        try await removeOwnFlag(bundle: "recommend", nodeUuid: nodeUuid, token: token)
+    }
+
+    /// The calculated flagged_entity relationship can be read but not filtered.
+    /// Search only this member's records, including later pages, before deleting.
+    private func removeOwnFlag(bundle: String, nodeUuid: String, token: String) async throws {
+        guard let user = AuthStore.current?.user else { throw APIError.unauthorized }
+        let owner = user.uuid
+        var offset = 0
+        while true {
+            let response = try await client.jsonAPIList(
+                "flagging/\(bundle)",
+                query: ["filter[uid.id]": owner, "sort": "-created",
+                        "page[limit]": "50", "page[offset]": "\(offset)"],
+                headers: ["X-CSRF-Token": token]
+            )
+            guard AuthStore.current?.user?.uuid == owner else { throw APIError.unauthorized }
+            if let flagging = response.data.first(where: { $0.relationshipId("flagged_entity") == nodeUuid }) {
+                try await client.jsonAPIDelete("flagging/\(bundle)/\(flagging.id)", headers: ["X-CSRF-Token": token])
+                return
+            }
+            guard response.hasNextPage, !response.data.isEmpty else { return }
+            offset += response.data.count
+        }
     }
 
     /// Every app this person has recommended — unlike Follow/Save (tracked
@@ -530,11 +546,7 @@ struct FlagEndpoints {
     /// checked against has recommendations dating back to 2019), so a
     /// local-only cache would show nothing for any existing member.
     func recommendedApps(uid: String, csrfToken: String) async throws -> [RecommendedApp] {
-        let response = try await client.jsonAPIList(
-            "flagging/recommend",
-            query: ["filter[uid.id]": uid, "include": "flagged_entity", "sort": "-created"],
-            headers: ["X-CSRF-Token": csrfToken]
-        )
+        let response = try await ownFlags(bundle: "recommend", uid: uid, token: csrfToken)
         let included = response.included ?? []
         return response.data.compactMap { flagging in
             guard let entityId = flagging.relationshipId("flagged_entity"),
@@ -547,6 +559,30 @@ struct FlagEndpoints {
                 url: (node.attributes["path"]?.pathAlias).map { "https://www.applevis.com\($0)" }
             )
         }
+    }
+
+    /// Do not silently truncate a member's older website follows/recommendations
+    /// at Drupal's default page size. Include target nodes from every page.
+    private func ownFlags(bundle: String, uid: String, token: String) async throws -> JsonApiCollectionResponse {
+        var records: [JsonApiNode] = []
+        var included: [JsonApiNode] = []
+        var seenRecords = Set<String>()
+        var seenIncluded = Set<String>()
+        var offset = 0
+        while true {
+            let response = try await client.jsonAPIList(
+                "flagging/\(bundle)",
+                query: ["filter[uid.id]": uid, "include": "flagged_entity", "sort": "-created",
+                        "page[limit]": "50", "page[offset]": "\(offset)"],
+                headers: ["X-CSRF-Token": token]
+            )
+            guard AuthStore.current?.user?.uuid == uid else { throw APIError.unauthorized }
+            records += response.data.filter { seenRecords.insert($0.id).inserted }
+            included += (response.included ?? []).filter { seenIncluded.insert($0.id).inserted }
+            guard response.hasNextPage, !response.data.isEmpty else { break }
+            offset += response.data.count
+        }
+        return JsonApiCollectionResponse(data: records, included: included, links: nil)
     }
 
     /// The "Recommendations" widget every app page shows — a count plus a

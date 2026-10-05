@@ -603,6 +603,7 @@ final class HomeViewModel: ObservableObject {
             // that was just moved to "now."
             currentVisitBoundary = visitBoundary
             advanceVisitBoundaryIfNeeded(previousLoadedAt: previousLoadedAt)
+            await syncWebsiteReads(for: items)
             await establishFeedBaselines(for: items)
             buildNewActivitySummary()
             lastLoadedAt = Date()
@@ -643,8 +644,35 @@ final class HomeViewModel: ObservableObject {
         hasMore = more.count >= pageSize
         // Later pages need baselines too, or an unopened item that only
         // ever appears past page one could never show a count.
+        await syncWebsiteReads(for: more)
         await establishFeedBaselines(for: more)
         recomputeNewActivity()
+    }
+
+    private func syncWebsiteReads(for items: [FeedItem]) async {
+        guard let user = AuthStore.current?.user,
+              let dates = try? await APIClient.shared.history.readDates(for: items, user: user) else { return }
+        let existing = PersistenceStore.shared.allItemVisits()
+        let newer = items.filter { item in
+            guard let date = dates[item.id] else { return false }
+            return date > (existing[item.id]?.seenAt ?? .distantPast)
+        }
+        let active = newer.filter { $0.lastActivityAt > (dates[$0.id] ?? .distantPast) }
+        let counts = await Self.commentCountsSince(dates, for: active)
+        guard AuthStore.current?.user?.uuid == user.uuid else { return }
+        var merged: [String: PersistenceStore.ItemVisit] = [:]
+        let current = PersistenceStore.shared.allItemVisits()
+        for item in newer {
+            guard let date = dates[item.id], date > (current[item.id]?.seenAt ?? .distantPast) else { continue }
+            let arrived: Int
+            if item.lastActivityAt <= date { arrived = 0 }
+            else if let count = counts[item.id] { arrived = count }
+            else { continue } // Failed comment query: preserve existing badges.
+            merged[item.id] = .init(seenAt: date, commentCount: max(0, item.commentCount - arrived))
+            if case .forumTopic = item { PersistenceStore.shared.markTopicSeen(id: item.contentId) }
+        }
+        PersistenceStore.shared.correctItemVisits(merged)
+        itemVisits = PersistenceStore.shared.allItemVisits()
     }
 
     /// Content posted between one page fetch and the next shifts every
@@ -677,6 +705,20 @@ final class HomeViewModel: ObservableObject {
     /// the "NEW" badge (alongside a comment count, if it has comments),
     /// and counts as a new topic/episode/etc. in the summary. Stays true
     /// until cleared, not just until the visit boundary next moves.
+    /// The date an item's new comments start from: when you last opened
+    /// it, or for one you haven't opened, where its baseline started
+    /// counting. Nil when every comment is new (a brand-new item) or the
+    /// date isn't known (a baseline saved before dates were kept). Fetch
+    /// picks new comments by this date instead of by position, since the
+    /// site lists replies in thread order and a new reply to an old
+    /// comment sits mid-thread. Reported directly (2026-10-04): Fetch
+    /// listed a two-week-old comment as new.
+    func newCommentsSince(_ item: FeedItem) -> Date? {
+        if let visit = itemVisits[item.id] { return visit.seenAt }
+        guard let baseline = feedBaselines[item.id], !baseline.isNewItem else { return nil }
+        return baseline.newSince
+    }
+
     func isBrandNew(_ item: FeedItem) -> Bool {
         itemVisits[item.id] == nil && feedBaselines[item.id]?.isNewItem == true
     }
@@ -703,7 +745,7 @@ final class HomeViewModel: ObservableObject {
 
         for item in items where itemVisits[item.id] == nil && feedBaselines[item.id] == nil && additions[item.id] == nil {
             if !hasBoundary || item.lastActivityAt <= boundary {
-                additions[item.id] = .init(firstSeenAt: now, commentCount: item.commentCount, isNewItem: false)
+                additions[item.id] = .init(firstSeenAt: now, commentCount: item.commentCount, isNewItem: false, newSince: now)
             } else if item.createdAt > boundary {
                 additions[item.id] = .init(firstSeenAt: now, commentCount: 0, isNewItem: true)
             } else {
@@ -714,7 +756,7 @@ final class HomeViewModel: ObservableObject {
         let newSince = await Self.commentCountsSince(Dictionary(uniqueKeysWithValues: needsExactCount.map { ($0.id, boundary) }), for: needsExactCount)
         for item in needsExactCount {
             let arrived = newSince[item.id] ?? 1
-            additions[item.id] = .init(firstSeenAt: now, commentCount: max(0, item.commentCount - arrived), isNewItem: false)
+            additions[item.id] = .init(firstSeenAt: now, commentCount: max(0, item.commentCount - arrived), isNewItem: false, newSince: boundary)
         }
 
         PersistenceStore.shared.addFeedBaselines(additions)
@@ -814,7 +856,7 @@ final class HomeViewModel: ObservableObject {
     /// advance past it, with no way to dismiss a single item on its own.
     /// `through`: how many comments were read, when Fetch loaded more than
     /// Home's count.
-    func markAsRead(_ item: FeedItem, through: Int? = nil) {
+    func markAsRead(_ item: FeedItem, through: Int? = nil, announce: Bool = true) {
         let count = max(item.commentCount, through ?? 0)
         PersistenceStore.shared.stampItemVisit(id: item.id, commentCount: count)
         itemVisits[item.id] = PersistenceStore.ItemVisit(seenAt: Date(), commentCount: count)
@@ -822,16 +864,12 @@ final class HomeViewModel: ObservableObject {
             PersistenceStore.shared.markTopicSeen(id: topic.id)
         }
         recomputeNewActivity()
-        UIAccessibility.post(notification: .announcement, argument: String(localized: "Marked as read."))
-    }
-
-    /// Fetch's "Mark Read Up to Here": the first `seen` comments count as
-    /// read. The item stays new until the rest are read too. Requested
-    /// directly (2026-09-28).
-    func markRead(_ item: FeedItem, seenCount seen: Int) {
-        PersistenceStore.shared.stampItemVisit(id: item.id, commentCount: seen)
-        itemVisits[item.id] = PersistenceStore.ItemVisit(seenAt: Date(), commentCount: seen)
-        recomputeNewActivity()
+        APIClient.shared.history.syncMarkedRead([
+            HistoryEndpoints.target(id: item.contentId, nid: item.nid ?? 0, kind: item.kind)
+        ])
+        if announce {
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "Marked as read."))
+        }
     }
 
     func markAllAsRead(_ itemsToMark: [FeedItem]) {
@@ -845,6 +883,9 @@ final class HomeViewModel: ObservableObject {
         }
         isNewActivityDismissed = true
         recomputeNewActivity()
+        APIClient.shared.history.syncMarkedRead(itemsToMark.map {
+            HistoryEndpoints.target(id: $0.contentId, nid: $0.nid ?? 0, kind: $0.kind)
+        })
         // Unlike single-item markAsRead above, this collapses several
         // sections at once — the What's New card, the New/Latest picker's
         // contents, and the whole New list emptying out — all in the same
@@ -1353,8 +1394,8 @@ final class HomeViewModel: ObservableObject {
         // English interpolation, so it never translated. Plural forms come
         // from the catalog's variations for these keys.
         guard !parts.isEmpty else {
-            return String(localized: "\(newItems.count) new items since your last visit")
+            return String(localized: "New items not read yet: \(newItems.count)")
         }
-        return String(localized: "\(ListFormatter.localizedString(byJoining: parts)) since your last visit")
+        return String(localized: "Not read yet: \(ListFormatter.localizedString(byJoining: parts))")
     }
 }

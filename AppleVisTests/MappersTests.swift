@@ -39,6 +39,20 @@ struct MappersTests {
         #expect(topic == nil)
     }
 
+    @Test("recent topic pin follows Drupal string values including unpin")
+    func stringPinStatus() {
+        var raw = item(uuid: "8C1B8E8E-1234-4A11-9C11-000000000001", url: "/forum/apple-watch/some-topic")
+        raw["sticky"] = .string("1")
+        #expect(Mappers.forumFromRecent(raw)?.isPinned == true)
+        raw["sticky"] = .string("0")
+        #expect(Mappers.forumFromRecent(raw)?.isPinned == false)
+        raw["sticky"] = nil
+        #expect(Mappers.forumFromRecent(raw)?.isPinned == false)
+        #expect(JSONValue.bool(true).boolValue == true)
+        #expect(JSONValue.number(0).boolValue == false)
+        #expect(JSONValue.string("unexpected").boolValue == nil)
+    }
+
     @Test("rejects a missing uuid")
     func rejectsMissingUUID() {
         var raw = item(uuid: "unused", url: "/forum/apple-watch/some-topic")

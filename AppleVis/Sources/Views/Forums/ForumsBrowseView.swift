@@ -121,7 +121,22 @@ struct ForumsBrowseView: View {
         if let selectedCategory {
             result = result.filter { $0.category.caseInsensitiveCompare(selectedCategory.name) == .orderedSame }
         }
-        return result
+        return Self.pinnedFirst(result)
+    }
+
+    private static func pinnedFirst(_ topics: [ForumTopic]) -> [ForumTopic] {
+        topics.enumerated().sorted {
+            $0.element.isPinned != $1.element.isPinned ? $0.element.isPinned : $0.offset < $1.offset
+        }.map(\.element)
+    }
+
+    private func syncWebsiteReads(for fetched: [ForumTopic]) async {
+        guard let user = auth.user,
+              let dates = try? await APIClient.shared.history.readDates(for: fetched.map { .forumTopic($0) }, user: user),
+              auth.user?.uuid == user.uuid else { return }
+        for topic in fetched where dates[FeedItem.forumTopic(topic).id] != nil {
+            PersistenceStore.shared.markTopicSeen(id: topic.id)
+        }
     }
 
     var body: some View {
@@ -280,6 +295,15 @@ struct ForumsBrowseView: View {
             SoundPlayer.shared.play(.refresh)
             Task { await loadMoreUntilEnoughOrCap() }
         }
+        // An editor pinned or unpinned a topic: move it now, not on the
+        // next refresh, and keep VoiceOver on it.
+        .onReceive(NotificationCenter.default.publisher(for: .contentPinChanged)) { note in
+            guard let id = note.object as? String, let pinned = note.userInfo?["pinned"] as? Bool,
+                  let index = topics.firstIndex(where: { $0.id == id }) else { return }
+            topics[index].isPinned = pinned
+            topics = Self.pinnedFirst(topics)
+            focusOnTopic(id)
+        }
     }
 
     private var topicList: some View {
@@ -379,10 +403,10 @@ struct ForumsBrowseView: View {
     /// insufficient for a sparse category even with the auto-topup below.
     private func fetchPage(_ pageToFetch: Int) async throws -> (items: [ForumTopic], hasMore: Bool) {
         if let selectedCategory {
-            let result = try await APIClient.shared.forums.categoryListing(tid: selectedCategory.tid, page: pageToFetch)
+            let result = try await APIClient.shared.forums.categoryListing(tid: selectedCategory.tid, page: pageToFetch, forceRefresh: true)
             return (result.items, result.hasMore)
         }
-        let items = try await APIClient.shared.forums.recent(page: pageToFetch, appleOnly: appleTopicsFilter == .appleOnly)
+        let items = try await APIClient.shared.forums.recent(page: pageToFetch, appleOnly: appleTopicsFilter == .appleOnly, includePinned: true, forceRefresh: true)
         return (items, items.count >= APIPaging.pageSize)
     }
 
@@ -394,6 +418,7 @@ struct ForumsBrowseView: View {
             async let topicsResult = fetchPage(page)
             async let categoriesResult = categories.isEmpty ? APIClient.shared.forums.categories() : []
             let (fetched, cats) = try await (topicsResult, categoriesResult)
+            await syncWebsiteReads(for: fetched.items)
             topics = applyRefinements(to: fetched.items)
             if !cats.isEmpty { categories = cats }
             hasMore = fetched.hasMore
@@ -442,7 +467,10 @@ struct ForumsBrowseView: View {
             // once a later attempt succeeded.
             let more = try await fetchPage(page + 1)
             page += 1
-            topics += applyRefinements(to: more.items)
+            await syncWebsiteReads(for: more.items)
+            let incoming = applyRefinements(to: more.items)
+            let incomingIds = Set(incoming.map(\.id))
+            topics = Self.pinnedFirst(topics.filter { !incomingIds.contains($0.id) } + incoming)
             hasMore = more.hasMore
         } catch {
             toast.error(String(localized: "Couldn't load more topics."))
@@ -466,7 +494,7 @@ private struct ForumFilterSheetView: View {
     @EnvironmentObject private var preferences: PreferencesStore
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             Form {
                 if showsPersonalFilters {
                     Section("Show") {

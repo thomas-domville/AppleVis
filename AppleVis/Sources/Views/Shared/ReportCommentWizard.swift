@@ -155,7 +155,7 @@ struct ReportCommentWizard: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             wizardContent
                 .navigationTitle(navigationTitleText)
                 .navigationBarTitleDisplayMode(.inline)

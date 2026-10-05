@@ -6,29 +6,48 @@ struct MiniPlayerView: View {
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var toast: ToastStore
-    @State private var showFullPlayer = false
 
     var body: some View {
         if let episode = player.currentEpisode {
             HStack(spacing: 12) {
-                AsyncImage(url: episode.artworkUrl.flatMap(URL.init)) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: {
-                    Image(systemName: "mic.fill").foregroundStyle(.secondary)
-                }
-                .frame(width: 44, height: 44)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .accessibilityHidden(true)
+                // A real button rather than a tap gesture on the whole bar:
+                // VoiceOver only heard the title as plain text, and the
+                // "Double-tap to open player" label sat on a container it
+                // never reads. Reported by a beta tester who couldn't find
+                // a way into the player.
+                Button {
+                    player.isFullPlayerPresented = true
+                } label: {
+                    HStack(spacing: 12) {
+                        AsyncImage(url: episode.artworkUrl.flatMap(URL.init)) { image in
+                            image.resizable().scaledToFill()
+                        } placeholder: {
+                            Image(systemName: "mic.fill").foregroundStyle(.secondary)
+                        }
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(episode.title)
-                        .font(.subheadline).fontWeight(.medium)
-                        .lineLimit(1)
-                    Text(episode.showTitle)
-                        .font(.caption).foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(episode.title)
+                                .font(.subheadline).fontWeight(.medium)
+                                .lineLimit(1)
+                            Text(episode.showTitle)
+                                .font(.caption).foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .contentShape(Rectangle())
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(
+                    String(localized: "Now Playing: \(episode.title) by \(episode.showTitle). ") +
+                    (player.isPlaying ? String(localized: "Playing.") : String(localized: "Paused."))
+                )
+                .accessibilityHint(String(localized: "Opens the player."))
+                .accessibilityAddTraits(.isButton)
 
                 Button {
                     player.togglePlayPause()
@@ -67,14 +86,8 @@ struct MiniPlayerView: View {
             .padding(.vertical, 10)
             .adaptiveGlass(in: RoundedRectangle(cornerRadius: 16))
             .padding(.horizontal, 8)
-            .contentShape(Rectangle())
-            .onTapGesture { showFullPlayer = true }
             .accessibilityElement(children: .contain)
-            .accessibilityLabel(
-                String(localized: "\(episode.title) by \(episode.showTitle). ") +
-                (player.isPlaying ? String(localized: "Playing. Double-tap to open player.") : String(localized: "Paused. Double-tap to open player."))
-            )
-            .sheet(isPresented: $showFullPlayer) {
+            .sheet(isPresented: $player.isFullPlayerPresented) {
                 FullPlayerView()
             }
             // Previously `errorMessage` was set on a stream failure but
@@ -104,7 +117,7 @@ struct FullPlayerView: View {
     private let speedOptions: [Float] = PodcastSpeedOptions.all.map(Float.init)
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             if let episode = player.currentEpisode {
                 ScrollView {
                     VStack(spacing: 0) {

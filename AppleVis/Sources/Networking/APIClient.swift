@@ -22,6 +22,9 @@ enum APIError: LocalizedError {
     /// failed) and there's no cached response to fall back to yet — see
     /// CachedFetch.swift.
     case offlineNoCache(group: String)
+    /// The website turned down something a member posted, with its reason
+    /// when it gave one. Used to surface as `.unknown`. See `SiteRefusal`.
+    case refused(SiteRefusal)
 
     var errorDescription: String? {
         switch self {
@@ -30,11 +33,12 @@ enum APIError: LocalizedError {
         case .unauthorized:  return String(localized: "Incorrect username or password.")
         case .forbidden:     return String(localized: "You don't have permission to do that.")
         case .rateLimited:   return String(localized: "Too many requests. Please wait a moment.")
-        case .server:        return String(localized: "AppleVis is having trouble right now. Try again later.")
+        case .server:        return String(localized: "AppleVis is having trouble right now, and it's not something you did. Try again in a little while.")
         case .decoding: return String(localized: "AppleVis sent back something this version of the app doesn't understand. Try updating the app.")
         case .notFound: return String(localized: "This item is no longer available. It may have been removed, moved, or is awaiting moderation.")
         case .unknown: return String(localized: "AppleVis sent back something unexpected. Try again in a moment.")
         case .offlineNoCache(let group): return String(localized: "No saved \(group) content yet. Connect to the internet to load content for the first time.")
+        case .refused(let refusal): return refusal.userMessage
         }
     }
 }
@@ -52,6 +56,7 @@ extension APIError: Equatable {
         case (.notFound, .notFound): return true
         case (.unknown(let a), .unknown(let b)): return a == b
         case (.offlineNoCache(let a), .offlineNoCache(let b)): return a == b
+        case (.refused(let a), .refused(let b)): return a.statusCode == b.statusCode
         default: return false
         }
     }
@@ -232,8 +237,8 @@ final class APIClient {
         request.httpMethod = "DELETE"
         jsonAPIHeaders(headers).forEach { request.setValue($1, forHTTPHeaderField: $0) }
         try await sendWithSessionRecovery(request) { request in
-            let (_, response) = try await self.session.data(for: request)
-            try self.validateStatus(response, sideEffects: false)
+            let (data, response) = try await self.session.data(for: request)
+            try self.validateStatus(response, body: Self.postBody(data, for: request), sideEffects: false)
         }
     }
 
@@ -254,6 +259,25 @@ final class APIClient {
     /// beta tester's app submission failed while the app still looked
     /// signed in.
     private nonisolated func sendWithSessionRecovery<T>(_ request: URLRequest, send: (URLRequest) async throws -> T) async throws -> T {
+        do {
+            return try await sendRecoveringSession(request, send: send)
+        } catch let error where request.value(forHTTPHeaderField: "X-CSRF-Token") != nil {
+            // Kept for the Copy Details button on the screen showing the
+            // error, so a member can tell us exactly what went wrong.
+            let problem = DiagnosticInfo.postingProblem(for: request, error: error)
+            await MainActor.run { PostingProblemLog.shared.record(problem) }
+            throw error
+        }
+    }
+
+    /// A reply's body, kept only for a member's own post: a request
+    /// carrying the security token. Signing in has none, so a refused
+    /// password stays the plain error AuthStore expects.
+    private nonisolated static func postBody(_ data: Data, for request: URLRequest) -> Data? {
+        request.value(forHTTPHeaderField: "X-CSRF-Token") != nil ? data : nil
+    }
+
+    private nonisolated func sendRecoveringSession<T>(_ request: URLRequest, send: (URLRequest) async throws -> T) async throws -> T {
         do {
             return try await send(request)
         } catch let error as APIError where (error == .forbidden || error == .unauthorized)
@@ -299,7 +323,7 @@ final class APIClient {
     private nonisolated func perform<T: Decodable>(request: URLRequest, sideEffects: Bool = true) async throws -> T {
         do {
             let (data, response) = try await session.data(for: request)
-            try validateStatus(response, sideEffects: sideEffects)
+            try validateStatus(response, body: Self.postBody(data, for: request), sideEffects: sideEffects)
             return try decoder.decode(T.self, from: data)
         } catch let apiError as APIError {
             throw apiError
@@ -321,7 +345,7 @@ final class APIClient {
     private nonisolated func performRaw<T: Decodable>(request: URLRequest, sideEffects: Bool = true) async throws -> T {
         do {
             let (data, response) = try await session.data(for: request)
-            try validateStatus(response, sideEffects: sideEffects)
+            try validateStatus(response, body: Self.postBody(data, for: request), sideEffects: sideEffects)
             if data.isEmpty, let empty = EmptyJSONAPIResponse() as? T {
                 return empty
             }
@@ -340,7 +364,7 @@ final class APIClient {
         }
     }
 
-    private nonisolated func validateStatus(_ response: URLResponse, sideEffects: Bool = true) throws {
+    private nonisolated func validateStatus(_ response: URLResponse, body: Data? = nil, sideEffects: Bool = true) throws {
         guard let http = response as? HTTPURLResponse else { return }
         switch http.statusCode {
         case 200...299: return
@@ -369,6 +393,10 @@ final class APIClient {
         case 500...599:
             AppLog.network.error("Server error \(http.statusCode) from \(http.url?.path ?? "?", privacy: .public)")
             throw APIError.server(statusCode: http.statusCode)
+        case 400...499 where !sideEffects && body != nil:
+            // A write the site turned down. Its reason comes back in the
+            // body; keep it rather than a bare status code.
+            throw APIError.refused(SiteRefusal.parse(statusCode: http.statusCode, data: body ?? Data()))
         default:
             AppLog.network.error("Unexpected status \(http.statusCode) from \(http.url?.path ?? "?", privacy: .public)")
             throw APIError.unknown(statusCode: http.statusCode)

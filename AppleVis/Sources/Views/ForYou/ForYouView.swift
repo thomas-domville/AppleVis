@@ -16,6 +16,7 @@ struct ForYouView: View {
     @State private var followingCount: Int?
     @State private var recommendedCount: Int?
     @AccessibilityFocusState private var isPickerFocused: Bool
+    @AccessibilityFocusState private var isProfileButtonFocused: Bool
     // Dedicated from isPickerFocused above, which targets the invisible
     // "For You" heading on tab-switch — this one targets the section
     // Picker itself, so a swipe-adjust can pull focus back onto the picker
@@ -48,7 +49,7 @@ struct ForYouView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             VStack(spacing: 0) {
                 // Matches the setup wizard/Welcome Tour convention of a
                 // heading announcing the screen name — the tab-switch focus
@@ -184,9 +185,14 @@ struct ForYouView: View {
                 // button, which never had this swap-to-"Sign In" behavior
                 // in the first place. This was a For You-only deviation.
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink(destination: ProfileView()) {
+                    NavigationLink(destination: ProfileView()
+                        .onDisappear {
+                            Task { await retryAccessibilityFocus(into: $isProfileButtonFocused) }
+                        }
+                    ) {
                         Image(systemName: "person.circle")
                     }
+                    .accessibilityFocused($isProfileButtonFocused)
                     .accessibilityLabel(String(localized: "Profile and Settings"))
                     .accessibilityHint(String(localized: "Sign in, manage your account, and access app settings."))
                 }
@@ -273,7 +279,7 @@ struct DownloadsView: View {
                     primaryAction: { showBrowsePodcasts = true }
                 )
                 .sheet(isPresented: $showBrowsePodcasts) {
-                    NavigationStack { PodcastBrowseView() }
+                    AppNavigationStack { PodcastBrowseView() }
                 }
             } else {
                 List {
@@ -498,7 +504,7 @@ private struct DownloadedEpisodeRow: View {
         if isCurrentlyPlaying {
             player.togglePlayPause()
         } else {
-            await player.load(downloadedEpisodePlaceholder(for: meta))
+            await player.startFromList(downloadedEpisodePlaceholder(for: meta))
         }
     }
 
@@ -630,7 +636,7 @@ struct SavedItemsView: View {
                         primaryAction: { showBrowseContent = true }
                     )
                     .sheet(isPresented: $showBrowseContent) {
-                        NavigationStack { DiscoverView() }
+                        AppNavigationStack { DiscoverView() }
                     }
                 }
             } else {
@@ -928,7 +934,7 @@ private struct SavedPodcastEpisodeCard: View {
         if isCurrentlyPlaying {
             player.togglePlayPause()
         } else {
-            await player.load(episode)
+            await player.startFromList(episode)
         }
     }
 
@@ -1052,7 +1058,7 @@ struct FollowingView: View {
                     primaryAction: { showBrowseForums = true }
                 )
                 .sheet(isPresented: $showBrowseForums) {
-                    NavigationStack { ForumsBrowseView() }
+                    AppNavigationStack { ForumsBrowseView() }
                 }
             } else {
                 List {
@@ -1242,7 +1248,7 @@ struct RecommendedAppsView: View {
                     primaryAction: { showBrowseApps = true }
                 )
                 .sheet(isPresented: $showBrowseApps) {
-                    NavigationStack { AppBrowseView() }
+                    AppNavigationStack { AppBrowseView() }
                 }
             } else {
                 List {

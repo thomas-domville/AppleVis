@@ -26,7 +26,7 @@ enum HomeFeedFilter: String, CaseIterable, Identifiable {
     var summary: String {
         switch self {
         case .all: return String(localized: "Everything in your Home feed.")
-        case .new: return String(localized: "Only what's changed since your last visit.")
+        case .new: return String(localized: "New posts and comments you haven't read yet.")
         case .fetch: return String(localized: "New items with their new comments in full, ready to read.")
         case .mouseRecap: return String(localized: "The Mouse's best bits from the past week or month.")
         }
@@ -49,11 +49,19 @@ enum MouseRecapWindow: Int, CaseIterable, Identifiable {
 /// docs/IMPLEMENTATION_NOTES.md: "VoiceOver focus should land on the
 /// summary before the first feed card." Falls back to the greeting when
 /// there's no What's New card to land on.
+extension Notification.Name {
+    /// Sent by Home's What's New box: move VoiceOver to Fetch's first post.
+    static let homeFocusFetchFirstPost = Notification.Name("applevis.home.focusFetchFirstPost")
+    /// Sent by Home's What's New box: move VoiceOver to the Nibbles description.
+    static let homeFocusNibblesHeader = Notification.Name("applevis.home.focusNibblesHeader")
+}
+
 enum HomeFocusTarget: Hashable {
     case summary
     case greeting
     case item(String)
     case askTheMouse
+    case profile
 }
 
 /// Time-of-day greeting shown on the Home tab's greeting card.
@@ -134,6 +142,56 @@ struct HomeView: View {
         homeFeedFilter == .new ? String(localized: "New Activity") : String(localized: "Latest Activity")
     }
 
+    static let nibblesHeaderID = "nibbles.header"
+
+    /// Says where the What's New box goes in the current view.
+    private var whatsNewCardHint: String {
+        switch homeFeedFilter {
+        case .all: return String(localized: "Double-tap to jump to where you left off in the feed.")
+        case .new: return String(localized: "Double-tap to move to the first unread item.")
+        case .fetch: return String(localized: "Double-tap to move to the first post in Fetch.")
+        case .mouseRecap: return String(localized: "Double-tap to move to the start of Nibbles.")
+        }
+    }
+
+    /// The What's New box only ever jumped to the first new item. In Fetch
+    /// and Nibbles that row isn't on screen, so it did nothing, and in All
+    /// its hint promised "where you left off" but didn't go there. Each
+    /// view now has its own destination. Reported directly (2026-10-04).
+    /// - All: the item you last opened, so you can swipe back up through
+    ///   what's newer. With no such item loaded, the oldest unread item.
+    /// - New: the first unread item.
+    /// - Fetch: the first post.
+    /// - Nibbles: the Nibbles description.
+    private func openWhatsNewCard(_ proxy: ScrollViewProxy) {
+        let target: String?
+        switch homeFeedFilter {
+        case .all:
+            target = vm.lastVisitedItemId ?? vm.newItems.last?.id
+        case .new:
+            target = vm.newItems.first?.id
+        case .fetch:
+            let first = vm.newItems.first { vm.isBrandNew($0) || vm.newReplyCount(for: $0) > 0 }
+            if let first {
+                withReduceMotionAwareAnimation { proxy.scrollTo(FetchHeadingsRotor.headingID(first), anchor: .top) }
+            }
+            NotificationCenter.default.post(name: .homeFocusFetchFirstPost, object: nil)
+            return
+        case .mouseRecap:
+            withReduceMotionAwareAnimation { proxy.scrollTo(Self.nibblesHeaderID, anchor: .top) }
+            NotificationCenter.default.post(name: .homeFocusNibblesHeader, object: nil)
+            return
+        }
+        guard let target else { return }
+        withReduceMotionAwareAnimation { proxy.scrollTo(target, anchor: .top) }
+        // Scrolling the viewport doesn't move VoiceOver's focus on its
+        // own, and a single fixed delay isn't reliable before the target
+        // row has laid out (CARD-12).
+        Task {
+            await retryAccessibilityFocus(.item(target), into: $focusTarget, delaysMs: [150, 350, 600, 900])
+        }
+    }
+
     private var visibleItems: [FeedItem] {
         switch homeFeedFilter {
         case .all:
@@ -152,7 +210,7 @@ struct HomeView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             Group {
                 if vm.isLoading && vm.items.isEmpty {
                     LoadingView()
@@ -233,9 +291,14 @@ struct HomeView: View {
                         .accessibilityHint(auth.isSignedIn
                             ? String(localized: "Create a new forum topic or app entry")
                             : String(localized: "Sign in required to create a new forum topic or app entry"))
-                        NavigationLink(destination: ProfileView()) {
+                        NavigationLink(destination: ProfileView()
+                            .onDisappear {
+                                Task { await retryAccessibilityFocus(.profile, into: $focusTarget) }
+                            }
+                        ) {
                             Image(systemName: "person.circle")
                         }
+                        .accessibilityFocused($focusTarget, equals: .profile)
                         .accessibilityLabel(String(localized: "Profile and Settings"))
                         .accessibilityHint(String(localized: "Sign in, manage your account, and access app settings."))
                     }
@@ -265,7 +328,7 @@ struct HomeView: View {
                 guard newPhase == .active, keyCommands.selectedTab == 0 else { return }
                 let isStale = vm.lastLoadedAt.map { Date().timeIntervalSince($0) > Self.staleThreshold } ?? true
                 guard isStale else { return }
-                Task { await refreshAndAnnounce() }
+                Task { await refreshAndAnnounce(returningToApp: true) }
             }
             .overlay(alignment: .top) { ToastOverlay() }
             .sheet(isPresented: $showCustomizeHome, onDismiss: {
@@ -400,7 +463,7 @@ struct HomeView: View {
             waited += 200
         }
         guard !vm.newActivitySummary.isEmpty else {
-            UIAccessibility.post(notification: .announcement, argument: "You're all caught up — nothing new since your last visit.")
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "You're all caught up. There's nothing new to read."))
             return
         }
         let rawSummary = vm.newActivitySummary
@@ -532,23 +595,8 @@ struct HomeView: View {
                 if !vm.newItems.isEmpty && !vm.isNewActivityDismissed && preferences.welcomeSummaryEnabled {
                     WhatsNewCard(
                         message: vm.newActivitySummary,
-                        onTap: {
-                            guard let first = vm.newItems.first else { return }
-                            withReduceMotionAwareAnimation { proxy.scrollTo(first.id, anchor: .top) }
-                            // Scrolling the viewport doesn't move VoiceOver's
-                            // focus on its own — without this, double-tapping
-                            // moved the card visually but left a VoiceOver
-                            // user's swipe cursor exactly where it was,
-                            // making the action look like it did nothing.
-                            //
-                            // Reported directly: a single fixed delay looked
-                            // like it silently "forgot" where the user left
-                            // off on a slower device — see
-                            // retryAccessibilityFocus's doc comment (CARD-12).
-                            Task {
-                                await retryAccessibilityFocus(.item(first.id), into: $focusTarget, delaysMs: [150, 350, 600, 900])
-                            }
-                        },
+                        hint: whatsNewCardHint,
+                        onTap: { openWhatsNewCard(proxy) },
                         onDismiss: { vm.isNewActivityDismissed = true }
                     )
                     .accessibilityFocused($focusTarget, equals: .summary)
@@ -600,9 +648,9 @@ struct HomeView: View {
                 if homeFeedFilter == .mouseRecap {
                     MouseRecapHomeContent(vm: vm, window: $mouseRecapWindow)
                 } else if homeFeedFilter == .fetch {
-                    FetchHomeContent(vm: vm)
+                    FetchHomeContent(vm: vm, scrollTo: { id in proxy.scrollTo(id, anchor: .top) })
                 } else if homeFeedFilter == .new && visibleItems.isEmpty {
-                    Text("No new activity since your last visit.")
+                    Text("You're all caught up. There's nothing new to read.")
                         .font(.subheadline).foregroundStyle(.secondary)
                         .listRowSeparator(.hidden)
                 }
@@ -744,7 +792,15 @@ struct HomeView: View {
     /// Was pull-to-refresh-only, so returning from the background left
     /// focus to fall back on the system default (typically the leading nav
     /// bar button) with no announcement at all. Reported directly.
-    private func refreshAndAnnounce() async {
+    ///
+    /// Returning to the app (`returningToApp`) keeps VoiceOver where it was
+    /// and speaks one "Home updated" line. It used to move focus to the
+    /// What's New box and announce the summary as well, so a returning user
+    /// heard the old box, then the new summary, then the new box again, and
+    /// lost their place. Pull-to-refresh starts at the top, so it still
+    /// moves to the box, without the extra announcement. Reported directly
+    /// (2026-10-04).
+    private func refreshAndAnnounce(returningToApp: Bool = false) async {
         // announceWelcomeIfNeeded() only ever fires once per session (see
         // hasAnnouncedWelcome), so a reload otherwise gets nothing but a
         // non-speech chime — a VoiceOver user has no way to tell the
@@ -752,6 +808,7 @@ struct HomeView: View {
         // Reported directly: users couldn't tell a refresh that found
         // nothing new from one that silently failed.
         let previousLoadedAt = vm.lastLoadedAt
+        let previousFocus = focusTarget
         await vm.load()
         await vm.loadMouseRecap(force: true)
         notificationHistory = PersistenceStore.shared.notificationHistory()
@@ -768,16 +825,29 @@ struct HomeView: View {
         // announceWelcomeIfNeeded() — that preference is about suppressing
         // the unsolicited on-launch greeting, not about withholding
         // feedback from a reload the user is actively looking at.
-        if !vm.newItems.isEmpty && !vm.isNewActivityDismissed {
+        let hasNews = !vm.newItems.isEmpty && !vm.isNewActivityDismissed
+        let caughtUp = String(localized: "You're all caught up. There's nothing new to read.")
+
+        if returningToApp {
+            let summary = hasNews ? vm.newActivitySummary : caughtUp
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "Home updated. \(summary)"))
+            // Only if the reload took away the item VoiceOver was on.
+            if focusTarget == nil, let previous = previousFocus {
+                Task { await retryAccessibilityFocus(previous, into: $focusTarget, delaysMs: [900, 1300]) }
+            }
+            return
+        }
+
+        if hasNews && preferences.welcomeSummaryEnabled {
+            // VoiceOver reads the box on arrival, so no separate
+            // announcement: that read the summary twice.
+            Task { await retryAccessibilityFocus(.summary, into: $focusTarget) }
+        } else if hasNews {
+            // Welcome Summary off: there's no box to land on.
             UIAccessibility.post(notification: .announcement, argument: vm.newActivitySummary)
-            // Welcome Summary being off hides the card this would
-            // otherwise focus (see feedList below) — the spoken
-            // announcement above still always fires, only the focus
-            // target changes to something that actually exists.
-            let focusAfterRefresh: HomeFocusTarget = preferences.welcomeSummaryEnabled ? .summary : .greeting
-            Task { await retryAccessibilityFocus(focusAfterRefresh, into: $focusTarget) }
+            Task { await retryAccessibilityFocus(.greeting, into: $focusTarget) }
         } else {
-            UIAccessibility.post(notification: .announcement, argument: String(localized: "No new activity since your last visit."))
+            UIAccessibility.post(notification: .announcement, argument: caughtUp)
         }
     }
 
@@ -824,7 +894,7 @@ struct CustomizeHomeView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             Form {
                 Section("Content Types") {
                     Toggle("Forums", isOn: $preferences.showForums)
@@ -858,6 +928,7 @@ private struct MouseRecapHomeContent: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var aiBlurbs: [String: String] = [:]
     @State private var aiWindow: MouseRecapWindow?
+    @AccessibilityFocusState private var isHeaderFocused: Bool
 
     var body: some View {
         Group {
@@ -887,6 +958,9 @@ private struct MouseRecapHomeContent: View {
                 .listRowSeparator(.hidden)
             } else if let digest = vm.mouseRecap?.scoped(toLastDays: window.rawValue) {
                 newsletterContent(digest)
+                    .onReceive(NotificationCenter.default.publisher(for: .homeFocusNibblesHeader)) { _ in
+                        Task { await retryAccessibilityFocus(into: $isHeaderFocused) }
+                    }
 
                 if !vm.failedMouseRecapSourceNames.isEmpty {
                     Section {
@@ -968,7 +1042,9 @@ private struct MouseRecapHomeContent: View {
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityElement(children: .combine)
+                .accessibilityFocused($isHeaderFocused)
             }
+            .id(HomeView.nibblesHeaderID)
         }
         .listRowSeparator(.hidden)
         .task(id: "\(window.rawValue)-\(digest.generatedAt.timeIntervalSince1970)") {
@@ -1736,6 +1812,7 @@ private struct SourceErrorBanner: View {
 /// is itself different each time.
 private struct WhatsNewCard: View {
     let message: String
+    let hint: String
     let onTap: () -> Void
     let onDismiss: () -> Void
 
@@ -1761,7 +1838,7 @@ private struct WhatsNewCard: View {
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(String(localized: "What's New. \(message)"))
-            .accessibilityHint(String(localized: "Double-tap to jump to where you left off in the feed."))
+            .accessibilityHint(hint)
 
             Button("Dismiss", action: onDismiss)
                 .font(.caption).fontWeight(.semibold)

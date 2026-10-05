@@ -14,7 +14,7 @@ struct QueueView: View {
     @AccessibilityFocusState private var isTitleFocused: Bool
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             Group {
                 if player.queue.isEmpty {
                     ContentUnavailableView(

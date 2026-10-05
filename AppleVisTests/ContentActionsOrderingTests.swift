@@ -66,6 +66,22 @@ struct ContentActionsOrderingTests {
         #expect(!actions.contains(.deleteContent))
     }
 
+    @Test("Pin is offered only to editors, and only where the row allows it")
+    func pinOnlyForEditors() {
+        #expect(ContentActionsModifier.canonicalActions(
+            hasNewCount: false, supportsFollow: true, isSignedIn: true, hasUrl: true,
+            isOwnTopic: false, isAdmin: true, canPin: true
+        ).contains(.pin))
+        #expect(!ContentActionsModifier.canonicalActions(
+            hasNewCount: false, supportsFollow: true, isSignedIn: true, hasUrl: true,
+            isOwnTopic: true, isAdmin: false, canPin: true
+        ).contains(.pin))
+        #expect(!ContentActionsModifier.canonicalActions(
+            hasNewCount: false, supportsFollow: true, isSignedIn: true, hasUrl: true,
+            isOwnTopic: false, isAdmin: true, canPin: false
+        ).contains(.pin))
+    }
+
     @Test("save is always offered")
     func saveAlwaysPresent() {
         for combo in Self.allBoolCombos {

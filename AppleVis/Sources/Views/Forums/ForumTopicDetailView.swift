@@ -116,7 +116,10 @@ struct ForumTopicDetailView: View {
                         onAddComment: { showReplyCompose = true },
                         onEdit: { startEditTopic() },
                         onUnpublish: { await unpublishTopic() },
-                        onDelete: { await deleteTopic() }
+                        onDelete: { await deleteTopic() },
+                        adminExtras: AnyView(PinMenuItem(kind: .forumTopic, id: detail.id, isPinned: detail.isPinned ?? false) {
+                            self.detail?.isPinned = $0
+                        })
                     )
                 }
             }

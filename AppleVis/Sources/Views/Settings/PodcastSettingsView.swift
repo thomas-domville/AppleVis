@@ -92,8 +92,39 @@ struct PodcastSettingsView: View {
                     UIAccessibility.post(notification: .announcement, argument: String(localized: "\(Int(preferences.skipForwardInterval)) seconds"))
                 }
 
+                Picker("Headphone Controls", selection: $preferences.headphoneControls) {
+                    ForEach(PodcastHeadphoneControls.allCases) { opt in
+                        Text(opt.displayName).tag(opt)
+                    }
+                }
+                .accessibilityHint(String(localized: "Chooses what a double or triple press on AirPods does."))
+                // See the Speed picker above for the full reasoning — a
+                // persistent .accessibilityValue() duplicated the native
+                // announcement on plain focus.
+                .accessibilityAdjustableAction { direction in
+                    let all = PodcastHeadphoneControls.allCases
+                    guard let idx = all.firstIndex(of: preferences.headphoneControls) else { return }
+                    switch direction {
+                    case .increment:
+                        preferences.headphoneControls = all[(idx + 1) % all.count]
+                    case .decrement:
+                        preferences.headphoneControls = all[(idx - 1 + all.count) % all.count]
+                    @unknown default: break
+                    }
+                    UIAccessibility.post(notification: .announcement, argument: preferences.headphoneControls.displayName)
+                }
+                Text("Skip Forward and Back makes a double press on AirPods skip forward and a triple press skip back, by the amounts set above. Next Episode and Restart makes a double press play the next episode in your queue and a triple press go back to the start of the episode. Headphone remotes and car controls work the same way.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Toggle("Auto-Play Next", isOn: $preferences.autoPlayNext)
                     .accessibilityHint(String(localized: "Automatically starts the next episode when the current one ends."))
+
+                Toggle("Open Player on Play", isOn: $preferences.openPlayerOnPlay)
+                    .accessibilityHint(String(localized: "Opens the player when you play an episode from a list."))
+                Text("When this is on, playing an episode from a list opens the player. When it is off, the player stays at the bottom of the screen.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Audio Enhancement") {
@@ -240,6 +271,8 @@ struct PodcastSettingsView: View {
                     preferences.skipBackInterval = 10
                     preferences.skipForwardInterval = 30
                     preferences.autoPlayNext = true
+                    preferences.openPlayerOnPlay = false
+                    preferences.headphoneControls = .skip
                     preferences.sleepTimerMinutes = 0
                     preferences.resumeRewindSeconds = 15
                     preferences.trimSilence = false

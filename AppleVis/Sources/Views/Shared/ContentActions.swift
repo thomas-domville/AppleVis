@@ -32,6 +32,9 @@ let followFeatureEnabled = true
 /// flagging endpoint (`APIClient.shared.flags`).
 struct ContentActionsModifier: ViewModifier {
     let id: String
+    /// Set only by forum topic and blog post rows: whether it's pinned on
+    /// the website, which offers editors Pin or Unpin. See `PinAction`.
+    var isPinned: Bool? = nil
     /// The target's internal Drupal node ID (nid), not its JSON:API UUID —
     /// required by Follow/Recommend's `entity_id` attribute; see
     /// `FlagEndpoints.follow`'s doc comment for why.
@@ -73,6 +76,11 @@ struct ContentActionsModifier: ViewModifier {
     @EnvironmentObject private var toast: ToastStore
     @EnvironmentObject private var tips: TipStore
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+    @Environment(\.openAtFirstNewComment) private var openAtFirstNewComment
+    /// The pin state after an editor changes it here, until the list reloads.
+    @State private var pinnedOverride: Bool?
+    private var currentlyPinned: Bool { pinnedOverride ?? isPinned ?? false }
+    private var canPin: Bool { isAdmin && PinAction.pinnableKinds.contains(kind) && isPinned != nil }
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var isSaved = false
     @State private var isFollowing = false
@@ -253,6 +261,16 @@ struct ContentActionsModifier: ViewModifier {
                         Label("Edit \(kind.displayName)", systemImage: "pencil")
                     }
                     .accessibilityHidden(true)
+                    if canPin {
+                        Button { Task { await togglePin() } } label: {
+                            if currentlyPinned {
+                                Label("Unpin \(kind.displayName)", systemImage: "pin.slash")
+                            } else {
+                                Label("Pin \(kind.displayName)", systemImage: "pin")
+                            }
+                        }
+                        .accessibilityHidden(true)
+                    }
                     Button { showUnpublishConfirm = true } label: {
                         Label("Unpublish \(kind.displayName)", systemImage: "eye.slash")
                     }
@@ -300,6 +318,8 @@ struct ContentActionsModifier: ViewModifier {
             .modifier(ConditionalAccessibilityAction(isActive: isOwnTopic && !isAdmin, name: "Edit Topic") { startEdit() })
             .modifier(ConditionalAccessibilityAction(isActive: isOwnTopic && !isAdmin, name: "Delete Topic") { showDeleteConfirm = true })
             .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Edit \(kind.displayName)") { startEdit() })
+            .modifier(ConditionalAccessibilityAction(isActive: canPin && !currentlyPinned, name: "Pin \(kind.displayName)") { Task { await togglePin() } })
+            .modifier(ConditionalAccessibilityAction(isActive: canPin && currentlyPinned, name: "Unpin \(kind.displayName)") { Task { await togglePin() } })
             .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Unpublish \(kind.displayName)") { showUnpublishConfirm = true })
             .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Delete \(kind.displayName)") { showDeleteConfirm = true })
             .sheet(isPresented: $showBrowser) {
@@ -409,6 +429,14 @@ struct ContentActionsModifier: ViewModifier {
         toast.success(String(localized: "\(kind.displayName) updated"))
     }
 
+    private func togglePin() async {
+        guard let user = auth.user else { return }
+        let pin = !currentlyPinned
+        if await PinAction.set(pin, kind: kind, id: id, user: user, toast: toast) {
+            pinnedOverride = pin
+        }
+    }
+
     private func unpublish() async {
         guard let user = auth.user else { return }
         let suffix = await resolvedNodeTypeSuffix()
@@ -459,6 +487,9 @@ struct ContentActionsModifier: ViewModifier {
         // Home updates New and Fetch straight away. It used to only notice
         // on its next reload, so the item stayed listed. Reported directly.
         NotificationCenter.default.post(name: .itemMarkedRead, object: key)
+        APIClient.shared.history.syncMarkedRead([
+            HistoryEndpoints.target(id: id, nid: entityId, kind: kind)
+        ])
         UIAccessibility.post(notification: .announcement, argument: String(localized: "Marked as read."))
     }
 
@@ -471,6 +502,11 @@ struct ContentActionsModifier: ViewModifier {
     /// Opens as a sheet rather than a push — see pendingContentIntent's doc
     /// comment on DeepLinkRouter for why.
     private func jumpToFirstNewComment() {
+        // Pushed on the row's own stack, like activating the row.
+        if let openAtFirstNewComment {
+            openAtFirstNewComment(kind: kind, id: id)
+            return
+        }
         deepLinkRouter.pendingContentIntent = .firstNewComment
         deepLinkRouter.pendingContent = (kind: kind, id: id)
     }
@@ -591,6 +627,7 @@ enum ContentAction: Equatable {
     case editTopic
     case deleteTopic
     case editContent
+    case pin
     case unpublish
     case deleteContent
 }
@@ -606,7 +643,8 @@ extension ContentActionsModifier {
         // Defaulted so existing call sites/tests written before Follow was
         // shelved keep compiling — mirrors `canOfferFollow`'s "hide
         // starting a new follow, but never hide undoing an existing one."
-        isFollowing: Bool = false
+        isFollowing: Bool = false,
+        canPin: Bool = false
     ) -> [ContentAction] {
         var actions: [ContentAction] = []
         if hasNewCount {
@@ -624,6 +662,7 @@ extension ContentActionsModifier {
         }
         if isAdmin {
             actions.append(.editContent)
+            if canPin { actions.append(.pin) }
             actions.append(.unpublish)
             actions.append(.deleteContent)
         }
@@ -695,7 +734,7 @@ struct EditNodeSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             Form {
                 Section {
                     WizardStepHeader(
@@ -759,7 +798,7 @@ struct EditNodeSheet: View {
                     rewriteButton
                 }
                 if let error {
-                    Text(error).foregroundStyle(.red)
+                    PostingErrorMessage(message: error)
                 }
             }
             .themedList(preferences.colors)
@@ -855,6 +894,7 @@ extension Notification.Name {
     /// Posted with an item's visit key when Mark as Read is used from its
     /// own actions, so Home can drop it from New and Fetch at once.
     static let itemMarkedRead = Notification.Name("AppleVis.itemMarkedRead")
+
 }
 
 /// Attaches `.swipeActions` only while VoiceOver is off.
@@ -940,10 +980,11 @@ extension View {
         onSaveToggle: ((Bool) -> Void)? = nil, onFollowToggle: ((Bool) -> Void)? = nil,
         currentCommentCount: Int? = nil, onAddComment: (() -> Void)? = nil,
         authorId: String? = nil, onContentDeleted: (() -> Void)? = nil,
+        isPinned: Bool? = nil,
         @ViewBuilder extraMenuItems: () -> some View = { EmptyView() }
     ) -> some View {
         modifier(ContentActionsModifier(
-            id: id, entityId: entityId, kind: kind, title: title, lastActivityAt: lastActivityAt, url: url, supportsFollow: supportsFollow,
+            id: id, isPinned: isPinned, entityId: entityId, kind: kind, title: title, lastActivityAt: lastActivityAt, url: url, supportsFollow: supportsFollow,
             onSaveToggle: onSaveToggle, onFollowToggle: onFollowToggle,
             currentCommentCount: currentCommentCount, onAddComment: onAddComment,
             authorId: authorId, onContentDeleted: onContentDeleted,

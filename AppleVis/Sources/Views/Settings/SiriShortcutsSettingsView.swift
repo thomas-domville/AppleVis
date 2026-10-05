@@ -73,7 +73,7 @@ struct SiriShortcutsSettingsView: View {
                     icon: "sparkles",
                     title: String(localized: "What's New on AppleVis"),
                     subtitle: String(localized: "\"Hey Siri, what's new on AppleVis\""),
-                    detail: String(localized: "Speaks a summary of what's new since your last visit."),
+                    detail: String(localized: "Speaks a summary of what's new that you haven't read yet."),
                     isSystemFeature: true
                 )
                 FeatureInfoRow(

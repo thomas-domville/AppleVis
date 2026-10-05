@@ -191,7 +191,7 @@ struct UpdateAppInfoSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             Form {
                 Section {
                     WizardStepHeader(

@@ -160,7 +160,7 @@ struct AccountSecurityWizard: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             wizardContent
                 .navigationTitle(mode.title)
                 .navigationBarTitleDisplayMode(.inline)

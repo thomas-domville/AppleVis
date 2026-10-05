@@ -166,7 +166,7 @@ enum IntelligenceService {
     static func generateDigest(_ activitySummary: String) async -> String? {
         guard isAvailable else { return nil }
         return await cleanedResponse(
-            "Here is a list of new AppleVis activity since the user's last visit. " +
+            "Here is a list of new AppleVis activity the user hasn't read yet. " +
             "Write a friendly 2-3 sentence digest for a blind VoiceOver user:\n\n\(activitySummary)"
         )
     }

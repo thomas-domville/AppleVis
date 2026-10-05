@@ -41,6 +41,16 @@ struct ContentActionEndpoints {
         try await client.jsonAPIDelete("node/\(nodeType)/\(nodeId)", headers: ["X-CSRF-Token": csrfToken])
     }
 
+    /// Pins or unpins a post on the website (Drupal's "Sticky at top of
+    /// lists"). Editors and admins only. Checked live (2026-10-05) on an
+    /// unpublished test topic: the website stores it and reads it back.
+    func setPinned(_ pinned: Bool, nodeId: String, nodeType: String, csrfToken: String) async throws {
+        try await client.jsonAPIUpdate(
+            "node/\(nodeType)/\(nodeId)", type: "node--\(nodeType)", id: nodeId,
+            attributes: ["sticky": AnyEncodable(pinned)], headers: ["X-CSRF-Token": csrfToken]
+        )
+    }
+
     func unpublishNode(nodeId: String, nodeType: String, csrfToken: String) async throws {
         try await client.jsonAPIUpdate(
             "node/\(nodeType)/\(nodeId)", type: "node--\(nodeType)", id: nodeId,

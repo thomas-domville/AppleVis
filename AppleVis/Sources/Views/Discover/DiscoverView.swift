@@ -208,6 +208,7 @@ struct DiscoverView: View {
             .navigationDestination(for: BugReport.self) { bug in
                 BugDetailView(bugId: bug.id)
             }
+            .firstNewCommentDestination()
             // Closing a form (sent or cancelled) returns VoiceOver to the
             // row that opened it, not the top of the screen. Reported directly.
             .sheet(isPresented: $showSubmitApp, onDismiss: { restoreFocus(to: Self.contributeFocusID("square.grid.2x2")) }) { SubmitAppView() }
@@ -216,6 +217,8 @@ struct DiscoverView: View {
             .sheet(isPresented: $showSubmitPodcast, onDismiss: { restoreFocus(to: Self.contributeFocusID("mic")) }) { SubmitPodcastView() }
             .sheet(isPresented: $showContact, onDismiss: { restoreFocus(to: Self.contributeFocusID("envelope")) }) { ContactView() }
         }
+        // Rows here open a post at its first new comment on this stack.
+        .environment(\.openAtFirstNewComment, OpenAtFirstNewCommentAction { navigationPath.append($0) })
     }
 
     @ViewBuilder

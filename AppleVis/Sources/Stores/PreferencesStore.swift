@@ -67,6 +67,8 @@ final class PreferencesStore: ObservableObject {
     @AppStorage("podcast.skipBack")     var skipBackInterval: Double = 10
     @AppStorage("podcast.skipForward")  var skipForwardInterval: Double = 30
     @AppStorage("podcast.autoPlay")     var autoPlayNext = true
+    @AppStorage("podcast.openPlayerOnPlay") var openPlayerOnPlay = false
+    @AppStorage("podcast.headphoneControls") var headphoneControls: PodcastHeadphoneControls = .skip
     @AppStorage("podcast.sleepTimer")   var sleepTimerMinutes: Int = 0
     // RN defaulted this to 15 seconds; Swift's default of 0 meant fresh
     // installs got no resume-rewind at all out of the box.
@@ -492,6 +494,19 @@ enum PodcastAutoDownload: String, CaseIterable, Identifiable {
         case .off:      return "Off"
         case .wifiOnly: return String(localized: "Wi-Fi Only")
         case .always:   return String(localized: "Always")
+        }
+    }
+}
+
+/// What the next-track and previous-track commands do: AirPods double and
+/// triple presses, headphone remotes, and car steering-wheel buttons.
+enum PodcastHeadphoneControls: String, CaseIterable, Identifiable {
+    case skip, track
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .skip:  return String(localized: "Skip Forward and Back")
+        case .track: return String(localized: "Next Episode and Restart")
         }
     }
 }

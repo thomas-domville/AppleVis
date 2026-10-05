@@ -165,7 +165,10 @@ struct BlogDetailView: View {
                     onAddComment: { showCompose = true },
                     onEdit: { startEditBlogPost(detail) },
                     onUnpublish: { await unpublishBlogPost(detail) },
-                    onDelete: { await deleteBlogPost(detail) }
+                    onDelete: { await deleteBlogPost(detail) },
+                    adminExtras: AnyView(PinMenuItem(kind: .blogPost, id: detail.id, isPinned: detail.isPinned ?? false) {
+                        self.detail?.isPinned = $0
+                    })
                 )
             }
         }
@@ -522,7 +525,7 @@ struct ComposeBlogCommentView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             VStack(alignment: .leading, spacing: 0) {
                 WizardStepHeader(
                     title: "Add Comment", icon: "text.bubble",
@@ -581,7 +584,7 @@ struct ComposeBlogCommentView: View {
                     .padding(.horizontal)
                     .padding(.bottom, 8)
                 if let err = submitError {
-                    Text(err).foregroundStyle(.red).padding()
+                    PostingErrorMessage(message: err).padding()
                 }
             }
             .navigationTitle("Add Comment")

@@ -14,8 +14,14 @@ struct ForumEndpoints {
     /// Sorted by last-comment activity via the native `/api/v1/forums/recent`
     /// endpoint — matches the website's own sort order (JSON:API `-changed`
     /// sort does not, since it doesn't account for new comments on old topics).
-    func recent(page: Int = 0, appleOnly: Bool = false, forceRefresh: Bool = false) async throws -> [ForumTopic] {
-        try await fetchWithCache(group: .forums, key: "forums:list:\(appleOnly):\(page)", forceRefresh: forceRefresh) {
+    ///
+    /// `includePinned` (Forums only) adds every topic pinned on the website
+    /// to the top of the first page, even quiet ones this activity-sorted
+    /// feed wouldn't reach. Asked fresh each time, so a topic unpinned on
+    /// the website drops back into its place on the next refresh.
+    func recent(page: Int = 0, appleOnly: Bool = false, includePinned: Bool = false, forceRefresh: Bool = false) async throws -> [ForumTopic] {
+        let pinnedKey = includePinned && page == 0 ? ":pinned" : ""
+        return try await fetchWithCache(group: .forums, key: "forums:list:\(appleOnly):\(page)\(pinnedKey)", forceRefresh: forceRefresh) {
             var queryItems = [URLQueryItem(name: "page", value: "\(page)")]
             if appleOnly {
                 queryItems += Self.nonAppleTids.map { URLQueryItem(name: "apple_only[]", value: "\($0)") }
@@ -23,12 +29,40 @@ struct ForumEndpoints {
             let raw: JSONValue = try await client.get("forums/recent", queryItems: queryItems)
             let items = raw.arrayValue ?? []
             let topics = items.compactMap { $0.objectValue }.compactMap { Mappers.forumFromRecent($0) }
-            // Pinned-first, stable otherwise — matches the website's own
-            // ordering once the backend starts sending `sticky`; a no-op
-            // today since every item maps `isPinned` to false until then.
-            return topics.enumerated()
+            // Pinned first among the topics this page contains. The server
+            // still pages by activity, so older pins can arrive on later pages.
+            let ordered = topics.enumerated()
                 .sorted { $0.element.isPinned != $1.element.isPinned ? $0.element.isPinned : $0.offset < $1.offset }
                 .map(\.element)
+            // If the pinned list can't be fetched, the page still loads.
+            guard page == 0, includePinned,
+                  let pinned = try? await pinnedTopics(appleOnly: appleOnly), !pinned.isEmpty else { return ordered }
+            let pinnedIds = Set(pinned.map(\.id))
+            return pinned + ordered.filter { !pinnedIds.contains($0.id) }
+        }
+    }
+
+    /// Every forum topic pinned on the website right now, newest first.
+    /// The website's activity-sorted list can't put quiet pinned topics on
+    /// its first page, so they're asked for directly (checked live,
+    /// 2026-10-05). Nothing pinned is an empty list.
+    func pinnedTopics(appleOnly: Bool) async throws -> [ForumTopic] {
+        let response = try await client.jsonAPIList(
+            "node/forum",
+            query: ["filter[sticky]": "1", "filter[status]": "1", "include": "uid,taxonomy_forums",
+                    "sort": "-changed", "page[limit]": "20"]
+        )
+        let included = response.included ?? []
+        return response.data.compactMap { node in
+            if appleOnly,
+               let termId = node.relationshipId("taxonomy_forums"),
+               let tid = included.first(where: { $0.id == termId })?.attributes["drupal_internal__tid"]?.intValue,
+               Self.nonAppleTids.contains(tid) {
+                return nil
+            }
+            var topic = Mappers.forum(node, included: included)
+            topic.isPinned = true
+            return topic
         }
     }
 
@@ -47,8 +81,8 @@ struct ForumEndpoints {
     /// `AppEndpoints.jsonAPIWatchCategoryListing` — same JSON:API pattern
     /// already confirmed live for an equivalent taxonomy-reference field,
     /// not separately re-verified against this specific relationship.
-    func categoryListing(tid: Int, page: Int, limit: Int = APIPaging.pageSize) async throws -> PagedListResult<ForumTopic> {
-        try await fetchWithCache(group: .forums, key: "forums:category:\(tid):\(page)") {
+    func categoryListing(tid: Int, page: Int, limit: Int = APIPaging.pageSize, forceRefresh: Bool = false) async throws -> PagedListResult<ForumTopic> {
+        try await fetchWithCache(group: .forums, key: "forums:category:\(tid):\(page)", forceRefresh: forceRefresh) {
             let response = try await client.jsonAPIList(
                 "node/forum",
                 query: [
@@ -140,7 +174,8 @@ struct ForumEndpoints {
                 url: url,
                 isFollowing: false,
                 isSaved: false,
-                replies: replies
+                replies: replies,
+                isPinned: topic.isPinned
             )
         }
     }
@@ -150,7 +185,17 @@ struct ForumEndpoints {
     /// nodes without one. `categoryTid` is accepted for API-surface parity but
     /// currently unused in the request body.
     @discardableResult
-    func submitTopic(title: String, body: String, categoryTid: Int, csrfToken: String) async throws -> ForumTopic {
+    /// `categoryId` is the forum's own JSON:API id (`ForumCategory.id`).
+    /// The chosen forum was never sent: the topic was created with no forum
+    /// at all, so it never appeared in any forum or on Home, and the person
+    /// was told nothing went wrong. Reported by a beta tester (2026-10-05).
+    /// The relationship shape matches what the site returns for existing
+    /// topics, checked live.
+    ///
+    /// `isPublished` is the site's own answer. A topic the site keeps for a
+    /// moderator to approve comes back unpublished, and the app used to say
+    /// "Topic posted" anyway.
+    func submitTopic(title: String, body: String, categoryId: String, csrfToken: String) async throws -> (topic: ForumTopic, isPublished: Bool) {
         let response = try await client.jsonAPICreate(
             "node/forum",
             type: "node--forum",
@@ -158,9 +203,13 @@ struct ForumEndpoints {
                 "title": AnyEncodable(title),
                 "body": AnyEncodable(RichTextValue(value: body, format: drupalDefaultTextFormat)),
             ],
+            relationships: [
+                "taxonomy_forums": JsonApiRelationshipRef(type: "taxonomy_term--forums", id: categoryId),
+            ],
             headers: ["X-CSRF-Token": csrfToken]
         )
-        return Mappers.forum(response.data, included: response.included ?? [])
+        let isPublished = response.data.attributes["status"]?.boolValue ?? true
+        return (Mappers.forum(response.data, included: response.included ?? []), isPublished)
     }
 
     /// `replyToCommentId` sets the real Drupal `pid` (parent comment)

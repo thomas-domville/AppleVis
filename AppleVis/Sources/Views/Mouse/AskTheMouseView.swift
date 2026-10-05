@@ -36,6 +36,10 @@ struct AskTheMouseView: View {
         String(localized: "Questions can be up to 300 characters, so yours was shortened. Try asking it more briefly.")
     }
     @State private var searchStartedAt: Date?
+    /// When something was last spoken during a search, so "Still
+    /// searching." only comes after a long quiet stretch.
+    @State private var lastSpokenAt: Date?
+    @State private var searchSeconds = 0
     @State private var sheetPlace: MousePlace?
     @State private var forumQuestion: ForumQuestion?
     @State private var webSearch: WebSearch?
@@ -127,6 +131,7 @@ struct AskTheMouseView: View {
             .navigationDestination(for: Resource.self) { ResourceDetailView(resourceId: $0.id) }
             .navigationDestination(for: BlogPost.self) { BlogDetailView(postId: $0.id) }
             .navigationDestination(for: BugReport.self) { BugDetailView(bugId: $0.id) }
+            .firstNewCommentDestination()
             .navigationDestination(item: $pushedPlace) { place in
                 placeView(place)
             }
@@ -139,6 +144,7 @@ struct AskTheMouseView: View {
             .sheet(item: $webSearch) { item in
                 SafariView(url: item.url)
             }
+            .task(id: mouse.isBusy) { await searchHeartbeat() }
             .onChange(of: mouse.turns.first?.step) { oldStep, newStep in
                 searchStepChanged(from: oldStep, to: newStep)
             }
@@ -155,6 +161,8 @@ struct AskTheMouseView: View {
                 }
             }
         }
+        // Rows here open a post at its first new comment on this stack.
+        .environment(\.openAtFirstNewComment, OpenAtFirstNewCommentAction { path.append($0) })
     }
 
     // MARK: - Top
@@ -352,7 +360,7 @@ struct AskTheMouseView: View {
     private func turnSections(_ turn: MouseTurn) -> some View {
         Section {
             if let step = turn.step {
-                MouseSearchingRow(status: step.status, prop: step.prop)
+                MouseSearchingRow(status: step.status, prop: step.prop, seconds: searchSeconds)
                 // The answer appearing as it's written. On screen only:
                 // VoiceOver moves to the finished answer, so it never
                 // reads half a sentence.
@@ -471,11 +479,25 @@ struct AskTheMouseView: View {
         // so the person knows the answer is one step away under Need More
         // Help. Found testing "How do I take a screenshot on my iPad?"
         // (2026-10-01).
+        //
+        // When the search did turn up AppleVis results, just none that
+        // answered, say so: VoiceOver lands here first, and "couldn't find
+        // that" alone suggested there was nothing below worth reading.
+        // Requested directly (2026-10-04).
+        let hasResults = !turn.moreGuides.isEmpty || !turn.forums.isEmpty || !turn.podcasts.isEmpty
+            || !turn.blogs.isEmpty || !turn.bugs.isEmpty || !turn.otherApps.isEmpty || !turn.saved.isEmpty
         if let link = turn.appleLink, !turn.isOffTopic {
-            return String(localized: "I couldn't find that on AppleVis, but \(link.providerName) has a page about it: \(link.title). You'll find it under Need More Help.")
+            return hasResults
+                ? String(localized: "I couldn't find an answer on AppleVis, but \(link.providerName) has a page about it: \(link.title). You'll find it under Need More Help. The AppleVis results below might help too.")
+                : String(localized: "I couldn't find that on AppleVis, but \(link.providerName) has a page about it: \(link.title). You'll find it under Need More Help.")
         }
         if let entry = turn.catalogLink, !turn.isOffTopic {
-            return String(localized: "I couldn't find that on AppleVis, but \("Apple Support") has a page about it: \(entry.title). You'll find it under Need More Help.")
+            return hasResults
+                ? String(localized: "I couldn't find an answer on AppleVis, but \("Apple Support") has a page about it: \(entry.title). You'll find it under Need More Help. The AppleVis results below might help too.")
+                : String(localized: "I couldn't find that on AppleVis, but \("Apple Support") has a page about it: \(entry.title). You'll find it under Need More Help.")
+        }
+        if hasResults {
+            return String(localized: "I couldn't find a direct answer on AppleVis, but the results below might help. The community might know too, so you could ask in the Forums.")
         }
         return String(localized: "I couldn't find that on AppleVis. The community might know, so you could ask in the Forums.")
     }
@@ -974,10 +996,18 @@ struct AskTheMouseView: View {
                 }
             } header: {
                 // Changes while the Mouse reads each result for a line.
+                // Once it's done, what's left here wasn't checked: only the
+                // first few results are read, and none are without Apple
+                // Intelligence. Said plainly, so a link here isn't taken as
+                // a vetted answer. Requested directly (2026-10-05).
                 Text(turn.isReadingResults
                      ? String(localized: "More From AppleVis. The Mouse is reading these…")
-                     : String(localized: "More From AppleVis"))
+                     : String(localized: "More From AppleVis, Not Checked"))
                     .accessibilityAddTraits(.isHeader)
+            } footer: {
+                if !turn.isReadingResults {
+                    Text("The Mouse hasn't checked whether these answer your question. They share words with it, so they may still help.")
+                }
             }
         }
     }
@@ -1202,12 +1232,39 @@ struct AskTheMouseView: View {
         UIAccessibility.post(notification: .announcement, argument: String(localized: "The Mouse is searching."))
     }
 
+    /// While the Mouse searches, VoiceOver users hear a soft patter and
+    /// feel a light tap every second, the same "still working" signal the
+    /// scurrying Mouse gives sighted users. Speech stays for real changes:
+    /// step changes (below), or "Still searching." after 8 quiet seconds.
+    /// Requested directly (2026-10-04): a 5-second wait was silent.
+    private func searchHeartbeat() async {
+        guard mouse.isBusy else {
+            searchSeconds = 0
+            return
+        }
+        let started = searchStartedAt ?? Date()
+        searchStartedAt = started
+        lastSpokenAt = Date()
+        while !Task.isCancelled && mouse.isBusy {
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled, mouse.isBusy else { break }
+            searchSeconds = Int(Date().timeIntervalSince(started))
+            guard UIAccessibility.isVoiceOverRunning else { continue }
+            SoundPlayer.shared.play(.mousePatter)
+            if let last = lastSpokenAt, Date().timeIntervalSince(last) >= 8 {
+                UIAccessibility.post(notification: .announcement, argument: String(localized: "Still searching."))
+                lastSpokenAt = Date()
+            }
+        }
+    }
+
     /// Speaks progress only once a search has run for a few seconds, and
     /// then only when the step changes, so it isn't chatty. When it's done,
     /// a sound, a tap, and VoiceOver moves to the answer.
     private func searchStepChanged(from oldStep: MouseTurn.Step?, to newStep: MouseTurn.Step?) {
         if let newStep, let started = searchStartedAt, Date().timeIntervalSince(started) > 3 {
             UIAccessibility.post(notification: .announcement, argument: newStep.status)
+            lastSpokenAt = Date()
         }
         guard oldStep != nil, newStep == nil, let turn = mouse.turns.first else { return }
         searchStartedAt = nil
@@ -1339,6 +1396,14 @@ private struct MouseSearchingRow: View {
     let status: String
     /// What the Mouse holds for this step.
     let prop: String
+    /// How long the search has run, read when VoiceOver lands on the row.
+    var seconds = 0
+
+    private var spokenStatus: String {
+        guard seconds > 0 else { return status }
+        let elapsed = Duration.seconds(seconds).formatted(.units(allowed: [.minutes, .seconds], width: .wide))
+        return "\(status) \(elapsed)."
+    }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var scurry = false
 
@@ -1355,7 +1420,7 @@ private struct MouseSearchingRow: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(status)
+        .accessibilityLabel(spokenStatus)
         .onAppear {
             guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) { scurry = true }

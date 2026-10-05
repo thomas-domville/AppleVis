@@ -232,6 +232,11 @@ struct ForumTopicRow: View {
                         .lineLimit(2)
                     if translatedTitle != nil { TranslatedTitleBadge() }
                 }
+                if topic.isPinned {
+                    Label("Pinned", systemImage: "pin.fill")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
                 HStack {
                     if !topic.authorName.isEmpty {
                         Text("by \(topic.authorName)")
@@ -254,7 +259,8 @@ struct ForumTopicRow: View {
             id: topic.id, entityId: topic.nid ?? 0, kind: .forumTopic, title: topic.title, lastActivityAt: topic.lastActivityAt, url: topic.url,
             currentCommentCount: topic.replyCount,
             onAddComment: { showComposeReply = true },
-            authorId: topic.authorId, onContentDeleted: onDelete
+            authorId: topic.authorId, onContentDeleted: onDelete,
+            isPinned: topic.isPinned
         )
         .cardDensityPadding()
         .sheet(isPresented: $showComposeReply) {
@@ -288,7 +294,7 @@ struct ForumTopicRow: View {
             authorAndCount: byAuthorAndCount(topic.authorName, commentCountPhrase(topic.replyCount)),
             newActivityLabel: newLabel,
             date: topic.lastActivityAt.formatted(.relative(presentation: .named)),
-            alwaysAppend: savedFollowingLabel
+            alwaysAppend: savedFollowingLabel + (topic.isPinned ? ". " + String(localized: "Pinned") : "")
         )
     }
 }
@@ -562,7 +568,7 @@ struct PodcastEpisodeRow: View {
         if isCurrentlyPlaying {
             player.togglePlayPause()
         } else {
-            await player.load(episode)
+            await player.startFromList(episode)
         }
     }
 
@@ -884,6 +890,11 @@ struct BlogPostRow: View {
                         .lineLimit(2)
                     if translatedTitle != nil { TranslatedTitleBadge() }
                 }
+                if post.isPinned == true {
+                    Label("Pinned", systemImage: "pin.fill")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
                 HStack {
                     if !post.authorName.isEmpty {
                         Text("by \(post.authorName)")
@@ -904,7 +915,8 @@ struct BlogPostRow: View {
         .readAloudAction(postLabel)
         .contentActions(
             id: post.id, entityId: post.nid ?? 0, kind: .blogPost, title: post.title, lastActivityAt: post.lastActivityAt, url: post.url,
-            currentCommentCount: post.commentCount, onContentDeleted: onDelete
+            currentCommentCount: post.commentCount, onContentDeleted: onDelete,
+            isPinned: post.isPinned ?? false
         )
         .cardDensityPadding()
         .task(id: ContentTranslation.taskId(title: post.title, targetLanguage: preferences.effectiveContentLanguage)) {
@@ -926,7 +938,8 @@ struct BlogPostRow: View {
             authorAndCount: byAuthorAndCount(post.authorName, commentCountPhrase(post.commentCount)),
             newActivityLabel: newLabel,
             date: post.lastActivityAt.formatted(.relative(presentation: .named)),
-            alwaysAppend: post.isSaved ? String(localized: ". Saved.") : ""
+            alwaysAppend: (post.isSaved ? String(localized: ". Saved.") : "")
+                + (post.isPinned == true ? ". " + String(localized: "Pinned") : "")
         )
     }
 }

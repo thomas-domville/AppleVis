@@ -1755,7 +1755,7 @@ struct ComposeAppReviewView: View {
     // only a subject and body — so there's no star-rating input here; adding
     // one would silently discard whatever the user picked.
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             VStack(alignment: .leading, spacing: 0) {
                 WizardStepHeader(
                     title: "Add Comment", icon: "text.bubble",
@@ -1819,7 +1819,7 @@ struct ComposeAppReviewView: View {
                     .padding(.horizontal)
                     .padding(.bottom, 8)
                 if let err = submitError {
-                    Text(err).foregroundStyle(.red).padding()
+                    PostingErrorMessage(message: err).padding()
                 }
             }
             .navigationTitle("Add Comment")

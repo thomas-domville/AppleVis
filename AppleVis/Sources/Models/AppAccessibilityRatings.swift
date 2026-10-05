@@ -26,7 +26,9 @@ enum AppAccessibilityRatings {
         ("Few buttons are clearly labeled.", "Few buttons are clearly labeled."),
         ("No buttons are clearly labeled.", "No buttons are clearly labeled."),
     ]
-    static let notApplicableValue = String(localized: "Not applicable for this app")
+    /// Sent to the site as-is, so never localized: a translated value isn't
+    /// one of the field's allowed values and the whole submission fails.
+    static let notApplicableValue = "Not applicable for this app"
     static let notApplicableLabel = "Not applicable for this app."
 
     /// iOS/macOS's real 8-option Usability scale — ordered best to worst.

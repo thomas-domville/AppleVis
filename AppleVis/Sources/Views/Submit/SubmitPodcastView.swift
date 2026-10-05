@@ -90,7 +90,7 @@ struct SubmitPodcastView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             wizardContent
                 .navigationTitle("Submit a Podcast")
                 .navigationBarTitleDisplayMode(.inline)
@@ -158,6 +158,7 @@ struct SubmitPodcastView: View {
                             .foregroundStyle(.red)
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityFocused($isErrorFocused)
+                        PostingProblemDetailsButton()
                     }
                 }
             }

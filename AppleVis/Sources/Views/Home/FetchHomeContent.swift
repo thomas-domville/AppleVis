@@ -25,6 +25,15 @@ extension FeedItem {
 /// Requested directly (2026-09-25).
 struct FetchHomeContent: View {
     @ObservedObject var vm: HomeViewModel
+    /// Scrolls Home's list to a row id, so a row VoiceOver should move to
+    /// is built before focus is asked for.
+    let scrollTo: (String) -> Void
+
+    init(vm: HomeViewModel, scrollTo: @escaping (String) -> Void = { _ in }) {
+        _vm = ObservedObject(wrappedValue: vm)
+        self.scrollTo = scrollTo
+    }
+
     @ObservedObject private var listener = FetchListener.shared
     @ObservedObject private var store = FetchStore.shared
     @AppStorage("fetch.markReadAtEnd") private var markReadAtEnd = false
@@ -40,19 +49,24 @@ struct FetchHomeContent: View {
     /// comments" with nothing under it. Reported directly (2026-10-02).
     private var groups: [FetchListener.Group] {
         vm.newItems
-            .map { FetchListener.Group(item: $0, newCount: vm.newReplyCount(for: $0), isBrandNew: vm.isBrandNew($0)) }
+            .map { FetchListener.Group(item: $0, newCount: vm.newReplyCount(for: $0), isBrandNew: vm.isBrandNew($0), since: vm.newCommentsSince($0)) }
             .filter { $0.isBrandNew || $0.newCount > 0 }
     }
 
     var body: some View {
         header
             .id(FetchHeadingsRotor.headerID)
+            .onReceive(NotificationCenter.default.publisher(for: .homeFocusFetchFirstPost)) { _ in
+                let target = groups.first.map { "heading.\($0.item.id)" } ?? Self.caughtUpID
+                Task { await retryAccessibilityFocus(target, into: $focus, delaysMs: [150, 350, 600, 900]) }
+            }
             .listRowSeparator(.hidden)
             .modifier(FetchMagicTap(groups: groups))
             .modifier(FetchHeadingsRotor(groups: groups))
 
         if groups.isEmpty {
             caughtUp
+                .id(Self.caughtUpID)
                 .listRowSeparator(.hidden)
         } else {
             ForEach(groups, id: \.item.id) { group in
@@ -62,8 +76,7 @@ struct FetchHomeContent: View {
                     isBeingRead: listener.currentItemId == group.item.id,
                     onReachedEnd: { if markReadAtEnd { store.finishedIds.insert(group.item.id) } },
                     onMarkRead: { markRead(group) },
-                    focus: $focus,
-                    onMarkReadThrough: { comment, content in markRead(group, through: comment, in: content) }
+                    focus: $focus
                 )
                 .modifier(FetchMagicTap(groups: groups))
                 .modifier(FetchHeadingsRotor(groups: groups))
@@ -223,34 +236,16 @@ struct FetchHomeContent: View {
         // Through the last comment Fetch loaded, which can be past Home's
         // count when more arrived since Home refreshed.
         let shownCount = group.isBrandNew ? group.item.commentCount : group.newCount
+        // Fetch says "Group marked as read." itself, so Home's own
+        // "Marked as read." doesn't talk over it.
         if case .loaded(let content)? = store.state(for: group.item, newCount: shownCount) {
-            vm.markAsRead(group.item, through: content.throughCount)
+            vm.markAsRead(group.item, through: content.throughCount, announce: false)
         } else {
-            vm.markAsRead(group.item)
+            vm.markAsRead(group.item, announce: false)
         }
         // Said before the move, so the jump to the next heading has a
         // reason. Requested directly (2026-10-01).
         moveFocus(to: target, announcing: String(localized: "Group marked as read."))
-    }
-
-    /// "Mark Read Up to Here": this comment and the ones before it are
-    /// read; newer ones stay, and VoiceOver moves to the first of them.
-    /// On the last comment, the whole item is read. Kept on this device,
-    /// like all read status. Requested directly.
-    private func markRead(_ group: FetchListener.Group, through comment: FetchComment, in content: FetchContent) {
-        guard let index = content.comments.firstIndex(where: { $0.id == comment.id }) else { return }
-        let remaining = content.comments.count - index - 1
-        guard remaining > 0 else { markRead(group); return }
-        let shownCount = group.isBrandNew ? group.item.commentCount : group.newCount
-        // Counted from the comments Fetch loaded, not Home's total: on a
-        // busy topic Home's total can be behind, which marked too few as
-        // read, so ones already read came back. Reported directly
-        // (2026-10-02).
-        let seen = content.seenBefore + index + 1
-        store.keepAfter(index, of: group.item, from: shownCount, newCount: max(0, group.item.commentCount - seen))
-        vm.markRead(group.item, seenCount: seen)
-        moveFocus(to: content.comments[index + 1].id,
-                  announcing: String(localized: "Marked as read. \(String(localized: "\(remaining) new comments")) left."))
     }
 
     private func focusTarget(replacing item: FeedItem) -> String {
@@ -272,22 +267,43 @@ struct FetchHomeContent: View {
     /// With `announcing`, the message is spoken first: just after the rows
     /// vanish (so VoiceOver reading wherever it fell doesn't cut it off),
     /// and the move waits until it's been said.
+    ///
+    /// Marking a whole group read from its last comment removed every row
+    /// above where you were, so the list slid up and the next heading ended
+    /// up above the screen, where the list hadn't built it and focus
+    /// couldn't land. VoiceOver was left mid-group in another item, saying
+    /// nothing. The list now scrolls to the target first, every attempt.
+    /// Reported directly (2026-10-04).
     private func moveFocus(to target: String, announcing message: String? = nil) {
         focus = nil
         Task {
             guard UIAccessibility.isVoiceOverRunning else { return }
+            // Right away, so the rows that vanish don't leave the screen
+            // somewhere unrelated.
+            try? await Task.sleep(for: .milliseconds(50))
+            scrollTo(Self.scrollID(for: target))
             var delays = [350, 650, 1000]
             if let message {
-                try? await Task.sleep(for: .milliseconds(250))
+                try? await Task.sleep(for: .milliseconds(200))
                 UIAccessibility.post(notification: .announcement, argument: message)
                 delays = [message.count > 30 ? 2000 : 1300, 500, 700]
             }
             for delayMs in delays {
                 try? await Task.sleep(for: .milliseconds(delayMs))
+                scrollTo(Self.scrollID(for: target))
                 focus = nil
                 focus = target
             }
         }
+    }
+
+    /// Focus ids name headings "heading.<id>"; their rows are scrolled to
+    /// by `FetchHeadingsRotor.headingID`. Comments and All Caught Up use
+    /// the same id for both.
+    private static func scrollID(for focusID: String) -> String {
+        let prefix = "heading."
+        guard focusID.hasPrefix(prefix) else { return focusID }
+        return "fetch.heading.\(focusID.dropFirst(prefix.count))"
     }
 }
 
@@ -297,7 +313,7 @@ struct FetchHomeContent: View {
 /// While VoiceOver is anywhere in Fetch, this Headings rotor lists every
 /// item, on screen or not, and moves straight to it. Home's other views
 /// keep the usual Headings rotor. Reported directly (2026-09-28).
-private struct FetchHeadingsRotor: ViewModifier {
+struct FetchHeadingsRotor: ViewModifier {
     let groups: [FetchListener.Group]
     static let headerID = "fetch.header"
 
@@ -368,11 +384,14 @@ private struct FetchGroupRows: View {
     /// Fetch's shared focus. Also the row VoiceOver returns to after coming
     /// back from the page it opened.
     let focus: AccessibilityFocusState<String?>.Binding
-    let onMarkReadThrough: (FetchComment, FetchContent) -> Void
 
     @ObservedObject private var store = FetchStore.shared
     @State private var showsOriginal = false
     @State private var replyingTo: FetchComment?
+    /// Rows whose text is longer than their shortened view, and rows the
+    /// reader has expanded. See `FetchClampedText`.
+    @State private var clippedRows: Set<String> = []
+    @State private var expandedRows: Set<String> = []
 
     private var item: FeedItem { group.item }
     /// A brand-new item's comments are all new to you.
@@ -381,7 +400,7 @@ private struct FetchGroupRows: View {
     var body: some View {
         headingRow
             .id(FetchHeadingsRotor.headingID(item))
-            .task { await store.load(item, newCount: commentCount) }
+            .task { await store.load(item, newCount: commentCount, since: group.isBrandNew ? nil : group.since) }
             .sheet(item: $replyingTo) { comment in
                 replySheet(for: comment)
             }
@@ -406,7 +425,7 @@ private struct FetchGroupRows: View {
                 Text("Couldn't load this item.")
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Try Again") { Task { await store.retry(item, newCount: commentCount) } }
+                Button("Try Again") { Task { await store.retry(item, newCount: commentCount, since: group.isBrandNew ? nil : group.since) } }
             }
             .font(.subheadline)
             .padding(.leading, 20)
@@ -461,7 +480,7 @@ private struct FetchGroupRows: View {
                     .foregroundStyle(.primary)
                 Text(group.isBrandNew
                      ? String(localized: "New")
-                     : String(localized: "\(group.newCount) new comments"))
+                     : String(localized: "\(shownNewCount) new comments"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -475,7 +494,7 @@ private struct FetchGroupRows: View {
         // On the combined element, not inside it, so VoiceOver can land on
         // it. Fixed 2026-10-01.
         .accessibilityFocused(focus, equals: "heading.\(item.id)")
-        .accessibilityLabel(FetchText.heading(item, newCount: group.newCount, isBrandNew: group.isBrandNew))
+        .accessibilityLabel(FetchText.heading(item, newCount: shownNewCount, isBrandNew: group.isBrandNew))
         .accessibilityAddTraits(.isHeader)
         // "Mark This Group as Read": plain Mark as Read didn't say it clears
         // the post and all its comments. Requested directly (2026-10-01).
@@ -499,6 +518,13 @@ private struct FetchGroupRows: View {
         }
     }
 
+    /// Once loaded, the number of new comments actually listed, which can
+    /// differ from Home's count now that they're chosen by date.
+    private var shownNewCount: Int {
+        guard !group.isBrandNew, let loadedContent else { return group.newCount }
+        return loadedContent.comments.count
+    }
+
     private var loadedContent: FetchContent? {
         if case .loaded(let content)? = store.state(for: item, newCount: commentCount) { return content }
         return nil
@@ -506,24 +532,55 @@ private struct FetchGroupRows: View {
 
     /// The post, whole, as one row. Long posts and comments were briefly
     /// split into several rows; back to one each, as requested directly
-    /// (2026-10-01).
+    /// (2026-10-01). On screen a long one is shortened (see
+    /// `FetchClampedText`); VoiceOver still reads all of it.
     private func previewRows(_ content: FetchContent, isEnd: Bool) -> some View {
-        link(item.fetchTarget, rowId: "preview.\(item.id)") {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(content.preview)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                if content.previewIsExcerpt {
-                    Text("Continues. Double-tap to read the rest.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        let rowId = "preview.\(item.id)"
+        return VStack(alignment: .leading, spacing: 6) {
+            link(item.fetchTarget, rowId: rowId) {
+                VStack(alignment: .leading, spacing: 4) {
+                    clampedText(content.preview, rowId: rowId)
+                    if content.previewIsExcerpt {
+                        Text("Continues. Double-tap to read the rest.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
+            expandButton(rowId: rowId, showLabel: "Show Full Post")
         }
         .padding(.leading, 20)
         .accessibilityElement(children: .combine)
-        .accessibilityFocused(focus, equals: "preview.\(item.id)")
+        .accessibilityFocused(focus, equals: rowId)
+        .modifier(ExpandAction(rowId: rowId, showLabel: "Show Full Post", clipped: clippedRows, expanded: $expandedRows))
         .onAppear { if isEnd { onReachedEnd() } }
+    }
+
+    // MARK: Long text
+
+    private func clampedText(_ text: String, rowId: String) -> some View {
+        FetchClampedText(text: text, isExpanded: expandedRows.contains(rowId)) { isClipped in
+            if isClipped { clippedRows.insert(rowId) } else { clippedRows.remove(rowId) }
+        }
+    }
+
+    /// Shown only when the text is cut short (or was expanded). Hidden
+    /// from VoiceOver, which already reads the whole text; the same toggle
+    /// is an action on the row for Switch Control and Voice Control.
+    @ViewBuilder
+    private func expandButton(rowId: String, showLabel: LocalizedStringKey) -> some View {
+        if clippedRows.contains(rowId) || expandedRows.contains(rowId) {
+            let isExpanded = expandedRows.contains(rowId)
+            Button {
+                if isExpanded { expandedRows.remove(rowId) } else { expandedRows.insert(rowId) }
+            } label: {
+                if isExpanded { Text("Show Less") } else { Text(showLabel) }
+            }
+            .font(.caption.weight(.semibold))
+            // Borderless, so tapping it doesn't also open the thread.
+            .buttonStyle(.borderless)
+            .accessibilityHidden(true)
+        }
     }
 
     private func originalPostRow(_ content: FetchContent) -> some View {
@@ -547,25 +604,26 @@ private struct FetchGroupRows: View {
 
     private func commentRow(_ comment: FetchComment, isLast: Bool) -> some View {
         let target = FetchThreadTarget(kind: item.kind, contentId: item.contentId, platform: item.fetchTarget.platform, commentId: comment.id)
-        return link(target, rowId: comment.id) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(FetchText.commentHeader(comment))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                if let replyingTo = comment.replyingTo {
-                    Text(String(localized: "Replying to \(replyingTo)."))
-                        .font(.caption)
+        return VStack(alignment: .leading, spacing: 6) {
+            link(target, rowId: comment.id) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(FetchText.commentHeader(comment))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                }
-                Text(comment.text)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                if comment.isTruncated {
-                    Text("Continues. Double-tap to read the rest.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if let replyingTo = comment.replyingTo {
+                        Text(String(localized: "Replying to \(replyingTo)."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    clampedText(comment.text, rowId: comment.id)
+                    if comment.isTruncated {
+                        Text("Continues. Double-tap to read the rest.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
+            expandButton(rowId: comment.id, showLabel: "Show Full Comment")
         }
         .padding(.leading, 20)
         // A thin line joining the comments to their item, for sighted users.
@@ -575,13 +633,13 @@ private struct FetchGroupRows: View {
         .accessibilityElement(children: .combine)
         .accessibilityFocused(focus, equals: comment.id)
         .accessibilityHint(String(localized: "Double-tap to open this comment in its thread."))
+        .modifier(ExpandAction(rowId: comment.id, showLabel: "Show Full Comment", clipped: clippedRows, expanded: $expandedRows))
         // Reply (quoting this comment, without leaving Fetch), Copy, Share,
         // Report, and Edit / Unpublish / Delete where allowed.
         .modifier(FetchCommentActions(
             comment: comment, item: item,
             onReply: { replyingTo = comment },
-            isLastInGroup: isLast,
-            onMarkReadThrough: { if let content = loadedContent { onMarkReadThrough(comment, content) } },
+            onMarkRead: onMarkRead,
             onRemoved: { store.removeComment(comment.id, item: item, newCount: commentCount) },
             onEdited: { store.updateComment(comment.id, newText: $0, item: item, newCount: commentCount) }
         ))
@@ -607,6 +665,85 @@ private struct FetchGroupRows: View {
     }
 }
 
+/// Long text kept shorter than the screen. A row taller than the screen
+/// stopped VoiceOver: the list hadn't built the next row yet, so a swipe
+/// right jumped past the rest of Fetch to the tab bar. Splitting long text
+/// into several rows fixed that but made one comment several stops, which
+/// wasn't wanted. Now the text shows a few lines on screen, with Show Full
+/// Comment to expand it, while VoiceOver and braille get the whole text as
+/// one item, since a shortened Text still reads in full. Reported directly
+/// (2026-10-04).
+struct FetchClampedText: View {
+    let text: String
+    let isExpanded: Bool
+    let onClippedChange: (Bool) -> Void
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    /// Fewer lines at larger text sizes, so the row stays well under a
+    /// screen tall.
+    private var lineLimit: Int {
+        switch typeSize {
+        case .accessibility3, .accessibility4, .accessibility5: return 4
+        case .accessibility1, .accessibility2: return 6
+        case .xxxLarge, .xxLarge: return 8
+        default: return 10
+        }
+    }
+
+    var body: some View {
+        Text(text)
+            .font(.body)
+            .foregroundStyle(.primary)
+            .lineLimit(isExpanded ? nil : lineLimit)
+            .background {
+                // The full text, laid out at the same width but not shown,
+                // to tell whether the visible one was cut short.
+                GeometryReader { shown in
+                    Text(text)
+                        .font(.body)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(width: shown.size.width, alignment: .leading)
+                        .hidden()
+                        .accessibilityHidden(true)
+                        .background {
+                            GeometryReader { full in
+                                Color.clear
+                                    .onAppear { report(full: full.size.height, shown: shown.size.height) }
+                                    .onChange(of: full.size.height) { _, height in report(full: height, shown: shown.size.height) }
+                                    .onChange(of: shown.size.height) { _, height in report(full: full.size.height, shown: height) }
+                            }
+                        }
+                }
+            }
+    }
+
+    private func report(full: CGFloat, shown: CGFloat) {
+        guard !isExpanded else { return }
+        onClippedChange(full > shown + 1)
+    }
+}
+
+/// Show Full Comment / Show Less as a row action, for Switch Control and
+/// Voice Control users, who can't reach the hidden button.
+private struct ExpandAction: ViewModifier {
+    let rowId: String
+    let showLabel: LocalizedStringKey
+    let clipped: Set<String>
+    @Binding var expanded: Set<String>
+
+    // One modifier either way, so toggling doesn't rebuild the row and
+    // lose VoiceOver's place.
+    func body(content: Content) -> some View {
+        content.accessibilityActions {
+            if expanded.contains(rowId) {
+                Button("Show Less") { expanded.remove(rowId) }
+            } else if clipped.contains(rowId) {
+                Button(showLabel) { expanded.insert(rowId) }
+            }
+        }
+    }
+}
+
 /// Everything a comment offers on its own detail page, on Fetch's comment
 /// rows too: Reply, Copy, Share, Report, and — for its author or an admin —
 /// Edit and Delete, plus Unpublish for admins. Same wording and behavior as
@@ -615,18 +752,8 @@ private struct FetchCommentActions: ViewModifier {
     let comment: FetchComment
     let item: FeedItem
     let onReply: () -> Void
-    /// On the group's last comment, where marking it read clears the
-    /// whole group.
-    var isLastInGroup = false
-    /// "Mark Read Up to Here": this comment and the ones before it.
-    let onMarkReadThrough: () -> Void
-
-    /// On the last comment, Mark Read Up to Here clears the whole group,
-    /// so it's named for that, the same as on the heading. Requested
-    /// directly (2026-10-01).
-    private var markReadName: LocalizedStringKey {
-        isLastInGroup ? "Mark This Group as Read" : "Mark Read Up to Here"
-    }
+    /// Read status applies to the whole post and its comments, as on the website.
+    let onMarkRead: () -> Void
     let onRemoved: () -> Void
     let onEdited: (String) -> Void
 
@@ -647,7 +774,7 @@ private struct FetchCommentActions: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .accessibilityAction(named: Text(markReadName)) { onMarkReadThrough() }
+            .accessibilityAction(named: Text("Mark This Group as Read")) { onMarkRead() }
             .modifier(ConditionalAccessibilityAction(isActive: auth.isSignedIn, name: "Reply to this Comment") { onReply() })
             .accessibilityAction(named: Text("Copy Comment Text")) { copyText() }
             .accessibilityAction(named: Text("Share Comment")) { share() }
@@ -656,8 +783,8 @@ private struct FetchCommentActions: ViewModifier {
             .modifier(ConditionalAccessibilityAction(isActive: isAdmin, name: "Unpublish Comment") { showUnpublishConfirm = true })
             .modifier(ConditionalAccessibilityAction(isActive: canEdit, name: "Delete Comment") { showDeleteConfirm = true })
             .voiceOverAwareSwipeActions {
-                Button(action: onMarkReadThrough) {
-                    Label(markReadName, systemImage: "checkmark.circle")
+                Button(action: onMarkRead) {
+                    Label("Mark This Group as Read", systemImage: "checkmark.circle")
                 }
                 .tint(.green)
             } trailing: {
@@ -669,8 +796,8 @@ private struct FetchCommentActions: ViewModifier {
                 }
             }
             .contextMenu {
-                Button(action: onMarkReadThrough) {
-                    Label(markReadName, systemImage: "checkmark.circle")
+                Button(action: onMarkRead) {
+                    Label("Mark This Group as Read", systemImage: "checkmark.circle")
                 }
                 if auth.isSignedIn {
                     Button(action: onReply) {

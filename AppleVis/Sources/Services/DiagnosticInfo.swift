@@ -96,3 +96,60 @@ enum DiagnosticInfo {
         """
     }
 }
+
+// MARK: - Posting problems
+
+/// The short note behind Copy Details for AppleVis, and the Contact form's
+/// option to include it. Kept here with the support report because it's
+/// written for the AppleVis team, in English, whatever the app's language.
+extension DiagnosticInfo {
+    nonisolated static func postingProblem(for request: URLRequest, error: Error) -> PostingProblem {
+        var status: Int?
+        var said: [String] = []
+        let kind: String
+        switch error as? APIError {
+        case .refused(let refusal)?:
+            status = refusal.statusCode
+            said = refusal.problems.map(\.detail)
+            kind = refusal.fromFirewall ? "refused by firewall" : "refused"
+        case .server(let code)?: status = code; kind = "server error"
+        case .unknown(let code)?: status = code; kind = "unexpected"
+        case .forbidden?: status = 403; kind = "forbidden"
+        case .unauthorized?: status = 401; kind = "signed out"
+        case .notFound?: status = 404; kind = "not found"
+        case .rateLimited?: status = 429; kind = "rate limited"
+        case .timeout?: kind = "timed out"
+        case .network?: kind = "network"
+        case .decoding?: kind = "unreadable reply"
+        default: kind = String(describing: type(of: error))
+        }
+        return PostingProblem(
+            date: Date(),
+            method: request.httpMethod ?? "GET",
+            path: request.url?.path ?? "",
+            statusCode: status,
+            errorKind: kind,
+            siteSaid: said
+        )
+    }
+
+    static func postingProblemReport(_ problem: PostingProblem) -> String {
+        let when = problem.date.formatted(.iso8601.year().month().day().time(includingFractionalSeconds: false))
+        var lines = [
+            "AppleVis App Posting Problem",
+            "----------------------------",
+            "When:         \(when) UTC (\(TimeZone.current.identifier))",
+            "App Version:  \(DiagnosticInfo.appVersion) (Build \(DiagnosticInfo.buildNumber))",
+            "iOS Version:  \(DiagnosticInfo.iosVersion)",
+            "Language:     \(Locale.current.identifier)",
+            "Request:      \(problem.method) \(problem.path)",
+            "Response:     \(problem.statusCode.map { "HTTP \($0)" } ?? "none") (\(problem.errorKind))",
+        ]
+        if problem.siteSaid.isEmpty {
+            lines.append("Site said:    (no reason given)")
+        } else {
+            lines += problem.siteSaid.map { "Site said:    \($0)" }
+        }
+        return lines.joined(separator: "\n")
+    }
+}

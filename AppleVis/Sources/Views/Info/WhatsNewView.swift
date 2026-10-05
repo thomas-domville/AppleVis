@@ -191,14 +191,173 @@ struct ChangeItem: Identifiable {
     let title: String
     let description: String
 
-    static let currentVersion = "2026.20"
+    static let currentVersion = "2026.21"
 
     static let current: [ChangeItem] = [
+        ChangeItem(
+            systemImage: "text.bubble",
+            tag: .fixed,
+            title: "Jump to First New Comment Opens Posts Normally",
+            description: "Jump to First New Comment now opens a post the same way as choosing it, with the usual Back button, and VoiceOver lands on the first new comment. It used to open a separate view with a Close button."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.circle",
+            tag: .improved,
+            title: "Mark as Read Syncs with the Website",
+            description: "When signed in and online, Mark as Read and Mark All as Read also update your read history on the website."
+        ),
+        ChangeItem(
+            systemImage: "arrow.triangle.2.circlepath",
+            tag: .fixed,
+            title: "Website Sync Fixes",
+            description: "Topics pinned on the website always appear at the top of Forums, and they update when you refresh. When signed in, Home and Forums recognize items you read on the website."
+        ),
+        ChangeItem(
+            systemImage: "globe.europe.africa",
+            tag: .improved,
+            title: "Submitting Apps From Any Country",
+            description: "When you submit an app found in another country's App Store, AppleVis uses the developer's English description when there is one. If the description is only in another language, it's translated into English on your device, with a line saying so. The App Store link now opens in each reader's own country's App Store."
+        ),
+        ChangeItem(
+            systemImage: "exclamationmark.bubble",
+            tag: .improved,
+            title: "Clearer Messages When a Post Doesn't Go Through",
+            description: "When the site turns down a topic, comment, reply, edit, or app submission, AppleVis now tells you which part to fix. VoiceOver reads these messages as soon as they appear. If a post still won't go, Copy Details makes a short note of what went wrong for you to send us. Submit an App also checks the length of version numbers before you send."
+        ),
+        ChangeItem(
+            systemImage: "globe",
+            tag: .fixed,
+            title: "App Submissions in Other Languages",
+            description: "Choosing Not applicable for VoiceOver Performance or Button Labelling no longer stops an app submission when your iPhone isn't set to English."
+        ),
+        ChangeItem(
+            systemImage: "bubble.left.and.text.bubble.right",
+            tag: .fixed,
+            title: "New Topics Post to Their Forum",
+            description: "A new forum topic could close as if it had posted, but never appear. The forum you chose wasn't being sent with it. It is now. Confirmations such as Topic posted are also spoken after the screen closes, so VoiceOver no longer cuts them off. If a topic needs a moderator's approval, the app now says so."
+        ),
+        ChangeItem(
+            systemImage: "checklist.unchecked",
+            tag: .improved,
+            title: "Clearer About What the Mouse Checked",
+            description: "In Ask the Mouse, results the Mouse didn't read are now listed under More From AppleVis, Not Checked. They share words with your question, but the Mouse hasn't confirmed that they answer it."
+        ),
+        ChangeItem(
+            systemImage: "mic",
+            tag: .fixed,
+            title: "Latest Podcasts and Bug Reports from the Mouse",
+            description: "Asking the Mouse for the latest AppleVis podcast now brings the newest episodes, not older ones that happened to match. And questions that name a version, such as VoiceOver bugs in macOS 27, now find related bug reports."
+        ),
+        ChangeItem(
+            systemImage: "magnifyingglass",
+            tag: .fixed,
+            title: "Better App Answers from the Mouse",
+            description: "Asking the Mouse for Mac, Apple Watch, or Apple TV apps of a certain kind, such as Apple Watch fitness apps, found nothing. It now finds them. Questions using short terms such as RPG, GPS, or OCR find the right apps. And when several AppleVis blog posts match, such as yearly Golden Apples winners, the newest comes first."
+        ),
+        ChangeItem(
+            systemImage: "square.and.arrow.up",
+            tag: .new,
+            title: "Share or Print Help Articles",
+            description: "Every Help article now has Share or Print. It shares the article as plain text, to send to another device, a note taker, or a braille embosser. That way, steps such as how to force restart are at hand even when the device they're about isn't responding."
+        ),
+        ChangeItem(
+            systemImage: "list.bullet.rectangle",
+            tag: .new,
+            title: "Quick Reference in Help",
+            description: "Help has a new Quick Reference section, written by AppleVis. It covers VoiceOver and braille on iPhone, iPad, Mac, Apple Watch, and Apple TV, typing, low vision features, image and scene descriptions, the web, everyday tasks, what to do when VoiceOver stops talking, restarting and updating your devices, getting help, and a glossary of terms. Each article links to the Apple page it was checked against. Ask the Mouse can answer from it too."
+        ),
+        ChangeItem(
+            systemImage: "questionmark.bubble",
+            tag: .improved,
+            title: "When the Mouse Finds No Answer",
+            description: "When Ask the Mouse can't find a direct answer but does find related AppleVis results, its reply now says so and points you to the results below it."
+        ),
+        ChangeItem(
+            systemImage: "hand.point.up.braille",
+            tag: .improved,
+            title: "Braille Command Questions",
+            description: "Ask the Mouse now knows Apple's page of common braille display commands for VoiceOver on iPhone and iPad. A question such as What's the braille command for Control Center? gets a link to it under Need More Help."
+        ),
+        ChangeItem(
+            systemImage: "pawprint",
+            tag: .accessibility,
+            title: "Hear the Mouse Searching",
+            description: "With VoiceOver, Ask the Mouse now plays a soft patter and a light tap every second while it searches, so you know it's still working. After a quiet stretch, VoiceOver says Still searching. The searching row also says how long the search has taken."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.circle",
+            tag: .improved,
+            title: "Mark This Group as Read in Fetch",
+            description: "In Fetch, Mark This Group as Read is available on every comment and on the group heading. It marks the post and all its comments as read, matching the website."
+        ),
+        ChangeItem(
+            systemImage: "text.alignleft",
+            tag: .fixed,
+            title: "Long Comments in Fetch",
+            description: "With VoiceOver, a very long comment in Fetch could make swiping right skip the rest of Fetch and land on the tab bar. On screen, long posts and comments now show their first few lines, with Show Full Comment to see the rest. VoiceOver still reads each comment in full, as one item."
+        ),
+        ChangeItem(
+            systemImage: "dog",
+            tag: .fixed,
+            title: "Only New Comments in Fetch",
+            description: "Fetch could list older comments as new, such as one posted two weeks earlier. That happened when someone replied to an earlier comment, or a comment had been removed. Fetch now picks new comments by when they were posted, and the count above them matches what is listed."
+        ),
+        ChangeItem(
+            systemImage: "arrow.clockwise",
+            tag: .accessibility,
+            title: "Coming Back to Home",
+            description: "When you come back to AppleVis after more than five minutes, Home refreshes. VoiceOver now stays where you were and says Home updated, followed by what's new. Before, it moved you to the What's New summary and could read the summary more than once."
+        ),
+        ChangeItem(
+            systemImage: "sparkles",
+            tag: .fixed,
+            title: "What's New Summary on Home",
+            description: "Activating the What's New summary on Home often seemed to do nothing. It now goes somewhere useful in each view. In All, it takes you to the item you last opened. In New, it goes to the first unread item. In Fetch, it goes to the first post. In Nibbles, it goes to the start of Nibbles."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.circle",
+            tag: .improved,
+            title: "Done Button in Settings",
+            description: "Settings now opens on top of Profile, with Done at the top right of every Settings screen. Done closes Settings and takes you back to what you were doing, so you no longer need to choose Back several times."
+        ),
+        ChangeItem(
+            systemImage: "text.badge.checkmark",
+            tag: .improved,
+            title: "Clearer Wording for New",
+            description: "Home's New view and summary used to say since your last visit. That wasn't accurate, because anything you haven't read stays in New until you open it or mark it as read. They now say you haven't read it yet."
+        ),
+        ChangeItem(
+            systemImage: "airpods",
+            tag: .improved,
+            title: "AirPods Skip Forward and Back",
+            description: "A double press on AirPods now skips forward, and a triple press skips back, by the amounts set in Settings > Podcasts. Before, a triple press went back to the start of the episode. To get the old behaviour, change Headphone Controls in Settings > Podcasts."
+        ),
+        ChangeItem(
+            systemImage: "play.rectangle",
+            tag: .new,
+            title: "Open Player on Play",
+            description: "A new setting in Settings > Podcasts opens the player when you play an episode from a list. It is off by default. You can always open the player from the mini player at the bottom of the screen."
+        ),
+        ChangeItem(
+            systemImage: "lock.iphone",
+            tag: .fixed,
+            title: "Episode Length on the Lock Screen",
+            description: "The Lock Screen and Control Center now show how long a podcast episode is, instead of zero seconds. The time shown also updates after you skip. Skipping forward just after an episode starts no longer takes you back to the beginning."
+        ),
+        ChangeItem(
+            systemImage: "hand.point.up.braille",
+            tag: .accessibility,
+            title: "Finding the Player with VoiceOver",
+            description: "The mini player now reads as a button that opens the player. The first few times you play an episode from a list, VoiceOver says that the player is at the bottom of the screen."
+        ),
+    ]
+
+    static let archivedFrom2026_20: [ChangeItem] = [
         ChangeItem(
             systemImage: "checkmark.bubble",
             tag: .fixed,
             title: "Fetch Remembers What You've Read",
-            description: "On a busy topic, comments you had marked as read could come back in Fetch with the new ones. Fetch now always loads the latest comments. Mark Read Up to Here counts from the comments Fetch actually shows."
+            description: "On a busy topic, comments you had marked as read could come back in Fetch with the new ones. Fetch now always loads the latest comments."
         ),
         ChangeItem(
             systemImage: "dog",
@@ -1231,6 +1390,7 @@ struct HistorySection: Identifiable {
     let items: [ChangeItem]
 
     static let all: [HistorySection] = [
+        HistorySection(title: "Also in 2026.20", items: ChangeItem.archivedFrom2026_20),
         HistorySection(title: "Also in 2026.19", items: ChangeItem.archivedFrom2026_19),
         HistorySection(title: "Also in 2026.18", items: ChangeItem.archivedFrom2026_18),
         HistorySection(title: "Also in 2026.17", items: ChangeItem.archivedFrom2026_17),

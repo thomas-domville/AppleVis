@@ -38,7 +38,7 @@ struct EditProfileView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             Form {
                 Section {
                     WizardStepHeader(
@@ -327,7 +327,7 @@ private struct CountryPickerSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             List {
                 countryRow(name: String(localized: "Not Set"), isSelected: selection.isEmpty) {
                     selection = ""
@@ -383,7 +383,7 @@ private struct BioAssistSheet: View {
     @AccessibilityFocusState private var isHeaderFocused: Bool
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             Form {
                 Section {
                     WizardStepHeader(
@@ -497,7 +497,7 @@ private struct DevicesPickerSheet: View {
     private static let maxLength = 255
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             List {
                 Section {
                     Text("Select the Apple products you use. This is shown on your public profile.")
@@ -682,7 +682,7 @@ private struct TimeZonePickerSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             ScrollViewReader { proxy in
                 List {
                     if showDeviceSuggestion {

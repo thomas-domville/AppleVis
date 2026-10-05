@@ -76,6 +76,14 @@ struct HelpArticleDetailView: View {
         .background(preferences.colors.background)
         .navigationTitle(article.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                ShareLink(item: article.plainText, subject: Text(article.title)) {
+                    Label("Share or Print", systemImage: "square.and.arrow.up")
+                }
+                .accessibilityHint(String(localized: "Shares this article as text. To print or emboss it, choose Print."))
+            }
+        }
         .sheet(isPresented: $showWelcomeTour) {
             GuidedExperienceView(experience: GuidedExperienceRegistry.welcome)
         }
@@ -184,6 +192,8 @@ struct HelpBlockView: View {
             return items.enumerated().map { ("\(block.id).\($0.offset)", $0.element) }
         case .faq(let question, let answer):
             return [("\(block.id).q", question), ("\(block.id).a", answer)]
+        case .source(let label, _):
+            return [(block.id, label)]
         }
     }
 
@@ -264,6 +274,15 @@ struct HelpBlockView: View {
                 .accessibilityLabel(String(localized: (translated[qField] != nil || translated[aField] != nil)
                     ? "Question: \(qText). Answer: \(aText). Translated from English."
                     : "Question: \(qText). Answer: \(aText)"))
+
+            case .source(let originalLabel, let url):
+                if let destination = URL(string: url) {
+                    WebLink(destination: destination, hint: String(localized: "Opens the page this reference was checked against.")) {
+                        Label(text(block.id, originalLabel), systemImage: "link")
+                            .font(.subheadline)
+                    }
+                    .padding(.vertical, 6)
+                }
             }
         }
         .task(id: taskIdKey) { await resolveIfNeeded() }

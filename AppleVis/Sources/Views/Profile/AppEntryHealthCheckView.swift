@@ -625,7 +625,7 @@ private struct AppHealthFlagActions: ViewModifier {
         defer { isLoadingRefresh = false }
         guard let detail = try? await APIClient.shared.apps.detail(id: flag.appId, platform: .ios, forceRefresh: true),
               let storeUrl = detail.appStoreUrl?.trimmingCharacters(in: .whitespacesAndNewlines), !storeUrl.isEmpty,
-              case .found(let metadata) = await ItunesAPI.lookupMetadata(appStoreUrl: storeUrl)
+              case .found(let metadata) = await ItunesAPI.lookupMetadata(appStoreUrl: storeUrl, english: true)
         else {
             toast.error(String(localized: "Couldn't load the App Store details. Try again."))
             return

@@ -58,6 +58,8 @@ nonisolated enum JSONValue: Decodable, Sendable {
         switch self {
         case .bool(let b): return b
         case .number(let n): return n != 0
+        case .string("1"): return true
+        case .string("0"): return false
         default: return nil
         }
     }

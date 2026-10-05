@@ -24,7 +24,7 @@ final class ICloudSyncManager {
         "theme", "appearance.cardDensity",
         "feed.showForums", "feed.showPodcasts", "feed.showApps", "feed.showGuides",
         "feed.showBlogs", "feed.appleOnly",
-        "podcast.speed", "podcast.skipBack", "podcast.skipForward", "podcast.autoPlay",
+        "podcast.speed", "podcast.skipBack", "podcast.skipForward", "podcast.autoPlay", "podcast.openPlayerOnPlay", "podcast.headphoneControls",
         "podcast.sleepTimer", "podcast.resumeRewind", "podcast.trimSilence",
         "podcast.voiceBoost", "podcast.eq", "podcast.autoDownload", "podcast.autoDelete",
         "a11y.announcement", "a11y.helpfulTips", "a11y.welcomeSummary",

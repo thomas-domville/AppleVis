@@ -407,7 +407,17 @@ final class AskTheMouse: ObservableObject {
         // brought back unrelated posts under More From AppleVis.
         // Reported directly (2026-09-28).
         let appOnly = [.whatsNew, .changeSetting, .savedItems].contains(plan.kind)
-        async let siteResults: SearchResults? = appOnly ? nil : (try? APIClient.shared.search.query(searchPhrase))
+        async let siteResults: SearchResults? = appOnly ? nil : (try? APIClient.shared.search.query(searchPhrase, relaxBugVersions: true))
+        // "What's the latest AppleVis podcast?": the site's search ranks by
+        // relevance, so it brought back episodes from 2018 to 2022 and the
+        // newest one wasn't among them. Questions asking for the latest
+        // episodes get the newest from the podcast feed instead. Found
+        // testing live questions (2026-10-05).
+        let questionWords = Set(MouseKnowledge.terms(question))
+        let wantsLatestPodcast = !appOnly && !questionWords.isDisjoint(with: ["latest", "newest", "recent", "week", "last"])
+            && (lower.contains("podcast") || lower.contains("episode"))
+        async let latestEpisodes: [PodcastEpisode] = wantsLatestPodcast
+            ? ((try? await APIClient.shared.podcasts.episodes().items) ?? []) : []
         async let appResults: [AppListing]? = plan.kind == .findApps
             ? (try? APIClient.shared.apps.mouseSearch(
                 keyword: plan.appKeyword.isEmpty ? searchPhrase : plan.appKeyword,
@@ -429,6 +439,7 @@ final class AskTheMouse: ObservableObject {
         async let essentialFound: Resource? = appOnly ? nil : Self.findEssential(plan.essentialGuide)
         async let namedApp: AppRead? = appOnly || plan.kind == .findApps ? nil : Self.readNamedApp(plan.appName)
         var site = await siteResults
+        let latestPodcasts = Array(await latestEpisodes.prefix(3))
         for extra in await extraResults {
             site = site.map { merged($0, extra) } ?? extra
         }
@@ -478,7 +489,7 @@ final class AskTheMouse: ObservableObject {
         // The best-matching AppleVis blog post, read in full: news and
         // "what's new" answers live there. Found testing (2026-10-01).
         let blogCandidate: BlogPost? = [.appleHowTo, .communityDiscussion, .other].contains(plan.kind)
-            ? Self.ranked(site?.blogs ?? [], by: scorer) { ($0.title, $0.summary) }.first
+            ? Self.ranked(site?.blogs ?? [], by: scorer, newestFirst: \.publishedAt) { ($0.title, $0.summary) }.first
             : nil
         async let blogRead = Self.readBlog(blogCandidate)
         let candidateReads = await guideReads
@@ -522,7 +533,14 @@ final class AskTheMouse: ObservableObject {
         var guideFocus: [String: String] = [:]
         var versionNotes: [String: String] = [:]
         for article in help.prefix(2) {
-            let text = MouseKnowledge.bestPassages(in: MouseKnowledge.helpArticleText(article), terms: words, maxCharacters: 900)
+            // Inside an article, rank lines by the question's words that
+            // aren't already in its title. In "Braille Display Commands",
+            // nearly every line has "braille" and "command", so "go home"
+            // lost out to generic lines and the answer was cut. The title
+            // words already chose the article. Found testing (2026-10-05).
+            let titleWords = Set(MouseKnowledge.terms(article.title))
+            let focused = words.filter { !titleWords.contains($0) }
+            let text = MouseKnowledge.bestPassages(in: MouseKnowledge.helpPassageText(article), terms: focused.isEmpty ? words : focused, maxCharacters: 900)
             sources.append(.init(id: "help-\(article.id)", title: article.title, text: article.summary + "\n" + text))
         }
         for (guide, read) in zip(guides, guideTexts) where !read.text.isEmpty {
@@ -716,8 +734,10 @@ final class AskTheMouse: ObservableObject {
                 let usedForumIds = Set(turn.forumsUsed.map(\.id))
                 turn.moreGuides = Array(Self.ranked(site.guides.filter { !usedGuideIds.contains($0.id) }, by: scorer) { ($0.title, $0.summary) }.prefix(3))
                 turn.forums = Array(Self.ranked(site.forums.filter { !usedForumIds.contains($0.id) }, by: scorer) { ($0.title, "") }.prefix(3))
-                turn.podcasts = Array(Self.ranked(site.podcasts, by: scorer) { ($0.title, $0.description) }.prefix(2))
-                turn.blogs = Array(Self.ranked(site.blogs.filter { blog in !turn.blogsUsed.contains { $0.id == blog.id } }, by: scorer) { ($0.title, $0.summary) }.prefix(2))
+                turn.podcasts = latestPodcasts.isEmpty
+                    ? Array(Self.ranked(site.podcasts, by: scorer) { ($0.title, $0.description) }.prefix(2))
+                    : latestPodcasts
+                turn.blogs = Array(Self.ranked(site.blogs.filter { blog in !turn.blogsUsed.contains { $0.id == blog.id } }, by: scorer, newestFirst: \.publishedAt) { ($0.title, $0.summary) }.prefix(2))
                 turn.bugs = Array(Self.ranked(site.bugs, by: scorer) { ($0.title, $0.summary) }.prefix(2))
                 turn.otherApps = plan.kind == .findApps ? [] : Array(Self.ranked(site.apps, by: scorer) { ($0.name, $0.summary) }.prefix(3))
             }
@@ -1101,6 +1121,10 @@ final class AskTheMouse: ObservableObject {
             // Common spellings: "brail", British "centre" and "colour".
             // Requested directly (2026-10-01).
             "brail": "braille", "brial": "braille", "centre": "center", "colour": "color", "colours": "colors",
+            // "commands" alike too, so "braille command" matches Apple's
+            // "Common braille commands" page as a pair. Found testing
+            // (2026-10-04).
+            "braill": "braille", "commands": "command",
         ]
         // "voice over" and "voice-over" are VoiceOver.
         return text.lowercased()
@@ -1203,9 +1227,13 @@ final class AskTheMouse: ObservableObject {
             text.lowercased().replacingOccurrences(of: "-", with: " ")
         }
         // Whole words, so "up" doesn't match "update"; a longer word also
-        // matches its plural or other endings ("gesture", "gestures").
+        // matches its plural or other endings ("gesture", "gestures"), and
+        // a plural matches its singular ("apples" finds "Golden Apple
+        // Awards", which it used to miss; found testing 2026-10-05).
         func has(_ term: String, in words: Set<String>) -> Bool {
-            words.contains(term) || (term.count >= 4 && words.contains { $0.hasPrefix(term) && $0.count <= term.count + 3 })
+            words.contains(term)
+                || (term.count >= 4 && words.contains { $0.hasPrefix(term) && $0.count <= term.count + 3 })
+                || words.contains { $0.count >= 4 && term.hasPrefix($0) && term.count <= $0.count + 2 }
         }
         return { title, details in
             guard needed > 0 else { return nil }
@@ -1219,6 +1247,19 @@ final class AskTheMouse: ObservableObject {
             let together = pairs.filter { lowerTitle.contains($0) || lowerDetails.contains($0) }.count
             return inTitle.count * 3 + inDetails.count + together * 3
         }
+    }
+
+    /// Results that score, highest first; equal scores newest first. For
+    /// blog posts, which are news: "Who won the Golden Apples?" otherwise
+    /// led with the 2013 winners, the site's first match. Found testing
+    /// live questions (2026-10-05).
+    static func ranked<T>(_ items: [T], by scorer: (String, String) -> Int?, newestFirst date: (T) -> Date, text: (T) -> (String, String)) -> [T] {
+        items.compactMap { item -> (Int, Date, T)? in
+            let (title, details) = text(item)
+            return scorer(title, details).map { ($0, date(item), item) }
+        }
+        .sorted { $0.0 != $1.0 ? $0.0 > $1.0 : $0.1 > $1.1 }
+        .map(\.2)
     }
 
     /// Results that score, highest first; equal scores keep the site's order.

@@ -57,7 +57,7 @@ struct GuidedExperienceView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     VStack(spacing: 24) {

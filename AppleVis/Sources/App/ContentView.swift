@@ -65,12 +65,11 @@ struct ContentView: View {
             get: { deepLinkRouter.pendingContent.map { DeepLinkContent(kind: $0.kind, id: $0.id) } },
             set: { if $0 == nil { closePendingContent() } }
         )) { content in
-            NavigationStack {
+            AppNavigationStack {
                 destination(for: content)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("Close") { closePendingContent() }
-                                .accessibilityLabel("Close detail")
                         }
                     }
             }
@@ -105,7 +104,7 @@ struct ContentView: View {
             AskTheMouseView(initialQuestion: pending.text)
         }
         .sheet(item: $deepLinkRouter.pendingHelpArticle) { article in
-            NavigationStack {
+            AppNavigationStack {
                 HelpArticleDetailView(article: article)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
@@ -274,29 +273,18 @@ struct ContentView: View {
     @ViewBuilder
     private func siriDestination(for destination: SiriDestination) -> some View {
         switch destination {
-        case .forums(let filter): NavigationStack { ForumsBrowseView(initialFilter: filter) }
-        case .savedItems(let filter): NavigationStack { SavedItemsView(initialFilter: filter) }
+        case .forums(let filter): AppNavigationStack { ForumsBrowseView(initialFilter: filter) }
+        case .savedItems(let filter): AppNavigationStack { SavedItemsView(initialFilter: filter) }
         case .search(let query): DiscoverView(initialSearchQuery: query)
         }
     }
 
-    @ViewBuilder
     private func destination(for content: DeepLinkContent) -> some View {
-        let jumpToFirstNewComment = deepLinkRouter.pendingContentIntent == .firstNewComment
-        switch content.kind {
-        case .forumTopic:
-            ForumTopicDetailView(topicId: content.id, focusFirstNewCommentOnAppear: jumpToFirstNewComment)
-        case .podcastEpisode:
-            EpisodeDetailView(episodeId: content.id, focusFirstNewCommentOnAppear: jumpToFirstNewComment)
-        case .appListing:
-            AppDetailView(appId: content.id, focusFirstNewCommentOnAppear: jumpToFirstNewComment)
-        case .resource:
-            ResourceDetailView(resourceId: content.id, focusFirstNewCommentOnAppear: jumpToFirstNewComment)
-        case .blogPost:
-            BlogDetailView(postId: content.id, focusFirstNewCommentOnAppear: jumpToFirstNewComment)
-        case .bugReport:
-            BugDetailView(bugId: content.id, focusFirstNewCommentOnAppear: jumpToFirstNewComment)
-        }
+        ContentDetailDestination(
+            kind: content.kind,
+            id: content.id,
+            focusFirstNewComment: deepLinkRouter.pendingContentIntent == .firstNewComment
+        )
     }
 }
 

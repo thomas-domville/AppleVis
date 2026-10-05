@@ -101,7 +101,7 @@ struct SubmitBugView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             wizardContent
                 .navigationTitle("Submit a Bug Report")
                 .navigationBarTitleDisplayMode(.inline)
@@ -176,6 +176,7 @@ struct SubmitBugView: View {
                             .foregroundStyle(.red)
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityFocused($isErrorFocused)
+                        PostingProblemDetailsButton()
                     }
                 }
             }

@@ -20,7 +20,7 @@ struct SignInView: View {
     @AccessibilityFocusState private var isIntroFocused: Bool
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
                     if let expiredReason {

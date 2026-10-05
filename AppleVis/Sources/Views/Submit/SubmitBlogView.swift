@@ -125,7 +125,7 @@ struct SubmitBlogView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             wizardContent
                 .navigationTitle("Submit a Blog Post")
                 .navigationBarTitleDisplayMode(.inline)
@@ -204,6 +204,7 @@ struct SubmitBlogView: View {
                             .foregroundStyle(.red)
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityFocused($isErrorFocused)
+                        PostingProblemDetailsButton()
                     }
                 }
             }

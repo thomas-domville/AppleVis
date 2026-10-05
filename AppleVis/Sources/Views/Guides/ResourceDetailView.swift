@@ -781,7 +781,7 @@ struct ComposeResourceCommentView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             VStack(alignment: .leading, spacing: 0) {
                 WizardStepHeader(
                     title: "Add Comment", icon: "text.bubble",
@@ -840,7 +840,7 @@ struct ComposeResourceCommentView: View {
                     .padding(.horizontal)
                     .padding(.bottom, 8)
                 if let err = submitError {
-                    Text(err).foregroundStyle(.red).padding()
+                    PostingErrorMessage(message: err).padding()
                 }
             }
             .navigationTitle("Add Comment")

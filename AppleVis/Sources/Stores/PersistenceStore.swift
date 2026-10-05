@@ -314,6 +314,9 @@ final class PersistenceStore {
         /// "NEW" badge (alongside any comment count) until opened or
         /// marked read, rather than only until the boundary next moves.
         let isNewItem: Bool
+        /// Comments after this date are the new ones. Optional so
+        /// baselines saved before it existed still load.
+        var newSince: Date? = nil
     }
 
     private let feedBaselinesKey = "applevis.home.feedBaselines.v1"

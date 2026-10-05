@@ -103,7 +103,7 @@ struct OpenSavedItemsIntent: AppIntent {
 struct WhatsNewOnAppleVisIntent: AppIntent {
     static var title: LocalizedStringResource = "What's New on AppleVis"
     static var description = IntentDescription(
-        "Speaks a summary of what's new on AppleVis since your last visit."
+        "Speaks a summary of what's new on AppleVis that you haven't read yet."
     )
     static var openAppWhenRun: Bool = true
 

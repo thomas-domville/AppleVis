@@ -43,7 +43,7 @@ struct TranscriptView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             Group {
                 if isLoading {
                     LoadingView()

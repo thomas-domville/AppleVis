@@ -1,4 +1,5 @@
 import SwiftUI
+import NaturalLanguage
 import UIKit
 
 /// Uses the real JSON:API `AppEndpoints.submitApp` from Phase 1 — unlike
@@ -92,6 +93,12 @@ struct SubmitAppView: View {
     @State private var macPayload = SubmitMacAppPayload()
     @State private var macAccessibilityCommentsMinimumAnnounced = false
     @State private var isSubmitting = false
+    /// Set when the App Store description came in another language. See
+    /// `translateDescriptionIfNeeded()`.
+    @State private var descriptionTranslation: DescriptionTranslation?
+    /// The country of the App Store the app was found in ("de"), from its
+    /// link, before the link is saved without one.
+    @State private var storeCountryCode: String?
     @State private var error: String?
     @State private var submitted = false
     /// Shared across every platform's Accessibility/Additional Comments
@@ -235,11 +242,19 @@ struct SubmitAppView: View {
         }
     }
 
+    // The site's own length limits on the tested-on version fields, read
+    // from its Add App forms (2026-10-05). Anything longer made the site
+    // refuse the whole entry with no clue why.
+    static let iosVersionLimit = 10
+    static let watchosVersionLimit = 10
+    static let macosVersionLimit = 20
+
     private var isIosValid: Bool {
         !payload.appName.trimmingCharacters(in: .whitespaces).isEmpty &&
         !payload.appStoreUrl.trimmingCharacters(in: .whitespaces).isEmpty &&
         !payload.category.isEmpty &&
         !payload.osVersion.trimmingCharacters(in: .whitespaces).isEmpty &&
+        payload.osVersion.trimmingCharacters(in: .whitespaces).count <= Self.iosVersionLimit &&
         // "Description of App" is required server-side — verified against
         // the live form — but was never actually required (or even shown)
         // here, so a manual-entry submission with no App Store description
@@ -275,6 +290,7 @@ struct SubmitAppView: View {
         !watchPayload.appStoreUrl.trimmingCharacters(in: .whitespaces).isEmpty &&
         !watchPayload.category.isEmpty &&
         !watchPayload.watchosVersion.trimmingCharacters(in: .whitespaces).isEmpty &&
+        watchPayload.watchosVersion.trimmingCharacters(in: .whitespaces).count <= Self.watchosVersionLimit &&
         !watchPayload.appDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !watchPayload.price.isEmpty &&
         !watchPayload.usability.isEmpty &&
@@ -290,6 +306,7 @@ struct SubmitAppView: View {
         !macPayload.category.isEmpty &&
         !macPayload.appVersion.trimmingCharacters(in: .whitespaces).isEmpty &&
         !macPayload.osxVersionTested.trimmingCharacters(in: .whitespaces).isEmpty &&
+        macPayload.osxVersionTested.trimmingCharacters(in: .whitespaces).count <= Self.macosVersionLimit &&
         !macPayload.appDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !macPayload.price.isEmpty &&
         !macPayload.usability.isEmpty &&
@@ -340,7 +357,7 @@ struct SubmitAppView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             wizardContent
                 .navigationTitle("Submit an App")
                 .navigationBarTitleDisplayMode(.inline)
@@ -433,6 +450,7 @@ struct SubmitAppView: View {
                             .foregroundStyle(.red)
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityFocused($isErrorFocused)
+                        PostingProblemDetailsButton()
                     }
                 }
             }
@@ -626,10 +644,12 @@ struct SubmitAppView: View {
     private func applyPrefillIfNeeded() async {
         guard let prefillAppStoreURL, selectedHit == nil else { return }
         selectedHit = ItunesSearchHit(appStoreId: "", appName: "", developerName: "", artworkUrl: "", appStoreUrl: prefillAppStoreURL)
-        payload.appStoreUrl = prefillAppStoreURL
+        storeCountryCode = ItunesAPI.storefrontCode(of: prefillAppStoreURL)
+        payload.appStoreUrl = ItunesAPI.storeNeutralURL(prefillAppStoreURL)
         step = .details
-        if let meta = await ItunesAPI.fetchMetadata(appStoreUrl: prefillAppStoreURL, entity: platform.itunesEntity) {
+        if let meta = await ItunesAPI.fetchMetadata(appStoreUrl: prefillAppStoreURL, entity: platform.itunesEntity, english: true) {
             applyMetadata(meta)
+            await translateDescriptionIfNeeded()
         }
     }
 
@@ -638,6 +658,91 @@ struct SubmitAppView: View {
     /// `isMetadataFromAppStore` so the form switches those fields to
     /// read-only display instead of leaving them as editable text a
     /// submitter could accidentally overwrite with something wrong.
+    /// The description field for the platform being submitted.
+    private var currentDescription: String {
+        switch platform {
+        case .tvos: return tvPayload.appDescription
+        case .watchos: return watchPayload.appDescription
+        case .macos: return macPayload.appDescription
+        case .ios: return payload.appStoreDescription
+        }
+    }
+
+    private func setDescription(_ text: String) {
+        switch platform {
+        case .tvos: tvPayload.appDescription = text
+        case .watchos: watchPayload.appDescription = text
+        case .macos: macPayload.appDescription = text
+        case .ios: payload.appStoreDescription = text
+        }
+    }
+
+    /// An App Store description pulled in can't be edited here, and some
+    /// developers write theirs only in their own language (asked for in
+    /// English first; see `ItunesAPI.lookupMetadata`). The website is in
+    /// English, so a description in another language is translated on the
+    /// device, and a line saying so is added for readers. If translation
+    /// isn't available, it's sent as it is and the note says why.
+    /// Requested directly (2026-10-05).
+    private func translateDescriptionIfNeeded() async {
+        let original = currentDescription
+        guard isMetadataFromAppStore, IntelligenceService.detectNonEnglish(original) else {
+            descriptionTranslation = nil
+            return
+        }
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(original)
+        let code = recognizer.dominantLanguage?.rawValue ?? ""
+        descriptionTranslation = DescriptionTranslation(languageCode: code, state: .translating)
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "Translating the App Store description into English."))
+
+        var translated = await TranslationCoordinator.shared.translateToEnglish(original)
+        if (translated ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            translated = await IntelligenceService.translateToEnglish(subject: nil, body: original, isTopic: false)?.body
+        }
+        // Another app was picked while this one translated.
+        guard currentDescription == original, descriptionTranslation?.languageCode == code else { return }
+        if let translated, !translated.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            setDescription(translated + "\n\n" + SiteText.translatedDescriptionNote(languageCode: code))
+            descriptionTranslation?.state = .translated
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "Description translated into English."))
+        } else {
+            descriptionTranslation?.state = .unavailable
+        }
+    }
+
+    @ViewBuilder
+    private var descriptionTranslationNote: some View {
+        if let translation = descriptionTranslation {
+            let language = Locale.current.localizedString(forLanguageCode: translation.languageCode)
+                ?? String(localized: "another language")
+            switch translation.state {
+            case .translating:
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Translating into English…")
+                }
+                .accessibilityElement(children: .combine)
+            case .translated:
+                Label(String(localized: "Translated automatically from \(language). A line at the end tells AppleVis readers it was translated."), systemImage: "globe")
+                    .font(.footnote)
+            case .unavailable:
+                Label(String(localized: "This description is in \(language). Translation isn't available on this device right now, so it will be sent as it is."), systemImage: "globe")
+                    .font(.footnote)
+            }
+        }
+    }
+
+    /// Shown on the review step when the app came from another country's
+    /// App Store, so the submitter can tell it may be a regional app.
+    @ViewBuilder
+    private var storeCountryRow: some View {
+        if let code = storeCountryCode, code != "us",
+           let country = Locale.current.localizedString(forRegionCode: code.uppercased()) {
+            WizardReviewRow(label: "App Store Country", value: country)
+        }
+    }
+
     private func applyMetadata(_ meta: ItunesMetadata) {
         if platform == .tvos {
             applyTvMetadata(meta)
@@ -718,7 +823,7 @@ struct SubmitAppView: View {
         macPayload.appVersion = meta.version
         macPayload.category = macCategories.first { $0.caseInsensitiveCompare(meta.category) == .orderedSame } ?? ""
         macPayload.appDescription = meta.appStoreDescription
-        macPayload.appStoreUrl = meta.appStoreUrl
+        macPayload.appStoreUrl = ItunesAPI.storeNeutralURL(meta.appStoreUrl)
         appStoreIndicatesFree = meta.isFree
         isMetadataFromAppStore = true
         updatePriceCategory()
@@ -991,6 +1096,7 @@ struct SubmitAppView: View {
                     // verify what description was about to be sent under
                     // their submission. Reported directly.
                     WizardReviewRow(label: "Description of App", value: payload.appStoreDescription)
+                    descriptionTranslationNote
                 } else {
                     TextEditor(text: $payload.appStoreDescription)
                         .frame(minHeight: 100)
@@ -1149,6 +1255,8 @@ struct SubmitAppView: View {
         }
         if payload.osVersion.trimmingCharacters(in: .whitespaces).isEmpty {
             reasons.append(String(localized: "Enter the iOS version you tested on to continue."))
+        } else if payload.osVersion.trimmingCharacters(in: .whitespaces).count > Self.iosVersionLimit {
+            reasons.append(String(localized: "Shorten the iOS version to just the number, like 26.0.1, to continue."))
         }
         if payload.appStoreDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             reasons.append(String(localized: "Enter the app's description to continue."))
@@ -1217,6 +1325,7 @@ struct SubmitAppView: View {
             Section {
                 if isMetadataFromAppStore {
                     WizardReviewRow(label: "Description of App", value: tvPayload.appDescription)
+                    descriptionTranslationNote
                 } else {
                     TextEditor(text: $tvPayload.appDescription)
                         .frame(minHeight: 100)
@@ -1426,6 +1535,7 @@ struct SubmitAppView: View {
             Section {
                 if isMetadataFromAppStore {
                     WizardReviewRow(label: "Description of App", value: watchPayload.appDescription)
+                    descriptionTranslationNote
                 } else {
                     TextEditor(text: $watchPayload.appDescription)
                         .frame(minHeight: 100)
@@ -1571,6 +1681,8 @@ struct SubmitAppView: View {
         }
         if watchPayload.watchosVersion.trimmingCharacters(in: .whitespaces).isEmpty {
             reasons.append(String(localized: "Enter the minimum watchOS version to continue."))
+        } else if watchPayload.watchosVersion.trimmingCharacters(in: .whitespaces).count > Self.watchosVersionLimit {
+            reasons.append(String(localized: "Shorten the watchOS version to just the number, like 26.0, to continue."))
         }
         if watchPayload.appDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             reasons.append(String(localized: "Enter the app's description to continue."))
@@ -1665,6 +1777,7 @@ struct SubmitAppView: View {
             Section {
                 if isMetadataFromAppStore {
                     WizardReviewRow(label: "Description of App", value: macPayload.appDescription)
+                    descriptionTranslationNote
                 } else {
                     TextEditor(text: $macPayload.appDescription)
                         .frame(minHeight: 100)
@@ -1810,6 +1923,8 @@ struct SubmitAppView: View {
         }
         if macPayload.osxVersionTested.trimmingCharacters(in: .whitespaces).isEmpty {
             reasons.append(String(localized: "Enter the version of macOS tested to continue."))
+        } else if macPayload.osxVersionTested.trimmingCharacters(in: .whitespaces).count > Self.macosVersionLimit {
+            reasons.append(String(localized: "Shorten the macOS version to just the number, like 26.0.1, to continue."))
         }
         if macPayload.appDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             reasons.append(String(localized: "Enter the app's description to continue."))
@@ -1891,18 +2006,23 @@ struct SubmitAppView: View {
 
     private func select(_ hit: ItunesSearchHit) {
         selectedHit = hit
+        storeCountryCode = ItunesAPI.storefrontCode(of: hit.appStoreUrl)
+        descriptionTranslation = nil
+        // Saved with no country in the link, so every visitor to the entry
+        // lands in their own country's App Store, not the submitter's.
+        let link = ItunesAPI.storeNeutralURL(hit.appStoreUrl)
         switch platform {
         case .tvos:
             tvPayload.appName = hit.appName
         case .watchos:
             watchPayload.appName = hit.appName
-            watchPayload.appStoreUrl = hit.appStoreUrl
+            watchPayload.appStoreUrl = link
         case .macos:
             macPayload.appName = hit.appName
-            macPayload.appStoreUrl = hit.appStoreUrl
+            macPayload.appStoreUrl = link
         case .ios:
             payload.appName = hit.appName
-            payload.appStoreUrl = hit.appStoreUrl
+            payload.appStoreUrl = link
         }
         SoundPlayer.shared.play(.pickerTick)
         step = .details
@@ -1912,11 +2032,14 @@ struct SubmitAppView: View {
             // three can — `searchMacOS`'s two branches (native Mac App
             // Store vs. Catalyst) need different entities to look the same
             // id back up successfully. `fetchMacMetadata` tries both.
+            // English text where the developer wrote some: the entry is
+            // for the English-language site, whichever store found it.
             let meta = platform == .macos
-                ? await ItunesAPI.fetchMacMetadata(appStoreUrl: hit.appStoreUrl)
-                : await ItunesAPI.fetchMetadata(appStoreUrl: hit.appStoreUrl, entity: platform.itunesEntity)
+                ? await ItunesAPI.fetchMacMetadata(appStoreUrl: hit.appStoreUrl, english: true)
+                : await ItunesAPI.fetchMetadata(appStoreUrl: hit.appStoreUrl, entity: platform.itunesEntity, english: true)
             if let meta {
                 applyMetadata(meta)
+                await translateDescriptionIfNeeded()
             }
         }
     }
@@ -2060,6 +2183,7 @@ struct SubmitAppView: View {
             }
             Section("App") {
                 WizardReviewRow(label: "Platform", value: platform.displayName)
+                storeCountryRow
                 WizardReviewRow(label: "App Name", value: payload.appName)
                 WizardReviewRow(label: "App Store URL", value: payload.appStoreUrl)
                 WizardReviewRow(label: "Version", value: payload.appVersion)
@@ -2123,6 +2247,7 @@ struct SubmitAppView: View {
             }
             Section("App") {
                 WizardReviewRow(label: "Platform", value: platform.displayName)
+                storeCountryRow
                 WizardReviewRow(label: "App Name", value: tvPayload.appName)
                 WizardReviewRow(label: "Price", value: tvPayload.price)
                 WizardReviewRow(label: "Category", value: tvPayload.category)
@@ -2162,6 +2287,7 @@ struct SubmitAppView: View {
             }
             Section("App") {
                 WizardReviewRow(label: "Platform", value: platform.displayName)
+                storeCountryRow
                 WizardReviewRow(label: "App Name", value: watchPayload.appName)
                 WizardReviewRow(label: "App Store URL", value: watchPayload.appStoreUrl)
                 WizardReviewRow(label: "Version", value: watchPayload.appVersion)
@@ -2206,6 +2332,7 @@ struct SubmitAppView: View {
             }
             Section("App") {
                 WizardReviewRow(label: "Platform", value: platform.displayName)
+                storeCountryRow
                 WizardReviewRow(label: "App Name", value: macPayload.appName)
                 if !macPayload.appStoreUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     WizardReviewRow(label: "App Store URL", value: macPayload.appStoreUrl)
@@ -2402,4 +2529,11 @@ struct SubmitAppView: View {
         }
         isSubmitting = false
     }
+}
+
+/// A non-English App Store description being translated for the website.
+private struct DescriptionTranslation {
+    enum State { case translating, translated, unavailable }
+    let languageCode: String
+    var state: State
 }

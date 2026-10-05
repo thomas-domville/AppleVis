@@ -12,6 +12,9 @@ nonisolated struct BlogPost: Identifiable, Codable, Hashable, Sendable {
     let commentCount: Int
     let url: String
     var isSaved: Bool
+    /// Pinned on the website (Drupal's "sticky"). Optional so lists saved
+    /// before this existed still load.
+    var isPinned: Bool? = nil
 }
 
 nonisolated struct BlogPostDetail: Identifiable, Codable, Sendable {
@@ -32,6 +35,9 @@ nonisolated struct BlogPostDetail: Identifiable, Codable, Sendable {
     let url: String
     var comments: [BlogComment]
     var isSaved: Bool
+    /// Pinned on the website. Optional so details saved before this existed
+    /// still load.
+    var isPinned: Bool? = nil
 }
 
 nonisolated struct BlogComment: Identifiable, Codable, Sendable {

@@ -22,6 +22,10 @@ enum AppSound: String {
     case syncComplete    = "sync_complete"
     case tipPopup        = "tip_popup"
     case welcome
+    /// Ask the Mouse's once-a-second "still searching" tick, for VoiceOver
+    /// users who can't see the Mouse scurrying. Confirmation tier, so it's
+    /// on unless Confirmation Sounds is off.
+    case mousePatter     = "mouse_patter"
 
     /// Non-essential UI chrome — docs/APPLEVIS_2026_1_MASTER_SPEC.md defaults
     /// these off (tab switching, picker changes, opening screens, list
@@ -68,6 +72,9 @@ enum AppSound: String {
             return { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
         case .bookmarkSaved, .reply, .podcastPlay, .podcastPause:
             return { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+        case .mousePatter:
+            // A light tap with each tick, for braille and DeafBlind users.
+            return { UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.6) }
         case .tabChange, .articleOpen, .loadingStart, .pickerTick, .refresh,
              .screenClose, .searchComplete, .syncComplete, .tipPopup, .welcome:
             return nil

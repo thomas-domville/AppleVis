@@ -118,7 +118,7 @@ struct AuthorProfileSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             Group {
                 if isLoading {
                     LoadingView()
@@ -335,7 +335,7 @@ private struct ContactUserSheet: View {
     @AccessibilityFocusState private var isIntroFocused: Bool
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             Form {
                 Section {
                     Text("Your message is sent through AppleVis. \(recipientName) won't see your email address unless they reply.")
@@ -359,6 +359,7 @@ private struct ContactUserSheet: View {
                         Label(error, systemImage: "exclamationmark.circle")
                             .foregroundStyle(.red)
                             .accessibilityFocused($isErrorFocused)
+                        PostingProblemDetailsButton()
                     }
                 }
             }

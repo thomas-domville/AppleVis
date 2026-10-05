@@ -11,11 +11,17 @@ struct ProfileView: View {
     @State private var showCommunityAgreement = false
     @State private var showContact = false
     @State private var showWelcomeTour = false
+    @State private var showSettings = false
+    /// Set by Settings' Done button, so closing Settings also leaves
+    /// Profile and goes straight back to browsing. Swiping the sheet away
+    /// instead returns to Profile as before.
+    @State private var leaveProfileAfterSettings = false
+    @Environment(\.dismiss) private var dismiss
     @AccessibilityFocusState private var focusTarget: AnyHashable?
     private static let titleFocusID = AnyHashable("profile.title")
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             List {
                 if let user = auth.user {
                     signedInContent(user)
@@ -49,6 +55,25 @@ struct ProfileView: View {
             Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("contact")) }
         }) {
             ContactView()
+        }
+        // Settings opens as a sheet with Done on every screen, instead of
+        // being pushed here: finishing a change in General meant several
+        // Back presses to get back to browsing. Reported by a beta tester.
+        .sheet(isPresented: $showSettings, onDismiss: {
+            if leaveProfileAfterSettings {
+                leaveProfileAfterSettings = false
+                dismiss()
+            } else {
+                Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("settings")) }
+            }
+        }) {
+            AppNavigationStack {
+                SettingsView()
+            }
+            .environment(\.closeSettings, {
+                leaveProfileAfterSettings = true
+                showSettings = false
+            })
         }
         .sheet(isPresented: $showWelcomeTour, onDismiss: {
             Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("welcomeTour")) }
@@ -182,13 +207,11 @@ struct ProfileView: View {
 
     private var settingsSection: some View {
         Section("App") {
-            NavigationLink {
-                SettingsView()
-                    .onDisappear {
-                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("settings")) }
-                    }
+            Button {
+                showSettings = true
             } label: {
                 Label("Settings", systemImage: "gearshape")
+                    .foregroundStyle(.primary)
             }
             .accessibilityFocused($focusTarget, equals: AnyHashable("settings"))
             .accessibilityLabel(String(localized: "Open Settings"))

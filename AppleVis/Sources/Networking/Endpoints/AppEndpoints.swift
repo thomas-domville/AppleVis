@@ -791,7 +791,7 @@ struct AppEndpoints {
             "field_version": AnyEncodable(payload.appVersion),
             "field_cost": AnyEncodable(payload.price),
             "field_device_used": AnyEncodable(payload.supportedDevices),
-            "field_ios_version": AnyEncodable(payload.osVersion),
+            "field_ios_version": AnyEncodable(payload.osVersion.trimmingCharacters(in: .whitespaces)),
             "field_voiceover": AnyEncodable(payload.voiceOverPerformance),
             "field_labelling": AnyEncodable(payload.buttonLabelling),
             "field_usability": AnyEncodable(payload.usabilityNotes),
@@ -942,7 +942,7 @@ struct AppEndpoints {
             "field_link2": AnyEncodable(LinkValue(uri: payload.appStoreUrl, title: "")),
             "field_version": AnyEncodable(payload.appVersion),
             "field_cost": AnyEncodable(payload.price),
-            "field_watchos_version": AnyEncodable(payload.watchosVersion),
+            "field_watchos_version": AnyEncodable(payload.watchosVersion.trimmingCharacters(in: .whitespaces)),
             "field_usability_watch": AnyEncodable(payload.usability),
             "field_comments": AnyEncodable(RichTextValue(value: payload.accessibilityComments, format: drupalDefaultTextFormat)),
             "body": AnyEncodable(RichTextBodyValue(value: payload.appDescription, summary: "", format: drupalDefaultTextFormat)),
@@ -992,7 +992,7 @@ struct AppEndpoints {
             "status": AnyEncodable(true),
             "field_version": AnyEncodable(payload.appVersion),
             "field_cost": AnyEncodable(payload.price),
-            "field_osx_version": AnyEncodable(payload.osxVersionTested),
+            "field_osx_version": AnyEncodable(payload.osxVersionTested.trimmingCharacters(in: .whitespaces)),
             "field_usability": AnyEncodable(payload.usability),
             "field_comments": AnyEncodable(RichTextValue(value: payload.accessibilityComments, format: drupalDefaultTextFormat)),
             "body": AnyEncodable(RichTextBodyValue(value: payload.appDescription, summary: "", format: drupalDefaultTextFormat)),
@@ -1324,6 +1324,10 @@ extension AppEndpoints {
     /// content type with its own accessibility field and categories. It
     /// was iPhone and iPad only, so a Mac or Apple Watch question got
     /// iPhone apps. Requested directly (2026-10-01).
+    /// Short app keywords worth keeping: abbreviations that rarely appear
+    /// inside other words, unlike "car" in "card".
+    private static let shortKeywordsKept: Set<String> = ["rpg", "gps", "ocr", "pdf", "vpn", "mmo", "rss", "sms", "tts"]
+
     func mouseSearch(keyword: String, fullyAccessibleOnly: Bool, category: String?, platform: AppPlatform = .ios, limit: Int = 40) async throws -> [AppListing] {
         var query: [String: String] = [
             "include": "uid",
@@ -1342,7 +1346,12 @@ extension AppEndpoints {
         // crowds out real matches: Blind Drive never came back for car
         // games. Kept only when it's the only word. Found testing
         // (2026-10-01).
-        if all.contains(where: { $0.count >= 4 }) { all.removeAll { $0.count < 4 } }
+        // Common abbreviations stay, though: dropping "rpg" left "RPG
+        // games" finding only adventure games, and "ocr" returned network
+        // scanners. Found testing live questions (2026-10-05).
+        if all.contains(where: { $0.count >= 4 }) {
+            all.removeAll { $0.count < 4 && !Self.shortKeywordsKept.contains($0.lowercased()) }
+        }
         let words = all.prefix(4)
         if !words.isEmpty {
             query["filter[words][group][conjunction]"] = "OR"
@@ -1383,8 +1392,20 @@ extension AppEndpoints {
         case .watchos: categories = Self.watchCategoryUUIDs
         case .tvos: categories = Self.tvCategoryUUIDs
         }
+        // Each directory names its category field differently. This used
+        // iPhone's for all four, so the site refused any Mac, Apple Watch,
+        // or Apple TV search with a category, and the Mouse found no apps
+        // for questions like "Apple Watch fitness apps". Checked live
+        // (2026-10-05); the browse screens above already used these.
         if let category, let uuid = categories[category] {
-            query["filter[category][condition][path]"] = "taxonomy_vocabulary_1.id"
+            let field: String
+            switch platform {
+            case .ios: field = "taxonomy_vocabulary_1"
+            case .macos: field = "taxonomy_vocabulary_16"
+            case .watchos: field = "field_category_watch"
+            case .tvos: field = "field_category_tv"
+            }
+            query["filter[category][condition][path]"] = "\(field).id"
             query["filter[category][condition][value]"] = uuid
         }
         let response = try await client.jsonAPIList("node/\(platform.drupalBundle)", query: query)

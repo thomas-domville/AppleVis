@@ -33,6 +33,43 @@ private struct SettingsSection: Identifiable {
     let entries: [SettingsEntry]
 }
 
+/// Closes the whole Settings sheet from any screen inside it. Set by
+/// ProfileView's sheet; nil when a settings screen is opened from elsewhere
+/// (Ask the Mouse, Help), so those screens show no Done button.
+private struct CloseSettingsKey: EnvironmentKey {
+    static let defaultValue: (() -> Void)? = nil
+}
+
+extension EnvironmentValues {
+    var closeSettings: (() -> Void)? {
+        get { self[CloseSettingsKey.self] }
+        set { self[CloseSettingsKey.self] = newValue }
+    }
+}
+
+private struct SettingsDoneButton: ViewModifier {
+    @Environment(\.closeSettings) private var closeSettings
+
+    func body(content: Content) -> some View {
+        content.toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                if let closeSettings {
+                    Button("Done") { closeSettings() }
+                        .accessibilityHint(String(localized: "Closes Settings and goes back to where you were."))
+                }
+            }
+        }
+    }
+}
+
+extension View {
+    /// Adds Done at the top right when the screen is inside the Settings
+    /// sheet. Apply to every screen Settings can push.
+    func settingsDoneButton() -> some View {
+        modifier(SettingsDoneButton())
+    }
+}
+
 struct SettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var searchText = ""
@@ -122,9 +159,9 @@ struct SettingsView: View {
         )
     }
 
-    // Not wrapped in its own NavigationStack — ProfileView already pushes
-    // this onto its own NavigationStack (see `settingsSection` there), so
-    // this was nesting a second NavigationStack inside the first. Nested
+    // Not wrapped in its own NavigationStack — ProfileView's Settings
+    // sheet supplies one (see `showSettings` there). Wrapping here as well
+    // would nest a second NavigationStack inside the first. Nested
     // NavigationStacks are explicitly unsupported by SwiftUI and can
     // desync push/pop state in exactly this kind of unpredictable way —
     // consistent with drilling in a few levels (Settings > Help > an
@@ -177,6 +214,7 @@ struct SettingsView: View {
                     ForEach(section.entries) { entry in
                         NavigationLink {
                             entry.destination
+                                .settingsDoneButton()
                                 .onDisappear {
                                     Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable(entry.id)) }
                                 }
@@ -190,6 +228,7 @@ struct SettingsView: View {
         }
         .themedList(preferences.colors)
         .navigationTitle("Settings")
+        .settingsDoneButton()
         .searchable(text: $searchText, prompt: "Search Settings")
         .task { await retryAccessibilityFocus(into: $focusTarget, returningTo: Self.titleFocusID) }
     }

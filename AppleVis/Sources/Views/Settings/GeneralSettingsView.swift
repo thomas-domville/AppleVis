@@ -32,7 +32,7 @@ struct GeneralSettingsView: View {
                 // and Detailed apart without also finding and swiping to the
                 // caption text below on its own. Reported directly: heard
                 // the option name on focus and had no idea what it meant.
-                .accessibilityHint(String(localized: "Quiet says nothing. Helpful says a short welcome. Detailed adds an AI-generated summary of what's new since your last visit."))
+                .accessibilityHint(String(localized: "Quiet says nothing. Helpful says a short welcome. Detailed adds an AI-generated summary of what's new that you haven't read yet."))
                 // A persistent .accessibilityValue() here (the PODCAST-06
                 // fix, applied the same way in several other Settings
                 // pickers) was added so swiping up/down would speak the new
@@ -57,7 +57,7 @@ struct GeneralSettingsView: View {
                     }
                     UIAccessibility.post(notification: .announcement, argument: preferences.homeStartupBehavior.displayName)
                 }
-                Text("What Home says out loud when you open or return to it. Quiet: nothing spoken. Helpful: a short spoken welcome. Detailed: that same welcome, plus an AI-generated summary of what's new since your last visit.")
+                Text("What Home says out loud when you open or return to it. Quiet: nothing spoken. Helpful: a short spoken welcome. Detailed: that same welcome, plus an AI-generated summary of what's new that you haven't read yet.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -68,8 +68,8 @@ struct GeneralSettingsView: View {
                 // controls whether the *visual* new-activity card shows up
                 // in the Home feed at all. Reported directly.
                 Toggle("Welcome Summary", isOn: $preferences.welcomeSummaryEnabled)
-                    .accessibilityHint(String(localized: "Shows a short summary at the top of Home of new activity since your last visit."))
-                Text("The short summary at the top of Home listing what's new since you were last here — separate from Home Startup Behavior above, which is about what's spoken, not what's shown.")
+                    .accessibilityHint(String(localized: "Shows a short summary at the top of Home of new activity you haven't read yet."))
+                Text("The short summary at the top of Home listing what's new that you haven't read yet — separate from Home Startup Behavior above, which is about what's spoken, not what's shown.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -81,7 +81,7 @@ struct GeneralSettingsView: View {
                 // display preference, not a privacy control. Discussed and
                 // requested directly.
                 Toggle("Show What's New on Home", isOn: $preferences.showNewActivityIndicators)
-                    .accessibilityHint(String(localized: "When on, Home shows a New view, a short summary, and badges on content with new activity since your last visit."))
+                    .accessibilityHint(String(localized: "When on, Home shows a New view, a short summary, and badges on content with new activity you haven't read yet."))
                 Text("Reading history is always tracked on-device — this only controls whether Home actually shows what's new because of it. Turning it off doesn't erase anything; it just keeps Home quieter.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -172,6 +172,7 @@ struct GeneralSettingsView: View {
                 if let article = HelpContent.find("community-language-filter") {
                     NavigationLink {
                         HelpArticleDetailView(article: article)
+                            .settingsDoneButton()
                     } label: {
                         Label("Learn More About Language Filtering", systemImage: "info.circle")
                     }

@@ -248,7 +248,7 @@ struct AppHealthBulkRefreshView: View {
             return .failed(String(localized: "Couldn't load the app entry."))
         }
         guard let storeUrl = detail.appStoreUrl?.trimmingCharacters(in: .whitespacesAndNewlines), !storeUrl.isEmpty,
-              case .found(let metadata) = await ItunesAPI.lookupMetadata(appStoreUrl: storeUrl) else {
+              case .found(let metadata) = await ItunesAPI.lookupMetadata(appStoreUrl: storeUrl, english: true) else {
             return .failed(String(localized: "Couldn't load the App Store details."))
         }
         let deviceIOS = UIDevice.current.systemVersion

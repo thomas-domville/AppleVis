@@ -38,7 +38,20 @@ final class ToastStore: ObservableObject {
         // but the sound alone doesn't tell a VoiceOver user *which*
         // toast fired ("Saved" vs. "Removed from Saved" vs. "Couldn't
         // update follow status" all just played the same chime otherwise).
-        UIAccessibility.post(notification: .announcement, argument: message)
+        //
+        // Spoken a moment later and queued behind whatever VoiceOver is
+        // saying. Most success messages come just as a screen closes
+        // ("Topic posted", "Reply posted"), and an announcement made at
+        // that instant was cut off by the screen change, so a tester heard
+        // nothing and couldn't tell whether posting had worked. Reported
+        // directly (2026-10-05).
+        Task {
+            try? await Task.sleep(for: .milliseconds(500))
+            UIAccessibility.post(
+                notification: .announcement,
+                argument: NSAttributedString(string: message, attributes: [.accessibilitySpeechQueueAnnouncement: true])
+            )
+        }
         Task {
             try? await Task.sleep(for: .seconds(3))
             // CONC-02: previously nilled `current` unconditionally — two

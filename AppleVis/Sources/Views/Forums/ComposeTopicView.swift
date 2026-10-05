@@ -74,7 +74,7 @@ struct ComposeTopicView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             Group {
                 if !auth.isSignedIn {
                     signInRequiredView
@@ -161,7 +161,7 @@ struct ComposeTopicView: View {
                         }
                         if let error {
                             Section {
-                                Text(error).foregroundStyle(.red)
+                                PostingErrorMessage(message: error)
                             }
                         }
                     }
@@ -272,12 +272,18 @@ struct ComposeTopicView: View {
         isSubmitting = true
         error = nil
         do {
-            var posted = try await APIClient.shared.forums.submitTopic(title: title, body: bodyText, categoryTid: cat.tid, csrfToken: user.csrfToken)
-            toast.success(String(localized: "Topic posted"))
+            let result = try await APIClient.shared.forums.submitTopic(title: title, body: bodyText, categoryId: cat.id, csrfToken: user.csrfToken)
+            var posted = result.topic
             if followOnPost {
                 posted.isFollowing = await followNewTopic(posted, token: user.csrfToken)
             }
-            onPosted(posted)
+            // ToastStore speaks this after the screen has closed.
+            if result.isPublished {
+                toast.success(String(localized: "Topic posted"))
+                onPosted(posted)
+            } else {
+                toast.success(String(localized: "Topic sent. It will appear once a moderator approves it."))
+            }
             dismiss()
         } catch let e as APIError { error = e.localizedDescription
         } catch { self.error = String(localized: "Couldn't post topic. Try again.") }
@@ -352,7 +358,7 @@ struct ComposeReplyView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             VStack(alignment: .leading, spacing: 0) {
                 WizardStepHeader(
                     title: "Reply", icon: "arrowshape.turn.up.left",
@@ -431,7 +437,7 @@ struct ComposeReplyView: View {
                     .padding(.horizontal)
                     .padding(.bottom, 8)
                 if let error {
-                    Text(error).foregroundStyle(.red).padding()
+                    PostingErrorMessage(message: error).padding()
                 }
             }
             .navigationTitle("Reply")

@@ -212,8 +212,8 @@ enum ItunesAPI {
 
     /// Returns metadata on success, `nil` if the app isn't on the App Store
     /// (or the URL has no extractable numeric id) or the request failed.
-    static func fetchMetadata(appStoreUrl: String, entity: String = "software") async -> ItunesMetadata? {
-        if case .found(let metadata) = await lookupMetadata(appStoreUrl: appStoreUrl, entity: entity) {
+    static func fetchMetadata(appStoreUrl: String, entity: String = "software", english: Bool = false) async -> ItunesMetadata? {
+        if case .found(let metadata) = await lookupMetadata(appStoreUrl: appStoreUrl, entity: entity, english: english) {
             return metadata
         }
         return nil
@@ -229,28 +229,34 @@ enum ItunesAPI {
         return nil
     }
 
-    static func lookupMetadata(appStoreUrl: String, entity: String = "software") async -> ItunesMetadataLookupResult {
+    /// `english`: ask for the listing's English text even from another
+    /// country's store (Apple's `lang=en_us`), for anything that ends up
+    /// on the English-language website. It falls back to the store's own
+    /// language when the developer wrote no English. Checked live
+    /// (2026-10-05): WhatsApp's German listing comes back in English.
+    static func lookupMetadata(appStoreUrl: String, entity: String = "software", english: Bool = false) async -> ItunesMetadataLookupResult {
         guard let id = extractAppStoreId(appStoreUrl) else { return .invalidLink }
-        return await lookupMetadata(appStoreId: id, entity: entity, fallbackAppStoreUrl: appStoreUrl)
+        return await lookupMetadata(appStoreId: id, entity: entity, fallbackAppStoreUrl: appStoreUrl, english: english)
     }
 
     static func lookupMetadata(appStoreId: String, entity: String = "software") async -> ItunesMetadataLookupResult {
         await lookupMetadata(appStoreId: appStoreId, entity: entity, fallbackAppStoreUrl: "")
     }
 
-    private static func lookupMetadata(appStoreId id: String, entity: String, fallbackAppStoreUrl: String) async -> ItunesMetadataLookupResult {
-        let result = await lookupMetadata(appStoreId: id, entity: entity, fallbackAppStoreUrl: fallbackAppStoreUrl, country: currentCountry)
+    private static func lookupMetadata(appStoreId id: String, entity: String, fallbackAppStoreUrl: String, english: Bool = false) async -> ItunesMetadataLookupResult {
+        let result = await lookupMetadata(appStoreId: id, entity: entity, fallbackAppStoreUrl: fallbackAppStoreUrl, country: currentCountry, english: english)
         // See `rawSearchResults`'s identical fallback — without this, an
         // app that's genuinely still live but just not sold in the
         // person's own region (rather than actually delisted) would
         // otherwise report `.notFound`, which App Directory Health Check
         // would show as "Removed" even though it isn't.
         guard case .notFound = result, currentCountry != "us" else { return result }
-        return await lookupMetadata(appStoreId: id, entity: entity, fallbackAppStoreUrl: fallbackAppStoreUrl, country: "us")
+        return await lookupMetadata(appStoreId: id, entity: entity, fallbackAppStoreUrl: fallbackAppStoreUrl, country: "us", english: english)
     }
 
-    private static func lookupMetadata(appStoreId id: String, entity: String, fallbackAppStoreUrl: String, country: String) async -> ItunesMetadataLookupResult {
-        guard let url = URL(string: "https://itunes.apple.com/lookup?id=\(id)&entity=\(entity)&country=\(country)") else { return .failed }
+    private static func lookupMetadata(appStoreId id: String, entity: String, fallbackAppStoreUrl: String, country: String, english: Bool) async -> ItunesMetadataLookupResult {
+        let language = english && country != "us" ? "&lang=en_us" : ""
+        guard let url = URL(string: "https://itunes.apple.com/lookup?id=\(id)&entity=\(entity)&country=\(country)\(language)") else { return .failed }
 
         // Never the phone's saved copy: Apple allows reusing a lookup for a
         // day, so the Health Check's batch lookup and Refresh App Details'
@@ -363,7 +369,8 @@ enum ItunesAPI {
 
     private static func batchLookup(appStoreIds: [String], entity: String, country: String) async -> [String: ItunesMetadata] {
         guard !appStoreIds.isEmpty,
-              let url = URL(string: "https://itunes.apple.com/lookup?id=\(appStoreIds.joined(separator: ","))&entity=\(entity)&country=\(country)")
+              // English text, to compare with the English-language site.
+              let url = URL(string: "https://itunes.apple.com/lookup?id=\(appStoreIds.joined(separator: ","))&entity=\(entity)&country=\(country)\(country == "us" ? "" : "&lang=en_us")")
         else { return [:] }
 
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
@@ -460,19 +467,19 @@ enum ItunesAPI {
     /// stale — confirmed live against a real entry) simply returns `nil`
     /// from both, which every call site already handles by just not
     /// showing App Store data, same as any other failed lookup.
-    static func fetchMacMetadata(appStoreUrl: String) async -> ItunesMetadata? {
-        if case .found(let metadata) = await lookupMacMetadata(appStoreUrl: appStoreUrl) {
+    static func fetchMacMetadata(appStoreUrl: String, english: Bool = false) async -> ItunesMetadata? {
+        if case .found(let metadata) = await lookupMacMetadata(appStoreUrl: appStoreUrl, english: english) {
             return metadata
         }
         return nil
     }
 
-    static func lookupMacMetadata(appStoreUrl: String) async -> ItunesMetadataLookupResult {
-        let macResult = await lookupMetadata(appStoreUrl: appStoreUrl, entity: "macSoftware")
+    static func lookupMacMetadata(appStoreUrl: String, english: Bool = false) async -> ItunesMetadataLookupResult {
+        let macResult = await lookupMetadata(appStoreUrl: appStoreUrl, entity: "macSoftware", english: english)
         if case .found = macResult { return macResult }
         if case .invalidLink = macResult { return macResult }
 
-        let softwareResult = await lookupMetadata(appStoreUrl: appStoreUrl, entity: "software")
+        let softwareResult = await lookupMetadata(appStoreUrl: appStoreUrl, entity: "software", english: english)
         if case .found = softwareResult { return softwareResult }
         if case .failed = macResult { return .failed }
         if case .failed = softwareResult { return .failed }
@@ -510,6 +517,24 @@ enum ItunesAPI {
                 appStoreUrl: (r["trackViewUrl"] as? String) ?? ""
             )
         }
+    }
+
+    /// The same listing with no country in the link
+    /// ("https://apps.apple.com/app/id123"). Apple sends each visitor to
+    /// their own country's App Store, so an entry submitted from Germany
+    /// doesn't send everyone else to the German store. Checked live
+    /// (2026-10-05).
+    static func storeNeutralURL(_ url: String) -> String {
+        guard let id = extractAppStoreId(url) else { return url }
+        return "https://apps.apple.com/app/id\(id)"
+    }
+
+    /// The two-letter country in a store link ("de" in
+    /// apps.apple.com/de/app/…), or nil when the link has none.
+    static func storefrontCode(of url: String) -> String? {
+        guard let match = url.range(of: #"(apps|itunes)\.apple\.com/[a-z]{2}/"#, options: .regularExpression) else { return nil }
+        let code = url[match].split(separator: "/").last.map(String.init)
+        return code
     }
 
     private static func extractAppStoreId(_ url: String) -> String? {

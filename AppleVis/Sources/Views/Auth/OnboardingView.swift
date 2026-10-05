@@ -19,7 +19,7 @@ struct OnboardingView: View {
     @AccessibilityFocusState private var isStepHeaderFocused: Bool
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             VStack(spacing: 0) {
                 Group {
                     switch step {
@@ -514,7 +514,7 @@ private struct NewActivityDisplayStep: View {
                         title: "Show What's New?", icon: "bell.badge",
                         stepIndex: 4, stepTotal: 9, onBack: onBack, headerFocus: headerFocus
                     )
-                    Text("Home can show what's changed since your last visit: a New view alongside All and Nibbles, a short summary at the top, and a label on anything with new activity.")
+                    Text("Home can show what's new that you haven't read yet: a New view alongside All and Nibbles, a short summary at the top, and a label on anything with new activity.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -1191,7 +1191,7 @@ private struct ReadyStep: View {
             : ("person.crop.circle", String(localized: "You're continuing as a guest. You can sign in at any time from Profile."))
         )
         items.append(preferences.showNewActivityIndicators
-            ? ("sparkles", String(localized: "Home shows what's new since your last visit."))
+            ? ("sparkles", String(localized: "Home shows what's new that you haven't read yet."))
             : ("sparkles", String(localized: "Home doesn't show new-activity indicators."))
         )
         items.append(("paintbrush", String(localized: "Using the \(preferences.theme.displayName) theme.")))

@@ -32,6 +32,10 @@ final class PlayerStore: ObservableObject {
     @Published var volume: Float {
         didSet { didSetVolume(oldValue) }
     }
+    /// Drives the full player sheet the mini player presents, so starting
+    /// playback from a list row can open it too when Settings > Podcasts >
+    /// Open Player on Play is turned on.
+    @Published var isFullPlayerPresented = false
 
     private var player: AVPlayer?
     private var timeObserver: Any?
@@ -121,7 +125,10 @@ final class PlayerStore: ObservableObject {
         player = newPlayer
         currentEpisode = episode
         position = resolvedStart
-        duration = episode.duration ?? 0
+        // The API never supplies a duration, so fall back to the one an
+        // episode row already probed from the audio file. Without it the
+        // lock screen started at "zero seconds" — reported by a beta tester.
+        duration = Self.knownDuration(for: episode) ?? 0
 
         if resolvedStart > 0 {
             await newPlayer.seek(to: CMTime(seconds: resolvedStart, preferredTimescale: 600))
@@ -233,11 +240,38 @@ final class PlayerStore: ObservableObject {
         await player?.seek(to: CMTime(seconds: time, preferredTimescale: 600))
         position = time
         savePositionOfCurrentEpisode()
+        // Otherwise the lock screen kept counting from the pre-seek time.
+        updateNowPlayingPlaybackState()
     }
 
     func skip(by seconds: TimeInterval) async {
-        let target = max(0, min(position + seconds, duration))
+        // Only clamp once the real duration is known — clamping to an
+        // unknown (0) duration sent a skip forward back to the start.
+        let upper = duration > 0 ? duration : .greatestFiniteMagnitude
+        let target = max(0, min(position + seconds, upper))
         await seek(to: target)
+    }
+
+    /// Plays an episode started from a list row rather than its own page.
+    /// The player isn't on screen there, so this either opens it (when
+    /// Open Player on Play is on) or, for the first few plays with
+    /// VoiceOver, says where to find it. Reported by a beta tester who
+    /// started an episode from the rotor and couldn't find the player.
+    func startFromList(_ episode: PodcastEpisode) async {
+        await load(episode)
+        guard currentEpisode?.id == episode.id, errorMessage == nil else { return }
+        let defaults = UserDefaults.standard
+        if defaults.bool(forKey: "podcast.openPlayerOnPlay") {
+            isFullPlayerPresented = true
+        } else if UIAccessibility.isVoiceOverRunning {
+            let shown = defaults.integer(forKey: Self.playerHintCountKey)
+            guard shown < Self.playerHintLimit else { return }
+            defaults.set(shown + 1, forKey: Self.playerHintCountKey)
+            UIAccessibility.post(
+                notification: .announcement,
+                argument: String(localized: "Playing. The player is at the bottom of the screen.")
+            )
+        }
     }
 
     func savedPosition(for episodeId: String) -> TimeInterval? {
@@ -417,16 +451,34 @@ final class PlayerStore: ObservableObject {
             Task { await self?.skip(by: interval) }; return .success
         }
 
+        // AirPods double and triple presses (and headphone remotes and car
+        // buttons) arrive as next/previous track, not as skip commands. By
+        // default they skip forward and back, like most podcast apps: a
+        // beta tester's triple press restarted a long episode, and the
+        // double press did nothing with an empty Up Next. Settings >
+        // Podcasts > Headphone Controls brings back next episode/restart.
         center.nextTrackCommand.removeTarget(nil)
         center.nextTrackCommand.addTarget { [weak self] _ in
-            Task { await self?.playNext() }; return .success
+            if Self.headphoneControls == .skip {
+                let interval = UserDefaults.standard.object(forKey: "podcast.skipForward") as? Double ?? 30
+                Task { await self?.skip(by: interval) }
+            } else {
+                Task { await self?.playNext() }
+            }
+            return .success
         }
 
-        // Matches platform convention (e.g. Podcasts/Music): previous restarts
-        // the current episode, since there's no "previous episode" history stack.
+        // In Next Episode and Restart mode, previous restarts the current
+        // episode, since there's no "previous episode" history stack.
         center.previousTrackCommand.removeTarget(nil)
         center.previousTrackCommand.addTarget { [weak self] _ in
-            Task { await self?.seek(to: 0) }; return .success
+            if Self.headphoneControls == .skip {
+                let interval = UserDefaults.standard.object(forKey: "podcast.skipBack") as? Double ?? 10
+                Task { await self?.skip(by: -interval) }
+            } else {
+                Task { await self?.seek(to: 0) }
+            }
+            return .success
         }
 
         center.changePlaybackPositionCommand.removeTarget(nil)
@@ -456,8 +508,15 @@ final class PlayerStore: ObservableObject {
         timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             MainActor.assumeIsolated {
                 self?.position = time.seconds
-                if let duration = self?.player?.currentItem?.duration.seconds, duration.isFinite {
+                if let duration = self?.player?.currentItem?.duration.seconds, duration.isFinite, duration > 0,
+                   duration != self?.duration {
                     self?.duration = duration
+                    // The lock screen only got the duration known at load
+                    // time, so it stayed at zero for episodes without one.
+                    MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPMediaItemPropertyPlaybackDuration] = duration
+                    if let id = self?.currentEpisode?.id {
+                        PersistenceStore.shared.cacheProbedDuration(episodeId: id, duration: duration)
+                    }
                 }
                 self?.updateCurrentChapter()
             }
@@ -676,6 +735,18 @@ final class PlayerStore: ObservableObject {
     private static let speedKey = "podcast.speed"
     private static let volumeKey = "applevis.playerVolume"
     private static let minimumPausedBeforeResumeRewind: TimeInterval = 30
+    private static let playerHintCountKey = "podcast.playerHintCount"
+
+    private static var headphoneControls: PodcastHeadphoneControls {
+        UserDefaults.standard.string(forKey: "podcast.headphoneControls").flatMap(PodcastHeadphoneControls.init(rawValue:)) ?? .skip
+    }
+    private static let playerHintLimit = 3
+
+    /// 0 from the API means "unknown", not "zero seconds long".
+    private static func knownDuration(for episode: PodcastEpisode) -> TimeInterval? {
+        if let duration = episode.duration, duration > 0 { return duration }
+        return PersistenceStore.shared.cachedAudioMetadata(episodeId: episode.id)?.duration
+    }
 
     private func resumeRewindSeconds() -> TimeInterval {
         let defaults = UserDefaults.standard
@@ -754,6 +825,6 @@ final class PlayerStore: ObservableObject {
               let restored = try? JSONDecoder().decode(LastPlayed.self, from: data) else { return }
         currentEpisode = restored.episode
         position = restored.position
-        duration = restored.episode.duration ?? 0
+        duration = Self.knownDuration(for: restored.episode) ?? 0
     }
 }

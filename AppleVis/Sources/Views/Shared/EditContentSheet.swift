@@ -37,7 +37,7 @@ struct EditContentSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     WizardStepHeader(
@@ -99,7 +99,7 @@ struct EditContentSheet: View {
                     rewriteButton
                         .padding(.horizontal)
                     if let error {
-                        Text(error).foregroundStyle(.red).padding(.horizontal)
+                        PostingErrorMessage(message: error).padding(.horizontal)
                     }
                 }
                 .padding(.top)

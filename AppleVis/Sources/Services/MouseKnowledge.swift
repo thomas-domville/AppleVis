@@ -50,6 +50,31 @@ enum MouseKnowledge {
     /// Names people can't be expected to guess, pointing at the article
     /// that explains them.
     private static let nicknames: [String: [String]] = [
+        // Quick Reference (2026-10-04).
+        "ref-voiceover-gestures": ["voiceover gesture", "gestures", "magic tap", "rotor", "scrub", "split tap", "screen curtain", "item chooser", "go back with voiceover", "go back in voiceover", "back gesture", "scroll with voiceover", "scroll down with voiceover"],
+        "ref-voiceover-keyboard-ios": ["keyboard command", "keyboard shortcut", "magic keyboard", "external keyboard", "quick nav", "vo key"],
+        "ref-braille-display": ["braille command", "braille display", "braille key", "dots", "perkins", "pan braille"],
+        "ref-voiceover-keyboard-mac": ["mac voiceover", "voiceover on mac", "vo key", "voiceover utility", "command f5"],
+        "ref-voiceover-trackpad-mac": ["trackpad", "trackpad gesture", "trackpad commander"],
+        "ref-restart-iphone-ipad": ["force restart", "restart iphone", "restart ipad", "frozen", "not responding", "recovery mode", "restore iphone", "won't turn on", "hard reset", "reboot", "turn off my iphone", "turn off iphone", "turn off my ipad", "turn off ipad", "power off my iphone", "power off iphone", "shut down iphone", "shut down my iphone", "slide to power off"],
+        "ref-restart-mac": ["macos recovery", "restart mac", "restart my mac", "force shut down", "reinstall macos", "mac frozen", "turn off my mac", "shut down my mac"],
+        "ref-voiceover-watch": ["apple watch voiceover", "watch gestures", "digital crown navigation", "hand gestures"],
+        "ref-voiceover-tv": ["apple tv voiceover", "tv remote", "exploration mode", "navigation mode", "clickpad"],
+        "ref-braille-display-mac": ["mac braille", "braille on mac", "braille display mac"],
+        "ref-accessibility-shortcut": ["accessibility shortcut", "triple click", "triple-click", "turn on voiceover", "turn off voiceover", "turn voiceover off", "turn voiceover on", "back tap"],
+        "ref-setup-voiceover": ["set up with voiceover", "setup voiceover", "new iphone", "new mac", "pair apple watch", "first time setup"],
+        "ref-glossary": ["glossary", "definition of", "perkins keyboard", "perkins-style", "what is braille access", "what is live recognition", "what is the rotor", "what is magic tap", "what is screen curtain", "what is quick nav", "contracted braille", "grade 2", "grade 1"],
+        "ref-voiceover-silent": ["everything twice", "reading twice", "reads twice", "says twice", "speaks twice", "speaking twice", "talking twice", "speaking double", "speaks double", "voiceover stopped", "not talking", "no speech", "voiceover silent", "voiceover is silent", "screen is black", "screen black", "voiceover quiet", "can't hear voiceover"],
+        "ref-low-vision": ["low vision", "zoom", "magnify", "bigger text", "larger text", "speak screen", "read aloud", "out loud", "read my email", "read my emails", "read & speak", "read the screen", "read my screen", "without voiceover", "text bigger", "see the screen"],
+        "ref-typing-voiceover": ["typing", "type faster", "touch typing", "braille screen input", "bsi", "braille on the screen", "braille on screen", "type braille", "dictation", "text selection", "edit text"],
+        "ref-recognition": ["describe image", "image description", "live recognition", "screen recognition", "door detection", "point and speak", "describe photo", "doors", "around me", "surroundings", "describe what", "what's in front", "describe the"],
+        "ref-web-voiceover": ["safari", "webpage", "web page", "browse the web", "browsing the web", "reader view", "web rotor"],
+        "ref-siri-phrases": ["hey siri", "ask siri", "siri commands", "siri requests", "voice commands"],
+        "ref-iphone-everyday-voiceover": ["unlock", "home screen", "app switcher", "answer call", "camera voiceover", "take a photo", "take a picture", "camera with voiceover", "face id", "require attention", "arrange apps"],
+        "ref-mac-essentials": ["mac shortcut", "mac keyboard shortcut", "windows user", "switching from windows", "spotlight on mac", "mac spotlight", "force quit"],
+        "ref-getting-help": ["contact apple", "apple support", "accessibility support", "apple phone number", "call apple", "feedback to apple", "report to apple", "accessibility@apple.com"],
+        "ref-updating": ["software update", "update my iphone", "update my ipad", "update ios", "ios update", "backup", "back up", "new ios", "after the update", "after updating"],
+        "ref-restart-watch-airpods-tv": ["reset airpods", "restart airpods", "airpods max", "force restart watch", "restart apple watch", "restart apple tv", "turn off my apple watch", "turn off apple watch", "turn off my watch", "power off my apple watch", "power off apple watch", "power off my watch", "restart my watch"],
         "home-fetch": ["reading view", "goldie", "read everything", "grouped reading"],
         "home-whats-new": ["nibbles", "recap", "weekly summary", "monthly summary", "digest", "mouse recap"],
         "tutorial-post": ["plus button", "add button", "post button", "new topic", "start a topic"],
@@ -69,8 +94,43 @@ enum MouseKnowledge {
                 return items.joined(separator: "\n")
             case .faq(let question, let answer):
                 return question + "\n" + answer
+            case .source(let label, _):
+                return label
             }
         }.joined(separator: "\n")
+    }
+
+    /// An article as lines for Ask the Mouse to choose passages from.
+    /// Each bullet or step carries its heading, so a line picked on its own
+    /// still says what it's about: "Apple Watch: Turn off: press and hold
+    /// the side button…", not just "Turn off: …". Headings aren't lines of
+    /// their own, since a bare "Braille" or "Control VoiceOver" picked
+    /// without its content only crowded out real answers. Links are left
+    /// out; the Mouse shows the article itself as the source. Found testing
+    /// Quick Reference questions (2026-10-05).
+    static func helpPassageText(_ article: HelpArticle) -> String {
+        var heading = ""
+        var lines: [String] = []
+        for block in article.content {
+            switch block {
+            case .heading(let text):
+                heading = text
+            case .body(let text), .tip(let text), .note(let text), .warning(let text):
+                lines.append(heading.isEmpty ? text : "\(heading): \(text)")
+            case .bullets(let items):
+                lines += items.map { heading.isEmpty ? $0 : "\(heading): \($0)" }
+            case .steps(let items):
+                lines += items.enumerated().map { index, item in
+                    let step = "Step \(index + 1). \(item)"
+                    return heading.isEmpty ? step : "\(heading): \(step)"
+                }
+            case .faq(let question, let answer):
+                lines.append(question + " " + answer)
+            case .source:
+                break
+            }
+        }
+        return lines.joined(separator: "\n")
     }
 
     static var allHelpArticles: [HelpArticle] {
@@ -124,7 +184,11 @@ enum MouseKnowledge {
             (index, score(title: "", body: paragraph, terms: terms))
         }
         let chosen = ranked.filter { $0.1 > 0 }.sorted { $0.1 > $1.1 }.map(\.0)
-        let order = chosen.isEmpty ? Array(paragraphs.indices) : chosen
+        // Matching lines first, then the rest from the top to fill any room
+        // left. When only a line or two matched, the rest of the space went
+        // unused, and an article's opening steps, usually the most
+        // important, were left out. Found testing (2026-10-05).
+        let order = chosen + paragraphs.indices.filter { !chosen.contains($0) }
         var picked: [Int] = []
         var length = 0
         for index in order {
@@ -311,7 +375,7 @@ enum MousePlace: String, CaseIterable, Identifiable, Hashable {
 enum MouseSwitch: String, CaseIterable, Identifiable {
     case welcomeSummary, showWhatsNewOnHome, searchAutoFocus, appleVisTips, filterProfanity
     case homeForums, homePodcasts, homeApps, homeGuides, homeBlogs, appleTopicsOnly
-    case autoPlayNext, trimSilence, voiceBoost
+    case autoPlayNext, openPlayerOnPlay, trimSilence, voiceBoost
     case confirmationSounds, interfaceSounds, haptics
     case aiSummaries, composeRewrite, searchTranslation
 
@@ -332,6 +396,7 @@ enum MouseSwitch: String, CaseIterable, Identifiable {
         case .homeBlogs: return String(localized: "Blog Posts")
         case .appleTopicsOnly: return String(localized: "Apple Topics Only")
         case .autoPlayNext: return String(localized: "Auto-Play Next")
+        case .openPlayerOnPlay: return String(localized: "Open Player on Play")
         case .trimSilence: return String(localized: "Trim Silence")
         case .voiceBoost: return String(localized: "Voice Boost")
         case .confirmationSounds: return String(localized: "Confirmation Sounds")
@@ -347,7 +412,7 @@ enum MouseSwitch: String, CaseIterable, Identifiable {
         switch self {
         case .welcomeSummary, .showWhatsNewOnHome, .searchAutoFocus, .appleVisTips, .filterProfanity: return .generalSettings
         case .homeForums, .homePodcasts, .homeApps, .homeGuides, .homeBlogs, .appleTopicsOnly: return .homeFeedSettings
-        case .autoPlayNext, .trimSilence, .voiceBoost: return .podcastSettings
+        case .autoPlayNext, .openPlayerOnPlay, .trimSilence, .voiceBoost: return .podcastSettings
         case .confirmationSounds, .interfaceSounds, .haptics: return .soundsHapticsSettings
         case .aiSummaries, .composeRewrite, .searchTranslation: return .intelligenceSettings
         }
@@ -367,6 +432,7 @@ enum MouseSwitch: String, CaseIterable, Identifiable {
         case .homeBlogs: return "show blog posts on Home"
         case .appleTopicsOnly: return "only Apple-related forum topics on Home"
         case .autoPlayNext: return "play the next podcast episode automatically"
+        case .openPlayerOnPlay: return "open the full podcast player when playing an episode from a list"
         case .trimSilence: return "skip silences in podcasts"
         case .voiceBoost: return "make podcast voices louder and clearer"
         case .confirmationSounds: return "sounds when something succeeds"
@@ -393,6 +459,7 @@ enum MouseSwitch: String, CaseIterable, Identifiable {
         case .homeBlogs: return \.showBlogs
         case .appleTopicsOnly: return \.appleOnlyForums
         case .autoPlayNext: return \.autoPlayNext
+        case .openPlayerOnPlay: return \.openPlayerOnPlay
         case .trimSilence: return \.trimSilence
         case .voiceBoost: return \.voiceBoost
         case .confirmationSounds: return \.confirmationSoundsEnabled
