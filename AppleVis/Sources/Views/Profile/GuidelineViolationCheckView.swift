@@ -25,7 +25,6 @@ struct GuidelineViolationCheckView: View {
     @State private var showAIReview = false
     @AppStorage(GuidelineViolationScanner.readsConversationKey) private var readsConversation = true
     @ObservedObject private var reviewStore = GuidelineReviewStore.shared
-    @ObservedObject private var reviewPool = GuidelineReviewPool.shared
     @State private var showSendNotes = false
     @AccessibilityFocusState private var isTitleFocused: Bool
     /// Shared by whichever status section is currently showing —
@@ -351,39 +350,11 @@ struct GuidelineViolationCheckView: View {
                     Text("Your Reviews (\(reviewStore.reviews.count))")
                         .accessibilityAddTraits(.isHeader)
                 }
-
-                // Everyone's decisions, from CloudKit, so the rules are
-                // judged on the whole team's reviews (2026-10-06).
-                Section {
-                    let teamScores = reviewPool.ruleScores
-                    if reviewPool.isLoading && teamScores.isEmpty {
-                        Text("Loading the team's reviews…").font(.footnote).foregroundStyle(.secondary)
-                    } else if reviewPool.unavailable && teamScores.isEmpty {
-                        Text("Couldn't load the team's reviews. Check that you're signed in to iCloud, then try again.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    } else if teamScores.isEmpty {
-                        Text("No one on the team has marked a flag yet. Decisions you mark are shared here with other Site Editors and Admins, without the post itself.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    } else {
-                        Text("\(reviewPool.reviewerCount) reviewers. \(reviewPool.disagreements) flags where reviewers disagreed.")
-                            .font(.footnote)
-                        ForEach(teamScores) { score in
-                            Text("\(score.name): \(score.real) real, \(score.notAProblem) not a problem (\(Int((score.realShare * 100).rounded()))% real)")
-                                .font(.footnote)
-                        }
-                    }
-                    Button("Refresh Team Reviews") { Task { await reviewPool.refresh() } }
-                        .disabled(reviewPool.isLoading)
-                } header: {
-                    Text("Team Reviews")
-                        .accessibilityAddTraits(.isHeader)
-                }
             }
         }
         .themedList(preferences.colors)
         .navigationTitle("Guideline Violation Check")
         .onAppear { ICloudSyncManager.shared.pushGuidelineReviews() }
-        .task { await reviewPool.refresh() }
         .sheet(isPresented: $showSendNotes) { SendNotesWizard(package: reviewStore.notesPackage()) }
         .navigationBarTitleDisplayMode(.inline)
         // Fires on both transitions: a scan starting (lands on

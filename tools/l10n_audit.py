@@ -41,7 +41,7 @@ DETECTION_UI_LABELS = {'message', 'rule', 'label', 'title', 'hint'}
 # Admin-only screens stay English (Profile > Admin), by decision.
 ADMIN_FILES = {'GuidelineViolationCheckView.swift', 'GuidelineViolationScanner.swift', 'ModeratorToolsView.swift',
                'AppDirectoryHealthCheckView.swift', 'AppEntryHealthScanner.swift', 'FalsePositiveReportView.swift',
-               'GuidelineReviewStore.swift', 'GuidelineReviewPool.swift'}
+               'GuidelineReviewStore.swift'}
 # Messages e-mailed to the editorial team or posted to the English-only site.
 TEAM_FACING = [
     ('ReportCommentWizard.swift', r"^(Reported |Reporter's additional|\(none provided\)|— Sent via)"),

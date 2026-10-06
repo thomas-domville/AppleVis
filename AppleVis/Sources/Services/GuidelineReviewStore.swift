@@ -125,14 +125,12 @@ final class GuidelineReviewStore: ObservableObject {
         )
         save()
         ICloudSyncManager.shared.pushGuidelineReviews()
-        if let review = reviews[flag.id] { GuidelineReviewPool.shared.share(review) }
     }
 
     func undo(for flagId: String) {
         reviews[flagId] = nil
         save()
         ICloudSyncManager.shared.pushGuidelineReviews()
-        GuidelineReviewPool.shared.withdraw(flagId: flagId)
     }
 
     /// How often each rule's flags turned out to be real, from your

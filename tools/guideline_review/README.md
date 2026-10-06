@@ -34,9 +34,3 @@ To change a rule:
 The app always has the built-in copy from its last build, and keeps the last
 copy it downloaded, so the checks keep working with no internet or if GitHub
 can't be reached. A downloaded copy that's broken or not newer is ignored.
-
-## Team decisions
-
-Decisions marked in the Guideline Violation Check are also shared in iCloud
-(CloudKit) with other Site Editors and Admins, without the post text, and
-scored together under Team Reviews.
