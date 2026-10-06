@@ -1,0 +1,298 @@
+{
+ "about": "AppleVis guideline rules: the patterns the guideline checks look for, and Apple Intelligence's rule descriptions. Data only. The app ships a copy, downloads published/guideline-rules.json from the public GitHub repo, and uses its built-in copy if that is missing or invalid. Messages members see stay in the app, because they're translated.",
+ "version": 1,
+ "updated": "2026-10-06",
+ "variables": {
+  "thing": "(?:podcast|youtube\\s+channel|channel|website|site|blog|newsletter|mailing\\s+list|substack|patreon|videos?|episodes?)",
+  "notATool": "(?!\\s+(?:player|app|reader|client))",
+  "speechTargets": "voiceover|voice\\s+over|siri|daniel|alex|samantha|karen|moira|tessa|fred|serena|arthur|martha|rishi|veena|fiona|eloquence|espeak|vocalizer|the\\s+voice|voice|speech|phone|iphone|ipad|mac|watch|browser|app|notifications?|alerts?|narrator|screen\\s+reader|it",
+  "shutUpLinking": "to|would|will|just|finally|please|should|won't|wouldn't|doesn't|didn't|never|can't|couldn't|learning|learned|learns|trying|going|made|make|got|get",
+  "mannerVerbs": "explain\\w*|speak\\w*|spoke|talk\\w*|hear\\w*|heard|see|seeing|seen|saw|read\\w*|writ\\w*|wrote|describ\\w*|stat(?:e|es|ed|ing)|label\\w*|mark\\w*|show\\w*|shown|sound\\w*|pronounc\\w*|announc\\w*|display\\w*|laid|lay|set|put|visible|audible|understand\\w*|understood|communicat\\w*"
+ },
+ "patterns": {
+  "image": [
+   "<\\s*img\\b",
+   "<\\s*picture\\b",
+   "<\\s*source\\b[^>]+type\\s*=\\s*[\"']image/",
+   "\\!\\[[^\\]]*\\]\\([^)]+\\)",
+   "data:image/",
+   "\\bhttps?://\\S+\\.(png|jpe?g|gif|webp|heic|heif|tiff?|bmp|svg)(\\?\\S*)?\\b",
+   "\\b\\S+\\.(png|jpe?g|gif|webp|heic|heif|tiff?|bmp|svg)\\b"
+  ],
+  "vulgarStrong": [
+   "\\b(?:mother|cluster|mind|brain)?f+[\\W_]*u+[\\W_]*c+[\\W_]*k",
+   "\\bf[*#@$%]{1,3}c?k(?:er|ers|ing|in|ed|s)?\\b",
+   "\\bf[*#@$%]{2,3}ing\\b",
+   "\\bf(?:ck|uk|kn)(?:ing|in|er|ers|ed|s)?\\b",
+   "\\bc+[\\W_]*u+[\\W_]*n+[\\W_]*t+s?\\b",
+   "\\bc[*#@$%]nts?\\b",
+   "\\btwats?\\b",
+   "\\bc+[\\W_]*o+[\\W_]*c+[\\W_]*k+[\\W_]*s+[\\W_]*u+[\\W_]*c+[\\W_]*k+(?:er|ers|ing)?\\b",
+   "\\bc+[\\W_]*u+[\\W_]*m+[\\W_]*s+[\\W_]*h+[\\W_]*o+[\\W_]*t+s?\\b"
+  ],
+  "crude": [
+   "\\b(?:bull|horse|dip|chicken)?sh+[*!1i]+t+(?:s|ty|tier|tiest|head|heads|show|load|storm|post|ting)?\\b",
+   "\\b(?:ass|arse)holes?\\b",
+   "\\b(?:dumb|jack|smart|bad)\\s*ass(?:es)?\\b",
+   "\\bbitch(?:es|y|ing)?\\b",
+   "\\bdickheads?\\b",
+   "\\bwankers?\\b",
+   "\\bpiss\\s+off\\b",
+   "\\b(?:you|you're|you are|such|what|he's|she's|they're)\\s+(?:an?\\s+)?(?:\\w+\\s+)?(?:prick|dick|bastard)s?\\b"
+  ],
+  "toneHigh": [
+   "\\b(you|you're|you are|u r)\\s+(an?\\s+)?(idiot|moron|loser|stupid|dumb|clown|fool|jerk)\\b",
+   "\\b(nobody\\s+wants\\s+you|you\\s+should\\s+leave)\\b",
+   "\\byou\\s+(should\\s+)?go\\s+away\\b",
+   "\\byou\\s+shut\\s+up\\b",
+   "\\b(kill\\s+yourself|kys|i\\s+hope\\s+you\\s+(die|suffer))\\b",
+   "\\b(?<!not\\s)(all|those)\\s+(blind|disabled|deaf|autistic|lgbt|gay|trans|black|white|asian|jewish|muslim|christian)\\s+(people\\s+)?(are|should)\\s+(?:all\\s+|just\\s+|so\\s+)?(?:stupid|dumb|lazy|idiots?|useless|worthless|inferior|disgusting|freaks?|animals|scum|a\\s+burden|a\\s+waste|parasites|sick|die|leave|go\\s+away|be\\s+(?:banned|removed|locked\\s+up|ashamed))\\b",
+   "\\b(troll|trolling)\\b.*\\b(shut\\s+up|go\\s+away|idiot|moron|stupid)\\b"
+  ],
+  "toneMedium": [
+   "\\b(you're|you are)\\s+(is\\s+)?(stupid|dumb|ridiculous|nonsense|garbage|trash)\\b",
+   "\\b(learn\\s+to\\s+read|use\\s+your\\s+brain|you\\s+clearly\\s+don't\\s+know|you\\s+obviously\\s+don't\\s+understand)\\b",
+   "\\b(stop\\s+(whining|complaining|crying)|quit\\s+(whining|complaining|crying))\\b",
+   "\\b(what\\s+is\\s+wrong\\s+with\\s+you|are\\s+you\\s+serious\\s+right\\s+now)\\b"
+  ],
+  "tonePutDown": [
+   "\\bwhatever\\s+helps\\s+you\\s+sleep\\b",
+   "\\b(?:always|there's\\s+always|of\\s+course)\\s+(?:(?:find|get|have)\\s+)?(?:someone|somebody|people)\\s+like\\s+you\\b",
+   "\\bpeople\\s+like\\s+you\\s+(?:always|never|keep|ruin|are\\s+(?:the\\s+problem|why))\\b",
+   "\\bcope\\s+(?:and\\s+seethe|harder)\\b",
+   "\\bstay\\s+mad\\b",
+   "\\btouch(?:ing)?\\s+grass\\b",
+   "\\bok(?:ay)?\\s+boomer\\b",
+   "\\bget\\s+a\\s+life\\b",
+   "\\bskill\\s+issue\\b",
+   "\\bmind\\s+your\\s+own\\s+(?:damn\\s+)?business\\b",
+   "\\byou(?:'ve|\\s+have|\\s+got|\\s+obviously\\s+have|\\s+clearly\\s+have)\\s+(?:some\\s+|serious\\s+|a\\s+lot\\s+of\\s+|real\\s+|deep\\s+)?(?:insecurit(?:y|ies)|issues)\\b[^.!?]{0,80}\\b(?:counsell?or|therapist|therapy|psychiatrist|professional\\s+help)\\b",
+   "\\byou\\s+(?:really\\s+)?need\\s+(?:some\\s+)?(?:therapy|a\\s+therapist|professional\\s+help|to\\s+see\\s+a\\s+(?:therapist|shrink))\\b"
+  ],
+  "tonePutDownSentence": [
+   "^\\W*(?:ok(?:ay)?\\W+|but\\W+|lol\\W+|lmf?ao+\\W+)?who\\s+asked\\W*$",
+   "^\\W*(?:just\\s+|you\\s+need\\s+to\\s+|please\\s+)?grow\\s+up\\W*$"
+  ],
+  "toneLowSentence": [
+   "\\b(obviously|clearly)\\b(?=.*\\byou(?:r|'re|'ve|'d|'ll)?\\b).*[!?]|\\byou(?:r|'re|'ve|'d|'ll)?\\b.*\\b(obviously|clearly)\\b.*[!?]",
+   "^\\W*whatever\\b.*[!?]|^\\W*whatever\\W*$|\\bwhatever\\s+you\\s+say\\b"
+  ],
+  "toneLowAnywhere": [
+   "\\b(i\\s+can't\\s+believe|that's\\s+absurd|that's\\s+annoying|suck\\s+it\\s+up)\\b"
+  ],
+  "toneThanks": [
+   "\\b(thank|thanks|thx|appreciate[ds]?)\\b"
+  ],
+  "shutUp": [
+   "\\bshut\\s+up\\b"
+  ],
+  "shutUpAtDevice": [
+   "\\b(?:{speechTargets})(?:[\\s,.:!-]+(?:{shutUpLinking}))*[\\s,.:!-]*shut\\s+up\\b|\\bshut\\s+up[\\s,.:!-]*(?:{speechTargets})\\b"
+  ],
+  "selfShutUp": [
+   "\\b(?:i|we|i'll|we'll|i'd|we'd|i'm|we're|me|us|myself|ourselves)\\b[^.!?\\n]{0,40}?\\bshut\\s+up\\b"
+  ],
+  "mannerAdverbAfter": [
+   "\\b(?:{mannerVerbs})\\s+(?:(?:it|this|that|them|things|everything|out|up|so|very|more|really)\\s+){0,2}(?:clearly|obviously)\\b"
+  ],
+  "mannerAdverbBefore": [
+   "\\b(?:clearly|obviously)\\s+(?:labell?ed|marked|written|visible|audible|stated|explained|shown|displayed|announced)\\b"
+  ],
+  "quotedPassage": [
+   "\"[^\"\\n]{1,200}\"",
+   "“[^”\\n]{1,200}”",
+   "‘[^’\\n]{1,200}’",
+   "(?<![\\w])'[^'\\n]{1,200}'(?![\\w])"
+  ],
+  "moderation": [
+   "\\b(?:please\\s+be\\s+(?:respectful|kind|civil)|(?:our|the|community|posting|appleVis)\\s+guidelines|goes\\s+against|posting\\s+privileges|personal\\s+attacks\\s+(?:are|aren't|are\\s+not)|(?:our|the)\\s+(?:trolling|moderation)\\s+policy|as\\s+a\\s+(?:friendly\\s+)?reminder|moderator\\s+note|keep\\s+(?:the|this)\\s+discussion|this\\s+thread\\s+(?:has|will)\\s+been?\\s+(?:locked|closed))\\b"
+  ],
+  "selfPromotion": [
+   "\\b(?:check\\s+out|visit|subscribe\\s+to|follow|listen\\s+to|watch|join|head\\s+(?:over\\s+)?to|go\\s+to|stop\\s+by|support|sign\\s+up\\s+(?:for|to)|tune\\s+in\\s+to|give)\\s+my\\s+(?:new\\s+|latest\\s+)?{thing}\\b",
+   "\\bmy\\s+(?:new|latest|brand[-\\s]new)\\s+{thing}\\b{notATool}",
+   "\\bi(?:'ve|\\s+have)?\\s+(?:just\\s+)?(?:started|launched|created)\\s+(?:a|my)\\s+(?:new\\s+)?{thing}\\b",
+   "\\blike\\s+and\\s+subscribe\\b"
+  ],
+  "selfPromotionFeedback": [
+   "\\b(?:feedback|test(?:ing|ers?)?|try\\s+(?:it|this|them)(?:\\s+out)?|beta)\\b"
+  ],
+  "selfPromotionMyThing": [
+   "\\bmy\\s+{thing}\\b{notATool}"
+  ],
+  "link": [
+   "(?:https?://|www\\.)\\S+"
+  ],
+  "referral": [
+   "[?&](ref|referral|affiliate|aff|partner|subid)="
+  ],
+  "advertising": [
+   "(?:^|[.!?\\n]\\s*)(?:for\\s+sale|wanted\\s+to\\s+buy|wtb|wts)\\b",
+   "\\b(?:for\\s+sale|wanted\\s+to\\s+buy)\\s*[:\\-–]",
+   "\\b(?:i'm|i\\s+am|we're|we\\s+are)\\s+selling\\b",
+   "\\b(?:have|has|got)\\s+(?:an?\\s+|my\\s+|some\\s+|two\\s+|a\\s+few\\s+)?[\\w\\s-]{0,30}?\\bfor\\s+sale\\b",
+   "\\bbuy\\s+now\\b",
+   "\\bget\\s+\\d+%\\s+off\\b",
+   "\\b(?:promo|coupon|discount)\\s+code\\b[^.!?\\n]{0,80}(?:\\b(?:off|discount|save|savings|checkout)\\b|%)",
+   "(?:\\b(?:off|discount|save|savings)\\b|%)[^.!?\\n]{0,80}\\b(?:promo|coupon|discount)\\s+code\\b",
+   "\\b(?:takes?|saves?|get)\\s+(?:up\\s+to\\s+)?[$£€]\\d+\\s+off\\b"
+  ],
+  "pressRelease": [
+   "\\bfor\\s+immediate\\s+release\\b",
+   "(?:^|\\n)\\s*press\\s+release\\b",
+   "\\bpress\\s+release\\s*[:\\-–]",
+   "\\b(?:pr\\s*newswire|business\\s*wire|globe\\s*newswire|accesswire)\\b",
+   "\\bmedia\\s+contact\\s*:"
+  ],
+  "aiDisclosure": [
+   "\\bas\\s+an\\s+ai(?:\\s+language\\s+model|\\s+model|\\s+assistant)?\\s*,\\s*i\\b",
+   "\\bas\\s+an\\s+ai\\s+language\\s+model\\b",
+   "\\bas\\s+a\\s+language\\s+model\\b",
+   "\\bi\\s+don't\\s+have\\s+personal\\s+experience\\b",
+   "\\bi\\s+cannot\\s+browse\\s+the\\s+internet\\b",
+   "\\bas\\s+of\\s+my\\s+knowledge\\s+cutoff\\b",
+   "\\bi'm\\s+unable\\s+to\\s+access\\s+real-time\\b",
+   "\\b(?:certainly|absolutely)!\\s+here's\\b",
+   "\\bsure!\\s+here's\\s+a\\b",
+   "\\bgreat\\s+question!\\s+here\\b"
+  ],
+  "shoutingMarks": [
+   "[!?]{3,}"
+  ],
+  "shoutingCaps": [
+   "\\b[A-Z]{4,}\\b"
+  ],
+  "shoutingExcitement": [
+   "\\b(?:love|loving|awesome|amazing|great|excited|exciting|yay|wow|congrat\\w*|thank\\w*|brilliant|fantastic|wonderful|cool|fun|happy|finally)\\b"
+  ],
+  "topicSwitch": [
+   "\\b(?:unrelated\\s+(?:question|note|topic|issue)|on\\s+(?:a|an)\\s+(?:different|unrelated|separate|other)\\s+(?:note|topic|subject)|off[\\s-]topic|(?:another|second|separate|different|other)\\s+(?:question|thing|issue|topic)\\s*,?\\s*(?:not|un)\\s*related|changing\\s+(?:the\\s+)?(?:topic|subject)|(?:totally|completely)\\s+different\\s+(?:question|topic|subject))\\b"
+  ],
+  "emailAddress": [
+   "\\b(?!(?:accessibility|support|contact|info|help|press|sales|admin|team|hello|feedback|abuse|legal|privacy|webmaster|postmaster|user|example|someone|yourname)@)([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})"
+  ],
+  "emailInvitation": [
+   "\\b(?:e-?mail|mail|contact|reach|write\\s+to|message|drop(?:ping)?\\s+(?:me|us)\\s+a\\s+(?:line|note|message)|send\\b[^.!?\\n]{0,60}?\\bto|email\\s+address(?:\\s+is)?|feedback\\s+to)\\s*:?[^.!?\\n]{0,25}$"
+  ],
+  "emailProject": [
+   "(?:^|[._-])(?:info|support|help|contact|feedback|dev|devs|app|apps|team|studio|games?|official|hello|mail)(?:[._-]|$)|(?:dev|app|apps|studio|games|official)$"
+  ],
+  "emailHeaderBefore": [
+   "(?:\\b(?:from|to|cc|bcc|reply-to|sender)\\s*:[^\\n]{0,60}|<\\s*|\\[mailto:)$"
+  ],
+  "emailHeaderAfter": [
+   "^\\s*>?\\s*(?:\\S+\\s+){0,3}wrote\\s*:"
+  ],
+  "announcementTopic": [
+   "\\b(survey|questionnaire|research study|research project|focus group|participants? needed|looking for participants?|study participants?)\\b"
+  ],
+  "announcementInvitation": [
+   "\\b(please|fill\\s+(?:in|out)|take\\s+(?:our|this|the|a|my|their|part)|complete\\s+(?:our|this|the|a|my)|participate|sign\\s+up|join\\s+(?:our|the|a|my)|click|link\\b|below|would\\s+(?:you|like)|could\\s+you|we'd\\s+(?:love|like|appreciate)|we\\s+would\\s+(?:love|like|appreciate)|help\\s+us|if\\s+you're\\s+interested|if\\s+you\\s+are\\s+interested|few\\s+minutes|looking\\s+for|participants?\\s+needed|recruiting|volunteers?)\\b"
+  ]
+ },
+ "lists": {
+  "lowValuePhrases": [
+   "me too",
+   "same here",
+   "same issue",
+   "same problem",
+   "same for me",
+   "same thing",
+   "ditto",
+   "i agree",
+   "agreed",
+   "just google it",
+   "try googling",
+   "just search for it",
+   "i haven't used",
+   "i don't use that",
+   "never used it",
+   "haven't tried it",
+   "can't help"
+  ],
+  "personalEmailProviders": [
+   "gmail.com",
+   "googlemail.com",
+   "icloud.com",
+   "me.com",
+   "mac.com",
+   "outlook.com",
+   "hotmail.com",
+   "live.com",
+   "msn.com",
+   "yahoo.com",
+   "ymail.com",
+   "rocketmail.com",
+   "aol.com",
+   "aim.com",
+   "proton.me",
+   "protonmail.com",
+   "pm.me",
+   "gmx.com",
+   "gmx.net",
+   "gmx.de",
+   "mail.com",
+   "zoho.com",
+   "yandex.com",
+   "yandex.ru",
+   "fastmail.com",
+   "hey.com",
+   "tutanota.com",
+   "tuta.io",
+   "comcast.net",
+   "att.net",
+   "verizon.net",
+   "sbcglobal.net",
+   "btinternet.com",
+   "sky.com",
+   "virginmedia.com",
+   "web.de",
+   "orange.fr",
+   "free.fr",
+   "laposte.net",
+   "libero.it",
+   "qq.com",
+   "163.com",
+   "126.com",
+   "naver.com"
+  ],
+  "personalEmailRegionalBases": [
+   "yahoo",
+   "hotmail",
+   "outlook",
+   "live",
+   "gmx",
+   "yandex",
+   "aol"
+  ]
+ },
+ "ai": {
+  "meanings": {
+   "tone": "Respectful discussion. No personal attacks, put-downs, or dismissive remarks aimed at another member. Criticising a product, company, or update, and venting about a bug, are fine.",
+   "personal-info": "Privacy. Members shouldn't accidentally expose their own or someone else's personal contact details. An address shared on purpose so people can get in touch, such as a developer's or a tester sign-up address, is fine.",
+   "self-promotion": "No self-promotion: don't use AppleVis to promote your own website, podcast, YouTube channel, mailing list, or other online resource. This does not prohibit sharing your own resources when doing so would benefit an existing discussion. Developers may share and discuss their apps on the forum, answer questions, seek feedback, and share updates, as long as it's genuine and not primarily promotional. Mentioning your own site while asking for help is fine.",
+   "advertising": "No advertising or selling. Posts shouldn't be sales listings or adverts. Talking about wanting to buy something, or asking where to buy it, is fine. Asking a developer for a promo code (an App Store download code) to try their app, or a developer offering codes to testers, is fine; only discount or sale codes are advertising.",
+   "press-release": "Press releases need discussion around them. Pasting a press release on its own just to promote something isn't allowed. Quoting part of one while discussing it is fine.",
+   "ai-disclosure": "If AI wrote a post, the member should say so. Quoting an AI's answer and saying it came from an AI is fine.",
+   "multi-topic": "One topic per post. A new post shouldn't mix unrelated subjects. Several questions about the same subject are fine.",
+   "shouting": "Be polite. Don't shout at people with capitals or strings of exclamation marks. Excitement, like \"I love this app!!!\", is fine."
+  },
+  "examples": {
+   "tone": {
+    "fine": "This update is a mess and Apple clearly didn't test it with VoiceOver.",
+    "breaks": "Nobody asked for your opinion, so stop posting."
+   },
+   "personal-info": {
+    "fine": "If you'd like to join the TestFlight, email me at the address on my app's page.",
+    "breaks": "Following up on my case. From: Jane Doe <jane.doe@gmail.com> wrote: ..."
+   },
+   "self-promotion": {
+    "fine": "In my own thread asking for game ideas: I've uploaded the prototype to my website. Could you test it and give me feedback?",
+    "breaks": "If this helped anyone, I'd really appreciate a like and subscribe."
+   },
+   "advertising": {
+    "fine": "I'd love a promo code to hear the other sounds the app offers.",
+    "breaks": "Use the code BACKTOSCHOOL20 for up to $250 off, valid through August 31."
+   }
+  }
+ }
+}

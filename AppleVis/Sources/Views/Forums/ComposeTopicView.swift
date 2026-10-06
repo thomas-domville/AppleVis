@@ -143,6 +143,7 @@ struct ComposeTopicView: View {
                             TextEditor(text: $bodyText)
                                 .frame(minHeight: 200)
                                 .rewriteFlash($justRewrote)
+                                .guidelineReminderActions(guidelines)
                                 .onChange(of: bodyText) { _, newValue in
                                     guidelines.textChanged(newValue)
                                     intelligence.textChanged(
@@ -269,6 +270,7 @@ struct ComposeTopicView: View {
             error = message
             return
         }
+        if await guidelines.confirmBeforePosting({ Task { await submit() } }) { return }
         isSubmitting = true
         error = nil
         do {
@@ -425,7 +427,11 @@ struct ComposeReplyView: View {
                 TextEditor(text: $bodyText)
                     .padding()
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: bodyText) { _, newValue in
+                        if guidelines.conversation == nil {
+                            guidelines.conversation = ConversationSource(commentBundle: CommentBundle.forumTopic.rawValue, nodeId: topicId, replyingToCommentId: quotedReply?.id)
+                        }
                         guidelines.textChanged(newValue, isReply: true)
                         intelligence.textChanged(
                             newValue,
@@ -504,6 +510,7 @@ struct ComposeReplyView: View {
             error = message
             return
         }
+        if await guidelines.confirmBeforePosting({ Task { await submit() } }) { return }
         isSubmitting = true
         error = nil
         do {

@@ -487,6 +487,7 @@ struct ContactView: View {
                     .accessibilityLabel(String(localized: "Message"))
                     .accessibilityHint(String(localized: "Required. Minimum 20 characters. \(effectiveType.messagePlaceholder)"))
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: message) { _, newValue in
                         handleMessageChange(newValue)
                         guidelines.textChanged(newValue)
@@ -768,6 +769,7 @@ struct ContactView: View {
             await announceWizardFailure(policyMessage, focus: $isErrorFocused)
             return
         }
+        if await guidelines.confirmBeforePosting({ Task { await submit() } }) { return }
         isSubmitting = true; error = nil
         UIAccessibility.post(notification: .announcement, argument: "Sending your message…")
 

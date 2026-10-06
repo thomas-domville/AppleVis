@@ -43,6 +43,8 @@ struct AskTheMouseView: View {
     @State private var sheetPlace: MousePlace?
     @State private var forumQuestion: ForumQuestion?
     @State private var webSearch: WebSearch?
+    @ObservedObject private var mouseNotes = MouseNotesStore.shared
+    @State private var showMouseNotes = false
     @State private var path = NavigationPath()
     /// Answers saved to For You > Saved, by turn id.
     @State private var savedAnswerIds: Set<String> = Set(PersistenceStore.shared.savedMouseAnswers().map(\.id))
@@ -143,6 +145,9 @@ struct AskTheMouseView: View {
             }
             .sheet(item: $webSearch) { item in
                 SafariView(url: item.url)
+            }
+            .sheet(isPresented: $showMouseNotes) {
+                SendNotesWizard(package: MouseNotesStore.shared.notesPackage())
             }
             .task(id: mouse.isBusy) { await searchHeartbeat() }
             .onChange(of: mouse.turns.first?.step) { oldStep, newStep in
@@ -313,6 +318,16 @@ struct AskTheMouseView: View {
                 NavigationLink(value: MouseRoute.pastConversations) {
                     Label(String(localized: "Past Conversations (\(mouse.conversations.count))"), systemImage: "clock.arrow.circlepath")
                 }
+            }
+            // Answers that didn't help, and questions AppleVis couldn't
+            // answer, sent to the AppleVis team to improve the Mouse.
+            if !mouseNotes.unsent.isEmpty {
+                Button {
+                    showMouseNotes = true
+                } label: {
+                    Label(String(localized: "Send Notes to AppleVis (\(mouseNotes.unsent.count))"), systemImage: "paperplane")
+                }
+                .accessibilityHint(String(localized: "Sends answers that didn't help, and questions AppleVis couldn't answer, so the Mouse can get better for everyone."))
             }
         }
     }
@@ -736,8 +751,48 @@ struct AskTheMouseView: View {
     /// answer's subject. Choosing one asks it as a follow-up, so there's
     /// nothing to type. Only on the latest answer. Requested directly
     /// (2026-09-29).
+    /// One-tap follow-ups under an answer: simpler wording, or the same
+    /// thing on another device. Requested directly (2026-10-06).
+    @ViewBuilder
+    private func quickFollowUpRows(_ turn: MouseTurn) -> some View {
+        if turn.answered, turn.answer != nil, turn.id == mouse.turns.first?.id, !mouse.isBusy {
+            Button {
+                askFollowUp(String(localized: "Can you explain that more simply?"))
+            } label: {
+                Label(String(localized: "Explain More Simply"), systemImage: "text.badge.minus")
+            }
+            .accessibilityHint(String(localized: "Asks the Mouse to explain its answer in simpler words."))
+            Menu {
+                ForEach(otherDevices, id: \.self) { device in
+                    Button(device) {
+                        askFollowUp(String(localized: "How does that work on \(device)?"))
+                    }
+                }
+            } label: {
+                Label(String(localized: "On Another Device"), systemImage: "laptopcomputer.and.iphone")
+            }
+            .accessibilityHint(String(localized: "Asks how the same thing works on another Apple device."))
+        }
+    }
+
+    /// The Apple devices other than the one in hand.
+    private var otherDevices: [String] {
+        let current = UIDevice.current.userInterfaceIdiom
+        return [
+            current == .phone ? nil : "iPhone",
+            current == .pad ? nil : "iPad",
+            "Mac", "Apple Watch", "Apple TV",
+        ].compactMap { $0 }
+    }
+
+    private func askFollowUp(_ text: String) {
+        question = text
+        ask()
+    }
+
     @ViewBuilder
     private func followUpRows(_ turn: MouseTurn) -> some View {
+        quickFollowUpRows(turn)
         if !turn.followUps.isEmpty, turn.id == mouse.turns.first?.id, !mouse.isBusy {
             Text("You Might Also Ask")
                 .font(.subheadline.weight(.semibold))
@@ -1102,9 +1157,31 @@ struct AskTheMouseView: View {
             }
             .onAppear { hop += 1 }
         case false?:
-            Text("Thanks for letting me know. Try Ask in the Forums below.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if turn.feedbackReason == nil {
+                // One optional tap that makes the note far more useful.
+                Text("What went wrong?")
+                    .font(.subheadline)
+                    .accessibilityAddTraits(.isHeader)
+                ForEach(MouseNote.Reason.allCases, id: \.self) { reason in
+                    Button(reasonLabel(reason)) {
+                        mouse.recordFeedbackReason(turn.id, reason: reason)
+                        UIAccessibility.post(notification: .announcement, argument: String(localized: "Thanks. You can send this to AppleVis from Send Notes to AppleVis."))
+                    }
+                }
+            } else {
+                Text("Thanks for letting me know. Try Ask in the Forums below.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func reasonLabel(_ reason: MouseNote.Reason) -> String {
+        switch reason {
+        case .wrong: return String(localized: "The Answer Was Wrong")
+        case .outOfDate: return String(localized: "It's Out of Date")
+        case .notWhatIAsked: return String(localized: "Not What I Asked")
+        case .nothingUseful: return String(localized: "Nothing Useful Found")
         }
     }
 

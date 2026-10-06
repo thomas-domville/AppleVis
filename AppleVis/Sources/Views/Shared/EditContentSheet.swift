@@ -88,6 +88,7 @@ struct EditContentSheet: View {
                         .frame(minHeight: 160)
                         .padding(.horizontal)
                         .rewriteFlash($justRewrote)
+                        .guidelineReminderActions(guidelines)
                         .onChange(of: text) { _, newValue in
                             guidelines.textChanged(newValue, isReply: isReply)
                             intelligence.textChanged(
@@ -156,6 +157,7 @@ struct EditContentSheet: View {
             error = message
             return
         }
+        if await guidelines.confirmBeforePosting({ Task { await save() } }) { return }
         isSaving = true; error = nil
         do {
             try await onSave(text)

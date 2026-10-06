@@ -3,3 +3,7 @@ hits.json
 __pycache__/
 month*.json
 misses.txt
+recent*.json
+# Review exports from the app hold members' posts.
+AppleVis Guideline Review*.txt
+*review-notes*.txt

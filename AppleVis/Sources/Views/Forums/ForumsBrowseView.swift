@@ -291,7 +291,7 @@ struct ForumsBrowseView: View {
             PersistenceStore.shared.markForumsVisited()
         }
         .refreshable {
-            await load(reset: true)
+            await RefreshHeartbeat.during { await load(reset: true) }
             SoundPlayer.shared.play(.refresh)
             Task { await loadMoreUntilEnoughOrCap() }
         }

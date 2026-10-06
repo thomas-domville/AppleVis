@@ -1807,7 +1807,11 @@ struct ComposeAppReviewView: View {
                 TextEditor(text: $reviewText)
                     .padding()
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: reviewText) { _, newValue in
+                        if guidelines.conversation == nil {
+                            guidelines.conversation = ConversationSource(commentBundle: AppEndpoints.commentBundle(for: platform), nodeId: appId)
+                        }
                         guidelines.textChanged(newValue, isReply: true)
                         intelligence.textChanged(
                             newValue,
@@ -1877,6 +1881,7 @@ struct ComposeAppReviewView: View {
             submitError = message
             return
         }
+        if await guidelines.confirmBeforePosting({ Task { await submit() } }) { return }
         isSubmitting = true; submitError = nil
         do {
             let review = try await APIClient.shared.apps.submitReview(

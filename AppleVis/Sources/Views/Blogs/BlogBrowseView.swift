@@ -35,7 +35,7 @@ struct BlogBrowseView: View {
         .navigationTitle("AppleVis Blog")
         .task { await load(reset: true) }
         .task { await retryAccessibilityFocus(into: $isTitleFocused) }
-        .refreshable { await load(reset: true); SoundPlayer.shared.play(.refresh) }
+        .refreshable { await RefreshHeartbeat.during { await load(reset: true) }; SoundPlayer.shared.play(.refresh) }
         // An editor pinned or unpinned a post: move it now.
         .onReceive(NotificationCenter.default.publisher(for: .contentPinChanged)) { note in
             guard let id = note.object as? String, let pinned = note.userInfo?["pinned"] as? Bool,

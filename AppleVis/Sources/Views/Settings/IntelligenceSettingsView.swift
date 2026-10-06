@@ -58,7 +58,7 @@ struct IntelligenceSettingsView: View {
 
                 Toggle("Smarter Guideline Reminders", isOn: $preferences.guidelineSecondOpinionEnabled)
                     .accessibilityHint(String(localized: "Uses Apple Intelligence to skip a guideline reminder that doesn't fit your draft."))
-                Text("Guideline reminders look for certain words and patterns. With this on, Apple Intelligence reads your whole draft and skips a reminder that clearly doesn't fit, like one for a friendly thank-you. It never adds reminders, and the checks for strong language and images always apply.")
+                Text("Guideline reminders look for certain words and patterns. With this on, Apple Intelligence reads your whole draft and skips a reminder that clearly doesn't fit, like one for a friendly thank-you. For a reply, it can also read the conversation you're replying in. It never adds reminders, and the checks for strong language and images always apply.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

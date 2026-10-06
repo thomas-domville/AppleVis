@@ -644,7 +644,7 @@ struct AppEndpoints {
         return response.data.map { Mappers.appReview($0, included: response.included ?? []) }
     }
 
-    private static func commentBundle(for platform: AppPlatform) -> String {
+    static func commentBundle(for platform: AppPlatform) -> String {
         switch platform {
         case .tvos:    return "comment_node_tv_directory"
         case .watchos: return "comment_node_watch_directory"

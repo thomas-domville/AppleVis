@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import NaturalLanguage
 import FoundationModels
 import os
@@ -48,7 +49,7 @@ enum IntelligenceService {
     /// with reasonable confidence. Mirrors the intent of the original
     /// Unicode-heuristic check but uses Apple's language recognizer for
     /// better accuracy across scripts that overlap Latin (e.g. French, Spanish).
-    static func detectNonEnglish(_ text: String) -> Bool {
+    nonisolated static func detectNonEnglish(_ text: String) -> Bool {
         let stripped = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard stripped.count >= 8 else { return false }
 
@@ -174,12 +175,19 @@ enum IntelligenceService {
     // MARK: - Guideline second opinion
 
     /// Apple Intelligence's read on one rule-based guideline flag.
-    struct GuidelineSecondOpinion: Sendable, Equatable {
+    nonisolated struct GuidelineSecondOpinion: Sendable, Equatable, Codable {
         /// False when, read in context, the post doesn't really break the
         /// guideline: the rule's keywords matched, but the meaning didn't.
+        /// True for "not sure" too, so an unsure answer keeps the flag.
         let isRealConcern: Bool
+        /// Apple Intelligence couldn't tell. Kept as a flag, but shown as
+        /// genuinely borderline. It used to have to pick yes or no, and was
+        /// told to say yes when unsure. Requested directly (2026-10-06).
+        var isUnsure = false
         /// One short sentence saying why, for the admin check.
         let reason: String
+        /// Decided after reading the conversation around the post.
+        var readConversation = false
     }
 
     /// Double-checks a rule-based flag in context. It can only confirm or
@@ -188,16 +196,114 @@ enum IntelligenceService {
     /// Replaces an earlier pass that asked the model to find violations on
     /// its own, which could invent flags and showed untranslated wording.
     /// Requested directly (2026-09-27).
-    static func secondOpinion(on warning: GuidelineWarning, in text: String) async -> GuidelineSecondOpinion? {
+    /// Where a flagged post sits. The model used to see a comment on its
+    /// own, so a developer replying in their own "looking for game ideas"
+    /// thread with the prototype they'd built looked like promotion, and it
+    /// agreed with the flag (2026-10-06). Reported directly.
+    struct FlagContext: Sendable {
+        var threadTitle: String = ""
+        var isReply: Bool = false
+        var authorStartedThread: Bool = false
+    }
+
+    /// Two steps. First the post alone, as before: clear-cut rules never get
+    /// here, and if the post is plainly fine that's the answer. Only if it
+    /// still looks like a problem, and it's a reply, is the conversation
+    /// read (the opening post, what it replied to, and the comments just
+    /// before), and the question asked again with it. So the extra reading
+    /// is spent only on the borderline flags that need it. If the
+    /// conversation can't be loaded or read, the first verdict stands.
+    /// Requested directly (2026-10-06).
+    static func reviewFlag(
+        _ warning: GuidelineWarning, in text: String, context: FlagContext,
+        loadConversation: (() async -> ConversationContext?)?
+    ) async -> GuidelineSecondOpinion? {
+        guard let first = await secondOpinion(on: warning, in: text, context: context) else { return nil }
+        guard first.isRealConcern, context.isReply, let loadConversation,
+              let conversation = await loadConversation(),
+              let notes = await conversationNotes(conversation, for: warning) else { return first }
+        var withThread = context
+        withThread.threadTitle = conversation.threadTitle.isEmpty ? context.threadTitle : conversation.threadTitle
+        withThread.authorStartedThread = context.authorStartedThread || conversation.flaggedAuthorStartedThread
+        guard var second = await secondOpinion(on: warning, in: text, context: withThread, conversation: notes) else { return first }
+        second.readConversation = true
+        return second
+    }
+
+    /// Room for the conversation in one request, in characters. The on-device
+    /// model reads about 4,096 tokens at once, instructions, post, and answer
+    /// included (Apple TN3193), and the post takes up to 3,000 characters.
+    private static let conversationBudget = 5_000
+    private static let conversationPartSize = 4_000
+
+    /// The conversation as it will be shown to the model. When it's too long
+    /// for one request, it's read in parts (at most three), each reduced to a
+    /// short note on what matters for this guideline, and the notes are used
+    /// instead. The model can't carry one part over to the next, since
+    /// everything in a session counts toward the same limit.
+    static func conversationNotes(_ conversation: ConversationContext, for warning: GuidelineWarning) async -> String? {
+        guard let meaning = guidelineMeaning(warning.id) else { return nil }
+        func clip(_ text: String, _ limit: Int) -> String {
+            text.count > limit ? String(text.prefix(limit)) + "…" : text
+        }
+        var units = ["Thread title: \(conversation.threadTitle)",
+                     "Opening post: \(clip(conversation.openingPost, 3_000))"]
+        if !conversation.earlier.isEmpty {
+            units.append("Comments just before it, oldest first:\n" + conversation.earlier.map { "- " + clip($0, 1_000) }.joined(separator: "\n"))
+        }
+        if let replyingTo = conversation.replyingTo {
+            units.append("The comment it replies to: \(clip(replyingTo, 2_000))")
+        }
+        let whole = units.joined(separator: "\n\n")
+        if whole.count <= conversationBudget { return whole }
+
+        guard #available(iOS 26.0, *), isAvailable else { return nil }
+        var parts: [String] = []
+        var current = ""
+        for unit in units {
+            if !current.isEmpty, current.count + unit.count > conversationPartSize {
+                parts.append(current)
+                current = ""
+            }
+            current += (current.isEmpty ? "" : "\n\n") + clip(unit, conversationPartSize)
+        }
+        if !current.isEmpty { parts.append(current) }
+        var notes: [String] = []
+        for part in parts.prefix(3) {
+            let prompt = """
+            Here is part of a conversation on AppleVis. A later reply in it was flagged for this guideline: \(meaning)
+
+            In one or two short sentences, note only what in this part matters for judging that reply, such as what the thread is about, who started it, or what was asked. If nothing matters, say so.
+
+            \(part)
+            """
+            if let note = await cleanedResponse(prompt) { notes.append(note) }
+        }
+        return notes.isEmpty ? nil : "Notes on the conversation:\n" + notes.map { "- " + $0 }.joined(separator: "\n")
+    }
+
+    static func secondOpinion(on warning: GuidelineWarning, in text: String, context: FlagContext = FlagContext(), conversation: String? = nil) async -> GuidelineSecondOpinion? {
         guard warning.allowsSecondOpinion, let meaning = guidelineMeaning(warning.id) else { return nil }
         guard #available(iOS 26.0, *), isAvailable else { return nil }
         let post = String(HTMLText.plainText(fromHTML: text).prefix(3000))
+        var placement = ""
+        if context.isReply {
+            placement = "This is a reply in the thread titled \"\(context.threadTitle)\"."
+            if context.authorStartedThread { placement += " The person who wrote it started that thread." }
+        } else if !context.threadTitle.isEmpty {
+            placement = "This is the opening post, titled \"\(context.threadTitle)\"."
+        }
+        let thread = conversation.map {
+            "The conversation it's part of, for context only. Judge only the post at the end, not anything in here.\n\($0)\n\n"
+        } ?? ""
         let prompt = """
-        An automatic check flagged this AppleVis post for the guideline below. Read the post in context and decide whether it really breaks the guideline. If you're unsure, say it does.
+        An automatic check flagged this AppleVis post for the guideline below. Read the post in context and decide whether it really breaks the guideline: breaks, fine, or unsure. Say unsure when it could reasonably go either way.
 
         Guideline: \(meaning)
 
-        Post:
+        \(placement)
+
+        \(thread)Post:
         \(post)
         """
         do {
@@ -207,7 +313,8 @@ enum IntelligenceService {
             Friendly, helpful, excited, or merely frustrated posts are fine. Only confirm real problems.
             """)
             let response = try await session.respond(to: prompt, generating: GuidelineVerdict.self)
-            return GuidelineSecondOpinion(isRealConcern: response.content.breaksGuideline, reason: response.content.reason)
+            let verdict = response.content.verdict
+            return GuidelineSecondOpinion(isRealConcern: verdict != "fine", isUnsure: verdict == "unsure", reason: response.content.reason)
         } catch {
             AppLog.intelligence.error("Guideline second opinion failed: \(error, privacy: .private)")
             return nil
@@ -216,27 +323,12 @@ enum IntelligenceService {
 
     /// What each context-dependent guideline is really about, including
     /// what's fine, so the model judges meaning rather than keywords.
+    /// What a judgement-call rule means, with a real AppleVis example of
+    /// each side (small on-device models judge borderline cases better with
+    /// examples). Kept in the shared rules file, so a better description or
+    /// example reaches everyone without an app update (2026-10-06).
     private static func guidelineMeaning(_ id: String) -> String? {
-        switch id {
-        case "tone-medium", "tone-low":
-            return "Respectful discussion. No personal attacks, put-downs, or dismissive remarks aimed at another member. Criticising a product, company, or update, and venting about a bug, are fine."
-        case "personal-info":
-            return "Privacy. Members shouldn't accidentally expose their own or someone else's personal contact details. An address shared on purpose so people can get in touch, such as a developer's or a tester sign-up address, is fine."
-        case "self-promotion":
-            return "No self-promotion. Members shouldn't use posts to advertise their own podcast, channel, website, or newsletter. Mentioning your own site while asking for help, or a developer discussing their app in its own thread, is fine."
-        case "advertising":
-            return "No advertising or selling. Posts shouldn't be sales listings or adverts. Talking about wanting to buy something, or asking where to buy it, is fine."
-        case "press-release":
-            return "Press releases need discussion around them. Pasting a press release on its own just to promote something isn't allowed. Quoting part of one while discussing it is fine."
-        case "ai-disclosure":
-            return "If AI wrote a post, the member should say so. Quoting an AI's answer and saying it came from an AI is fine."
-        case "multi-topic":
-            return "One topic per post. A new post shouldn't mix unrelated subjects. Several questions about the same subject are fine."
-        case "excessive-punctuation", "all-caps":
-            return "Be polite. Don't shout at people with capitals or strings of exclamation marks. Excitement, like \"I love this app!!!\", is fine."
-        default:
-            return nil
-        }
+        GuidelineRules.current.meaning(forRule: id)
     }
 
     /// Turns a person's rough notes about themselves into a short first-
@@ -340,6 +432,8 @@ enum IntelligenceService {
         var followUps: [String] = []
         /// When nothing answers it: what came close, and how it differs.
         var nearMiss = ""
+        /// The source each step came from, by id, in step order.
+        var stepSources: [String] = []
     }
 
     /// Why Apple Intelligence couldn't answer, when it's worth telling the
@@ -551,7 +645,10 @@ enum IntelligenceService {
         let history = earlier.isEmpty ? "" : "Earlier questions: " + earlier.joined(separator: " / ") + "\n\n"
         // Sources written for the person's own iOS version come first.
         // Requested directly (2026-09-29).
-        let version = iOSVersion.isEmpty ? "" : "The person uses iOS \(iOSVersion). When sources disagree, prefer what fits that version.\n\n"
+        // The device they're asking from, so a question that doesn't say
+        // is answered for it, and older sources are called out (2026-10-06).
+        let device = UIDevice.current.model
+        let version = iOSVersion.isEmpty ? "" : "The person is asking from an \(device) with iOS \(iOSVersion). When sources disagree, prefer what fits that version. When the question and About Me don't say which device, answer for their \(device) and say so in a few words. When the only sources that answer are written for an older iOS, say the steps may have changed.\n\n"
         // About Me: lead with the person's own device and way of using it
         // when the question doesn't say. Requested directly (2026-10-01).
         let profile = aboutMe.isEmpty ? "" : aboutMe + " When the question doesn't say which device or method, and the sources cover theirs, lead with that.\n\n"
@@ -602,7 +699,8 @@ enum IntelligenceService {
             followUps: answered
                 ? (latest?.followUps ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
                 : [],
-            nearMiss: answered ? "" : (latest?.nearMiss ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            nearMiss: answered ? "" : (latest?.nearMiss ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
+            stepSources: answered ? (latest?.stepSources ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } : []
         )
     }
 
@@ -707,8 +805,8 @@ enum IntelligenceService {
 @available(iOS 26.0, *)
 @Generable
 private struct GuidelineVerdict {
-    @Guide(description: "True if the post really breaks the guideline in context. False if the automatic flag was a false alarm.")
-    var breaksGuideline: Bool
+    @Guide(description: "breaks if the post really breaks the guideline in context, fine if the automatic flag was a false alarm, unsure if it could reasonably go either way.", .anyOf(["breaks", "fine", "unsure"]))
+    var verdict: String
     @Guide(description: "One short plain sentence, under 20 words, saying why.")
     var reason: String
 }
@@ -763,6 +861,8 @@ private struct MouseAnswerOutput {
     var steps: [String]
     @Guide(description: "The ids, in square brackets in the sources, of the sources the answer used, without the brackets.")
     var sourceIds: [String]
+    @Guide(description: "When there are steps: for each step, in the same order, the id of the source it came from, without the brackets. Otherwise empty.", .maximumCount(8))
+    var stepSources: [String]
     @Guide(description: "Only when the sources don't answer it: one or two warm sentences saying you couldn't find exactly that on AppleVis, then what was close and how it differs, such as a Mac shortcut instead of an iPhone one, or Braille Screen Input instead of a braille display. Empty when the sources answer it or nothing is close.")
     var nearMiss: String
     @Guide(description: "Two or three short questions the person might ask next about the same subject, worded as they would ask them, in the same language as the question. Empty if the sources don't answer it.", .maximumCount(3))

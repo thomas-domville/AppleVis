@@ -1,0 +1,576 @@
+{
+ "What are the most popular RPG games for iOS? | apps ios \"rpg, role playing, adventure\"": [
+  "Quiet Grind — Idle RPG",
+  "RPG Offline: OS Core Quest",
+  "Maze AI: Text based RPG",
+  "Runeval: Medieval RPG Arena",
+  "Ax Rpg II"
+ ],
+ "Is the SiriusXM app accessible? | forum \"siriusxm\"": [
+  "the siriusXM iPhone app",
+  "SiriusXM Accessibility Problems",
+  "Access to On-Demand Programming in SiriusXM App",
+  "SiriusXM iPhone and Apple TV apps",
+  "the siriusXM app"
+ ],
+ "Is the SiriusXM app accessible? | apps ios \"sirius\"": [
+  "SiriusXM: Music, Sports & News",
+  "Bose App"
+ ],
+ "Recommend a fully accessible weather app | apps ios \"weather\"": [
+  "Severe Weather Guardian",
+  "Weather Gods",
+  "Weather Office",
+  "Rain Alarm Live Weather Radar",
+  "NWS Weather: Deep Weather"
+ ],
+ "What's the best GPS app for blind people? | forum \"GPS navigation app\"": [
+  " Accessible GPS apps for navigating national parks, trails etc. ",
+  "Intuitive navigation GPS app for a UK user",
+  "Is there a GPS navigation app for this use case?",
+  "WeWalk & GPS navigation in combination with public transport",
+  "Apps Providing More Accurate Navigation Than Typical GPS"
+ ],
+ "What's the best GPS app for blind people? | apps ios \"navigation, gps\"": [
+  "Waze Navigation & Live Traffic",
+  "CrossGuide Blind Navigation ",
+  "Komoot: Route Planner & GPS",
+  "HERE WeGo Maps & Navigation",
+  "MapQuest GPS Navigation & Maps"
+ ],
+ "Is there an accessible chess game? | apps ios \"chess\"": [
+  "Chess Meets Necromancy",
+  "Diamond Chess Online",
+  "Shredder Chess Lite",
+  "Chess Clock Plus",
+  "Chess-wise 3"
+ ],
+ "What app can read my mail with OCR? | forum \"OCR read print mail\"": [
+  "Looking for a better OCR app",
+  "Scanners What to look for when buying one",
+  "[Announcement] Prizmo Go for iPhone & iPad. Instant Text Capture.",
+  "apple products, considering purchase, need information  about accessibility asap",
+  "Reading with AI glasses, more than OCR!"
+ ],
+ "What app can read my mail with OCR? | apps ios \"ocr, read text, text recognition\"": [
+  "Voice: OCR Document Reader ",
+  "ghostWriter Markdown",
+  "Sonarpad",
+  "EyeGuide Vision",
+  "Privacy AI: Powerful chatbot"
+ ],
+ "Fully accessible audio editors for Mac | apps mac \"audio editor, audio editing, recording\"": [
+  "Farrago",
+  "Maestral",
+  "Phone Play (for iPhone & iPad)",
+  "Audio Hijack",
+  "Just press Record"
+ ],
+ "Apple Watch fitness apps that work with VoiceOver | apps watch \"fitness, workout\"": [
+  "Seven - 7 Minute Workout",
+  "Zova - Fitness and Health",
+  "Fitnet Workout Videos",
+  "ECHO Watch Heart Rate Monitor",
+  "adidas Training by Runtastic"
+ ],
+ "How do I use Microsoft Word with VoiceOver on Mac? | guides \"Microsoft Word VoiceOver Mac\"": [
+  "Why I'm still on a Mac: a guide for skeptics and those who feel that grass may be greener with Windows",
+  "A Beginner's Guide to Using macOS with VoiceOver",
+  "Don't Touch it, Type it! A VoiceOver User's Guide to Using a QWERTY Bluetooth Keyboard",
+  "Even More Formatting Fun with Pages",
+  "Third edition of Personal Power: Getting The Most from iOS as a Totally Blind User"
+ ],
+ "How do I use Microsoft Word with VoiceOver on Mac? | forum \"Microsoft Word VoiceOver Mac\"": [
+  "Microsoft Word With Voiceover",
+  "Microsoft Word VoiceOver issues on Mac",
+  "Accessibility of Microsoft Word on Mac",
+  "Strange behavior with Microsoft Word on Mac.",
+  "Help Needed: VoiceOver Not Pronouncing Characters in Microsoft Word on Mac"
+ ],
+ "What do people think of Be My Eyes? | forum \"Be My Eyes\"": [
+  "Be My Eyes",
+  "be my eyes and audio",
+  "Be My Eyes on the Mac?",
+  "Be My Eyes Feedback",
+  "Be My Eyes for Mac"
+ ],
+ "What do people think of Be My Eyes? | blog2 \"Be My Eyes\"": [
+  "AppleVis Partners with Be My Eyes; Website to Reopen September 9, 2024",
+  "Be My Eyes - helping blind see To Launch Worldwide on January 15, 2015",
+  "Art of Fauna and Be My Eyes Named Among Finalists for 2025 App Store Awards",
+  "Art of Fauna and Be My Eyes Win 2025 Apple App Store Awards for Their Cultural Impact",
+  "Be My Eyes, Timecrest, and Zanagrams Named 2023 AppleVis Golden Apple Award Winners"
+ ],
+ "How do I use Instagram with VoiceOver? | guides \"Instagram VoiceOver\"": [
+  "A Beginner's Guide to Using iOS with VoiceOver"
+ ],
+ "How do I use Instagram with VoiceOver? | forum \"Instagram VoiceOver\"": [
+  "Navigating Instagram reels with VoiceOver broken?",
+  "How is Instagram with VoiceOver?",
+  "A quick guide on scrolling on instagram DMs with VoiceOver",
+  "Instagram reels unusable with VO on latest update",
+  "Voiceover Unresponsive When trying to create a post on Instagram"
+ ],
+ "What accessibility bugs are in iOS 26? | blog2 \"iOS 26 accessibility bugs\"": [
+  "iOS 26 and iPadOS 26: A Summary of VoiceOver and Braille Issues and Improvements",
+  "Apple Releases iOS 26.3 and iPadOS 26.3",
+  "Apple Releases iOS 26.4.2 and iPadOS 26.4.2",
+  "Apple Releases iOS 26.4.1 and iPadOS 26.4.1",
+  "Apple releases iOS 26.0.1 and iPadOS 26.0.1 with fix for VoiceOver loss of speech"
+ ],
+ "What accessibility bugs are in iOS 26? | ios_bug_report \"iOS 26\"": [
+  "Custom labels which were previously deleted in VoiceOver Settings are coming back",
+  "When editing text and using a hardware keyboard, navigating and selecting text can be inconsistent and unreliable",
+  "VoiceOver focus may spontaneously jump to another UI element, most typically soon after opening a screen, menu or modal",
+  "Intermittent failure of VoiceOver double-tap and triple-tap gestures",
+  "The scent with Siri message in an iMessage is not properly labeled to voiceover users"
+ ],
+ "Who won the Golden Apples? | blog2 \"Golden Apples\"": [
+  "Announcing the AppleVis Golden Apples of 2013",
+  "Announcing the AppleVis Golden Apples of 2012",
+  "Announcing the AppleVis Golden Apples of 2014",
+  "AppleVis Announces Winners of the 2025 Golden Apple Awards",
+  "[CLOSED] Cast Your Votes Now for the AppleVis Golden Apples of 2022"
+ ],
+ "How do I read Kindle books with VoiceOver? | guides \"Kindle VoiceOver\"": [
+  "Accessible Audio and EBooks For Free",
+  "Third edition of Personal Power: Getting The Most from iOS as a Totally Blind User"
+ ],
+ "How do I read Kindle books with VoiceOver? | forum \"Kindle books VoiceOver\"": [
+  "New Issue When Reading Kindle Books on iOS With VoiceOver/Can Others Duplicate This issue?",
+  "Persistent books on Kindle",
+  "ISSUE WITH KINDLE AND/OR VOICEOVER",
+  "Reading Kindle books where TTS is not enabled",
+  "Kindle App Not Working With VoiceOver?"
+ ],
+ "Is there a podcast about the iPhone camera for blind people? | podcast \"camera\"": [
+  "Google Translate For iOS: Translate With Your Voice, Camera, Keyboard Or Handwriting",
+  "How to Use  Live Text on iOS to Extract Text From the Camera and Photos App",
+  "Envision AI; Use Your iPhone's Camera and Artificial Intelligence to Recognize Text, Objects, Products, and More",
+  "Easily Take Selfies with SelfieX for iOS",
+  "Scan Your Bank Notes Quickly with the Cash Reader Tool for Blind"
+ ],
+ "How do I set up a braille display with my iPhone? | guides \"braille display iPhone\"": [
+  "Using a Braille Display on iOS: an Introduction",
+  "A Guide to Braille Screen Input on iOS and iPadOS",
+  "Moving Pics Off An iPHONE to Windows in iOS8",
+  "Opening brf files on iDevices, a limited solution.",
+  "Basic Terminology for Apple Accessibility"
+ ],
+ "Any tips for using Uber with VoiceOver? | forum \"Uber VoiceOver\"": [
+  "where to report the uber eats voiceover crashing",
+  "How to deal with Uber's brush-off?",
+  "Can't accept Uber terms and conditions",
+  "Your experiences with the new Uber Pool Express",
+  "Please share your Uber app accessibility experiences."
+ ],
+ "Any tips for using Uber with VoiceOver? | guides \"Uber\"": [
+  "Siri Tips & Settings"
+ ],
+ "What's the best accessible email app for iPhone? | forum \"email app\"": [
+  "Accessible Email Apps",
+  "scan and email apps",
+  "voice to email app",
+  "iOS email apps",
+  "Encrypted email apps"
+ ],
+ "What's the best accessible email app for iPhone? | apps ios \"email, mail\"": [
+  "YouMail Voicemail & Spam Block",
+  "QQ Mail",
+  "Spark Mail – Smart Email Inbox",
+  "‎Muse from Meta",
+  "MBraille"
+ ],
+ "Is Netflix accessible with VoiceOver? | forum \"Netflix VoiceOver\"": [
+  "tvOS 16.4, VoiceOver not working on Netflix",
+  "Netflix with voiceover, no longer verbalizes text thumbnails",
+  "Voiceover must read netflix subtitles",
+  "Using Netflix app with VoiceOver on iPhone",
+  "Netflix on Apple tv and VoiceOver"
+ ],
+ "How accessible is WhatsApp on iPhone? | forum \"WhatsApp accessibility\"": [
+  "Whatsapp FOr mac is not accessible",
+  "accessibility of Whatsapp desktop client on the mac ",
+  "Whatsapp and voice messaging. Is it accessible?",
+  "Best way to access WhatsApp on iPad?",
+  "Opinion, what’s your views on WhatsApp accessibility?"
+ ],
+ "Does Spotify work well with VoiceOver? | forum \"Spotify VoiceOver\"": [
+  "Spotify Connect vs VoiceOver",
+  "Using Spotify on IOS with VoiceOver",
+  "Spotify and voiceover (ios6.1)",
+  "Spotify focus issues with VoiceOver",
+  "Petition: Spotify accessibility"
+ ],
+ "Which banking apps are accessible? | forum \"accessible banking app\"": [
+  "Accessible banking apps",
+  "Most Accessible Banking Apps, or experiences with Ally Bank?",
+  "Looking for accessible banking apps in Australia",
+  "The farmington bank mobile app is not accessible with VoiceOver",
+  "Bank of America app no longer accessible with voiceover"
+ ],
+ "How do I use CarPlay with VoiceOver? | forum \"CarPlay VoiceOver\"": [
+  "Maybe a silly question about Carplay",
+  "Wireless Carplay",
+  "Car Play and VoiceOver",
+  "Looking for VoiceOver testers for EbookVoice, an app that turns books you own into narrated audiobooks",
+  "What is disturbing about \"Do Not Disturb\" in iOS 11"
+ ],
+ "How do I use CarPlay with VoiceOver? | guides \"CarPlay VoiceOver\"": [
+  "a guide to creating and running shortcuts on iOS and macOS"
+ ],
+ "What's the best braille display to buy? | forum \"best braille display\"": [
+  "finding the best braille display for my needs",
+  "What's the best Braille display with Mac and iPhone?",
+  "Braille display connection issues",
+  "compatible braille displays with ipad ",
+  "tips for using voice dream with braille display"
+ ],
+ "Are the Meta Ray-Ban glasses good for blind people? | forum \"Meta Ray-Ban glasses\"": [
+  "Meta Ray-Ban Glasses Questions",
+  "Apple possibly considering Meta Ray-Ban like glasses ",
+  "Buying Meta Ray-Ban Glasses",
+  "Enabling Look and ask with Meta AI on Ray-Ban Meta smart glasses",
+  "Embrace the Future with Ray-Ban Meta Smart Glasses: A Gateway to Seamless Communication"
+ ],
+ "Are the Meta Ray-Ban glasses good for blind people? | podcast \"Meta Ray-Ban glasses\"": [
+  "Review of the RAY-BAN META SMART GLASSES",
+  "Exploring the Latest Feature Additions to the Ray-Ban Meta Smart Glasses",
+  "AppleVis Extra #110: Envision & the Ally Solos Smart Glasses",
+  "Apple Crunch July 2025: It's All about Sweat and Earwax",
+  "Apple Crunch September 2024: Where's the Apple Intelligence?"
+ ],
+ "Should I switch from Android to iPhone? | forum \"switch from Android to iPhone\"": [
+  "Questions About iPhone 16 (iOS 18.5) After Switching from Android",
+  "I'm Thinking About Switching from iOS to Android; User Experiences Wanted",
+  "Accessibility on Modern IOS vs Google Pixel  ",
+  "My experience with an Android product, and my return to the iPhone",
+  "Thinking about switching to Android"
+ ],
+ "What's the latest AppleVis podcast? | podcast \"AppleVis podcast\"": [
+  "AppleVis Unleashed June 2020: Clownfish podcast",
+  "AppleVis Unleashed #1: Lots of Apple News to Kick Off our New Podcast",
+  "AppleVis Unleashed September 2022: We Didn’t Hear That Podcast",
+  "Recording Audio Podcasts: Some Basic Tips and Good Practice",
+  "AppleVis Unleashed January 2019: The Dog Whisperer"
+ ],
+ "Where's the AppleVis report on iOS 27? | blog2 \"iOS 27 VoiceOver braille issues\"": [
+  "iOS 27 and iPadOS 27: A Summary of VoiceOver and Braille Issues and Improvements ",
+  "Apple Releases iOS 27 and iPadOS 27",
+  "What's new in Accessibility in iOS 27 for Blind and DeafBlind Users",
+  "macOS Golden Gate: New Features, Changes, Improvements, and Bugs for Blind and Low Vision Users",
+  "Apple Releases iOS 14.0.1 with Bug Fixes for Widgets, Default App Settings, and More; Along With Updates for Other Platforms"
+ ],
+ "Are there VoiceOver bugs in macOS 27? | os_x_bug_report \"macOS 27 VoiceOver bug\"": [],
+ "Are there VoiceOver bugs in macOS 27? | blog2 \"macOS 27 VoiceOver bug\"": [
+  "iOS 27 and iPadOS 27: A Summary of VoiceOver and Braille Issues and Improvements ",
+  "macOS Golden Gate: New Features, Changes, Improvements, and Bugs for Blind and Low Vision Users",
+  "Apple Releases Version 26.6 of iOS, iPadOS, macOS, watchOS, and tvOS with Security Updates and Optimizations for upcoming \"27\" Updates",
+  "Apple Releases iOS 14.0.1 with Bug Fixes for Widgets, Default App Settings, and More; Along With Updates for Other Platforms",
+  "Apple Releases Version 27.0.1 of iOS, iPadOS, and macOS with fix for Face ID on iPhone 18 Pro and More"
+ ],
+ "How do I learn VoiceOver on my Mac as a beginner? | guides \"beginner guide macOS VoiceOver\"": [
+  "A Beginner's Guide to Using macOS with VoiceOver",
+  "How to use Mac with VoiceOver (A beginners guide)",
+  "A Beginner's Guide to Using iOS with VoiceOver",
+  "macOS Beta Testing for the Beginner",
+  "a Deep dive into VoiceOver settings for iOS and iPadOS"
+ ],
+ "How do I use Apple Pay with VoiceOver? | forum \"Apple Pay VoiceOver\"": [
+  "using apple pay with in the apple store app",
+  "Apple watch series 6 noise app, apple pay and hand washing features.",
+  "Apple Pay",
+  "apple pay, any experiences?",
+  "Stores Rejecting Apple Pay!"
+ ],
+ "How do I use Apple Pay with VoiceOver? | guides \"Apple Pay VoiceOver\"": [
+  "iOS App VoiceOver Accessibility Teaching and Testing Plan",
+  "Don't Touch it, Type it! A VoiceOver User's Guide to Using a QWERTY Bluetooth Keyboard",
+  "A Beginner's Guide to Using iOS with VoiceOver",
+  "A Guide to Using Audio Hijack with VoiceOver",
+  "A VoiceOver User's Guide to Xcode"
+ ],
+ "How can I play audio games on iPhone? | forum \"audio games iPhone\"": [
+  "Audio games for iPhone 4 ",
+  "Any downloadable iPhone audio games?",
+  "Possible new audio game on the mac",
+  "Ear Monsters  3D Audio Game Interview",
+  "Looking for Accessible Games For the iPhone"
+ ],
+ "How can I play audio games on iPhone? | guides \"audio games iPhone\"": [
+  "Toggling VoiceOver On and Off Using the Accessibility Shortcut on iOS and iPadOS",
+  "A Beginner's Guide to Using iOS with VoiceOver",
+  "A Guide to EveryCord: An iOS 11 Screen Recorder",
+  "Setting Up and Getting Started with your Amazon Echo Dot on iOS",
+  "iOS Siri and Dictation Command List"
+ ],
+ "How do I edit podcasts in GarageBand with VoiceOver? | forum \"GarageBand VoiceOver editing\"": [
+  "A new version of GarageBand iOS and iPad OS is now available with over 60 accessibility enhancements",
+  "Garageband on iPhone: In need of some conceptual hints",
+  "GarageBand on iOS: Accessibility case study and call to action",
+  "editing regions in garageband",
+  "Using GarageBand With VoiceOver "
+ ],
+ "How do I edit podcasts in GarageBand with VoiceOver? | guides \"GarageBand VoiceOver editing\"": [
+  "A Guide to Accessible Imovie Production"
+ ],
+ "Any recommendations for an accessible note taking app? | forum \"accessible note taking app\"": [
+  "Seeking an accessible cross platform note taking app",
+  "Introducing Noted, iOS App with VoiceOver – Audio + Note Taking",
+  "Access Note - Review",
+  "pages VS text edit VS notes app on mac?",
+  "Enhancing the standard iPhone Note App with voice commands"
+ ],
+ "How do I use Seeing AI? | forum \"Seeing AI\"": [
+  "Seeing AI",
+  "Seeing AI and new AI abilities",
+  "The Seeing AI App.",
+  "Seeing AI ",
+  "Seeing AI Product Recognition"
+ ],
+ "How do I use Seeing AI? | podcast \"Seeing AI\"": [
+  "Exploring LiDAR with Super LiDAR and Seeing AI on iOS",
+  "Quick Tip: Using the New Features in Seeing AI for iOS",
+  "AppleVis Extra 104: In conversation with the creators of Seeing AI, Winner of Best App in the 2024 Golden Apples",
+  "AppleVis Extra#112: Stephen Lovely on Rethinking Visual Accessibility with Vision AI Assistant",
+  "Transform PDFs with AI-Powered OCR: Your Guide to PDFgear for Mac"
+ ],
+ "What's the best way to read PDFs with VoiceOver? | forum \"PDF VoiceOver\"": [
+  "Signing PDF's on Mac with VoiceOver",
+  "Creating a PDF from an email using voiceover",
+  "Voiceover does not read PDF.aspx files",
+  "How To Read A Pdf Document With Voiceover For Mac?",
+  "annoying Voiceover PDF bug fixed in OS X update"
+ ],
+ "What's the best way to read PDFs with VoiceOver? | guides \"PDF VoiceOver\"": [
+  "Reading PDF documents on Mac with VoiceOver  ",
+  "Working with the iOS User Guide",
+  "Personal Power: Getting The Most From iOS as a Totally Blind user",
+  "Acting as co-pilot on a United States Interstate Road Trip",
+  "Third edition of Personal Power: Getting The Most from iOS as a Totally Blind User"
+ ],
+ "How do I get my iPhone to read my emails out loud? | forum \"read email aloud\"": [
+  "Looking for beta testers for the app \"Soccer Aloud\"",
+  "​ AirRead looking for app testers",
+  "Announcing New Speech Features in ZoomText for Mac OS X",
+  "New app for vocalizing text in images",
+  "VoiceOver focus regressions in iOS 26"
+ ],
+ "Is Microsoft Teams accessible on iPhone? | forum \"Microsoft Teams accessibility\"": [
+  "Raise your hand within Microsoft Teams with IOS 14.6",
+  "Microsoft teams",
+  "**Join the Apple Accessibility Feedback Team: Your Voice Matters!",
+  "Rant about MSTeams accessibility ",
+  "Sharing Screen in Teams On Mac"
+ ],
+ "What apps help DeafBlind users with braille? | forum \"DeafBlind braille\"": [
+  "braille access to IRC",
+  "Is there an app that will convert speech to text that can be read on a Braille Display?",
+  "Can A Mac Be Controlled Exclusively By a Braille Display?",
+  "Dolphin EasyReader with BrailleSense 6",
+  "Focus 40 blue fifth generation with MacBook Pro 2020."
+ ],
+ "What apps help DeafBlind users with braille? | guides \"DeafBlind braille\"": [
+  "Using a Braille Display on iOS: an Introduction",
+  "A Guide to Braille Screen Input on iOS and iPadOS"
+ ],
+ "How do I use Live Listen with my AirPods? | forum \"Live Listen AirPods\"": [
+  "Live Listen",
+  "Transparency mode issue while using Macbook air with Airpods pro 2",
+  "Odd sound effect when using AirPods Pro earbuds with purchased voices in Voice Dream Reader",
+  "AirPods 4 with Active Noise Cancellation: first impressions",
+  "Very quick views on AirPods Pro 3 from a blindness perspective"
+ ],
+ "Are there accessible watch faces for Apple Watch? | forum \"accessible watch face\"": [
+  "Is there still an Apple watch App switcher?",
+  "Timer Trouble on Apple Watch",
+  "Facely HD VS original FaceBook app",
+  "BrailleWatch for Apple Watch",
+  "VoiceOver Reding \"Disconnected\" Status Icon on Watch Face... But the Watch is Connected!"
+ ],
+ "What Apple TV apps work well with VoiceOver? | forum \"Apple TV app VoiceOver\"": [
+  "How to remove an app from Apple TV with voiceover",
+  "TV apps on Apple TV",
+  "Netflix on Apple tv and VoiceOver",
+  "Question about Controling Apple TV with Remote App",
+  "apple tv, voiceover and bluetooth"
+ ],
+ "What Apple TV apps work well with VoiceOver? | apps tv \"streaming, video\"": [
+  "Calm Radio - Online streaming with relaxing music",
+  "YES İPTV Player",
+  "iPlayTV",
+  "Funny or Die",
+  "VLC for Apple TV"
+ ],
+ "Is Logic Pro accessible for music production? | forum \"Logic Pro VoiceOver\"": [
+  "Issue with bouncing in Logic pro x with voiceover",
+  "Logic Pro X version 10.5 is out! With many enhancements for VoiceOver users",
+  "How to use Chord ID (Analyze Chords) in Logic Pro with VoiceOver?",
+  "Swipe-Comping or Any Equivalence with VoiceOver in Logic Pro X",
+  "Logic Pro X"
+ ],
+ "Is Logic Pro accessible for music production? | guides \"Logic Pro VoiceOver\"": [
+  "a Guide to Verbosity Options in macOS VoiceOver",
+  "A VoiceOver User's Guide to Xcode",
+  "The Mac's Messages App Explained",
+  "a guide to creating and running shortcuts on iOS and macOS"
+ ],
+ "How do I find my AirTag with VoiceOver? | forum \"AirTag VoiceOver\"": [
+  "Android alternatives to AirTags",
+  "Efficiently Activating Precision Finding with the iPhone ",
+  "VO annoyances",
+  "Tile and Apple Air Tags",
+  "Thinking about switching to Android"
+ ],
+ "Can I set up HomePod as a blind person? | forum \"HomePod setup VoiceOver\"": [
+  "VoiceOver problems with hand tremors, motion issues",
+  "HomePod recommendation.",
+  "Is Apple TV Worth it?  (e.g. compared to Roku)",
+  "URGENT!  MAJOR bluetooth bug with iOS 15.2",
+  "all opinions welcome, Apple watch"
+ ],
+ "Can I set up HomePod as a blind person? | guides \"HomePod setup VoiceOver\"": [
+  "iCloud Explained"
+ ],
+ "Which airline apps are accessible? | forum \"airline app accessibility\"": [
+  "Looking for an accessible app regarding airline tickets",
+  "Accessibility and booking on United Airlines ",
+  "Allegiant Airline App",
+  "If Screen Readers Were Airlines",
+  "united airlines and lack of accessibility"
+ ],
+ "Which airline apps are accessible? | apps ios \"airline, flight\"": [
+  "Flighty – Live Flight Tracker",
+  "United Airlines",
+  "FlightAware Flight Tracker",
+  "Flightradar24 | Flight Tracker",
+  "Southwest Airlines"
+ ],
+ "Is the Amazon shopping app accessible? | forum \"Amazon app VoiceOver\"": [
+  "Urgent: Amazon Music App on iOS is Broken for VoiceOver Users",
+  "Voiceover and the amazon app",
+  "voiceover freezes when trying to close amazon from app switcher",
+  "accessibility improvements needed for Amazon Alexa app for iOS voiceover users",
+  "Amazon Prime Video"
+ ],
+ "Can I learn to code Swift as a blind programmer? | forum \"blind programmer Xcode Swift\"": [
+  "Is it Possible to Self-Learn Swift as a Disabled & Blind old person with an iPhone?",
+  "Researching into iOS development after blindness",
+  "Xcode and Swift UI",
+  "Question about Xcode editors & swift tutorials?",
+  "Developing apps as blind person with Xcode"
+ ],
+ "Can I learn to code Swift as a blind programmer? | guides \"blind programmer Xcode Swift\"": [
+  "A VoiceOver User's Guide to Xcode",
+  "Why I'm still on a Mac: a guide for skeptics and those who feel that grass may be greener with Windows"
+ ],
+ "What are good accessible games for Apple Watch? | forum \"Apple Watch games\"": [
+  "found a yatzee game for Apple Watch.",
+  "What apps and games do you have on your apple watch?",
+  "Got my first Apple Watch. A few questions",
+  "Can I close apps on the apple watch?",
+  "Introducing The Martian Official Game"
+ ],
+ "What are good accessible games for Apple Watch? | apps watch \"game, puzzle, trivia\"": [
+  " Break this safe, a free game for your Apple Watch ",
+  "DeyesFree",
+  "ECHO Watch Heart Rate Monitor",
+  "Roll The Bones",
+  "Seven - 7 Minute Workout"
+ ],
+ "Are there recipe or cooking apps that work with VoiceOver? | forum \"cooking recipe app\"": [
+  "Seeking recipe app recommendations",
+  "How Do you cook? Feedback needed for hands free cooking app",
+  "Introducing: Cookie Voice Recipes",
+  "Seeking cooking app help ",
+  "Voice-based cooking app - Call for Beta Testers"
+ ],
+ "Are there recipe or cooking apps that work with VoiceOver? | apps ios \"recipe, cooking\"": [
+  "Cookie Voice Recipes",
+  "Cookpad: find & share recipes",
+  "Chocolate Recipes Free",
+  "Pepperplate Cooking Planner",
+  "8,500+ Drink Recipes"
+ ],
+ "How do I submit an app to the AppleVis App Directory? | forum \"submit app AppleVis app directory\"": [
+  "Getting app store link.",
+  "Suggestion: Add a \"Mac Compatible\" field for iOS app directory",
+  "Recommend the apps that you like",
+  "How do you submit Mac apps to the directory on a Mac?",
+  "AppleVis Giveaway for October!"
+ ],
+ "How do I submit an app to the AppleVis App Directory? | guides \"submit app AppleVis app directory\"": [
+  "One of the Methods Used for Adding Entries to the iOS App Directory",
+  "Intro to iOS Accessibility for Blind and Low Vision Users",
+  "A Beginner's Guide to Using iOS with VoiceOver",
+  "An Overview of Four iOS Text Editors"
+ ],
+ "How do I join the iOS beta safely? | forum \"iOS public beta\"": [
+  "iOS 10 Public Beta",
+  "iOS 17 beta 4 rerelease is out, along with public beta 2",
+  "iOS 18.2 public beta",
+  "Ios 26 public beta out.",
+  "Apple releases iOS and iPadOS Public beta."
+ ],
+ "How do I join the iOS beta safely? | blog2 \"iOS public beta\"": [
+  "Apple Releases First Public Previews of iOS 10 and macOS Sierra",
+  "iOS 4.3 beta 2 released",
+  "Apple Warns VoiceOver Users Not to Install watchOS 7 Beta 4 or the first Public Preview (Update: issue resolved in beta 5)",
+  "Announcing Changes to Our Guidelines Regarding Discussion of Beta and Preview Versions of Apple Software",
+  "Apple Previews New Accessibility Features Set to Come Later this Year in iOS, watchOS, tvOS, and macOS"
+ ],
+ "My phone keeps reading everything twice | forum \"VoiceOver speaks twice\"": [
+  "Voiceover speaking double and possible  home key issue",
+  "Voiceover not working in Camera app",
+  "VoiceOver randomly talks while phone is locked",
+  "Issue with context menu on my Macbook Air",
+  "*Attention* A simple VoiceOver Reboot Applescript"
+ ],
+ "VoiceOver keeps jumping around in apps | forum \"VoiceOver focus jumping\"": [
+  "iPhone VoiceOver focus incorrectly jumps to menu bar",
+  "Simple select option causes VoiceOver focus to jump to the top of the page",
+  "Voiceover focus jumps to the top of the page",
+  "Has anyone resolved VoiceOver focus jumping issues with a reset and clean setup of their iPhone?",
+  "VoiceOver focus jumpt to notification center"
+ ],
+ "VoiceOver keeps jumping around in apps | ios_bug_report \"VoiceOver focus jumping\"": [
+  "VoiceOver focus will occasionally jump to the Status Bar when swiping through the screen",
+  "VoiceOver focus will at times spontaneously ‘jump’ to the first element on the screen",
+  "VoiceOver focus may jump to the first UI element on the screen after you have interacted with another element on the screen",
+  "VoiceOver focus may spontaneously jump to another UI element, most typically soon after opening a screen, menu or modal",
+  "VoiceOver focus jumps to an unexpected location in the list of emails in the Mail app after taking an action such as delete, mark as unread or move."
+ ],
+ "Is the Reddit app accessible? | forum \"Reddit app VoiceOver\"": [
+  "An app that makes browsing Reddit as easy as using the Facebook iOS app?",
+  "I made a FULLY accessible Reddit app for iOS. It's free, ad-less, and I need beta testers!",
+  "most accessible Reddit app",
+  "Reddit Application Accessibility",
+  "Looking for VoiceOver feedback on recent accessibility updates to my indie game"
+ ],
+ "Which smart home devices work best for blind people? | forum \"smart home accessible\"": [
+  "question about accessible smart home accessories",
+  "Smart home question thread",
+  "Experiences with Yale Smart locks, IP cameras & Yale smart home app",
+  "accessible smart thermostat that works with homekit",
+  "Honeywell vs. Nest: State of Smart thermostats?"
+ ],
+ "How do I scan documents on my Mac? | forum \"scan documents Mac VoiceOver\"": [
+  "Seeking the Best OCR Scanning App for the Mac",
+  "scanning to PDF",
+  "Launching app-suite.eu:  AScan (Simplified OCR with Local AI) and AGram (Native Telegram Client) for macOS",
+  "Wonder Reader: free Mac reading, VoiceOver-linked speech and local AI — PDF and bookmark update",
+  "Software Engineering student here, I need a new laptop. Should I buy a Mac or stay on Windows?"
+ ],
+ "How do I scan documents on my Mac? | guides \"scan documents Mac VoiceOver\"": [
+  "A Beginner's Guide to Using macOS with VoiceOver",
+  "Tips for Taking Full Advantage of VoiceOver in Your App",
+  "A Guide to Information Security and Privacy on macOS"
+ ],
+ "What podcasts has AppleVis done about the Apple Watch? | podcast \"Apple Watch\"": [
+  "Apple Watch 101: A Demonstration of the Watch App on the iPhone After it has Paired with an Apple Watch",
+  "Apple Watch 101: Making And Receiving Calls On The Watch",
+  "Apple Watch 101: Turning The Watch On And Off",
+  "Apple Watch 101: Changing Watch Bands",
+  "Apple Watch 101: An Introduction To Siri On The Watch"
+ ]
+}

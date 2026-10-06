@@ -45,6 +45,14 @@ struct SoundsHapticsSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Guideline Reminders") {
+                Toggle("Speak Guideline Reminders", isOn: $preferences.speakGuidelineReminders)
+                    .accessibilityHint(String(localized: "Reads a guideline reminder aloud as soon as it appears while you write."))
+                Text("When a guideline reminder appears while you write, you hear a soft chime and feel a light tap, like a spelling ding. Stop and check it from the text field's Actions rotor, or keep writing. Turn this on to also have the reminder read aloud.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section {
                 Text("Sounds and haptics for errors and connectivity changes always play, since they're important to notice rather than decorative.")
                     .font(.caption)
@@ -56,6 +64,7 @@ struct SoundsHapticsSettingsView: View {
                     preferences.confirmationSoundsEnabled = true
                     preferences.interfaceSoundsEnabled = false
                     preferences.hapticsEnabled = true
+                    preferences.speakGuidelineReminders = false
                 }
             }
         }

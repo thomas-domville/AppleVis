@@ -369,6 +369,7 @@ struct SubmitPodcastView: View {
                     .accessibilityLabel(String(localized: "Episode Description"))
                     .accessibilityHint(String(localized: "Required, at least 20 characters. Describe the topics, guests, or themes, so listeners know what to expect."))
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: description) { _, newValue in
                         handleDescriptionChange(newValue)
                         guidelines.textChanged(newValue)
@@ -504,6 +505,7 @@ struct SubmitPodcastView: View {
             await announceWizardFailure(message, focus: $isErrorFocused)
             return
         }
+        if await guidelines.confirmBeforePosting({ Task { await submit() } }) { return }
         isSubmitting = true; error = nil
         let result = await DrupalFormClient.submitPodcast(
             description: description,

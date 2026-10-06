@@ -210,6 +210,28 @@ final class ICloudSyncManager {
         touchLastSyncDate()
     }
 
+    /// Your guideline review decisions (Profile > Admin), so reviewing on
+    /// iPhone or iPad adds up to one set. Merges what's in iCloud first, so
+    /// another device's newer decisions aren't overwritten. Leaves out the
+    /// post text, which stays on the device it was reviewed on. Rides on the
+    /// Saved Items switch, like the Mouse's history. Requested directly
+    /// (2026-10-06).
+    func pushGuidelineReviews() {
+        guard isSyncEnabled("sync.savedItems") else { return }
+        if let cloud: [GuidelineReview] = getJSON(key: "icloud.guidelineReviews") {
+            GuidelineReviewStore.shared.merge(fromCloud: cloud)
+        }
+        setJSON(GuidelineReviewStore.shared.cloudCopy, key: "icloud.guidelineReviews")
+        store.synchronize()
+        touchLastSyncDate()
+    }
+
+    private func pullGuidelineReviews() {
+        guard isSyncEnabled("sync.savedItems"),
+              let cloud: [GuidelineReview] = getJSON(key: "icloud.guidelineReviews") else { return }
+        GuidelineReviewStore.shared.merge(fromCloud: cloud)
+    }
+
     private func pullMouseConversations() {
         guard isSyncEnabled("sync.savedItems"),
               let cloud: MouseConversationHistory = getJSON(key: "icloud.mouseConversations"),
@@ -231,6 +253,7 @@ final class ICloudSyncManager {
         pullSavedItems()
         pullMouseRecentQuestions()
         pullMouseConversations()
+        pullGuidelineReviews()
         if let player {
             pullPodcastPositions { player.applyPulledPositions($0) }
             pullQueue { player.applyPulledQueue($0) }

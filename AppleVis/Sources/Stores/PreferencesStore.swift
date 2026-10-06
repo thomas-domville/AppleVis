@@ -157,6 +157,10 @@ final class PreferencesStore: ObservableObject {
     /// never does, matching how that tier is already off by default for
     /// sound too. See `AppSound.shouldPlayHaptic`.
     @AppStorage("sound.haptics") var hapticsEnabled = true
+    /// Reads a guideline reminder aloud when it appears while writing. Off
+    /// by default: the chime and tap say one is there, and it can be read
+    /// from the text field's Actions rotor. Requested directly (2026-10-06).
+    @AppStorage("sound.speakGuidelineReminders") var speakGuidelineReminders = false
 
     // MARK: - Intelligence / Smart Features
     @AppStorage("intel.nonEnglish")         var nonEnglishDetectionEnabled = true

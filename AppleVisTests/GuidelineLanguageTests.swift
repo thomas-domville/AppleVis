@@ -41,6 +41,8 @@ struct GuidelineLanguageTests {
         "I just started a podcast for blind gamers", "My new blog covers VoiceOver tips", "Like and subscribe!",
         "My podcast is at https://example.com/pod", "Head over to my channel for the full review",
         "I've launched my new newsletter", "listen to my latest episode",
+        "Check out my new podcast at https://example.com and let me know your thoughts!",
+        "I posted more on my blog https://example.com, let me know what you think",
     ])
     func selfPromotion(_ text: String) {
         #expect(ContentSubmissionPolicy.looksLikeSelfPromotion(text))
@@ -52,6 +54,10 @@ struct GuidelineLanguageTests {
         "I wrote about this on my blog last year and it still happens", "my channel list in Slack",
         "my YouTube channel subscriptions don't load", "How do I back up my website?", "my new podcast app is great",
         "I follow my favorite podcasts in Castro",
+        // A developer sharing a prototype for feedback, which the guidelines
+        // allow (2026-10-06).
+        "I'm done with the game prototype and I've uploaded to my website at https://audiofootball.gatunogames.com/ If you have a chance to try it out, I'd love to get your feedback on it.",
+        "Beta testers wanted! Details on my website https://dev.example.com",
     ])
     func notSelfPromotion(_ text: String) {
         #expect(!ContentSubmissionPolicy.looksLikeSelfPromotion(text))
@@ -116,9 +122,7 @@ struct GuidelineLanguageTests {
         #expect(emailSeverity(text) == .medium)
     }
 
-    @Test("a work, project, or deliberately shared address is only low", arguments: [
-        "please send a quick email to gokhan@birkinapps.com with the address you used",
-        "contact me at jane@mycompany.co.uk",
+    @Test("a personal address shared on purpose is only low", arguments: [
         // Shared on purpose, from real posts (2026-09-27 month review).
         "If you would like to join, email me at youmbidev@gmail.com and I will add you to the TestFlight group.",
         "Anyone interested is warmly welcome to drop me a line at mohammad.xciii@gmail.com.",
@@ -135,12 +139,16 @@ struct GuidelineLanguageTests {
         // The same address repeated later in the post is still the same share.
         "You can email the code to: gift.cards.jo@proton.me. Questions? Write anytime. Again, it's gift.cards.jo@proton.me.",
     ])
-    func workEmailIsLow(_ text: String) {
+    func sharedPersonalEmailIsLow(_ text: String) {
         #expect(emailSeverity(text) == .low)
     }
 
     @Test("role and placeholder addresses aren't flagged", arguments: [
         "write to accessibility@apple.com",
+        // Work and support addresses at a company's own domain (2026-10-06).
+        "please send a quick email to gokhan@birkinapps.com with the address you used",
+        "contact me at jane@mycompany.co.uk",
+        "send it to feedback@applevis.com",
         "Example: User@iCloud.com",
         "Support@birkinapps.com can help",
     ])
@@ -281,6 +289,8 @@ struct GuidelineLanguageTests {
         "It will be helpful if I can get a promo code for testing the software.",
         "If you need a promo code for a playing partner, please contact me.",
         "I'd love a promo code if you have any remaining.",
+        // "off" matched the start of "offers" (2026-10-06).
+        "I'm also interested in procedural soundscape generation, and request a promo code to hear the other sounds that Veil offers.",
     ])
     func appStorePromoCodeIsFine(_ text: String) {
         #expect(!GuidelinesChecker.check(text).contains { $0.id == "advertising" })

@@ -680,7 +680,7 @@ struct SavedItemsView: View {
         // anything) rather than merely irrelevant, so VoiceOver users get
         // the rotor-based variant instead of the touch-gesture one.
         .onAppear { tips.show(UIAccessibility.isVoiceOverRunning ? .savedRotorActions : .savedQuickActions) }
-        .refreshable { await load(); SoundPlayer.shared.play(.refresh) }
+        .refreshable { await RefreshHeartbeat.during { await load() }; SoundPlayer.shared.play(.refresh) }
         .confirmationDialog(
             String(localized: "Unsave all \(entries.count) items?"),
             isPresented: $showUnsaveAllConfirm, titleVisibility: .visible
@@ -1075,7 +1075,7 @@ struct FollowingView: View {
                         }
                     }
                 }
-                .refreshable { await load(); SoundPlayer.shared.play(.refresh) }
+                .refreshable { await RefreshHeartbeat.during { await load() }; SoundPlayer.shared.play(.refresh) }
                 .themedList(preferences.colors)
             }
         }
@@ -1260,7 +1260,7 @@ struct RecommendedAppsView: View {
                         }
                     }
                 }
-                .refreshable { await load(); SoundPlayer.shared.play(.refresh) }
+                .refreshable { await RefreshHeartbeat.during { await load() }; SoundPlayer.shared.play(.refresh) }
                 .themedList(preferences.colors)
             }
         }

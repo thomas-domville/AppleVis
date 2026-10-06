@@ -43,7 +43,7 @@ struct BugBrowseView: View {
         }
         .task { await load(reset: true) }
         .task { await retryAccessibilityFocus(into: $isTitleFocused) }
-        .refreshable { await load(reset: true); SoundPlayer.shared.play(.refresh) }
+        .refreshable { await RefreshHeartbeat.during { await load(reset: true) }; SoundPlayer.shared.play(.refresh) }
         .searchable(text: $searchText, prompt: "Search bug reports")
     }
 

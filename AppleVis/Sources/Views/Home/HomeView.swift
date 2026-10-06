@@ -129,6 +129,12 @@ struct HomeView: View {
     /// a reasonable starting point, not a value with strong justification
     /// behind it.
     private static let staleThreshold: TimeInterval = 5 * 60
+    /// When the app last went to the background. The 5 minutes count from
+    /// here, not from the last load: a feed loaded 10 minutes ago used to
+    /// refresh after a 1-minute trip to another app. Pulling down Control
+    /// Center or Notification Center never reaches the background, so it
+    /// no longer counts as leaving. Reported directly (2026-10-06).
+    @State private var leftAppAt: Date?
 
     /// Items actually shown below the feed picker — narrowed to just what's
     /// new since the last visit when the "New" segment is selected. Distinct
@@ -325,9 +331,16 @@ struct HomeView: View {
             // out from under whatever VoiceOver was focused on. Reported
             // directly.
             .onChange(of: scenePhase) { _, newPhase in
-                guard newPhase == .active, keyCommands.selectedTab == 0 else { return }
-                let isStale = vm.lastLoadedAt.map { Date().timeIntervalSince($0) > Self.staleThreshold } ?? true
-                guard isStale else { return }
+                if newPhase == .background {
+                    leftAppAt = Date()
+                    return
+                }
+                guard newPhase == .active, let left = leftAppAt else { return }
+                leftAppAt = nil
+                guard keyCommands.selectedTab == 0 else { return }
+                // A load that never succeeded still retries on return.
+                let awayLongEnough = Date().timeIntervalSince(left) > Self.staleThreshold
+                guard awayLongEnough || vm.lastLoadedAt == nil else { return }
                 Task { await refreshAndAnnounce(returningToApp: true) }
             }
             .overlay(alignment: .top) { ToastOverlay() }
@@ -809,8 +822,10 @@ struct HomeView: View {
         // nothing new from one that silently failed.
         let previousLoadedAt = vm.lastLoadedAt
         let previousFocus = focusTarget
-        await vm.load()
-        await vm.loadMouseRecap(force: true)
+        await RefreshHeartbeat.during {
+            await vm.load()
+            await vm.loadMouseRecap(force: true)
+        }
         notificationHistory = PersistenceStore.shared.notificationHistory()
         SoundPlayer.shared.play(.refresh)
 
@@ -1593,7 +1608,7 @@ private struct MouseRecapView: View {
                     }
                 }
                 .themedList(preferences.colors)
-                .refreshable { await vm.loadMouseRecap(force: true) }
+                .refreshable { await RefreshHeartbeat.during { await vm.loadMouseRecap(force: true) } }
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         ShareLink(item: digest.shareText(for: window.label), subject: Text("Nibbles")) {

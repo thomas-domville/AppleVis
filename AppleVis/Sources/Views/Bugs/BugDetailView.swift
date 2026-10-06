@@ -694,7 +694,11 @@ struct ComposeBugCommentView: View {
                 TextEditor(text: $commentText)
                     .padding()
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: commentText) { _, newValue in
+                        if guidelines.conversation == nil {
+                            guidelines.conversation = ConversationSource(commentBundle: (platform == .macos ? CommentBundle.macBugReport : CommentBundle.iosBugReport).rawValue, nodeId: bugId)
+                        }
                         guidelines.textChanged(newValue, isReply: true)
                         intelligence.textChanged(
                             newValue,
@@ -760,6 +764,7 @@ struct ComposeBugCommentView: View {
             submitError = message
             return
         }
+        if await guidelines.confirmBeforePosting({ Task { await submit() } }) { return }
         isSubmitting = true; submitError = nil
         do {
             let comment = try await APIClient.shared.bugReports.submitComment(

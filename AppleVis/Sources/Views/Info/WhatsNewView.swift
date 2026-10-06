@@ -195,6 +195,48 @@ struct ChangeItem: Identifiable {
 
     static let current: [ChangeItem] = [
         ChangeItem(
+            systemImage: "paperplane",
+            tag: .new,
+            title: "Help the Mouse Get Better",
+            description: "After No, It Didn't, you can tell the Mouse what went wrong. Questions AppleVis couldn't answer are noted too. Send Notes to AppleVis, in Ask the Mouse, sends them to the AppleVis team through the Contact form, so the Mouse improves for everyone and AppleVis can see what people ask that it hasn't covered yet. You see what's included first."
+        ),
+        ChangeItem(
+            systemImage: "bubble.left.and.bubble.right",
+            tag: .improved,
+            title: "Quicker Follow-Ups and Clearer Sources",
+            description: "Under an answer, Explain More Simply and On Another Device ask a follow-up in one tap. Step-by-step answers say where their steps came from. When you don't say which device, the Mouse answers for the one you're asking from, and it tells you when its sources were written for an older iOS."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.message",
+            tag: .improved,
+            title: "One Last Check Before Posting",
+            description: "If a guideline reminder is still showing when you post, AppleVis now asks once whether to post anyway or keep editing. Choosing Got It on the reminder means you won't be asked. While you dictate, reminders wait until you stop, then check what you dictated, so they no longer interrupt you."
+        ),
+        ChangeItem(
+            systemImage: "speaker.wave.2.bubble",
+            tag: .accessibility,
+            title: "Guideline Reminders with VoiceOver",
+            description: "A guideline reminder now gives a soft chime and a light tap instead of speaking over you, like a spelling ding. Stop and check it, or keep writing. In the text field, the Actions rotor has Read Guideline Reminder and Dismiss Guideline Reminder. To hear reminders read aloud as they appear, turn on Speak Guideline Reminders in Settings > Sounds & Haptics."
+        ),
+        ChangeItem(
+            systemImage: "text.bubble.badge.clock",
+            tag: .improved,
+            title: "Guideline Reminders Read the Conversation",
+            description: "When you write a reply and a guideline reminder still seems to fit, Apple Intelligence now reads the conversation you're replying in before showing it. A developer sharing their app for feedback in their own thread, for example, is no longer reminded about self-promotion. It never adds reminders, and it all happens on your iPhone."
+        ),
+        ChangeItem(
+            systemImage: "arrow.clockwise",
+            tag: .accessibility,
+            title: "Hear When a Refresh Is Still Loading",
+            description: "With VoiceOver, if a refresh takes more than a moment, you now hear a soft tick and feel a light tap every second until it finishes. If it takes a while, VoiceOver says Still refreshing. This works on Home and anywhere you pull down to refresh. It follows Confirmation Sounds and Haptic Feedback in Settings."
+        ),
+        ChangeItem(
+            systemImage: "arrow.clockwise",
+            tag: .fixed,
+            title: "Home Waits Five Minutes",
+            description: "Home now refreshes only when you've been away from AppleVis for more than five minutes. Before, a quick trip to another app could refresh it, and so could checking Control Center or a notification."
+        ),
+        ChangeItem(
             systemImage: "text.bubble",
             tag: .fixed,
             title: "Jump to First New Comment Opens Posts Normally",

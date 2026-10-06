@@ -351,6 +351,7 @@ struct SubmitBugView: View {
                     .accessibilityLabel(String(localized: "Description"))
                     .accessibilityHint(String(localized: "Required, at least 30 characters. Include what happened, what you expected, and the exact steps to reproduce it."))
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: description) { _, newValue in
                         handleDescriptionChange(newValue)
                         guidelines.textChanged(newValue)
@@ -573,6 +574,7 @@ struct SubmitBugView: View {
             await announceWizardFailure(message, focus: $isErrorFocused)
             return
         }
+        if await guidelines.confirmBeforePosting({ Task { await submit() } }) { return }
         isSubmitting = true; error = nil
         let result = await DrupalFormClient.submitBug(
             name: user.name, email: email.trimmingCharacters(in: .whitespacesAndNewlines), title: title, appleFeedback: appleFeedbackId,

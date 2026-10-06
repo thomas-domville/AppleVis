@@ -379,6 +379,7 @@ struct SubmitBlogView: View {
                     .accessibilityLabel(String(localized: "Why this post would interest AppleVis readers"))
                     .accessibilityHint(String(localized: "Required. Tell us about your post and why it would interest the AppleVis community."))
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: pitchMessage) { _, newValue in
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
@@ -414,6 +415,7 @@ struct SubmitBlogView: View {
                     .accessibilityLabel(String(localized: "Blog Post Draft"))
                     .accessibilityHint(String(localized: "Required. Minimum 50 characters."))
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: blogDraft) { _, newValue in
                         handleBlogDraftChange(newValue)
                         guidelines.textChanged(newValue)
@@ -655,6 +657,7 @@ struct SubmitBlogView: View {
             await announceWizardFailure(policyMessage, focus: $isErrorFocused)
             return
         }
+        if await guidelines.confirmBeforePosting({ Task { await submit() } }) { return }
         isSubmitting = true; error = nil
         // The live "Message" field is what editors actually read as the
         // submitter's pitch — sends the real pitch text now, with the

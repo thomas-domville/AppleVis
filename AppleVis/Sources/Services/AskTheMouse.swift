@@ -61,6 +61,8 @@ struct MouseTurn: Identifiable {
     var versionNotes: [String: String] = [:]
     /// Did this answer the question? Kept on the device.
     var feedback: Bool?
+    /// What was wrong, after "No, It Didn't", when the person said.
+    var feedbackReason: MouseNote.Reason?
 
     var answer: String?
     /// The answer as it's being written, shown on screen only. VoiceOver
@@ -235,6 +237,24 @@ final class AskTheMouse: ObservableObject {
         task = Task { await run(question, earlier: Array(earlier), turnId: turnId) }
     }
 
+    /// Site searches from the last three hours, by search phrase, so asking
+    /// again or rephrasing doesn't search applevis.com from scratch.
+    /// Requested directly (2026-10-06).
+    private static var siteSearchCache: [String: (results: SearchResults, at: Date)] = [:]
+
+    private static func cachedSiteSearch(_ phrase: String) async -> SearchResults? {
+        let key = cacheKey(phrase)
+        if let hit = siteSearchCache[key], Date().timeIntervalSince(hit.at) < 3 * 3600 { return hit.results }
+        guard let results = try? await APIClient.shared.search.query(phrase, relaxBugVersions: true) else { return nil }
+        siteSearchCache[key] = (results, Date())
+        if siteSearchCache.count > 60 {
+            for old in siteSearchCache.sorted(by: { $0.value.at < $1.value.at }).prefix(siteSearchCache.count - 60) {
+                siteSearchCache[old.key] = nil
+            }
+        }
+        return results
+    }
+
     /// Answers from the last hour, by question, for this session.
     private static var answerCache: [String: (turn: MouseTurn, at: Date)] = [:]
 
@@ -263,6 +283,15 @@ final class AskTheMouse: ObservableObject {
         pages += turn.forums.filter { turn.resultNotes[$0.id] != nil }.map { "forum-\($0.id)" }
         MouseSourceFeedback.record(helpful: helpful, sourceIds: pages, words: MouseKnowledge.terms(turn.question))
         update(turnId) { $0.feedback = helpful }
+        // Kept for Send Notes to AppleVis, so a miss can improve the Mouse
+        // for everyone, not just re-rank this device's results.
+        if !helpful { MouseNotesStore.shared.recordNotHelpful(turn) }
+    }
+
+    /// "What went wrong?", after No, It Didn't. Requested directly (2026-10-06).
+    func recordFeedbackReason(_ turnId: UUID, reason: MouseNote.Reason) {
+        update(turnId) { $0.feedbackReason = reason }
+        MouseNotesStore.shared.setReason(reason, for: turnId)
     }
 
     func stop() {
@@ -306,6 +335,11 @@ final class AskTheMouse: ObservableObject {
     /// asked back about aren't answers, so they're left out.
     private func recordConversation(_ turnId: UUID) {
         guard let turn = turns.first(where: { $0.id == turnId }), !turn.isSearching, turn.clarifyChoices.isEmpty else { return }
+        // A question nothing on AppleVis answered: a gap the AppleVis team
+        // may want to write about.
+        if !turn.answered, !turn.isOffTopic, !turn.isRestored {
+            MouseNotesStore.shared.recordNoAnswer(turn)
+        }
         var history = MouseConversationHistory.load()
         history.record(SavedMouseAnswer(id: turn.id.uuidString, question: turn.question, answer: turn.savedAnswerText,
                                         sources: turn.savedSources, savedAt: Date(), answered: turn.answered),
@@ -407,7 +441,7 @@ final class AskTheMouse: ObservableObject {
         // brought back unrelated posts under More From AppleVis.
         // Reported directly (2026-09-28).
         let appOnly = [.whatsNew, .changeSetting, .savedItems].contains(plan.kind)
-        async let siteResults: SearchResults? = appOnly ? nil : (try? APIClient.shared.search.query(searchPhrase, relaxBugVersions: true))
+        async let siteResults: SearchResults? = appOnly ? nil : Self.cachedSiteSearch(searchPhrase)
         // "What's the latest AppleVis podcast?": the site's search ranks by
         // relevance, so it brought back episodes from 2018 to 2022 and the
         // newest one wasn't among them. Questions asking for the latest
@@ -1189,7 +1223,35 @@ final class AskTheMouse: ObservableObject {
         if !stepWords.isEmpty, Double(stepWords.intersection(introWords).count) / Double(stepWords.count) >= 0.6 {
             intro = TextSegmentation.sentenceGroups(intro, groupSize: 1).first ?? intro
         }
-        return (IntelligenceService.mouseAnswerText(intro, steps: answer.steps), true)
+        // Where each step came from, so it can be trusted or checked. Once
+        // after the introduction when every step has the same source, after
+        // each step when they differ. Requested directly (2026-10-06).
+        var steps = answer.steps
+        let labels = answer.stepSources.map(Self.stepSourceLabel)
+        if labels.count == steps.count, labels.allSatisfy({ $0 != nil }) {
+            let named = labels.compactMap { $0 }
+            if Set(named).count == 1, let only = named.first {
+                intro += (intro.isEmpty ? "" : " ") + String(localized: "These steps are \(only).")
+            } else {
+                steps = zip(steps, named).map { "\($0) (\($1))" }
+            }
+        }
+        return (IntelligenceService.mouseAnswerText(intro, steps: steps), true)
+    }
+
+    /// "from an AppleVis guide", for a source id ("guide-123").
+    static func stepSourceLabel(_ id: String) -> String? {
+        switch id.split(separator: "-").first.map(String.init) ?? id {
+        case "help": return String(localized: "from AppleVis Help")
+        case "guide": return String(localized: "from an AppleVis guide")
+        case "comments", "appcomments": return String(localized: "from members' comments")
+        case "forum": return String(localized: "from a forum discussion")
+        case "blog": return String(localized: "from the AppleVis blog")
+        case "bug": return String(localized: "from the AppleVis Bug Tracker")
+        case "podcast": return String(localized: "from an AppleVis podcast")
+        case "setup": return String(localized: "from your settings")
+        default: return nil
+        }
     }
 
     // MARK: - iOS version

@@ -34,7 +34,7 @@ struct AppBrowseView: View {
         .navigationTitle("App Directory")
         .task { await load() }
         .task { await retryAccessibilityFocus(into: $isTitleFocused) }
-        .refreshable { await load(); SoundPlayer.shared.play(.refresh) }
+        .refreshable { await RefreshHeartbeat.during { await load() }; SoundPlayer.shared.play(.refresh) }
         .onChange(of: platform) { _, _ in Task { await load() } }
         .searchable(text: $searchText, prompt: "Search apps")
         .inputLimit($searchText, maximum: InputLimit.searchMaximum, warnWithin: 20) {
@@ -252,7 +252,7 @@ struct AppCategoryView: View {
         // "fresh" for up to 6 hours (ContentCache's default apps: TTL); an
         // ordinary tab visit is fine reusing that, a manual pull shouldn't
         // silently replay the same stale response.
-        .refreshable { await load(reset: true, forceRefresh: true); SoundPlayer.shared.play(.refresh) }
+        .refreshable { await RefreshHeartbeat.during { await load(reset: true, forceRefresh: true) }; SoundPlayer.shared.play(.refresh) }
     }
 
     /// Names the wait up front for a category too big for one request (see

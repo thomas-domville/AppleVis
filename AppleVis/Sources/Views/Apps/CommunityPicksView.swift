@@ -64,7 +64,7 @@ struct CommunityPicksView: View {
         }
         .task { await retryAccessibilityFocus(into: $isTitleFocused) }
         .refreshable {
-            await load(reset: true)
+            await RefreshHeartbeat.during { await load(reset: true) }
             SoundPlayer.shared.play(.refresh)
         }
         .onChange(of: sort) { _, newSort in

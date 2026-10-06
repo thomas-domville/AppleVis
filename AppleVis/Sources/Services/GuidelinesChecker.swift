@@ -70,6 +70,11 @@ enum GuidelinesChecker {
         let trimmed = ContentSubmissionPolicy.policyText(body: text).trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 10 else { return [] }
         let lower = trimmed.lowercased()
+        // Patterns come from the shared rules file (see GuidelineRules).
+        let rules = GuidelineRules.current
+        func hits(_ key: String, in text: String, caseInsensitive: Bool = true) -> Bool {
+            rules.patterns(key).contains { matches(text, $0, caseInsensitive: caseInsensitive) }
+        }
 
         var warnings: [GuidelineWarning] = []
 
@@ -160,16 +165,20 @@ enum GuidelinesChecker {
                 message: "Your post seems to include an email address. For your privacy and safety, the AppleVis guidelines recommend not sharing personal contact details publicly.",
                 severity: .medium
             ))
-        } else if !domains.isEmpty {
+        } else if domains.contains(where: isPersonalEmailDomain) {
+            // Only a personal mailbox gets the gentle tip. Work, project,
+            // and support addresses (a developer's support email, AppleVis's
+            // own) were 24 of 40 tips in three months and protected no one,
+            // so they're left alone (2026-10-06). Requested directly.
             warnings.append(GuidelineWarning(
                 id: "personal-info", rule: "Personal Information",
-                message: "Your post includes an email address. That's fine for a work or support address you mean to share. Just avoid posting a personal one.",
+                message: "Your post includes a personal email address. That's fine if you mean to share it. Just remember that everything on AppleVis is public.",
                 severity: .low
             ))
         }
 
         // Referral / affiliate links
-        if matches(text, #"[?&](ref|referral|affiliate|aff|partner|subid)="#, caseInsensitive: true) {
+        if hits("referral", in: text) {
             warnings.append(GuidelineWarning(
                 id: "referral-link", rule: "No Referral Links",
                 message: "Your post may include a referral or affiliate link. These aren't allowed on AppleVis because they can create a conflict of interest.",
@@ -191,21 +200,9 @@ enum GuidelinesChecker {
         // as a listing ("For sale: iPhone 14", "WTB a Braille display", "I'm
         // selling my…"), not in passing ("I've wanted to buy a purple iMac"
         // was flagged, 2026-09-27 month review). Reported directly.
-        let listing = [
-            #"(?:^|[.!?\n]\s*)(?:for\s+sale|wanted\s+to\s+buy|wtb|wts)\b"#,
-            #"\b(?:for\s+sale|wanted\s+to\s+buy)\s*[:\-–]"#,
-            #"\b(?:i'm|i\s+am|we're|we\s+are)\s+selling\b"#,
-            #"\b(?:have|has|got)\s+(?:an?\s+|my\s+|some\s+|two\s+|a\s+few\s+)?[\w\s-]{0,30}?\bfor\s+sale\b"#,
-            #"\bbuy\s+now\b"#, #"\bget\s+\d+%\s+off\b"#,
-            // A code only counts with discount or checkout wording. On
-            // AppleVis a "promo code" is usually an App Store download code
-            // a developer gives testers, or a member asks for: 3 of 4 code
-            // flags in an unseen month were that (2026-09-27 review).
-            #"\b(?:promo|coupon|discount)\s+code\b[^.!?\n]{0,80}\b(?:off|discount|save|savings|checkout|%)"#,
-            #"\b(?:off|discount|save|savings|%)[^.!?\n]{0,80}\b(?:promo|coupon|discount)\s+code\b"#,
-            #"\b(?:takes?|saves?|get)\s+(?:up\s+to\s+)?[$£€]\d+\s+off\b"#,
-        ]
-        if listing.contains(where: { matches(text, $0, caseInsensitive: true) }) {
+        // A code only counts with discount or checkout wording, as whole
+        // words ("offers" isn't "off"). See the rules file.
+        if hits("advertising", in: text) {
             warnings.append(GuidelineWarning(
                 id: "advertising", rule: "No Advertising or Selling",
                 message: "The AppleVis forums aren't for selling, trading, or advertising. If you think this would really help the community, please contact AppleVis first.",
@@ -231,14 +228,7 @@ enum GuidelinesChecker {
         // Only an actual release: its header, a "Press release:" label, or a
         // news-wire credit. "After seeing a press release" and an AppleVis
         // news article were both flagged (2026-09-27 unseen-month review).
-        let pressRelease = [
-            #"\bfor\s+immediate\s+release\b"#,
-            #"(?:^|\n)\s*press\s+release\b"#,
-            #"\bpress\s+release\s*[:\-–]"#,
-            #"\b(?:pr\s*newswire|business\s*wire|globe\s*newswire|accesswire)\b"#,
-            #"\bmedia\s+contact\s*:"#,
-        ]
-        if pressRelease.contains(where: { matches(text, $0, caseInsensitive: true) }) {
+        if hits("pressRelease", in: text) {
             warnings.append(GuidelineWarning(
                 id: "press-release", rule: "Press Releases",
                 message: "Press releases can only be posted as part of a wider discussion, not just to promote a product or service. Please add context beyond the release itself.",
@@ -250,14 +240,7 @@ enum GuidelinesChecker {
         // Whole words, in their chatbot form: a plain substring check found
         // "as an AI" inside "it was an AI error" (2026-09-27 three-month
         // review). Reported directly.
-        let aiArtifacts = [
-            #"\bas\s+an\s+ai(?:\s+language\s+model|\s+model|\s+assistant)?\s*,\s*i\b"#,
-            #"\bas\s+an\s+ai\s+language\s+model\b"#, #"\bas\s+a\s+language\s+model\b"#,
-            #"\bi\s+don't\s+have\s+personal\s+experience\b"#, #"\bi\s+cannot\s+browse\s+the\s+internet\b"#,
-            #"\bas\s+of\s+my\s+knowledge\s+cutoff\b"#, #"\bi'm\s+unable\s+to\s+access\s+real-time\b"#,
-            #"\b(?:certainly|absolutely)!\s+here's\b"#, #"\bsure!\s+here's\s+a\b"#, #"\bgreat\s+question!\s+here\b"#,
-        ]
-        if aiArtifacts.contains(where: { matches(lower, $0) }) {
+        if hits("aiDisclosure", in: lower, caseInsensitive: false) {
             warnings.append(GuidelineWarning(
                 id: "ai-disclosure", rule: "Disclose AI-Generated Content",
                 message: "Your post may contain AI-generated text. AppleVis asks you to say clearly in your post when AI tools helped create it.",
@@ -285,9 +268,9 @@ enum GuidelinesChecker {
         // (6 of 8 in the 2026-09-27 month review were happy posts). Needs
         // two signals now, not one. Reported directly.
         let shouting = sentencesKeepingMarkRuns(trimmed).contains { sentence in
-            matches(sentence, #"[!?]{3,}"#)
-                && matches(sentence, #"\b[A-Z]{4,}\b"#)
-                && !matches(sentence, #"\b(?:love|loving|awesome|amazing|great|excited|exciting|yay|wow|congrat\w*|thank\w*|brilliant|fantastic|wonderful|cool|fun|happy|finally)\b"#, caseInsensitive: true)
+            hits("shoutingMarks", in: sentence, caseInsensitive: false)
+                && hits("shoutingCaps", in: sentence, caseInsensitive: false)
+                && !hits("shoutingExcitement", in: sentence)
         }
         if shouting {
             warnings.append(GuidelineWarning(
@@ -299,13 +282,7 @@ enum GuidelinesChecker {
 
         // Low-value / no-value reply
         if trimmed.count < 60 {
-            let noValuePhrases = [
-                "me too", "same here", "same issue", "same problem", "same for me",
-                "same thing", "ditto", "i agree", "agreed", "just google it",
-                "try googling", "just search for it", "i haven't used", "i don't use that",
-                "never used it", "haven't tried it", "can't help",
-            ]
-            if noValuePhrases.contains(where: { lower.contains($0) }) {
+            if rules.list("lowValuePhrases").contains(where: { lower.contains($0) }) {
                 warnings.append(GuidelineWarning(
                     id: "low-value", rule: "Add Value to the Discussion",
                     message: "Short replies like \"me too\" or \"I haven't used that\" don't add much to the discussion. Consider sharing details, your experience, or a follow-up question instead.",
@@ -321,8 +298,7 @@ enum GuidelinesChecker {
         // case? will my charger work?"). Now it only takes a clear change of
         // subject. Telling topics apart properly needs an understanding of
         // meaning. Reported directly (2026-09-27 month review).
-        let topicSwitch = #"\b(?:unrelated\s+(?:question|note|topic|issue)|on\s+(?:a|an)\s+(?:different|unrelated|separate|other)\s+(?:note|topic|subject)|off[\s-]topic|(?:another|second|separate|different|other)\s+(?:question|thing|issue|topic)\s*,?\s*(?:not|un)\s*related|changing\s+(?:the\s+)?(?:topic|subject)|(?:totally|completely)\s+different\s+(?:question|topic|subject))\b"#
-        if !isReply && matches(text, topicSwitch, caseInsensitive: true) {
+        if !isReply && hits("topicSwitch", in: text) {
             warnings.append(GuidelineWarning(
                 id: "multi-topic", rule: "One Topic Per Post",
                 message: "Your post seems to ask several different questions. The AppleVis guidelines ask for one topic per post. Separate posts will get you better answers.",
@@ -379,7 +355,8 @@ enum GuidelinesChecker {
             .replacingOccurrences(of: "&amp;", with: "&")
             .replacingOccurrences(of: "&lt;", with: "<")
             .replacingOccurrences(of: "&gt;", with: ">")
-        let pattern = #"\b(?!(?:accessibility|support|contact|info|help|press|sales|admin|team|hello|feedback|abuse|legal|privacy|webmaster|postmaster|user|example|someone|yourname)@)([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})"#
+        let rules = GuidelineRules.current
+        let pattern = rules.pattern("emailAddress")
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return [] }
         let ns = text as NSString
         let found = regex.matches(in: text, range: NSRange(location: 0, length: ns.length)).map { match in
@@ -387,13 +364,13 @@ enum GuidelinesChecker {
             let domain = ns.substring(with: match.range(at: 2)).lowercased()
             let start = max(0, match.range.location - 80)
             let before = ns.substring(with: NSRange(location: start, length: match.range.location - start))
-            let invitation = #"\b(?:e-?mail|mail|contact|reach|write\s+to|message|drop(?:ping)?\s+(?:me|us)\s+a\s+(?:line|note|message)|send\b[^.!?\n]{0,60}?\bto|email\s+address(?:\s+is)?|feedback\s+to)\s*:?[^.!?\n]{0,25}$"#
+            let invitation = rules.pattern("emailInvitation")
             let shared = matches(before, invitation, caseInsensitive: true)
-            let project = matches(local, #"(?:^|[._-])(?:info|support|help|contact|feedback|dev|devs|app|apps|team|studio|games?|official|hello|mail)(?:[._-]|$)|(?:dev|app|apps|studio|games|official)$"#, caseInsensitive: true)
+            let project = matches(local, rules.pattern("emailProject"), caseInsensitive: true)
             let afterEnd = match.range.location + match.range.length
             let after = ns.substring(with: NSRange(location: afterEnd, length: min(40, ns.length - afterEnd)))
-            let header = matches(before, #"(?:\b(?:from|to|cc|bcc|reply-to|sender)\s*:[^\n]{0,60}|<\s*|\[mailto:)$"#, caseInsensitive: true)
-                || matches(after, #"^\s*>?\s*(?:\S+\s+){0,3}wrote\s*:"#, caseInsensitive: true)
+            let header = matches(before, rules.pattern("emailHeaderBefore"), caseInsensitive: true)
+                || matches(after, rules.pattern("emailHeaderAfter"), caseInsensitive: true)
             return EmailAddress(local: local, domain: domain, sharedOnPurpose: shared, looksLikeProject: project, inPastedHeader: header)
         }
         // One address, one judgement: offered on purpose once ("email the
@@ -411,23 +388,12 @@ enum GuidelinesChecker {
         emailAddresses(in: text).map(\.domain)
     }
 
-    /// Free, personal mailbox services. An address on one of these is
-    /// someone's own inbox, not a business or support address.
-    private static let personalEmailProviders: Set<String> = [
-        "gmail.com", "googlemail.com", "icloud.com", "me.com", "mac.com",
-        "outlook.com", "hotmail.com", "live.com", "msn.com",
-        "yahoo.com", "ymail.com", "rocketmail.com", "aol.com", "aim.com",
-        "proton.me", "protonmail.com", "pm.me", "gmx.com", "gmx.net", "gmx.de",
-        "mail.com", "zoho.com", "yandex.com", "yandex.ru", "fastmail.com", "hey.com",
-        "tutanota.com", "tuta.io", "comcast.net", "att.net", "verizon.net", "sbcglobal.net",
-        "btinternet.com", "sky.com", "virginmedia.com", "web.de", "orange.fr", "free.fr",
-        "laposte.net", "libero.it", "qq.com", "163.com", "126.com", "naver.com",
-    ]
-
-    /// Also catches regional versions like yahoo.co.uk or hotmail.fr.
+    /// Free, personal mailbox services, from the rules file. Also catches
+    /// regional versions like yahoo.co.uk or hotmail.fr.
     static func isPersonalEmailDomain(_ domain: String) -> Bool {
-        if personalEmailProviders.contains(domain) { return true }
-        let regionalBases = ["yahoo", "hotmail", "outlook", "live", "gmx", "yandex", "aol"]
+        let rules = GuidelineRules.current
+        if rules.list("personalEmailProviders").contains(domain) { return true }
+        let regionalBases = rules.list("personalEmailRegionalBases")
         let firstLabel = domain.split(separator: ".").first.map(String.init) ?? ""
         return regionalBases.contains(firstLabel)
     }
@@ -466,8 +432,9 @@ enum GuidelinesChecker {
     /// flagged as high, needing approval. Asking people to fill one in,
     /// sign up, or take part still is. Reported directly.
     private static func announcementNeedsApproval(_ text: String) -> Bool {
-        let pattern = #"\b(survey|questionnaire|research study|research project|focus group|participants? needed|looking for participants?|study participants?)\b"#
-        let invitation = #"\b(please|fill\s+(?:in|out)|take\s+(?:our|this|the|a|my|their|part)|complete\s+(?:our|this|the|a|my)|participate|sign\s+up|join\s+(?:our|the|a|my)|click|link\b|below|would\s+(?:you|like)|could\s+you|we'd\s+(?:love|like|appreciate)|we\s+would\s+(?:love|like|appreciate)|help\s+us|if\s+you're\s+interested|if\s+you\s+are\s+interested|few\s+minutes|looking\s+for|participants?\s+needed|recruiting|volunteers?)\b"#
+        let rules = GuidelineRules.current
+        let pattern = rules.pattern("announcementTopic")
+        let invitation = rules.pattern("announcementInvitation")
         let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?"))
         for sentence in sentences where matches(sentence, pattern, caseInsensitive: true) {
             if !sentence.localizedCaseInsensitiveContains("thank") && matches(sentence, invitation, caseInsensitive: true) {

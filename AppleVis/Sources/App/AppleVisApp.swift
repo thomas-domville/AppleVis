@@ -127,6 +127,10 @@ struct AppleVisApp: App {
                     // other device's saved items/queue/settings changes
                     // never appeared until a full quit and relaunch.
                     ICloudSyncManager.shared.pullAll()
+                    // Newer guideline rules, if published (at most twice a
+                    // day). The built-in copy carries on if it can't reach
+                    // GitHub. See GuidelineRules.
+                    Task { await GuidelineRules.refreshIfDue() }
                     // Refreshes `.system`/`.oppositeToSystem`'s notion of the
                     // real device appearance from UIKit directly — see the
                     // doc comment on `PreferencesStore.systemIsDark` for why

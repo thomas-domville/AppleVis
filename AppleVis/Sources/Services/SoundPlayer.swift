@@ -26,6 +26,17 @@ enum AppSound: String {
     /// users who can't see the Mouse scurrying. Confirmation tier, so it's
     /// on unless Confirmation Sounds is off.
     case mousePatter     = "mouse_patter"
+    /// A soft two-note chime when a guideline reminder appears while
+    /// writing, like a spelling ding: you can stop and check it, or keep
+    /// going. An original sound, not one of VoiceOver's. Confirmation tier,
+    /// so it's on by default. Requested directly (2026-10-06).
+    case guidelineDing   = "guideline_ding"
+    /// A soft, low tick once a second while a refresh is still loading,
+    /// for VoiceOver users (see RefreshHeartbeat). Quieter than the
+    /// Mouse's patter so the two are easy to tell apart. Original sound.
+    /// Confirmation tier, so it's on by default. Requested directly
+    /// (2026-10-06).
+    case refreshTick     = "refresh_tick"
 
     /// Non-essential UI chrome — docs/APPLEVIS_2026_1_MASTER_SPEC.md defaults
     /// these off (tab switching, picker changes, opening screens, list
@@ -75,6 +86,12 @@ enum AppSound: String {
         case .mousePatter:
             // A light tap with each tick, for braille and DeafBlind users.
             return { UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.6) }
+        case .refreshTick:
+            // The cue for braille and DeafBlind users, who may not hear it.
+            return { UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.45) }
+        case .guidelineDing:
+            // The cue for braille and DeafBlind users, who may not hear it.
+            return { UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 0.7) }
         case .tabChange, .articleOpen, .loadingStart, .pickerTick, .refresh,
              .screenClose, .searchComplete, .syncComplete, .tipPopup, .welcome:
             return nil

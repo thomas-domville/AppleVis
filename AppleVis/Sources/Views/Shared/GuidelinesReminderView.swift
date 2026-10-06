@@ -179,65 +179,265 @@ final class GuidelinesCheckState: ObservableObject {
     /// doesn't re-ask about the same draft.
     private var opinionCache: [String: IntelligenceService.GuidelineSecondOpinion] = [:]
 
+    /// The conversation a reply is being written in, set by the comment box.
+    /// A reminder Apple Intelligence still thinks fits after reading the
+    /// draft alone gets a second look with the thread around it, so a
+    /// developer answering in their own thread, for example, isn't nudged
+    /// about self-promotion. Requested directly (2026-10-06).
+    var conversation: ConversationSource?
+    /// Loaded once per draft, and only if a reminder needs it.
+    private var loadedConversation: ConversationContext??
+
     /// Settings > Intelligence > Smarter Guideline Reminders. On by default.
     private static var secondOpinionEnabled: Bool {
         UserDefaults.standard.object(forKey: "intel.guidelineSecondOpinion") as? Bool ?? true
+    }
+
+    /// The latest draft, for checking when dictation ends or at Submit.
+    private var lastDraft: (text: String, isReply: Bool)?
+    /// Dictation was in progress at the last change. Reminders wait until
+    /// it ends: a pause between dictated sentences isn't a pause in
+    /// writing, and a reminder spoken mid-dictation was talked over or
+    /// distracting. Many VoiceOver users dictate. Requested directly
+    /// (2026-10-06).
+    private var isDictating = false
+    private var inputModeObserver: AnyCancellable?
+    /// Reminders already asked about at Submit, so it's only once per draft.
+    private var askedAtSubmit: Set<String> = []
+
+    init() {
+        inputModeObserver = NotificationCenter.default
+            .publisher(for: UITextInputMode.currentInputModeDidChangeNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.inputModeChanged() }
     }
 
     /// `isReply` — see `GuidelinesChecker.check(_:isReply:)`'s doc comment;
     /// forwarded as-is, defaulting to false (a new topic/post/entry).
     func textChanged(_ text: String, isReply: Bool = false) {
         checkTask?.cancel()
+        lastDraft = (text, isReply)
         guard text.trimmingCharacters(in: .whitespacesAndNewlines).count >= 10 else {
             topWarning = nil
+            return
+        }
+        // Checked once dictation ends instead (inputModeChanged).
+        if Self.isDictationActive {
+            isDictating = true
             return
         }
         checkTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(1500))
             guard !Task.isCancelled, let self else { return }
-            var visible = GuidelinesChecker.check(text, isReply: isReply).filter { !self.dismissedIds.contains($0.id) }
-            // Apple Intelligence second opinion (2026-09-27): the rules spot
-            // a possible issue, then the on-device model reads the whole
-            // draft and skips a reminder that clearly doesn't fit ("thanks
-            // for explaining it clearly!"). It can't add reminders, and the
-            // clear-cut rules (strong language, images, and so on) never get
-            // one. Used to ask the model to find problems on its own when
-            // the rules found none, which could invent reminders in
-            // untranslated wording. Requested directly.
-            if Self.secondOpinionEnabled && IntelligenceService.isAvailable && !visible.isEmpty {
-                var top: GuidelineWarning?
-                for warning in visible {
-                    guard !Task.isCancelled else { return }
-                    if warning.allowsSecondOpinion,
-                       let opinion = await self.opinion(on: warning, in: text),
-                       !opinion.isRealConcern {
-                        continue
-                    }
-                    top = warning
-                    break
-                }
-                guard !Task.isCancelled else { return }
-                visible = top.map { [$0] } ?? []
-            }
-            self.topWarning = visible.first
-            if let top = visible.first, top.id != self.lastAnnouncedId {
-                self.lastAnnouncedId = top.id
-                UIAccessibility.post(notification: .announcement, argument: String(localized: "Guideline reminder: \(String(localized: String.LocalizationValue(top.rule))). \(String(localized: String.LocalizationValue(top.message)))"))
-            }
+            await self.runCheck(text, isReply: isReply)
+            if !Task.isCancelled { self.checkTask = nil }
         }
     }
 
-    private func opinion(on warning: GuidelineWarning, in text: String) async -> IntelligenceService.GuidelineSecondOpinion? {
+    /// Dictation just ended: check now, with no wait, since this is when
+    /// someone listens back to what they dictated.
+    private func inputModeChanged() {
+        let dictating = Self.isDictationActive
+        let wasDictating = isDictating
+        isDictating = dictating
+        guard wasDictating, !dictating, let draft = lastDraft,
+              draft.text.trimmingCharacters(in: .whitespacesAndNewlines).count >= 10 else { return }
+        checkTask?.cancel()
+        checkTask = Task { [weak self] in
+            await self?.runCheck(draft.text, isReply: draft.isReply)
+            if !Task.isCancelled { self?.checkTask = nil }
+        }
+    }
+
+    /// The keyboard reports "dictation" as its language while dictating.
+    /// Widely used, though not a documented promise; if it ever stops
+    /// working, reminders behave as before and the Submit question still
+    /// catches a missed one.
+    private static var isDictationActive: Bool {
+        FirstResponderFinder.current()?.textInputMode?.primaryLanguage == "dictation"
+    }
+
+    private func runCheck(_ text: String, isReply: Bool, announce: Bool = true) async {
+        var visible = GuidelinesChecker.check(text, isReply: isReply).filter { !self.dismissedIds.contains($0.id) }
+        // Apple Intelligence second opinion (2026-09-27): the rules spot
+        // a possible issue, then the on-device model reads the whole
+        // draft and skips a reminder that clearly doesn't fit ("thanks
+        // for explaining it clearly!"). It can't add reminders, and the
+        // clear-cut rules (strong language, images, and so on) never get
+        // one. Used to ask the model to find problems on its own when
+        // the rules found none, which could invent reminders in
+        // untranslated wording. Requested directly.
+        if Self.secondOpinionEnabled && IntelligenceService.isAvailable && !visible.isEmpty {
+            var top: GuidelineWarning?
+            for warning in visible {
+                guard !Task.isCancelled else { return }
+                // Medium reminders only. A low one is just a soft ding, so
+                // it isn't worth an Apple Intelligence check while typing:
+                // fewer model runs, less battery (2026-10-06).
+                if warning.allowsSecondOpinion, warning.severity == .medium,
+                   let opinion = await self.opinion(on: warning, in: text, isReply: isReply),
+                   !opinion.isRealConcern {
+                    continue
+                }
+                top = warning
+                break
+            }
+            guard !Task.isCancelled else { return }
+            visible = top.map { [$0] } ?? []
+        }
+        self.topWarning = visible.first
+        if announce, let top = visible.first, top.id != self.lastAnnouncedId {
+            self.lastAnnouncedId = top.id
+            Self.cue(top)
+        }
+    }
+
+    /// Called first thing on Submit, after the hard checks. When a medium
+    /// reminder is still showing (not dismissed with Got It), asks once:
+    /// Post Anyway or Keep Editing. True means it asked, and `post` runs if
+    /// they choose Post Anyway. Never for low reminders, never twice for
+    /// the same reminder, and never blocks. For anyone who missed it while
+    /// writing, such as a VoiceOver user who dictated and went straight to
+    /// Submit. Requested directly (2026-10-06).
+    func confirmBeforePosting(_ post: @escaping () -> Void) async -> Bool {
+        // A check still waiting (typed or dictated just before Submit)
+        // runs now, quietly, so the question reflects the final text.
+        if let draft = lastDraft, checkTask != nil {
+            checkTask?.cancel()
+            checkTask = nil
+            if draft.text.trimmingCharacters(in: .whitespacesAndNewlines).count >= 10 {
+                await runCheck(draft.text, isReply: draft.isReply, announce: false)
+            }
+        }
+        guard let top = topWarning, top.severity == .medium, !askedAtSubmit.contains(top.id) else { return false }
+        askedAtSubmit.insert(top.id)
+        let rule = String(localized: String.LocalizationValue(top.rule))
+        let message = String(localized: String.LocalizationValue(top.message))
+        let alert = UIAlertController(
+            title: String(localized: "Before You Post"),
+            message: "\(rule). \(message)",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: String(localized: "Keep Editing"), style: .cancel))
+        alert.addAction(UIAlertAction(title: String(localized: "Post Anyway"), style: .default) { _ in post() })
+        guard let presenter = FirstResponderFinder.topViewController() else { return false }
+        presenter.present(alert, animated: true)
+        return true
+    }
+
+    private func opinion(on warning: GuidelineWarning, in text: String, isReply: Bool) async -> IntelligenceService.GuidelineSecondOpinion? {
         let key = "\(warning.id)|\(text.hashValue)"
         if let cached = opinionCache[key] { return cached }
-        let opinion = await IntelligenceService.secondOpinion(on: warning, in: text)
+        let load: (() async -> ConversationContext?)? = (isReply && conversation != nil) ? { [weak self] in
+            await self?.conversationContext()
+        } : nil
+        let opinion = await IntelligenceService.reviewFlag(
+            warning, in: text, context: IntelligenceService.FlagContext(isReply: isReply), loadConversation: load
+        )
         if let opinion { opinionCache[key] = opinion }
         return opinion
+    }
+
+    private func conversationContext() async -> ConversationContext? {
+        if let loadedConversation { return loadedConversation }
+        guard let conversation else { return nil }
+        var loaded = await GuidelineConversation.load(conversation)
+        // Replying in a thread you started yourself.
+        if let me = AuthStore.current?.user?.uuid, !me.isEmpty, loaded?.startedById == me {
+            loaded?.flaggedAuthorStartedThread = true
+        }
+        loadedConversation = .some(loaded)
+        return loaded
+    }
+
+    /// The "ding": a soft chime and a light tap when a reminder appears,
+    /// like a misspelling ding in a word processor. You can stop and check
+    /// it from the Actions rotor, or keep writing. It's only read aloud
+    /// with Settings > Sounds & Haptics > Speak Guideline Reminders on,
+    /// since speech while typing or dictating got in the way. Requested
+    /// directly (2026-10-06).
+    private static func cue(_ warning: GuidelineWarning) {
+        SoundPlayer.shared.play(.guidelineDing)
+        if PreferencesStore.current?.speakGuidelineReminders == true {
+            speak(warning)
+        }
+    }
+
+    /// Queued behind what VoiceOver is already saying. It used to interrupt,
+    /// so typing echo could cut it off after a word or two.
+    private static func speak(_ warning: GuidelineWarning) {
+        let text = String(localized: "Guideline reminder: \(String(localized: String.LocalizationValue(warning.rule))). \(String(localized: String.LocalizationValue(warning.message)))")
+        UIAccessibility.post(
+            notification: .announcement,
+            argument: NSAttributedString(string: text, attributes: [.accessibilitySpeechQueueAnnouncement: true])
+        )
+    }
+
+    /// The text field's "Read Guideline Reminder" action.
+    func readAgain() {
+        guard let top = topWarning else { return }
+        Self.speak(top)
     }
 
     func dismiss() {
         guard let top = topWarning else { return }
         dismissedIds.insert(top.id)
         topWarning = nil
+    }
+}
+
+/// "Read Guideline Reminder" and "Dismiss Guideline Reminder" in the text
+/// field's own Actions rotor while a reminder is showing, so a VoiceOver
+/// user can hear it again or dismiss it without leaving the field to find
+/// the reminder above it. Requested directly (2026-10-06).
+struct GuidelineReminderActions: ViewModifier {
+    @ObservedObject var guidelines: GuidelinesCheckState
+
+    func body(content: Content) -> some View {
+        content
+            .modifier(ConditionalAccessibilityAction(isActive: guidelines.topWarning != nil, name: "Read Guideline Reminder") {
+                guidelines.readAgain()
+            })
+            .modifier(ConditionalAccessibilityAction(isActive: guidelines.topWarning != nil, name: "Dismiss Guideline Reminder") {
+                guidelines.dismiss()
+                UIAccessibility.post(notification: .announcement, argument: String(localized: "Reminder dismissed."))
+            })
+    }
+}
+
+extension View {
+    func guidelineReminderActions(_ guidelines: GuidelinesCheckState) -> some View {
+        modifier(GuidelineReminderActions(guidelines: guidelines))
+    }
+}
+
+/// Finds the focused text field (to read its input mode) and the screen
+/// on top (to present the Submit question from anywhere).
+@MainActor
+enum FirstResponderFinder {
+    private static weak var found: UIResponder?
+
+    static func current() -> UIResponder? {
+        found = nil
+        UIApplication.shared.sendAction(#selector(UIResponder.appleVisCaptureFirstResponder(_:)), to: nil, from: nil, for: nil)
+        return found
+    }
+
+    fileprivate static func capture(_ responder: UIResponder) { found = responder }
+
+    static func topViewController() -> UIViewController? {
+        var top = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }?
+            .rootViewController
+        while let presented = top?.presentedViewController, !presented.isBeingDismissed { top = presented }
+        return top
+    }
+}
+
+extension UIResponder {
+    @objc fileprivate func appleVisCaptureFirstResponder(_ sender: Any?) {
+        FirstResponderFinder.capture(self)
     }
 }

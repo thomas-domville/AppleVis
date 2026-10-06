@@ -787,6 +787,7 @@ struct EditNodeSheet: View {
                     TextEditor(text: $bodyText)
                         .frame(minHeight: 200)
                         .rewriteFlash($justRewrote)
+                        .guidelineReminderActions(guidelines)
                         .onChange(of: bodyText) { _, newValue in
                             guidelines.textChanged(newValue)
                             intelligence.textChanged(
@@ -854,6 +855,7 @@ struct EditNodeSheet: View {
             error = message
             return
         }
+        if await guidelines.confirmBeforePosting({ Task { await submit() } }) { return }
         isSubmitting = true; error = nil
         do {
             try await onSave(title, bodyText)

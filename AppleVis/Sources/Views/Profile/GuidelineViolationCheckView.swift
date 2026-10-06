@@ -23,6 +23,10 @@ struct GuidelineViolationCheckView: View {
     /// only appeared once a flag had been cleared, so it often seemed
     /// missing. Requested directly (2026-10-01).
     @State private var showAIReview = false
+    @AppStorage(GuidelineViolationScanner.readsConversationKey) private var readsConversation = true
+    @ObservedObject private var reviewStore = GuidelineReviewStore.shared
+    @ObservedObject private var reviewPool = GuidelineReviewPool.shared
+    @State private var showSendNotes = false
     @AccessibilityFocusState private var isTitleFocused: Bool
     /// Shared by whichever status section is currently showing —
     /// "Scanning…", the error message, or the results summary — since
@@ -209,6 +213,11 @@ struct GuidelineViolationCheckView: View {
                                         : "Showing what the rules caught. \(visibleFlags.count) flagged."
                                     UIAccessibility.post(notification: .announcement, argument: message)
                                 }
+                            if showAIReview {
+                                Toggle("Read the Conversation", isOn: $readsConversation)
+                                    .accessibilityHint("On lets Apple Intelligence read the thread around a reply it still thinks breaks a guideline before deciding. Off judges each post on its own. Changing it checks the flags again.")
+                                    .onChange(of: readsConversation) { _, _ in scanner.rerunReview() }
+                            }
                             HStack {
                                 if scanner.isReviewing { ProgressView() }
                                 Text(reviewStatus)
@@ -252,10 +261,130 @@ struct GuidelineViolationCheckView: View {
                         Text("Read in context, these look fine. Give them a quick look before moving on.")
                     }
                 }
+
+                if !repeatMembers.isEmpty {
+                    Section {
+                        ForEach(repeatMembers, id: \.name) { member in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(member.name): \(member.count) flags")
+                                    .font(.subheadline).fontWeight(.semibold)
+                                Text(member.rules)
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                    } header: {
+                        Text("Members with Repeated Reminders (\(repeatMembers.count))")
+                            .accessibilityAddTraits(.isHeader)
+                    } footer: {
+                        Text("Three or more flags in this range. A prompt for a kind, personal word if it seems useful, not a penalty. Never shown to members.")
+                    }
+                }
+
+                if !scanner.wouldBlockAsNotEnglish.isEmpty {
+                    Section {
+                        ForEach(scanner.wouldBlockAsNotEnglish) { item in
+                            NavigationLink {
+                                GuidelineFlagDestination(flag: item)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(item.itemTitle).font(.subheadline).fontWeight(.semibold).lineLimit(1)
+                                    Text("By \(item.authorName)").font(.caption).foregroundStyle(.secondary)
+                                    Text(item.excerpt).font(.footnote).lineLimit(3)
+                                    if let verdict = GuidelineReviewStore.shared.verdict(for: item.id) {
+                                        Text(verdict == .realProblem ? "You marked this: rightly blocked" : "You marked this: shouldn't be blocked")
+                                            .font(.caption).fontWeight(.semibold)
+                                    }
+                                }
+                                .accessibilityElement(children: .combine)
+                            }
+                            .accessibilityAction(named: Text("Mark Shouldn't Be Blocked")) {
+                                GuidelineReviewStore.shared.record(.notAProblem, for: item, opinions: [:])
+                                UIAccessibility.post(notification: .announcement, argument: "Marked shouldn't be blocked.")
+                            }
+                            .accessibilityAction(named: Text("Mark Rightly Blocked")) {
+                                GuidelineReviewStore.shared.record(.realProblem, for: item, opinions: [:])
+                                UIAccessibility.post(notification: .announcement, argument: "Marked rightly blocked.")
+                            }
+                            .voiceOverAwareSwipeActions {
+                                Button { GuidelineReviewStore.shared.record(.notAProblem, for: item, opinions: [:]) } label: {
+                                    Label("Shouldn't Be Blocked", systemImage: "checkmark.circle")
+                                }
+                                .tint(.green)
+                                Button { GuidelineReviewStore.shared.record(.realProblem, for: item, opinions: [:]) } label: {
+                                    Label("Rightly Blocked", systemImage: "nosign")
+                                }
+                                .tint(.red)
+                            } trailing: {
+                                EmptyView()
+                            }
+                        }
+                    } header: {
+                        Text("Would Be Blocked as Not English (\(scanner.wouldBlockAsNotEnglish.count))")
+                            .accessibilityAddTraits(.isHeader)
+                    } footer: {
+                        Text("The app won't post text it thinks isn't in English. These are already on the site, so most should be English. If any are, the check is too strict there: mark them, and they'll be in your review notes.")
+                    }
+                }
+
+                Section {
+                    let scores = reviewStore.ruleScores
+                    if scores.isEmpty {
+                        Text("Mark flags Not a Problem or Real Problem, from a swipe or the VoiceOver Actions rotor. Each rule's score builds up here, and you can send your notes to AppleVis to improve the rules for everyone.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    } else {
+                        ForEach(scores) { score in
+                            Text("\(score.name): \(score.real) real, \(score.notAProblem) not a problem (\(Int((score.realShare * 100).rounded()))% real)")
+                                .font(.footnote)
+                        }
+                        if !reviewStore.unsent.isEmpty {
+                            Button("Send Review Notes (\(reviewStore.unsent.count))") { showSendNotes = true }
+                                .accessibilityHint("Sends your decisions not sent yet to the AppleVis team through the Contact form, to improve the rules for everyone.")
+                        }
+                    }
+                    Button("Ask Apple Intelligence Again") {
+                        GuidelineOpinionCache.shared.clear()
+                        scanner.rerunReview()
+                    }
+                    .accessibilityHint("Forgets Apple Intelligence's saved verdicts and checks the current flags again, for instance after the rules change.")
+                } header: {
+                    Text("Your Reviews (\(reviewStore.reviews.count))")
+                        .accessibilityAddTraits(.isHeader)
+                }
+
+                // Everyone's decisions, from CloudKit, so the rules are
+                // judged on the whole team's reviews (2026-10-06).
+                Section {
+                    let teamScores = reviewPool.ruleScores
+                    if reviewPool.isLoading && teamScores.isEmpty {
+                        Text("Loading the team's reviews…").font(.footnote).foregroundStyle(.secondary)
+                    } else if reviewPool.unavailable && teamScores.isEmpty {
+                        Text("Couldn't load the team's reviews. Check that you're signed in to iCloud, then try again.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    } else if teamScores.isEmpty {
+                        Text("No one on the team has marked a flag yet. Decisions you mark are shared here with other Site Editors and Admins, without the post itself.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    } else {
+                        Text("\(reviewPool.reviewerCount) reviewers. \(reviewPool.disagreements) flags where reviewers disagreed.")
+                            .font(.footnote)
+                        ForEach(teamScores) { score in
+                            Text("\(score.name): \(score.real) real, \(score.notAProblem) not a problem (\(Int((score.realShare * 100).rounded()))% real)")
+                                .font(.footnote)
+                        }
+                    }
+                    Button("Refresh Team Reviews") { Task { await reviewPool.refresh() } }
+                        .disabled(reviewPool.isLoading)
+                } header: {
+                    Text("Team Reviews")
+                        .accessibilityAddTraits(.isHeader)
+                }
             }
         }
         .themedList(preferences.colors)
         .navigationTitle("Guideline Violation Check")
+        .onAppear { ICloudSyncManager.shared.pushGuidelineReviews() }
+        .task { await reviewPool.refresh() }
+        .sheet(isPresented: $showSendNotes) { SendNotesWizard(package: reviewStore.notesPackage()) }
         .navigationBarTitleDisplayMode(.inline)
         // Fires on both transitions: a scan starting (lands on
         // "Scanning…") and finishing (lands on the error or results).
@@ -271,8 +400,24 @@ struct GuidelineViolationCheckView: View {
         } label: {
             GuidelineFlagRow(flag: flag, opinions: showAIReview ? (scanner.opinions[flag.id] ?? [:]) : [:])
         }
-        .modifier(GuidelineFlagActions(flag: flag, onHandled: { scanner.removeFlag(id: flag.id) }))
+        .modifier(GuidelineFlagActions(flag: flag, opinions: scanner.opinions[flag.id] ?? [:], onHandled: { scanner.removeFlag(id: flag.id) }))
     }
+
+    /// Members with three or more flags in the range, most first. For a
+    /// quiet, personal word rather than reacting post by post; never shown
+    /// to members, and not a penalty. Requested directly (2026-10-06).
+    private var repeatMembers: [(name: String, count: Int, rules: String)] {
+        let byAuthor = Dictionary(grouping: scanner.flags.filter { !$0.authorIsEditorial }, by: \.authorName)
+        return byAuthor.compactMap { name, flags in
+            guard flags.count >= 3, !name.isEmpty else { return nil }
+            let rules = Dictionary(grouping: flags.flatMap(\.warnings), by: \.rule)
+                .map { "\($0.key) \($0.value.count)" }.sorted().joined(separator: ", ")
+            return (name, flags.count, rules)
+        }
+        .sorted { $0.count > $1.count }
+    }
+
+
 }
 
 /// Routes to the right detail screen for a flag's content kind — every one
@@ -365,6 +510,7 @@ private struct GuidelineFlagFullText: View {
 
 private struct GuidelineFlagRow: View {
     let flag: GuidelineFlag
+    @ObservedObject private var reviewStore = GuidelineReviewStore.shared
     /// Apple Intelligence's verdict on each context-dependent rule, by rule id.
     var opinions: [String: IntelligenceService.GuidelineSecondOpinion] = [:]
 
@@ -372,9 +518,12 @@ private struct GuidelineFlagRow: View {
     private var opinionLines: [(id: String, text: String, isFine: Bool)] {
         flag.warnings.compactMap { warning in
             guard let opinion = opinions[warning.id] else { return nil }
-            let verdict = opinion.isRealConcern
-                ? "Apple Intelligence agrees: \(opinion.reason)"
-                : "Apple Intelligence thinks this is probably fine: \(opinion.reason)"
+            let read = opinion.readConversation ? ", after reading the conversation" : ""
+            let verdict = opinion.isUnsure
+                ? "Apple Intelligence isn't sure\(read): \(opinion.reason)"
+                : opinion.isRealConcern
+                ? "Apple Intelligence agrees\(read): \(opinion.reason)"
+                : "Apple Intelligence thinks this is probably fine\(read): \(opinion.reason)"
             return (warning.id, flag.warnings.count > 1 ? "\(warning.rule): \(verdict)" : verdict, !opinion.isRealConcern)
         }
     }
@@ -439,6 +588,14 @@ private struct GuidelineFlagRow: View {
                 .font(.subheadline).fontWeight(.semibold)
                 .lineLimit(1)
 
+            // Your decision, once made, so you can see what's still to review.
+            if let verdict = reviewStore.verdict(for: flag.id) {
+                Label(verdict == .realProblem ? "You marked this a real problem" : "You marked this not a problem",
+                      systemImage: verdict == .realProblem ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
+                    .font(.caption).fontWeight(.semibold)
+                    .foregroundStyle(verdict == .realProblem ? Color(red: 0.725, green: 0.110, blue: 0.110) : Color(red: 0.08, green: 0.45, blue: 0.20))
+            }
+
             // Previously folded into the same caption line as the author
             // name ("JohnDoe — Keep AppleVis 13+"), easy to skim right past
             // — which guideline actually triggered the flag is the whole
@@ -498,7 +655,16 @@ private struct GuidelineFlagRow: View {
 /// Requested directly.
 private struct GuidelineFlagActions: ViewModifier {
     let flag: GuidelineFlag
+    var opinions: [String: IntelligenceService.GuidelineSecondOpinion] = [:]
     let onHandled: () -> Void
+    @ObservedObject private var reviewStore = GuidelineReviewStore.shared
+
+    /// Saved on this device (and your other devices through iCloud), to
+    /// improve the rules from real decisions. Requested directly (2026-10-06).
+    private func mark(_ verdict: GuidelineReview.Verdict) {
+        reviewStore.record(verdict, for: flag, opinions: opinions)
+        UIAccessibility.post(notification: .announcement, argument: verdict == .realProblem ? "Marked a real problem." : "Marked not a problem.")
+    }
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -522,6 +688,14 @@ private struct GuidelineFlagActions: ViewModifier {
             // see VoiceOverAwareSwipeActions's doc comment. The accessibility
             // actions below are the real path for them.
             .voiceOverAwareSwipeActions {
+                Button { mark(.notAProblem) } label: {
+                    Label("Not a Problem", systemImage: "checkmark.circle")
+                }
+                .tint(.green)
+                Button { mark(.realProblem) } label: {
+                    Label("Real Problem", systemImage: "exclamationmark.circle")
+                }
+                .tint(.red)
                 if flag.isPreviewShortened {
                     Button {
                         showFullText = true
@@ -555,6 +729,12 @@ private struct GuidelineFlagActions: ViewModifier {
                 }
                 .tint(.gray)
             }
+            .accessibilityAction(named: Text("Mark Not a Problem")) { mark(.notAProblem) }
+            .accessibilityAction(named: Text("Mark Real Problem")) { mark(.realProblem) }
+            .modifier(ConditionalAccessibilityAction(isActive: reviewStore.verdict(for: flag.id) != nil, name: "Undo Review") {
+                reviewStore.undo(for: flag.id)
+                UIAccessibility.post(notification: .announcement, argument: "Review undone.")
+            })
             .modifier(ConditionalAccessibilityAction(isActive: flag.isPreviewShortened, name: "Read Full Text") { showFullText = true })
             .accessibilityAction(named: Text("Edit \(flag.kindLabel)")) { showEditSheet = true }
             .accessibilityAction(named: Text("Unpublish \(flag.kindLabel)")) { showUnpublishConfirm = true }

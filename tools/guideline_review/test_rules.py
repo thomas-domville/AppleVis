@@ -23,7 +23,7 @@ expect = {
     'notSelfPromotion': lambda t: not rules.looks_like_self_promotion(t),
     'clean': lambda t: not rules.contains_strong_vulgar(t) and not rules.contains_crude(t) and rules.tone_concern(t) is None,
     'personalEmailIsMedium': lambda t: email_sev(t) == 'medium',
-    'workEmailIsLow': lambda t: email_sev(t) == 'low',
+    'sharedPersonalEmailIsLow': lambda t: email_sev(t) == 'low',
     'roleEmailIsIgnored': lambda t: email_sev(t) is None,
     'descriptiveClearlyIsFine': lambda t: rules.tone_concern(t) is None,
     'dismissiveClearlyIsLow': lambda t: rules.tone_concern(t) == 'low',

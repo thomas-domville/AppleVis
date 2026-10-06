@@ -31,15 +31,17 @@ LANGS = ['ar', 'de', 'el', 'es', 'fa', 'fr', 'he', 'hi', 'id', 'it', 'ja', 'ko',
 
 # Help articles are translated at runtime by Auto-Translate, by design.
 DESIGN_EXEMPT_FILES = {'HelpContent.swift'}
-# Support report e-mailed to the AppleVis team, and text the app adds to
-# posts on the English-language website; both stay English on purpose.
-TEAM_FACING_FILES = {'DiagnosticInfo.swift', 'SiteText.swift'}
+# Support report e-mailed to the AppleVis team, text the app adds to posts
+# on the English-language website, and conversation text prepared for Apple
+# Intelligence to read; all stay English on purpose.
+TEAM_FACING_FILES = {'DiagnosticInfo.swift', 'SiteText.swift', 'GuidelineConversation.swift', 'GuidelineRules.swift'}
 # Phrase lists used to *detect* English in drafts; only the shown messages count.
 DETECTION_FILES = {'GuidelinesChecker.swift', 'ContentSubmissionPolicy.swift'}
 DETECTION_UI_LABELS = {'message', 'rule', 'label', 'title', 'hint'}
 # Admin-only screens stay English (Profile > Admin), by decision.
 ADMIN_FILES = {'GuidelineViolationCheckView.swift', 'GuidelineViolationScanner.swift', 'ModeratorToolsView.swift',
-               'AppDirectoryHealthCheckView.swift', 'AppEntryHealthScanner.swift', 'FalsePositiveReportView.swift'}
+               'AppDirectoryHealthCheckView.swift', 'AppEntryHealthScanner.swift', 'FalsePositiveReportView.swift',
+               'GuidelineReviewStore.swift', 'GuidelineReviewPool.swift'}
 # Messages e-mailed to the editorial team or posted to the English-only site.
 TEAM_FACING = [
     ('ReportCommentWizard.swift', r"^(Reported |Reporter's additional|\(none provided\)|— Sent via)"),

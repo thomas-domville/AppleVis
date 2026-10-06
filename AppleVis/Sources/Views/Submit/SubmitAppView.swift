@@ -1199,6 +1199,7 @@ struct SubmitAppView: View {
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
                     .accessibilityHint(String(localized: "Required, at least 20 characters. Describe what works well with VoiceOver or other accessibility features, what doesn't, and anything other blind or low vision users should know."))
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: payload.accessibilityComments) { _, newValue in
                         handleAccessibilityCommentsChange(newValue)
                         guidelines.textChanged(newValue)
@@ -1224,6 +1225,7 @@ struct SubmitAppView: View {
                     .accessibilityLabel(String(localized: "Additional Comments"))
                     .accessibilityHint(String(localized: "Optional. Anything else about this app worth mentioning that didn't fit above."))
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: payload.otherComments) { _, newValue in
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
@@ -1409,6 +1411,7 @@ struct SubmitAppView: View {
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
                     .accessibilityHint(String(localized: "Required, at least 20 characters. Describe what works well with VoiceOver or other accessibility features, what doesn't, and anything other blind or low vision users should know."))
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: tvPayload.accessibilityComments) { _, newValue in
                         handleTvAccessibilityCommentsChange(newValue)
                         guidelines.textChanged(newValue)
@@ -1431,6 +1434,7 @@ struct SubmitAppView: View {
                     .accessibilityLabel(String(localized: "Other Comments"))
                     .accessibilityHint(String(localized: "Optional. Anything else about this app worth mentioning that didn't fit above."))
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: tvPayload.otherComments) { _, newValue in
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
@@ -1628,6 +1632,7 @@ struct SubmitAppView: View {
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
                     .accessibilityHint(String(localized: "Required, at least 20 characters. Describe what works well with VoiceOver or other accessibility features, what doesn't, and anything other blind or low vision users should know."))
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: watchPayload.accessibilityComments) { _, newValue in
                         handleWatchAccessibilityCommentsChange(newValue)
                         guidelines.textChanged(newValue)
@@ -1650,6 +1655,7 @@ struct SubmitAppView: View {
                     .accessibilityLabel(String(localized: "Other Comments"))
                     .accessibilityHint(String(localized: "Optional. Anything else about this app worth mentioning that didn't fit above."))
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: watchPayload.otherComments) { _, newValue in
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
@@ -1870,6 +1876,7 @@ struct SubmitAppView: View {
                     .accessibilityLabel(String(localized: "Accessibility Comments"))
                     .accessibilityHint(String(localized: "Required, at least 20 characters. Describe what works well with VoiceOver or other accessibility features, what doesn't, and anything other blind or low vision users should know."))
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: macPayload.accessibilityComments) { _, newValue in
                         handleMacAccessibilityCommentsChange(newValue)
                         guidelines.textChanged(newValue)
@@ -1892,6 +1899,7 @@ struct SubmitAppView: View {
                     .accessibilityLabel(String(localized: "Other Comments"))
                     .accessibilityHint(String(localized: "Optional. Anything else about this app worth mentioning that didn't fit above."))
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: macPayload.otherComments) { _, newValue in
                         guidelines.textChanged(newValue)
                         intelligence.textChanged(
@@ -2406,6 +2414,7 @@ struct SubmitAppView: View {
             await announceWizardFailure(message, focus: $isErrorFocused)
             return
         }
+        if await guidelines.confirmBeforePosting({ Task { await submit() } }) { return }
         isSubmitting = true; error = nil
         do {
             let posted = try await APIClient.shared.apps.submitApp(payload: payload, csrfToken: user.csrfToken)
@@ -2451,6 +2460,7 @@ struct SubmitAppView: View {
             await announceWizardFailure(message, focus: $isErrorFocused)
             return
         }
+        if await guidelines.confirmBeforePosting({ Task { await submitTv(user: user) } }) { return }
         isSubmitting = true; error = nil
         do {
             let posted = try await APIClient.shared.apps.submitTvApp(payload: tvPayload, csrfToken: user.csrfToken)
@@ -2482,6 +2492,7 @@ struct SubmitAppView: View {
             await announceWizardFailure(message, focus: $isErrorFocused)
             return
         }
+        if await guidelines.confirmBeforePosting({ Task { await submitWatch(user: user) } }) { return }
         isSubmitting = true; error = nil
         do {
             let posted = try await APIClient.shared.apps.submitWatchApp(payload: watchPayload, csrfToken: user.csrfToken)
@@ -2513,6 +2524,7 @@ struct SubmitAppView: View {
             await announceWizardFailure(message, focus: $isErrorFocused)
             return
         }
+        if await guidelines.confirmBeforePosting({ Task { await submitMac(user: user) } }) { return }
         isSubmitting = true; error = nil
         do {
             let posted = try await APIClient.shared.apps.submitMacApp(payload: macPayload, csrfToken: user.csrfToken)

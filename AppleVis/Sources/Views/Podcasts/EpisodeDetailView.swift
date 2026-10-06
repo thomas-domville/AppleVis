@@ -1319,7 +1319,11 @@ struct ComposePodcastCommentView: View {
                 TextEditor(text: $commentText)
                     .padding()
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: commentText) { _, newValue in
+                        if guidelines.conversation == nil {
+                            guidelines.conversation = ConversationSource(commentBundle: CommentBundle.podcastEpisode.rawValue, nodeId: episodeId)
+                        }
                         guidelines.textChanged(newValue, isReply: true)
                         intelligence.textChanged(
                             newValue,
@@ -1385,6 +1389,7 @@ struct ComposePodcastCommentView: View {
             submitError = message
             return
         }
+        if await guidelines.confirmBeforePosting({ Task { await submit() } }) { return }
         isSubmitting = true; submitError = nil
         do {
             let comment = try await APIClient.shared.podcasts.submitComment(

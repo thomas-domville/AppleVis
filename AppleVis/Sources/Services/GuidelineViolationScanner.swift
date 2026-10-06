@@ -86,6 +86,11 @@ struct GuidelineFlag: Identifiable {
     /// site shares the author's roles with the signed-in admin. Suggested
     /// directly (2026-09-27).
     var authorIsEditorial: Bool = false
+    /// A reply by the person who started the thread. The guidelines let
+    /// developers share and discuss their own project in their own thread,
+    /// so self-promotion is set aside for these, and Apple Intelligence is
+    /// told. Reported directly (2026-10-06).
+    var authorStartedThread: Bool = false
     /// The line that set off each rule, by rule id, when it can be found:
     /// shown above the preview so a long post's problem is easy to spot.
     /// Requested directly (2026-10-01).
@@ -164,6 +169,12 @@ extension GuidelineWarning.Severity {
 @MainActor
 final class GuidelineViolationScanner: ObservableObject {
     @Published private(set) var flags: [GuidelineFlag] = []
+    /// Posts and comments in the range that the English-only check, which
+    /// blocks posting in the app, would have stopped. They're on the site,
+    /// so most are probably English: this shows whether the check blocks
+    /// real posts it shouldn't (app names, code, a quoted phrase). Admin
+    /// only. Requested directly (2026-10-06).
+    @Published private(set) var wouldBlockAsNotEnglish: [GuidelineFlag] = []
     @Published private(set) var isScanning = false
     /// Root items (topics, posts, entries) actually checked by the last scan.
     @Published private(set) var scannedPostCount = 0
@@ -200,6 +211,23 @@ final class GuidelineViolationScanner: ObservableObject {
         guard let judged = opinions[flag.id], !flag.warnings.isEmpty else { return false }
         return flag.warnings.allSatisfy { judged[$0.id]?.isRealConcern == false }
     }
+    /// Let Apple Intelligence read the conversation around a reply it still
+    /// thinks breaks a guideline before deciding. A switch on the admin
+    /// screen, so its verdicts can be compared with and without it. On by
+    /// default. Requested directly (2026-10-06).
+    static let readsConversationKey = "admin.guidelineReadsConversation"
+    static var readsConversation: Bool {
+        UserDefaults.standard.object(forKey: readsConversationKey) as? Bool ?? true
+    }
+
+    /// Asks Apple Intelligence again about the current flags, for instance
+    /// after the conversation switch changes.
+    func rerunReview() {
+        reviewTask?.cancel()
+        opinions = [:]
+        reviewWithAppleIntelligence()
+    }
+
     @Published private(set) var isReviewing = false
     @Published private(set) var reviewedCount = 0
     @Published private(set) var reviewTotal = 0
@@ -264,6 +292,7 @@ final class GuidelineViolationScanner: ObservableObject {
         isScanning = true
         error = nil
         flags = []
+        wouldBlockAsNotEnglish = []
         scannedPostCount = 0
         scannedCommentCount = 0
         itemsCheckedSoFar = 0
@@ -307,6 +336,7 @@ final class GuidelineViolationScanner: ObservableObject {
 
         scannedPostCount = result.postCount
         scannedCommentCount = result.commentCount
+        wouldBlockAsNotEnglish = result.notEnglish.sorted { $0.createdAt > $1.createdAt }
         flags = result.flags.sorted { a, b in
             if a.highestSeverity.sortOrder != b.highestSeverity.sortOrder {
                 return a.highestSeverity.sortOrder < b.highestSeverity.sortOrder
@@ -329,13 +359,37 @@ final class GuidelineViolationScanner: ObservableObject {
         reviewTotal = candidates.count
         isReviewing = true
         let scanId = currentScanId
+        let readsConversation = Self.readsConversation
         reviewTask = Task { [weak self] in
+            // A thread is read once, however many of its comments are flagged.
+            var conversations: [ConversationSource: ConversationContext?] = [:]
             for flag in candidates {
                 guard !Task.isCancelled else { return }
                 var judged: [String: IntelligenceService.GuidelineSecondOpinion] = [:]
+                var source: ConversationSource?
+                if readsConversation, let bundle = flag.commentType, let commentId = flag.commentId {
+                    source = ConversationSource(commentBundle: bundle, nodeId: flag.itemId, flaggedCommentId: commentId)
+                }
                 for warning in flag.warnings where warning.allowsSecondOpinion {
-                    if let opinion = await IntelligenceService.secondOpinion(on: warning, in: flag.body) {
+                    let context = IntelligenceService.FlagContext(
+                        threadTitle: flag.itemTitle, isReply: !flag.isRootItem, authorStartedThread: flag.authorStartedThread
+                    )
+                    let load: (() async -> ConversationContext?)? = source.map { source in
+                        {
+                            if let cached = conversations[source] { return cached }
+                            let loaded = await GuidelineConversation.load(source)
+                            conversations[source] = loaded
+                            return loaded
+                        }
+                    }
+                    let cacheKey = GuidelineOpinionCache.key(
+                        flagId: flag.id, ruleId: warning.id, text: flag.body, readsConversation: readsConversation
+                    )
+                    if let saved = GuidelineOpinionCache.shared.opinion(for: cacheKey) {
+                        judged[warning.id] = saved
+                    } else if let opinion = await IntelligenceService.reviewFlag(warning, in: flag.body, context: context, loadConversation: load) {
                         judged[warning.id] = opinion
+                        GuidelineOpinionCache.shared.store(opinion, for: cacheKey)
                     }
                 }
                 guard let self, !Task.isCancelled, self.currentScanId == scanId else { return }
@@ -365,6 +419,8 @@ final class GuidelineViolationScanner: ObservableObject {
         let parentTitle: String
         let authorName: String
         var authorIsEditorial = false
+        /// The comment's author also started the thread it's in.
+        var startedThread = false
         let createdAt: Date
         let body: String
         let url: String?
@@ -380,6 +436,7 @@ final class GuidelineViolationScanner: ObservableObject {
 
     private struct StreamResult {
         var flags: [GuidelineFlag] = []
+        var notEnglish: [GuidelineFlag] = []
         var postCount = 0
         var commentCount = 0
         /// Queries (out of two per stream) that threw — used only to tell
@@ -395,6 +452,7 @@ final class GuidelineViolationScanner: ObservableObject {
             var total = StreamResult()
             for await result in group {
                 total.flags.append(contentsOf: result.flags)
+                total.notEnglish.append(contentsOf: result.notEnglish)
                 total.postCount += result.postCount
                 total.commentCount += result.commentCount
                 total.failedQueries += result.failedQueries
@@ -415,6 +473,14 @@ final class GuidelineViolationScanner: ObservableObject {
         result.commentCount = comments.count
 
         for post in posts {
+            if IntelligenceService.detectNonEnglish(HTMLText.plainText(fromHTML: post.body)) {
+                result.notEnglish.append(GuidelineFlag(
+                    id: "\(stream.nodeType)-post-\(post.id)-lang", kind: stream.kind, itemId: post.id, itemTitle: post.title,
+                    authorName: post.authorName, excerpt: .excerpt(from: post.body), body: post.body,
+                    createdAt: post.createdAt, isRootItem: true, warnings: [],
+                    commentId: nil, commentType: nil, nodeType: stream.nodeType, url: post.url
+                ))
+            }
             let warnings = setAsideForEditorial(GuidelinesChecker.check(post.body), editorial: post.authorIsEditorial)
             if !warnings.isEmpty {
                 result.flags.append(GuidelineFlag(
@@ -429,14 +495,23 @@ final class GuidelineViolationScanner: ObservableObject {
         }
 
         for comment in comments {
-            let warnings = setAsideForEditorial(GuidelinesChecker.check(comment.body, isReply: true), editorial: comment.authorIsEditorial)
+            if IntelligenceService.detectNonEnglish(HTMLText.plainText(fromHTML: comment.body)) {
+                result.notEnglish.append(GuidelineFlag(
+                    id: "\(stream.commentBundle)-comment-\(comment.id)-lang", kind: stream.kind, itemId: comment.parentId, itemTitle: comment.parentTitle,
+                    authorName: comment.authorName, excerpt: .excerpt(from: comment.body), body: comment.body,
+                    createdAt: comment.createdAt, isRootItem: false, warnings: [],
+                    commentId: comment.id, commentType: stream.commentBundle, nodeType: nil, url: comment.url
+                ))
+            }
+            var warnings = setAsideForEditorial(GuidelinesChecker.check(comment.body, isReply: true), editorial: comment.authorIsEditorial)
+            if comment.startedThread { warnings.removeAll { $0.id == "self-promotion" } }
             if !warnings.isEmpty {
                 result.flags.append(GuidelineFlag(
                     id: "\(stream.commentBundle)-comment-\(comment.id)", kind: stream.kind, itemId: comment.parentId, itemTitle: comment.parentTitle,
                     authorName: comment.authorName, excerpt: .excerpt(from: comment.body), body: comment.body,
                     createdAt: comment.createdAt, isRootItem: false, warnings: warnings,
                     commentId: comment.id, commentType: stream.commentBundle, nodeType: nil, url: comment.url,
-                    authorIsEditorial: comment.authorIsEditorial,
+                    authorIsEditorial: comment.authorIsEditorial, authorStartedThread: comment.startedThread,
                     triggers: Self.triggers(warnings, in: comment.body, isReply: true)
                 ))
             }
@@ -542,7 +617,7 @@ final class GuidelineViolationScanner: ObservableObject {
                     query: [
                         "sort": "-created", "include": "uid,entity_id", "page[limit]": "50", "page[offset]": "\(page * 50)",
                         "fields[comment--\(bundle)]": "comment_body,created,name,drupal_internal__cid,uid,entity_id",
-                        "fields[node--\(parentNodeType)]": "title,path,drupal_internal__nid",
+                        "fields[node--\(parentNodeType)]": "title,path,drupal_internal__nid,uid",
                         "fields[user--user]": "display_name,name,roles",
                     ]
                 )
@@ -569,10 +644,13 @@ final class GuidelineViolationScanner: ObservableObject {
                     .map { "https://www.applevis.com/comment/\($0)#comment-\($0)" }
                     ?? parent.flatMap(Self.websiteURL(for:))
                 progress(1)
-                let commentUser = node.relationshipId("uid").flatMap { id in included.first { $0.id == id } }
+                let commentUserId = node.relationshipId("uid")
+                let commentUser = commentUserId.flatMap { id in included.first { $0.id == id } }
+                let startedThread = commentUserId != nil && parent?.relationshipId("uid") == commentUserId
                 results.append(RawComment(
                     id: node.id, parentId: parentId, parentTitle: parentTitle,
-                    authorName: c.authorName, authorIsEditorial: isEditorial(commentUser), createdAt: created, body: c.body, url: url
+                    authorName: c.authorName, authorIsEditorial: isEditorial(commentUser), startedThread: startedThread,
+                    createdAt: created, body: c.body, url: url
                 ))
             }
             if reachedCutoff { break }

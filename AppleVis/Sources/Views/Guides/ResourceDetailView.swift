@@ -828,7 +828,11 @@ struct ComposeResourceCommentView: View {
                 TextEditor(text: $commentText)
                     .padding()
                     .rewriteFlash($justRewrote)
+                    .guidelineReminderActions(guidelines)
                     .onChange(of: commentText) { _, newValue in
+                        if guidelines.conversation == nil {
+                            guidelines.conversation = ConversationSource(commentBundle: CommentBundle.guide.rawValue, nodeId: resourceId)
+                        }
                         guidelines.textChanged(newValue, isReply: true)
                         intelligence.textChanged(
                             newValue,
@@ -894,6 +898,7 @@ struct ComposeResourceCommentView: View {
             submitError = message
             return
         }
+        if await guidelines.confirmBeforePosting({ Task { await submit() } }) { return }
         isSubmitting = true; submitError = nil
         do {
             let comment = try await APIClient.shared.resources.submitComment(
