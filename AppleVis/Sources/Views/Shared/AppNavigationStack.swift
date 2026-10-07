@@ -47,8 +47,10 @@ struct AppNavigationStack<Root: View>: View {
         let path = $path
         NavigationStack(path: path) {
             root.firstNewCommentDestination()
+                .contentSelectionDestination()
         }
         .environment(\.openAtFirstNewComment, OpenAtFirstNewCommentAction { path.wrappedValue.append($0) })
+        .environment(\.pushContent, PushContentAction { path.wrappedValue.append($0) })
     }
 }
 

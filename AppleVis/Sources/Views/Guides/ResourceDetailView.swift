@@ -65,6 +65,8 @@ struct ResourceDetailView: View {
             SoundPlayer.shared.play(.articleOpen)
             await load()
         }
+        // Ticks while Apple Intelligence summarizes (2026-10-07).
+        .waitingTick(while: isSummarizingDiscussion, stillWaiting: String(localized: "Still summarizing."))
     }
 
     @ViewBuilder
@@ -867,6 +869,10 @@ struct ComposeResourceCommentView: View {
                 }
             }
         }
+        // Ticks while posting is slow (2026-10-07).
+        .waitingTick(while: isSubmitting, stillWaiting: String(localized: "Still posting."))
+        // Ticks while Apple Intelligence rewrites or translates (2026-10-07).
+        .waitingTick(while: intelligence.isProcessing, stillWaiting: intelligence.stillWorkingMessage)
     }
 
     @ViewBuilder
@@ -904,7 +910,7 @@ struct ComposeResourceCommentView: View {
             let comment = try await APIClient.shared.resources.submitComment(
                 resourceId: resourceId, body: commentText, csrfToken: user.csrfToken
             )
-            toast.success(String(localized: "Comment posted"))
+            toast.success(String(localized: "Comment posted"), sound: .reply)
             onPosted(comment)
             dismiss()
         } catch let e as APIError { submitError = e.localizedDescription

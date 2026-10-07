@@ -35,6 +35,8 @@ struct GuidelineViolationCheckView: View {
     /// tapping Start Scan and getting silence — same pattern as the sibling
     /// App Directory Health Check screen.
     @AccessibilityFocusState private var isStatusFocused: Bool
+    /// The flag VoiceOver moves to after one is handled (2026-10-07).
+    @AccessibilityFocusState private var focusedFlagId: String?
 
     /// Medium+High only by default — `GuidelinesChecker` was tuned to be
     /// gentle and advisory for someone's own draft. Run in bulk across
@@ -143,6 +145,7 @@ struct GuidelineViolationCheckView: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityAddTraits(.updatesFrequently)
                     .accessibilityFocused($isStatusFocused)
+                    .progressTick(on: scanner.itemsCheckedSoFar)
 
                     // Ends a long scan early and keeps what it's checked so
                     // far. Requested directly.
@@ -225,6 +228,7 @@ struct GuidelineViolationCheckView: View {
                             }
                             .accessibilityElement(children: .combine)
                             .accessibilityAddTraits(scanner.isReviewing ? .updatesFrequently : [])
+                            .progressTick(on: scanner.isReviewing ? reviewStatus : "")
                         }
                     } else {
                         Text("Apple Intelligence isn't available on this device, so this shows what the rules caught.")
@@ -299,11 +303,11 @@ struct GuidelineViolationCheckView: View {
                             }
                             .accessibilityAction(named: Text("Mark Shouldn't Be Blocked")) {
                                 GuidelineReviewStore.shared.record(.notAProblem, for: item, opinions: [:])
-                                UIAccessibility.post(notification: .announcement, argument: "Marked shouldn't be blocked.")
+                                if let message = ActionCue.play(.markedRead, orSay: "Marked shouldn't be blocked.") { ActionCue.sayQueued(message) }
                             }
                             .accessibilityAction(named: Text("Mark Rightly Blocked")) {
                                 GuidelineReviewStore.shared.record(.realProblem, for: item, opinions: [:])
-                                UIAccessibility.post(notification: .announcement, argument: "Marked rightly blocked.")
+                                if let message = ActionCue.play(.markedRead, orSay: "Marked rightly blocked.") { ActionCue.sayQueued(message) }
                             }
                             .voiceOverAwareSwipeActions {
                                 Button { GuidelineReviewStore.shared.record(.notAProblem, for: item, opinions: [:]) } label: {
@@ -371,7 +375,25 @@ struct GuidelineViolationCheckView: View {
         } label: {
             GuidelineFlagRow(flag: flag, opinions: showAIReview ? (scanner.opinions[flag.id] ?? [:]) : [:])
         }
-        .modifier(GuidelineFlagActions(flag: flag, opinions: scanner.opinions[flag.id] ?? [:], onHandled: { scanner.removeFlag(id: flag.id) }))
+        .accessibilityFocused($focusedFlagId, equals: flag.id)
+        .modifier(GuidelineFlagActions(flag: flag, opinions: scanner.opinions[flag.id] ?? [:], onHandled: { flagHandled(flag) }))
+    }
+
+    /// After a flag is edited, unpublished or deleted: VoiceOver moves
+    /// straight to the next flag (or the one before, or the status when
+    /// none are left). The row used to vanish with focus left wherever the
+    /// list put it. The action's own message plays its sound and is spoken
+    /// after the move (2026-10-07).
+    private func flagHandled(_ flag: GuidelineFlag) {
+        let next = ActionCue.neighbor(of: flag.id, in: (visibleFlags + probablyFineFlags).map(\.id))
+        scanner.removeFlag(id: flag.id)
+        Task {
+            if let next {
+                await moveAccessibilityFocusPromptly(to: next, into: $focusedFlagId)
+            } else {
+                await moveAccessibilityFocusPromptly(into: $isStatusFocused)
+            }
+        }
     }
 
     /// Members with three or more flags in the range, most first. For a
@@ -634,7 +656,11 @@ private struct GuidelineFlagActions: ViewModifier {
     /// improve the rules from real decisions. Requested directly (2026-10-06).
     private func mark(_ verdict: GuidelineReview.Verdict) {
         reviewStore.record(verdict, for: flag, opinions: opinions)
-        UIAccessibility.post(notification: .announcement, argument: verdict == .realProblem ? "Marked a real problem." : "Marked not a problem.")
+        // A sound and tap; the row's own label then says the verdict. Words
+        // only when sounds and haptics are both off (2026-10-07).
+        if let message = ActionCue.play(.markedRead, orSay: verdict == .realProblem ? "Marked a real problem." : "Marked not a problem.") {
+            ActionCue.sayQueued(message)
+        }
     }
 
     @EnvironmentObject private var auth: AuthStore
@@ -704,7 +730,7 @@ private struct GuidelineFlagActions: ViewModifier {
             .accessibilityAction(named: Text("Mark Real Problem")) { mark(.realProblem) }
             .modifier(ConditionalAccessibilityAction(isActive: reviewStore.verdict(for: flag.id) != nil, name: "Undo Review") {
                 reviewStore.undo(for: flag.id)
-                UIAccessibility.post(notification: .announcement, argument: "Review undone.")
+                if let message = ActionCue.play(.markedRead, orSay: "Review undone.") { ActionCue.sayQueued(message) }
             })
             .modifier(ConditionalAccessibilityAction(isActive: flag.isPreviewShortened, name: "Read Full Text") { showFullText = true })
             .accessibilityAction(named: Text("Edit \(flag.kindLabel)")) { showEditSheet = true }

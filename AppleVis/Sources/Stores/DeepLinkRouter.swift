@@ -24,6 +24,10 @@ final class DeepLinkRouter: ObservableObject {
     @Published var pendingSubmit: PendingSubmit?
     @Published var pendingSiriDestination: SiriDestination?
     @Published var pendingPodcastAction: PodcastSiriAction?
+    /// "Listen to AppleVis Fetch": Fetch starts reading once it has loaded.
+    @Published var pendingListenToFetch = false
+    /// "Start a new AppleVis topic": opens the composer over the app.
+    @Published var pendingNewTopic = false
     /// Set by the "What's new on AppleVis" Siri shortcut — consumed by
     /// HomeView once it's live (mirrors the podcast-action pattern above:
     /// HomeViewModel is a `@StateObject` owned by HomeView, not a
@@ -92,47 +96,60 @@ final class DeepLinkRouter: ObservableObject {
     /// through to `handleUniversalLink`.
     @discardableResult
     func handleCustomScheme(_ url: URL) -> Bool {
-        guard url.scheme == "applevis" else { return false }
-        let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
-        func value(_ name: String) -> String? { query.first { $0.name == name }?.value }
+        guard let route = AppRoute(url: url) else { return false }
+        open(route)
+        return true
+    }
 
-        switch url.host {
-        case "submit-app":
+    /// Opens a typed route: from a link, Siri or Shortcuts, or a keyboard
+    /// shortcut. One place, so each way in reaches the same screen the same
+    /// way (Adaptive Experience, 2026-10-06).
+    func open(_ route: AppRoute) {
+        switch route {
+        case .home, .discover, .forYou:
+            if let tab = route.tab { KeyCommandRouter.current?.selectedTab = tab }
+        case .homeView(let view, let listen):
+            // Home keeps its view in this same setting, so it switches as
+            // if chosen in the view picker.
+            UserDefaults.standard.set(view.rawValue, forKey: "home.feedFilter")
+            KeyCommandRouter.current?.selectedTab = 0
+            if listen { pendingListenToFetch = true }
+        case .newTopic:
+            pendingNewTopic = true
+        case .askTheMouse(let question):
+            pendingMouseQuestion = PendingMouseQuestion(text: question)
+        case .contact:
+            KeyCommandRouter.current?.openContact()
+        case .settings:
+            KeyCommandRouter.current?.openSettings()
+        case .forums(let filter):
+            pendingSiriDestination = .forums(filter: filter)
+        case .savedItems:
+            pendingSiriDestination = .savedItems(filter: nil)
+        case .search(let query):
+            pendingSiriDestination = .search(query: query)
+        case .whatsNew:
+            pendingSpeakWhatsNew = true
+        case .podcast(let action):
+            pendingPodcastAction = action
+        case .submitApp(let appURL):
             _ = AppShareConsumer.consumePendingAppStoreURL()
-            if let appURL = value("url") { pendingSubmit = .app(url: appURL) }
-        case "submit-blog":
+            if let appURL { pendingSubmit = .app(url: appURL) }
+        case .submitBlog(let text):
             _ = AppShareConsumer.consumePendingBlogText()
-            if let text = value("text") { pendingSubmit = .blog(text: text) }
-        case "submit-podcast":
+            if let text { pendingSubmit = .blog(text: text) }
+        case .submitPodcast(let podURL):
             _ = AppShareConsumer.consumePendingPodcastURL()
-            if let podURL = value("url") { pendingSubmit = .podcast(url: podURL) }
-        case "submit-podcast-audio":
+            if let podURL { pendingSubmit = .podcast(url: podURL) }
+        case .submitPodcastAudio:
             if let (data, fileName) = AppShareConsumer.consumePendingPodcastAudio() {
                 pendingSubmit = .podcastAudio(data: data, fileName: fileName)
             }
-        case "submit-bug":
+        case .submitBug:
             pendingSubmit = .bug
-        case "whats-new":
-            pendingSpeakWhatsNew = true
-        case "ask":
-            pendingMouseQuestion = PendingMouseQuestion(text: value("q") ?? "")
-        case "forums":
-            let filter = value("filter").flatMap(ForumFilter.init(rawValue:)) ?? .recent
-            pendingSiriDestination = .forums(filter: filter)
-        case "saved":
-            pendingSiriDestination = .savedItems(filter: nil)
-        case "search":
-            if let query = value("q") { pendingSiriDestination = .search(query: query) }
-        case "podcasts":
-            switch value("action") {
-            case "resume": pendingPodcastAction = .resume
-            case "playLatest": pendingPodcastAction = .playLatest
-            default: break
-            }
-        default:
-            return false
+        case .ignored:
+            break
         }
-        return true
     }
 
     /// Fallback for the rare case a Share Extension's `openURL` request

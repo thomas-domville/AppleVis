@@ -384,6 +384,10 @@ struct SubmitAppView: View {
             // requested directly.
             focusStepAfterTransition()
         }
+        // Ticks while sending is slow (2026-10-07).
+        .waitingTick(while: isSubmitting, stillWaiting: String(localized: "Still sending."))
+        // Ticks while Apple Intelligence rewrites or translates (2026-10-07).
+        .waitingTick(while: intelligence.isProcessing, stillWaiting: intelligence.stillWorkingMessage)
     }
 
     // Broken out of `body` into smaller named pieces — a single giant

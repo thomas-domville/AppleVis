@@ -64,6 +64,9 @@ struct ContentLanguagePickerView: View {
         .navigationTitle("Translation Language")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchText, prompt: "Search Languages")
+        // Ticks every 3 seconds while a translation language downloads:
+        // it can take a while, but only once (2026-10-07).
+        .waitingTick(while: isPreparing, stillWaiting: String(localized: "Still downloading."), every: .seconds(3))
     }
 
     private func select(_ option: LanguageOption) {

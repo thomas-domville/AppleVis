@@ -30,10 +30,22 @@ final class ToastStore: ObservableObject {
         }
     }
 
-    func show(_ message: String, kind: Toast.Kind = .success) {
+    /// `quiet`: shown on screen only. For a list that already confirmed
+    /// the action with its own sound and moved VoiceOver on (2026-10-07).
+    /// `sound`: the action's own sound (posting, saving) in place of the
+    /// generic success chime, so the two don't play on top of each other.
+    /// The message is still spoken (2026-10-07).
+    func show(_ message: String, kind: Toast.Kind = .success, quiet: Bool = false, sound: AppSound? = nil) {
         let toast = Toast(message: message, kind: kind)
         current = toast
-        SoundPlayer.shared.play(kind == .success ? .success : .error)
+        if quiet {
+            Task {
+                try? await Task.sleep(for: .seconds(3))
+                if current?.id == toast.id { current = nil }
+            }
+            return
+        }
+        SoundPlayer.shared.play(sound ?? (kind == .success ? .success : .error))
         // The toast itself renders on screen with its own distinct text,
         // but the sound alone doesn't tell a VoiceOver user *which*
         // toast fired ("Saved" vs. "Removed from Saved" vs. "Couldn't
@@ -66,7 +78,7 @@ final class ToastStore: ObservableObject {
         }
     }
 
-    func success(_ message: String) { show(message, kind: .success) }
+    func success(_ message: String, quiet: Bool = false, sound: AppSound? = nil) { show(message, kind: .success, quiet: quiet, sound: sound) }
     func error(_ message: String)   { show(message, kind: .error) }
     func warning(_ message: String) { show(message, kind: .warning) }
 }

@@ -293,12 +293,15 @@ struct ProfileView: View {
                 Text("Version")
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")
+                // The build too: the version stays the same for every beta
+                // until a public release, so testers report the build
+                // (2026-10-07).
+                Text(verbatim: "\(DiagnosticInfo.appVersion) (\(DiagnosticInfo.buildNumber))")
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(
-                String(localized: "Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown")")
+                String(localized: "Version \(DiagnosticInfo.appVersion), build \(DiagnosticInfo.buildNumber)")
             )
         }
     }

@@ -29,7 +29,15 @@ struct ForumsBrowseView: View {
     @State private var hasMore = false
     @State private var isLoadingMore = false
     @State private var showFilterSheet = false
+    /// The topic showing beside the list on a wide window. Kept across
+    /// refreshes and filter changes while the topic still exists, so
+    /// reloading the list never closes what you're reading.
+    @State private var selectedTopic: ContentSelection?
+    /// Command-N: opens the same composer as the Post button.
+    @State private var showComposeFromKeyboard = false
     @State private var searchText = ""
+    /// Command-F moves here (Adaptive Experience, 2026-10-06).
+    @FocusState private var isSearchFocused: Bool
     /// Snapshot of `forumsLastVisit` taken once per genuine visit (in
     /// `.task`, when the Forums tab is actually entered) rather than read
     /// live from the ever-advancing store — see `ForumFilter.apply`'s doc
@@ -140,6 +148,130 @@ struct ForumsBrowseView: View {
     }
 
     var body: some View {
+        // On a wide window (iPad, a wide Stage Manager window, an open
+        // iPhone Duo), the chosen topic shows beside the list; on a narrow
+        // one this is the list alone, exactly as before (Adaptive
+        // Experience, 2026-10-06).
+        AdaptiveListDetail(
+            selection: $selectedTopic,
+            placeholder: "Choose a topic to read it here.",
+            placeholderSystemImage: "bubble.left.and.bubble.right",
+            onDetailClosed: { closed in
+                if let topic = topics.first(where: { $0.id == closed.id }) { deleteTopicWithFocus(topic) }
+            }
+        ) {
+            forumList
+        } detail: { selection in
+            ForumTopicDetailView(topicId: selection.id, focusFirstNewCommentOnAppear: selection.focusFirstNewComment)
+        }
+        .navigationTitle("Forums")
+        .keyboardNewTopicTarget { showComposeFromKeyboard = true }
+        .navigationDestination(isPresented: $showComposeFromKeyboard) {
+            ComposeTopicView(onPosted: { topic in
+                topics.insert(topic, at: 0)
+                revealAndFocus(topic)
+            })
+        }
+        .searchable(text: $searchText, prompt: "Search topics")
+        .applySearchFocus($isSearchFocused)
+        .keyboardSearchTarget($isSearchFocused)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                HStack {
+                    // Matches Home's own "Post" entry point exactly — same
+                    // icon, same label, same always-visible-with-a-hint
+                    // reasoning (ComposeTopicView already shows its own
+                    // sign-in prompt when opened signed out, so hiding this
+                    // for a signed-out/VoiceOver user just hides that the
+                    // option exists at all). Previously gated on
+                    // auth.isSignedIn with no accessibility label at all —
+                    // a bare "square.and.pencil" icon has no useful default
+                    // VoiceOver reading. Reported directly.
+                    NavigationLink(destination: ComposeTopicView(onPosted: { topic in
+                        topics.insert(topic, at: 0)
+                        revealAndFocus(topic)
+                    })) {
+                        Image(systemName: "plus.circle")
+                    }
+                    .accessibilityLabel(String(localized: "Post"))
+                    .accessibilityHint(auth.isSignedIn
+                        ? String(localized: "Create a new forum topic")
+                        : String(localized: "Sign in required to create a new forum topic"))
+                    Button {
+                        showFilterSheet = true
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                    }
+                    .accessibilityLabel(filterButtonAccessibilityLabel)
+                }
+            }
+        }
+        .sheet(isPresented: $showFilterSheet, onDismiss: {
+            Task {
+                await load(reset: true)
+                // Previously the reloaded list (a completely different
+                // result set after a filter change) left VoiceOver focus
+                // wherever the OS defaulted it — typically back near the
+                // toolbar filter button — instead of on the new content.
+                // VoiceOver moves to the first topic straight away and says
+                // what the list now shows after reading it. It used to say
+                // it first and move 0.3 seconds later, which cut the words
+                // off (2026-10-07).
+                let message = showsPersonalFilters ? String(localized: "Showing \(filter.displayName).") : String(localized: "Forum filters updated.")
+                if let first = filteredTopics.first {
+                    focusOnTopic(first.id, saying: message)
+                } else {
+                    // Previously nothing moved focus to the empty state
+                    // itself after a filter change landed on zero results
+                    // (FORUM-18) — VoiceOver's cursor stayed on the
+                    // now-hidden filter control.
+                    Task { await moveAccessibilityFocusPromptly(into: $isEmptyStateFocused, saying: message) }
+                }
+                // Fire-and-forget: tops up a sparse filter in the
+                // background without blocking the focus logic above on it.
+                Task { await loadMoreUntilEnoughOrCap() }
+            }
+        }) {
+            ForumFilterSheetView(
+                filter: $filter,
+                appleTopicsFilter: $appleTopicsFilter,
+                selectedCategory: $selectedCategory,
+                categories: categories,
+                showsPersonalFilters: showsPersonalFilters
+            )
+        }
+        .task {
+            // Snapshot once per genuine visit — NOT inside load(reset:),
+            // which also runs on pull-to-refresh and filter changes within
+            // the same visit and must not shift the New/Since-Last-Visit
+            // baseline each time. See FORUM-01.
+            sessionLastVisit = PersistenceStore.shared.forumsLastVisit
+            await load(reset: true)
+            restoreLastViewedTopicIfPresent()
+            // Fire-and-forget: tops up a sparse filter in the background
+            // without blocking the focus/restore logic above on it.
+            Task { await loadMoreUntilEnoughOrCap() }
+        }
+        .onDisappear {
+            // A real end-of-visit signal: fires on tab switch away, not on
+            // pushing/popping a topic detail screen within this same
+            // NavigationStack (SwiftUI doesn't toggle a stack root's
+            // onAppear/onDisappear for child pushes).
+            PersistenceStore.shared.markForumsVisited()
+        }
+        // An editor pinned or unpinned a topic: move it now, not on the
+        // next refresh, and keep VoiceOver on it.
+        .onReceive(NotificationCenter.default.publisher(for: .contentPinChanged)) { note in
+            guard let id = note.object as? String, let pinned = note.userInfo?["pinned"] as? Bool,
+                  let index = topics.firstIndex(where: { $0.id == id }) else { return }
+            topics[index].isPinned = pinned
+            topics = Self.pinnedFirst(topics)
+            focusOnTopic(id)
+        }
+    }
+
+    /// The list and its loading, error and empty states.
+    private var forumList: some View {
         Group {
             if let localItems = localFilterItems {
                 let filteredLocalItems = localItems.filter { matchesSearch(title: $0.title) }
@@ -153,14 +285,14 @@ struct ForumsBrowseView: View {
                     )
                 } else {
                     List(filteredLocalItems, id: \.id) { item in
-                        NavigationLink(value: ForumTopic(
+                        AdaptiveRowLink(value: ForumTopic(
                             id: item.id, title: item.title, authorName: "", authorId: "",
                             createdAt: item.lastActivityAt ?? .distantPast, lastActivityAt: item.lastActivityAt ?? .distantPast,
                             replyCount: 0, category: "", categoryId: "", url: "",
                             isUnread: false,
                             isFollowing: PersistenceStore.shared.isFollowed(id: item.id),
                             isSaved: PersistenceStore.shared.isSaved(id: item.id)
-                        )) {
+                        ), selection: ContentSelection(kind: .forumTopic, id: item.id), title: item.title) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(item.title)
                                 if let activity = item.lastActivityAt {
@@ -202,107 +334,12 @@ struct ForumsBrowseView: View {
                 topicList
             }
         }
-        .navigationTitle("Forums")
-        .searchable(text: $searchText, prompt: "Search topics")
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                HStack {
-                    // Matches Home's own "Post" entry point exactly — same
-                    // icon, same label, same always-visible-with-a-hint
-                    // reasoning (ComposeTopicView already shows its own
-                    // sign-in prompt when opened signed out, so hiding this
-                    // for a signed-out/VoiceOver user just hides that the
-                    // option exists at all). Previously gated on
-                    // auth.isSignedIn with no accessibility label at all —
-                    // a bare "square.and.pencil" icon has no useful default
-                    // VoiceOver reading. Reported directly.
-                    NavigationLink(destination: ComposeTopicView(onPosted: { topic in
-                        topics.insert(topic, at: 0)
-                        revealAndFocus(topic)
-                    })) {
-                        Image(systemName: "plus.circle")
-                    }
-                    .accessibilityLabel(String(localized: "Post"))
-                    .accessibilityHint(auth.isSignedIn
-                        ? String(localized: "Create a new forum topic")
-                        : String(localized: "Sign in required to create a new forum topic"))
-                    Button {
-                        showFilterSheet = true
-                    } label: {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                    }
-                    .accessibilityLabel(filterButtonAccessibilityLabel)
-                }
-            }
-        }
-        .sheet(isPresented: $showFilterSheet, onDismiss: {
-            Task {
-                await load(reset: true)
-                // Previously the reloaded list (a completely different
-                // result set after a filter change) left VoiceOver focus
-                // wherever the OS defaulted it — typically back near the
-                // toolbar filter button — instead of on the new content.
-                UIAccessibility.post(
-                    notification: .announcement,
-                    argument: showsPersonalFilters ? String(localized: "Showing \(filter.displayName).") : String(localized: "Forum filters updated.")
-                )
-                if let first = filteredTopics.first {
-                    focusOnTopic(first.id)
-                } else {
-                    // Previously nothing moved focus to the empty state
-                    // itself after a filter change landed on zero results
-                    // (FORUM-18) — VoiceOver's cursor stayed on the
-                    // now-hidden filter control.
-                    Task {
-                        try? await Task.sleep(for: .milliseconds(300))
-                        isEmptyStateFocused = true
-                    }
-                }
-                // Fire-and-forget: tops up a sparse filter in the
-                // background without blocking the focus logic above on it.
-                Task { await loadMoreUntilEnoughOrCap() }
-            }
-        }) {
-            ForumFilterSheetView(
-                filter: $filter,
-                appleTopicsFilter: $appleTopicsFilter,
-                selectedCategory: $selectedCategory,
-                categories: categories,
-                showsPersonalFilters: showsPersonalFilters
-            )
-        }
-        .task {
-            // Snapshot once per genuine visit — NOT inside load(reset:),
-            // which also runs on pull-to-refresh and filter changes within
-            // the same visit and must not shift the New/Since-Last-Visit
-            // baseline each time. See FORUM-01.
-            sessionLastVisit = PersistenceStore.shared.forumsLastVisit
-            await load(reset: true)
-            restoreLastViewedTopicIfPresent()
-            // Fire-and-forget: tops up a sparse filter in the background
-            // without blocking the focus/restore logic above on it.
-            Task { await loadMoreUntilEnoughOrCap() }
-        }
-        .onDisappear {
-            // A real end-of-visit signal: fires on tab switch away, not on
-            // pushing/popping a topic detail screen within this same
-            // NavigationStack (SwiftUI doesn't toggle a stack root's
-            // onAppear/onDisappear for child pushes).
-            PersistenceStore.shared.markForumsVisited()
-        }
+        // On the list, not the whole screen: on a wide window, pulling down
+        // inside the topic beside it mustn't reload the list.
         .refreshable {
             await RefreshHeartbeat.during { await load(reset: true) }
             SoundPlayer.shared.play(.refresh)
             Task { await loadMoreUntilEnoughOrCap() }
-        }
-        // An editor pinned or unpinned a topic: move it now, not on the
-        // next refresh, and keep VoiceOver on it.
-        .onReceive(NotificationCenter.default.publisher(for: .contentPinChanged)) { note in
-            guard let id = note.object as? String, let pinned = note.userInfo?["pinned"] as? Bool,
-                  let index = topics.firstIndex(where: { $0.id == id }) else { return }
-            topics[index].isPinned = pinned
-            topics = Self.pinnedFirst(topics)
-            focusOnTopic(id)
         }
     }
 
@@ -332,6 +369,7 @@ struct ForumsBrowseView: View {
     /// (FORUM-12) — same class of gap, same fix pattern, as FORUM-11's
     /// reply-deletion focus in ForumTopicDetailView.
     private func deleteTopicWithFocus(_ topic: ForumTopic) {
+        if selectedTopic?.id == topic.id { selectedTopic = nil }
         let list = filteredTopics
         guard let idx = list.firstIndex(where: { $0.id == topic.id }) else {
             topics.removeAll { $0.id == topic.id }
@@ -373,11 +411,10 @@ struct ForumsBrowseView: View {
         }
     }
 
-    private func focusOnTopic(_ id: String) {
-        Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            focusedTopicId = id
-        }
+    /// Prompt, with a few quick retries while the list settles, instead
+    /// of one try after a fixed 0.3 seconds (2026-10-07).
+    private func focusOnTopic(_ id: String, saying message: String? = nil) {
+        Task { await moveAccessibilityFocusPromptly(to: id, into: $focusedTopicId, saying: message) }
     }
 
     /// Following/Saved render `localFilterItems` instead of `topicList` —

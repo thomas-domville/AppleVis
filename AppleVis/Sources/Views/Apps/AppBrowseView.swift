@@ -10,14 +10,49 @@ struct AppBrowseView: View {
     @State private var isLoading = false
     @State private var error: String?
     @State private var searchText = ""
+    /// Command-F moves here (Adaptive Experience, 2026-10-06).
+    @FocusState private var isSearchFocused: Bool
     @State private var searchResults: [AppListing] = []
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
     @AccessibilityFocusState private var isTitleFocused: Bool
+    /// The search result showing beside the results on a wide window.
+    @State private var selectedApp: ContentSelection?
 
     private var isSearchActive: Bool { !searchText.trimmingCharacters(in: .whitespaces).isEmpty }
 
     var body: some View {
+        // Search results can show the chosen app beside them on a wide
+        // window. The platform and category picker never does: an empty
+        // pane beside it would only be in the way (Adaptive Experience,
+        // 2026-10-06).
+        AdaptiveListDetail(
+            selection: $selectedApp,
+            placeholder: "Choose an app to read about it here.",
+            placeholderSystemImage: "square.grid.2x2",
+            onDetailClosed: { closed in searchResults.removeAll { $0.id == closed.id } },
+            isEnabled: isSearchActive
+        ) {
+            directoryContent
+        } detail: { selection in
+            AppDetailView(appId: selection.id,
+                          platform: searchResults.first { $0.id == selection.id }?.platform,
+                          focusFirstNewCommentOnAppear: selection.focusFirstNewComment)
+        }
+        .navigationTitle("App Directory")
+        .task { await load() }
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
+        .onChange(of: platform) { _, _ in Task { await load() } }
+        .searchable(text: $searchText, prompt: "Search apps")
+        .applySearchFocus($isSearchFocused)
+        .keyboardSearchTarget($isSearchFocused)
+        .inputLimit($searchText, maximum: InputLimit.searchMaximum, warnWithin: 20) {
+            toast.warning(InputLimit.searchShortened)
+        }
+        .onChange(of: searchText) { _, newValue in runSearch(newValue) }
+    }
+
+    private var directoryContent: some View {
         Group {
             if isSearchActive {
                 searchResultsSection
@@ -31,16 +66,9 @@ struct AppBrowseView: View {
                 categoryList
             }
         }
-        .navigationTitle("App Directory")
-        .task { await load() }
-        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
+        // On the list, so pulling down inside an app beside it doesn't
+        // reload the directory.
         .refreshable { await RefreshHeartbeat.during { await load() }; SoundPlayer.shared.play(.refresh) }
-        .onChange(of: platform) { _, _ in Task { await load() } }
-        .searchable(text: $searchText, prompt: "Search apps")
-        .inputLimit($searchText, maximum: InputLimit.searchMaximum, warnWithin: 20) {
-            toast.warning(InputLimit.searchShortened)
-        }
-        .onChange(of: searchText) { _, newValue in runSearch(newValue) }
     }
 
     @ViewBuilder
@@ -211,8 +239,32 @@ struct AppCategoryView: View {
     @State private var pageLimit = 20
     @ObservedObject private var networkStatus = NetworkStatusStore.shared
     @AccessibilityFocusState private var isTitleFocused: Bool
+    /// The app showing beside the category's list on a wide window. Kept
+    /// across refreshes while the app is still in the category.
+    @State private var selectedApp: ContentSelection?
 
     var body: some View {
+        // On a wide window the chosen app shows beside the category's list;
+        // on a narrow one this is the list alone, exactly as before
+        // (Adaptive Experience, 2026-10-06).
+        AdaptiveListDetail(
+            selection: $selectedApp,
+            placeholder: "Choose an app to read about it here.",
+            placeholderSystemImage: "square.grid.2x2",
+            onDetailClosed: { closed in apps.removeAll { $0.id == closed.id } }
+        ) {
+            categoryContent
+        } detail: { selection in
+            AppDetailView(appId: selection.id,
+                          platform: apps.first { $0.id == selection.id }?.platform ?? destination.platform,
+                          focusFirstNewCommentOnAppear: selection.focusFirstNewComment)
+        }
+        .navigationTitle(destination.category.name)
+        .task { await load(reset: true) }
+        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
+    }
+
+    private var categoryContent: some View {
         Group {
             if isLoading && apps.isEmpty {
                 LoadingView(message: initialLoadingMessage)
@@ -237,16 +289,16 @@ struct AppCategoryView: View {
                             .listRowSeparator(.hidden)
                     }
                     ForEach(apps) { app in
-                        AppListingRow(app: app, onDelete: { apps.removeAll { $0.id == app.id } })
+                        AppListingRow(app: app, onDelete: {
+                            if selectedApp?.id == app.id { selectedApp = nil }
+                            apps.removeAll { $0.id == app.id }
+                        })
                     }
                 }
                 .listStyle(.plain)
                 .themedList(preferences.colors)
             }
         }
-        .navigationTitle(destination.category.name)
-        .task { await load(reset: true) }
-        .task { await retryAccessibilityFocus(into: $isTitleFocused) }
         // forceRefresh: true — a deliberate pull is the user asking "is
         // there anything new," and this category's pages can sit cached as
         // "fresh" for up to 6 hours (ContentCache's default apps: TTL); an

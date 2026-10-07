@@ -40,7 +40,7 @@ struct AppHealthBulkRefreshView: View {
                 summarySection
             } else {
                 Section {
-                    Text("Choose which details may be refreshed and which entries. Each entry only changes the details you've chosen that differ from the App Store, and keeps everything else.")
+                    Text("Choose which details may be updated and which entries. Each entry only changes the details you've chosen that differ from the App Store, and keeps everything else.")
                         .accessibilityFocused($focus, equals: .intro)
                 }
                 fieldsSection
@@ -49,7 +49,7 @@ struct AppHealthBulkRefreshView: View {
                     Button {
                         confirming = true
                     } label: {
-                        Label(String(localized: "Refresh Entries (\(selectedFlags.count))"), systemImage: "arrow.triangle.2.circlepath")
+                        Label(String(localized: "Update Entries (\(selectedFlags.count))"), systemImage: "arrow.triangle.2.circlepath")
                     }
                     .disabled(selectedFlags.isEmpty || fields.isEmpty)
                 }
@@ -59,12 +59,12 @@ struct AppHealthBulkRefreshView: View {
             }
         }
         .themedList(preferences.colors)
-        .navigationTitle("Refresh in Bulk")
+        .navigationTitle("Update in Bulk")
         .navigationBarTitleDisplayMode(.inline)
         .interactiveDismissDisabled(isRunning)
         .navigationBarBackButtonHidden(isRunning)
-        .confirmationDialog(String(localized: "Refresh the chosen entries (\(selectedFlags.count))?"), isPresented: $confirming, titleVisibility: .visible) {
-            Button(String(localized: "Refresh Entries (\(selectedFlags.count))")) {
+        .confirmationDialog(String(localized: "Update the chosen entries (\(selectedFlags.count))?"), isPresented: $confirming, titleVisibility: .visible) {
+            Button(String(localized: "Update Entries (\(selectedFlags.count))")) {
                 Task { await run() }
             }
         } message: {
@@ -102,7 +102,7 @@ struct AppHealthBulkRefreshView: View {
                 }
             }
         } header: {
-            Text("Details to Refresh")
+            Text("Details to Update")
         } footer: {
             Text("A detail that already matches the App Store is left as it is.")
         }
@@ -139,7 +139,7 @@ struct AppHealthBulkRefreshView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(stopRequested
                          ? String(localized: "Stopping after this entry…")
-                         : String(localized: "Refreshing \(min(done + 1, selectedFlags.count)) of \(selectedFlags.count)"))
+                         : String(localized: "Updating \(min(done + 1, selectedFlags.count)) of \(selectedFlags.count)"))
                     if let current {
                         Text(current.appName)
                             .font(.footnote)
@@ -150,13 +150,14 @@ struct AppHealthBulkRefreshView: View {
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.updatesFrequently)
             .accessibilityFocused($focus, equals: .progress)
+            .progressTick(on: done)
             Button(role: .destructive) {
                 stopRequested = true
             } label: {
                 Label("Stop", systemImage: "stop.circle")
             }
             .disabled(stopRequested)
-            .accessibilityHint(String(localized: "Stops after the entry being refreshed now."))
+            .accessibilityHint(String(localized: "Stops after the entry being updated now."))
         }
     }
 
@@ -183,8 +184,8 @@ struct AppHealthBulkRefreshView: View {
             default: return false
             }
         }.count
-        var parts = [String(localized: "Refreshed: \(updated)."), String(localized: "Already matched: \(matched).")]
-        if failed > 0 { parts.append(String(localized: "Couldn't refresh: \(failed).")) }
+        var parts = [String(localized: "Updated: \(updated)."), String(localized: "Already matched: \(matched).")]
+        if failed > 0 { parts.append(String(localized: "Couldn't update: \(failed).")) }
         let skipped = selectedFlags.count - results.count
         if skipped > 0 { parts.append(String(localized: "Not started: \(skipped).")) }
         return parts.joined(separator: " ")
@@ -267,9 +268,9 @@ struct AppHealthBulkRefreshView: View {
             )
             return .updated(chosen.map(\.label))
         } catch APIError.forbidden {
-            return .notAllowed(String(localized: "You don't have permission to refresh app entries."))
+            return .notAllowed(String(localized: "You don't have permission to update app entries."))
         } catch APIError.unauthorized {
-            return .notAllowed(String(localized: "Please sign in again to refresh app entries."))
+            return .notAllowed(String(localized: "Please sign in again to update app entries."))
         } catch {
             return .failed(String(localized: "AppleVis didn't accept the change."))
         }
@@ -309,11 +310,11 @@ private enum BulkOutcome {
     var description: String {
         switch self {
         case .updated(let labels):
-            return String(localized: "Refreshed: \(ListFormatter.localizedString(byJoining: labels)).")
+            return String(localized: "Updated: \(ListFormatter.localizedString(byJoining: labels)).")
         case .alreadyMatched:
             return String(localized: "Already matched the App Store. Nothing changed.")
         case .failed(let reason), .notAllowed(let reason):
-            return String(localized: "Not refreshed. \(reason)")
+            return String(localized: "Not updated. \(reason)")
         }
     }
 }

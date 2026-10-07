@@ -127,6 +127,10 @@ struct EditContentSheet: View {
             .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut, value: guidelines.topWarning?.id)
             .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
         }
+        // Ticks while saving is slow (2026-10-07).
+        .waitingTick(while: isSaving, stillWaiting: String(localized: "Still saving."))
+        // Ticks while Apple Intelligence rewrites or translates (2026-10-07).
+        .waitingTick(while: intelligence.isProcessing, stillWaiting: intelligence.stillWorkingMessage)
     }
 
     @ViewBuilder

@@ -124,6 +124,10 @@ struct AppDetailView: View {
     // at all, only comment-level moderation.
     @State private var editingAppNode: EditableNode?
     @Environment(\.dismiss) private var dismiss
+    /// Beside a list on a wide window: see ForumTopicDetailView.
+    @Environment(\.isInDetailPane) private var isInDetailPane
+    @Environment(\.detailFocusRequest) private var detailFocusRequest
+    @Environment(\.closeDetailPane) private var closeDetailPane
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedReviewId: String?
     @EnvironmentObject private var auth: AuthStore
@@ -146,6 +150,9 @@ struct AppDetailView: View {
             SoundPlayer.shared.play(.articleOpen)
             await load()
         }
+        .onChange(of: detailFocusRequest) { _, _ in focusTitleAfterLoad() }
+        // Ticks while Apple Intelligence summarizes (2026-10-07).
+        .waitingTick(while: isSummarizingReviews || isSummarizingConsensus, stillWaiting: String(localized: "Still summarizing."))
     }
 
     @ViewBuilder
@@ -381,7 +388,7 @@ struct AppDetailView: View {
                 appInfoRefreshRequest = AppInfoRefreshRequest(diffs: diffs)
             } label: {
                 Label(
-                    isUpdatingAppInformation ? String(localized: "Refreshing App Details…") : String(localized: "Refresh App Details"),
+                    isUpdatingAppInformation ? String(localized: "Updating from App Store…") : String(localized: "Update from App Store"),
                     systemImage: "arrow.triangle.2.circlepath"
                 )
             }
@@ -436,7 +443,7 @@ struct AppDetailView: View {
             try await APIClient.shared.content.deleteNode(nodeId: detail.id, nodeType: appNodeTypeSuffix(for: detail.platform), csrfToken: user.csrfToken)
             toast.success(String(localized: "App Entry deleted"))
             NotificationCenter.default.post(name: .appEntryChanged, object: detail.id)
-            dismiss()
+            if let closeDetailPane { closeDetailPane() } else { dismiss() }
         } catch {
             toast.error(String(localized: "Couldn't delete."))
         }
@@ -1207,7 +1214,7 @@ struct AppDetailView: View {
         // Opened via "Jump to First New Comment": that comment gets focus
         // instead. Title focus used to run regardless, and its retries could
         // pull focus straight back to the title. Reported directly.
-        if !(focusFirstNewCommentOnAppear && newReviewCount > 0) { focusTitleAfterLoad() }
+        if !(focusFirstNewCommentOnAppear && newReviewCount > 0), !isInDetailPane { focusTitleAfterLoad() }
     }
 
     private func confirmAppleTVSupport(for appStoreId: String) async {
@@ -1311,7 +1318,7 @@ struct AppDetailView: View {
                 testedOnIOS: UIDevice.current.systemVersion,
                 csrfToken: user.csrfToken
             )
-            toast.success(String(localized: "App details refreshed"))
+            toast.success(String(localized: "Updated from the App Store"))
             NotificationCenter.default.post(name: .appEntryChanged, object: current.id)
             appInfoRefreshRequest = nil
             await load(forceRefresh: true)
@@ -1848,6 +1855,10 @@ struct ComposeAppReviewView: View {
             }
             .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
         }
+        // Ticks while posting is slow (2026-10-07).
+        .waitingTick(while: isSubmitting, stillWaiting: String(localized: "Still posting."))
+        // Ticks while Apple Intelligence rewrites or translates (2026-10-07).
+        .waitingTick(while: intelligence.isProcessing, stillWaiting: intelligence.stillWorkingMessage)
     }
 
     @ViewBuilder
@@ -1887,7 +1898,7 @@ struct ComposeAppReviewView: View {
             let review = try await APIClient.shared.apps.submitReview(
                 appId: appId, subject: subject, body: reviewText, csrfToken: user.csrfToken, platform: platform
             )
-            toast.success(String(localized: "Comment posted"))
+            toast.success(String(localized: "Comment posted"), sound: .reply)
             onPosted(review)
             dismiss()
         } catch let e as APIError { submitError = e.localizedDescription

@@ -14,18 +14,24 @@ struct PodcastBrowseView: View {
     @State private var isLoadingMore = false
     @ObservedObject private var networkStatus = NetworkStatusStore.shared
     @AccessibilityFocusState private var isTitleFocused: Bool
+    /// The episode showing beside the list on a wide window. Playback is
+    /// separate: it carries on whatever is shown, and however the window
+    /// changes.
+    @State private var selectedEpisode: ContentSelection?
 
     var body: some View {
-        Group {
-            if isLoading && episodes.isEmpty {
-                LoadingView(message: "Loading episodes…")
-            } else if let error, episodes.isEmpty {
-                ErrorView(message: error) { await load(reset: true) }
-            } else if episodes.isEmpty {
-                EmptyStateView(title: String(localized: "No Episodes Yet"), message: "Pull to refresh podcast episodes", systemImage: "mic")
-            } else {
-                episodeList
-            }
+        // On a wide window the chosen episode shows beside the list; on a
+        // narrow one this is the list alone, exactly as before (Adaptive
+        // Experience, 2026-10-06).
+        AdaptiveListDetail(
+            selection: $selectedEpisode,
+            placeholder: "Choose an episode to read about it here.",
+            placeholderSystemImage: "mic",
+            onDetailClosed: { closed in episodes.removeAll { $0.id == closed.id } }
+        ) {
+            podcastContent
+        } detail: { selection in
+            EpisodeDetailView(episodeId: selection.id, focusFirstNewCommentOnAppear: selection.focusFirstNewComment)
         }
         .navigationTitle("Podcasts")
         .toolbar {
@@ -49,6 +55,23 @@ struct PodcastBrowseView: View {
         }
         .task { await load(reset: true) }
         .task { await retryAccessibilityFocus(into: $isTitleFocused) }
+    }
+
+    /// The list and its loading, error and empty states.
+    private var podcastContent: some View {
+        Group {
+            if isLoading && episodes.isEmpty {
+                LoadingView(message: "Loading episodes…")
+            } else if let error, episodes.isEmpty {
+                ErrorView(message: error) { await load(reset: true) }
+            } else if episodes.isEmpty {
+                EmptyStateView(title: String(localized: "No Episodes Yet"), message: "Pull to refresh podcast episodes", systemImage: "mic")
+            } else {
+                episodeList
+            }
+        }
+        // On the list, so pulling down inside an episode beside it doesn't
+        // reload the list.
         .refreshable { await RefreshHeartbeat.during { await load(reset: true) }; SoundPlayer.shared.play(.refresh) }
     }
 
@@ -59,7 +82,10 @@ struct PodcastBrowseView: View {
                     .listRowSeparator(.hidden)
             }
             ForEach(Array(episodes.enumerated()), id: \.element.id) { index, episode in
-                let row = PodcastEpisodeRow(episode: episode, onDelete: { episodes.removeAll { $0.id == episode.id } })
+                let row = PodcastEpisodeRow(episode: episode, onDelete: {
+                    if selectedEpisode?.id == episode.id { selectedEpisode = nil }
+                    episodes.removeAll { $0.id == episode.id }
+                })
                 if index == 0 {
                     row.accessibilityFocused($isTitleFocused)
                 } else {

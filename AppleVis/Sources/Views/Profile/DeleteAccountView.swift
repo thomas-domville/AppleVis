@@ -106,6 +106,8 @@ struct DeleteAccountView: View {
             Text("This cannot be undone.")
         }
         .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
+        // Ticks while deleting your account is slow (2026-10-07).
+        .waitingTick(while: isDeleting, stillWaiting: String(localized: "Still deleting."))
     }
 
     private func deleteAccount() {

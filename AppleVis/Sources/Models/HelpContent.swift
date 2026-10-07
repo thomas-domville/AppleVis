@@ -178,6 +178,49 @@ enum HelpContent {
                         .body("Settings controls how AppleVis looks, sounds, and behaves, including appearance, accessibility, sounds and haptics, notifications, podcasts, privacy, and Apple Intelligence features."),
                         .body("Help, What's New, Replay Welcome Tour, and Contact AppleVis are in the About AppleVis section of Profile and Settings."),
                         .body("To message another member, open their profile. Private messages aren't sent from your own account screen."),
+                        .heading("On iPad and iPhone Duo"),
+                        .body("On iPad, on an open iPhone Duo, or in a wide window, some lists show the item you choose beside them, and there are more keyboard shortcuts. AppleVis on iPad and iPhone Duo explains how this works, including with VoiceOver."),
+                    ],
+                    relatedLinks: [
+                        RelatedLink(label: "AppleVis on iPad and iPhone Duo", type: .guide, destination: .article("start-ipad-duo")),
+                        RelatedLink(label: "AppleVis Keyboard Shortcuts", type: .guide, destination: .article("ref-applevis-keyboard")),
+                    ]
+                ),
+                // Adaptive Experience upgrade (2026-10-06). Grows with each
+                // phase: keep it in step with what's actually built.
+                HelpArticle(
+                    id: "start-ipad-duo",
+                    title: "AppleVis on iPad and iPhone Duo",
+                    summary: "How AppleVis uses a bigger screen, and what changes with VoiceOver.",
+                    content: [
+                        .body("AppleVis adjusts to the space it has. It does this on iPad, on iPhone Duo, and in any window you resize with Split View or Stage Manager."),
+                        .heading("Lists and items side by side"),
+                        .body("When there's enough room, some lists show the item you choose beside them. The list stays on one side, and the item you're reading is on the other."),
+                        .bullets([
+                            "Forums: topics beside the list of topics.",
+                            "App Directory: an app beside the list of apps in a category, or beside your search results. The list of platforms and categories doesn't do this, because there's nothing to show beside it yet.",
+                            "Podcasts: an episode beside the list of episodes. Anything that's playing keeps playing.",
+                        ]),
+                        .body("This happens on iPad in full screen, in a wide Stage Manager window, and on iPhone Duo when it's open."),
+                        .body("When there isn't enough room, these lists work the way they always have. Choosing an item opens it, and Back returns to the list. This happens on iPhone, on iPhone Duo when it's closed, and in a narrow Split View window."),
+                        .body("If the window gets narrower while an item is showing, the item stays open, and Back returns to the list. Nothing you were reading is lost."),
+                        .heading("With VoiceOver"),
+                        .bullets([
+                            "Choosing an item shows it beside the list. VoiceOver stays on the item in the list and says that it's shown.",
+                            "With VoiceOver, to move to the topic, app, or episode beside the list, choose it again in the list. You can also use the Headings rotor to move to its title.",
+                            "The item you're reading is marked Selected in the list.",
+                            "Jump to First New Comment opens the item beside the list and moves straight to that comment.",
+                            "Pulling down to refresh the list doesn't close the item you're reading.",
+                        ]),
+                        .heading("Deleting a post"),
+                        .body("If you delete your own post while it's showing beside the list, it closes, it's removed from the list, and VoiceOver moves to the next item."),
+                        .heading("Keyboard and trackpad"),
+                        .body("With a hardware keyboard, Command-M opens Ask the Mouse and Command-Shift-C opens Contact AppleVis from anywhere. Command-F moves to the search field. AppleVis Keyboard Shortcuts, in the Quick Reference section of Help, lists them all."),
+                        .body("With a trackpad or mouse, the sections in Discover highlight as the pointer moves over them. Everything you can do with the pointer, you can also do with touch, VoiceOver, Switch Control, or Full Keyboard Access."),
+                        .heading("Where you left off"),
+                        .body("If iOS closes AppleVis in the background, AppleVis reopens on the tab you were using, rather than on Home."),
+                        .heading("Discover on a bigger screen"),
+                        .body("Discover's sections spread across more columns when there's room, and stay a comfortable width on the largest screens. With very large text, the sections stack in a single column so their names aren't cut short."),
                     ]
                 ),
                 HelpArticle(
@@ -297,6 +340,9 @@ enum HelpContent {
                             "On Home, choose Mark All as Read to clear every badge at once.",
                         ]),
                         .tip("The same actions are available on every topic, post, app, and episode, whichever way you open them."),
+                        .heading("With VoiceOver"),
+                        .body("When something leaves a list, such as an item you mark as read in New or Fetch, or one you unsave, unfollow, remove from your queue, or remove from your downloads, you hear two quick notes and feel a light tap. VoiceOver moves straight to the next item, or the one before it if there's nothing after. When it was the last one, you hear the success sound instead."),
+                        .body("If Confirmation Sounds and Haptic Feedback are both off, VoiceOver says what happened after it reads the next item."),
                     ]
                 ),
                 HelpArticle(
@@ -495,6 +541,7 @@ enum HelpContent {
                             "On screen, a long post or comment shows its first few lines. Choose Show Full Post or Show Full Comment to see the rest. VoiceOver and braille always get the whole text.",
                             "With VoiceOver, set the rotor to Headings to jump from item to item.",
                         ]),
+                        .body("In Fetch, Expand Visible Text and Collapse Visible Text change what is shown on screen. VoiceOver and braille still read the full text."),
                         .heading("Listen to Fetch"),
                         .body("Listen to Fetch reads everything aloud, item by item. Use the buttons to pause, skip a comment, or move to the next or previous item. With VoiceOver, a two-finger double tap plays and pauses."),
                         .body("Listening Speed, just below, sets how fast it reads. My Settings, the first choice, uses the voice and speed you chose for VoiceOver, or for Spoken Content in Settings > Accessibility if you don't use VoiceOver. You can also choose Slow, Normal, Fast, Faster, or Fastest. With VoiceOver, swipe up or down on Listening Speed to change it. If you change it while listening, the current sentence starts again at the new speed."),
@@ -502,8 +549,9 @@ enum HelpContent {
                         .bullets([
                             "Mark This Group as Read, on an item's heading, marks the post and all its new comments as read. The whole group leaves Fetch, and VoiceOver moves to the next item's heading.",
                             "In Fetch, Mark This Group as Read is available on every comment and on the group heading. It marks the post and all its comments as read, matching the website.",
-                            "When a group is marked as read, VoiceOver says Group marked as read, then moves to the next group's heading.",
-                            "Mark All as Read, at the top of Fetch, clears everything.",
+                            "When a group is marked as read, you hear a short sound and feel a light tap, and VoiceOver moves straight to the next group's heading. If there's no group after it, VoiceOver moves to the one before. When the last group is marked as read, you hear the success sound and VoiceOver moves to All Caught Up.",
+                            "If Confirmation Sounds and Haptic Feedback are both off, VoiceOver says Group marked as read after reading the next heading.",
+                            "In Fetch, use the Reading List heading to reach Mark All as Read with one swipe left. Comment actions begin with Mark This Group as Read, and expansion comes last.",
                         ]),
                         .body("With VoiceOver, use the Actions rotor. You can also touch and hold a group heading or comment, or swipe right on a comment, to choose Mark This Group as Read."),
                         .body("If you turn on Mark as Read When Finished, items you've read to the end are marked as read when you leave Fetch. What you've read is kept on this device."),
@@ -516,10 +564,14 @@ enum HelpContent {
                     summary: "How AppleVis welcomes you back and helps you catch up.",
                     content: [
                         .body("When you open AppleVis, Home greets you and returns you to where you left off. The greeting is a little different depending on whether you're signed in."),
-                        .body("Near the top, a summary shows how much is new that you haven't read yet."),
+                        .body("Near the top, a summary shows new activity since you last read or marked each item as read. Unread items can accumulate across visits. Opening the app or dismissing the summary does not mark them as read."),
                         .body("Activate the summary to move through the feed. In All, it takes you to the item you last opened, so you can move back up through what's newer. In New, it goes to the first unread item. In Fetch, it goes to the first post. In Nibbles, it goes to the start of Nibbles."),
                         .body("If you leave AppleVis for more than five minutes, Home refreshes when you come back. VoiceOver stays where you were and says Home updated, followed by what's new."),
                         .body("With VoiceOver, if a refresh takes more than a moment, you hear a soft tick and feel a light tap every second until it finishes. If it takes a while, VoiceOver says Still refreshing. This works anywhere you pull down to refresh."),
+                        .body("The same tick plays when you open a topic, app entry, episode, or anything else that's slow to load. If it takes a while, VoiceOver says Still loading. The tick stops as soon as the page appears."),
+                        .body("It also plays while something you've written is on its way: a topic, reply, comment, or review, a Submit or Contact form, a report, or a message. If it takes a while, VoiceOver says Still posting, Still sending, or Still saving. When it's done, you hear the usual confirmation."),
+                        .body("And it plays while Apple Intelligence works on your iPhone: summarizing a discussion, rewriting or translating what you've written, writing a bio, or translating a search. If it takes a while, VoiceOver says Still summarizing, Still writing, or Still translating. While a translation language downloads in Settings, the tick comes every 3 seconds instead, and VoiceOver says Still downloading."),
+                        .body("Signing in, Sync Now in Settings > Saved & Sync, and deleting your account tick the same way, with Still signing in, Still syncing, or Still deleting if they take a while."),
                         .heading("Filtering the feed"),
                         .bullets([
                             "All shows everything your feed is set up to include.",
@@ -1100,7 +1152,7 @@ enum HelpContent {
                             "Use Add to Queue or Play Next to choose what plays after the current episode.",
                             "Download episodes to listen offline.",
                             "AppleVis remembers where you stopped in each episode. To go back to the beginning, open the episode and use Start Over in Episode Tools.",
-                            "Listened, in Episode Tools, is a switch you can turn on or off as a reminder that you've heard an episode. It turns on by itself when an episode plays to the end, and episode lists show a checkmark for it. It doesn't change your place in the episode.",
+                            "Listened, in Episode Tools, is a switch you can turn on or off as a reminder that you've heard an episode. It turns on by itself when an episode plays to the end, and episode lists show a checkmark for it. It doesn't change your place in the episode. Marking an episode listened, here or with Mark as Listened on an episode in a list, plays the success sound and a tap; marking it not listened plays a soft tick.",
                             "When an episode has chapters, move between them from the chapter list.",
                             "The Lock Screen shows the episode title, artwork, progress, and playback controls.",
                             "On supported iPhone models, the Dynamic Island shows the episode title and playback state while you use other apps.",
@@ -1245,9 +1297,9 @@ enum HelpContent {
                     content: [
                         .body("Settings > Sounds & Haptics controls the sounds and vibrations AppleVis uses."),
                         .bullets([
-                            "Confirmation Sounds: play for actions such as saving, finished downloads, and podcast play and pause, the soft chime when a guideline reminder appears while you write, and, with VoiceOver, the soft tick while a refresh is still loading.",
+                            "Confirmation Sounds: play for actions such as saving, following, recommending, posting, finished downloads, podcast play and pause, and adding an episode to your queue. Save, Follow, and Recommend each have their own sound, and a softer version when you undo them. They also cover the soft chime when a guideline reminder appears while you write, the two quick notes when you mark something as read or remove it from a list, and, with VoiceOver, the soft tick while a refresh or a page is still loading.",
                             "Speak Guideline Reminders: reads a guideline reminder aloud as soon as it appears. It's off by default, so you only hear the chime.",
-                            "Interface Sounds: play for switching tabs, changing pickers, opening screens, and refreshing lists. These are off by default.",
+                            "Interface Sounds: play for switching tabs, changing pickers, opening screens, and refreshing lists. These are off by default. Each tab has its own pitch of the same soft pop: low for Home, middle for Discover, and high for For You, so you can tell where you landed by ear.",
                             "Haptic Feedback: vibrates for the same moments as Confirmation Sounds, such as saving, signing in, and errors. Sounds and haptics are separate, so you can use either one on its own.",
                         ]),
                         .note("Sounds and haptics for errors and connection changes always play, whatever is turned on here, so you don't miss them."),
@@ -1293,20 +1345,32 @@ enum HelpContent {
                     summary: "Use AppleVis from system features outside the app.",
                     content: [
                         .heading("Siri phrases"),
-                        .body("AppleVis adds several phrases to Siri. You can say any of these at any time, or add your own phrases in the Shortcuts app."),
+                        .body("AppleVis adds these phrases to Siri. You can say any of them at any time, without opening AppleVis first. They're grouped here the same way the Shortcuts app shows them."),
+                        .heading("Ask and find"),
                         .bullets([
-                            "\"Hey Siri, open AppleVis\" opens Home.",
-                            "\"Hey Siri, open AppleVis Forums\" opens Forums.",
-                            "\"Hey Siri, show unread AppleVis topics\" opens Forums filtered to Unread.",
-                            "\"Hey Siri, resume AppleVis podcast\" continues your last episode where you left off.",
-                            "\"Hey Siri, play latest AppleVis podcast\" plays the newest episode.",
-                            "\"Hey Siri, search AppleVis\" opens search.",
-                            "\"Hey Siri, open AppleVis saved items\" opens Saved in For You.",
-                            "\"Hey Siri, what's new on AppleVis\" speaks a summary of what's new that you haven't read yet.",
-                            "\"Hey Siri, report a bug to AppleVis\" opens the accessibility bug report form.",
                             "\"Hey Siri, ask the AppleVis Mouse\" asks for your question, then opens Ask the Mouse with the answer. This needs Apple Intelligence.",
+                            "\"Hey Siri, search AppleVis\" asks what you're looking for, then shows the results.",
                         ]),
+                        .heading("Catching up"),
+                        .bullets([
+                            "\"Hey Siri, what's new on AppleVis\" opens Home on New, with the new posts and comments you haven't read yet.",
+                            "\"Hey Siri, listen to AppleVis Fetch\" opens Fetch and starts reading everything new aloud. If there's nothing new, VoiceOver says you're all caught up.",
+                            "\"Hey Siri, open AppleVis Nibbles\" opens Nibbles, the summary of recent activity, for the period you chose last.",
+                        ]),
+                        .heading("Podcasts"),
+                        .bullets([
+                            "\"Hey Siri, resume my AppleVis podcast\" continues your last episode where you left off.",
+                            "\"Hey Siri, play the latest AppleVis podcast\" plays the newest episode.",
+                        ]),
+                        .heading("Posting and getting in touch"),
+                        .bullets([
+                            "\"Hey Siri, start a new AppleVis topic\" opens the composer for a new forum topic, ready for you to write or dictate.",
+                            "\"Hey Siri, contact AppleVis\" opens the Contact AppleVis form. \"Report a problem with AppleVis\" does the same.",
+                        ]),
+                        .body("\"Hey Siri, open AppleVis\" works too, as it does for every app."),
                         .body("If Siri uses another language, you can say these phrases in that language too. Settings > Siri & Shortcuts lists every phrase."),
+                        .heading("In the Shortcuts app"),
+                        .body("Every phrase above is also an action in the Shortcuts app. A few more actions are there without a phrase of their own: Open AppleVis Forums, Show Unread AppleVis Topics, Open AppleVis Saved Items, and Report an AppleVis Bug, which opens the Bug Tracker form for reporting accessibility bugs in Apple's software. You can give any of them a phrase by adding it to a shortcut and naming the shortcut."),
                         .heading("Spotlight"),
                         .body("Spotlight can find AppleVis topics, apps, podcasts, and guides from iOS Search. Anything you've opened is added, so it's easy to find again."),
                         .body("Everything you've saved or followed is added too, even if you saved it on another device. So are the Help articles, so searching iOS for a setting such as Trim Silence finds the article that explains it."),
@@ -1349,14 +1413,16 @@ enum HelpContent {
                     content: [
                         .body("Ask the Mouse lets you ask a question in your own words. The Mouse searches Help, AppleVis guides, the App Directory, forums, podcasts, blog posts, bug reports, What's New, and your saved items. Then it answers from what it found."),
                         .body("With VoiceOver, you hear a soft patter and feel a light tap every second while the Mouse is searching. If it takes a while, VoiceOver says Still searching. Swipe to the searching row to hear what the Mouse is doing and how long it has been searching."),
-                        .body("It needs Apple Intelligence. On a device without it, Ask the Mouse isn't shown, and search works as before."),
+                        .body("It needs Apple Intelligence. On a device without it, Ask the Mouse isn't shown, and search works as before. If you open it with Command-M on such a device, it explains why and points you to Discover and Help."),
                         .heading("Where to find it"),
                         .bullets([
                             "On Home, choose Ask the Mouse at the top right, next to Post. It's shown visually as the Mouse's face.",
                             "In Help, choose Ask the Mouse at the top of the screen.",
                             "In Discover, start a search, then choose Ask the Mouse above the results.",
                             "With Siri, say \"Ask the AppleVis Mouse\", then say your question.",
+                            "With a hardware keyboard, press Command-M from anywhere in AppleVis.",
                         ]),
+                        .body("On iPad and on an open iPhone Duo, answers stay a comfortable line length instead of stretching across the whole screen."),
                         .heading("Asking a question"),
                         .steps([
                             "Type your question, or choose one of the suggestions.",
@@ -1562,6 +1628,39 @@ enum HelpContent {
                         .source(label: "Apple Support: Use VoiceOver gestures on iPad", url: "https://support.apple.com/guide/ipad/use-voiceover-gestures-ipad9a246584/ipados"),
                     ],
                     contentType: .guide
+                ),
+                // Adaptive Experience upgrade (2026-10-06). Keep in step with
+                // the Go and Actions menus in AppleVisApp.swift.
+                HelpArticle(
+                    id: "ref-applevis-keyboard",
+                    title: "AppleVis Keyboard Shortcuts",
+                    summary: "Shortcuts for AppleVis on iPhone and iPad with a hardware keyboard.",
+                    content: [
+                        .body("With a hardware keyboard, these shortcuts work anywhere in AppleVis. On iPad, press Globe-M to show the menu bar, then choose the Go or Actions menu to see them. On iPadOS 18 and earlier, hold down the Command key instead."),
+                        .heading("Anywhere in AppleVis"),
+                        .bullets([
+                            "Command-1: Home.",
+                            "Command-2: Discover.",
+                            "Command-3: For You.",
+                            "Command-R: refresh Home.",
+                            "Command-F: search. On a screen with a search field, such as Forums or the App Directory, it moves to that field. Elsewhere, it moves to the search in Discover.",
+                            "Command-M: Ask the Mouse.",
+                            "Command-Shift-C: Contact AppleVis.",
+                            "Command-Comma: Settings.",
+                        ]),
+                        .heading("When there's something to act on"),
+                        .bullets([
+                            "Command-N: start a new topic, from Home or Forums.",
+                            "Command-Shift-S: save or unsave the topic, app, episode, or other post you're reading.",
+                        ]),
+                        .heading("In the podcast player"),
+                        .bullets([
+                            "Space: play or pause.",
+                            "Left Arrow and Right Arrow: skip back and forward.",
+                        ]),
+                        .body("If a form or another screen is already open, Command-M, Command-Shift-C, and Command-Comma don't open on top of it. VoiceOver says to finish or close it first, so nothing you're writing is lost."),
+                        .body("Command-C still copies, as in every app."),
+                    ]
                 ),
                 HelpArticle(
                     id: "ref-voiceover-keyboard-ios",

@@ -387,6 +387,10 @@ private struct ContactUserSheet: View {
             }
             .task { await retryAccessibilityFocus(into: $isIntroFocused) }
         }
+        // Ticks while sending is slow (2026-10-07).
+        .waitingTick(while: isSending, stillWaiting: String(localized: "Still sending."))
+        // Ticks while Apple Intelligence rewrites or translates (2026-10-07).
+        .waitingTick(while: intelligence.isProcessing, stillWaiting: intelligence.stillWorkingMessage)
     }
 
     private func send() async {

@@ -12,6 +12,8 @@ struct QueueView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showClearConfirm = false
     @AccessibilityFocusState private var isTitleFocused: Bool
+    /// The episode VoiceOver moves to after one is removed.
+    @AccessibilityFocusState private var focusedEpisode: String?
 
     var body: some View {
         AppNavigationStack {
@@ -37,8 +39,9 @@ struct QueueView: View {
                                     onOpen: { deepLinkRouter.pendingContent = (kind: .podcastEpisode, id: episode.id) },
                                     onMoveUp: { moveUp(from: index) },
                                     onMoveDown: { moveDown(from: index) },
-                                    onRemove: { player.removeFromQueue(id: episode.id) }
+                                    onRemove: { removeFromQueue(episode.id) }
                                 )
+                                .accessibilityFocused($focusedEpisode, equals: episode.id)
                             }
                             .onMove { source, dest in
                                 player.moveInQueue(from: source, to: dest)
@@ -72,7 +75,8 @@ struct QueueView: View {
             ) {
                 Button("Clear Queue", role: .destructive) {
                     player.clearQueue()
-                    UIAccessibility.post(notification: .announcement, argument: "Queue cleared.")
+                    let message = ActionCue.play(.success, orSay: String(localized: "Queue cleared."))
+                    Task { await moveAccessibilityFocusPromptly(into: $isTitleFocused, saying: message) }
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
@@ -95,6 +99,22 @@ struct QueueView: View {
                     argument: String(localized: "\(String(localized: "\(player.queue.count) episodes in queue"))\(duration).")
                 )
             }
+    }
+
+    /// A sound and tap, then the next episode in the queue (or the empty
+    /// queue's title when it was the last). The row used to vanish with
+    /// VoiceOver left wherever the list put it (2026-10-07).
+    private func removeFromQueue(_ id: String) {
+        let next = ActionCue.neighbor(of: id, in: player.queue.map(\.id))
+        player.removeFromQueue(id: id)
+        let spoken = ActionCue.play(next == nil ? .success : .markedRead, orSay: String(localized: "Removed from queue"))
+        Task {
+            if let next {
+                await moveAccessibilityFocusPromptly(to: next, into: $focusedEpisode, saying: spoken)
+            } else {
+                await moveAccessibilityFocusPromptly(into: $isTitleFocused, saying: spoken)
+            }
+        }
     }
 
     private func moveUp(from index: Int) {

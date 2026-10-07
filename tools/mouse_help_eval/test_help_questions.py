@@ -48,6 +48,13 @@ TESTS = [
     ("Keyboard shortcut to go to the home screen with VoiceOver", "ref-voiceover-keyboard-ios", "VO-H"),
     ("How do I open Control Center with a Magic Keyboard and VoiceOver?", "ref-voiceover-keyboard-ios", "Option-Down Arrow"),
     ("What is quick nav?", "ref-glossary", "Quick Nav"),
+    # Adaptive Experience upgrade (2026-10-06).
+    ("How do I read forum topics side by side on my iPad?", "start-ipad-duo", "Forums: topics beside the list of topics"),
+    ("With VoiceOver how do I move to the topic beside the list?", "start-ipad-duo", "choose it again"),
+    ("Does AppleVis work on iPhone Duo?", "start-ipad-duo", "iPhone Duo"),
+    ("What's the keyboard shortcut for Ask the Mouse?", "smart-ask-the-mouse", "Command-M"),
+    ("How do I contact AppleVis with my keyboard?", "ref-applevis-keyboard", "Command-Shift-C"),
+    ("How do I see AppleVis keyboard shortcuts on my iPad?", "ref-applevis-keyboard", "Globe-M"),
     ("How do I turn on VoiceOver on a Mac?", "ref-accessibility-shortcut", "Command-F5"),
     ("how do i open voiceover utility", "ref-voiceover-keyboard-mac", "VO-Fn-F8"),
     ("Mac VoiceOver command to go to the dock", "ref-voiceover-keyboard-mac", "VO-D"),

@@ -529,6 +529,11 @@ enum ItunesAPI {
         return "https://apps.apple.com/app/id\(id)"
     }
 
+    /// The app's App Store ID in a link, whatever its country, name, or
+    /// tracking tag ("?uo=4", which Apple's lookup adds to every link it
+    /// returns). Two links with the same ID are the same app (2026-10-07).
+    static func appStoreId(of url: String) -> String? { extractAppStoreId(url) }
+
     /// The two-letter country in a store link ("de" in
     /// apps.apple.com/de/app/…), or nil when the link has none.
     static func storefrontCode(of url: String) -> String? {

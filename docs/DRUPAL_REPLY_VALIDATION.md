@@ -45,3 +45,11 @@ On a Mac, open `AppleVis.xcodeproj`, select the shared AppleVis scheme and an av
 5. Use Mark as Read from a Home item and a browse item's actions, then check its website history. Use Mark All as Read and confirm each selected item is updated. Verify missing-ID forum rows and Mac/Watch/TV app entries. In Fetch, Mark This Group as Read on any comment must clear the complete group and move VoiceOver to the next heading. Check the Actions rotor, swipe action, and context menu; none should offer Mark Read Up to Here. Offline marking still clears local badges and reports that the website update failed.
 
 The developer's deletion owner check cannot be certified without the patch or a controlled two-user test. Anonymous deletion rejection alone does not prove ownership enforcement.
+
+## Fetch action navigation — October 7, 2026
+
+Fetch comment actions are now declared in one ordered list: Mark This Group as Read, Reply when signed in, Open Comment in Topic, Copy, Share, Report, authorized moderation actions, then Expand Visible Text/Collapse Visible Text. The full comment remains one spoken/Braille item; visual expansion still has a visible Show Full Comment/Show Less button. The accessible reading element ignores the child NavigationLink's default long action label and opens through the explicitly named action. Sighted navigation continues using the original link.
+
+A Reading List heading immediately follows the separate Mark All as Read button. It is included in Fetch's custom Headings rotor, so users can return from distant comments and swipe left once to the button. No Mark All as Read action is added to individual comments.
+
+Device checks: verify the action order with signed-out, member, author, and admin accounts; verify full-text reading remains intact; open via the named action and check focus returns to the same comment; expand/collapse with VoiceOver and with the visible button; navigate to Reading List using Headings while far down Fetch and swipe left to Mark All as Read. Check Braille, Switch Control, Voice Control, and large Dynamic Type. After marking all read, existing immediate focus/cue behavior must reach All Caught Up.

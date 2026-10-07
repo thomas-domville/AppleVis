@@ -77,6 +77,8 @@ struct ContentActionsModifier: ViewModifier {
     @EnvironmentObject private var tips: TipStore
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @Environment(\.openAtFirstNewComment) private var openAtFirstNewComment
+    /// Set by a list that handles Mark as Read itself (Home's New).
+    @Environment(\.markedReadFeedback) private var markedReadFeedback
     /// The pin state after an editor changes it here, until the list reloads.
     @State private var pinnedOverride: Bool?
     private var currentlyPinned: Bool { pinnedOverride ?? isPinned ?? false }
@@ -484,13 +486,20 @@ struct ContentActionsModifier: ViewModifier {
         // Same as Home's own Mark as Read: a topic also loses its unread
         // marker in Forums.
         if kind == .forumTopic { PersistenceStore.shared.markTopicSeen(id: id) }
+        // A list that handles this itself (Home's New, which moves
+        // VoiceOver to the next item) is told first, while the item is
+        // still listed. Otherwise a sound and tap confirm it (2026-10-07).
+        if let markedReadFeedback {
+            markedReadFeedback(kind: kind, id: id)
+        } else if let message = ActionCue.play(.markedRead, orSay: String(localized: "Marked as read.")) {
+            ActionCue.sayQueued(message)
+        }
         // Home updates New and Fetch straight away. It used to only notice
         // on its next reload, so the item stayed listed. Reported directly.
         NotificationCenter.default.post(name: .itemMarkedRead, object: key)
         APIClient.shared.history.syncMarkedRead([
             HistoryEndpoints.target(id: id, nid: entityId, kind: kind)
         ])
-        UIAccessibility.post(notification: .announcement, argument: String(localized: "Marked as read."))
     }
 
     /// Opens the item and lands VoiceOver focus directly on the first new
@@ -539,12 +548,12 @@ struct ContentActionsModifier: ViewModifier {
         if isSaved {
             PersistenceStore.shared.unsave(id: id)
             isSaved = false
-            toast.success(String(localized: "Removed from Saved"))
+            // In Saved, the list itself confirms and moves VoiceOver on.
+            toast.success(String(localized: "Removed from Saved"), quiet: onSaveToggle != nil, sound: .unsaved)
         } else {
             PersistenceStore.shared.save(SavedItem(id: id, kind: kind, title: title, savedAt: Date(), lastActivityAt: lastActivityAt))
             isSaved = true
-            toast.success(String(localized: "Saved"))
-            SoundPlayer.shared.play(.bookmarkSaved)
+            toast.success(String(localized: "Saved"), sound: .bookmarkSaved)
         }
         onSaveToggle?(isSaved)
     }
@@ -557,7 +566,8 @@ struct ContentActionsModifier: ViewModifier {
                 PersistenceStore.shared.markUnfollowed(id: id)
                 FollowStore.shared.markNotFollowed(id)
                 isFollowing = false
-                toast.success(String(localized: "Unfollowed"))
+                // In Following, the list itself confirms and moves on.
+                toast.success(String(localized: "Unfollowed"), quiet: onFollowToggle != nil, sound: .unfollowed)
                 onFollowToggle?(false)
             } else {
                 try await APIClient.shared.flags.follow(nodeUuid: id, nodeType: kind.nodeType, entityId: entityId, token: user.csrfToken)
@@ -567,7 +577,7 @@ struct ContentActionsModifier: ViewModifier {
                 ))
                 FollowStore.shared.markFollowed(id)
                 isFollowing = true
-                toast.success(String(localized: "Following"))
+                toast.success(String(localized: "Following"), sound: .followed)
                 if kind == .forumTopic { tips.show(.followTopicNotifications) }
                 onFollowToggle?(true)
             }
@@ -585,13 +595,12 @@ struct ContentActionsModifier: ViewModifier {
                 try await APIClient.shared.flags.unrecommend(nodeUuid: id, token: user.csrfToken)
                 RecommendationStore.shared.markNotRecommended(id)
                 isRecommended = false
-                toast.success(String(localized: "Removed from Recommendations"))
+                toast.success(String(localized: "Removed from Recommendations"), sound: .unrecommended)
             } else {
                 try await APIClient.shared.flags.recommend(nodeUuid: id, nodeType: kind.nodeType, entityId: entityId, token: user.csrfToken)
                 RecommendationStore.shared.markRecommended(id)
                 isRecommended = true
-                toast.success(String(localized: "You recommended this app!"))
-                SoundPlayer.shared.play(.bookmarkSaved)
+                toast.success(String(localized: "You recommended this app!"), sound: .recommended)
             }
         } catch let e as APIError {
             toast.error(e.localizedDescription)
@@ -823,6 +832,10 @@ struct EditNodeSheet: View {
             .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut, value: guidelines.topWarning?.id)
             .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
         }
+        // Ticks while saving is slow (2026-10-07).
+        .waitingTick(while: isSubmitting, stillWaiting: String(localized: "Still saving."))
+        // Ticks while Apple Intelligence rewrites or translates (2026-10-07).
+        .waitingTick(while: intelligence.isProcessing, stillWaiting: intelligence.stillWorkingMessage)
     }
 
     @ViewBuilder
@@ -1152,12 +1165,11 @@ struct ContentDetailActions: View {
         if isSaved {
             PersistenceStore.shared.unsave(id: id)
             isSaved = false
-            toast.success(String(localized: "Removed from Saved"))
+            toast.success(String(localized: "Removed from Saved"), sound: .unsaved)
         } else {
             PersistenceStore.shared.save(SavedItem(id: id, kind: kind, title: title, savedAt: Date(), lastActivityAt: lastActivityAt))
             isSaved = true
-            toast.success(String(localized: "Saved"))
-            SoundPlayer.shared.play(.bookmarkSaved)
+            toast.success(String(localized: "Saved"), sound: .bookmarkSaved)
         }
     }
 
@@ -1169,7 +1181,7 @@ struct ContentDetailActions: View {
                 PersistenceStore.shared.markUnfollowed(id: id)
                 FollowStore.shared.markNotFollowed(id)
                 isFollowing = false
-                toast.success(String(localized: "Unfollowed"))
+                toast.success(String(localized: "Unfollowed"), sound: .unfollowed)
             } else {
                 try await APIClient.shared.flags.follow(nodeUuid: id, nodeType: kind.nodeType, entityId: entityId, token: user.csrfToken)
                 PersistenceStore.shared.markFollowed(FollowedItem(
@@ -1178,7 +1190,7 @@ struct ContentDetailActions: View {
                 ))
                 FollowStore.shared.markFollowed(id)
                 isFollowing = true
-                toast.success(String(localized: "Following"))
+                toast.success(String(localized: "Following"), sound: .followed)
                 if kind == .forumTopic { tips.show(.followTopicNotifications) }
             }
         } catch let e as APIError {
@@ -1195,13 +1207,12 @@ struct ContentDetailActions: View {
                 try await APIClient.shared.flags.unrecommend(nodeUuid: id, token: user.csrfToken)
                 RecommendationStore.shared.markNotRecommended(id)
                 isRecommended = false
-                toast.success(String(localized: "Removed from Recommendations"))
+                toast.success(String(localized: "Removed from Recommendations"), sound: .unrecommended)
             } else {
                 try await APIClient.shared.flags.recommend(nodeUuid: id, nodeType: kind.nodeType, entityId: entityId, token: user.csrfToken)
                 RecommendationStore.shared.markRecommended(id)
                 isRecommended = true
-                toast.success(String(localized: "You recommended this app!"))
-                SoundPlayer.shared.play(.bookmarkSaved)
+                toast.success(String(localized: "You recommended this app!"), sound: .recommended)
             }
         } catch let e as APIError {
             toast.error(e.localizedDescription)

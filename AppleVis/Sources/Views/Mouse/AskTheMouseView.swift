@@ -117,6 +117,12 @@ struct AskTheMouseView: View {
                 }
             }
             .themedList(preferences.colors)
+            // On a wide window (iPad, an open iPhone Duo), answers stay a
+            // comfortable line length instead of running edge to edge
+            // (Adaptive Experience, 2026-10-06).
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
+            .background(preferences.colors.background)
             .navigationTitle("Ask the Mouse")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -134,6 +140,7 @@ struct AskTheMouseView: View {
             .navigationDestination(for: BlogPost.self) { BlogDetailView(postId: $0.id) }
             .navigationDestination(for: BugReport.self) { BugDetailView(bugId: $0.id) }
             .firstNewCommentDestination()
+            .contentSelectionDestination()
             .navigationDestination(item: $pushedPlace) { place in
                 placeView(place)
             }
@@ -168,6 +175,7 @@ struct AskTheMouseView: View {
         }
         // Rows here open a post at its first new comment on this stack.
         .environment(\.openAtFirstNewComment, OpenAtFirstNewCommentAction { path.append($0) })
+        .environment(\.pushContent, PushContentAction { path.append($0) })
     }
 
     // MARK: - Top

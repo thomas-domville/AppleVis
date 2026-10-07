@@ -205,7 +205,10 @@ struct ForumTopicRow: View {
     }
 
     var body: some View {
-        NavigationLink(value: topic) {
+        // Pushes the topic on a narrow window, as always; on a wide one,
+        // shows it beside the list (Adaptive Experience, 2026-10-06).
+        AdaptiveRowLink(value: topic, selection: ContentSelection(kind: .forumTopic, id: topic.id),
+                        title: translatedTitle ?? topic.title) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Label(topic.category, systemImage: "bubble.left.and.bubble.right")
@@ -327,7 +330,10 @@ struct PodcastEpisodeRow: View {
     @State private var isListened = false
 
     var body: some View {
-        NavigationLink(value: episode) {
+        // Pushes the episode on a narrow window, as always; on a wide one,
+        // shows it beside the list (Adaptive Experience, 2026-10-06).
+        AdaptiveRowLink(value: episode, selection: ContentSelection(kind: .podcastEpisode, id: episode.id),
+                        title: translatedTitle ?? episode.title) {
             HStack(spacing: 12) {
                 AsyncImage(url: episode.artworkUrl.flatMap(URL.init)) { image in
                     image.resizable().scaledToFill()
@@ -425,7 +431,7 @@ struct PodcastEpisodeRow: View {
             Task { await playOrToggle() }
         }
         .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to Queue")) {
-            if isQueued { player.removeFromQueue(id: episode.id) } else { player.enqueue(episode) }
+            if isQueued { player.removeFromQueue(id: episode.id); SoundPlayer.shared.play(.markedRead) } else { player.enqueue(episode) }
         }
         // Save bookmarks the episode for later; it never implied a download
         // (data usage/storage the user didn't ask for), and Settings already
@@ -456,7 +462,7 @@ struct PodcastEpisodeRow: View {
             }
             .accessibilityHidden(true)
             Button {
-                if isQueued { player.removeFromQueue(id: episode.id) } else { player.enqueue(episode) }
+                if isQueued { player.removeFromQueue(id: episode.id); SoundPlayer.shared.play(.markedRead) } else { player.enqueue(episode) }
             } label: {
                 Label(isQueued ? "Remove from Queue" : "Add to Queue", systemImage: isQueued ? "text.badge.minus" : "text.badge.plus")
             }
@@ -535,9 +541,13 @@ struct PodcastEpisodeRow: View {
             PersistenceStore.shared.markEpisodePlayed(episode.id)
         }
         isListened.toggle()
-        UIAccessibility.post(notification: .announcement, argument: isListened
-            ? String(localized: "Marked as listened")
-            : String(localized: "Marked as not listened"))
+        // A sound and tap, like Mark as Read: the success sound for
+        // listened, the soft tick for not listened. Words only when sounds
+        // and haptics are both off (2026-10-07).
+        let message = isListened ? String(localized: "Marked as listened") : String(localized: "Marked as not listened")
+        if let spoken = ActionCue.play(isListened ? .success : .refreshTick, orSay: message) {
+            ActionCue.sayQueued(spoken)
+        }
     }
 
     private func resolveDurationIfNeeded() async {
@@ -660,7 +670,10 @@ struct AppListingRow: View {
     @State private var translatedTitle: String?
 
     var body: some View {
-        NavigationLink(value: app) {
+        // Pushes the app on a narrow window, as always; on a wide one,
+        // shows it beside the list (Adaptive Experience, 2026-10-06).
+        AdaptiveRowLink(value: app, selection: ContentSelection(kind: .appListing, id: app.id),
+                        title: translatedTitle ?? app.name) {
             HStack(spacing: 12) {
                 AsyncImage(url: app.iconUrl.flatMap(URL.init)) { image in
                     image.resizable().scaledToFill()

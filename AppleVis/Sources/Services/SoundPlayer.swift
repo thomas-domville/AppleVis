@@ -5,6 +5,12 @@ import UIKit
 /// UI feedback sounds bundled in Resources/Sounds. Filenames match the case names.
 enum AppSound: String {
     case tabChange       = "tab_change"
+    /// A soft pop for each tab, pitched low for Home, middle for Discover,
+    /// and high for For You, so the sound says where you landed. Chosen by
+    /// the user (2026-10-07). See `tabSound(for:)`.
+    case tabChangeHome     = "tab_change_home"
+    case tabChangeDiscover = "tab_change_discover"
+    case tabChangeForYou   = "tab_change_for_you"
     case articleOpen     = "article_open"
     case bookmarkSaved   = "bookmark_saved"
     case downloadComplete = "download_complete"
@@ -14,6 +20,22 @@ enum AppSound: String {
     case pickerTick      = "picker_tick"
     case podcastPlay     = "podcast_play"
     case podcastPause    = "podcast_pause"
+    /// Adding an episode to the queue or Play Next: the same soft mallet
+    /// as Play and Pause, so the podcast sounds are one family. Chosen by
+    /// the user (2026-10-07).
+    case podcastQueue    = "podcast_queue"
+    /// Following something: the bookmark clip's wooden tap, then a tiny bell
+    /// for "you'll hear about this". Related to Save, but easy to tell
+    /// apart. Chosen by the user (2026-10-07).
+    case followed        = "followed"
+    /// Recommending an app: the clip's tap, then a warm, bright pair of
+    /// notes, a friendly nod, a step brighter than Save and Follow.
+    case recommended     = "recommended"
+    /// The "off" versions: softer, and the other way round from their "on"
+    /// sound, so you can tell doing from undoing (2026-10-07).
+    case unsaved         = "unsaved"
+    case unfollowed      = "unfollowed"
+    case unrecommended   = "unrecommended"
     case refresh
     case reply
     case screenClose     = "screen_close"
@@ -37,12 +59,28 @@ enum AppSound: String {
     /// Confirmation tier, so it's on by default. Requested directly
     /// (2026-10-06).
     case refreshTick     = "refresh_tick"
+    /// Two quick soft notes when a Fetch group is marked read, played as
+    /// VoiceOver moves straight on, instead of waiting to say "Group marked
+    /// as read." Original sound. Confirmation tier. Requested directly
+    /// (2026-10-07).
+    case markedRead      = "marked_read"
+
+    /// The tab's own pop: 0 Home, 1 Discover, 2 For You.
+    static func tabSound(for tab: Int) -> AppSound {
+        switch tab {
+        case 0: return .tabChangeHome
+        case 1: return .tabChangeDiscover
+        case 2: return .tabChangeForYou
+        default: return .tabChange
+        }
+    }
 
     /// Non-essential UI chrome — docs/APPLEVIS_2026_1_MASTER_SPEC.md defaults
     /// these off (tab switching, picker changes, opening screens, list
     /// refresh), gated by PreferencesStore's `interfaceSoundsEnabled`.
     fileprivate static let interfaceSounds: Set<AppSound> = [
-        .tabChange, .articleOpen, .screenClose, .pickerTick, .refresh,
+        .tabChange, .tabChangeHome, .tabChangeDiscover, .tabChangeForYou,
+        .articleOpen, .screenClose, .pickerTick, .refresh,
         .searchComplete, .tipPopup, .syncComplete, .loadingStart, .welcome,
     ]
 
@@ -81,18 +119,23 @@ enum AppSound: String {
             return { UINotificationFeedbackGenerator().notificationOccurred(.error) }
         case .offline:
             return { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
-        case .bookmarkSaved, .reply, .podcastPlay, .podcastPause:
+        case .bookmarkSaved, .reply, .podcastPlay, .podcastPause, .podcastQueue, .followed,
+             .recommended, .unsaved, .unfollowed, .unrecommended:
             return { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
         case .mousePatter:
             // A light tap with each tick, for braille and DeafBlind users.
             return { UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.6) }
+        case .markedRead:
+            // The cue for braille and DeafBlind users, who may not hear it.
+            return { UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: 0.8) }
         case .refreshTick:
             // The cue for braille and DeafBlind users, who may not hear it.
             return { UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.45) }
         case .guidelineDing:
             // The cue for braille and DeafBlind users, who may not hear it.
             return { UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 0.7) }
-        case .tabChange, .articleOpen, .loadingStart, .pickerTick, .refresh,
+        case .tabChange, .tabChangeHome, .tabChangeDiscover, .tabChangeForYou,
+             .articleOpen, .loadingStart, .pickerTick, .refresh,
              .screenClose, .searchComplete, .syncComplete, .tipPopup, .welcome:
             return nil
         }

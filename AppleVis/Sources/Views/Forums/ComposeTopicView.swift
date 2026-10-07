@@ -207,6 +207,10 @@ struct ComposeTopicView: View {
             .sheet(isPresented: $showSignIn) { SignInView() }
             .communityAgreementGate(showCommunityAgreement: $showCommunityAgreement, showSignIn: $showSignIn)
         }
+        // Ticks while posting is slow (2026-10-07).
+        .waitingTick(while: isSubmitting, stillWaiting: String(localized: "Still posting."))
+        // Ticks while Apple Intelligence rewrites or translates (2026-10-07).
+        .waitingTick(while: intelligence.isProcessing, stillWaiting: intelligence.stillWorkingMessage)
     }
 
     private var signInRequiredView: some View {
@@ -281,10 +285,10 @@ struct ComposeTopicView: View {
             }
             // ToastStore speaks this after the screen has closed.
             if result.isPublished {
-                toast.success(String(localized: "Topic posted"))
+                toast.success(String(localized: "Topic posted"), sound: .reply)
                 onPosted(posted)
             } else {
-                toast.success(String(localized: "Topic sent. It will appear once a moderator approves it."))
+                toast.success(String(localized: "Topic sent. It will appear once a moderator approves it."), sound: .reply)
             }
             dismiss()
         } catch let e as APIError { error = e.localizedDescription
@@ -475,6 +479,10 @@ struct ComposeReplyView: View {
                 Text("Your progress will be discarded.")
             }
         }
+        // Ticks while posting is slow (2026-10-07).
+        .waitingTick(while: isSubmitting, stillWaiting: String(localized: "Still posting."))
+        // Ticks while Apple Intelligence rewrites or translates (2026-10-07).
+        .waitingTick(while: intelligence.isProcessing, stillWaiting: intelligence.stillWorkingMessage)
     }
 
     /// Was a toolbar button under the overflow "More" menu — easy to miss,
@@ -517,8 +525,7 @@ struct ComposeReplyView: View {
             let reply = try await APIClient.shared.forums.submitReply(
                 topicId: topicId, body: bodyText, csrfToken: user.csrfToken, replyToCommentId: quotedReply?.id
             )
-            toast.success(String(localized: "Reply posted"))
-            SoundPlayer.shared.play(.reply)
+            toast.success(String(localized: "Reply posted"), sound: .reply)
             onPosted(reply)
             dismiss()
         } catch let e as APIError { error = e.localizedDescription

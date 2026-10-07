@@ -73,6 +73,8 @@ extension View {
 struct SettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var searchText = ""
+    /// Command-F moves here (Adaptive Experience, 2026-10-06).
+    @FocusState private var isSearchFocused: Bool
     @AccessibilityFocusState private var focusTarget: AnyHashable?
     private static let titleFocusID = AnyHashable("settings.title")
 
@@ -230,6 +232,8 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .settingsDoneButton()
         .searchable(text: $searchText, prompt: "Search Settings")
+        .applySearchFocus($isSearchFocused)
+        .keyboardSearchTarget($isSearchFocused)
         .task { await retryAccessibilityFocus(into: $focusTarget, returningTo: Self.titleFocusID) }
     }
 }

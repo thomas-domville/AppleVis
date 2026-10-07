@@ -9,6 +9,8 @@ struct BlogBrowseView: View {
     @State private var page = 0
     @State private var hasMore = false
     @State private var searchText = ""
+    /// Command-F moves here (Adaptive Experience, 2026-10-06).
+    @FocusState private var isSearchFocused: Bool
     @State private var isLoadingMore = false
     @ObservedObject private var networkStatus = NetworkStatusStore.shared
     @AccessibilityFocusState private var isTitleFocused: Bool
@@ -46,6 +48,8 @@ struct BlogBrowseView: View {
             }.map(\.element)
         }
         .searchable(text: $searchText, prompt: "Search posts")
+        .applySearchFocus($isSearchFocused)
+        .keyboardSearchTarget($isSearchFocused)
     }
 
     private var visible: [BlogPost] {

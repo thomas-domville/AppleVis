@@ -168,8 +168,28 @@ struct AppleVisApp: App {
                 Divider()
                 Button("Refresh") { keyCommands.refreshRequested.send() }
                     .keyboardShortcut("r", modifiers: .command)
-                Button("Settings") { keyCommands.showSettings = true }
+                Button("Search") { keyCommands.search() }
+                    .keyboardShortcut("f", modifiers: .command)
+                Divider()
+                // Never Command-C: that stays Copy (Adaptive Experience,
+                // 2026-10-06).
+                // Always offered: without Apple Intelligence, Ask the Mouse
+                // explains why and points to Discover and Help.
+                Button("Ask the Mouse") { keyCommands.openAskTheMouse() }
+                    .keyboardShortcut("m", modifiers: .command)
+                Button("Contact AppleVis") { keyCommands.openContact() }
+                    .keyboardShortcut("c", modifiers: [.command, .shift])
+                Button("Settings") { keyCommands.openSettings() }
                     .keyboardShortcut(",", modifiers: .command)
+            }
+            // Shortcuts for what's on screen, offered only where they work.
+            CommandMenu("Actions") {
+                Button("New Topic") { keyCommands.requests.send(.newTopic) }
+                    .keyboardShortcut("n", modifiers: .command)
+                    .disabled(!keyCommands.isAvailable(.newTopic))
+                Button("Save or Unsave") { keyCommands.requests.send(.save) }
+                    .keyboardShortcut("s", modifiers: [.command, .shift])
+                    .disabled(!keyCommands.isAvailable(.save))
             }
         }
     }

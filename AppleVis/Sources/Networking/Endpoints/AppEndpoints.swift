@@ -712,7 +712,9 @@ struct AppEndpoints {
 
         if detail.platform != .tvos {
             if includedFields.contains("link") {
-                let appStoreUrl = metadata.appStoreUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+                // Saved neutral: no country and no "?uo=4", so it opens
+                // each person's own App Store (2026-10-07).
+                let appStoreUrl = ItunesAPI.storeNeutralURL(metadata.appStoreUrl.trimmingCharacters(in: .whitespacesAndNewlines))
                 if !appStoreUrl.isEmpty {
                     attributes["field_link2"] = AnyEncodable(LinkValue(uri: appStoreUrl, title: ""))
                 }

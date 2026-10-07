@@ -35,6 +35,12 @@ struct LoadingView: View {
         // signal short of re-swiping to discover it. `.screenChanged` both
         // re-scans the screen and speaks its argument.
         .onAppear { UIAccessibility.post(notification: .screenChanged, argument: localized(message)) }
+        // On a slow connection, VoiceOver users hear the same soft tick and
+        // tap as a refresh every second after the first second and a half,
+        // and "Still loading." once at 8 seconds, so silence never leaves
+        // them wondering whether it's stuck. Stops as soon as the page
+        // appears and this view goes away. Requested directly (2026-10-07).
+        .task { await RefreshHeartbeat.tick(stillWaiting: String(localized: "Still loading.")) }
     }
 }
 

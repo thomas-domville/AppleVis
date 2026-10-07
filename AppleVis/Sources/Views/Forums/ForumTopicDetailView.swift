@@ -56,6 +56,12 @@ struct ForumTopicDetailView: View {
     // the topic itself had no Edit/Delete/Unpublish at all.
     @State private var editingTopicNode: EditableNode?
     @Environment(\.dismiss) private var dismiss
+    /// Beside a list on a wide window: VoiceOver stays on the list when the
+    /// topic appears, and moves here only when asked (choosing the row
+    /// again). Deleting closes the pane instead of the whole list.
+    @Environment(\.isInDetailPane) private var isInDetailPane
+    @Environment(\.detailFocusRequest) private var detailFocusRequest
+    @Environment(\.closeDetailPane) private var closeDetailPane
 
     private var isOwnTopic: Bool {
         guard let detail, let user = auth.user else { return false }
@@ -133,6 +139,9 @@ struct ForumTopicDetailView: View {
             SoundPlayer.shared.play(.articleOpen)
             await load()
         }
+        .onChange(of: detailFocusRequest) { _, _ in focusTitleAfterLoad() }
+        // Ticks while Apple Intelligence summarizes (2026-10-07).
+        .waitingTick(while: isSummarizing, stillWaiting: String(localized: "Still summarizing."))
     }
 
     private func startEditTopic() {
@@ -172,7 +181,7 @@ struct ForumTopicDetailView: View {
         do {
             try await APIClient.shared.content.deleteNode(nodeId: detail.id, nodeType: "forum", csrfToken: user.csrfToken)
             toast.success(String(localized: "Topic deleted"))
-            dismiss()
+            if let closeDetailPane { closeDetailPane() } else { dismiss() }
         } catch {
             toast.error(String(localized: "Couldn't delete."))
         }
@@ -561,7 +570,7 @@ struct ForumTopicDetailView: View {
         // Opened via "Jump to First New Comment": that comment gets focus
         // instead. Title focus used to run regardless, and its retries could
         // pull focus straight back to the title. Reported directly.
-        if !(focusFirstNewCommentOnAppear && hasNewReplies) { focusTitleAfterLoad() }
+        if !(focusFirstNewCommentOnAppear && hasNewReplies), !isInDetailPane { focusTitleAfterLoad() }
     }
 
     private func toggleFollow() async {
@@ -572,7 +581,7 @@ struct ForumTopicDetailView: View {
                 isFollowing = false
                 PersistenceStore.shared.markUnfollowed(id: d.id)
                 FollowStore.shared.markNotFollowed(d.id)
-                toast.success(String(localized: "Unfollowed topic"))
+                toast.success(String(localized: "Unfollowed topic"), sound: .unfollowed)
             } else {
                 try await APIClient.shared.forums.follow(nodeUuid: d.id, entityId: d.nid, token: user.csrfToken)
                 isFollowing = true
@@ -581,7 +590,7 @@ struct ForumTopicDetailView: View {
                     title: d.title, followedAt: Date(), lastActivityAt: d.lastActivityAt, url: d.url
                 ))
                 FollowStore.shared.markFollowed(d.id)
-                toast.success(String(localized: "Following topic"))
+                toast.success(String(localized: "Following topic"), sound: .followed)
             }
         } catch let e as APIError {
             toast.error(e.localizedDescription)
@@ -663,14 +672,18 @@ struct ForumTopicDetailView: View {
     /// typically already visible right where the deleted reply was. Falls
     /// back to the topic title if the deleted reply had no neighbors (it
     /// was the only one left).
+    ///
+    /// A sound and tap confirm it, and VoiceOver moves on at once. The
+    /// spoken confirmation used to be cut off by the next comment being
+    /// read; it's now only spoken, queued, when sounds and haptics are both
+    /// off (2026-10-07).
     private func focusAfterReplyRemoval(neighborId: String?, announcement: String) {
-        UIAccessibility.post(notification: .announcement, argument: announcement)
+        let spoken = ActionCue.play(.markedRead, orSay: announcement)
         Task {
-            try? await Task.sleep(for: .milliseconds(300))
             if let neighborId {
-                focusedReplyId = neighborId
+                await moveAccessibilityFocusPromptly(to: neighborId, into: $focusedReplyId, saying: spoken)
             } else {
-                isTitleFocused = true
+                await moveAccessibilityFocusPromptly(into: $isTitleFocused, saying: spoken)
             }
         }
     }
@@ -740,14 +753,14 @@ struct ForumTopicDetailView: View {
         if isSaved {
             PersistenceStore.shared.unsave(id: detail.id)
             isSaved = false
-            toast.success(String(localized: "Removed from Saved"))
+            toast.success(String(localized: "Removed from Saved"), sound: .unsaved)
         } else {
             PersistenceStore.shared.save(SavedItem(
                 id: detail.id, kind: .forumTopic, title: detail.title,
                 savedAt: Date(), lastActivityAt: detail.lastActivityAt
             ))
             isSaved = true
-            toast.success(String(localized: "Saved"))
+            toast.success(String(localized: "Saved"), sound: .bookmarkSaved)
         }
     }
 
@@ -1039,7 +1052,7 @@ struct ReplyView: View {
         do {
             try await APIClient.shared.content.unpublishComment(commentType: "comment_forum", commentId: reply.id, csrfToken: user.csrfToken)
             onUnpublish?()
-            toast.success(String(localized: "Comment unpublished"))
+            toast.success(String(localized: "Comment unpublished"), quiet: onUnpublish != nil)
         } catch {
             toast.error(String(localized: "Couldn't unpublish comment."))
         }
@@ -1050,7 +1063,9 @@ struct ReplyView: View {
         do {
             try await APIClient.shared.content.deleteComment(commentType: "comment_forum", commentId: reply.id, csrfToken: user.csrfToken)
             onDelete?()
-            toast.success(String(localized: "Reply deleted"))
+            // The topic confirms it and moves VoiceOver on; the toast is
+            // only for sight, so it isn't said twice.
+            toast.success(String(localized: "Reply deleted"), quiet: onDelete != nil)
         } catch {
             toast.error(String(localized: "Couldn't delete reply."))
         }

@@ -52,6 +52,12 @@ struct DiscoverView: View {
     // title below, overriding whichever section's own restoreFocus was
     // trying to put focus back where it belonged. Reported directly.
     @State private var navigationPath = NavigationPath()
+    /// The narrowest a hub card gets before the grid drops a column. Grows
+    /// with the text size, so at the largest sizes cards stack in one column
+    /// instead of squeezing their titles; on a wide iPad or Stage Manager
+    /// window more columns fit. Two columns on iPhone at default sizes, as
+    /// before (Adaptive Experience, 2026-10-06).
+    @ScaledMetric(relativeTo: .headline) private var hubCardMinimumWidth: CGFloat = 150
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var toast: ToastStore
@@ -127,6 +133,9 @@ struct DiscoverView: View {
                 toast.warning(InputLimit.searchShortened)
             }
             .applySearchFocus($isSearchFieldFocused)
+            // Command-F. Only while the hub itself is showing: with a
+            // section pushed over it, that section's own search answers.
+            .keyboardSearchTarget($isSearchFieldFocused, isActive: navigationPath.isEmpty)
             .onChange(of: searchText) { _, newValue in runSearch(newValue) }
             .task {
                 // .onChange doesn't fire for a prefilled initial value (e.g.
@@ -209,6 +218,7 @@ struct DiscoverView: View {
                 BugDetailView(bugId: bug.id)
             }
             .firstNewCommentDestination()
+            .contentSelectionDestination()
             // Closing a form (sent or cancelled) returns VoiceOver to the
             // row that opened it, not the top of the screen. Reported directly.
             .sheet(isPresented: $showSubmitApp, onDismiss: { restoreFocus(to: Self.contributeFocusID("square.grid.2x2")) }) { SubmitAppView() }
@@ -219,6 +229,10 @@ struct DiscoverView: View {
         }
         // Rows here open a post at its first new comment on this stack.
         .environment(\.openAtFirstNewComment, OpenAtFirstNewCommentAction { navigationPath.append($0) })
+        // A wide list that becomes narrow pushes its open item here.
+        .environment(\.pushContent, PushContentAction { navigationPath.append($0) })
+        // Ticks while Apple Intelligence translates your search (2026-10-07).
+        .waitingTick(while: isTranslatingSearch, stillWaiting: String(localized: "Still translating."))
     }
 
     @ViewBuilder
@@ -396,6 +410,10 @@ struct DiscoverView: View {
                 contributeSection
             }
             .padding(.top, 12)
+            // On a very wide window the hub stays a comfortable width,
+            // centred, rather than stretching rows of text edge to edge.
+            .frame(maxWidth: 1_100, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
         .background(preferences.colors.background)
     }
@@ -406,7 +424,7 @@ struct DiscoverView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HubSectionHeader(title: title, subtitle: subtitle, accent: accent)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: hubCardMinimumWidth, maximum: 360), spacing: 16, alignment: .top)], spacing: 16) {
                 cards()
             }
             .padding(.horizontal)
@@ -637,6 +655,10 @@ private struct HubCard: View {
             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
+        // A pointer or trackpad highlights the whole card, like a system
+        // button (Adaptive Experience, 2026-10-06).
+        .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 14))
+        .hoverEffect(.highlight)
         .accessibilityFocused(focusTarget, equals: destination.focusID)
     }
 }

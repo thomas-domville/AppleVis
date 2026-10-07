@@ -131,6 +131,7 @@ struct AppEntryHealthCheckView: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityAddTraits(.updatesFrequently)
                     .accessibilityFocused($isStatusFocused)
+                    .progressTick(on: scanner.detailsChecked)
 
                     // Ends a long scan early and keeps what it's found so
                     // far, instead of splitting big categories into batches
@@ -195,10 +196,10 @@ struct AppEntryHealthCheckView: View {
                                 scanner.removeFlag(id: flag.id)
                             }
                         } label: {
-                            Label(String(localized: "Refresh in Bulk (\(refreshable.count))"), systemImage: "arrow.triangle.2.circlepath.circle")
+                            Label(String(localized: "Update in Bulk (\(refreshable.count))"), systemImage: "arrow.triangle.2.circlepath.circle")
                         }
                     } footer: {
-                        Text("Refresh App Details for several entries at once. Each one only changes what's different on the App Store.")
+                        Text("Update several entries from the App Store at once. Each one only changes what's different on the App Store.")
                     }
                 }
 
@@ -301,39 +302,21 @@ struct AppEntryHealthCheckView: View {
             }
         }
         scanner.removeFlag(id: flag.id)
+        // Straight on to the next entry. It used to wait for VoiceOver to
+        // finish the message first, up to three seconds. With a message, a
+        // sound and tap confirm it, and the words are only spoken (after
+        // the move) when sounds and haptics are both off. Without one, the
+        // action's own toast already plays its sound (2026-10-07).
+        let spoken = message.flatMap { ActionCue.play(next == nil ? .success : .markedRead, orSay: $0) }
         Task {
-            if let message, UIAccessibility.isVoiceOverRunning {
-                await announceAndWait(message)
-            }
             if let next {
-                await retryAccessibilityFocus(into: $focusedFlagId, returningTo: next)
+                await moveAccessibilityFocusPromptly(to: next, into: $focusedFlagId, saying: spoken)
             } else {
-                await retryAccessibilityFocus(into: $isStatusFocused)
+                await moveAccessibilityFocusPromptly(into: $isStatusFocused, saying: spoken)
             }
         }
     }
 
-    /// Speaks `message` and returns when VoiceOver has finished it, or
-    /// after 3 seconds at most.
-    private func announceAndWait(_ message: String) async {
-        // Let the page finish closing first, or the announcement can be lost.
-        try? await Task.sleep(for: .milliseconds(400))
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { @MainActor in
-                for await _ in NotificationCenter.default.notifications(named: UIAccessibility.announcementDidFinishNotification) {
-                    break
-                }
-            }
-            group.addTask {
-                try? await Task.sleep(for: .seconds(3))
-            }
-            await MainActor.run {
-                UIAccessibility.post(notification: .announcement, argument: message)
-            }
-            await group.next()
-            group.cancelAll()
-        }
-    }
 }
 
 private struct AppHealthFlagRow: View {
@@ -477,12 +460,12 @@ private struct AppHealthFlagActions: ViewModifier {
                     Button {
                         Task { await beginRefresh() }
                     } label: {
-                        Label("Refresh App Details", systemImage: "arrow.triangle.2.circlepath")
+                        Label("Update from App Store", systemImage: "arrow.triangle.2.circlepath")
                     }
                     .tint(.green)
                 }
             }
-            .modifier(ConditionalAccessibilityAction(isActive: canRefresh, name: "Refresh App Details") {
+            .modifier(ConditionalAccessibilityAction(isActive: canRefresh, name: "Update from App Store") {
                 Task { await beginRefresh() }
             })
             // Share, Open in App Store, and (for a removed app) Search the
@@ -549,6 +532,9 @@ private struct AppHealthFlagActions: ViewModifier {
                     try await saveEdit(title: newTitle, body: newBody, format: node.format)
                 }
             }
+            // Ticks while the App Store is checked before Refresh opens.
+            // (2026-10-07)
+            .waitingTick(while: isLoadingRefresh, stillWaiting: String(localized: "Still checking the App Store."))
     }
 
     private func beginEdit() async {
@@ -659,7 +645,7 @@ private struct AppHealthFlagActions: ViewModifier {
                 testedOnIOS: UIDevice.current.systemVersion,
                 csrfToken: user.csrfToken
             )
-            toast.success(String(localized: "App details refreshed"))
+            toast.success(String(localized: "Updated from the App Store"))
             refreshRequest = nil
             onHandled()
         } catch APIError.forbidden {

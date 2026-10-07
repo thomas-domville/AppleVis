@@ -113,11 +113,22 @@ struct AppInfoFieldDiff: Identifiable {
         // Mirrors AppEndpoints.updateAppInformation's own platform check —
         // tvOS entries never touch the App Store link or version fields.
         if detail.platform != .tvos {
+            // Compared by the app's ID, not letter for letter: Apple's link
+            // always ends in "?uo=4" and names a country, so a link that
+            // already pointed to the right app looked changed every time,
+            // and accepting it swapped a clean link for a messier one. When
+            // the app really is different, the suggestion is the neutral
+            // link (no country, no tag), which opens each person's own
+            // App Store, as Submit an App saves. Requested directly
+            // (2026-10-07).
             let oldLink = detail.appStoreUrl ?? ""
-            let newLink = metadata.appStoreUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+            let storeLink = metadata.appStoreUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+            let oldId = ItunesAPI.appStoreId(of: oldLink)
+            let isSameApp = oldId != nil && oldId == ItunesAPI.appStoreId(of: storeLink)
+            let newLink = storeLink.isEmpty || isSameApp ? oldLink : ItunesAPI.storeNeutralURL(storeLink)
             diffs.append(AppInfoFieldDiff(
                 id: "link", label: String(localized: "App Store Link"), systemImage: "link",
-                oldValue: oldLink, newValue: newLink.isEmpty ? oldLink : newLink
+                oldValue: oldLink, newValue: newLink
             ))
 
             let oldVersion = detail.reviewedVersion ?? ""
@@ -195,7 +206,7 @@ struct UpdateAppInfoSheet: View {
             Form {
                 Section {
                     WizardStepHeader(
-                        title: "Refresh App Details", icon: "arrow.triangle.2.circlepath",
+                        title: "Update from App Store", icon: "arrow.triangle.2.circlepath",
                         stepIndex: 1, stepTotal: 1, headerFocus: $isHeaderFocused
                     )
                     Text(changedDiffs.isEmpty
@@ -250,7 +261,7 @@ struct UpdateAppInfoSheet: View {
                 }
             }
             .themedList(preferences.colors)
-            .navigationTitle("Refresh App Details")
+            .navigationTitle("Update from App Store")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -260,13 +271,15 @@ struct UpdateAppInfoSheet: View {
                     if isUpdating {
                         ProgressView()
                     } else if !changedDiffs.isEmpty {
-                        Button("Refresh") { onConfirm() }
+                        Button("Update") { onConfirm() }
                             .disabled(!canConfirm)
                     }
                 }
             }
             .disabled(isUpdating)
             .task { await retryAccessibilityFocus(into: $isHeaderFocused) }
+            // Ticks while the site is being updated (2026-10-07).
+            .waitingTick(while: isUpdating, stillWaiting: String(localized: "Still saving."))
         }
     }
 

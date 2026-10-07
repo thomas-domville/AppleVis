@@ -191,9 +191,96 @@ struct ChangeItem: Identifiable {
     let title: String
     let description: String
 
-    static let currentVersion = "2026.21"
+    static let currentVersion = "2026.0"
 
     static let current: [ChangeItem] = [
+        ChangeItem(
+            systemImage: "sparkles",
+            tag: .improved,
+            title: "Clearer Wording for New Activity",
+            description: "Home's summary now says New since you last read or marked as read. Unread items can accumulate across visits. Opening the app or dismissing the summary does not mark them as read."
+        ),
+        ChangeItem(
+            systemImage: "text.alignleft",
+            tag: .accessibility,
+            title: "Clearer Expansion Actions in Fetch",
+            description: "In Fetch, Expand Visible Text and Collapse Visible Text change what is shown on screen. VoiceOver and braille still read the full text."
+        ),
+        ChangeItem(
+            systemImage: "list.bullet",
+            tag: .improved,
+            title: "Easier Actions in Fetch",
+            description: "In Fetch, use the Reading List heading to reach Mark All as Read with one swipe left. Comment actions begin with Mark This Group as Read, and expansion comes last."
+        ),
+        ChangeItem(
+            systemImage: "speaker.wave.2",
+            tag: .improved,
+            title: "A Fresh Set of Sounds",
+            description: "AppleVis's sounds have been redone as one gentle family. Each one eases in and out, and similar sounds sit at the same volume. Refresh, posting, Save, Follow, Recommend, errors, and closing screens have new sounds. Each tab has its own pitch, podcast Play and Pause now sound different, and undoing Save, Follow, or Recommend plays a softer version of its sound."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.circle",
+            tag: .accessibility,
+            title: "Quicker Mark as Listened and Forum Filters",
+            description: "Marking an episode listened now plays the success sound and a tap, and marking it not listened plays a soft tick, instead of only speaking. After you change Forums filters, VoiceOver moves to the first topic straight away and then says what the list shows."
+        ),
+        ChangeItem(
+            systemImage: "person.badge.clock",
+            tag: .accessibility,
+            title: "Hear When Signing In or Syncing Is Slow",
+            description: "With VoiceOver, signing in, Sync Now, and deleting your account now tick the same way as a refresh if they take more than a moment."
+        ),
+        ChangeItem(
+            systemImage: "sparkles",
+            tag: .accessibility,
+            title: "Hear When Apple Intelligence Is Working",
+            description: "With VoiceOver, if a summary, a rewrite, a bio, or a translation takes more than a moment, you now hear the same soft tick and light tap as a refresh until it's ready. If it takes a while, VoiceOver says Still summarizing, Still writing, or Still translating. Downloading a translation language ticks every 3 seconds instead."
+        ),
+        ChangeItem(
+            systemImage: "paperplane",
+            tag: .accessibility,
+            title: "Hear When Posting Takes a While",
+            description: "With VoiceOver, if posting a topic, reply, comment, or review, sending a form or message, or saving an edit takes more than a moment, you now hear the same soft tick and light tap as a refresh until it's done. If it takes a while, VoiceOver says Still posting, Still sending, or Still saving."
+        ),
+        ChangeItem(
+            systemImage: "hourglass",
+            tag: .accessibility,
+            title: "Hear When a Page Is Still Loading",
+            description: "With VoiceOver, if a topic, app entry, episode, or other page takes more than a moment to open, you now hear the same soft tick and feel the same light tap as a refresh, every second until it appears. If it takes a while, VoiceOver says Still loading."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.circle",
+            tag: .accessibility,
+            title: "Faster with VoiceOver When Clearing Things",
+            description: "When you mark something as read in New or Fetch, or unsave, unfollow, or remove an item from your queue or downloads, VoiceOver now moves straight to the next item, with a short sound and a light tap to confirm. It used to wait to say what happened first, or jump back to the top of the list. Deleting a comment works the same way. Clearing the last item plays the success sound."
+        ),
+        ChangeItem(
+            systemImage: "rectangle.split.2x1",
+            tag: .new,
+            title: "Lists and Posts Side by Side on iPad and iPhone Duo",
+            description: "When there's enough room, Forums, the App Directory, and Podcasts now show the list on one side and the item you choose on the other. This works on iPad, in a wide Stage Manager window, and on an open iPhone Duo. With VoiceOver, choosing an item shows it and leaves you in the list. Choose it again to move to it. Discover also uses the extra width for its sections. On iPhone and in narrow windows, everything works as before."
+        ),
+        ChangeItem(
+            systemImage: "keyboard",
+            tag: .new,
+            title: "More Keyboard Shortcuts",
+            description: "With a hardware keyboard, Command-M opens Ask the Mouse and Command-Shift-C opens Contact AppleVis from anywhere. Command-F moves to the search field, Command-N starts a new topic from Home or Forums, and Command-Shift-S saves or unsaves what you're reading. On iPad, press Globe-M to show the menu bar and see them all. Help lists them under AppleVis Keyboard Shortcuts."
+        ),
+        ChangeItem(
+            systemImage: "mic.fill",
+            tag: .improved,
+            title: "Siri Phrases, Rearranged",
+            description: "AppleVis's Siri phrases are now grouped, with the biggest features first. New: \"Listen to AppleVis Fetch\" opens Fetch and reads everything new aloud, \"Open AppleVis Nibbles\" opens Nibbles, \"Start a new AppleVis topic\" opens the composer, and \"Contact AppleVis\" opens the Contact form. \"What's new on AppleVis\" now opens Home on New. Forums, Unread Topics, Saved Items, and Report a Bug are still actions in the Shortcuts app."
+        ),
+        ChangeItem(
+            systemImage: "arrow.uturn.backward",
+            tag: .improved,
+            title: "Back on Your Last Tab",
+            description: "If iOS closes AppleVis in the background, it now reopens on the tab you were using, rather than on Home."
+        ),
+    ]
+
+    static let archivedFrom2026_21: [ChangeItem] = [
         ChangeItem(
             systemImage: "paperplane",
             tag: .new,
@@ -1432,6 +1519,7 @@ struct HistorySection: Identifiable {
     let items: [ChangeItem]
 
     static let all: [HistorySection] = [
+        HistorySection(title: "Also in 2026.21", items: ChangeItem.archivedFrom2026_21),
         HistorySection(title: "Also in 2026.20", items: ChangeItem.archivedFrom2026_20),
         HistorySection(title: "Also in 2026.19", items: ChangeItem.archivedFrom2026_19),
         HistorySection(title: "Also in 2026.18", items: ChangeItem.archivedFrom2026_18),

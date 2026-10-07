@@ -213,6 +213,7 @@ struct DormantAccountsView: View {
                             .foregroundStyle(.secondary)
                     }
                     .accessibilityElement(children: .combine)
+                    .progressTick(on: store.foundSoFar)
                     .accessibilityFocused($isStatusFocused)
                 }
             } else if let error = store.error {
@@ -322,6 +323,7 @@ struct DormantAccountsView: View {
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityFocused($isBulkProgressFocused)
+                .progressTick(on: store.bulkDone)
                 Button("Stop", role: .destructive) { store.stopBulkDelete() }
             } else {
                 Button(role: .destructive) {
@@ -353,7 +355,7 @@ struct DormantAccountsView: View {
         } else {
             toast.success(String(localized: "Deleted \(deletedPhrase)."))
         }
-        await retryAccessibilityFocus(into: $isStatusFocused)
+        await moveAccessibilityFocusPromptly(into: $isStatusFocused)
     }
 
     /// Speaks the new count after a filter changes the list out of view.
@@ -564,10 +566,12 @@ struct DormantAccountsView: View {
             try await APIClient.shared.adminAccounts.deleteAccount(id: account.id, csrfToken: user.csrfToken)
             store.remove(id: account.id)
             toast.success(String(localized: "Account deleted"))
+            // Straight on; the toast's sound and words confirm it, after
+            // the move (2026-10-07).
             if let next {
-                await retryAccessibilityFocus(into: $focusedAccountId, returningTo: next)
+                await moveAccessibilityFocusPromptly(to: next, into: $focusedAccountId)
             } else {
-                await retryAccessibilityFocus(into: $isStatusFocused)
+                await moveAccessibilityFocusPromptly(into: $isStatusFocused)
             }
         } catch APIError.forbidden {
             toast.error(String(localized: "You don't have permission to delete this account."))

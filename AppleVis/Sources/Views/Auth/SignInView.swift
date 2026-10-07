@@ -159,6 +159,8 @@ struct SignInView: View {
                 await retryAccessibilityFocus(into: $isIntroFocused)
             }
         }
+        // Ticks while signing in is slow (2026-10-07).
+        .waitingTick(while: auth.isLoading, stillWaiting: String(localized: "Still signing in."))
     }
 
     private func benefitRow(_ text: String) -> some View {

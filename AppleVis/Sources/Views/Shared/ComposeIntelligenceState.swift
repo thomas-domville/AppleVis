@@ -8,6 +8,14 @@ import Combine
 final class ComposeIntelligenceState: ObservableObject {
     @Published private(set) var showTranslatePrompt = false
     @Published private(set) var isProcessing = false
+    /// Translating rather than rewriting, so the waiting tick can say which.
+    @Published private(set) var isTranslating = false
+
+    /// Said once if Apple Intelligence is still working after 8 seconds
+    /// (2026-10-07).
+    var stillWorkingMessage: String {
+        isTranslating ? String(localized: "Still translating.") : String(localized: "Still writing.")
+    }
 
     private var detectTask: Task<Void, Never>?
 
@@ -30,8 +38,9 @@ final class ComposeIntelligenceState: ObservableObject {
     }
 
     func translate(subject: String?, body: String, isTopic: Bool) async -> IntelligenceService.DraftRewriteResult? {
+        isTranslating = true
         isProcessing = true
-        defer { isProcessing = false }
+        defer { isProcessing = false; isTranslating = false }
         let result = await IntelligenceService.translateToEnglish(subject: subject, body: body, isTopic: isTopic)
         if result != nil { showTranslatePrompt = false }
         return result

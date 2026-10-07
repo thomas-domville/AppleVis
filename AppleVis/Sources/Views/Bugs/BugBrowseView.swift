@@ -11,6 +11,8 @@ struct BugBrowseView: View {
     @State private var platform: BugPlatform = .ios
     @State private var statusFilter: BugStatus? = .active
     @State private var searchText = ""
+    /// Command-F moves here (Adaptive Experience, 2026-10-06).
+    @FocusState private var isSearchFocused: Bool
     @State private var isLoadingMore = false
     @ObservedObject private var networkStatus = NetworkStatusStore.shared
     @AccessibilityFocusState private var isTitleFocused: Bool
@@ -45,6 +47,8 @@ struct BugBrowseView: View {
         .task { await retryAccessibilityFocus(into: $isTitleFocused) }
         .refreshable { await RefreshHeartbeat.during { await load(reset: true) }; SoundPlayer.shared.play(.refresh) }
         .searchable(text: $searchText, prompt: "Search bug reports")
+        .applySearchFocus($isSearchFocused)
+        .keyboardSearchTarget($isSearchFocused)
     }
 
     private var visible: [BugReport] {

@@ -231,6 +231,8 @@ struct EditProfileView: View {
         .sheet(isPresented: $showTimeZonePicker) {
             TimeZonePickerSheet(selection: $timezone)
         }
+        // Ticks while saving is slow (2026-10-07).
+        .waitingTick(while: isSaving, stillWaiting: String(localized: "Still saving."))
     }
 
     /// "America/New_York" -> "New York" — the identifier's region prefix is
@@ -448,6 +450,8 @@ private struct BioAssistSheet: View {
                 }
             }
         }
+        // Ticks while Apple Intelligence writes a bio (2026-10-07).
+        .waitingTick(while: isGenerating, stillWaiting: String(localized: "Still writing."))
     }
 
     private func generate() async {

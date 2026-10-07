@@ -186,6 +186,8 @@ struct AccountSecurityWizard: View {
                     focusStepAfterTransition()
                 }
         }
+        // Ticks while saving is slow (2026-10-07).
+        .waitingTick(while: isSubmitting, stillWaiting: String(localized: "Still saving."))
     }
 
     // Broken out of `body` into its own computed property (along with

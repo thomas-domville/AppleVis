@@ -59,6 +59,10 @@ struct EpisodeDetailView: View {
     // every other content kind for consistency.
     @State private var editingEpisodeNode: EditableNode?
     @Environment(\.dismiss) private var dismiss
+    /// Beside a list on a wide window: see ForumTopicDetailView.
+    @Environment(\.isInDetailPane) private var isInDetailPane
+    @Environment(\.detailFocusRequest) private var detailFocusRequest
+    @Environment(\.closeDetailPane) private var closeDetailPane
     @AccessibilityFocusState private var isTitleFocused: Bool
     @AccessibilityFocusState private var focusedCommentId: String?
     /// Dismissing the Transcript sheet otherwise left VoiceOver focus on
@@ -98,6 +102,7 @@ struct EpisodeDetailView: View {
             SoundPlayer.shared.play(.articleOpen)
             await load()
         }
+        .onChange(of: detailFocusRequest) { _, _ in focusTitleAfterLoad() }
         .task(id: episode?.artworkUrl) {
             guard let artworkUrl = episode?.artworkUrl, let url = URL(string: artworkUrl) else { return }
             artworkDescription = await ImageDescriber.describe(imageAt: url)
@@ -343,15 +348,15 @@ struct EpisodeDetailView: View {
                         player.removeFromQueue(id: episode.id)
                         toast.success(String(localized: "Removed from queue"))
                     } else {
-                        player.enqueue(episode)
-                        toast.success(String(localized: "Added to queue"))
+                        player.enqueue(episode, cue: false)
+                        toast.success(String(localized: "Added to queue"), sound: .podcastQueue)
                     }
                 }
                 .accessibilityLabel(String(localized: isQueued(episode) ? "Remove from Queue" : "Add to Queue"))
 
                 episodeToolButton(title: "Play Next", subtitle: "Up next", systemImage: "text.line.first.and.arrowtriangle.forward") {
-                    player.playNext(episode)
-                    toast.success(String(localized: "Playing next"))
+                    player.playNext(episode, cue: false)
+                    toast.success(String(localized: "Playing next"), sound: .podcastQueue)
                 }
                 .accessibilityLabel(String(localized: "Play Next"))
 
@@ -373,6 +378,9 @@ struct EpisodeDetailView: View {
                         PersistenceStore.shared.markEpisodePlayed(episode.id)
                     }
                     isListened.toggle()
+                    // VoiceOver says On or Off itself; the sound and tap
+                    // match the episode rows (2026-10-07).
+                    SoundPlayer.shared.play(isListened ? .success : .refreshTick)
                 }
                 .accessibilityLabel(String(localized: "Listened"))
                 .accessibilityValue(isListened ? String(localized: "On") : String(localized: "Off"))
@@ -980,7 +988,7 @@ struct EpisodeDetailView: View {
         do {
             try await APIClient.shared.content.deleteNode(nodeId: episode.id, nodeType: "podcast", csrfToken: user.csrfToken)
             toast.success(String(localized: "Episode deleted"))
-            dismiss()
+            if let closeDetailPane { closeDetailPane() } else { dismiss() }
         } catch {
             toast.error(String(localized: "Couldn't delete."))
         }
@@ -1039,7 +1047,7 @@ struct EpisodeDetailView: View {
         // Opened via "Jump to First New Comment": that comment gets focus
         // instead. Title focus used to run regardless, and its retries could
         // pull focus straight back to the title. Reported directly.
-        if episode != nil, !(focusFirstNewCommentOnAppear && newCommentCount > 0) {
+        if episode != nil, !(focusFirstNewCommentOnAppear && newCommentCount > 0), !isInDetailPane {
             focusTitleAfterLoad()
         }
     }
@@ -1358,6 +1366,10 @@ struct ComposePodcastCommentView: View {
                 }
             }
         }
+        // Ticks while posting is slow (2026-10-07).
+        .waitingTick(while: isSubmitting, stillWaiting: String(localized: "Still posting."))
+        // Ticks while Apple Intelligence rewrites or translates (2026-10-07).
+        .waitingTick(while: intelligence.isProcessing, stillWaiting: intelligence.stillWorkingMessage)
     }
 
     @ViewBuilder
@@ -1395,8 +1407,7 @@ struct ComposePodcastCommentView: View {
             let comment = try await APIClient.shared.podcasts.submitComment(
                 episodeId: episodeId, body: commentText, csrfToken: user.csrfToken
             )
-            toast.success(String(localized: "Comment posted"))
-            SoundPlayer.shared.play(.reply)
+            toast.success(String(localized: "Comment posted"), sound: .reply)
             onPosted(comment)
             dismiss()
         } catch let e as APIError { submitError = e.localizedDescription

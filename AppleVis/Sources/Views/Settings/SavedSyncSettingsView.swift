@@ -137,6 +137,8 @@ struct SavedSyncSettingsView: View {
         .navigationTitle("Saved & Sync")
         .navigationBarTitleDisplayMode(.inline)
         .task { await retryAccessibilityFocus(into: $isTitleFocused) }
+        // Ticks while syncing with iCloud is slow (2026-10-07).
+        .waitingTick(while: isSyncing, stillWaiting: String(localized: "Still syncing."))
     }
 
     private func triggerSync() {

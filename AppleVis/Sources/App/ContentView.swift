@@ -11,6 +11,10 @@ struct ContentView: View {
     @State private var showWelcomeTourFromPrompt = false
     @State private var showTranslatePrompt = false
     @State private var detectedLanguageCode: String?
+    /// The tab you were on, so if iOS closes AppleVis in the background
+    /// it reopens where you left it (Adaptive Experience, 2026-10-06).
+    @SceneStorage("applevis.selectedTab") private var savedTab = 0
+    @State private var isRestoringTab = false
 
     var body: some View {
         TabView(selection: $keyCommands.selectedTab) {
@@ -28,7 +32,14 @@ struct ContentView: View {
                 .tag(2)
         }
         .onChange(of: keyCommands.selectedTab) { _, newTab in
-            SoundPlayer.shared.play(.tabChange)
+            savedTab = newTab
+            // Reopening on the saved tab isn't a tab change someone made,
+            // so no sound or announcement for it.
+            if isRestoringTab {
+                isRestoringTab = false
+                return
+            }
+            SoundPlayer.shared.play(AppSound.tabSound(for: newTab))
             // Double-tapping a tab bar item to switch to it doesn't
             // reliably re-announce the new selected state on this SDK's
             // TabView the way exploring back onto an already-selected
@@ -94,6 +105,20 @@ struct ContentView: View {
         .sheet(isPresented: $keyCommands.showSettings) {
             ProfileView()
         }
+        // Command-M and Command-Shift-C open the same Ask the Mouse and
+        // Contact AppleVis as everywhere else, never a copy (Adaptive
+        // Experience, 2026-10-06).
+        .sheet(isPresented: $keyCommands.showAskTheMouse) {
+            AskTheMouseView()
+        }
+        .sheet(isPresented: $keyCommands.showContact) {
+            ContactView()
+        }
+        // "Start a new AppleVis topic" from Siri or Shortcuts. The composer
+        // asks to sign in itself when needed.
+        .sheet(isPresented: $deepLinkRouter.pendingNewTopic) {
+            ComposeTopicView()
+        }
         .sheet(item: $deepLinkRouter.pendingSubmit) { submit in
             submitDestination(for: submit)
         }
@@ -146,6 +171,12 @@ struct ContentView: View {
             Text("Our community spans people from all over the world, speaking many different languages — so we use English as AppleVis's one shared language, to keep everyone reading and talking together in the same place. It looks like your device is set to \(detectedLanguageDisplayName). Want AppleVis to automatically translate posts into \(detectedLanguageDisplayName) as you browse? You can turn this off anytime in Settings.")
         }
         .onAppear {
+            // Quietly, before anything is announced; a link or shortcut
+            // that opened the app picks its own tab afterwards.
+            if (0...2).contains(savedTab), keyCommands.selectedTab == 0, savedTab != 0 {
+                isRestoringTab = true
+                keyCommands.selectedTab = savedTab
+            }
             offerWelcomeTourIfNeeded()
             offerContentTranslationPromptIfNeeded()
         }

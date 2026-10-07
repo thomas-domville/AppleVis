@@ -70,6 +70,8 @@ struct SendNotesWizard: View {
             }
             .task(id: step) { await retryAccessibilityFocus(into: $isStepFocused) }
         }
+        // Ticks while sending is slow (2026-10-07).
+        .waitingTick(while: isSending, stillWaiting: String(localized: "Still sending."))
     }
 
     private var whatsIncluded: some View {

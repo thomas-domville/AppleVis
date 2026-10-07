@@ -100,16 +100,67 @@ struct OpenSavedItemsIntent: AppIntent {
     }
 }
 
+/// Opens Home on New: the new posts and comments you haven't read, across
+/// every kind of content. It used to read Home's summary aloud after
+/// opening the app, which opening the app already shows; New is what
+/// people want when they ask what's new (2026-10-06).
 struct WhatsNewOnAppleVisIntent: AppIntent {
     static var title: LocalizedStringResource = "What's New on AppleVis"
     static var description = IntentDescription(
-        "Speaks a summary of what's new on AppleVis that you haven't read yet."
+        "Opens Home on New, with the new posts and comments you haven't read yet."
     )
     static var openAppWhenRun: Bool = true
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        _ = await UIApplication.shared.open(URL(string: "applevis://whats-new")!)
+        _ = await UIApplication.shared.open(URL(string: "applevis://home?view=new")!)
+        return .result()
+    }
+}
+
+/// Opens Fetch and starts Listen to Fetch: everything new, read aloud,
+/// without touching the screen (2026-10-06).
+struct ListenToFetchIntent: AppIntent {
+    static var title: LocalizedStringResource = "Listen to AppleVis Fetch"
+    static var description = IntentDescription(
+        "Opens Fetch on Home and reads everything new aloud."
+    )
+    static var openAppWhenRun: Bool = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        _ = await UIApplication.shared.open(URL(string: "applevis://home?view=fetch&listen=1")!)
+        return .result()
+    }
+}
+
+/// Opens Home on Nibbles, for the period last chosen there (2026-10-06).
+struct OpenNibblesIntent: AppIntent {
+    static var title: LocalizedStringResource = "Open AppleVis Nibbles"
+    static var description = IntentDescription(
+        "Opens Nibbles on Home, a summary of recent activity on AppleVis."
+    )
+    static var openAppWhenRun: Bool = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        _ = await UIApplication.shared.open(URL(string: "applevis://home?view=nibbles")!)
+        return .result()
+    }
+}
+
+/// Opens the composer for a new forum topic, ready for dictation
+/// (2026-10-06).
+struct StartNewTopicIntent: AppIntent {
+    static var title: LocalizedStringResource = "Start a New AppleVis Topic"
+    static var description = IntentDescription(
+        "Opens the composer to start a new forum topic."
+    )
+    static var openAppWhenRun: Bool = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        _ = await UIApplication.shared.open(URL(string: "applevis://new-topic")!)
         return .result()
     }
 }
@@ -153,37 +204,84 @@ struct AskTheMouseIntent: AppIntent {
     }
 }
 
+/// Opens the Contact AppleVis form (2026-10-06).
+struct ContactAppleVisIntent: AppIntent {
+    static var title: LocalizedStringResource = "Contact AppleVis"
+    static var description = IntentDescription(
+        "Opens the Contact AppleVis form, to ask a question or send feedback to the AppleVis team."
+    )
+    static var openAppWhenRun: Bool = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        _ = await UIApplication.shared.open(URL(string: "applevis://contact")!)
+        return .result()
+    }
+}
+
+/// The spoken Siri phrases, in the order the Shortcuts app and Spotlight
+/// show them: grouped, with the biggest features first. Chosen with the
+/// user (2026-10-06). Open AppleVis, Forums, Unread Topics, Saved Items and
+/// Report a Bug no longer have phrases ("Open AppleVis" works for any app
+/// anyway); they're still actions in the Shortcuts app. An app may have
+/// ten; one is left free for a future feature. Keep Help's "Siri and
+/// Spotlight" article in the same order.
 struct AppleVisShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
+        // Ask and find
         AppShortcut(
-            intent: OpenAppleVisIntent(),
+            intent: AskTheMouseIntent(),
             phrases: [
-                "Open \(.applicationName)",
-                "Open \(.applicationName) app",
+                "Ask the \(.applicationName) Mouse",
+                "Ask \(.applicationName) Mouse a question",
+                "Ask \(.applicationName) a question",
             ],
-            shortTitle: "Open AppleVis",
-            systemImageName: "eye"
+            shortTitle: "Ask the Mouse",
+            systemImageName: "questionmark.bubble.fill"
+        )
+        // A plain String @Parameter can't be embedded in a phrase on this
+        // SDK, so Siri asks for the search words after the phrase.
+        AppShortcut(
+            intent: SearchAppleVisIntent(),
+            phrases: [
+                "Search \(.applicationName)",
+                "Find something on \(.applicationName)",
+                "Look something up on \(.applicationName)",
+            ],
+            shortTitle: "Search AppleVis",
+            systemImageName: "magnifyingglass"
+        )
+        // Catching up on Home
+        AppShortcut(
+            intent: WhatsNewOnAppleVisIntent(),
+            phrases: [
+                "What's new on \(.applicationName)",
+                "Catch me up on \(.applicationName)",
+                "\(.applicationName) update",
+            ],
+            shortTitle: "What's New",
+            systemImageName: "sparkles"
         )
         AppShortcut(
-            intent: OpenAppleVisForumsIntent(),
+            intent: ListenToFetchIntent(),
             phrases: [
-                "Open \(.applicationName) Forums",
-                "Show \(.applicationName) Forums",
-                "Go to \(.applicationName) Forums",
+                "Listen to \(.applicationName) Fetch",
+                "Read me \(.applicationName) Fetch",
+                "Play \(.applicationName) Fetch",
             ],
-            shortTitle: "Open Forums",
-            systemImageName: "bubble.left.and.bubble.right.fill"
+            shortTitle: "Listen to Fetch",
+            systemImageName: "dog.fill"
         )
         AppShortcut(
-            intent: ShowUnreadTopicsIntent(),
+            intent: OpenNibblesIntent(),
             phrases: [
-                "Show unread \(.applicationName) topics",
-                "Open \(.applicationName) unread",
-                "What's unread on \(.applicationName)",
+                "Open \(.applicationName) Nibbles",
+                "Show me \(.applicationName) Nibbles",
             ],
-            shortTitle: "Unread Topics",
-            systemImageName: "envelope.badge.fill"
+            shortTitle: "Nibbles",
+            systemImageName: "newspaper.fill"
         )
+        // Podcasts
         AppShortcut(
             intent: ResumeAppleVisPodcastIntent(),
             phrases: [
@@ -204,63 +302,26 @@ struct AppleVisShortcuts: AppShortcutsProvider {
             shortTitle: "Play Latest Podcast",
             systemImageName: "radio.fill"
         )
+        // Posting and getting in touch
         AppShortcut(
-            intent: SearchAppleVisIntent(),
-            // Confirmed via the AppIntents metadata compiler itself
-            // ("'AppEntity' and 'AppEnum' are the only allowed types for
-            // 'query'") — a plain String @Parameter genuinely can't be
-            // embedded in a phrase on this SDK, so RN's equivalent phrases
-            // (which did embed their query parameter) aren't reproducible
-            // here. Siri still prompts for `query` conversationally after
-            // one of these static phrases.
+            intent: StartNewTopicIntent(),
             phrases: [
-                "Search \(.applicationName)",
-                "Find something on \(.applicationName)",
-                "Look something up on \(.applicationName)",
+                "Start a new \(.applicationName) topic",
+                "Post on \(.applicationName)",
+                "New \(.applicationName) topic",
             ],
-            shortTitle: "Search AppleVis",
-            systemImageName: "magnifyingglass"
+            shortTitle: "New Topic",
+            systemImageName: "square.and.pencil"
         )
         AppShortcut(
-            intent: OpenSavedItemsIntent(),
+            intent: ContactAppleVisIntent(),
             phrases: [
-                "Open my \(.applicationName) saved items",
-                "Show \(.applicationName) saved",
-                "My \(.applicationName) bookmarks",
+                "Contact \(.applicationName)",
+                "Send feedback to \(.applicationName)",
+                "Report a problem with \(.applicationName)",
             ],
-            shortTitle: "Saved Items",
-            systemImageName: "bookmark.fill"
-        )
-        AppShortcut(
-            intent: WhatsNewOnAppleVisIntent(),
-            phrases: [
-                "What's new on \(.applicationName)",
-                "Catch me up on \(.applicationName)",
-                "\(.applicationName) update",
-            ],
-            shortTitle: "What's New",
-            systemImageName: "sparkles"
-        )
-        AppShortcut(
-            intent: ReportBugToAppleVisIntent(),
-            phrases: [
-                "Report a bug to \(.applicationName)",
-                "Report an \(.applicationName) bug",
-                "File an \(.applicationName) accessibility bug",
-            ],
-            shortTitle: "Report a Bug",
-            systemImageName: "ant.fill"
-        )
-        // The tenth and last shortcut an app is allowed.
-        AppShortcut(
-            intent: AskTheMouseIntent(),
-            phrases: [
-                "Ask the \(.applicationName) Mouse",
-                "Ask \(.applicationName) Mouse a question",
-                "Ask \(.applicationName) a question",
-            ],
-            shortTitle: "Ask the Mouse",
-            systemImageName: "questionmark.bubble.fill"
+            shortTitle: "Contact AppleVis",
+            systemImageName: "envelope.fill"
         )
     }
 }

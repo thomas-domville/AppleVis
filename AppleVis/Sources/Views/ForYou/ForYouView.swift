@@ -263,6 +263,8 @@ struct DownloadsView: View {
     /// view's rows and fixed alongside it, matching the same pattern
     /// already used in the other three ForYou sections.
     @AccessibilityFocusState private var summaryFocused: Bool
+    /// The row VoiceOver moves to after one is removed.
+    @AccessibilityFocusState private var focusedRow: String?
 
     var body: some View {
         Group {
@@ -320,7 +322,8 @@ struct DownloadsView: View {
                         downloadsSummaryHeader
                             .accessibilityFocused($summaryFocused)
                         ForEach(downloads.downloadedEpisodes, id: \.id) { meta in
-                            DownloadedEpisodeRow(meta: meta)
+                            DownloadedEpisodeRow(meta: meta) { removeDownload(meta.id) }
+                                .accessibilityFocused($focusedRow, equals: meta.id)
                         }
                     }
                     if !downloads.downloadedEpisodes.isEmpty {
@@ -336,7 +339,8 @@ struct DownloadsView: View {
                 ) {
                     Button("Remove Downloads", role: .destructive) {
                         DownloadManager.shared.deleteAll()
-                        UIAccessibility.post(notification: .announcement, argument: "All downloads removed.")
+                        let message = ActionCue.play(.success, orSay: String(localized: "All downloads removed."))
+                        Task { await moveAccessibilityFocusPromptly(into: $summaryFocused, saying: message) }
                     }
                     Button("Cancel", role: .cancel) {}
                 } message: {
@@ -353,6 +357,22 @@ struct DownloadsView: View {
         .onChange(of: downloads.lastFailure) { _, failure in
             guard let failure else { return }
             toast.error(String(localized: "Couldn't download \"\(failure.episodeTitle)\". Try again."))
+        }
+    }
+
+    /// Sound and tap, then the next download (or the summary when none are
+    /// left), instead of VoiceOver landing wherever the list put it
+    /// (2026-10-07).
+    private func removeDownload(_ id: String) {
+        let next = ActionCue.neighbor(of: id, in: downloads.downloadedEpisodes.map(\.id))
+        downloads.delete(id)
+        let spoken = ActionCue.play(next == nil ? .success : .markedRead, orSay: String(localized: "Download removed."))
+        Task {
+            if let next {
+                await moveAccessibilityFocusPromptly(to: next, into: $focusedRow, saying: spoken)
+            } else {
+                await moveAccessibilityFocusPromptly(into: $summaryFocused, saying: spoken)
+            }
         }
     }
 
@@ -406,6 +426,9 @@ fileprivate func downloadedEpisodePlaceholder(for meta: DownloadedEpisodeMeta) -
 /// so this is genuinely the same episode id space, not a coincidental match.
 private struct DownloadedEpisodeRow: View {
     let meta: DownloadedEpisodeMeta
+    /// Removes this download through the list, which moves VoiceOver on
+    /// (2026-10-07).
+    let onRemove: () -> Void
     @EnvironmentObject private var player: PlayerStore
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @EnvironmentObject private var preferences: PreferencesStore
@@ -450,6 +473,7 @@ private struct DownloadedEpisodeRow: View {
             Button {
                 if isQueued {
                     player.removeFromQueue(id: meta.id)
+                    SoundPlayer.shared.play(.markedRead)
                 } else {
                     player.enqueue(downloadedEpisodePlaceholder(for: meta))
                 }
@@ -471,12 +495,13 @@ private struct DownloadedEpisodeRow: View {
         .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to Queue")) {
             if isQueued {
                 player.removeFromQueue(id: meta.id)
+                SoundPlayer.shared.play(.markedRead)
             } else {
                 player.enqueue(downloadedEpisodePlaceholder(for: meta))
             }
         }
         .accessibilityAction(named: Text("Remove Download")) {
-            downloads.delete(meta.id)
+            onRemove()
         }
         // .accessibilityHidden(true) on this button did not stop it from
         // also being announced as a bare "Remove" custom action alongside
@@ -486,7 +511,7 @@ private struct DownloadedEpisodeRow: View {
         // one name from VoiceOver but sees "Delete" on the swipe button
         // itself has no way to know they're the same action.
         .voiceOverAwareSwipeActions {
-            Button("Remove", role: .destructive) { downloads.delete(meta.id) }
+            Button("Remove", role: .destructive) { onRemove() }
         }
         .task(id: ContentTranslation.taskId(title: meta.title, targetLanguage: preferences.effectiveContentLanguage)) {
             translatedTitle = await ContentTranslation.resolvedTitle(
@@ -537,6 +562,8 @@ struct SavedItemsView: View {
     @State private var showUnsaveAllConfirm = false
     @State private var showBrowseContent = false
     @AccessibilityFocusState private var summaryFocused: Bool
+    /// The row VoiceOver moves to after one is removed.
+    @AccessibilityFocusState private var focusedRow: String?
 
     /// One saved thing in the list: an item, or a Mouse answer.
     private enum Entry: Identifiable {
@@ -663,12 +690,15 @@ struct SavedItemsView: View {
             summaryHeader
                 .accessibilityFocused($summaryFocused)
             ForEach(entries) { entry in
-                switch entry {
-                case .item(let item):
-                    rowView(for: item)
-                case .answer(let answer):
-                    SavedMouseAnswerRow(answer: answer) { removeAnswer(answer) }
+                Group {
+                    switch entry {
+                    case .item(let item):
+                        rowView(for: item)
+                    case .answer(let answer):
+                        SavedMouseAnswerRow(answer: answer) { removeAnswer(answer) }
+                    }
                 }
+                .accessibilityFocused($focusedRow, equals: entry.id)
             }
             if !entries.isEmpty {
                 Button("Unsave All", role: .destructive) { showUnsaveAllConfirm = true }
@@ -776,14 +806,30 @@ struct SavedItemsView: View {
     /// list still on screen and moves focus back to the summary, matching
     /// RN's post-unsave focus handling (foryou.tsx ~611-618).
     private func removeFromList(_ item: SavedItem) {
+        let next = ActionCue.neighbor(of: "item-\(item.id)", in: entries.map(\.id))
         items.removeAll { $0.id == item.id }
         enrichedEpisodes.removeValue(forKey: item.id)
-        focusSummaryAfterDelay()
+        moveOn(to: next, saying: String(localized: "Removed from Saved"))
     }
 
     private func removeAnswer(_ answer: SavedMouseAnswer) {
+        let next = ActionCue.neighbor(of: "answer-\(answer.id)", in: entries.map(\.id))
         answers.removeAll { $0.id == answer.id }
-        focusSummaryAfterDelay()
+        moveOn(to: next, saying: String(localized: "Removed from Saved"))
+    }
+
+    /// After a row is removed: a sound and tap, and VoiceOver straight to
+    /// the next row, or the summary when the list is empty. It used to go
+    /// back to the summary every time, losing your place (2026-10-07).
+    private func moveOn(to next: String?, saying message: String) {
+        let spoken = ActionCue.play(next == nil ? .success : .markedRead, orSay: message)
+        Task {
+            if let next {
+                await moveAccessibilityFocusPromptly(to: next, into: $focusedRow, saying: spoken)
+            } else {
+                await moveAccessibilityFocusPromptly(into: $summaryFocused, saying: spoken)
+            }
+        }
     }
 
     private func unsaveAll() {
@@ -793,9 +839,9 @@ struct SavedItemsView: View {
         let answersToRemove = Set(filteredAnswers.map(\.id))
         for id in answersToRemove { PersistenceStore.shared.unsaveMouseAnswer(id: id) }
         answers.removeAll { answersToRemove.contains($0.id) }
-        toast.success(String(localized: "Removed \(toRemove.count + answersToRemove.count) items from Saved"))
-        UIAccessibility.post(notification: .announcement, argument: String(localized: "Removed saved items."))
-        focusSummaryAfterDelay()
+        toast.success(String(localized: "Removed \(toRemove.count + answersToRemove.count) items from Saved"), quiet: true)
+        let message = ActionCue.play(.success, orSay: String(localized: "Removed saved items."))
+        Task { await moveAccessibilityFocusPromptly(into: $summaryFocused, saying: message) }
     }
 
     /// Retries at each delay rather than a single guessed one — setting
@@ -980,7 +1026,7 @@ private struct SavedPodcastEpisodeCard: View {
             .accessibilityHidden(true)
 
             Button {
-                if isQueued { player.removeFromQueue(id: episode.id) } else { player.enqueue(episode) }
+                if isQueued { player.removeFromQueue(id: episode.id); SoundPlayer.shared.play(.markedRead) } else { player.enqueue(episode) }
             } label: {
                 Image(systemName: isQueued ? "text.badge.minus" : "text.badge.plus")
                     .font(.title3)
@@ -1004,7 +1050,7 @@ private struct SavedPodcastEpisodeCard: View {
             Task { await playOrToggle() }
         }
         .accessibilityAction(named: Text(isQueued ? "Remove from Queue" : "Add to Queue")) {
-            if isQueued { player.removeFromQueue(id: episode.id) } else { player.enqueue(episode) }
+            if isQueued { player.removeFromQueue(id: episode.id); SoundPlayer.shared.play(.markedRead) } else { player.enqueue(episode) }
         }
         .contentActions(
             id: episode.id, entityId: episode.nid, kind: .podcastEpisode, title: episode.title,
@@ -1033,6 +1079,8 @@ struct FollowingView: View {
     @State private var error: String?
     @State private var showBrowseForums = false
     @AccessibilityFocusState private var summaryFocused: Bool
+    /// The row VoiceOver moves to after one is removed.
+    @AccessibilityFocusState private var focusedRow: String?
     /// Reports the loaded count back to ForYouView so its section picker
     /// can show "Following (3)" once this section has been visited at
     /// least once this session — Following is server-backed, so unlike
@@ -1070,9 +1118,20 @@ struct FollowingView: View {
                         .accessibilityFocused($summaryFocused)
                     ForEach(items) { item in
                         FollowedItemRow(item: item) {
+                            // Sound and tap, then the next followed item
+                            // (or the summary when none are left).
+                            let next = ActionCue.neighbor(of: item.id, in: items.map(\.id))
                             items.removeAll { $0.id == item.id }
-                            focusSummaryAfterDelay()
+                            let spoken = ActionCue.play(next == nil ? .success : .markedRead, orSay: String(localized: "Unfollowed"))
+                            Task {
+                                if let next {
+                                    await moveAccessibilityFocusPromptly(to: next, into: $focusedRow, saying: spoken)
+                                } else {
+                                    await moveAccessibilityFocusPromptly(into: $summaryFocused, saying: spoken)
+                                }
+                            }
                         }
+                        .accessibilityFocused($focusedRow, equals: item.id)
                     }
                 }
                 .refreshable { await RefreshHeartbeat.during { await load() }; SoundPlayer.shared.play(.refresh) }
@@ -1225,6 +1284,8 @@ struct RecommendedAppsView: View {
     @State private var error: String?
     @State private var showBrowseApps = false
     @AccessibilityFocusState private var summaryFocused: Bool
+    /// The row VoiceOver moves to after one is removed.
+    @AccessibilityFocusState private var focusedRow: String?
     /// Same purpose as FollowingView's `onLoaded` — lets ForYouView's
     /// section picker show "Recommended (5)" once this section has loaded
     /// at least once this session.
@@ -1258,6 +1319,7 @@ struct RecommendedAppsView: View {
                         RecommendedAppRow(app: app) {
                             Task { await unrecommend(app) }
                         }
+                        .accessibilityFocused($focusedRow, equals: app.id)
                     }
                 }
                 .refreshable { await RefreshHeartbeat.during { await load() }; SoundPlayer.shared.play(.refresh) }
@@ -1305,9 +1367,16 @@ struct RecommendedAppsView: View {
         guard let user = auth.user else { return }
         do {
             try await APIClient.shared.flags.unrecommend(nodeUuid: app.id, token: user.csrfToken)
+            // Sound and tap, then the next recommended app (or the summary).
+            let next = ActionCue.neighbor(of: app.id, in: apps.map(\.id))
             apps.removeAll { $0.id == app.id }
-            toast.success(String(localized: "Removed from Recommendations"))
-            UIAccessibility.post(notification: .announcement, argument: "Removed \(app.title) from your recommendations.")
+            toast.success(String(localized: "Removed from Recommendations"), quiet: true)
+            let spoken = ActionCue.play(next == nil ? .success : .markedRead, orSay: String(localized: "Removed from Recommendations"))
+            if let next {
+                await moveAccessibilityFocusPromptly(to: next, into: $focusedRow, saying: spoken)
+            } else {
+                await moveAccessibilityFocusPromptly(into: $summaryFocused, saying: spoken)
+            }
         } catch let e as APIError {
             toast.error(e.localizedDescription)
         } catch {

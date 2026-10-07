@@ -872,7 +872,9 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
-    func markAllAsRead(_ itemsToMark: [FeedItem]) {
+    /// `announce: false` when the caller confirms it with a sound and moves
+    /// VoiceOver itself (Home's New, Fetch).
+    func markAllAsRead(_ itemsToMark: [FeedItem], announce: Bool = true) {
         guard !itemsToMark.isEmpty else { return }
         for item in itemsToMark {
             PersistenceStore.shared.stampItemVisit(id: item.id, commentCount: item.commentCount)
@@ -893,9 +895,10 @@ final class HomeViewModel: ObservableObject {
         // layout change and VoiceOver dropped it silently. A short delay
         // lets the collapse finish first. Reported directly: "Mark All
         // Read" said nothing.
+        guard announce else { return }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(400))
-            UIAccessibility.post(notification: .announcement, argument: "All new activity marked as read.")
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "All new activity marked as read."))
         }
     }
 
@@ -1396,6 +1399,6 @@ final class HomeViewModel: ObservableObject {
         guard !parts.isEmpty else {
             return String(localized: "New items not read yet: \(newItems.count)")
         }
-        return String(localized: "Not read yet: \(ListFormatter.localizedString(byJoining: parts))")
+        return String(localized: "New since you last read or marked as read: \(ListFormatter.localizedString(byJoining: parts))")
     }
 }

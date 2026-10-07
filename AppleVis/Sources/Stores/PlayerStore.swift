@@ -301,19 +301,23 @@ final class PlayerStore: ObservableObject {
 
     // MARK: - Queue
 
-    func enqueue(_ episode: PodcastEpisode) {
+    /// `cue`: plays the queue sound. Off when the caller's own message
+    /// plays it instead (2026-10-07).
+    func enqueue(_ episode: PodcastEpisode, cue: Bool = true) {
         guard !queue.contains(where: { $0.id == episode.id }) else { return }
         queue.append(episode)
         saveQueue()
+        if cue { SoundPlayer.shared.play(.podcastQueue) }
     }
 
     /// Inserts at the front of "Up Next" instead of the end — `enqueue`
     /// alone had no way to say "play this one right after the current
     /// episode" versus "play this one last."
-    func playNext(_ episode: PodcastEpisode) {
+    func playNext(_ episode: PodcastEpisode, cue: Bool = true) {
         queue.removeAll { $0.id == episode.id }
         queue.insert(episode, at: 0)
         saveQueue()
+        if cue { SoundPlayer.shared.play(.podcastQueue) }
     }
 
     func removeFromQueue(id: String) {

@@ -10,6 +10,8 @@ struct GuideBrowseView: View {
     @State private var hasMore = false
     @State private var selectedFilter: GuideFilter = .all
     @State private var searchText = ""
+    /// Command-F moves here (Adaptive Experience, 2026-10-06).
+    @FocusState private var isSearchFocused: Bool
     @State private var isLoadingMore = false
     @ObservedObject private var networkStatus = NetworkStatusStore.shared
     @AccessibilityFocusState private var isTitleFocused: Bool
@@ -34,6 +36,8 @@ struct GuideBrowseView: View {
         .task { await retryAccessibilityFocus(into: $isTitleFocused) }
         .refreshable { await RefreshHeartbeat.during { await load(reset: true) }; SoundPlayer.shared.play(.refresh) }
         .searchable(text: $searchText, prompt: "Search guides")
+        .applySearchFocus($isSearchFocused)
+        .keyboardSearchTarget($isSearchFocused)
     }
 
     private var visible: [Resource] {

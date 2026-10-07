@@ -209,6 +209,9 @@ struct DetailActionsMenu: View {
                 }
             }
         }
+        // Command-Shift-S, while this post is on screen (Adaptive
+        // Experience, 2026-10-06).
+        .keyboardSaveTarget { toggleSave() }
     }
 
     private func addComment() {
@@ -232,12 +235,11 @@ struct DetailActionsMenu: View {
         if isSaved {
             PersistenceStore.shared.unsave(id: id)
             isSaved = false
-            toast.success(String(localized: "Removed from Saved"))
+            toast.success(String(localized: "Removed from Saved"), sound: .unsaved)
         } else {
             PersistenceStore.shared.save(SavedItem(id: id, kind: kind, title: title, savedAt: Date(), lastActivityAt: lastActivityAt))
             isSaved = true
-            toast.success(String(localized: "Saved"))
-            SoundPlayer.shared.play(.bookmarkSaved)
+            toast.success(String(localized: "Saved"), sound: .bookmarkSaved)
         }
     }
 
@@ -249,7 +251,7 @@ struct DetailActionsMenu: View {
                 PersistenceStore.shared.markUnfollowed(id: id)
                 FollowStore.shared.markNotFollowed(id)
                 isFollowing = false
-                toast.success(String(localized: "Unfollowed"))
+                toast.success(String(localized: "Unfollowed"), sound: .unfollowed)
             } else {
                 try await APIClient.shared.flags.follow(nodeUuid: id, nodeType: kind.nodeType, entityId: entityId, token: user.csrfToken)
                 PersistenceStore.shared.markFollowed(FollowedItem(
@@ -258,7 +260,7 @@ struct DetailActionsMenu: View {
                 ))
                 FollowStore.shared.markFollowed(id)
                 isFollowing = true
-                toast.success(String(localized: "Following"))
+                toast.success(String(localized: "Following"), sound: .followed)
                 if kind == .forumTopic { tips.show(.followTopicNotifications) }
             }
         } catch let e as APIError {
@@ -275,13 +277,12 @@ struct DetailActionsMenu: View {
                 try await APIClient.shared.flags.unrecommend(nodeUuid: id, token: user.csrfToken)
                 RecommendationStore.shared.markNotRecommended(id)
                 isRecommended = false
-                toast.success(String(localized: "Removed from Recommendations"))
+                toast.success(String(localized: "Removed from Recommendations"), sound: .unrecommended)
             } else {
                 try await APIClient.shared.flags.recommend(nodeUuid: id, nodeType: kind.nodeType, entityId: entityId, token: user.csrfToken)
                 RecommendationStore.shared.markRecommended(id)
                 isRecommended = true
-                toast.success(String(localized: "You recommended this app!"))
-                SoundPlayer.shared.play(.bookmarkSaved)
+                toast.success(String(localized: "You recommended this app!"), sound: .recommended)
             }
         } catch let e as APIError {
             toast.error(e.localizedDescription)

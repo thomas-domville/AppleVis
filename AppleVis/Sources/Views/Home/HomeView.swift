@@ -58,6 +58,8 @@ extension Notification.Name {
 
 enum HomeFocusTarget: Hashable {
     case summary
+    /// New's "You're all caught up" line, after the last item is marked read.
+    case caughtUp
     case greeting
     case item(String)
     case askTheMouse
@@ -313,6 +315,15 @@ struct HomeView: View {
             .refreshable {
                 await refreshAndAnnounce()
             }
+            // A row's own Mark as Read action (swipe or Actions rotor) gets
+            // the same quick confirmation and focus move.
+            .environment(\.markedReadFeedback, MarkedReadFeedbackAction { kind, id in
+                if let item = visibleItems.first(where: { $0.kind == kind && $0.contentId == id }) {
+                    confirmMarkedRead(item)
+                } else if let message = ActionCue.play(.markedRead, orSay: String(localized: "Marked as read.")) {
+                    ActionCue.sayQueued(message)
+                }
+            })
             .onReceive(keyCommands.refreshRequested) { Task { await vm.load() } }
             // Returning to the foreground while on some other tab
             // deliberately does nothing here — refreshing a list the user
@@ -357,6 +368,8 @@ struct HomeView: View {
             }) {
                 AskTheMouseView()
             }
+            // Command-N, same as Post (Adaptive Experience, 2026-10-06).
+            .keyboardNewTopicTarget { showComposeTopic = true }
             .sheet(isPresented: $showComposeTopic, onDismiss: { Task { await vm.load() } }) {
                 ComposeTopicView()
             }
@@ -666,6 +679,7 @@ struct HomeView: View {
                     Text("You're all caught up. There's nothing new to read.")
                         .font(.subheadline).foregroundStyle(.secondary)
                         .listRowSeparator(.hidden)
+                        .accessibilityFocused($focusTarget, equals: .caughtUp)
                 }
 
                 if !visibleItems.isEmpty {
@@ -687,7 +701,11 @@ struct HomeView: View {
                         Spacer()
                         if homeFeedFilter == .new {
                             Button("Mark All Read") {
-                                vm.markAllAsRead(visibleItems)
+                                vm.markAllAsRead(visibleItems, announce: false)
+                                // The success sound, then straight to the
+                                // all caught up line (2026-10-07).
+                                let message = ActionCue.play(.success, orSay: String(localized: "All new activity marked as read."))
+                                Task { await moveAccessibilityFocusPromptly(to: .caughtUp, into: $focusTarget, saying: message) }
                             }
                             .font(.caption.weight(.bold))
                             .accessibilityLabel(String(localized: "Mark all new activity as read"))
@@ -707,7 +725,8 @@ struct HomeView: View {
                     let newCount = vm.newReplyCount(for: item)
                     let showsNewBadge = newItemIds.contains(item.id) && (vm.isBrandNew(item) || newCount == 0)
                     FeedRow(item: item, newCount: newCount, isNew: showsNewBadge) {
-                        vm.markAsRead(item)
+                        confirmMarkedRead(item)
+                        vm.markAsRead(item, announce: false)
                     }
                     .id(item.id)
                     .accessibilityFocused($focusTarget, equals: .item(item.id))
@@ -813,6 +832,24 @@ struct HomeView: View {
     /// lost their place. Pull-to-refresh starts at the top, so it still
     /// moves to the box, without the extra announcement. Reported directly
     /// (2026-10-04).
+    /// Marking an item read: a sound and tap at once. In New the item
+    /// leaves the list, so VoiceOver moves straight to the next item, or
+    /// the one before, or "You're all caught up" with the success sound.
+    /// In All it stays, so focus does too. Called before the item is
+    /// marked, while it's still listed (2026-10-07).
+    private func confirmMarkedRead(_ item: FeedItem) {
+        guard homeFeedFilter == .new else {
+            if let message = ActionCue.play(.markedRead, orSay: String(localized: "Marked as read.")) {
+                ActionCue.sayQueued(message)
+            }
+            return
+        }
+        let next = ActionCue.neighbor(of: item.id, in: visibleItems.map(\.id))
+        let message = ActionCue.play(next == nil ? .success : .markedRead, orSay: String(localized: "Marked as read."))
+        let target: HomeFocusTarget = next.map { .item($0) } ?? .caughtUp
+        Task { await moveAccessibilityFocusPromptly(to: target, into: $focusTarget, saying: message) }
+    }
+
     private func refreshAndAnnounce(returningToApp: Bool = false) async {
         // announceWelcomeIfNeeded() only ever fires once per session (see
         // hasAnnouncedWelcome), so a reload otherwise gets nothing but a
