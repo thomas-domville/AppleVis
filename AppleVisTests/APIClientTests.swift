@@ -10,9 +10,9 @@ struct APIClientTests {
         #expect(message == "This item is no longer available. It may have been removed, moved, or is awaiting moderation.")
     }
 
-    @Test("unknown(400) still reports the raw code when not remapped")
-    func unknownMessageStillMentionsCode() {
-        #expect(APIError.unknown(statusCode: 400).errorDescription == "Unexpected error (HTTP 400).")
+    @Test("unknown(400) has a friendly, non-technical message when not remapped")
+    func unknownMessageIsFriendly() {
+        #expect(APIError.unknown(statusCode: 400).errorDescription == "AppleVis sent back something unexpected. Try again in a moment.")
     }
 
     // A content UUID sourced from a list/feed endpoint can outlive the node

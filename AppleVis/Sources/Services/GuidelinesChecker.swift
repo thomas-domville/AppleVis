@@ -390,7 +390,7 @@ enum GuidelinesChecker {
 
     /// Free, personal mailbox services, from the rules file. Also catches
     /// regional versions like yahoo.co.uk or hotmail.fr.
-    static func isPersonalEmailDomain(_ domain: String) -> Bool {
+    nonisolated static func isPersonalEmailDomain(_ domain: String) -> Bool {
         let rules = GuidelineRules.current
         if rules.list("personalEmailProviders").contains(domain) { return true }
         let regionalBases = rules.list("personalEmailRegionalBases")

@@ -360,8 +360,8 @@ struct FetchHeadingsRotor: ViewModifier {
     func body(content: Content) -> some View {
         content.accessibilityRotor(.headings) {
             AccessibilityRotorEntry(String(localized: "Fetch"), id: Self.headerID)
-            if !groups.isEmpty {
-                AccessibilityRotorEntry(String(localized: "Reading List"), id: Self.readingListID)
+            ForEach(groups.isEmpty ? [] : [Self.readingListID], id: \.self) { id in
+                AccessibilityRotorEntry(String(localized: "Reading List"), id: id)
             }
             ForEach(groups, id: \.item.id) { group in
                 AccessibilityRotorEntry(

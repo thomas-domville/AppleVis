@@ -384,16 +384,17 @@ final class AskTheMouse: ObservableObject {
         let catalog = MouseAppleCatalog.candidates(for: question, phrases: Array(earlier.prefix(1)))
         // The devices and features from About Me, when filled in.
         let aboutMe = MouseProfile.load().modelText
-        var plan = await IntelligenceService.mousePlan(for: question, earlier: earlier, catalog: catalog, aboutMe: aboutMe)
+        var draftPlan = await IntelligenceService.mousePlan(for: question, earlier: earlier, catalog: catalog, aboutMe: aboutMe)
             ?? IntelligenceService.MousePlan(searchPhrases: [fallback])
         if Task.isCancelled { return }
         // A question in another language matches none of Apple's English
         // page titles before planning. Once Apple Intelligence has put it
         // into English search words, a clear match is offered.
-        if plan.appleLink == nil, plan.catalogLink == nil,
-           [.appleHowTo, .other, .communityDiscussion].contains(plan.kind) {
-            plan.catalogLink = MouseAppleCatalog.confidentMatch(for: question, phrases: plan.searchPhrases + [plan.webQuery])
+        if draftPlan.appleLink == nil, draftPlan.catalogLink == nil,
+           [.appleHowTo, .other, .communityDiscussion].contains(draftPlan.kind) {
+            draftPlan.catalogLink = MouseAppleCatalog.confidentMatch(for: question, phrases: draftPlan.searchPhrases + [draftPlan.webQuery])
         }
+        let plan = draftPlan
         // Not about Apple, accessibility, or AppleVis, like "What's the
         // best Kia SUV?": a friendly redirect, without searching AppleVis
         // for it. Requested directly (2026-10-01).
@@ -498,10 +499,11 @@ final class AskTheMouse: ObservableObject {
         let scorer = Self.relevanceScorer(question: question, words: words)
         let feedback = MouseSourceFeedback.load()
         let essential = await essentialFound
-        var guideCandidates = plan.kind == .findApps ? [] : Self.guideCandidates(site?.guides ?? [], scorer: scorer)
+        var rankedGuides = plan.kind == .findApps ? [] : Self.guideCandidates(site?.guides ?? [], scorer: scorer)
         if let essential {
-            guideCandidates = [essential] + guideCandidates.filter { $0.id != essential.id }
+            rankedGuides = [essential] + rankedGuides.filter { $0.id != essential.id }
         }
+        let guideCandidates = rankedGuides
         // A known bug that matches, for "it isn't working" questions.
         let bugCandidate: BugReport? = [.appleHowTo, .communityDiscussion, .other].contains(plan.kind)
             ? Self.ranked(site?.bugs ?? [], by: scorer) { ($0.title, $0.summary) }.first

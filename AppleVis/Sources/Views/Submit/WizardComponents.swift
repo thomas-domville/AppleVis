@@ -59,6 +59,7 @@ struct ThankYouView<Footer: View>: View {
     /// suggestion, never something the wizard should push.
     @ViewBuilder var footer: () -> Footer
     @AccessibilityFocusState private var isHeadingFocused: Bool
+    @State private var hasAppeared = false
 
     var body: some View {
         VStack(spacing: 24) {
@@ -79,7 +80,7 @@ struct ThankYouView<Footer: View>: View {
                 // view appears, which for a one-shot completion screen like
                 // this is exactly "on appear." System symbol effects
                 // already respect Reduce Motion on their own.
-                .symbolEffect(.bounce)
+                .symbolEffect(.bounce, value: hasAppeared)
 
             // `Text(String)`/`Button(String)` resolve to the verbatim
             // initializer, not the LocalizedStringKey one, so a plain
@@ -106,6 +107,7 @@ struct ThankYouView<Footer: View>: View {
             Spacer()
         }
         .padding(32)
+        .onAppear { hasAppeared = true }
         .task {
             try? await Task.sleep(for: .milliseconds(350))
             isHeadingFocused = true

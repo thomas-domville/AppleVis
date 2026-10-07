@@ -158,9 +158,7 @@ nonisolated final class GuidelineRules: @unchecked Sendable {
               published.version > current.version
         else { return }
         try? data.write(to: savedURL, options: .atomic)
-        lock.lock()
-        active = published
-        lock.unlock()
+        Self.lock.withLock { active = published }
         AppLog.network.info("Guideline rules updated to version \(published.version)")
     }
 }

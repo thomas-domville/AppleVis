@@ -204,6 +204,12 @@ enum IntelligenceService {
         var threadTitle: String = ""
         var isReply: Bool = false
         var authorStartedThread: Bool = false
+
+        nonisolated init(threadTitle: String = "", isReply: Bool = false, authorStartedThread: Bool = false) {
+            self.threadTitle = threadTitle
+            self.isReply = isReply
+            self.authorStartedThread = authorStartedThread
+        }
     }
 
     /// Two steps. First the post alone, as before: clear-cut rules never get

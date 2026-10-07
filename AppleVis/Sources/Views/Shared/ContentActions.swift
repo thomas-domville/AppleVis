@@ -625,7 +625,7 @@ struct ContentActionsModifier: ViewModifier {
 /// actions appear, in what order, or under what condition up there, update
 /// `canonicalActions` below to match, or the test suite will pass against a
 /// mirror that no longer reflects the real UI.
-enum ContentAction: Equatable {
+nonisolated enum ContentAction: Hashable, Sendable {
     case markAsRead
     case jumpToFirstNewComment
     case save
