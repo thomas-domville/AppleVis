@@ -222,6 +222,29 @@ struct NotificationSettingsView: View {
                 }
             }
 
+            Section {
+                Toggle("Catch-Up Reminders", isOn: $preferences.catchUpReminders)
+                    .disabled(pushDenied)
+                    .accessibilityHint(String(localized: "If you haven't opened AppleVis for a week, a gentle reminder says what's new."))
+                    .onChange(of: preferences.catchUpReminders) { _, isOn in
+                        CatchUpReminders.markOffered()
+                        if isOn {
+                            if systemAuthStatus == .notDetermined { requestPermission() }
+                        } else {
+                            CatchUpReminders.disable()
+                        }
+                    }
+                Text("If you haven't opened AppleVis for a week, you'll get a gentle reminder of what's new. If you're still away, one more comes two weeks later, and then no more until you're back.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Reminders")
+            } footer: {
+                if pushDenied {
+                    Text("Push notifications are blocked in iOS Settings — these won't arrive until allowed above.")
+                }
+            }
+
             if !auth.isSignedIn {
                 Section {
                     Label {
@@ -247,6 +270,7 @@ struct NotificationSettingsView: View {
                     preferences.notifyNewResources = false
                     preferences.notifyAnnouncements = false
                     preferences.notifyNewComments = false
+                    preferences.catchUpReminders = false
                     preferences.notificationSound = .mouseSqueak
                     preferences.badgeCountEnabled = true
                 }

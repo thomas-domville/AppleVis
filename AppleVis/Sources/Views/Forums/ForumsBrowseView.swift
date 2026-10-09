@@ -167,7 +167,7 @@ struct ForumsBrowseView: View {
         .navigationTitle("Forums")
         .keyboardNewTopicTarget { showComposeFromKeyboard = true }
         .navigationDestination(isPresented: $showComposeFromKeyboard) {
-            ComposeTopicView(onPosted: { topic in
+            ComposeTopicView(isInSheet: false, onPosted: { topic in
                 topics.insert(topic, at: 0)
                 revealAndFocus(topic)
             })
@@ -187,7 +187,7 @@ struct ForumsBrowseView: View {
                     // auth.isSignedIn with no accessibility label at all —
                     // a bare "square.and.pencil" icon has no useful default
                     // VoiceOver reading. Reported directly.
-                    NavigationLink(destination: ComposeTopicView(onPosted: { topic in
+                    NavigationLink(destination: ComposeTopicView(isInSheet: false, onPosted: { topic in
                         topics.insert(topic, at: 0)
                         revealAndFocus(topic)
                     })) {

@@ -18,4 +18,7 @@ nonisolated enum AppLog {
     // trace to debug from beyond the generic user-facing error string.
     static let network = Logger(subsystem: "com.applevis.AppleVisSwift", category: "network")
     static let translation = Logger(subsystem: "com.applevis.AppleVisSwift", category: "translation")
+    /// Screens appearing and disappearing, to check navigation on a device
+    /// (2026-10-09). Debug builds only; see `navigationLog`.
+    static let navigation = Logger(subsystem: "com.applevis.AppleVisSwift", category: "navigation")
 }

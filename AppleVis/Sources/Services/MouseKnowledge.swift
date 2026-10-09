@@ -17,9 +17,16 @@ enum MouseKnowledge {
         "want", "would", "could", "should", "please", "tell", "find", "show", "some", "one",
     ]
 
+    /// Lowercased, with "Wi-Fi", "Wi Fi", and "wifi" as one word: Help
+    /// says Wi-Fi and people type wifi, so "connect to wifi at a hotel"
+    /// found nothing. Found testing (2026-10-09).
+    static func normalized(_ text: String) -> String {
+        text.lowercased().replacingOccurrences(of: #"\bwi[- ]fi\b"#, with: "wifi", options: .regularExpression)
+    }
+
     /// Lowercased search words with common filler removed.
     static func terms(_ text: String) -> [String] {
-        let words = text.lowercased()
+        let words = normalized(text)
             .components(separatedBy: CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "'")).inverted)
             .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "'")) }
             .filter { $0.count >= 2 && !stopWords.contains($0) }
@@ -27,16 +34,54 @@ enum MouseKnowledge {
         return words.filter { seen.insert($0).inserted }
     }
 
+    /// Words nearly every article has. When the question has a subject of
+    /// its own, they count for half: "How do I set an alarm with VoiceOver?"
+    /// found articles with VoiceOver in the title before the alarm one, and
+    /// "AppleVis" in a question favored every AppleVis article. Found
+    /// testing 160 new questions (2026-10-09).
+    private static let weakWords: Set<String> = ["voiceover", "iphone", "ipad", "applevis", "app", "apps", "use", "using"]
+
+    /// The word without a common ending, so "deleting", "transcripts", and
+    /// "funded" find "delete", "transcript", and "funds" (2026-10-09).
+    static func stem(_ word: String) -> String {
+        guard word.count > 4 else { return word }
+        for suffix in ["ing", "ed", "es", "s"] where word.hasSuffix(suffix) && word.count - suffix.count >= 4 {
+            return String(word.dropLast(suffix.count))
+        }
+        return word.hasSuffix("e") ? String(word.dropLast()) : word
+    }
+
+    /// How many words in `text` start with `stem`, up to `cap`. Only at the
+    /// start of a word, so "thing" isn't found inside "something".
+    private static func wordStarts(of stem: String, in text: String, cap: Int) -> Int {
+        guard !stem.isEmpty else { return 0 }
+        var count = 0
+        var rest = text.startIndex..<text.endIndex
+        while count < cap, let found = text.range(of: stem, range: rest) {
+            if found.lowerBound == text.startIndex {
+                count += 1
+            } else {
+                let before = text[text.index(before: found.lowerBound)]
+                if !before.isLetter && !before.isNumber { count += 1 }
+            }
+            rest = found.upperBound..<text.endIndex
+        }
+        return count
+    }
+
     /// How well `text` matches. Title hits count most, then the summary,
     /// then the body (capped so a long article can't win on length alone).
     /// A whole phrase appearing counts extra.
     static func score(title: String, summary: String = "", body: String = "", terms: [String], phrases: [String] = []) -> Int {
-        let title = title.lowercased(), summary = summary.lowercased(), body = body.lowercased()
+        let title = normalized(title), summary = normalized(summary), body = normalized(body)
         var total = 0
+        let hasSubject = terms.contains { !weakWords.contains($0) }
         for term in terms {
-            if title.contains(term) { total += 6 }
-            if summary.contains(term) { total += 3 }
-            total += min(body.components(separatedBy: term).count - 1, 3)
+            let weak = hasSubject && weakWords.contains(term)
+            let root = stem(term)
+            if wordStarts(of: root, in: title, cap: 1) > 0 { total += weak ? 3 : 6 }
+            if wordStarts(of: root, in: summary, cap: 1) > 0 { total += weak ? 1 : 3 }
+            total += wordStarts(of: root, in: body, cap: weak ? 2 : 3)
         }
         for phrase in phrases.map({ $0.lowercased() }) where phrase.contains(" ") {
             if title.contains(phrase) { total += 8 }
@@ -50,8 +95,124 @@ enum MouseKnowledge {
     /// Names people can't be expected to guess, pointing at the article
     /// that explains them.
     private static let nicknames: [String: [String]] = [
+        // AppleVis's own side-by-side layout, so "move to the topic beside
+        // the list" isn't taken for moving an app (2026-10-08).
+        "start-ipad-duo": ["beside the list", "next to the list", "side by side"],
+        // "The three things at the bottom of my screen" is about what's on
+        // the screen, not the iPhone's bottom edge. The Mouse can't see the
+        // screen; AppleVis's own tabs are the likeliest answer, and the
+        // answer says it can't see (2026-10-09).
+        // Forum questions members actually asked (2026-10-09), and the
+        // articles written for the ones Help didn't cover.
+        "howto-sign-pdf": ["sign a pdf", "signing a pdf", "sign a document", "signing a document", "sign papers", "signing papers", "signature", "fill in a form", "fill out a form", "fill in a pdf"],
+        "howto-duplicate-contacts": ["duplicate contact", "merge contacts", "merge duplicate", "contacts twice", "same contact twice"],
+        "howto-time-format": ["24 hour", "24-hour", "12 hour", "12-hour", "military time"],
+        "howto-group-chat-name": ["group text", "group chat", "group message", "group conversation", "name a group", "label a group", "labeling a group", "labelling a group"],
+        "howto-share-name-photo": ["my name and photo", "name not showing", "name isn't showing", "name doesn't show", "share my name", "contact poster", "see my name"],
+        "howto-files-cloud": ["dropbox", "google drive", "onedrive", "icloud drive", "files app", "sync a folder", "syncing a folder", "transfer files", "transferring files", "move files", "folder synced", "keep a folder", "synced between", "sync between my mac"],
+        "howto-iphone-mirroring": ["iphone mirroring", "mirror my iphone", "mirroring my iphone", "control my iphone from my mac", "use my iphone from my mac"],
+        "howto-passwords": ["verification code", "codes from text", "code from a text", "one-time code", "one time code", "passkey", "2fa code", "security code"],
+        "howto-keyboard-language": ["emoji", "emojis"],
+        "community-edit-profile": ["my applevis account", "applevis account changes", "change my applevis account"],
+        // Wording from 160 new questions (2026-10-09): plain titles that skip the jargon people use.
+        "howto-shareplay": ["shareplay", "share play", "share my screen", "screen share", "screen sharing"],
+        "howto-vo-audio-ducking": ["audio ducking", "ducking", "music gets quieter", "music getting quieter", "music quieter"],
+        "howto-vo-activities": ["voiceover activities", "voiceover activity", "different settings in different apps"],
+        "howto-airpods-controls": ["airpods controls", "airpod controls", "press my airpods", "squeeze my airpods", "airpods stem controls"],
+        "howto-autocorrect": ["autocorrect", "auto correct", "auto-correct", "predictive text", "changing my words", "changes my words"],
+        "howto-bluetooth-trouble": ["won't connect", "wont connect", "not connecting", "won't pair", "wont pair"],
+        "howto-airplay": ["stream to my apple tv", "stream to apple tv", "airplay", "cast to"],
+        "howto-vo-verbosity": ["say less", "talks too much", "talk less", "speak less", "too chatty", "less chatty"],
+        "howto-app-transcript": ["transcript"],
+        "howto-app-contact": ["bug in the applevis app", "problem with the applevis app", "applevis app bug", "applevis app isn't working", "applevis app not working"],
+        "community-language-filter": ["masked", "with stars", "asterisk", "bleeped", "censored", "swear"],
+        // Odd wordings, typos, and plain words from the fifth batch (2026-10-09).
+        "howto-announce-notifications": ["read my texts", "read my messages", "read my text messages", "read incoming", "read messages to me"],
+        "howto-app-ai-off": ["turn off the mouse", "hide the mouse", "turn off ask the mouse", "don't want the mouse", "dont want the mouse"],
+        "howto-app-play-episode": ["newest podcast", "latest podcast", "latest episode", "newest episode"],
+        "community-guidelines": ["rules for posting", "posting rules", "the rules", "allowed to post", "what can i post"],
+        "howto-wifi-join": ["connect to wifi", "join wifi", "wifi at a", "hotel wifi", "public wifi", "wifi password at"],
+        "howto-airdrop": ["send a photo to", "send photos to", "send a file to", "send files to"],
+        "howto-braille-connect": ["focus 40", "focus 14", "focus blue", "brailliant", "mantis", "orbit reader", "chameleon"],
+        "howto-flashlight": ["flashlight", "flash light", "torch"],
+        "start-tabs": ["bottom of the screen", "bottom of my screen", "tab bar", "tabs at the bottom", "three tabs", "buttons at the bottom of the screen", "things at the bottom"],
+        // How-To Library (2026-10-08): the words people use, which aren't
+        // always the article's. Checked with test_howto_questions.py.
+        "howto-home-move-app": ["rearrange", "move app", "move apps", "move an app", "reorder app", "organize app", "organise app"],
+        "howto-home-hide-app": ["hidden app", "hide app", "hide an app"],
+        "howto-home-find-app": ["find an app", "can't find an app", "cant find an app", "missing app", "app disappeared", "app is gone"],
+        "howto-hotspot": ["hotspot", "hot spot", "tether"],
+        "howto-silent-mode": ["silent", "mute my phone", "mute the ringer", "vibrate only", "on vibrate", "vibrate mode", "vibrate"],
+        "howto-emergency": ["medical id", "emergency contact"],
+        "howto-vo-speaking-rate": ["talk faster", "talk slower", "speak faster", "speak slower", "speech rate", "speaking rate", "voiceover faster", "voiceover slower", "talking too fast", "talks too fast", "talking too slow", "talks too slow", "slow down voiceover", "speed up voiceover"],
+        "howto-vo-voice": ["voiceover voice", "different voice", "change the voice", "change voice", "new voice", "siri voice for voiceover", "old siri voice", "enhanced voice", "premium voice", "downloaded voice", "remove a voice", "delete a voice", "delete voices", "remove voices", "downloading voices", "download a voice"],
+        "howto-vo-hints": ["double tap to open", "double-tap to open", "hints", "stop saying double"],
+        "howto-vo-image-explorer": ["describe a picture", "describe a photo", "describe an image", "describe the picture", "describe the image", "question about a photo", "question about an image", "question about a picture", "image recognition", "image explorer", "describe the screen"],
+        "howto-vo-live-recognition": ["what my camera", "camera is looking", "camera sees", "live recognition", "ask a question action button"],
+        "howto-vo-typing-style": ["typing mode", "typing style", "direct touch typing"],
+        "howto-braille-commands": ["change braille command", "change a braille command", "change this command", "change the command", "reassign braille", "braille key assignment"],
+        "howto-braille-trouble": ["braille display keeps", "braille display won't", "braille display wont", "braille display disconnect", "braille display drops"],
+        "howto-color-filters": ["grayscale", "greyscale", "color filter", "colour filter", "black and white screen"],
+        "howto-reduce-motion": ["reduce motion", "screen moving", "motion sick", "animations"],
+        "howto-speak-screen": ["read the screen to me", "read aloud without voiceover", "speak screen", "speak selection", "read it to me"],
+        "howto-auto-captions": ["subtitles", "captions on video", "captions on my video", "automatic captions", "caption my video"],
+        "howto-live-captions": ["live captions"],
+        "howto-sound-recognition": ["doorbell", "smoke alarm", "sound recognition", "baby crying", "hear the door"],
+        "howto-text-replacement": ["text replacement", "text shortcut", "type a phrase"],
+        "howto-dictation": ["dictate", "dictation", "speak to type", "voice typing"],
+        "howto-writing-tools": ["proofread", "writing tools", "rewrite my", "check my spelling"],
+        "howto-apple-pay": ["apple pay", "pay with my iphone", "pay with my phone", "contactless"],
+        "howto-low-power": ["low power", "battery last", "save battery", "charging limit"],
+        "howto-storage": ["storage", "out of space", "free up space", "running out of space"],
+        "howto-find-my": ["lost my", "find my app", "find my airpods", "find my iphone", "find my ipad", "find my watch", "find my mac", "find my network", "where is my iphone", "where is my phone", "where are my airpods", "use find my"],
+        "howto-watch-voiceover": ["voiceover on my apple watch", "voiceover on apple watch", "voiceover on my watch"],
+        "howto-tv-voiceover": ["voiceover on apple tv", "voiceover on my apple tv"],
+        // AppleVis's own settings (2026-10-08).
+        "howto-av-theme": ["theme", "goldie theme", "mouse theme", "high contrast theme", "dark theme", "app dark", "make the app dark", "dark mode in applevis", "app darker", "applevis dark"],
+        "howto-av-sounds": ["sounds in applevis", "applevis sounds", "turn off the sounds", "confirmation sounds", "interface sounds", "make noises", "makes noises", "noises", "beeps", "clicking sounds"],
+        "howto-av-haptics": ["haptics in applevis", "haptic feedback", "turn off haptics", "vibrations in applevis", "app vibrating", "app vibrates", "stop the app vibrating", "applevis vibrat"],
+        "howto-av-welcome": ["welcome message", "welcome when", "startup behavior", "home startup", "stop the welcome"],
+        "howto-av-apple-only": ["non-apple", "non apple", "apple topics only", "only apple topics"],
+        "howto-av-reminders": ["catch-up reminder", "catch up reminder", "catchup reminder"],
+        "howto-av-notification-sound": ["notification sound for applevis", "applevis notification sound", "mouse squeak", "apple crunch"],
+        "howto-av-podcast": ["skip time", "skip forward", "skip back", "podcast speed", "playback speed", "play faster", "play slower", "speed up the podcast", "slow down the podcast", "faster podcast"],
+        "howto-apple-account-sign-out": ["apple account", "apple id", "icloud account"],
+        "howto-home-rename-app": ["rename an app", "rename app", "change an app's name", "change the name of an app"],
+        "howto-app-where": ["where is everything", "where everything is", "find my way around", "map of the app"],
+        "howto-app-last-comment": ["last comment", "latest comment", "end of the thread", "end of a thread", "bottom of the thread"],
+        "howto-app-share": ["share a topic", "share a forum topic", "share a post", "share an episode", "share a link", "send a link"],
+        "howto-app-check-app": ["app is accessible", "app accessible", "is the app accessible", "accessible with voiceover", "app works with voiceover"],
+        "howto-app-own-language": ["in spanish", "in french", "in german", "read applevis in", "translate posts", "translate comments"],
+        "howto-app-sync": ["between my iphone and ipad", "between devices", "all my devices", "sync my saved", "sync saved", "icloud sync"],
+        "howto-app-free-space": ["applevis is using", "space used by applevis", "applevis storage", "storage used by applevis", "applevis taking up"],
+        "content-apps": ["get a mac app", "download a mac app", "developer's website"],
+        "start-what-is-applevis": ["who owns applevis", "who runs applevis", "who controls applevis", "is applevis independent", "who funds applevis", "owned by be my eyes", "nonprofit", "non-profit", "not for profit", "be my eyes foundation", "donate to applevis", "support applevis", "who founded applevis", "funds applevis", "need an account", "without an account", "without signing in", "need to sign in", "how is applevis funded", "who pays for applevis", "is applevis free", "applevis cost", "does applevis cost", "pay for applevis", "who started applevis", "started applevis"],
+        "howto-av-sign-out": ["sign out of applevis", "log out of applevis", "sign out of the app", "log out of the app"],
+        "howto-av-open-settings": ["applevis settings", "open settings in applevis"],
+        // Device guides: "where do I start?" (2026-10-08).
+        "guide-iphone": ["new to iphone", "new iphone user", "getting started with iphone", "learn iphone", "learn voiceover", "beginner", "just got an iphone", "start with voiceover", "where to start", "don't know where to start", "dont know where to start", "new to this"],
+        "guide-ipad": ["getting an ipad", "buying an ipad", "buy an ipad", "new to ipad", "getting started with ipad", "learn ipad", "just got an ipad"],
+        "guide-mac": ["first mac", "buying a mac", "buy a mac", "new to mac", "getting started with mac", "learn mac", "just got a mac", "voiceover on mac", "got a new mac", "new mac what now"],
+        "guide-watch": ["new to apple watch", "getting started with apple watch", "just got an apple watch", "learn apple watch"],
+        "guide-tv": ["new to apple tv", "getting started with apple tv", "just got an apple tv"],
+        // Know Your Device: "what's this?" questions (2026-10-08).
+        "howto-know-side-buttons": ["buttons on the side", "button on the side", "side buttons", "buttons on my iphone", "what are the buttons", "what is this button", "what's this button", "what button"],
+        "howto-know-action-button": ["action button"],
+        "howto-know-camera-control": ["camera control", "button on the bottom right", "flat button"],
+        "howto-know-camera-bumps": ["bumps", "bump on the back", "round things on the back", "circles on the back", "camera lenses", "lenses on the back"],
+        "howto-know-small-holes": ["small hole", "smaller bump", "little hole", "tiny hole", "small circle", "lidar", "flash on the back"],
+        "howto-know-bottom-edge": ["bottom edge", "bottom of my iphone", "bottom of my phone", "holes on the bottom", "three things", "charging port", "speaker holes"],
+        "howto-know-front": ["dynamic island", "earpiece", "notch", "top of the screen", "front camera"],
+        "howto-know-magsafe": ["magsafe", "magnet", "qi2"],
+        "howto-know-charging": ["charge my iphone", "charge my phone", "how do i charge", "wireless charging", "wireless charger"],
+        "howto-know-sim": ["sim card", "sim tray", "sim slot"],
+        "howto-know-edge-lines": ["lines on the edge", "lines on the side", "antenna", "strips on the edge"],
+        "howto-know-which-iphone": ["which iphone", "what iphone do i have", "model name", "what model"],
+        "howto-know-airpods": ["airpods case", "case button", "light on my airpods", "the stem", "airpods stem"],
+        "howto-know-watch": ["digital crown", "buttons on my apple watch", "buttons on my watch", "watch buttons"],
+        "howto-know-tv-remote": ["apple tv remote", "siri remote", "remote buttons", "buttons on the remote"],
         // Quick Reference (2026-10-04).
-        "ref-voiceover-gestures": ["voiceover gesture", "gestures", "magic tap", "rotor", "scrub", "split tap", "screen curtain", "item chooser", "go back with voiceover", "go back in voiceover", "back gesture", "scroll with voiceover", "scroll down with voiceover"],
+        "ref-voiceover-gestures": ["voiceover gesture", "gestures", "magic tap", "rotor", "scrub", "split tap", "screen curtain", "item chooser", "go back with voiceover", "go back in voiceover", "back gesture", "scroll with voiceover", "scroll down with voiceover", "how do i double tap", "what is double tap", "what is a double tap"],
         "ref-voiceover-keyboard-ios": ["keyboard command", "keyboard shortcut", "magic keyboard", "external keyboard", "quick nav", "vo key"],
         "ref-braille-display": ["braille command", "braille display", "braille key", "dots", "perkins", "pan braille"],
         "ref-voiceover-keyboard-mac": ["mac voiceover", "voiceover on mac", "vo key", "voiceover utility", "command f5"],
@@ -61,18 +222,18 @@ enum MouseKnowledge {
         "ref-voiceover-watch": ["apple watch voiceover", "watch gestures", "digital crown navigation", "hand gestures"],
         "ref-voiceover-tv": ["apple tv voiceover", "tv remote", "exploration mode", "navigation mode", "clickpad"],
         "ref-braille-display-mac": ["mac braille", "braille on mac", "braille display mac"],
-        "ref-accessibility-shortcut": ["accessibility shortcut", "triple click", "triple-click", "turn on voiceover", "turn off voiceover", "turn voiceover off", "turn voiceover on", "back tap"],
+        "ref-accessibility-shortcut": ["accessibility shortcut", "triple click", "triple-click", "turn on voiceover", "turn off voiceover", "turn voiceover off", "turn voiceover on", "back tap", "double tap everything", "have to double tap", "turned on by accident", "accidentally turned", "turned it on by accident"],
         "ref-setup-voiceover": ["set up with voiceover", "setup voiceover", "new iphone", "new mac", "pair apple watch", "first time setup"],
-        "ref-glossary": ["glossary", "definition of", "perkins keyboard", "perkins-style", "what is braille access", "what is live recognition", "what is the rotor", "what is magic tap", "what is screen curtain", "what is quick nav", "contracted braille", "grade 2", "grade 1"],
-        "ref-voiceover-silent": ["everything twice", "reading twice", "reads twice", "says twice", "speaks twice", "speaking twice", "talking twice", "speaking double", "speaks double", "voiceover stopped", "not talking", "no speech", "voiceover silent", "voiceover is silent", "screen is black", "screen black", "voiceover quiet", "can't hear voiceover"],
+        "ref-glossary": ["glossary", "definition of", "perkins keyboard", "perkins-style", "what is braille access", "what is live recognition", "what is the rotor", "what is magic tap", "what is screen curtain", "what is quick nav", "contracted braille", "grade 2", "grade 1", "golden apple"],
+        "ref-voiceover-silent": ["reset voiceover", "everything twice", "reading twice", "reads twice", "says twice", "speaks twice", "speaking twice", "talking twice", "speaking double", "speaks double", "voiceover stopped", "not talking", "no speech", "voiceover silent", "voiceover is silent", "screen is black", "screen black", "voiceover quiet", "can't hear voiceover", "went dark", "gone dark", "went black", "gone black", "cant hear voiceover", "cant here voiceover", "can't here voiceover", "wont stop talking", "won't stop talking"],
         "ref-low-vision": ["low vision", "zoom", "magnify", "bigger text", "larger text", "speak screen", "read aloud", "out loud", "read my email", "read my emails", "read & speak", "read the screen", "read my screen", "without voiceover", "text bigger", "see the screen"],
-        "ref-typing-voiceover": ["typing", "type faster", "touch typing", "braille screen input", "bsi", "braille on the screen", "braille on screen", "type braille", "dictation", "text selection", "edit text"],
-        "ref-recognition": ["describe image", "image description", "live recognition", "screen recognition", "door detection", "point and speak", "describe photo", "doors", "around me", "surroundings", "describe what", "what's in front", "describe the"],
+        "ref-typing-voiceover": ["typing", "type faster", "touch typing", "braille screen input", "bsi", "braille on the screen", "braille on screen", "type braille", "dictation", "text selection", "edit text", "copy text", "copying text", "copy and paste", "paste text", "selecting text", "select text"],
+        "ref-recognition": ["describe image", "image description", "live recognition", "screen recognition", "door detection", "point and speak", "describe photo", "doors", "around me", "surroundings", "describe what", "what's in front", "describe the", "in front of me"],
         "ref-web-voiceover": ["safari", "webpage", "web page", "browse the web", "browsing the web", "reader view", "web rotor"],
         "ref-siri-phrases": ["hey siri", "ask siri", "siri commands", "siri requests", "voice commands"],
-        "ref-iphone-everyday-voiceover": ["unlock", "home screen", "app switcher", "answer call", "camera voiceover", "take a photo", "take a picture", "camera with voiceover", "face id", "require attention", "arrange apps"],
-        "ref-mac-essentials": ["mac shortcut", "mac keyboard shortcut", "windows user", "switching from windows", "spotlight on mac", "mac spotlight", "force quit"],
-        "ref-getting-help": ["contact apple", "apple support", "accessibility support", "apple phone number", "call apple", "feedback to apple", "report to apple", "accessibility@apple.com"],
+        "ref-iphone-everyday-voiceover": ["unlock", "home screen", "app switcher", "answer call", "camera voiceover", "take a photo", "take a picture", "camera with voiceover", "face id", "require attention", "arrange apps", "during a call", "on a call", "while on a call", "in a call"],
+        "ref-mac-essentials": ["mac shortcut", "mac keyboard shortcut", "windows user", "switching from windows", "spotlight on mac", "mac spotlight", "force quit", "lock my mac", "locking my mac", "lock the mac", "lock the screen on my mac", "unlock my mac", "unlocking my mac"],
+        "ref-getting-help": ["contact apple", "apple support", "accessibility support", "apple phone number", "call apple", "feedback to apple", "report to apple", "accessibility@apple.com", "person at apple", "talk to apple", "speak to someone at apple", "phone at apple", "talk to someone at apple"],
         "ref-updating": ["software update", "update my iphone", "update my ipad", "update ios", "ios update", "backup", "back up", "new ios", "after the update", "after updating"],
         "ref-restart-watch-airpods-tv": ["reset airpods", "restart airpods", "airpods max", "force restart watch", "restart apple watch", "restart apple tv", "turn off my apple watch", "turn off apple watch", "turn off my watch", "power off my apple watch", "power off apple watch", "power off my watch", "restart my watch"],
         "home-fetch": ["reading view", "goldie", "read everything", "grouped reading"],
@@ -84,6 +245,99 @@ enum MouseKnowledge {
         "community-submit-bug": ["report a bug", "bug report", "feedback assistant"],
         "trouble-sign-in": ["can't sign in", "cannot log in", "password", "log in", "login", "signed out"],
     ]
+
+    /// Words that mean a nickname isn't about that article after all.
+    private static let nicknameExcludes: [String: [String]] = [
+        "howto-know-bottom-edge": ["screen"],
+        // "Focus 40" is a braille display, not Focus (2026-10-09).
+        "howto-focus": ["focus 40", "focus 14", "focus blue"],
+    ]
+
+    // MARK: - Spelling
+
+    /// Nicknames match without apostrophes: "whats in front of me" finds
+    /// "what's in front".
+    private static func nicknameText(_ text: String) -> String {
+        normalized(text).replacingOccurrences(of: "'", with: "").replacingOccurrences(of: "\u{2019}", with: "")
+    }
+
+    /// Every word Help and its nicknames use.
+    private static let vocabulary: Set<String> = {
+        var words = Set<String>()
+        func add(_ text: String) {
+            for word in normalized(text).components(separatedBy: CharacterSet.alphanumerics.inverted) where word.count >= 3 {
+                words.insert(word)
+            }
+        }
+        for article in allHelpArticles {
+            add(article.title)
+            add(article.summary)
+            add(helpArticleText(article))
+        }
+        nicknames.values.forEach { $0.forEach(add) }
+        return words
+    }()
+
+    /// The question with a misspelled word replaced by the one Help word a
+    /// letter away, when there's exactly one: "evrything", "roter", and
+    /// "magnifyer" found nothing. A capitalized word after the first is
+    /// left alone, since it's likely a name, like Sonos. Found testing odd
+    /// wordings (2026-10-09).
+    static func spellingFixed(_ text: String) -> String {
+        var result = ""
+        var word = ""
+        var isFirst = true
+        func flush() {
+            guard !word.isEmpty else { return }
+            let lower = word.lowercased()
+            if isFirst || word == lower {
+                let fixed = correction(lower)
+                result += fixed != lower ? fixed : word
+            } else {
+                result += word
+            }
+            isFirst = false
+            word = ""
+        }
+        for character in text {
+            if character.isLetter || character.isNumber || character == "'" {
+                word.append(character)
+            } else {
+                flush()
+                result.append(character)
+            }
+        }
+        flush()
+        return result
+    }
+
+    private static func correction(_ word: String) -> String {
+        guard word.count >= 5, !vocabulary.contains(word), word.allSatisfy(\.isLetter) else { return word }
+        let near = vocabulary.filter { oneLetterApart(word, $0) }
+        return near.count == 1 ? near.first ?? word : word
+    }
+
+    /// One letter added, left out, or changed.
+    private static func oneLetterApart(_ first: String, _ second: String) -> Bool {
+        let a = Array(first), b = Array(second)
+        guard a != b, abs(a.count - b.count) <= 1 else { return false }
+        if a.count == b.count {
+            return zip(a, b).filter { $0 != $1 }.count == 1
+        }
+        let (short, long) = a.count < b.count ? (a, b) : (b, a)
+        var i = 0, j = 0, skipped = false
+        while i < short.count, j < long.count {
+            if short[i] == long[j] {
+                i += 1
+                j += 1
+            } else {
+                if skipped { return false }
+                skipped = true
+                j += 1
+            }
+        }
+        return true
+    }
 
     static func helpArticleText(_ article: HelpArticle) -> String {
         article.content.map { block -> String in
@@ -139,12 +393,17 @@ enum MouseKnowledge {
 
     /// Help articles ranked by how well they match, best first.
     static func searchHelp(_ query: String, phrases: [String] = [], limit: Int = 3) -> [HelpArticle] {
+        let query = spellingFixed(query)
         let words = terms(([query] + phrases).joined(separator: " "))
         guard !words.isEmpty else { return [] }
-        let lowerQuery = query.lowercased()
+        let lowerQuery = nicknameText(query)
         let scored: [(HelpArticle, Int)] = allHelpArticles.map { article in
             var value = score(title: article.title, summary: article.summary, body: helpArticleText(article), terms: words, phrases: [query] + phrases)
-            if let names = nicknames[article.id], names.contains(where: { lowerQuery.contains($0) }) { value += 12 }
+            // A nickname is a person's choice of article, so it outweighs a
+            // strong title match on common words: "read my texts to me" lost
+            // to "Read Printed Text" at 12 (2026-10-09).
+            if let names = nicknames[article.id], names.contains(where: { lowerQuery.contains(nicknameText($0)) }),
+               !(nicknameExcludes[article.id] ?? []).contains(where: { lowerQuery.contains(nicknameText($0)) }) { value += 16 }
             return (article, value)
         }
         // Needs more than a single stray body hit to count as a match.
@@ -155,7 +414,7 @@ enum MouseKnowledge {
     /// in their usual order. Used to match titles and summaries only, so
     /// anything mentioned only in an article's text couldn't be found.
     static func filterHelpSections(_ query: String) -> [HelpSection] {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = spellingFixed(query.trimmingCharacters(in: .whitespacesAndNewlines))
         guard !trimmed.isEmpty else { return HelpContent.sections }
         let lower = trimmed.lowercased()
         let words = terms(trimmed)
@@ -313,7 +572,7 @@ enum MousePlace: String, CaseIterable, Identifiable, Hashable {
         case .notificationSettings: return settings(String(localized: "Notifications"))
         case .soundsHapticsSettings: return settings(String(localized: "Sounds & Haptics"))
         case .homeFeedSettings: return settings(String(localized: "Home Feed"))
-        case .podcastSettings: return settings(String(localized: "Podcasts"))
+        case .podcastSettings: return settings(String(localized: "Podcast"))
         case .savedSyncSettings: return settings(String(localized: "Saved & Sync"))
         case .privacySettings: return settings(String(localized: "Privacy"))
         case .intelligenceSettings: return settings(String(localized: "Intelligence"))

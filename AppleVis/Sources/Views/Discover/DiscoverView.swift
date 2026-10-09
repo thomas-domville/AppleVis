@@ -43,6 +43,10 @@ struct DiscoverView: View {
     @State private var lastAnnouncedMessage: String?
     @FocusState private var isSearchFieldFocused: Bool
     @AccessibilityFocusState private var focusTarget: AnyHashable?
+    /// The Profile button, after a real Back from Profile (see
+    /// `returnsFocusOnBack`). Hanging it off Profile's disappearing also
+    /// fired when Profile pushed Help or an article (2026-10-09).
+    @State private var returnFocus: AnyHashable?
     private static let titleFocusID = AnyHashable("discover.title")
     // Tracks whether the stack is sitting at the hub grid or has something
     // pushed (Podcasts, Apps, etc.) — a TabView never tears down a hidden
@@ -111,15 +115,14 @@ struct DiscoverView: View {
                 }
             }
             .navigationTitle("Discover")
+            .returnsFocusOnBack($returnFocus, into: $focusTarget)
             .sheet(item: $mouseQuestion) { item in
                 AskTheMouseView(initialQuestion: item.text)
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink(destination: ProfileView()
-                        .onDisappear {
-                            Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("profile")) }
-                        }
+                        .notesReturnFocus(AnyHashable("profile"), in: $returnFocus)
                     ) {
                         Image(systemName: "person.circle")
                     }
@@ -240,28 +243,28 @@ struct DiscoverView: View {
         switch destination {
         case .apps:
             AppBrowseView()
-                .onDisappear { restoreFocus(to: destination.focusID) }
+                .notesReturnFocus(destination.focusID, in: $returnFocus)
         case .communityPicks:
             CommunityPicksView()
-                .onDisappear { restoreFocus(to: destination.focusID) }
+                .notesReturnFocus(destination.focusID, in: $returnFocus)
         case .forums:
             ForumsBrowseView(showsPersonalFilters: false)
-                .onDisappear { restoreFocus(to: destination.focusID) }
+                .notesReturnFocus(destination.focusID, in: $returnFocus)
         case .blogs:
             BlogBrowseView()
-                .onDisappear { restoreFocus(to: destination.focusID) }
+                .notesReturnFocus(destination.focusID, in: $returnFocus)
         case .guides:
             GuideBrowseView()
-                .onDisappear { restoreFocus(to: destination.focusID) }
+                .notesReturnFocus(destination.focusID, in: $returnFocus)
         case .podcasts:
             PodcastBrowseView()
-                .onDisappear { restoreFocus(to: destination.focusID) }
+                .notesReturnFocus(destination.focusID, in: $returnFocus)
         case .bugTracker:
             BugBrowseView()
-                .onDisappear { restoreFocus(to: destination.focusID) }
+                .notesReturnFocus(destination.focusID, in: $returnFocus)
         case .rssFeeds:
             RSSFeedsView()
-                .onDisappear { restoreFocus(to: destination.focusID) }
+                .notesReturnFocus(destination.focusID, in: $returnFocus)
         }
     }
 
@@ -386,11 +389,11 @@ struct DiscoverView: View {
                 }
                 hubSection(title: "Community", subtitle: String(localized: "Find discussions and recent posts from AppleVis members."), accent: .blue) {
                     HubCard(title: String(localized: "Forums"), subtitle: String(localized: "Discussion & help"), systemImage: "bubble.left.and.bubble.right", color: .blue, destination: .forums, focusTarget: $focusTarget)
-                    HubCard(title: String(localized: "Blogs"), subtitle: String(localized: "Articles & news"), systemImage: "newspaper", color: .red, destination: .blogs, focusTarget: $focusTarget)
+                    HubCard(title: String(localized: "Blog"), subtitle: String(localized: "Articles & news"), systemImage: "newspaper", color: .red, destination: .blogs, focusTarget: $focusTarget)
                 }
                 hubSection(title: String(localized: "Learn"), subtitle: String(localized: "Explore guides, podcast episodes, and practical accessibility resources."), accent: .orange) {
                     HubCard(title: String(localized: "Guides"), subtitle: String(localized: "Tutorials & resources"), systemImage: "book", color: .orange, destination: .guides, focusTarget: $focusTarget)
-                    HubCard(title: String(localized: "Podcasts"), subtitle: String(localized: "Audio content"), systemImage: "mic.fill", color: .purple, destination: .podcasts, focusTarget: $focusTarget)
+                    HubCard(title: String(localized: "Podcast"), subtitle: String(localized: "Audio content"), systemImage: "mic.fill", color: .purple, destination: .podcasts, focusTarget: $focusTarget)
                 }
                 hubSection(title: "Bug Tracker", subtitle: String(localized: "Browse active accessibility bugs reported by the AppleVis community."), accent: .brown) {
                     // Card previously said "Bug Reports" — a real button,

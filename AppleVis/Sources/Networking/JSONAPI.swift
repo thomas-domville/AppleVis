@@ -99,8 +99,16 @@ nonisolated enum JSONValue: Decodable, Sendable {
         (self["processed"]?.stringValue) ?? (self["value"]?.stringValue)
     }
 
+    /// Drupal's separate summary, or nil when there isn't one. Drupal
+    /// sends an empty string, not nothing, when the summary box was left
+    /// blank, which is almost every app entry. That empty string used to
+    /// stop every `?? richTextValue` fallback, so 19 of the 20 newest app
+    /// entries reached the Mouse, its ranking, and Nibbles with no
+    /// description at all. Found testing (2026-10-08).
     var richTextSummary: String? {
-        self["summary"]?.stringValue
+        guard let summary = self["summary"]?.stringValue,
+              !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return summary
     }
 
     /// The original source text as written — Markdown, plain text, or raw

@@ -3,15 +3,17 @@ import SwiftUI
 struct AboutView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @AccessibilityFocusState private var focusTarget: AnyHashable?
+    /// The row that opened a pushed screen: VoiceOver goes back to it after
+    /// a real Back, not when that screen pushes another (2026-10-09).
+    @State private var returnFocus: AnyHashable?
+    @State private var didFirstFocus = false
 
     var body: some View {
         Form {
             Section("App Information") {
                 NavigationLink {
                     WhatsNewView()
-                        .onDisappear {
-                            Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("whatsNew")) }
-                        }
+                        .notesReturnFocus(AnyHashable("whatsNew"), in: $returnFocus)
                 } label: {
                     Label("What's New", systemImage: "sparkles")
                 }
@@ -26,9 +28,7 @@ struct AboutView: View {
                 // Media and Credits. Requested directly.
                 NavigationLink {
                     DiagnosticInfoView()
-                        .onDisappear {
-                            Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("diagnosticInfo")) }
-                        }
+                        .notesReturnFocus(AnyHashable("diagnosticInfo"), in: $returnFocus)
                 } label: {
                     Label("Diagnostic Info", systemImage: "wrench.and.screwdriver")
                 }
@@ -43,9 +43,7 @@ struct AboutView: View {
                 // directly.
                 NavigationLink {
                     SocialLinksView()
-                        .onDisappear {
-                            Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("socialLinks")) }
-                        }
+                        .notesReturnFocus(AnyHashable("socialLinks"), in: $returnFocus)
                 } label: {
                     Label("Follow AppleVis on Social Media", systemImage: "person.2.wave.2")
                 }
@@ -61,18 +59,14 @@ struct AboutView: View {
             Section("Legal & Credits") {
                 NavigationLink {
                     CreditsView()
-                        .onDisappear {
-                            Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("credits")) }
-                        }
+                        .notesReturnFocus(AnyHashable("credits"), in: $returnFocus)
                 } label: {
                     Label("Credits", systemImage: "person.2")
                 }
                 .accessibilityFocused($focusTarget, equals: AnyHashable("credits"))
                 NavigationLink {
                     OpenSourceView()
-                        .onDisappear {
-                            Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("openSource")) }
-                        }
+                        .notesReturnFocus(AnyHashable("openSource"), in: $returnFocus)
                 } label: {
                     Label("Open Source Licences", systemImage: "doc.text")
                 }
@@ -97,6 +91,7 @@ struct AboutView: View {
         }
         .themedList(preferences.colors)
         .navigationTitle("About")
+        .returnsFocusOnBack($returnFocus, into: $focusTarget)
         .navigationBarTitleDisplayMode(.inline)
         // Missing the initial title-focus `.task` its sibling hub screens
         // (SettingsView, ProfileView) both have — reuses the "whatsNew"
@@ -104,6 +99,11 @@ struct AboutView: View {
         // ProfileView reuses its own titleFocusID for both initial focus
         // and returning-from-a-subscreen focus. Full app-wide focus audit,
         // requested directly.
-        .task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("whatsNew")) }
+        // First appearance only: after Back, the row you came from (2026-10-09).
+        .task {
+            guard !didFirstFocus else { return }
+            didFirstFocus = true
+            await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("whatsNew"))
+        }
     }
 }

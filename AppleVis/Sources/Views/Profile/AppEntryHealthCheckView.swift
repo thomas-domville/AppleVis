@@ -35,6 +35,9 @@ struct AppEntryHealthCheckView: View {
     /// The flagged app VoiceOver should land on after coming back from its
     /// App Entry page, or after the previous one is fixed and leaves the list.
     @AccessibilityFocusState private var focusedFlagId: String?
+    /// The entry that was opened, handled after a real Back rather than
+    /// when the entry opens another screen (2026-10-09).
+    @State private var returnFlag: AppHealthFlag?
     /// `.task` runs again every time this screen reappears, so coming back
     /// from an App Entry page used to throw VoiceOver back up to the intro
     /// text. Only the first appearance focuses it now. Reported directly.
@@ -224,6 +227,15 @@ struct AppEntryHealthCheckView: View {
         }
         .themedList(preferences.colors)
         .navigationTitle("App Directory Health Check")
+        .onAppear {
+            guard let flag = returnFlag else { return }
+            returnFlag = nil
+            if changedAppIds.remove(flag.appId) != nil {
+                handled(flag, announcing: String(localized: "Updated and removed from the list."))
+            } else {
+                Task { await retryAccessibilityFocus(into: $focusedFlagId, returningTo: flag.id) }
+            }
+        }
         .navigationBarTitleDisplayMode(.inline)
         .task {
             guard !hasFocusedTitle else { return }
@@ -254,13 +266,7 @@ struct AppEntryHealthCheckView: View {
     private func flagRow(_ flag: AppHealthFlag) -> some View {
         NavigationLink {
             AppDetailView(appId: flag.appId, platform: .ios)
-                .onDisappear {
-                    if changedAppIds.remove(flag.appId) != nil {
-                        handled(flag, announcing: String(localized: "Updated and removed from the list."))
-                    } else {
-                        Task { await retryAccessibilityFocus(into: $focusedFlagId, returningTo: flag.id) }
-                    }
-                }
+                .onAppear { returnFlag = flag }
         } label: {
             AppHealthFlagRow(flag: flag)
         }
@@ -272,7 +278,7 @@ struct AppEntryHealthCheckView: View {
         switch group {
         case .removed:              return String(localized: "Removed from the App Store")
         case .titleChanged:         return String(localized: "Title Changed")
-        case .detailsOutdated:      return String(localized: "Other Details Out of Date")
+        case .detailsOutdated:      return String(localized: "Other Details to Update")
         case .minorTitleDifference: return String(localized: "Minor Title Differences")
         }
     }
@@ -343,7 +349,7 @@ private struct AppHealthFlagRow: View {
         case .removed:
             return String(localized: "Removed — No longer found on the App Store.")
         case .detailsOutdated:
-            return String(localized: "Out of Date — \(outdatedText).")
+            return String(localized: "Can be updated: \(outdatedText).")
         case .titleChanged(let newTitle):
             base = String(localized: "Title Changed — App Store now shows: \(newTitle)")
         case .minorTitleDifference(let newTitle):
@@ -352,7 +358,7 @@ private struct AppHealthFlagRow: View {
         // Everything else that's out of date rides along, so one row tells
         // the whole story, not just the title. Requested directly.
         guard !flag.outdatedFields.isEmpty else { return base }
-        return base + " " + String(localized: "Also out of date: \(outdatedText).")
+        return base + " " + String(localized: "Also can be updated: \(outdatedText).")
     }
 
     /// Only what actually differs, e.g. "Version 3.4 on the App Store, 3.2
@@ -371,6 +377,8 @@ private struct AppHealthFlagRow: View {
                 : String(localized: "Version \(new) on the App Store, \(old) on AppleVis")
         case "devices":
             return String(localized: "Supported devices: App Store suggests \(field.newValue ?? "")")
+        case "link":
+            return String(localized: "App Store link, to the neutral link")
         default:
             return field.label
         }
@@ -548,7 +556,7 @@ private struct AppHealthFlagActions: ViewModifier {
     /// The entry's own App Store link, while the app is still listed.
     private var appStoreURL: URL? {
         if case .removed = flag.kind { return nil }
-        return flag.appStoreUrl.flatMap(URL.init)
+        return flag.appStoreUrl.flatMap { AppDetailView.isAppStoreLink($0) ? URL(string: $0) : nil }
     }
 
     /// App Store search for the entry's name, offered only when its listing

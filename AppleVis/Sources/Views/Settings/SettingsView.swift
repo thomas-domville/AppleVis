@@ -76,6 +76,10 @@ struct SettingsView: View {
     /// Command-F moves here (Adaptive Experience, 2026-10-06).
     @FocusState private var isSearchFocused: Bool
     @AccessibilityFocusState private var focusTarget: AnyHashable?
+    /// The row that opened a pushed screen: VoiceOver goes back to it after
+    /// a real Back, not when that screen pushes another (2026-10-09).
+    @State private var returnFocus: AnyHashable?
+    @State private var didFirstFocus = false
     private static let titleFocusID = AnyHashable("settings.title")
 
     private var sections: [SettingsSection] {
@@ -104,7 +108,7 @@ struct SettingsView: View {
             SettingsSection(title: "Content", entries: [
                 SettingsEntry(icon: "bubble.left.and.bubble.right", label: "Home Feed", subtitle: String(localized: "What shows up in your Home feed"), color: .green,
                               destination: AnyView(HomeFeedSettingsView())),
-                SettingsEntry(icon: "headphones", label: "Podcasts", subtitle: String(localized: "Playback and download defaults"), color: .pink,
+                SettingsEntry(icon: "headphones", label: "Podcast", subtitle: String(localized: "Playback and download defaults"), color: .pink,
                               destination: AnyView(PodcastSettingsView())),
             ]),
             SettingsSection(title: "Data & Privacy", entries: [
@@ -217,9 +221,7 @@ struct SettingsView: View {
                         NavigationLink {
                             entry.destination
                                 .settingsDoneButton()
-                                .onDisappear {
-                                    Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable(entry.id)) }
-                                }
+                                .notesReturnFocus(AnyHashable(entry.id), in: $returnFocus)
                         } label: {
                             SettingsRow(icon: entry.icon, label: entry.label, subtitle: entry.subtitle, color: entry.color)
                         }
@@ -230,11 +232,17 @@ struct SettingsView: View {
         }
         .themedList(preferences.colors)
         .navigationTitle("Settings")
+        .returnsFocusOnBack($returnFocus, into: $focusTarget)
         .settingsDoneButton()
         .searchable(text: $searchText, prompt: "Search Settings")
         .applySearchFocus($isSearchFocused)
         .keyboardSearchTarget($isSearchFocused)
-        .task { await retryAccessibilityFocus(into: $focusTarget, returningTo: Self.titleFocusID) }
+        // First appearance only: after Back, the row you came from (2026-10-09).
+        .task {
+            guard !didFirstFocus else { return }
+            didFirstFocus = true
+            await retryAccessibilityFocus(into: $focusTarget, returningTo: Self.titleFocusID)
+        }
     }
 }
 

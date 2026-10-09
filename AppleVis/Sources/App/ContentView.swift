@@ -103,7 +103,7 @@ struct ContentView: View {
             SafariView(url: wrapped.url)
         }
         .sheet(isPresented: $keyCommands.showSettings) {
-            ProfileView()
+            ProfileView(isInSheet: true)
         }
         // Command-M and Command-Shift-C open the same Ask the Mouse and
         // Contact AppleVis as everywhere else, never a copy (Adaptive

@@ -562,7 +562,7 @@ struct ContentActionsModifier: ViewModifier {
         guard let user = auth.user else { return }
         do {
             if isFollowing {
-                try await APIClient.shared.flags.unfollow(nodeUuid: id, token: user.csrfToken)
+                try await APIClient.shared.flags.unfollow(nodeUuid: id, entityId: entityId, token: user.csrfToken)
                 PersistenceStore.shared.markUnfollowed(id: id)
                 FollowStore.shared.markNotFollowed(id)
                 isFollowing = false
@@ -592,7 +592,7 @@ struct ContentActionsModifier: ViewModifier {
         guard let user = auth.user else { return }
         do {
             if isRecommended {
-                try await APIClient.shared.flags.unrecommend(nodeUuid: id, token: user.csrfToken)
+                try await APIClient.shared.flags.unrecommend(nodeUuid: id, entityId: entityId, token: user.csrfToken)
                 RecommendationStore.shared.markNotRecommended(id)
                 isRecommended = false
                 toast.success(String(localized: "Removed from Recommendations"), sound: .unrecommended)
@@ -1177,7 +1177,7 @@ struct ContentDetailActions: View {
         guard let user = auth.user else { return }
         do {
             if isFollowing {
-                try await APIClient.shared.flags.unfollow(nodeUuid: id, token: user.csrfToken)
+                try await APIClient.shared.flags.unfollow(nodeUuid: id, entityId: entityId, token: user.csrfToken)
                 PersistenceStore.shared.markUnfollowed(id: id)
                 FollowStore.shared.markNotFollowed(id)
                 isFollowing = false
@@ -1204,7 +1204,7 @@ struct ContentDetailActions: View {
         guard let user = auth.user else { return }
         do {
             if isRecommended {
-                try await APIClient.shared.flags.unrecommend(nodeUuid: id, token: user.csrfToken)
+                try await APIClient.shared.flags.unrecommend(nodeUuid: id, entityId: entityId, token: user.csrfToken)
                 RecommendationStore.shared.markNotRecommended(id)
                 isRecommended = false
                 toast.success(String(localized: "Removed from Recommendations"), sound: .unrecommended)

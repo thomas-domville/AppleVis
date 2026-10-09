@@ -17,6 +17,10 @@ struct ForYouView: View {
     @State private var recommendedCount: Int?
     @AccessibilityFocusState private var isPickerFocused: Bool
     @AccessibilityFocusState private var isProfileButtonFocused: Bool
+    /// The Profile button, after a real Back from Profile (see
+    /// `returnsFocusOnBack`). Hanging it off Profile's disappearing also
+    /// fired when Profile pushed Help or an article (2026-10-09).
+    @State private var returnToProfileButton = false
     // Dedicated from isPickerFocused above, which targets the invisible
     // "For You" heading on tab-switch — this one targets the section
     // Picker itself, so a swipe-adjust can pull focus back onto the picker
@@ -177,6 +181,12 @@ struct ForYouView: View {
                 }
             }
             .navigationTitle("For You")
+            .returnsFocusOnBack($returnToProfileButton, into: $isProfileButtonFocused)
+            // Large title on the same row as the buttons, so VoiceOver reads
+            // the top of the screen left to right: the title, then the
+            // buttons beside it, as on Discover. With the title on its own
+            // row below, the buttons came first (beta tester, 2026-10-08).
+            .toolbarTitleDisplayMode(.inlineLarge)
             .toolbar {
                 // RN's shared header button is always "Profile and
                 // Settings" regardless of sign-in state (src/components/
@@ -186,9 +196,7 @@ struct ForYouView: View {
                 // in the first place. This was a For You-only deviation.
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink(destination: ProfileView()
-                        .onDisappear {
-                            Task { await retryAccessibilityFocus(into: $isProfileButtonFocused) }
-                        }
+                        .notesReturnFocus(in: $returnToProfileButton)
                     ) {
                         Image(systemName: "person.circle")
                     }
@@ -277,7 +285,7 @@ struct DownloadsView: View {
                     message: String(localized: "Download episodes for offline playback from any episode's detail page."),
                     systemImage: "arrow.down.circle",
                     mousePose: .listening,
-                    primaryActionLabel: String(localized: "Browse Podcasts"),
+                    primaryActionLabel: String(localized: "Browse Podcast Episodes"),
                     primaryAction: { showBrowsePodcasts = true }
                 )
                 .sheet(isPresented: $showBrowsePodcasts) {

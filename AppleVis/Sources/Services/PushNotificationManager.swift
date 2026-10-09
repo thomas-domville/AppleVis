@@ -104,6 +104,11 @@ enum PushNotificationManager {
     /// same `DeepLinkRouter.pendingContent` path Spotlight taps use.
     /// Expected payload shape: `{"kind": "forumTopic", "id": "<uuid>"}`.
     static func handle(userInfo: [AnyHashable: Any]) {
+        // A catch-up reminder opens Home's New view.
+        if userInfo["route"] as? String == "catchUp" {
+            deepLinkRouter?.open(.homeView(.new, listen: false))
+            return
+        }
         guard let kindRaw = userInfo["kind"] as? String,
               let id = userInfo["id"] as? String,
               let kind = ContentKind(rawValue: kindRaw) else { return }
@@ -115,6 +120,9 @@ enum PushNotificationManager {
     /// whether or not it's ever tapped. `kind`/`id` come from the same
     /// custom payload keys `handle(userInfo:)` reads.
     static func recordHistory(content: UNNotificationContent) {
+        // Catch-up reminders come from AppleVis itself, not the community,
+        // so they stay out of Home's notification list.
+        guard content.categoryIdentifier != CatchUpReminders.category else { return }
         let kind = (content.userInfo["kind"] as? String).flatMap(ContentKind.init(rawValue:))
         let contentId = content.userInfo["id"] as? String
         PersistenceStore.shared.recordNotification(NotificationHistoryItem(
@@ -153,6 +161,7 @@ enum PushNotificationManager {
         case "newResource":   return prefs.notifyNewResources
         case "announcement":  return prefs.notifyAnnouncements
         case "newComment":    return prefs.notifyNewComments
+        case CatchUpReminders.category: return false // never adds to the badge
         default:              return true
         }
     }

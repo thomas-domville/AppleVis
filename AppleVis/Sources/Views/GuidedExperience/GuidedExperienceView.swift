@@ -6,6 +6,9 @@ import SwiftUI
 struct GuidedExperienceView: View {
     let experience: GuidedExperience
     var onFinish: (() -> Void)? = nil
+    /// Starts at this step instead of the beginning: the first step of a
+    /// chapter chosen when replaying the tour (see ProfileView).
+    var startStep: Int? = nil
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -148,7 +151,9 @@ struct GuidedExperienceView: View {
         }
         .onAppear {
             let progress = GuidedExperienceStore.getProgress(experience.id)
-            if progress.dismissed {
+            if let startStep {
+                stepIndex = max(0, min(startStep, experience.steps.count - 1))
+            } else if progress.dismissed {
                 // Matches goToStep's own clamp below — nothing currently
                 // persists a negative lastStepIndex, but this was the one
                 // place in the file reading a saved index back without the

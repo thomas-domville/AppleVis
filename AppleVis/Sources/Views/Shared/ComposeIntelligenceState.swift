@@ -21,7 +21,12 @@ final class ComposeIntelligenceState: ObservableObject {
 
     func textChanged(_ text: String, translationEnabled: Bool, detectionEnabled: Bool) {
         detectTask?.cancel()
-        guard translationEnabled, detectionEnabled else {
+        // Spotting another language works on any device, but translating
+        // needs Apple Intelligence. Without it, the offer used to appear
+        // and then fail with "Couldn't translate this" (found in a check of
+        // devices without Apple Intelligence, 2026-10-08). The English-only
+        // check when posting still applies either way.
+        guard translationEnabled, detectionEnabled, IntelligenceService.isAvailable else {
             showTranslatePrompt = false
             return
         }

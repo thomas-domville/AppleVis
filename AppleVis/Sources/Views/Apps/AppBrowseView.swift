@@ -242,6 +242,29 @@ struct AppCategoryView: View {
     /// The app showing beside the category's list on a wide window. Kept
     /// across refreshes while the app is still in the category.
     @State private var selectedApp: ContentSelection?
+    /// The category's App Store types, such as Board or Card for Games,
+    /// from Apple's own list; empty for a category without types. Which
+    /// type each app is comes from its App Store listing (`AppGenres`), so
+    /// the AppleVis website doesn't need to store it. Requested directly
+    /// (2026-10-09): All first, every type listed even when empty, and any
+    /// category that has types gets them.
+    @State private var types: [AppGenre] = []
+    @State private var typeIndex: [String: [String]] = [:]
+    @State private var isFindingTypes = false
+    @State private var selectedType: String?
+
+    private var shownApps: [AppListing] {
+        guard let selectedType else { return apps }
+        return apps.filter { typeIndex[$0.id]?.contains(selectedType) == true }
+    }
+
+    private func count(of typeId: String) -> Int {
+        apps.filter { typeIndex[$0.id]?.contains(typeId) == true }.count
+    }
+
+    private var selectedTypeName: String {
+        types.first { $0.id == selectedType }?.name ?? String(localized: "All")
+    }
 
     var body: some View {
         // On a wide window the chosen app shows beside the category's list;
@@ -262,6 +285,7 @@ struct AppCategoryView: View {
         .navigationTitle(destination.category.name)
         .task { await load(reset: true) }
         .task { await retryAccessibilityFocus(into: $isTitleFocused) }
+        .task { await loadTypes() }
     }
 
     private var categoryContent: some View {
@@ -288,7 +312,15 @@ struct AppCategoryView: View {
                         OfflineBanner()
                             .listRowSeparator(.hidden)
                     }
-                    ForEach(apps) { app in
+                    if !types.isEmpty {
+                        typePicker
+                            .listRowSeparator(.hidden)
+                    }
+                    if selectedType != nil, shownApps.isEmpty {
+                        Text("No \(selectedTypeName) apps here yet.")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(shownApps) { app in
                         AppListingRow(app: app, onDelete: {
                             if selectedApp?.id == app.id { selectedApp = nil }
                             apps.removeAll { $0.id == app.id }
@@ -305,6 +337,49 @@ struct AppCategoryView: View {
         // ordinary tab visit is fine reusing that, a manual pull shouldn't
         // silently replay the same stale response.
         .refreshable { await RefreshHeartbeat.during { await load(reset: true, forceRefresh: true) }; SoundPlayer.shared.play(.refresh) }
+    }
+
+    @ViewBuilder
+    private var typePicker: some View {
+        if isFindingTypes {
+            HStack(spacing: 8) {
+                ProgressView().accessibilityHidden(true)
+                Text("Finding each app's type…")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
+        } else {
+            Picker("Type", selection: $selectedType) {
+                Text("\(String(localized: "All")) (\(apps.count))").tag(String?.none)
+                ForEach(types) { type in
+                    Text("\(type.name) (\(count(of: type.id)))").tag(Optional(type.id))
+                }
+            }
+            .accessibilityValue(Text(selectedType == nil
+                                     ? String(localized: "\(String(localized: "All")), \(apps.count) apps")
+                                     : String(localized: "\(selectedTypeName), \(shownApps.count) apps")))
+            .onChange(of: selectedType) { _, _ in
+                SoundPlayer.shared.play(.pickerTick)
+                UIAccessibility.post(notification: .announcement, argument: String(localized: "\(shownApps.count) apps"))
+            }
+        }
+    }
+
+    /// Apple's types for this category, then which app is which. Only for
+    /// a category Apple gives types, and not Apple TV, whose entries have no
+    /// App Store link to look up.
+    private func loadTypes() async {
+        guard destination.platform != .tvos else { return }
+        let found = await AppGenres.shared.types(forCategory: destination.category.name, platform: destination.platform)
+        guard !found.isEmpty else { return }
+        types = found
+        isFindingTypes = true
+        typeIndex = await AppGenres.shared.typeIndex(platform: destination.platform, categoryTid: destination.category.tid)
+        isFindingTypes = false
+        // Couldn't work them out (offline, say): no picker rather than one
+        // that filters everything away.
+        if typeIndex.isEmpty { types = [] }
     }
 
     /// Names the wait up front for a category too big for one request (see

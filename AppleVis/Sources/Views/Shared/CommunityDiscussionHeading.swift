@@ -172,7 +172,9 @@ struct OptionalReplyFocus: ViewModifier {
 /// unless the poster changes it. Shared by ForumReply (ForumTopicDetailView)
 /// and the generic CommentRow (Blog/Guide/Podcast comments) so reading a
 /// comment aloud doesn't announce "Subject: Comment." for no reason.
-enum CommentSubject {
+/// The rest of CommentSubject, which makes the subject a comment is
+/// posted with, is in Services/CommentSubject.swift (2026-10-09).
+extension CommentSubject {
     static func display(_ subject: String, parentTitle: String) -> String? {
         func normalize(_ value: String) -> String {
             var s = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -194,32 +196,18 @@ enum CommentSubject {
     }
 }
 
-/// Shared "quote and reply" text builder — every content type's reply flow
-/// (Forums' ComposeReplyView originally, now also Guides/Blogs/Podcasts/Apps)
-/// prefixes the compose box with the same quoted-excerpt format, so replying
-/// to a comment reads the same everywhere.
+/// Replies made before 2026-10-09 outside the Forums. Reply to this Comment
+/// used to paste "Name wrote:\n> excerpt" into the reply, because only
+/// forum replies could be linked to the comment they answer. The website now
+/// has a Reply button on every kind of comment, and the app links replies
+/// the same way everywhere (`pid`), so nothing is pasted any more.
 enum QuotedReply {
-    static func prefix(authorName: String, body: String) -> String {
-        let plain = body.strippingHTMLTags()
-        let excerpt = plain.count > 150 ? String(plain.prefix(150)).trimmingCharacters(in: .whitespaces) + "…" : plain
-        return "\(authorName) wrote:\n> \(excerpt)\n\n"
-    }
-
-    /// Backs each detail screen's "Replies to Me" rotor. Was true for every
-    /// content type that nothing in the Drupal comment data links a reply
-    /// back to its parent comment or author — no parent id, no mentions
-    /// field — until forums specifically got a real `pid` (parent comment)
-    /// field exposed via the site's own new "Reply" button (confirmed live
-    /// 2026-09-15; see `ForumReply.parentId`'s doc comment). Forums'
-    /// `ForumTopicDetailView` now checks that real relationship first and
-    /// only falls back to this heuristic for older, pre-`pid` replies.
-    /// Guides/Blogs/Podcasts/Apps have no such button yet, so for those this
-    /// is still the only signal available: does `body` open with exactly
-    /// the quote format `prefix(authorName:body:)` produces when someone
-    /// taps "Reply to this Comment" on one of `authorName`'s own comments.
-    /// That means this only ever catches explicit quote-replies, not a
-    /// free-text "@username" mention typed into an ordinary comment —
-    /// there's no distinct, detectable feature for that here at all.
+    /// Backs each detail screen's "Replies to Me" rotor, for older replies
+    /// only: every screen checks the real reply link (`parentId`) first, and
+    /// falls back to this for a reply posted before replies were linked.
+    /// Does `body` open with the "Name wrote:" quote the app used to paste
+    /// in when someone chose Reply to this Comment on one of `authorName`'s
+    /// comments? It never catches a free-text "@username" mention.
     static func isDirectedAt(_ authorName: String, body: String) -> Bool {
         guard !authorName.isEmpty else { return false }
         return body.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("\(authorName) wrote:")

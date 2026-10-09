@@ -3,6 +3,9 @@ import SwiftUI
 struct ComposeTopicView: View {
     /// Previously discarded — ForumsBrowseView had no way to show the new
     /// topic or move VoiceOver focus to it without a manual pull-to-refresh.
+    /// Its own navigation stack only as a sheet. Forums pushes it onto its
+    /// own stack, and a stack inside a stack isn't supported (2026-10-09).
+    var isInSheet = true
     var onPosted: (ForumTopic) -> Void = { _ in }
     /// Ask the Mouse's "Ask in the Forums" starts the topic with the
     /// person's question as its title, ready to reword.
@@ -73,8 +76,17 @@ struct ComposeTopicView: View {
         }
     }
 
+    @ViewBuilder
+    private func stackIfSheet<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        if isInSheet {
+            AppNavigationStack { content() }
+        } else {
+            content()
+        }
+    }
+
     var body: some View {
-        AppNavigationStack {
+        stackIfSheet {
             Group {
                 if !auth.isSignedIn {
                     signInRequiredView
@@ -333,6 +345,7 @@ struct ComposeReplyView: View {
     let onPosted: (ForumReply) -> Void
 
     @State private var bodyText = ""
+    @State private var subject = ""
     @State private var isSubmitting = false
     @State private var error: String?
     @State private var showDiscardConfirm = false
@@ -349,6 +362,8 @@ struct ComposeReplyView: View {
         self.topicId = topicId
         self.topicTitle = topicTitle
         self.quotedReply = quotedReply
+        // Filled in like the website's reply form (2026-10-09).
+        _subject = State(initialValue: CommentSubject.replyPrefill(quotedReply?.subject))
         self.onPosted = onPosted
     }
 
@@ -391,10 +406,17 @@ struct ComposeReplyView: View {
                         .padding(.bottom, 8)
                         .accessibilityHidden(true)
                 }
+                // Optional, like the website's own form. Left blank, the
+                // subject is made the way the website makes it: see
+                // CommentSubject. Reported by a beta tester (2026-10-09).
+                TextField("Subject (optional)", text: $subject)
+                    .textFieldStyle(.roundedBorder)
+                    .padding(.horizontal)
                 if intelligence.showTranslatePrompt {
                     TranslatePromptView(isProcessing: intelligence.isProcessing) {
                         Task {
-                            if let result = await intelligence.translate(subject: nil, body: bodyText, isTopic: false) {
+                            if let result = await intelligence.translate(subject: subject.isEmpty ? nil : subject, body: bodyText, isTopic: false) {
+                                if !subject.isEmpty { subject = result.subject ?? subject }
                                 bodyText = result.body
                                 justRewrote = true
                             } else {
@@ -428,7 +450,16 @@ struct ComposeReplyView: View {
                         .padding(.bottom, 8)
                         .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
                 }
+                // The box had no label, so VoiceOver said only "text field".
+                // The visible label is for everyone; VoiceOver reads it as
+                // the box's own label. Reported by a beta tester (2026-10-09).
+                Text("Reply")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal)
+                    .padding(.top, 12)
+                    .accessibilityHidden(true)
                 TextEditor(text: $bodyText)
+                    .accessibilityLabel(Text("Reply"))
                     .padding()
                     .rewriteFlash($justRewrote)
                     .guidelineReminderActions(guidelines)
@@ -513,6 +544,7 @@ struct ComposeReplyView: View {
     private func submit() async {
         guard let user = auth.user else { return }
         if let message = ContentSubmissionPolicy.blockingMessage(
+            subject: subject,
             body: bodyText
         ) {
             error = message
@@ -523,7 +555,9 @@ struct ComposeReplyView: View {
         error = nil
         do {
             let reply = try await APIClient.shared.forums.submitReply(
-                topicId: topicId, body: bodyText, csrfToken: user.csrfToken, replyToCommentId: quotedReply?.id
+                topicId: topicId, body: bodyText, csrfToken: user.csrfToken,
+                subject: CommentSubject.make(typed: subject, body: bodyText, replyingTo: quotedReply?.subject),
+                replyToCommentId: quotedReply?.id
             )
             toast.success(String(localized: "Reply posted"), sound: .reply)
             onPosted(reply)

@@ -340,8 +340,8 @@ struct MouseRecapDigest: Codable {
 
     func podcastSectionTitle(periodName: String) -> String {
         Self.isMonth(periodName)
-            ? String(localized: "This Month in Podcasts")
-            : String(localized: "This Week in Podcasts")
+            ? String(localized: "This Month on the Podcast")
+            : String(localized: "This Week on the Podcast")
     }
 
     func podcastSectionIntro(periodName: String) -> String {
@@ -486,6 +486,10 @@ final class HomeViewModel: ObservableObject {
     }
 
     @Published private(set) var items: [FeedItem] = []
+    /// Forum topics pinned on the website, shown first in Home's All view
+    /// until they're unpinned, as on the website (2026-10-08, from a beta
+    /// tester). Kept on a failed fetch rather than cleared.
+    @Published private(set) var pinnedItems: [FeedItem] = []
     @Published private(set) var isLoading = false
     @Published private(set) var error: String?
     @Published private(set) var hasMore = false
@@ -559,6 +563,11 @@ final class HomeViewModel: ObservableObject {
         isLoading = true
         let hadNoItems = items.isEmpty
         if hadNoItems { error = nil }
+        // On opening, show the lists saved last time (often by background
+        // refresh, see BackgroundRefreshTask) straight away, while the live
+        // check below runs. New activity is still worked out from the live
+        // lists only, so badges and the summary stay accurate.
+        let showedSaved = hadNoItems ? await showSavedSnapshot() : false
         page = 0
         // Home's forum topic cards bake their bell-badge state in at mapping
         // time (`Mappers.forum`/`forumFromRecent`), unlike Following/
@@ -581,20 +590,27 @@ final class HomeViewModel: ObservableObject {
         }
 
         let previousLoadedAt = lastLoadedAt
+        async let pinned = Self.fetchPinned()
         let (fetched, failed) = await fetchPage(page: 0)
         failedSourceNames = failed
+        if let pinned = await pinned { pinnedItems = pinned }
 
         if fetched.isEmpty && !failed.isEmpty {
             // Total failure. On first load there's nothing to show but the
             // error; on a later refresh, leave whatever's already on screen
             // alone rather than blanking it — the failedSourceNames banner
             // already tells the user something's wrong.
-            if hadNoItems {
+            if hadNoItems && !showedSaved {
                 error = String(localized: "Couldn't load Home. Pull to refresh.")
             }
         } else {
             error = nil
-            items = Self.deduplicated(fetched.sorted { $0.lastActivityAt > $1.lastActivityAt })
+            let newItems = Self.deduplicated(fetched.sorted { $0.lastActivityAt > $1.lastActivityAt })
+            // Pages with new comments load live next time they're opened,
+            // not from a saved copy without them (2026-10-09).
+            OutdatedPages.markChanged(from: items, to: newItems)
+            items = newItems
+            if failed.isEmpty { Self.saveSnapshot(items) }
             hasMore = fetched.count >= pageSize
             itemVisits = PersistenceStore.shared.allItemVisits()
             // Captured BEFORE potentially advancing it below, so this
@@ -603,13 +619,61 @@ final class HomeViewModel: ObservableObject {
             // that was just moved to "now."
             currentVisitBoundary = visitBoundary
             advanceVisitBoundaryIfNeeded(previousLoadedAt: previousLoadedAt)
-            await syncWebsiteReads(for: items)
-            await establishFeedBaselines(for: items)
+            await syncWebsiteReads(for: items + pinnedItems)
+            await establishFeedBaselines(for: items + pinnedItems)
             buildNewActivitySummary()
             lastLoadedAt = Date()
         }
 
         isLoading = false
+    }
+
+    /// Pinned forum topics, when Home shows forums. Nil when they couldn't
+    /// be fetched, so the ones already showing stay.
+    private static func fetchPinned() async -> [FeedItem]? {
+        let showForums = UserDefaults.standard.object(forKey: "feed.showForums") as? Bool ?? true
+        guard showForums else { return [] }
+        let appleOnly = UserDefaults.standard.object(forKey: "feed.appleOnly") as? Bool ?? true
+        guard let topics = try? await APIClient.shared.forums.pinnedTopics(appleOnly: appleOnly) else { return nil }
+        return topics.map { FeedItem.forumTopic($0) }
+    }
+
+    // MARK: - Saved lists and background refresh
+
+    private static let snapshotKey = "home.snapshot"
+
+    /// Shows Home's saved lists, if there are any. Returns whether it did.
+    private func showSavedSnapshot() async -> Bool {
+        guard let saved = await ContentCache.shared.get(HomeSnapshot.self, key: Self.snapshotKey)?.data else { return false }
+        let restored = Self.deduplicated(saved.feedItems.sorted { $0.lastActivityAt > $1.lastActivityAt })
+        guard !restored.isEmpty, items.isEmpty else { return false }
+        itemVisits = PersistenceStore.shared.allItemVisits()
+        feedBaselines = PersistenceStore.shared.allFeedBaselines()
+        currentVisitBoundary = visitBoundary
+        items = restored
+        return true
+    }
+
+    private static func saveSnapshot(_ items: [FeedItem]) {
+        ContentCache.shared.set(HomeSnapshot(items), key: snapshotKey)
+    }
+
+    /// Run by BackgroundRefreshTask while the app is closed: fetches Home's
+    /// first page, saves it for the next opening, and picks up what was
+    /// read on the website. Quiet: no sounds, and nothing on screen
+    /// changes. Returns whether every list loaded.
+    static func refreshInBackground() async -> Bool {
+        let model = HomeViewModel()
+        let (fetched, failed) = await model.fetchPage(page: 0)
+        guard !fetched.isEmpty, !Task.isCancelled else { return false }
+        let sorted = deduplicated(fetched.sorted { $0.lastActivityAt > $1.lastActivityAt })
+        // A partial result isn't saved: it would hide a whole type of
+        // content until the live check on opening.
+        if failed.isEmpty { saveSnapshot(sorted) }
+        await model.syncWebsiteReads(for: sorted)
+        // A waiting catch-up reminder now says what's actually new.
+        await CatchUpReminders.update(with: sorted)
+        return failed.isEmpty
     }
 
     private var visitBoundary: Date {
@@ -902,7 +966,11 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
-    func loadMouseRecap(force: Bool = false) async {
+    /// `fresh`: fetch live lists instead of the kept ones (forums kept up
+    /// to 30 minutes, the rest up to 6 hours). Only a pull to refresh asks
+    /// for it, so Nibbles really catches up when someone asks; other
+    /// rebuilds keep saving data. Requested directly (2026-10-08).
+    func loadMouseRecap(force: Bool = false, fresh: Bool = false) async {
         if !force, let mouseRecap, Date().timeIntervalSince(mouseRecap.generatedAt) < 10 * 60 {
             return
         }
@@ -923,7 +991,7 @@ final class HomeViewModel: ObservableObject {
         let endDate = Date()
         let startDate = Calendar.current.date(byAdding: .day, value: -Self.mouseRecapMaxDays, to: endDate) ?? endDate.addingTimeInterval(-TimeInterval(Self.mouseRecapMaxDays) * 24 * 60 * 60)
         async let commentDates = Self.forumCommentDates(since: startDate)
-        let result = await fetchMouseRecapItems(since: startDate)
+        let result = await fetchMouseRecapItems(since: startDate, fresh: fresh)
 
         failedMouseRecapSourceNames = result.failedSources
         if result.items.isEmpty && !result.failedSources.isEmpty {
@@ -1061,7 +1129,10 @@ final class HomeViewModel: ObservableObject {
         let showApps     = UserDefaults.standard.object(forKey: "feed.showApps")     as? Bool ?? true
         let showGuides   = UserDefaults.standard.object(forKey: "feed.showGuides")   as? Bool ?? true
         let showBlogs    = UserDefaults.standard.object(forKey: "feed.showBlogs")    as? Bool ?? true
-        let appleOnly    = UserDefaults.standard.object(forKey: "feed.appleOnly")    as? Bool ?? false
+        // Same default as PreferencesStore.appleOnlyForums. Was `false`,
+        // so after Skip Setup the switch in Settings said Apple topics only
+        // while Home showed everything (2026-10-08).
+        let appleOnly    = UserDefaults.standard.object(forKey: "feed.appleOnly")    as? Bool ?? true
 
         async let forums = showForums
             ? fetchSource(name: "Forums") {
@@ -1080,7 +1151,7 @@ final class HomeViewModel: ObservableObject {
         // see `recentlyCommented`.
         let includeRecentlyCommented = page == 0
         async let podcasts = showPodcasts
-            ? fetchSource(name: "Podcasts") {
+            ? fetchSource(name: "Podcast") {
                 async let listedPage = APIClient.shared.podcasts.episodes(page: page, forceRefresh: true)
                 async let active = Self.recentlyCommented(
                     enabled: includeRecentlyCommented,
@@ -1119,7 +1190,7 @@ final class HomeViewModel: ObservableObject {
               }
             : SourceFetchResult(items: [], failedName: nil)
         async let blogs = showBlogs
-            ? fetchSource(name: "Blogs") {
+            ? fetchSource(name: "Blog") {
                 async let listedPage = APIClient.shared.blogs.list(page: page, forceRefresh: true)
                 async let active = Self.recentlyCommented(
                     enabled: includeRecentlyCommented,
@@ -1191,41 +1262,44 @@ final class HomeViewModel: ObservableObject {
         return extra + listed.filter { !extraIds.contains($0.id) }
     }
 
-    private func fetchMouseRecapItems(since startDate: Date) async -> MouseRecapFetchResult {
+    private func fetchMouseRecapItems(since startDate: Date, fresh: Bool = false) async -> MouseRecapFetchResult {
         let showForums   = UserDefaults.standard.object(forKey: "feed.showForums")   as? Bool ?? true
         let showPodcasts = UserDefaults.standard.object(forKey: "feed.showPodcasts") as? Bool ?? true
         let showApps     = UserDefaults.standard.object(forKey: "feed.showApps")     as? Bool ?? true
         let showGuides   = UserDefaults.standard.object(forKey: "feed.showGuides")   as? Bool ?? true
         let showBlogs    = UserDefaults.standard.object(forKey: "feed.showBlogs")    as? Bool ?? true
-        let appleOnly    = UserDefaults.standard.object(forKey: "feed.appleOnly")    as? Bool ?? false
+        // Same default as PreferencesStore.appleOnlyForums. Was `false`,
+        // so after Skip Setup the switch in Settings said Apple topics only
+        // while Home showed everything (2026-10-08).
+        let appleOnly    = UserDefaults.standard.object(forKey: "feed.appleOnly")    as? Bool ?? true
 
         async let forums = showForums
             ? fetchRecapPages(name: "Forums", since: startDate) { page in
-                let topics = try await APIClient.shared.forums.recent(page: page, appleOnly: appleOnly)
+                let topics = try await APIClient.shared.forums.recent(page: page, appleOnly: appleOnly, forceRefresh: fresh)
                 return (topics.map { FeedItem.forumTopic($0) }, topics.count >= APIPaging.pageSize)
             }
             : SourceFetchResult(items: [], failedName: nil)
         async let podcasts = showPodcasts
-            ? fetchRecapPages(name: "Podcasts", since: startDate) { page in
-                let result = try await APIClient.shared.podcasts.episodes(page: page)
+            ? fetchRecapPages(name: "Podcast", since: startDate) { page in
+                let result = try await APIClient.shared.podcasts.episodes(page: page, forceRefresh: fresh)
                 return (result.items.map { FeedItem.podcastEpisode($0) }, result.hasMore)
             }
             : SourceFetchResult(items: [], failedName: nil)
         async let apps = showApps
             ? fetchRecapPages(name: "Apps", since: startDate) { page in
-                let result = try await APIClient.shared.apps.list(page: page)
+                let result = try await APIClient.shared.apps.list(page: page, forceRefresh: fresh)
                 return (result.items.map { FeedItem.appListing($0) }, result.hasMore)
             }
             : SourceFetchResult(items: [], failedName: nil)
         async let guides = showGuides
             ? fetchRecapPages(name: "Guides", since: startDate) { page in
-                let result = try await APIClient.shared.resources.list(page: page)
+                let result = try await APIClient.shared.resources.list(page: page, forceRefresh: fresh)
                 return (result.items.map { FeedItem.resource($0) }, result.hasMore)
             }
             : SourceFetchResult(items: [], failedName: nil)
         async let blogs = showBlogs
-            ? fetchRecapPages(name: "Blogs", since: startDate) { page in
-                let result = try await APIClient.shared.blogs.list(page: page)
+            ? fetchRecapPages(name: "Blog", since: startDate) { page in
+                let result = try await APIClient.shared.blogs.list(page: page, forceRefresh: fresh)
                 return (result.items.map { FeedItem.blogPost($0) }, result.hasMore)
             }
             : SourceFetchResult(items: [], failedName: nil)
@@ -1357,10 +1431,11 @@ final class HomeViewModel: ObservableObject {
             return
         }
         newItems = items.filter(isNewActivity)
-        HomeBadgeStore.shared.unreadForumTopicCount = newItems.filter {
-            if case .forumTopic = $0 { return true }
-            return false
-        }.count
+        // The Home tab's badge is the number of items in New, of every
+        // type, so it matches the New view and the summary. It used to
+        // count only forum topics, which a beta tester found confusing
+        // (2026-10-08).
+        HomeBadgeStore.shared.unreadForumTopicCount = newItems.count
         guard !newItems.isEmpty else { newActivitySummary = ""; return }
         newActivitySummary = buildSummaryText(for: newItems)
     }
@@ -1400,5 +1475,33 @@ final class HomeViewModel: ObservableObject {
             return String(localized: "New items not read yet: \(newItems.count)")
         }
         return String(localized: "New since you last read or marked as read: \(ListFormatter.localizedString(byJoining: parts))")
+    }
+}
+
+/// Home's first page, saved so the next opening can show it at once. Kept
+/// as plain lists per type because the mixed `FeedItem` isn't saved
+/// directly; the order is rebuilt from each item's latest activity.
+nonisolated struct HomeSnapshot: Codable, Sendable {
+    var forums: [ForumTopic] = []
+    var podcasts: [PodcastEpisode] = []
+    var apps: [AppListing] = []
+    var resources: [Resource] = []
+    var blogs: [BlogPost] = []
+
+    @MainActor init(_ items: [FeedItem]) {
+        for item in items {
+            switch item {
+            case .forumTopic(let topic):       forums.append(topic)
+            case .podcastEpisode(let episode): podcasts.append(episode)
+            case .appListing(let app):         apps.append(app)
+            case .resource(let resource):      resources.append(resource)
+            case .blogPost(let post):          blogs.append(post)
+            }
+        }
+    }
+
+    @MainActor var feedItems: [FeedItem] {
+        forums.map { .forumTopic($0) } + podcasts.map { .podcastEpisode($0) } + apps.map { .appListing($0) }
+            + resources.map { .resource($0) } + blogs.map { .blogPost($0) }
     }
 }

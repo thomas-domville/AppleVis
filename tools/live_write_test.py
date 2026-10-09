@@ -19,6 +19,21 @@ run-app ios real <App Store id> [country]
        way the app's Submit form does (name, version, devices, description,
        link, category), to reproduce a submission the site refused. Any
        refusal is printed with the site's own reason.
+run-subjects <forum term id>
+       Same as run, but the comment and the reply are sent with no subject,
+       and the subjects the site gives them are printed. Everything is
+       deleted at the end. (2026-10-09: what a blank Subject should send.)
+run-replies <forum term id>
+       Posts the way the app does since 2026-10-09: an UNPUBLISHED topic, a
+       comment whose subject is its first words (the app's rule for a blank
+       Subject), and a reply to that comment with "Re: <its subject>" and
+       the parent link. Checks the subjects, the parent link, the thread
+       position, and that the website's own page shows the reply nested
+       under the comment. Everything is deleted at the end.
+run-replies-app
+       Same as run-replies, on an UNPUBLISHED App Directory entry instead of
+       a forum topic: app entries, blog posts, guides, podcast episodes, and
+       bug reports link replies the same way since 2026-10-09.
 run    Creates an UNPUBLISHED topic in the given forum, then a comment, a
        reply to the comment, deletes the reply and comment, and deletes the
        topic. Every step is checked, and anonymous visitors are checked to
@@ -95,7 +110,7 @@ def step(label, ok, detail=''):
     print(('PASS' if ok else 'FAIL'), '|', label, ('| ' + detail) if detail else '')
     return ok
 
-def run(tid):
+def run(tid, with_subjects=True):
     sign_in()
     w = {'X-CSRF-Token': csrf}
     status, body = call(anonymous, 'GET', f'jsonapi/taxonomy_term/forums?filter[drupal_internal__tid]={tid}')
@@ -128,24 +143,35 @@ def run(tid):
 
     try:
         comment_body = {'data': {'type': 'comment--comment_forum', 'attributes': {
-            'entity_type': 'node', 'field_name': 'comment_forum', 'subject': 'Test comment',
+            'entity_type': 'node', 'field_name': 'comment_forum',
             'comment_body': {'value': 'Automated test comment.', 'format': TEXT_FORMAT}},
             'relationships': {'entity_id': {'data': {'type': 'node--forum', 'id': tid_uuid}},
                               'comment_type': {'data': {'type': 'comment_type--comment_type', 'id': FORUM_COMMENT_TYPE_UUID}}}}}
+        if with_subjects:
+            comment_body['data']['attributes']['subject'] = 'Test comment'
         status, body = call(signed_in, 'POST', 'jsonapi/comment/comment_forum', comment_body, w)
         comment_id = body.get('data', {}).get('id') if status == 201 else None
         step('Post a comment on the topic', bool(comment_id), f'HTTP {status}')
+        if comment_id and not with_subjects:
+            print('   Subject the site gave the comment:', repr(body['data']['attributes'].get('subject')))
+        elif not comment_id:
+            print('   ', json.dumps(body)[:400])
 
         reply_id = None
         if comment_id:
             reply = json.loads(json.dumps(comment_body))
-            reply['data']['attributes']['subject'] = 'Test reply'
+            if with_subjects:
+                reply['data']['attributes']['subject'] = 'Test reply'
+            else:
+                reply['data']['attributes'].pop('subject', None)
             reply['data']['attributes']['comment_body']['value'] = 'Automated test reply to the comment.'
             reply['data']['relationships']['pid'] = {'data': {'type': 'comment--comment_forum', 'id': comment_id}}
             status, body = call(signed_in, 'POST', 'jsonapi/comment/comment_forum', reply, w)
             reply_id = body.get('data', {}).get('id') if status == 201 else None
             parent = ((body.get('data', {}).get('relationships', {}).get('pid', {}) or {}).get('data') or {}).get('id')
             step('Reply to the comment', bool(reply_id), f'HTTP {status}')
+            if reply_id and not with_subjects:
+                print('   Subject the site gave the reply:', repr(body['data']['attributes'].get('subject')))
             step('Reply is linked to its comment', parent == comment_id)
 
         if reply_id:
@@ -158,6 +184,106 @@ def run(tid):
         status, _ = call(signed_in, 'DELETE', f'jsonapi/node/forum/{tid_uuid}', None, w)
         step('Delete the topic', status == 204, f'HTTP {status}')
         status, _ = call(signed_in, 'GET', f'jsonapi/node/forum/{tid_uuid}')
+        step('Topic is gone', status == 404, f'HTTP {status}')
+
+def app_subject(body, parent=None):
+    """CommentSubject.make, for a blank Subject field."""
+    if parent:
+        base = parent
+        while base.lower().startswith('re:'):
+            base = base[3:].strip()
+        return ('Re: ' + base)[:64]
+    lines = [l for l in body.splitlines() if not l.strip().startswith('>') and not l.strip().endswith(' wrote:')]
+    words = ' '.join(' '.join(lines).split())
+    if len(words) <= 29:
+        return words
+    cut = words[:28]
+    return (cut[:cut.rfind(' ')] if ' ' in cut else cut).strip() + '\u2026'
+
+def run_replies(tid):
+    sign_in()
+    w = {'X-CSRF-Token': csrf}
+    status, body = call(anonymous, 'GET', f'jsonapi/taxonomy_term/forums?filter[drupal_internal__tid]={tid}')
+    terms = body.get('data', [])
+    if not terms: sys.exit(f'No forum with term id {tid}.')
+    forum_uuid, forum_name = terms[0]['id'], terms[0]['attributes']['name']
+    print(f'Forum: {forum_name}\n')
+    stamp = time.strftime('%Y-%m-%d %H:%M')
+    topic_body = {'data': {'type': 'node--forum', 'attributes': {
+        'title': f'App test, please ignore ({stamp})',
+        'body': {'value': 'Automated test of the AppleVis app. This topic is unpublished and will be deleted in a moment.', 'format': TEXT_FORMAT},
+        'status': False,
+    }, 'relationships': {'taxonomy_forums': {'data': {'type': 'taxonomy_term--forums', 'id': forum_uuid}}}}}
+    status, body = call(signed_in, 'POST', 'jsonapi/node/forum', topic_body, w)
+    if not step('Create topic', status == 201, f'HTTP {status}'):
+        print(json.dumps(body)[:500]); return
+    topic = body['data']; topic_uuid = topic['id']; nid = topic['attributes'].get('drupal_internal__nid')
+    if topic['attributes'].get('status'):
+        step('Topic is unpublished', False, 'published anyway: deleting now')
+        call(signed_in, 'DELETE', f'jsonapi/node/forum/{topic_uuid}', None, w)
+        return
+    step('Topic is unpublished', True)
+    status, _ = call(anonymous, 'GET', f'jsonapi/node/forum/{topic_uuid}')
+    step('Hidden from anonymous visitors', status in (403, 404), f'HTTP {status}')
+
+    def comment(text, subject, parent_uuid=None):
+        payload = {'data': {'type': 'comment--comment_forum', 'attributes': {
+            'entity_type': 'node', 'field_name': 'comment_forum', 'subject': subject,
+            'comment_body': {'value': text, 'format': TEXT_FORMAT}},
+            'relationships': {'entity_id': {'data': {'type': 'node--forum', 'id': topic_uuid}},
+                              'comment_type': {'data': {'type': 'comment_type--comment_type', 'id': FORUM_COMMENT_TYPE_UUID}}}}}
+        if parent_uuid:
+            payload['data']['relationships']['pid'] = {'data': {'type': 'comment--comment_forum', 'id': parent_uuid}}
+        return call(signed_in, 'POST', 'jsonapi/comment/comment_forum', payload, w)
+
+    made = []
+    try:
+        text1 = 'Automated test comment from the AppleVis app. Please ignore it.'
+        subject1 = app_subject(text1)
+        status, body = comment(text1, subject1)
+        c1 = body.get('data') if status == 201 else None
+        step('Post a comment (blank Subject, so its first words)', bool(c1), f'HTTP {status}')
+        if not c1:
+            print('   ', json.dumps(body)[:400]); return
+        made.append(c1['id'])
+        a1 = c1['attributes']
+        step('Comment subject saved', a1.get('subject') == subject1, repr(a1.get('subject')))
+
+        text2 = 'Oliver wrote:\n> Automated test comment.\n\nAutomated test reply to that comment.'
+        subject2 = app_subject(text2, parent=a1.get('subject'))
+        status, body = comment(text2, subject2, parent_uuid=c1['id'])
+        c2 = body.get('data') if status == 201 else None
+        step('Reply to the comment', bool(c2), f'HTTP {status}')
+        if not c2:
+            print('   ', json.dumps(body)[:400]); return
+        made.append(c2['id'])
+        a2 = c2['attributes']
+        parent = ((c2.get('relationships', {}).get('pid', {}) or {}).get('data') or {}).get('id')
+        step('Reply subject is Re: and the comment subject', a2.get('subject') == subject2, repr(a2.get('subject')))
+        step('Reply is linked to its comment', parent == c1['id'])
+        t1, t2 = (a1.get('thread') or ''), (a2.get('thread') or '')
+        step('Reply is threaded under the comment, like a website reply', t2.startswith(t1.rstrip('/') + '.'), f'{t1} then {t2}')
+
+        h = dict(BASE_HEADERS); h['Accept'] = 'text/html'
+        req = urllib.request.Request(SITE + f'node/{nid}', headers=h)
+        page = signed_in.open(req, timeout=30).read().decode('utf-8', 'ignore')
+        c1_id, c2_id = a1.get('drupal_internal__cid'), a2.get('drupal_internal__cid')
+        i1, i2 = page.find(f'comment-{c1_id}'), page.find(f'comment-{c2_id}')
+        step('Website page shows both', i1 != -1 and i2 != -1, f'{i1} {i2}')
+        # The site lists comments flat; a reply carries "In reply to
+        # <comment>" linking its parent (checked against a website reply).
+        j = page.find('<article', i2 + 10) if i2 != -1 else -1
+        reply_html = page[i2:j if j != -1 else i2 + 8000] if i2 != -1 else ''
+        step('Website page shows the reply as In reply to the comment',
+             'comment__in-reply-to' in reply_html and f'/comment/{c1_id}' in reply_html)
+        step('Website page shows the reply subject', subject2 in page)
+    finally:
+        for cid in reversed(made):
+            status, _ = call(signed_in, 'DELETE', f'jsonapi/comment/comment_forum/{cid}', None, w)
+            step('Delete a test comment', status == 204, f'HTTP {status}')
+        status, _ = call(signed_in, 'DELETE', f'jsonapi/node/forum/{topic_uuid}', None, w)
+        step('Delete the topic', status == 204, f'HTTP {status}')
+        status, _ = call(signed_in, 'GET', f'jsonapi/node/forum/{topic_uuid}')
         step('Topic is gone', status == 404, f'HTTP {status}')
 
 APP_TYPES = {
@@ -299,6 +425,87 @@ def run_app(platform, with_status, real=None):
         status, _ = call(signed_in, 'GET', f'jsonapi/node/{node}/{uuid}')
         step('Entry is gone', status == 404, f'HTTP {status}')
 
+IOS_APP_COMMENT_TYPE_UUID = 'ee475b17-740d-4521-b17f-07ca26fd1ee8'  # CommentBundle.iosApp.typeUuid
+
+def run_replies_app():
+    node, field, vocab, table = APP_TYPES['ios']
+    sign_in()
+    w = {'X-CSRF-Token': csrf}
+    categories = swift_table(table)
+    category_name, category_uuid = next(iter(categories.items()))
+    attrs = app_attributes('ios', time.strftime('%Y-%m-%d %H:%M'))
+    attrs['status'] = False
+    rels = {field: {'data': {'type': f'taxonomy_term--{vocab}', 'id': category_uuid}}}
+    status, body = call(signed_in, 'POST', f'jsonapi/node/{node}', {'data': {'type': f'node--{node}', 'attributes': attrs, 'relationships': rels}}, w)
+    if not step('Create an unpublished App Directory entry', status == 201, f'HTTP {status}'):
+        print('   ', json.dumps(body)[:500]); return
+    entry = body['data']; uuid = entry['id']; nid = entry['attributes'].get('drupal_internal__nid')
+    made = []
+    bundle = 'comment_node_ios_app_directory'
+    try:
+        if entry['attributes'].get('status'):
+            step('Entry is unpublished', False, 'published anyway: deleting now'); return
+        step('Entry is unpublished', True)
+        status, _ = call(anonymous, 'GET', f'jsonapi/node/{node}/{uuid}')
+        step('Hidden from anonymous visitors', status in (403, 404), f'HTTP {status}')
+
+        def comment(text, subject, parent_uuid=None):
+            payload = {'data': {'type': f'comment--{bundle}', 'attributes': {
+                'entity_type': 'node', 'field_name': bundle, 'subject': subject,
+                'comment_body': {'value': text, 'format': TEXT_FORMAT}},
+                'relationships': {'entity_id': {'data': {'type': f'node--{node}', 'id': uuid}},
+                                  'comment_type': {'data': {'type': 'comment_type--comment_type', 'id': IOS_APP_COMMENT_TYPE_UUID}}}}}
+            if parent_uuid:
+                payload['data']['relationships']['pid'] = {'data': {'type': f'comment--{bundle}', 'id': parent_uuid}}
+            return call(signed_in, 'POST', f'jsonapi/comment/{bundle}', payload, w)
+
+        text1 = 'Automated test comment from the AppleVis app. Please ignore it.'
+        subject1 = app_subject(text1)
+        status, body = comment(text1, subject1)
+        c1 = body.get('data') if status == 201 else None
+        step('Post a comment', bool(c1), f'HTTP {status}')
+        if not c1:
+            print('   ', json.dumps(body)[:400]); return
+        made.append(c1['id'])
+        a1 = c1['attributes']
+
+        text2 = 'Automated test reply to that comment.'
+        subject2 = app_subject(text2, parent=a1.get('subject'))
+        status, body = comment(text2, subject2, parent_uuid=c1['id'])
+        c2 = body.get('data') if status == 201 else None
+        step('Reply to the comment', bool(c2), f'HTTP {status}')
+        if not c2:
+            print('   ', json.dumps(body)[:400]); return
+        made.append(c2['id'])
+        a2 = c2['attributes']
+        parent = ((c2.get('relationships', {}).get('pid', {}) or {}).get('data') or {}).get('id')
+        step('Reply subject is Re: and the comment subject', a2.get('subject') == subject2, repr(a2.get('subject')))
+        step('Reply is linked to its comment', parent == c1['id'])
+        t1, t2 = (a1.get('thread') or ''), (a2.get('thread') or '')
+        step('Reply is threaded under the comment', t2.startswith(t1.rstrip('/') + '.'), f'{t1} then {t2}')
+
+        status, listed = call(signed_in, 'GET', f'jsonapi/comment/{bundle}?filter[entity_id.id]={uuid}&sort=created')
+        ids = {d['id']: ((d.get('relationships', {}).get('pid', {}) or {}).get('data') or {}).get('id') for d in listed.get('data', [])}
+        step('Reading the comments back gives the reply its parent, as the app reads them', ids.get(c2['id']) == c1['id'])
+
+        h = dict(BASE_HEADERS); h['Accept'] = 'text/html'
+        req = urllib.request.Request(SITE + f'node/{nid}', headers=h)
+        page = signed_in.open(req, timeout=30).read().decode('utf-8', 'ignore')
+        c1_id, c2_id = a1.get('drupal_internal__cid'), a2.get('drupal_internal__cid')
+        i2 = page.find(f'id="comment-{c2_id}"')
+        j = page.find('<article', i2 + 10) if i2 != -1 else -1
+        reply_html = page[i2:j if j != -1 else i2 + 8000] if i2 != -1 else ''
+        step('Website page shows the reply as In reply to the comment',
+             'comment__in-reply-to' in reply_html and f'/comment/{c1_id}' in reply_html)
+    finally:
+        for cid in reversed(made):
+            status, _ = call(signed_in, 'DELETE', f'jsonapi/comment/{bundle}/{cid}', None, w)
+            step('Delete a test comment', status == 204, f'HTTP {status}')
+        status, _ = call(signed_in, 'DELETE', f'jsonapi/node/{node}/{uuid}', None, w)
+        step('Delete the entry', status == 204, f'HTTP {status}')
+        status, _ = call(signed_in, 'GET', f'jsonapi/node/{node}/{uuid}')
+        step('Entry is gone', status == 404, f'HTTP {status}')
+
 if __name__ == '__main__':
     if len(sys.argv) >= 2 and sys.argv[1] == 'check':
         check()
@@ -309,6 +516,12 @@ if __name__ == '__main__':
         if len(sys.argv) >= 5 and sys.argv[3] == 'real':
             real = (sys.argv[4], sys.argv[5] if len(sys.argv) >= 6 else 'us')
         run_app(sys.argv[2], len(sys.argv) >= 4 and sys.argv[3] == 'status', real)
+    elif len(sys.argv) >= 2 and sys.argv[1] == 'run-replies-app':
+        run_replies_app()
+    elif len(sys.argv) >= 3 and sys.argv[1] == 'run-replies':
+        run_replies(int(sys.argv[2]))
+    elif len(sys.argv) >= 3 and sys.argv[1] == 'run-subjects':
+        run(int(sys.argv[2]), with_subjects=False)
     elif len(sys.argv) >= 3 and sys.argv[1] == 'run':
         run(int(sys.argv[2]))
     else:

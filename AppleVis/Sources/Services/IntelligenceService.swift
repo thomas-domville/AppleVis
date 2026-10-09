@@ -43,6 +43,26 @@ enum IntelligenceService {
         }
     }
 
+    /// For members: why the Apple Intelligence features aren't showing, or
+    /// nil when they're available. Shown in Settings > Intelligence.
+    static var unavailableExplanation: String? {
+        guard #available(iOS 26.0, *) else {
+            return String(localized: "Apple Intelligence needs iOS 26 or later, so these features aren't available. Everything else in AppleVis works as usual.")
+        }
+        switch SystemLanguageModel.default.availability {
+        case .available:
+            return nil
+        case .unavailable(.deviceNotEligible):
+            return String(localized: "This device doesn't support Apple Intelligence, so these features aren't available. Everything else in AppleVis works as usual.")
+        case .unavailable(.appleIntelligenceNotEnabled):
+            return String(localized: "Apple Intelligence is turned off. To use these features, turn it on in iOS Settings > Apple Intelligence & Siri.")
+        case .unavailable(.modelNotReady):
+            return String(localized: "Apple Intelligence is still getting ready on this device. These features will be available once it finishes downloading.")
+        case .unavailable:
+            return String(localized: "Apple Intelligence isn't available right now, so these features are hidden. Everything else in AppleVis works as usual.")
+        }
+    }
+
     // MARK: - Non-English detection (NaturalLanguage — no model download needed)
 
     /// True when the dominant detected language of `text` isn't English,
@@ -674,7 +694,11 @@ enum IntelligenceService {
         Only use a source that is about the same device as the question (iPhone, iPad, Mac, Apple Watch, or \
         Apple TV) and the same way of using it (a braille display, Braille Screen Input, a keyboard, or touch \
         gestures). A source about a different device or method doesn't answer the question, even if it uses \
-        the same words; mention it in nearMiss instead. Bug reports are known accessibility bugs from \
+        the same words; mention it in nearMiss instead. You can't see the person's screen or device: when \
+        they ask what something on their screen is, say you can't see it, give what the sources say about \
+        AppleVis's own screens if that may be it, and ask which app or screen they're on. Never describe a \
+        screen you haven't been told about. When a source is marked as checked against Apple's documentation, \
+        give its finger counts, dot numbers, and steps exactly as written. Bug reports are known accessibility bugs from \
         the AppleVis Bug Tracker: when one matches, say it's a known bug, whether it's still active or fixed and \
         in which version, and give any workaround. Members' comments on an app entry say how accessible members \
         found that app: sum up what they report, mention how recent the comments are, and say it's members' \
@@ -754,9 +778,11 @@ enum IntelligenceService {
         """
         do {
             let session = LanguageModelSession(instructions: mouseInstructions + """
-             Sort the results. Put what the person asked for in main, things that are close in related, \
-            and anything that doesn't fit in none. Write each blurb only from that result's own text, in the \
-            same language as the question.
+             Sort the results. Put a result in main only when you're sure it's what the person asked for. \
+            Put anything you're unsure about, or that is only close, in none: only main is shown. List fully \
+            accessible results first. When a result is only partly accessible or not rated, say so in a few \
+            words in its blurb. Write each blurb only from that result's own text, in the same language as \
+            the question.
             """)
             let result = try await session.respond(to: prompt, generating: MousePicksOutput.self).content
             let known = Set(items.map(\.id))
@@ -826,7 +852,7 @@ private struct MousePlanOutput {
     var kind: String
     @Guide(description: "One to three short English search phrases for the AppleVis website, including other common ways to word it. No filler words.")
     var searchPhrases: [String]
-    @Guide(description: "When finding apps: one to three English words, separated by commas, likely to appear in the app's name or description, such as card, solitaire, poker for card games, or dice for dice games. Avoid short words found inside other words: for car games use racing, driving rather than car. Otherwise empty.")
+    @Guide(description: "When finding apps: one to three English words, separated by commas, likely to appear in the app's name or description, such as card, solitaire, poker for card games, or dice for dice games. Avoid short words found inside other words: for car games use racing, driving rather than car. Use words that name what the app is, not everyday words most descriptions use, such as home, money, learn, run, or image: for identifying money use currency, banknote; for budgeting use budget, expense; for learning a language use language, vocabulary. Otherwise empty.")
     var appKeyword: String
     @Guide(description: "True only if the person asked for apps that are fully, totally, or completely accessible.")
     var fullyAccessibleOnly: Bool
@@ -871,7 +897,7 @@ private struct MouseAnswerOutput {
     var stepSources: [String]
     @Guide(description: "Only when the sources don't answer it: one or two warm sentences saying you couldn't find exactly that on AppleVis, then what was close and how it differs, such as a Mac shortcut instead of an iPhone one, or Braille Screen Input instead of a braille display. Empty when the sources answer it or nothing is close.")
     var nearMiss: String
-    @Guide(description: "Two or three short questions the person might ask next about the same subject, worded as they would ask them, in the same language as the question. Empty if the sources don't answer it.", .maximumCount(3))
+    @Guide(description: "Two or three short questions the person might ask next about the same subject, worded as they would ask them, in the same language as the question. Each one must make sense on its own: name the device and the feature instead of saying this, that, or it, such as How do I change the braille display command for Notification Center on iPhone? Prefer questions the sources can answer. Empty if the sources don't answer it.", .maximumCount(3))
     var followUps: [String]
 }
 
@@ -892,7 +918,7 @@ private struct MousePicksOutput {
 private struct MousePickOutput {
     @Guide(description: "The result's id exactly as given in square brackets, without the brackets.")
     var id: String
-    @Guide(description: "main if it's what the person asked for, related if it's close, none if it doesn't fit.", .anyOf(["main", "related", "none"]))
+    @Guide(description: "main only if you're sure it's what the person asked for; none if it's only close, you're unsure, or it doesn't fit.", .anyOf(["main", "related", "none"]))
     var group: String
     @Guide(description: "One short sentence about it, under 20 words, from its own text only.")
     var blurb: String

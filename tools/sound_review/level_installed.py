@@ -16,7 +16,7 @@ TIER = {
     'refresh_tick': -22, 'mouse_patter': -22,
     'tip_popup': -18,
     # frequent confirmation, a little under the rest
-    'marked_read': -16, 'unsaved': -16, 'unfollowed': -16, 'unrecommended': -16,
+    'marked_read': -16, 'all_caught_up': -14, 'unsaved': -16, 'unfollowed': -16, 'unrecommended': -16,
     # medium: confirmations
     'success': -13, 'bookmark_saved': -13, 'reply': -13, 'refresh': -13, 
     'podcast_play': -13, 'podcast_pause': -13, 'podcast_queue': -13, 'followed': -13, 'recommended': -13, 'guideline_ding': -13,

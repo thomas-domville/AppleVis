@@ -56,6 +56,7 @@ struct AppHealthFlag: Identifiable {
             case "version":     return "Version"
             case "description": return "Description"
             case "devices":     return "Supported Devices"
+            case "link":        return "App Store Link (not the neutral link)"
             default:            return id
             }
         }
@@ -388,14 +389,15 @@ final class AppEntryHealthScanner: ObservableObject {
                 appleVisUrl: listing.url, appStoreUrl: listing.appStoreUrl
             )
         }
-        // The link is left out on purpose: this lookup found the app by
-        // the id in the entry's own link, so it's already the right app,
-        // and the App Store's copy of the address carries tracking bits
-        // that would make every entry look out of date. Refresh App
-        // Details still offers it.
+        // The link counts only when the one on file isn't the neutral
+        // form (https://apps.apple.com/app/id…): it names a country or the
+        // app, or has a tracking tag. AppInfoFieldDiff compares by the
+        // app's id, so the App Store's own tracking bits never count. It
+        // used to be skipped entirely, so a scan never found a /us/ link.
+        // Requested directly (2026-10-08).
         let outdated: [AppHealthFlag.OutdatedField] = detail.map { detail in
             AppInfoFieldDiff.build(detail: detail, metadata: metadata)
-                .filter { $0.changed && $0.id != "title" && $0.id != "link" }
+                .filter { $0.changed && $0.id != "title" }
                 .map { diff in
                     let showsValues = diff.id == "version" || diff.id == "devices"
                     return AppHealthFlag.OutdatedField(

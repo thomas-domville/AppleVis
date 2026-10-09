@@ -21,6 +21,7 @@ struct AppleVisApp: App {
 
     init() {
         BackgroundDownloadTask.register()
+        BackgroundRefreshTask.register()
         Self.purgeCacheIfRetentionExpired()
     }
 
@@ -100,6 +101,8 @@ struct AppleVisApp: App {
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .background {
                     BackgroundDownloadTask.scheduleNext()
+                    BackgroundRefreshTask.scheduleNext()
+                    CatchUpReminders.appWentToBackground()
                     ICloudSyncManager.shared.pushSavedItems()
                     player.pushPlaybackStateToICloud()
                     ICloudSyncManager.shared.pushReadHistory()
@@ -131,6 +134,11 @@ struct AppleVisApp: App {
                     // day). The built-in copy carries on if it can't reach
                     // GitHub. See GuidelineRules.
                     Task { await GuidelineRules.refreshIfDue() }
+                    // Reads the website missed (offline, or it didn't
+                    // answer) go now, with the time they were made.
+                    APIClient.shared.history.sendPendingReads()
+                    // Back in the app: any waiting catch-up reminder is cancelled.
+                    CatchUpReminders.appBecameActive()
                     // Refreshes `.system`/`.oppositeToSystem`'s notion of the
                     // real device appearance from UIKit directly — see the
                     // doc comment on `PreferencesStore.systemIsDark` for why
@@ -147,6 +155,9 @@ struct AppleVisApp: App {
                 PushNotificationManager.toastStore = toast
                 APIClient.authStore = auth
                 APIClient.toastStore = toast
+            }
+            .onChange(of: networkMonitor.isConnected) { _, connected in
+                if connected { APIClient.shared.history.sendPendingReads() }
             }
             .onChange(of: preferences.notificationSound) { _, _ in
                 Task { await PushNotificationManager.syncRegistration() }

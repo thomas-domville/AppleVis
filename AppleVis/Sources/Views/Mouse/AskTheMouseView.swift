@@ -507,8 +507,7 @@ struct AskTheMouseView: View {
         // answered, say so: VoiceOver lands here first, and "couldn't find
         // that" alone suggested there was nothing below worth reading.
         // Requested directly (2026-10-04).
-        let hasResults = !turn.moreGuides.isEmpty || !turn.forums.isEmpty || !turn.podcasts.isEmpty
-            || !turn.blogs.isEmpty || !turn.bugs.isEmpty || !turn.otherApps.isEmpty || !turn.saved.isEmpty
+        let hasResults = turn.hasCheckedResults
         if let link = turn.appleLink, !turn.isOffTopic {
             return hasResults
                 ? String(localized: "I couldn't find an answer on AppleVis, but \(link.providerName) has a page about it: \(link.title). You'll find it under Need More Help. The AppleVis results below might help too.")
@@ -1010,67 +1009,22 @@ struct AskTheMouseView: View {
 
     // MARK: - Everything else it found
 
+    /// While the Mouse reads the best few results, one line says so. Once
+    /// it's done, those that answer are in Other Sources, and the rest
+    /// aren't listed: results it hadn't checked used to stay here under
+    /// "Not Checked", along with apps and saved items that only shared a
+    /// word with the question. Requested directly (2026-10-08): only show
+    /// what the Mouse knows is good.
     @ViewBuilder
     private func moreSection(_ turn: MouseTurn) -> some View {
-        // Results with their own answer are in Other Sources; once the
-        // Mouse has read them, only the rest stay here.
-        let unanswered: (String) -> Bool = { turn.resultNotes[$0] == nil }
-        let hasMore = turn.moreGuides.contains { unanswered($0.id) } || turn.forums.contains { unanswered($0.id) }
-            || turn.podcasts.contains { unanswered($0.id) } || turn.blogs.contains { unanswered($0.id) }
-            || turn.bugs.contains { unanswered($0.id) } || !turn.otherApps.isEmpty || !turn.saved.isEmpty
-        if hasMore {
+        if turn.isReadingResults {
             Section {
-                ForEach(turn.saved) { item in
-                    NavigationLink(value: MouseRoute.saved(item.kind, item.id)) {
-                        sourceLabel(kind: String(localized: "Saved \(item.kind.displayName)"), title: item.title, note: nil)
-                    }
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .accessibilityHidden(true)
+                    Text("More From AppleVis. The Mouse is reading these…")
                 }
-                // Groups that have helped most come first.
-                ForEach(MouseFeedback.groupOrder(), id: \.self) { group in
-                    switch group {
-                    case "guide":
-                        ForEach(turn.moreGuides.filter { unanswered($0.id) }) { guide in
-                            resultRow(kind: String(localized: "Guide"), icon: "doc.text.fill", tint: ContentKind.resource.accentColor, title: guide.title, note: turn.resultNotes[guide.id],
-                                      route: MouseRoute.guide(guide.id, focusText: turn.guideFocus[guide.id]))
-                                .contentActions(id: guide.id, entityId: guide.nid ?? 0, kind: .resource, title: guide.title, url: guide.url)
-                        }
-                    case "forum":
-                        ForEach(turn.forums.filter { unanswered($0.id) }) { topic in
-                            resultRow(kind: String(localized: "Forum Topic"), icon: "bubble.left.and.bubble.right.fill", tint: ContentKind.forumTopic.accentColor, title: topic.title, note: turn.resultNotes[topic.id], route: topic)
-                                .contentActions(id: topic.id, entityId: topic.nid ?? 0, kind: .forumTopic, title: topic.title, url: topic.url)
-                        }
-                    case "blog":
-                        ForEach(turn.blogs.filter { unanswered($0.id) }) { post in
-                            resultRow(kind: String(localized: "Blog Post"), icon: "newspaper.fill", tint: ContentKind.blogPost.accentColor, title: post.title, note: turn.resultNotes[post.id], route: post)
-                                .contentActions(id: post.id, entityId: post.nid ?? 0, kind: .blogPost, title: post.title, url: post.url)
-                        }
-                    case "podcast":
-                        ForEach(turn.podcasts.filter { unanswered($0.id) }) { episode in
-                            resultRow(kind: String(localized: "Podcast Episode"), icon: "headphones", tint: ContentKind.podcastEpisode.accentColor, title: episode.title, note: turn.resultNotes[episode.id], route: episode)
-                                .contentActions(id: episode.id, entityId: episode.nid, kind: .podcastEpisode, title: episode.title, url: episode.url)
-                        }
-                    default:
-                        EmptyView()
-                    }
-                }
-                ForEach(turn.otherApps) { AppListingRow(app: $0) }
-                ForEach(turn.bugs.filter { unanswered($0.id) }) { bug in
-                    resultRow(kind: String(localized: "Bug Report"), icon: "ant.fill", tint: ContentKind.bugReport.accentColor, title: bug.title, note: turn.resultNotes[bug.id], route: bug)
-                }
-            } header: {
-                // Changes while the Mouse reads each result for a line.
-                // Once it's done, what's left here wasn't checked: only the
-                // first few results are read, and none are without Apple
-                // Intelligence. Said plainly, so a link here isn't taken as
-                // a vetted answer. Requested directly (2026-10-05).
-                Text(turn.isReadingResults
-                     ? String(localized: "More From AppleVis. The Mouse is reading these…")
-                     : String(localized: "More From AppleVis, Not Checked"))
-                    .accessibilityAddTraits(.isHeader)
-            } footer: {
-                if !turn.isReadingResults {
-                    Text("The Mouse hasn't checked whether these answer your question. They share words with it, so they may still help.")
-                }
+                .accessibilityElement(children: .combine)
             }
         }
     }
@@ -1358,7 +1312,14 @@ struct AskTheMouseView: View {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
         let target = answerFocus(turn)
-        Task { await retryAccessibilityFocus(target, into: $focus) }
+        // Longer than the usual tries: the whole answer, its sources, and
+        // the sections below arrive at once, and on a follow-up the button
+        // that asked it has just gone. VoiceOver could end up nowhere
+        // (2026-10-08). Stops as soon as focus lands. A leftover focus from
+        // an earlier answer is cleared first, or the retry took it for the
+        // person having moved on and gave up.
+        focus = nil
+        Task { await retryAccessibilityFocus(target, into: $focus, delaysMs: [300, 550, 850, 1300, 2000]) }
     }
 
     private func suggestTopic(_ turn: MouseTurn) {

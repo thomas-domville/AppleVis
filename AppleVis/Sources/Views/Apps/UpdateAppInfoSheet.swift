@@ -121,11 +121,23 @@ struct AppInfoFieldDiff: Identifiable {
             // link (no country, no tag), which opens each person's own
             // App Store, as Submit an App saves. Requested directly
             // (2026-10-07).
+            //
+            // The same app's link is also suggested in its neutral form
+            // when the one on file names a country or the app, or has the
+            // "?uo=4" tag, so the Health Check finds those entries and this
+            // sheet fixes them. Only the id is kept. A link that's already
+            // neutral still matches. Requested directly (2026-10-08): 11 of
+            // the 12 newest entries had a /us/ link and the scan showed none.
             let oldLink = detail.appStoreUrl ?? ""
             let storeLink = metadata.appStoreUrl.trimmingCharacters(in: .whitespacesAndNewlines)
             let oldId = ItunesAPI.appStoreId(of: oldLink)
             let isSameApp = oldId != nil && oldId == ItunesAPI.appStoreId(of: storeLink)
-            let newLink = storeLink.isEmpty || isSameApp ? oldLink : ItunesAPI.storeNeutralURL(storeLink)
+            let newLink: String
+            if isSameApp || (storeLink.isEmpty && oldId != nil) {
+                newLink = ItunesAPI.storeNeutralURL(oldLink)
+            } else {
+                newLink = storeLink.isEmpty ? oldLink : ItunesAPI.storeNeutralURL(storeLink)
+            }
             diffs.append(AppInfoFieldDiff(
                 id: "link", label: String(localized: "App Store Link"), systemImage: "link",
                 oldValue: oldLink, newValue: newLink

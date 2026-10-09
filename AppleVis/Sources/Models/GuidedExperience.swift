@@ -138,27 +138,27 @@ enum GuidedExperienceRegistry {
             // MARK: Discover
             GuidedExperienceStep(
                 id: "discover-overview", chapterTitle: "Discover", title: "Discover", icon: "safari",
-                body: "Next is Discover. This is where you'll find the main sections of AppleVis in browsable lists.\n\nThe App Directory contains app listings. Community includes Forums and Blogs. Learn includes Guides and Podcasts. You'll also find the Bug Tracker, ways to contribute to AppleVis, ways to stay updated, and a growing Friends of AppleVis section with trusted outside resources the community vouches for, starting with Be My Eyes.\n\nSearch is at the top of the Discover screen, so I'll show you that first."
+                body: "Next is Discover. This is where you'll find the main sections of AppleVis in browsable lists.\n\nThe App Directory contains app listings. Community includes Forums and the Blog. Learn includes Guides and the Podcast. You'll also find the Bug Tracker, ways to contribute to AppleVis, ways to stay updated, and a growing Friends of AppleVis section with trusted outside resources the community vouches for, starting with Be My Eyes.\n\nSearch is at the top of the Discover screen, so I'll show you that first."
             ),
             GuidedExperienceStep(
                 id: "discover-search", chapterTitle: "Discover", title: "Search", icon: "magnifyingglass",
-                body: "Search uses a full-text index. That means it can find words inside the content of a post, not just in its title.\n\nWhen you type a search, AppleVis searches Forums, the App Directory, Guides, Blogs, Podcasts, and the Bug Tracker at the same time. Results are grouped by content type so you can narrow down what you're looking for.\n\nResults are announced as you type, so you don't need to press a separate Search button.\n\nIf you enter your search in another language, AppleVis can detect that and offer to translate it before searching.\n\nSearch is always available at the top of Discover. Help has a separate search of its own, which I'll show you later when we get to Profile & Settings."
+                body: "Search uses a full-text index. That means it can find words inside the content of a post, not just in its title.\n\nWhen you type a search, AppleVis searches Forums, the App Directory, Guides, the Blog, the Podcast, and the Bug Tracker at the same time. Results are grouped by content type so you can narrow down what you're looking for.\n\nResults are announced as you type, so you don't need to press a separate Search button.\n\nIf you enter your search in another language, AppleVis can detect that and offer to translate it before searching.\n\nSearch is always available at the top of Discover. Help has a separate search of its own, which I'll show you later when we get to Profile & Settings."
             ),
             GuidedExperienceStep(
                 id: "discover-app-directory", chapterTitle: "Discover", title: "App Directory", icon: "square.grid.2x2",
                 body: "The App Directory can be browsed first by platform — iOS, Mac, Apple Watch, or Apple TV — and then by category.\n\nWhen you open an app entry, you'll see the same detail page covered earlier in Home: accessibility notes from the person who submitted the entry, the AI-powered Consensus based on wider community reviews, and a direct link to the App Store.\n\nNext to the App Directory is Community Picks. It shows the apps members recommend, either the latest ones or the most recommended."
             ),
             GuidedExperienceStep(
-                id: "discover-forums-blogs-guides-podcasts", chapterTitle: "Discover", title: "Forums, Blogs, Guides & Podcasts", icon: "books.vertical",
-                body: "Forums, Blogs, Guides, and Podcasts each open into their own browsable lists.\n\nForums can be filtered by category or by Recent, New, Unread, Following, and Saved, using the same options available through Customize Home.\n\nBlogs are listed with the newest posts first. Guides are grouped by topic. Podcasts list episodes by show.\n\nWhen you open an item, you'll use the same type of detail page already covered in Home for topics, blog posts, guides, and podcast episodes."
+                id: "discover-forums-blogs-guides-podcasts", chapterTitle: "Discover", title: "Forums, Blog, Guides & Podcast", icon: "books.vertical",
+                body: "Forums, the Blog, Guides, and the Podcast each open into their own browsable lists.\n\nForums can be filtered by category or by Recent, New, Unread, Following, and Saved, using the same options available through Customize Home.\n\nThe Blog lists the newest posts first. Guides are grouped by topic. The Podcast lists its episodes, which you can filter by type and tag.\n\nWhen you open an item, you'll use the same type of detail page already covered in Home for topics, blog posts, guides, and podcast episodes."
             ),
             GuidedExperienceStep(
                 id: "discover-bug-tracker", chapterTitle: "Discover", title: "Bug Tracker", icon: "ant",
-                body: "The Bug Tracker contains known accessibility bugs for iOS and macOS. It shows iOS bugs first, and you can switch to macOS from the filter menu.\n\nYou can filter the list to show only bugs that are currently active, or view the full history.\n\nEach report shows its severity. If AppleVis has formally reported the bug to Apple, the report also includes its Apple Feedback ID."
+                body: "The Bug Tracker contains known accessibility bugs for iOS and macOS. It shows iOS bugs first, and you can switch to macOS from the filter menu.\n\nYou can filter the list to show only bugs that are currently active, or view the full history.\n\nEach report shows its severity and the Apple Feedback ID of the report filed with Apple."
             ),
             GuidedExperienceStep(
                 id: "discover-contribute", chapterTitle: "Discover", title: "Ways to Contribute", icon: "plus.square",
-                body: "You can submit an App, Blog Post, Bug Report, or Podcast from Discover. You need to be signed in, and each submission is reviewed before it is published under the AppleVis name.\n\nForum topics work differently. You can post a topic immediately without editorial review from Home or from Forums.\n\nContact AppleVis is also available here if you want to reach the team directly, and you don't need to be signed in to use it."
+                body: "You can submit an App, Blog Post, Bug Report, or Podcast from Discover. You need to be signed in. An app entry appears in the App Directory straight away. Blog posts, bug reports, and podcasts are reviewed by the team before they're published under the AppleVis name.\n\nForum topics, replies, and comments appear straight away too. You can post a topic from Home or from Forums.\n\nContact AppleVis is also available here if you want to reach the team directly, and you don't need to be signed in to use it."
             ),
             GuidedExperienceStep(
                 id: "discover-staying-in-touch", chapterTitle: "Discover", title: "Staying in Touch", icon: "dot.radiowaves.left.and.right",
@@ -166,7 +166,7 @@ enum GuidedExperienceRegistry {
             ),
             GuidedExperienceStep(
                 id: "discover-checkpoint", chapterTitle: "Discover", title: "That's Discover!", icon: "arrow.right.circle",
-                body: "That's Discover! We've covered Search, the App Directory, Forums, Blogs, Guides, Podcasts, the Bug Tracker, ways to contribute, and ways to stay in touch with AppleVis.\n\nYou can continue to For You or explore Discover first.",
+                body: "That's Discover! We've covered Search, the App Directory, Forums, the Blog, Guides, the Podcast, the Bug Tracker, ways to contribute, and ways to stay in touch with AppleVis.\n\nYou can continue to For You or explore Discover first.",
                 continueLabel: "Continue to For You",
                 secondaryActions: [
                     GuidedExperienceSecondaryAction(label: "Explore Discover Now", kind: .exploreScreen(.discover)),
@@ -223,7 +223,7 @@ enum GuidedExperienceRegistry {
             ),
             GuidedExperienceStep(
                 id: "profile-help", chapterTitle: "Profile & Settings", title: "Help", icon: "questionmark.circle",
-                body: "Before we finish, I'll show you Help.\n\nHelp includes tutorials, accessibility tips, settings walkthroughs, information about smart features, and troubleshooting articles.\n\nThe Help content is stored on your device, so you can use it even when you don't have an internet connection.\n\nHelp has its own search, separate from Search in Discover and the search in Settings. It searches both article titles and their summaries.\n\nIf you still need help after reading an article, Contact & Support is one section away and gives you a way to reach the AppleVis team directly."
+                body: "Before we finish, I'll show you Help.\n\nHelp includes tutorials, accessibility tips, settings walkthroughs, information about smart features, and troubleshooting articles.\n\nSome features, such as Ask the Mouse, summaries, and Rewrite, need a device with Apple Intelligence. Help's Apple Intelligence Features article lists them all and explains what you need.\n\nThe Help content is stored on your device, so you can use it even when you don't have an internet connection.\n\nHelp has its own search, separate from Search in Discover and the search in Settings. It searches both article titles and their summaries.\n\nIf you still need help after reading an article, Contact & Support is one section away and gives you a way to reach the AppleVis team directly."
             ),
 
             // MARK: All Set
@@ -238,4 +238,20 @@ enum GuidedExperienceRegistry {
             GuidedExperienceCompletionAction(label: "Replay Tour", kind: .replay),
         ]
     )
+}
+
+extension GuidedExperience {
+    /// The chapters a replay can start from, in order, each with its first
+    /// step. The one-step Welcome and All Set chapters are left out: Start
+    /// from the Beginning covers the first, and the second is only a
+    /// goodbye.
+    var replayChapters: [(title: String, firstStep: Int)] {
+        var chapters: [(title: String, firstStep: Int)] = []
+        for (index, step) in steps.enumerated() where chapters.last?.title != step.chapterTitle {
+            chapters.append((step.chapterTitle, index))
+        }
+        return chapters.filter { chapter in
+            steps.filter { $0.chapterTitle == chapter.title }.count > 1
+        }
+    }
 }

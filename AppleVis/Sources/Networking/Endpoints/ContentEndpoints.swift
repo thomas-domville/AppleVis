@@ -61,7 +61,7 @@ struct ResourceEndpoints {
             let commentsResponse = try await commentsRes
             let comments = commentsResponse.data.map { n in
                 let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
-                return ResourceComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, rawBody: c.rawBody, bodyFormat: c.bodyFormat, createdAt: c.createdAt)
+                return ResourceComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, rawBody: c.rawBody, bodyFormat: c.bodyFormat, createdAt: c.createdAt, parentId: n.relationshipId("pid"))
             }
 
             return ResourceDetail(
@@ -78,22 +78,31 @@ struct ResourceEndpoints {
     }
 
     @discardableResult
-    func submitComment(resourceId: String, body: String, csrfToken: String) async throws -> ResourceComment {
+    func submitComment(subject: String = "Comment", resourceId: String, body: String, csrfToken: String, replyToCommentId: String? = nil) async throws -> ResourceComment {
         var attributes = CommentBundle.guide.baseAttributes
-        attributes["subject"] = AnyEncodable("Comment")
+        attributes["subject"] = AnyEncodable(subject)
         attributes["comment_body"] = AnyEncodable(RichTextValue(value: body, format: drupalDefaultTextFormat))
+        // Your comment shows when you come back to the page, not a saved
+        // copy from before it (2026-10-09).
+        await OutdatedPages.shared.mark(OutdatedPages.guide(resourceId))
+        // A reply to a comment links to it, as the website's own Reply
+        // does, so the website shows "In reply to …" (2026-10-09).
+        var relationships: [String: JsonApiRelationshipRef] = [
+            "entity_id": JsonApiRelationshipRef(type: "node--guides", id: resourceId),
+            "comment_type": CommentBundle.guide.commentTypeRelationship,
+        ]
+        if let replyToCommentId {
+            relationships["pid"] = JsonApiRelationshipRef(type: "comment--comment_node_guides", id: replyToCommentId)
+        }
         let response = try await client.jsonAPICreate(
             "comment/comment_node_guides",
             type: "comment--comment_node_guides",
             attributes: attributes,
-            relationships: [
-                "entity_id": JsonApiRelationshipRef(type: "node--guides", id: resourceId),
-                "comment_type": CommentBundle.guide.commentTypeRelationship,
-            ],
+            relationships: relationships,
             headers: ["X-CSRF-Token": csrfToken]
         )
         let c = Mappers.genericComment(response.data, included: response.included ?? [])
-        return ResourceComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, rawBody: c.rawBody, bodyFormat: c.bodyFormat, createdAt: c.createdAt)
+        return ResourceComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, rawBody: c.rawBody, bodyFormat: c.bodyFormat, createdAt: c.createdAt, parentId: response.data.relationshipId("pid"))
     }
 
     /// Fetches the next page of comments beyond the initial 100 (used by "Load more comments").
@@ -104,7 +113,7 @@ struct ResourceEndpoints {
         )
         return response.data.map { n in
             let c = Mappers.genericComment(n, included: response.included ?? [])
-            return ResourceComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, rawBody: c.rawBody, bodyFormat: c.bodyFormat, createdAt: c.createdAt)
+            return ResourceComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, rawBody: c.rawBody, bodyFormat: c.bodyFormat, createdAt: c.createdAt, parentId: n.relationshipId("pid"))
         }
     }
 }
@@ -156,7 +165,7 @@ struct BlogEndpoints {
             let commentsResponse = try await commentsRes
             let comments = commentsResponse.data.map { n in
                 let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
-                return BlogComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
+                return BlogComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt, parentId: n.relationshipId("pid"))
             }
 
             return BlogPostDetail(
@@ -171,22 +180,31 @@ struct BlogEndpoints {
     }
 
     @discardableResult
-    func submitComment(blogId: String, body: String, csrfToken: String) async throws -> BlogComment {
+    func submitComment(subject: String = "Comment", blogId: String, body: String, csrfToken: String, replyToCommentId: String? = nil) async throws -> BlogComment {
         var attributes = CommentBundle.blogPost.baseAttributes
-        attributes["subject"] = AnyEncodable("Comment")
+        attributes["subject"] = AnyEncodable(subject)
         attributes["comment_body"] = AnyEncodable(RichTextValue(value: body, format: drupalDefaultTextFormat))
+        // Your comment shows when you come back to the page, not a saved
+        // copy from before it (2026-10-09).
+        await OutdatedPages.shared.mark(OutdatedPages.blogPost(blogId))
+        // A reply to a comment links to it, as the website's own Reply
+        // does, so the website shows "In reply to …" (2026-10-09).
+        var relationships: [String: JsonApiRelationshipRef] = [
+            "entity_id": JsonApiRelationshipRef(type: "node--\(Self.contentType)", id: blogId),
+            "comment_type": CommentBundle.blogPost.commentTypeRelationship,
+        ]
+        if let replyToCommentId {
+            relationships["pid"] = JsonApiRelationshipRef(type: "comment--comment_node_\(Self.contentType)", id: replyToCommentId)
+        }
         let response = try await client.jsonAPICreate(
             "comment/comment_node_\(Self.contentType)",
             type: "comment--comment_node_\(Self.contentType)",
             attributes: attributes,
-            relationships: [
-                "entity_id": JsonApiRelationshipRef(type: "node--\(Self.contentType)", id: blogId),
-                "comment_type": CommentBundle.blogPost.commentTypeRelationship,
-            ],
+            relationships: relationships,
             headers: ["X-CSRF-Token": csrfToken]
         )
         let c = Mappers.genericComment(response.data, included: response.included ?? [])
-        return BlogComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
+        return BlogComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt, parentId: response.data.relationshipId("pid"))
     }
 
     func moreComments(blogId: String, offset: Int) async throws -> [BlogComment] {
@@ -196,7 +214,7 @@ struct BlogEndpoints {
         )
         return response.data.map { n in
             let c = Mappers.genericComment(n, included: response.included ?? [])
-            return BlogComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
+            return BlogComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt, parentId: n.relationshipId("pid"))
         }
     }
 }
@@ -256,7 +274,7 @@ struct BugReportEndpoints {
             let commentsResponse = try await commentsRes
             detail.comments = commentsResponse.data.map { n in
                 let c = Mappers.genericComment(n, included: commentsResponse.included ?? [])
-                return BugComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
+                return BugComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt, parentId: n.relationshipId("pid"))
             }
             return detail
         }
@@ -270,7 +288,7 @@ struct BugReportEndpoints {
         )
         return response.data.map { n in
             let c = Mappers.genericComment(n, included: response.included ?? [])
-            return BugComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
+            return BugComment(id: n.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt, parentId: n.relationshipId("pid"))
         }
     }
 
@@ -278,23 +296,32 @@ struct BugReportEndpoints {
     /// read-only (fetched and displayed, but with no way to post one),
     /// unlike every other content type's comment thread.
     @discardableResult
-    func submitComment(platform: BugPlatform, bugId: String, body: String, csrfToken: String) async throws -> BugComment {
+    func submitComment(subject: String = "Comment", platform: BugPlatform, bugId: String, body: String, csrfToken: String, replyToCommentId: String? = nil) async throws -> BugComment {
         let bundle = commentBundleId(for: platform)
         var attributes = bundle.baseAttributes
-        attributes["subject"] = AnyEncodable("Comment")
+        attributes["subject"] = AnyEncodable(subject)
         attributes["comment_body"] = AnyEncodable(RichTextValue(value: body, format: drupalDefaultTextFormat))
+        // Your comment shows when you come back to the page, not a saved
+        // copy from before it (2026-10-09).
+        await OutdatedPages.shared.mark(OutdatedPages.bugReport(bugId, platform: platform))
+        // A reply to a comment links to it, as the website's own Reply
+        // does, so the website shows "In reply to …" (2026-10-09).
+        var relationships: [String: JsonApiRelationshipRef] = [
+            "entity_id": JsonApiRelationshipRef(type: "node--\(nodeType(for: platform))", id: bugId),
+            "comment_type": bundle.commentTypeRelationship,
+        ]
+        if let replyToCommentId {
+            relationships["pid"] = JsonApiRelationshipRef(type: "comment--\(bundle.rawValue)", id: replyToCommentId)
+        }
         let response = try await client.jsonAPICreate(
             "comment/\(bundle.rawValue)",
             type: "comment--\(bundle.rawValue)",
             attributes: attributes,
-            relationships: [
-                "entity_id": JsonApiRelationshipRef(type: "node--\(nodeType(for: platform))", id: bugId),
-                "comment_type": bundle.commentTypeRelationship,
-            ],
+            relationships: relationships,
             headers: ["X-CSRF-Token": csrfToken]
         )
         let c = Mappers.genericComment(response.data, included: response.included ?? [])
-        return BugComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
+        return BugComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt, parentId: response.data.relationshipId("pid"))
     }
 
     private func commentBundleId(for platform: BugPlatform) -> CommentBundle {
@@ -392,9 +419,9 @@ struct SearchEndpoints {
         let guidesResult = try? await guidesRes
         if guidesResult == nil { failed.append("Guides") }
         let blogsResult = try? await blogsRes
-        if blogsResult == nil { failed.append("Blogs") }
+        if blogsResult == nil { failed.append("Blog") }
         let podcastsResult = try? await podcastsRes
-        if podcastsResult == nil { failed.append("Podcasts") }
+        if podcastsResult == nil { failed.append("Podcast") }
         let iosBugsResult = try? await iosBugsRes
         let macBugsResult = try? await macBugsRes
         if iosBugsResult == nil && macBugsResult == nil { failed.append(String(localized: "Bug Reports")) }
@@ -490,8 +517,8 @@ struct FlagEndpoints {
     }
 
     /// Unfollow requires resolving the flagging entity's own id first, then deleting it.
-    func unfollow(nodeUuid: String, token: String) async throws {
-        try await removeOwnFlag(bundle: "subscribe_node", nodeUuid: nodeUuid, token: token)
+    func unfollow(nodeUuid: String, entityId: Int = 0, token: String) async throws {
+        try await removeOwnFlag(bundle: "subscribe_node", nodeUuid: nodeUuid, entityId: entityId, token: token)
     }
 
     /// "Recommend This App" — confirmed live against the site's own
@@ -512,15 +539,30 @@ struct FlagEndpoints {
         )
     }
 
-    func unrecommend(nodeUuid: String, token: String) async throws {
-        try await removeOwnFlag(bundle: "recommend", nodeUuid: nodeUuid, token: token)
+    func unrecommend(nodeUuid: String, entityId: Int = 0, token: String) async throws {
+        try await removeOwnFlag(bundle: "recommend", nodeUuid: nodeUuid, entityId: entityId, token: token)
     }
 
     /// The calculated flagged_entity relationship can be read but not filtered.
-    /// Search only this member's records, including later pages, before deleting.
-    private func removeOwnFlag(bundle: String, nodeUuid: String, token: String) async throws {
+    /// With the item's node ID, one request finds this member's record
+    /// (`filter[uid.id]` + `filter[entity_id]`, live since 2026-10-08).
+    /// Otherwise, or if that finds nothing, search only this member's
+    /// records, including later pages, before deleting.
+    private func removeOwnFlag(bundle: String, nodeUuid: String, entityId: Int, token: String) async throws {
         guard let user = AuthStore.current?.user else { throw APIError.unauthorized }
         let owner = user.uuid
+        if entityId > 0 {
+            let response = try await client.jsonAPIList(
+                "flagging/\(bundle)",
+                query: ["filter[uid.id]": owner, "filter[entity_id]": String(entityId), "page[limit]": "10"],
+                headers: ["X-CSRF-Token": token]
+            )
+            guard AuthStore.current?.user?.uuid == owner else { throw APIError.unauthorized }
+            if let flagging = response.data.first(where: { $0.relationshipId("flagged_entity") == nodeUuid }) {
+                try await client.jsonAPIDelete("flagging/\(bundle)/\(flagging.id)", headers: ["X-CSRF-Token": token])
+                return
+            }
+        }
         var offset = 0
         while true {
             let response = try await client.jsonAPIList(

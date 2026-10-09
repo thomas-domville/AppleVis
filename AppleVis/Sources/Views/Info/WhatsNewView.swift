@@ -195,6 +195,246 @@ struct ChangeItem: Identifiable {
 
     static let current: [ChangeItem] = [
         ChangeItem(
+            systemImage: "magnifyingglass",
+            tag: .improved,
+            title: "Ask the Mouse Finds More",
+            description: "Ask the Mouse understands more ways of asking, and finds apps named for what you ask even when they're in another category. New How-To articles cover signing a PDF, merging duplicate contacts, 24-hour time, naming a group chat, sharing your name and photo, Files and iCloud Drive, and iPhone Mirroring."
+        ),
+        ChangeItem(
+            systemImage: "hand.tap",
+            tag: .improved,
+            title: "Exact Gestures and Braille Commands",
+            description: "Ask the Mouse gives VoiceOver gestures and braille commands exactly as Help does, checked against Apple's support pages. Searching Help shows them as a Quick Answer."
+        ),
+        ChangeItem(
+            systemImage: "bubble.left.and.bubble.right",
+            tag: .improved,
+            title: "The Mouse Keeps Track of Your Device",
+            description: "Ask What about on a Mac? and the Mouse answers for a Mac until you start a new question. It says when it can't see your screen, and a question about a kind of game lists only games."
+        ),
+        ChangeItem(
+            systemImage: "book",
+            tag: .fixed,
+            title: "Help Articles Stay Put",
+            description: "Opening a Help article from Profile and Settings no longer jumps back to Home or Profile. Back returns you to the article you came from, with VoiceOver on it, and related articles open from anywhere, including Ask the Mouse."
+        ),
+        ChangeItem(
+            systemImage: "heart.circle",
+            tag: .new,
+            title: "Support AppleVis",
+            description: "Support AppleVis, in the About AppleVis section of Profile and Settings, opens the Be My Eyes Foundation's donation page in Safari. The Foundation funds AppleVis through grants and donations."
+        ),
+        ChangeItem(
+            systemImage: "heart",
+            tag: .improved,
+            title: "AppleVis and the Be My Eyes Foundation",
+            description: "AppleVis is an independent nonprofit, funded by the Be My Eyes Foundation through grants and donations. AppleVis makes all its own decisions. About & Credits and Help say so, and Help's What AppleVis Is article explains who owns and runs AppleVis."
+        ),
+        ChangeItem(
+            systemImage: "gamecontroller",
+            tag: .new,
+            title: "Game Types and More in the App Directory",
+            description: "Games now has a Type picker in the App Directory: All, or Action, Board, Card, Puzzle, Trivia, Word, and the rest, each with how many games are in it. App entries show their category on one line, with their App Store type and any other category they're in, such as Games (Board, Family), also Social Networking. Ask the Mouse uses the same types, so card games means games the App Store calls Card games. The types come from the App Store, and any category that has types gets them."
+        ),
+        ChangeItem(
+            systemImage: "paperplane",
+            tag: .new,
+            title: "Send a Posting Problem to Us",
+            description: "If something you post doesn't go through, Send to AppleVis is now right under the message. It opens Contact AppleVis as a Bug Report, with the details of what went wrong and your app and device info already included, so there's nothing to copy and paste. What you wrote stays on screen behind it. Copy Details for AppleVis is still there if you'd rather email us."
+        ),
+        ChangeItem(
+            systemImage: "arrowshape.turn.up.left",
+            tag: .improved,
+            title: "Replies Linked Everywhere",
+            description: "Reply to this Comment now links your reply to the comment, on app entries, blog posts, guides, podcast episodes, and bug reports, as it already did in the Forums. The website shows it as In reply to, and AppleVis shows Replying to and the person's name, which takes you to their comment. The comment you're answering shows above your reply instead of being pasted into it."
+        ),
+        ChangeItem(
+            systemImage: "square.grid.2x2",
+            tag: .improved,
+            title: "More on Every App Entry",
+            description: "App entries now show Additional Comments and the developer's website, as the website does. A Mac app that isn't in the Mac App Store has a Get It from the Developer button, and a button that goes to a website rather than the App Store now says Open Website."
+        ),
+        ChangeItem(
+            systemImage: "shippingbox",
+            tag: .new,
+            title: "Mac Apps Outside the App Store",
+            description: "When you submit a Mac app, apps that aren't in the Mac App Store are listed too, from Homebrew, a free catalogue of Mac apps. Choosing one fills in its name, version, and the developer's website. For apps that are in the App Store, the developer's website is now filled in from the listing."
+        ),
+        ChangeItem(
+            systemImage: "text.bubble",
+            tag: .improved,
+            title: "Subjects and Labels for Comments",
+            description: "Every comment and reply now has a Subject, as on the website, instead of just Comment or Reply. A reply to someone starts with “Re:” and their subject, like the website's reply form, and you can change it. It's optional here: left blank, your first few words are used. The comment box is now labelled, so VoiceOver says what it's for."
+        ),
+        ChangeItem(
+            systemImage: "arrow.clockwise.circle",
+            tag: .fixed,
+            title: "Your Comment Shows When You Come Back",
+            description: "After you post, edit, or delete a comment, leaving the page and coming back now shows the change straight away. It could take up to 15 minutes before. Pages that Home says have new comments also load fresh."
+        ),
+        ChangeItem(
+            systemImage: "arrow.clockwise",
+            tag: .fixed,
+            title: "Fetch No Longer Gets Stuck Loading",
+            description: "If a topic got another comment while you were reading Fetch, its group could keep saying it was loading its new comments, while the groups below it loaded fine. It now loads the new comments as soon as they arrive."
+        ),
+        ChangeItem(
+            systemImage: "pawprint",
+            tag: .accessibility,
+            title: "Fetch Keeps Your Place After Long Groups",
+            description: "With VoiceOver, marking a group as read in Fetch now always moves you to the next group's heading, even when the group had a long comment. Before, VoiceOver could end up several groups further down."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.seal",
+            tag: .improved,
+            title: "The Mouse Only Shows What It Has Checked",
+            description: "Ask the Mouse now lists only what it knows is good. Apps members rated not accessible are never suggested, fully accessible apps come first, and an app that's only partly accessible says so. Apps that are only close to what you asked are left out. Guides, forum topics, blog posts, and podcast episodes appear only once the Mouse has read them and found they answer your question, so the Not Checked list is gone."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.circle",
+            tag: .fixed,
+            title: "Submit an App Says It's Live",
+            description: "After you submit an app, the thank-you screen now says your entry is in the App Directory. It appears straight away, but the screen used to say the team would let you know when it was ready. The Welcome Tour and Help say the same: app entries, forum topics, and comments appear straight away, and blog posts, bug reports, and podcasts are reviewed first."
+        ),
+        ChangeItem(
+            systemImage: "square.grid.2x2",
+            tag: .fixed,
+            title: "Better App Suggestions from the Mouse",
+            description: "When you ask the Mouse for apps, such as accessible card games or a grocery app, it now reads each app's description before choosing. Before, most apps reached it with no description at all, so it could only go by their names. Nibbles shows each new app's description too, and Spotlight shows a short, plain description for guides and blog posts."
+        ),
+        ChangeItem(
+            systemImage: "book.pages",
+            tag: .new,
+            title: "A How-To Library in Help",
+            description: "Help now has more than 220 short how-to articles, in twelve new sections. They cover using AppleVis itself, what each button and port on your device is for, a start-here guide for each Apple device, VoiceOver, braille, the Home Screen, Wi-Fi and Bluetooth, calls and notifications, vision, hearing, and physical access, everyday tasks, and AppleVis settings. Each one covers a single task, with VoiceOver steps first. Ask the Mouse uses them too, so it can answer many more questions about AppleVis and your devices."
+        ),
+        ChangeItem(
+            systemImage: "link",
+            tag: .fixed,
+            title: "Web Addresses Without https:// Now Work",
+            description: "When you submit an app, you can type the developer's website as www.example.com, and AppleVis adds https:// for you. If what you type doesn't look like a web address, the form now says so before you send it. Before, the website refused the whole app with “The path is invalid.”"
+        ),
+        ChangeItem(
+            systemImage: "bubble.left.and.text.bubble.right",
+            tag: .improved,
+            title: "Ask the Mouse Follows the Conversation",
+            description: "A follow-up like “Is there a way to change this command?” now picks up what you were just talking about, so the Mouse looks in the right place. Its suggested next questions now name the device and feature, and VoiceOver moves to each new answer more reliably."
+        ),
+        ChangeItem(
+            systemImage: "pawprint.fill",
+            tag: .new,
+            title: "Goldie Says You're All Caught Up",
+            description: "When you've read everything in New or Fetch, or chosen Mark All as Read, you now hear Goldie's own sound, a happy two-note wuff and a soft bell, with two light taps. Before, it was the same success sound as sending a post."
+        ),
+        ChangeItem(
+            systemImage: "checkmark.circle",
+            tag: .fixed,
+            title: "Fetch Tidies Up When You're Done",
+            description: "When everything in Fetch is read, Mark All as Read and the Reading List heading now go away, leaving just All Caught Up. Marking an item as read while Listen to Fetch is reading it now moves the reading on to the next item."
+        ),
+        ChangeItem(
+            systemImage: "textformat",
+            tag: .improved,
+            title: "The Blog and the Podcast",
+            description: "AppleVis has one blog and one podcast, so Discover and Settings now call them the Blog and the Podcast. Where you choose what appears on Home, and in search results, they're Blog Posts and Podcast Episodes, since those are the items you get."
+        ),
+        ChangeItem(
+            systemImage: "arrow.left.and.right.text.vertical",
+            tag: .accessibility,
+            title: "Top of Home and For You Reads in Order",
+            description: "With VoiceOver, the top of Home and For You now reads left to right, the same as Discover: the screen's title first, then the buttons beside it, such as Profile and Settings. Before, the buttons came first, so swiping and exploring by touch found them in different places."
+        ),
+        ChangeItem(
+            systemImage: "pin",
+            tag: .new,
+            title: "Pinned Topics First on Home",
+            description: "Forum topics pinned on the website now appear first in Home's All view, under a Pinned heading, until they're unpinned."
+        ),
+        ChangeItem(
+            systemImage: "number.circle",
+            tag: .improved,
+            title: "Home Tab Count Matches New",
+            description: "The number on the Home tab now counts every item in New, not only forum topics, so it always matches the New view and the summary."
+        ),
+        ChangeItem(
+            systemImage: "dial.medium",
+            tag: .accessibility,
+            title: "Home Rotors Work Again",
+            description: "With VoiceOver, the Forum Topics, Podcast Episodes, App Entries, Guides, Blog Posts, and New Items rotors on Home now move to each item. Before, they often found nothing. The rotor also only offers the types you show in Customize Home."
+        ),
+        ChangeItem(
+            systemImage: "exclamationmark.bubble",
+            tag: .fixed,
+            title: "Better Behavior Without Apple Intelligence",
+            description: "On a device without Apple Intelligence, AppleVis no longer offers to translate a draft it can't translate. Settings > Intelligence now explains why its features aren't available, and what to do if Apple Intelligence is just turned off."
+        ),
+        ChangeItem(
+            systemImage: "list.number",
+            tag: .new,
+            title: "Replay the Tour From Any Chapter",
+            description: "Once you've been through the Welcome Tour, Replay Welcome Tour in Profile lets you start from the beginning or jump straight to Home, Discover, For You, or Profile & Settings."
+        ),
+        ChangeItem(
+            systemImage: "sparkles",
+            tag: .improved,
+            title: "Clearer Apple Intelligence Requirements",
+            description: "The Welcome Tour now mentions which features need Apple Intelligence and where to find the full list in Help. Help's Apple Intelligence Features article now includes supported iPads, the language and storage requirements, and every feature that needs it."
+        ),
+        ChangeItem(
+            systemImage: "list.bullet.rectangle",
+            tag: .fixed,
+            title: "Setup Says What Skipping Keeps",
+            description: "If you skip Setup, AppleVis now tells you the starting settings it will use: Apple topics only on Home and Forums, milder language masked, and What's New shown. Home also now follows Apple Topics Only after Setup is skipped. Before, Settings showed it switched on while Home showed every topic."
+        ),
+        ChangeItem(
+            systemImage: "bell.badge",
+            tag: .new,
+            title: "Catch-Up Reminders",
+            description: "If you'd like, AppleVis can send a gentle reminder when you haven't opened it for a week, saying what's new while you were away. You'll get two at most before AppleVis waits for you to come back. They're off until you turn them on, in Settings > Notifications."
+        ),
+        ChangeItem(
+            systemImage: "arrow.clockwise.circle",
+            tag: .new,
+            title: "Home Is Ready Sooner",
+            description: "Now and then, while AppleVis is closed, iOS lets it refresh Home in the background. When you open AppleVis, Home shows those lists straight away, then checks for anything newer. Any Mark as Read waiting to reach the website goes then too. iOS decides when this happens, and it doesn't happen after you swipe AppleVis away in the App Switcher."
+        ),
+        ChangeItem(
+            systemImage: "pawprint",
+            tag: .new,
+            title: "Goldie Themes",
+            description: "Goldie, the golden retriever from Fetch, now has her own themes, Goldie — Light and Goldie — Dark. They use her honey and cream colors, with her red collar for buttons and links. Find them in Settings > Appearance."
+        ),
+        ChangeItem(
+            systemImage: "circle.lefthalf.filled",
+            tag: .improved,
+            title: "Easier-to-Read Themes",
+            description: "Links, buttons, and tags are now easier to read in several themes. Mouse — Light, Warm, Sepia, and Cupertino Sunset use deeper shades of their own colors. AppleVis Classic and Orchard have darker tags. Each theme keeps its look."
+        ),
+        ChangeItem(
+            systemImage: "hand.raised",
+            tag: .accessibility,
+            title: "Home Lets You Lead When It Opens",
+            description: "When you opened AppleVis, VoiceOver could jump to the item you last opened once Home finished loading, even if you had already started moving around. Now, if you've already moved, VoiceOver stays where you are. To jump to where you left off, use the Pick Up Where You Left Off action on the greeting at the top of Home."
+        ),
+        ChangeItem(
+            systemImage: "wifi",
+            tag: .fixed,
+            title: "No More False Offline Messages",
+            description: "AppleVis could say you were offline when your Wi-Fi or cellular connection was fine. This happened most often just after opening the app. It now says you're offline only when you are. If the website itself isn't answering, the message says so, and it clears once the website is back."
+        ),
+        ChangeItem(
+            systemImage: "newspaper",
+            tag: .fixed,
+            title: "Nibbles Catches Up When You Refresh",
+            description: "Pulling down to refresh Nibbles now gets the very latest posts. Before, it could stay a few hours behind even after a refresh."
+        ),
+        ChangeItem(
+            systemImage: "person.badge.key",
+            tag: .improved,
+            title: "Stay Signed In",
+            description: "Remember me is now on when you sign in, so when the website signs you out every few weeks, AppleVis quietly signs you back in instead of asking. Your password stays in this iPhone's Keychain and is removed when you sign out. You can turn Remember me off on the sign-in screen."
+        ),
+        ChangeItem(
             systemImage: "sparkles",
             tag: .improved,
             title: "Clearer Wording for New Activity",
@@ -258,7 +498,7 @@ struct ChangeItem: Identifiable {
             systemImage: "rectangle.split.2x1",
             tag: .new,
             title: "Lists and Posts Side by Side on iPad and iPhone Duo",
-            description: "When there's enough room, Forums, the App Directory, and Podcasts now show the list on one side and the item you choose on the other. This works on iPad, in a wide Stage Manager window, and on an open iPhone Duo. With VoiceOver, choosing an item shows it and leaves you in the list. Choose it again to move to it. Discover also uses the extra width for its sections. On iPhone and in narrow windows, everything works as before."
+            description: "When there's enough room, Forums, the App Directory, and the Podcast now show the list on one side and the item you choose on the other. This works on iPad, in a wide Stage Manager window, and on an open iPhone Duo. With VoiceOver, choosing an item shows it and leaves you in the list. Choose it again to move to it. Discover also uses the extra width for its sections. On iPhone and in narrow windows, everything works as before."
         ),
         ChangeItem(
             systemImage: "keyboard",
@@ -333,13 +573,13 @@ struct ChangeItem: Identifiable {
             systemImage: "checkmark.circle",
             tag: .improved,
             title: "Mark as Read Syncs with the Website",
-            description: "When signed in and online, Mark as Read and Mark All as Read also update your read history on the website."
+            description: "When you're signed in, Mark as Read and Mark All as Read also update your read history on the website. If you're offline, the website catches up when you're back online."
         ),
         ChangeItem(
             systemImage: "arrow.triangle.2.circlepath",
             tag: .fixed,
             title: "Website Sync Fixes",
-            description: "Topics pinned on the website always appear at the top of Forums, and they update when you refresh. When signed in, Home and Forums recognize items you read on the website."
+            description: "Topics pinned on the website always appear at the top of Forums, and they update when you refresh. When signed in, Home and Forums recognize items you read on the website. Following and Recommended in For You include what you follow and recommend on the website, and you can remove those from the app too."
         ),
         ChangeItem(
             systemImage: "globe.europe.africa",

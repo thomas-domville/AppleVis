@@ -14,6 +14,22 @@ struct IntelligenceSettingsView: View {
                     .accessibilityFocused($isTitleFocused)
             }
 
+            // Without Apple Intelligence these switches do nothing, so say
+            // why before them (2026-10-08).
+            if let explanation = IntelligenceService.unavailableExplanation {
+                Section {
+                    Label {
+                        Text(explanation)
+                            .font(.subheadline)
+                    } icon: {
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+            }
+
             Section("Apple Intelligence Features") {
                 // Previously described as noticing non-English content you're
                 // *reading* and offering to translate it — but AppleVis

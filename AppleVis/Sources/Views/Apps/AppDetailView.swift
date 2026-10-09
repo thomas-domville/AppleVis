@@ -75,6 +75,9 @@ struct AppDetailView: View {
     @State private var showReviewCompose = false
     @State private var quotedReview: AppReview?
     @State private var itunesMetadata: ItunesMetadata?
+    /// "Games (Board, Family), also Social Networking", from the App Store
+    /// listing (2026-10-09).
+    @State private var categoryLine: String?
     @State private var appStoreLookupIssue: AppStoreLookupIssue?
     /// True when `itunesMetadata` came from `matchAppleTVEntryToAppStore()`'s
     /// best-effort name match rather than a real App Store link AppleVis
@@ -92,6 +95,8 @@ struct AppDetailView: View {
     @State private var newReviewCount = 0
     @State private var pendingFocusReviewId: String?
     @State private var recommendationSummary: RecommendationSummary?
+    /// Off until the website can supply public counts (see `load`).
+    private static let showsRecommendationCount = false
     @State private var reviewsSummary: String?
     @State private var isSummarizingReviews = false
     @State private var accessibilityConsensus: String?
@@ -151,6 +156,12 @@ struct AppDetailView: View {
             await load()
         }
         .onChange(of: detailFocusRequest) { _, _ in focusTitleAfterLoad() }
+        // The one-line Category, once the App Store listing is in
+        // (2026-10-09).
+        .task(id: itunesMetadata?.appStoreId) {
+            guard let meta = itunesMetadata, let platform = detail?.platform else { categoryLine = nil; return }
+            categoryLine = await AppGenres.shared.categoryLine(primaryId: nil, genreIds: meta.genreIds, platform: platform)
+        }
         // Ticks while Apple Intelligence summarizes (2026-10-07).
         .waitingTick(while: isSummarizingReviews || isSummarizingConsensus, stillWaiting: String(localized: "Still summarizing."))
     }
@@ -223,6 +234,14 @@ struct AppDetailView: View {
                         SegmentedHTMLView(html: acc, contentKind: "appListing", contentId: detail.id, field: "accessibilityComments")
                             .padding(.horizontal).padding(.bottom, 8)
                     }
+                    // The submitter's Additional Comments: sent by Submit
+                    // an App on every platform, but never shown here, only
+                    // on the website. Reported by a beta tester (2026-10-09).
+                    if let other = detail.otherComments, !HTMLText.plainText(fromHTML: other).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        sectionHeading("Additional Comments")
+                        SegmentedHTMLView(html: other, contentKind: "appListing", contentId: detail.id, field: "otherComments")
+                            .padding(.horizontal).padding(.bottom, 8)
+                    }
 
                     if let meta = itunesMetadata {
                         appStoreInfoSection(detail, meta)
@@ -284,8 +303,14 @@ struct AppDetailView: View {
             }
             .accessibilityRotor("Replies to Me") {
                 ForEach(detail.reviews.filter { review in
-                    guard let name = auth.user?.name else { return false }
-                    return QuotedReply.isDirectedAt(name, body: review.body)
+                    // The real reply link first, matched by account, as
+                    // forum replies are; the quote check only for older
+                    // replies that have no link (2026-10-09).
+                    guard let user = auth.user else { return false }
+                    if let pid = review.parentId, let parent = detail.reviews.first(where: { $0.id == pid }) {
+                        return parent.authorId == user.uuid
+                    }
+                    return QuotedReply.isDirectedAt(user.name, body: review.body)
                 }) { review in
                     AccessibilityRotorEntry(review.authorName, id: review.id)
                 }
@@ -293,7 +318,7 @@ struct AppDetailView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
-                if let storeURL = detail.appStoreUrl.flatMap(URL.init) {
+                if case .appStore(let storeURL)? = Self.mainStoreAction(detail) {
                     // Deliberately a plain Link, not WebLink — an
                     // apps.apple.com URL is a Universal Link that iOS hands
                     // straight to the native App Store app when opened
@@ -311,14 +336,14 @@ struct AppDetailView: View {
                     }
                     .accessibilityLabel(String(localized: "Open in App Store"))
                     .accessibilityHint(String(localized: "Opens the App Store, outside the app."))
-                } else if let macUpdateURL = detail.macUpdateUrl.flatMap(URL.init) {
-                    // Only ever reachable for a Mac entry with no App Store
-                    // link at all — AppleVis's own fallback reference for
-                    // apps not in the Mac App Store. Reported directly.
-                    WebLink(destination: macUpdateURL, showsExternalIcon: false) {
+                } else if let action = Self.mainStoreAction(detail) {
+                    // Not the App Store: the app's own website, or for a Mac
+                    // app outside the Mac App Store, the developer's site or
+                    // MacUpdate. Named for where it really goes (2026-10-09).
+                    WebLink(destination: action.url, showsExternalIcon: false) {
                         Image(systemName: "arrow.up.right.square")
                     }
-                    .accessibilityLabel(String(localized: "Open on MacUpdate"))
+                    .accessibilityLabel(action.shortLabel)
                 }
                 DetailActionsMenu(
                     id: detail.id, entityId: detail.nid, kind: .appListing, title: detail.name, lastActivityAt: detail.lastActivityAt, url: detail.url,
@@ -581,6 +606,12 @@ struct AppDetailView: View {
             // Braille rather than one long combined line.
             VStack(spacing: 0) {
                 if !detail.developer.isEmpty { infoRow("Developer", detail.developer) }
+                // The category, its App Store types, and any other category
+                // the app is in, on one line, as one stop. The AppleVis site
+                // only stores the main category (2026-10-09).
+                if let line = categoryLine ?? (detail.category.isEmpty ? nil : detail.category) {
+                    infoRow("Category", line)
+                }
                 infoRow("Platform", detail.platform.displayName)
                 if !detail.price.isEmpty { infoRow("Price", detail.price) }
                 if !supportedDevicesText(detail).isEmpty { infoRow("Devices", supportedDevicesText(detail)) }
@@ -592,9 +623,55 @@ struct AppDetailView: View {
         }
     }
 
+    /// Where an entry's main button goes. "Open in App Store" only for a
+    /// real App Store link: a few entries hold the app's own website in
+    /// that field. A Mac app that isn't in the Mac App Store is got from
+    /// its developer, so their website is the main button, then MacUpdate.
+    /// Requested directly (2026-10-09).
+    enum StoreAction {
+        case appStore(URL), website(URL), developer(URL), macUpdate(URL)
+
+        var url: URL {
+            switch self {
+            case .appStore(let url), .website(let url), .developer(let url), .macUpdate(let url): return url
+            }
+        }
+
+        var shortLabel: String {
+            switch self {
+            case .appStore:  return String(localized: "Open in App Store")
+            case .website:   return String(localized: "Open Website")
+            case .developer: return String(localized: "Get It from the Developer")
+            case .macUpdate: return String(localized: "Open on MacUpdate")
+            }
+        }
+    }
+
+    static func isAppStoreLink(_ link: String) -> Bool {
+        guard let host = URL(string: link)?.host?.lowercased() else { return false }
+        return host == "apps.apple.com" || host == "itunes.apple.com" || host.hasSuffix(".apps.apple.com")
+    }
+
+    private static func url(_ text: String?) -> URL? {
+        guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty,
+              let url = URL(string: text), url.scheme != nil else { return nil }
+        return url
+    }
+
+    static func mainStoreAction(_ detail: AppDetail) -> StoreAction? {
+        if let link = detail.appStoreUrl, let url = url(link) {
+            return isAppStoreLink(link) ? .appStore(url) : .website(url)
+        }
+        if detail.platform == .macos, let url = url(detail.developerWebsite) { return .developer(url) }
+        if let url = url(detail.macUpdateUrl) { return .macUpdate(url) }
+        return nil
+    }
+
     @ViewBuilder
     private func storeActionButton(_ detail: AppDetail) -> some View {
-        if let storeURL = detail.appStoreUrl.flatMap(URL.init) {
+        let main = Self.mainStoreAction(detail)
+        switch main {
+        case .appStore(let storeURL)?:
             // Deliberately a plain Link, not WebLink — see the identical
             // reasoning on the toolbar App Store button above: this needs
             // to always hand off to the native App Store app via Universal
@@ -610,7 +687,29 @@ struct AppDetailView: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel(String(localized: "Open \(detail.name) in the App Store."))
             .accessibilityHint(String(localized: "Opens the App Store listing. Downloads and purchases are handled by Apple."))
-        } else if let macUpdateURL = detail.macUpdateUrl.flatMap(URL.init) {
+        case .website(let url)?:
+            WebLink(destination: url, showsExternalIcon: false) {
+                storeActionLabel(
+                    title: "Open Website",
+                    caption: "Downloads and purchases are handled outside AppleVis.",
+                    systemImage: "arrow.up.forward.square"
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(String(localized: "Open the website for \(detail.name)."))
+        case .developer(let url)?:
+            WebLink(destination: url, showsExternalIcon: false) {
+                storeActionLabel(
+                    title: "Get It from the Developer",
+                    caption: "This app isn't in the Mac App Store. Downloads and purchases are handled by the developer.",
+                    systemImage: "arrow.up.forward.square"
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(String(localized: "Get \(detail.name) from the developer's website."))
+        case .macUpdate(let macUpdateURL)?:
             WebLink(destination: macUpdateURL, showsExternalIcon: false) {
                 storeActionLabel(
                     title: "Open on MacUpdate",
@@ -622,6 +721,28 @@ struct AppDetailView: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel(String(localized: "Open \(detail.name) on MacUpdate."))
             .accessibilityHint(String(localized: "Opens the app listing in your browser. Downloads and purchases are handled outside AppleVis."))
+        case nil:
+            EmptyView()
+        }
+
+        // The developer's website and MacUpdate, when they aren't the main
+        // button already (2026-10-09).
+        let mainURL = main?.url
+        // The entry's own, or else the one in the App Store listing's
+        // Information section (2026-10-09).
+        if let site = Self.url(detail.developerWebsite) ?? Self.url(itunesMetadata?.developerWebsite), site != mainURL {
+            WebLink(destination: site) {
+                Label("Developer's Website", systemImage: "globe")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, 6)
+        }
+        if let macUpdate = Self.url(detail.macUpdateUrl), macUpdate != mainURL {
+            WebLink(destination: macUpdate) {
+                Label("MacUpdate", systemImage: "shippingbox")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, 6)
         }
     }
 
@@ -1060,7 +1181,8 @@ struct AppDetailView: View {
                         guard let idx = self.detail?.reviews.firstIndex(where: { $0.id == review.id }) else { return }
                         self.detail?.reviews[idx] = AppReview(
                             id: review.id, subject: review.subject, authorName: review.authorName,
-                            authorId: review.authorId, rating: review.rating, body: newText, createdAt: review.createdAt
+                            authorId: review.authorId, rating: review.rating, body: newText, createdAt: review.createdAt,
+                            parentId: review.parentId
                         )
                     },
                     onReplyTo: {
@@ -1072,7 +1194,9 @@ struct AppDetailView: View {
                     },
                     parentTitle: detail.name,
                     parentURL: detail.url,
-                    focusBinding: $focusedReviewId
+                    focusBinding: $focusedReviewId,
+                    parentAuthorName: review.parentId.flatMap { pid in detail.reviews.first { $0.id == pid } }?.authorName,
+                    onJumpToParent: review.parentId.flatMap { pid in detail.reviews.first { $0.id == pid } }.map { parent in { pendingFocusReviewId = parent.id } }
                 )
                 .id(review.id)
                 if index < detail.reviews.count - 1 {
@@ -1131,9 +1255,14 @@ struct AppDetailView: View {
             if hasMoreReviews {
                 Task { await ensureAllReviewsLoaded() }
             }
-            // Backgrounded like confirmAppleTVSupport below — supplementary,
-            // shouldn't delay the rest of the page.
-            if let appId = detail?.id {
+            // The public recommendation count is switched off for now: the
+            // website can't filter recommendations by app
+            // (`filter[flagged_entity.id]` returns a server error, confirmed
+            // live 2026-10-08), and members can only read their own. Asking
+            // anyway cost an error on every app page. Turn this back on, fed
+            // by the Community Picks endpoint's `total_recommendations`, once
+            // the website offers it. The summary row below is kept ready.
+            if Self.showsRecommendationCount, let appId = detail?.id {
                 Task { recommendationSummary = try? await APIClient.shared.flags.recommendationSummary(appUuid: appId) }
             }
             if let storeUrl = detail?.appStoreUrl, !storeUrl.isEmpty {
@@ -1402,7 +1531,9 @@ private extension AppDetail {
             reviews: reviews,
             isSaved: isSaved,
             macUpdateUrl: macUpdateUrl,
-            lastCommentAt: lastCommentAt
+            lastCommentAt: lastCommentAt,
+            developerWebsite: developerWebsite,
+            otherComments: otherComments
         )
     }
 }
@@ -1454,6 +1585,11 @@ struct AppReviewRow: View {
     /// Optional review focus target used after jumping or posting so
     /// VoiceOver focus lands here, not just scrolls the viewport.
     var focusBinding: AccessibilityFocusState<String?>.Binding? = nil
+    /// The comment this one replies to, when it's on this page, as forum
+    /// replies show it. The website shows "In reply to …" (2026-10-09).
+    var parentAuthorName: String? = nil
+    /// Moves to that comment. Nil hides the line, so it never goes nowhere.
+    var onJumpToParent: (() -> Void)? = nil
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -1482,6 +1618,16 @@ struct AppReviewRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            // Same as forum replies: a separate stop, so VoiceOver can jump to
+            // the comment this one answers (2026-10-09).
+            if let parentAuthorName, let onJumpToParent {
+                Button(action: onJumpToParent) {
+                    Label(String(localized: "Replying to \(parentAuthorName)"), systemImage: "arrowshape.turn.up.left")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityHint(String(localized: "Jumps to the comment this one replies to."))
+            }
             // A separate header/body split, not one combined element covering
             // the whole card — matches every other comment type in the app
             // (docs/IMPLEMENTATION_NOTES.md: render an actionable header, then
@@ -1512,7 +1658,8 @@ struct AppReviewRow: View {
             .accessibilityLabel(
                 String(localized: "Comment \(index) of \(total) by \(review.authorName). ") +
                 (review.rating.map { String(localized: "\($0) out of 5 stars. ") } ?? "") +
-                (displayedSubject.map { String(localized: "Subject: \($0).") } ?? "")
+                (displayedSubject.map { String(localized: "Subject: \($0).") } ?? "") +
+                (parentAuthorName.map { " " + String(localized: "Reply to \($0)'s comment.") } ?? "")
             )
             .accessibilityHint(String(localized: "Actions available: copy, share, and more."))
             .modifier(OptionalReplyFocus(binding: focusBinding, id: review.id))
@@ -1749,10 +1896,12 @@ struct ComposeAppReviewView: View {
         self.appId = appId
         self.appName = appName
         self.quotedReview = quotedReview
+        // Filled in like the website's reply form (2026-10-09).
+        _subject = State(initialValue: CommentSubject.replyPrefill(quotedReview?.subject))
         self.platform = platform
         self.onPosted = onPosted
         if let quotedReview {
-            _reviewText = State(initialValue: QuotedReply.prefix(authorName: quotedReview.authorName, body: quotedReview.body))
+            _reviewText = State(initialValue: "")
         } else {
             _reviewText = State(initialValue: "")
         }
@@ -1772,6 +1921,20 @@ struct ComposeAppReviewView: View {
                 Text(quotedReview != nil ? "Replying to \(quotedReview!.authorName) — Commenting on: \(appName)" : "Commenting on: \(appName)")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .padding(.horizontal).padding(.top)
+                // The comment being answered, for reading while you write. Not
+                // part of your comment any more: the reply links to it, and
+                // the website shows "In reply to …", as forum replies do.
+                // VoiceOver hears "Replying to …" in the header above, so this
+                // isn't a stop of its own (2026-10-09).
+                if let quotedReview {
+                    Text(quotedReview.body.strippingHTMLTags())
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                        .padding(.horizontal)
+                        .padding(.bottom, 8)
+                        .accessibilityHidden(true)
+                }
                 TextField("Subject (optional)", text: $subject)
                     .textFieldStyle(.roundedBorder)
                     .padding()
@@ -1811,13 +1974,22 @@ struct ComposeAppReviewView: View {
                         .padding(.horizontal)
                         .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
                 }
+                // The box had no label, so VoiceOver said only "text field".
+                // The visible label is for everyone; VoiceOver reads it as
+                // the box's own label. Reported by a beta tester (2026-10-09).
+                Text("Comment")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal)
+                    .padding(.top, 12)
+                    .accessibilityHidden(true)
                 TextEditor(text: $reviewText)
+                    .accessibilityLabel(Text("Comment"))
                     .padding()
                     .rewriteFlash($justRewrote)
                     .guidelineReminderActions(guidelines)
                     .onChange(of: reviewText) { _, newValue in
                         if guidelines.conversation == nil {
-                            guidelines.conversation = ConversationSource(commentBundle: AppEndpoints.commentBundle(for: platform), nodeId: appId)
+                            guidelines.conversation = ConversationSource(commentBundle: AppEndpoints.commentBundle(for: platform), nodeId: appId, replyingToCommentId: quotedReview?.id)
                         }
                         guidelines.textChanged(newValue, isReply: true)
                         intelligence.textChanged(
@@ -1896,7 +2068,7 @@ struct ComposeAppReviewView: View {
         isSubmitting = true; submitError = nil
         do {
             let review = try await APIClient.shared.apps.submitReview(
-                appId: appId, subject: subject, body: reviewText, csrfToken: user.csrfToken, platform: platform
+                appId: appId, subject: CommentSubject.make(typed: subject, body: reviewText, replyingTo: quotedReview?.subject), body: reviewText, csrfToken: user.csrfToken, platform: platform, replyToCommentId: quotedReview?.id
             )
             toast.success(String(localized: "Comment posted"), sound: .reply)
             onPosted(review)

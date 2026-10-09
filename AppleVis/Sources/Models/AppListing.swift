@@ -19,6 +19,11 @@ nonisolated struct AppListing: Identifiable, Codable, Hashable, Sendable {
     let price: String
     let supportedDevices: [String]
     let voiceOverPerformance: String?
+    /// The overall usability rating: iPhone's 8-option scale, or the
+    /// 4-option one for Apple Watch and Apple TV. Lets Ask the Mouse leave
+    /// out apps rated not accessible and put fully accessible ones first
+    /// (2026-10-08).
+    var usability: String? = nil
     let summary: String
     let url: String
     var isSaved: Bool
@@ -79,6 +84,15 @@ nonisolated struct AppDetail: Identifiable, Codable, Sendable {
     /// recent comment" and showed "2 weeks ago" on an entry Home correctly
     /// showed as commented on hours earlier. Reported directly.
     var lastCommentAt: Date? = nil
+    /// "Developer's Website" (`field_link3`) on iPhone, Mac, and Apple
+    /// Watch entries; Apple TV has no such field. Submit an App always sent
+    /// it, but the entry screen never showed it. On a Mac app that isn't in
+    /// the Mac App Store, it's where you get the app. Reported by a beta
+    /// tester (2026-10-09).
+    var developerWebsite: String? = nil
+    /// "Additional Comments" (`field_other_comments`), on all four
+    /// platforms. Sent by Submit an App, never shown until 2026-10-09.
+    var otherComments: String? = nil
 
     /// Latest activity of any kind: the newest comment, or the last edit.
     var lastActivityAt: Date { max(lastCommentAt ?? .distantPast, lastUpdatedAt) }
@@ -141,6 +155,10 @@ nonisolated struct AppReview: Identifiable, Codable, Sendable {
     var rawBody: String = ""
     var bodyFormat: String = drupalDefaultTextFormat
     let createdAt: Date
+    /// The comment this one replies to (Drupal's `pid`), when it was posted
+    /// with the website's Reply button or the app's Reply to this Comment.
+    /// The website shows it as "In reply to …" (2026-10-09).
+    var parentId: String? = nil
 }
 
 nonisolated struct AppCategory: Identifiable, Codable, Hashable, Sendable {

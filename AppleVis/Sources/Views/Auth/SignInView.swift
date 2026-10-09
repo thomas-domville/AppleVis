@@ -7,7 +7,10 @@ struct SignInView: View {
     var expiredReason: AuthStore.ReSignInPrompt.Reason? = nil
     @State private var username = ""
     @State private var password = ""
-    @State private var rememberMe = false
+    /// On by default (2026-10-08, requested directly), so the website's
+    /// sign-out every few weeks doesn't interrupt anyone; it can still be
+    /// switched off before signing in.
+    @State private var rememberMe = true
     @State private var isSigningIn = false
     @State private var signInError: String?
     @Environment(\.dismiss) private var dismiss

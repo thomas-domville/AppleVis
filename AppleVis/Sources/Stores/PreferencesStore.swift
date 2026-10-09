@@ -102,6 +102,10 @@ final class PreferencesStore: ObservableObject {
     /// RN's `notifBadge` ("Shows a number on the AppleVis icon... tap the
     /// app and the badge clears") had no Swift equivalent at all.
     @AppStorage("notif.badgeCount")     var badgeCountEnabled    = true
+    /// Catch-up reminders after a week away (see CatchUpReminders). Off
+    /// until the member turns them on: App Store rules ask for an explicit
+    /// choice for reminders like these.
+    @AppStorage(CatchUpReminders.enabledKey) var catchUpReminders = false
 
     // MARK: - Accessibility
     @AppStorage("a11y.announcement")    var announcementLevel: AnnouncementLevel = .normal
@@ -235,7 +239,7 @@ enum ThemeGroup: String, CaseIterable, Identifiable {
 /// entirely.)
 enum AppTheme: String, CaseIterable, Identifiable {
     case system, oppositeToSystem, light, dark, midnight, warm, sepia
-    case applevisClassic, mouseLight, mouseDark, orchard, goldenGate, nebula
+    case applevisClassic, mouseLight, mouseDark, goldieLight, goldieDark, orchard, goldenGate, nebula
     case highContrastLight, highContrastDark
 
     var id: String { rawValue }
@@ -244,7 +248,7 @@ enum AppTheme: String, CaseIterable, Identifiable {
         switch self {
         case .system, .oppositeToSystem, .light, .dark, .midnight, .warm, .sepia:
             return .standard
-        case .applevisClassic, .mouseLight, .mouseDark, .orchard, .goldenGate, .nebula:
+        case .applevisClassic, .mouseLight, .mouseDark, .goldieLight, .goldieDark, .orchard, .goldenGate, .nebula:
             return .appleVis
         case .highContrastLight, .highContrastDark:
             return .accessibility
@@ -263,6 +267,8 @@ enum AppTheme: String, CaseIterable, Identifiable {
         case .applevisClassic:   return String(localized: "AppleVis Classic")
         case .mouseLight:        return String(localized: "Mouse — Light")
         case .mouseDark:         return String(localized: "Mouse — Dark")
+        case .goldieLight:       return String(localized: "Goldie — Light")
+        case .goldieDark:        return String(localized: "Goldie — Dark")
         case .orchard:            return String(localized: "Orchard")
         // Was "Golden Gate" — Apple's own macOS 26 code name, and not
         // worth the trademark risk for a theme name with no real
@@ -290,6 +296,8 @@ enum AppTheme: String, CaseIterable, Identifiable {
         case .applevisClassic:   return String(localized: "The blue and white scheme from applevis.com")
         case .mouseLight:        return String(localized: "Warm, playful theme inspired by AnonyMouse")
         case .mouseDark:         return String(localized: "The Mouse theme in a warm charcoal dark edition")
+        case .goldieLight:       return String(localized: "Cosy honey and cream, with Goldie's red collar")
+        case .goldieDark:        return String(localized: "Goldie's colours after dark, in warm cocoa and honey")
         case .orchard:            return String(localized: "Fresh apple greens and deep reds")
         case .goldenGate:        return String(localized: "Warm California sunset tones")
         case .nebula:             return String(localized: "Deep indigo and soft lavender, space-inspired")
@@ -310,9 +318,9 @@ enum AppTheme: String, CaseIterable, Identifiable {
         switch self {
         case .system: return nil
         case .oppositeToSystem: return systemIsDark ? .light : .dark
-        case .light, .warm, .sepia, .applevisClassic, .mouseLight, .orchard, .goldenGate, .highContrastLight:
+        case .light, .warm, .sepia, .applevisClassic, .mouseLight, .goldieLight, .orchard, .goldenGate, .highContrastLight:
             return .light
-        case .dark, .midnight, .mouseDark, .nebula, .highContrastDark:
+        case .dark, .midnight, .mouseDark, .goldieDark, .nebula, .highContrastDark:
             return .dark
         }
     }
@@ -333,6 +341,8 @@ enum AppTheme: String, CaseIterable, Identifiable {
         case .applevisClassic:   return .applevisClassic
         case .mouseLight:        return .mouseLight
         case .mouseDark:         return .mouseDark
+        case .goldieLight:       return .goldieLight
+        case .goldieDark:        return .goldieDark
         case .orchard:            return .orchard
         case .goldenGate:        return .goldenGate
         case .nebula:             return .nebula

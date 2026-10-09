@@ -577,7 +577,7 @@ struct ForumTopicDetailView: View {
         guard let user = auth.user, let d = detail else { return }
         do {
             if isFollowing {
-                try await APIClient.shared.forums.unfollow(nodeUuid: d.id, token: user.csrfToken)
+                try await APIClient.shared.forums.unfollow(nodeUuid: d.id, entityId: d.nid, token: user.csrfToken)
                 isFollowing = false
                 PersistenceStore.shared.markUnfollowed(id: d.id)
                 FollowStore.shared.markNotFollowed(d.id)

@@ -14,6 +14,11 @@ struct HelpArticleDetailView: View {
     /// screens focus their own intro description. Full app-wide focus
     /// audit, requested directly.
     @AccessibilityFocusState private var isSummaryFocused: Bool
+    /// The summary only the first time; after Back from a related article,
+    /// that link (2026-10-09).
+    @State private var didFocusSummary = false
+    @AccessibilityFocusState private var focusedRelatedId: String?
+    @State private var returnRelatedId: String?
 
     /// Matches RN's "Read Article Summary" accessibility action format:
     /// "{title}. {summary}. {N} section headings. {M} steps."
@@ -87,7 +92,13 @@ struct HelpArticleDetailView: View {
         .sheet(isPresented: $showWelcomeTour) {
             GuidedExperienceView(experience: GuidedExperienceRegistry.welcome)
         }
-        .task { await retryAccessibilityFocus(into: $isSummaryFocused) }
+        .task {
+            guard !didFocusSummary else { return }
+            didFocusSummary = true
+            await retryAccessibilityFocus(into: $isSummaryFocused)
+        }
+        .returnsFocusOnBack($returnRelatedId, into: $focusedRelatedId)
+        .navigationLog("Help article \(article.id)")
     }
 
     // MARK: - Related links
@@ -118,11 +129,20 @@ struct HelpArticleDetailView: View {
         switch link.destination {
         case .article(let id):
             if let target = HelpContent.find(id) {
-                NavigationLink(value: target) {
+                // Opens the article itself, not by value: a value link needs
+                // the screen around it to say where articles go, and only
+                // Help did. From Ask the Mouse, a saved answer, Settings, or
+                // a link into the app, related articles did nothing
+                // (2026-10-09).
+                NavigationLink {
+                    HelpArticleDetailView(article: target)
+                        .notesReturnFocus(target.id, in: $returnRelatedId)
+                } label: {
                     relatedLinkLabel(link)
                 }
                 .accessibilityLabel(link.label)
                 .accessibilityHint(String(localized: "Opens this help article."))
+                .accessibilityFocused($focusedRelatedId, equals: target.id)
             }
         case .guidedExperienceWelcome:
             Button {

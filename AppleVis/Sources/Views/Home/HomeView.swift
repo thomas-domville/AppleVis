@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 /// Narrows the feed already loaded on Home to just what's new since the
 /// last visit — distinct from "Customize Home," which controls which
@@ -103,8 +104,18 @@ struct HomeView: View {
     /// `feedList`'s own `ScrollViewReader`, since `proxy` isn't reachable
     /// from `announceWelcomeIfNeeded()` itself (it's local to that closure).
     @State private var pendingResumeFocusItemId: String?
+    /// VoiceOver focus changes since Home first appeared, before the
+    /// welcome. The first is iOS placing focus on the new screen; any
+    /// after that mean the member has started moving around themselves.
+    @State private var focusChangesSinceOpen = 0
     @State private var hasCheckedAnniversary = false
     @State private var showAnniversary = false
+    /// The one-time catch-up reminder offer (see CatchUpReminders). Read
+    /// once when Home appears, so it doesn't pop in mid-visit.
+    @State private var showCatchUpOffer = CatchUpReminders.shouldOffer
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    /// Links Home's rotors to their rows (see FeedKindRotor).
+    @Namespace private var rotorNamespace
     @State private var anniversaryYears = 0
     @State private var showCustomizeHome = false
     // @AppStorage, not @State — plain @State reset to .all on every fresh
@@ -123,6 +134,10 @@ struct HomeView: View {
     @State private var showAskTheMouse = false
     @State private var showSubmitApp = false
     @AccessibilityFocusState private var focusTarget: HomeFocusTarget?
+    /// The Profile button, after a real Back from Profile (see
+    /// `returnsFocusOnBack`). Hanging it off Profile's disappearing also
+    /// fired when Profile pushed Help or an article (2026-10-09).
+    @State private var returnFocus: HomeFocusTarget?
     @Environment(\.scenePhase) private var scenePhase
     /// How long Home's feed can sit unrefreshed before returning to the
     /// foreground triggers a reload — briefly switching to another app and
@@ -143,6 +158,7 @@ struct HomeView: View {
     /// from the "Customize Home" menu, which controls which content TYPES
     /// are fetched at all, not which of the fetched items are shown.
     static let activityHeadingID = "home.activityHeading"
+    static let pinnedHeadingID = "home.pinnedHeading"
 
     /// Was a ternary of two literals, which made it a plain String that
     /// skipped translation.
@@ -203,7 +219,9 @@ struct HomeView: View {
     private var visibleItems: [FeedItem] {
         switch homeFeedFilter {
         case .all:
-            return vm.items
+            // Pinned topics are listed above the feed, so not again in it.
+            let pinned = Set(vm.pinnedItems.map(\.id))
+            return vm.items.filter { !pinned.contains($0.id) }
         case .new:
             return vm.newItems
         case .fetch, .mouseRecap:
@@ -229,6 +247,12 @@ struct HomeView: View {
                 }
             }
             .navigationTitle("Home")
+            .returnsFocusOnBack($returnFocus, into: $focusTarget)
+            // Large title on the same row as the buttons, so VoiceOver reads
+            // the top of the screen left to right: the title, then the
+            // buttons beside it, as on Discover. With the title on its own
+            // row below, the buttons came first (beta tester, 2026-10-08).
+            .toolbarTitleDisplayMode(.inlineLarge)
             .toolbar {
                 // Matches the original design: Customize Home in the
                 // top-left, Profile/Settings in the top-right — not both
@@ -300,9 +324,7 @@ struct HomeView: View {
                             ? String(localized: "Create a new forum topic or app entry")
                             : String(localized: "Sign in required to create a new forum topic or app entry"))
                         NavigationLink(destination: ProfileView()
-                            .onDisappear {
-                                Task { await retryAccessibilityFocus(.profile, into: $focusTarget) }
-                            }
+                            .notesReturnFocus(HomeFocusTarget.profile, in: $returnFocus)
                         ) {
                             Image(systemName: "person.circle")
                         }
@@ -381,6 +403,9 @@ struct HomeView: View {
                     showAnniversary = false
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIAccessibility.elementFocusedNotification)) { _ in
+                if !hasAnnouncedWelcome { focusChangesSinceOpen += 1 }
+            }
             .onChange(of: vm.isLoading) { _, isLoading in
                 guard !isLoading else { return }
                 announceWelcomeIfNeeded()
@@ -429,8 +454,18 @@ struct HomeView: View {
 
         SoundPlayer.shared.play(.welcome)
 
+        // Loading can take a few seconds. If the member has already started
+        // moving around Home by then, VoiceOver stays where they are: the
+        // welcome still plays, but nothing takes over. "Pick Up Where You
+        // Left Off" on the greeting does the jump whenever they want it.
+        // A tester found being moved mid-list on opening too aggressive
+        // (2026-10-08).
+        let memberHasMoved = focusChangesSinceOpen > 1
+
         let baseText = vm.isReturningVisit
-            ? String(localized: "Welcome back to AppleVis. Returning to where you left off.")
+            ? (memberHasMoved
+                ? String(localized: "Welcome back to AppleVis.")
+                : String(localized: "Welcome back to AppleVis. Returning to where you left off."))
             : String(localized: "Welcome to AppleVis. Home is ready.")
 
         if preferences.homeStartupBehavior == .detailed && !vm.newActivitySummary.isEmpty {
@@ -460,6 +495,7 @@ struct HomeView: View {
         // `greetingHeadline`), so this no longer needs a signed-out special
         // case that fell through to no focus move at all. Requested
         // directly.
+        if memberHasMoved { return }
         if !vm.newItems.isEmpty && !vm.isNewActivityDismissed && preferences.welcomeSummaryEnabled {
             Task { await retryAccessibilityFocus(.summary, into: $focusTarget) }
         } else if let lastId = vm.lastVisitedItemId, homeFeedFilter == .all {
@@ -521,6 +557,50 @@ struct HomeView: View {
         return vm.isReturningVisit ? String(localized: "Welcome back") : String(localized: "Welcome to AppleVis")
     }
 
+    /// Offered once, after AppleVis has been opened on three different
+    /// days. A row with two buttons rather than an alert, so it never takes
+    /// VoiceOver focus away from what the member is doing.
+    private var catchUpOffer: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Catch-Up Reminders")
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+            Text("If you're away from AppleVis for a week, would you like a gentle reminder of what's new? Two at most, and you can change this in Settings > Notifications.")
+                .font(.subheadline)
+                .foregroundStyle(preferences.colors.textSecondary)
+            // Side by side, or stacked at the largest text sizes.
+            let buttons = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
+                : AnyLayout(HStackLayout(spacing: 12))
+            buttons {
+                Button("Turn On") {
+                    CatchUpReminders.markOffered()
+                    preferences.catchUpReminders = true
+                    showCatchUpOffer = false
+                    Task {
+                        let settings = await UNUserNotificationCenter.current().notificationSettings()
+                        if settings.authorizationStatus == .notDetermined {
+                            _ = await PushNotificationManager.requestAuthorizationAndRegister()
+                        }
+                        UIAccessibility.post(notification: .announcement, argument: String(localized: "Catch-up reminders are on."))
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                Button("No Thanks") {
+                    CatchUpReminders.markOffered()
+                    showCatchUpOffer = false
+                    UIAccessibility.post(notification: .announcement, argument: String(localized: "No catch-up reminders. You can turn them on in Settings > Notifications."))
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(preferences.colors.card, in: RoundedRectangle(cornerRadius: 12))
+        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+        .listRowSeparator(.hidden)
+    }
+
     private var greetingCard: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("\(Greeting.text()),")
@@ -545,6 +625,16 @@ struct HomeView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(String(localized: "\(Greeting.text()), \(greetingHeadline)."))
         .accessibilityFocused($focusTarget, equals: .greeting)
+        // Opening the app no longer moves VoiceOver once the member has
+        // started moving around, so the jump is here, on request.
+        .accessibilityActions {
+            if let lastId = vm.lastVisitedItemId {
+                Button(String(localized: "Pick Up Where You Left Off")) {
+                    if homeFeedFilter != .all { homeFeedFilter = .all }
+                    pendingResumeFocusItemId = lastId
+                }
+            }
+        }
         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
         .listRowSeparator(.hidden)
     }
@@ -575,6 +665,10 @@ struct HomeView: View {
         ScrollViewReader { proxy in
             List {
                 greetingCard
+
+                if showCatchUpOffer {
+                    catchUpOffer
+                }
 
                 if !notificationHistory.isEmpty {
                     NavigationLink(destination: NotificationHistoryView()) {
@@ -682,6 +776,33 @@ struct HomeView: View {
                         .accessibilityFocused($focusTarget, equals: .caughtUp)
                 }
 
+                // Pinned on the website: first in All, until unpinned, as
+                // on the website (2026-10-08, from a beta tester).
+                if homeFeedFilter == .all && !vm.pinnedItems.isEmpty {
+                    Text("Pinned")
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityLabel(String(localized: "Pinned"))
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 4, trailing: 16))
+                        .listRowSeparator(.hidden)
+                        .id(Self.pinnedHeadingID)
+                        .modifier(ActivityHeadingRotor(headings: rotorHeadings))
+                    ForEach(vm.pinnedItems) { item in
+                        let newCount = vm.newReplyCount(for: item)
+                        FeedRow(item: item, newCount: newCount, isNew: newItemIds.contains(item.id) && newCount == 0) {
+                            confirmMarkedRead(item)
+                            vm.markAsRead(item, announce: false)
+                        }
+                        .id(item.id)
+                        .accessibilityRotorEntry(id: item.id, in: rotorNamespace)
+                        .accessibilityFocused($focusTarget, equals: .item(item.id))
+                        .modifier(ActivityHeadingRotor(headings: rotorHeadings))
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    }
+                }
+
                 if !visibleItems.isEmpty {
                     HStack {
                         Text(activityHeadingTitle)
@@ -704,7 +825,7 @@ struct HomeView: View {
                                 vm.markAllAsRead(visibleItems, announce: false)
                                 // The success sound, then straight to the
                                 // all caught up line (2026-10-07).
-                                let message = ActionCue.play(.success, orSay: String(localized: "All new activity marked as read."))
+                                let message = ActionCue.play(.allCaughtUp, orSay: String(localized: "All new activity marked as read."))
                                 Task { await moveAccessibilityFocusPromptly(to: .caughtUp, into: $focusTarget, saying: message) }
                             }
                             .font(.caption.weight(.bold))
@@ -715,7 +836,7 @@ struct HomeView: View {
                     .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 4, trailing: 16))
                     .listRowSeparator(.hidden)
                     .id(Self.activityHeadingID)
-                    .modifier(ActivityHeadingRotor(title: activityHeadingTitle))
+                    .modifier(ActivityHeadingRotor(headings: rotorHeadings))
                 }
 
                 ForEach(visibleItems) { item in
@@ -729,8 +850,13 @@ struct HomeView: View {
                         vm.markAsRead(item, announce: false)
                     }
                     .id(item.id)
+                    // Ties the row to its rotor entries. Home's list only
+                    // builds rows near the screen, so without this the
+                    // Forum Topics, Podcast Episodes, and other rotors
+                    // found nothing (beta tester, 2026-10-08).
+                    .accessibilityRotorEntry(id: item.id, in: rotorNamespace)
                     .accessibilityFocused($focusTarget, equals: .item(item.id))
-                    .modifier(ActivityHeadingRotor(title: activityHeadingTitle))
+                    .modifier(ActivityHeadingRotor(headings: rotorHeadings))
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 }
 
@@ -765,7 +891,7 @@ struct HomeView: View {
                     let label = newCount > 0
                         ? "\(item.title)\(newPart), " + String(localized: "\(newCount) new comments")
                         : "\(item.title), " + String(localized: "new")
-                    AccessibilityRotorEntry(label, id: item.id)
+                    AccessibilityRotorEntry(label, id: item.id, in: rotorNamespace)
                 }
             }
             // Home is the one place in the app that genuinely interleaves
@@ -777,11 +903,16 @@ struct HomeView: View {
             // `visibleItems`, not the full feed, so a rotor built while
             // the New filter is active only offers what's actually
             // on screen.
-            .accessibilityRotor("Forum Topics") { kindRotorContent(.forumTopic) }
-            .accessibilityRotor("Podcast Episodes") { kindRotorContent(.podcastEpisode) }
-            .accessibilityRotor("App Entries") { kindRotorContent(.appListing) }
-            .accessibilityRotor("Guides") { kindRotorContent(.resource) }
-            .accessibilityRotor("Blog Posts") { kindRotorContent(.blogPost) }
+            // Only for the types Home shows (Customize Home), so the rotor
+            // isn't crowded with ones that can never have anything
+            // (2026-10-08). Based on that setting rather than what's on
+            // screen at the moment, so the list isn't rebuilt under
+            // VoiceOver whenever the last item of a type is read.
+            .modifier(FeedKindRotor(title: "Forum Topics", isShown: preferences.showForums, items: rotorItems(.forumTopic), namespace: rotorNamespace))
+            .modifier(FeedKindRotor(title: "Podcast Episodes", isShown: preferences.showPodcasts, items: rotorItems(.podcastEpisode), namespace: rotorNamespace))
+            .modifier(FeedKindRotor(title: "App Entries", isShown: preferences.showApps, items: rotorItems(.appListing), namespace: rotorNamespace))
+            .modifier(FeedKindRotor(title: "Guides", isShown: preferences.showGuides, items: rotorItems(.resource), namespace: rotorNamespace))
+            .modifier(FeedKindRotor(title: "Blog Posts", isShown: preferences.showBlogs, items: rotorItems(.blogPost), namespace: rotorNamespace))
             // "Pick up where you left off" — set by announceWelcomeIfNeeded()
             // when there's no new activity to summarize but there is a
             // last-visited item. That method can't reach `proxy` itself (it's
@@ -834,7 +965,8 @@ struct HomeView: View {
     /// (2026-10-04).
     /// Marking an item read: a sound and tap at once. In New the item
     /// leaves the list, so VoiceOver moves straight to the next item, or
-    /// the one before, or "You're all caught up" with the success sound.
+    /// the one before, or "You're all caught up" with the All Caught Up
+    /// sound.
     /// In All it stays, so focus does too. Called before the item is
     /// marked, while it's still listed (2026-10-07).
     private func confirmMarkedRead(_ item: FeedItem) {
@@ -845,7 +977,7 @@ struct HomeView: View {
             return
         }
         let next = ActionCue.neighbor(of: item.id, in: visibleItems.map(\.id))
-        let message = ActionCue.play(next == nil ? .success : .markedRead, orSay: String(localized: "Marked as read."))
+        let message = ActionCue.play(next == nil ? .allCaughtUp : .markedRead, orSay: String(localized: "Marked as read."))
         let target: HomeFocusTarget = next.map { .item($0) } ?? .caughtUp
         Task { await moveAccessibilityFocusPromptly(to: target, into: $focusTarget, saying: message) }
     }
@@ -861,7 +993,9 @@ struct HomeView: View {
         let previousFocus = focusTarget
         await RefreshHeartbeat.during {
             await vm.load()
-            await vm.loadMouseRecap(force: true)
+            // A pull fetches Nibbles' lists fresh; coming back to the app
+            // keeps the saved ones (2026-10-08).
+            await vm.loadMouseRecap(force: true, fresh: !returningToApp)
         }
         notificationHistory = PersistenceStore.shared.notificationHistory()
         SoundPlayer.shared.play(.refresh)
@@ -911,10 +1045,23 @@ struct HomeView: View {
     }
 
     @AccessibilityRotorContentBuilder
-    private func kindRotorContent(_ kind: ContentKind) -> some AccessibilityRotorContent {
-        ForEach(visibleItems.filter { $0.kind == kind }) { item in
-            AccessibilityRotorEntry(item.title, id: item.id)
+    /// One type's items for its rotor, pinned topics first in All.
+    private func rotorItems(_ kind: ContentKind) -> [FeedItem] {
+        let pinned = homeFeedFilter == .all ? vm.pinnedItems : []
+        return (pinned + visibleItems).filter { $0.kind == kind }
+    }
+
+    /// The Headings rotor's entries: Pinned, when it's showing, then the
+    /// activity heading.
+    private var rotorHeadings: [HomeRotorHeading] {
+        var headings: [HomeRotorHeading] = []
+        if homeFeedFilter == .all && !vm.pinnedItems.isEmpty {
+            headings.append(HomeRotorHeading(title: String(localized: "Pinned"), id: Self.pinnedHeadingID))
         }
+        if !visibleItems.isEmpty {
+            headings.append(HomeRotorHeading(title: activityHeadingTitle, id: Self.activityHeadingID))
+        }
+        return headings
     }
 
     /// Backs the "Feed summary" custom accessibility action on the section
@@ -949,11 +1096,13 @@ struct CustomizeHomeView: View {
         AppNavigationStack {
             Form {
                 Section("Content Types") {
-                    Toggle("Forums", isOn: $preferences.showForums)
-                    Toggle("Podcasts", isOn: $preferences.showPodcasts)
-                    Toggle("Apps", isOn: $preferences.showApps)
-                    Toggle("Guides", isOn: $preferences.showGuides)
-                    Toggle("Blogs", isOn: $preferences.showBlogs)
+                    // Same names as Settings > Home Feed: these choose
+                    // which items appear (2026-10-08).
+                    Toggle("Forum Topics", isOn: $preferences.showForums)
+                    Toggle("Podcast Episodes", isOn: $preferences.showPodcasts)
+                    Toggle("App Listings", isOn: $preferences.showApps)
+                    Toggle("Guides & Tutorials", isOn: $preferences.showGuides)
+                    Toggle("Blog Posts", isOn: $preferences.showBlogs)
                 }
                 Section("Forums") {
                     Toggle("Apple Topics Only", isOn: $preferences.appleOnlyForums)
@@ -1645,7 +1794,7 @@ private struct MouseRecapView: View {
                     }
                 }
                 .themedList(preferences.colors)
-                .refreshable { await RefreshHeartbeat.during { await vm.loadMouseRecap(force: true) } }
+                .refreshable { await RefreshHeartbeat.during { await vm.loadMouseRecap(force: true, fresh: true) } }
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         ShareLink(item: digest.shareText(for: window.label), subject: Text("Nibbles")) {
@@ -2009,12 +2158,40 @@ struct FeedRow: View {
 /// VoiceOver and the Headings rotor couldn't go back up to it. While
 /// VoiceOver is on that heading or any item under it, this Headings rotor
 /// always offers it. Reported directly (2026-09-29).
-private struct ActivityHeadingRotor: ViewModifier {
+struct HomeRotorHeading: Identifiable {
     let title: String
+    let id: String
+}
+
+private struct ActivityHeadingRotor: ViewModifier {
+    let headings: [HomeRotorHeading]
 
     func body(content: Content) -> some View {
         content.accessibilityRotor(.headings) {
-            AccessibilityRotorEntry(title, id: HomeView.activityHeadingID)
+            ForEach(headings) { heading in
+                AccessibilityRotorEntry(heading.title, id: heading.id)
+            }
+        }
+    }
+}
+
+/// One content type's rotor on Home, offered only when Home shows that
+/// type. Entries are tied to their rows through `namespace`.
+private struct FeedKindRotor: ViewModifier {
+    let title: LocalizedStringKey
+    let isShown: Bool
+    let items: [FeedItem]
+    let namespace: Namespace.ID
+
+    func body(content: Content) -> some View {
+        if isShown {
+            content.accessibilityRotor(Text(title)) {
+                ForEach(items) { item in
+                    AccessibilityRotorEntry(item.title, id: item.id, in: namespace)
+                }
+            }
+        } else {
+            content
         }
     }
 }

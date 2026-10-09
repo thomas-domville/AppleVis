@@ -290,15 +290,16 @@ private struct BulkField: Identifiable {
             BulkField(id: "description", label: String(localized: "Description")),
             BulkField(id: "version", label: String(localized: "Version")),
             BulkField(id: "devices", label: String(localized: "Supported Devices")),
-            // Off to start: the App Store's address carries tracking bits,
-            // so it nearly always looks different.
+            // On to start (2026-10-08): it now only counts as different
+            // when the link on file isn't the neutral one, so turning it on
+            // fixes /us/ links and nothing else.
             BulkField(id: "link", label: String(localized: "App Store Link")),
             BulkField(id: AppInfoFieldDiff.iosTestedID, label: String(localized: "iOS Version Tested"),
                       note: String(localized: "Sets it to this device's iOS \(UIDevice.current.systemVersion), only where that's newer than the one on file.")),
         ]
     }
 
-    static let defaultIds: Set<String> = ["title", "description", "version", "devices"]
+    static let defaultIds: Set<String> = ["title", "description", "version", "devices", "link"]
 }
 
 private enum BulkOutcome {

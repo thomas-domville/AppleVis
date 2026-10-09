@@ -58,8 +58,8 @@ struct RSSFeedsView: View {
             url: URL(string: "https://www.applevis.com/feed/forums-apple.xml")!
         ),
         RSSFeed(
-            id: "podcasts", title: "Podcasts",
-            description: "New Podcasts.",
+            id: "podcasts", title: "Podcast",
+            description: "New episodes of the AppleVis Podcast.",
             url: URL(string: "https://www.applevis.com/feed/podcasts")!
         ),
     ]

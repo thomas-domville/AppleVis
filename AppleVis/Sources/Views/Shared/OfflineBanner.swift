@@ -3,14 +3,21 @@ import SwiftUI
 /// Shown above stale content when the device has no network connection.
 struct OfflineBanner: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    @ObservedObject private var network = NetworkMonitor.shared
     @State private var hasAnnounced = false
 
     // Deliberately avoids the word "saved" — this is about locally cached
     // content shown while offline/degraded, unrelated to the user-facing
     // "Saved" (bookmarks) feature, and the overlap was confusing enough
     // that a VoiceOver user asked whether this banner was a bug.
+    //
+    // Also shown when the phone is online but the website didn't answer.
+    // Saying "You're offline" then confused a tester on good Wi-Fi
+    // (2026-10-08), so that case says what actually happened.
     private var label: String {
-        String(localized: "You're offline. Showing previously loaded content — pull down to refresh once you're back online.")
+        network.isConnected
+            ? String(localized: "The website isn't answering right now, so you're seeing previously loaded content. Pull down to try again.")
+            : String(localized: "You're offline. Showing previously loaded content — pull down to refresh once you're back online.")
     }
 
     var body: some View {

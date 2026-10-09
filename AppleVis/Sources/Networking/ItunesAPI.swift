@@ -50,6 +50,15 @@ struct ItunesMetadata {
     /// the very same track id returns it directly when present — see
     /// `ItunesAPI.fetchTvOSSupport`/`confirmAppleTVSupport(for:)`.
     let deviceFamilies: [String]
+    /// The developer's website from the listing's Information section
+    /// (Apple's `sellerUrl`). Many apps have one, some don't. Submit an
+    /// App fills Developer's Website from it, and an entry without its own
+    /// shows it. Suggested directly (2026-10-09).
+    var developerWebsite: String = ""
+    /// Apple's category and type numbers for the app, main one first, such
+    /// as Games, Board, Family, and Social Networking. AppGenres names them
+    /// (2026-10-09).
+    var genreIds: [String] = []
 
     /// `languageCodes` arrives as raw ISO 639-1 codes ("EN", "ES", "FR") —
     /// spoken and read as letters by VoiceOver with no indication they're
@@ -79,7 +88,9 @@ struct ItunesMetadata {
             fileSizeMb: fileSizeMb, minimumOsVersion: minimumOsVersion, ageRating: ageRating, screenshotUrls: screenshotUrls,
             appStoreDescription: appStoreDescription, languageCodes: languageCodes,
             releaseDate: releaseDate, currentVersionReleaseDate: currentVersionReleaseDate,
-            deviceFamilies: deviceFamilies + [family]
+            deviceFamilies: deviceFamilies + [family],
+            developerWebsite: developerWebsite,
+            genreIds: genreIds
         )
     }
 }
@@ -339,7 +350,9 @@ enum ItunesAPI {
             languageCodes: (r["languageCodesISO2A"] as? [String]) ?? [],
             releaseDate: releaseDate,
             currentVersionReleaseDate: currentVersionReleaseDate,
-            deviceFamilies: deviceFamilies(supportedDevices: rawSupportedDevices, features: features)
+            deviceFamilies: deviceFamilies(supportedDevices: rawSupportedDevices, features: features),
+            developerWebsite: ((r["sellerUrl"] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
+            genreIds: (r["genreIds"] as? [String]) ?? []
         )
     }
 

@@ -94,6 +94,11 @@ struct ContactView: View {
     /// Feedback", which RN just opened in Safari) preselect a type — the
     /// picker still shows so the user can change their mind.
     var initialType: ContactType? = nil
+    /// A starting message, and the app and device info switched on: set by
+    /// Send to AppleVis under a posting error, so a member can tell us
+    /// with nothing to copy or set up (2026-10-09).
+    var initialMessage: String? = nil
+    var includesDeviceInfo: Bool = false
 
     @State private var step: Step = .type
     @State private var contactType: ContactType?
@@ -174,6 +179,8 @@ struct ContactView: View {
                         }
                     }
                     if contactType == nil { contactType = initialType }
+                    if message.isEmpty, let initialMessage { message = initialMessage }
+                    if includesDeviceInfo { includeSysInfo = true }
                     // Step 1 previously got no explicit focus at all — only
                     // goNext()/goBack() ever called focusStepAfterTransition(),
                     // so opening this wizard left VoiceOver focus on system

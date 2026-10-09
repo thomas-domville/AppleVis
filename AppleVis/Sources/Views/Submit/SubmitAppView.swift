@@ -25,6 +25,9 @@ struct SubmitAppView: View {
     @AccessibilityFocusState private var isStepFocused: Bool
     @AccessibilityFocusState private var isErrorFocused: Bool
     @AccessibilityFocusState private var duplicateLinkFocus: String?
+    /// The row that opened a pushed screen: VoiceOver goes back to it after
+    /// a real Back, not when that screen pushes another (2026-10-09).
+    @State private var returnFocus: String?
 
     @State private var step: Step = .search
     /// Previously there was no platform state at all and every search
@@ -38,6 +41,9 @@ struct SubmitAppView: View {
     @State private var platform: AppPlatform = .ios
     @State private var searchQuery = ""
     @State private var searchResults: [ItunesSearchHit] = []
+    /// Mac apps from Homebrew's catalogue that match the search, for apps
+    /// that aren't in the Mac App Store (2026-10-09).
+    @State private var homebrewResults: [HomebrewApp] = []
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
     @State private var selectedHit: ItunesSearchHit?
@@ -250,6 +256,7 @@ struct SubmitAppView: View {
     static let macosVersionLimit = 20
 
     private var isIosValid: Bool {
+        WebAddress.isPlausible(payload.developerWebsite) &&
         !payload.appName.trimmingCharacters(in: .whitespaces).isEmpty &&
         !payload.appStoreUrl.trimmingCharacters(in: .whitespaces).isEmpty &&
         !payload.category.isEmpty &&
@@ -286,6 +293,7 @@ struct SubmitAppView: View {
     // (unlike Apple TV), plus its own required watchOS Version field, but
     // no Device(s) Tested On and only a single Usability rating.
     private var isWatchValid: Bool {
+        WebAddress.isPlausible(watchPayload.developerWebsite) &&
         !watchPayload.appName.trimmingCharacters(in: .whitespaces).isEmpty &&
         !watchPayload.appStoreUrl.trimmingCharacters(in: .whitespaces).isEmpty &&
         !watchPayload.category.isEmpty &&
@@ -302,6 +310,8 @@ struct SubmitAppView: View {
     // unlike every other platform, NOT an App Store link: a real share of
     // Mac apps aren't in the Mac App Store at all. Confirmed live.
     private var isMacValid: Bool {
+        WebAddress.isPlausible(macPayload.developerWebsite) &&
+        WebAddress.isPlausible(macPayload.macUpdateUrl) &&
         !macPayload.appName.trimmingCharacters(in: .whitespaces).isEmpty &&
         !macPayload.category.isEmpty &&
         !macPayload.appVersion.trimmingCharacters(in: .whitespaces).isEmpty &&
@@ -360,6 +370,7 @@ struct SubmitAppView: View {
         AppNavigationStack {
             wizardContent
                 .navigationTitle("Submit an App")
+                .returnsFocusOnBack($returnFocus, into: $duplicateLinkFocus)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbarContent }
                 .confirmationDialog(
@@ -409,7 +420,7 @@ struct SubmitAppView: View {
             ThankYouView(
                 icon: "app.badge",
                 heading: "You did it — thanks!",
-                message: "Your submission has been sent to our team. Thank you for describing this app's accessibility. We'll let you know when it's ready to appear in the directory.",
+                message: "Your app entry is now in the App Directory. Thank you for describing this app's accessibility, so others know what to expect.",
                 doneLabel: "Done",
                 onDone: { dismiss() }
             )
@@ -769,6 +780,12 @@ struct SubmitAppView: View {
         // Reported directly.
         payload.osVersion = UIDevice.current.systemVersion
         payload.appStoreDescription = meta.appStoreDescription
+        // The developer's website from the App Store listing, when the
+        // listing has one and nothing is typed yet. Still editable.
+        // Suggested directly (2026-10-09).
+        if payload.developerWebsite.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            payload.developerWebsite = meta.developerWebsite
+        }
         // Pre-selects the devices this app actually supports, per the App
         // Store listing — a helpful default, not a claim about which ones
         // the submitter personally tested, so this stays freely editable
@@ -811,6 +828,9 @@ struct SubmitAppView: View {
         watchPayload.appVersion = meta.version
         watchPayload.category = watchCategories.first { $0.caseInsensitiveCompare(meta.category) == .orderedSame } ?? ""
         watchPayload.appDescription = meta.appStoreDescription
+        if watchPayload.developerWebsite.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            watchPayload.developerWebsite = meta.developerWebsite
+        }
         appStoreIndicatesFree = meta.isFree
         isMetadataFromAppStore = true
         updatePriceCategory()
@@ -828,6 +848,9 @@ struct SubmitAppView: View {
         macPayload.category = macCategories.first { $0.caseInsensitiveCompare(meta.category) == .orderedSame } ?? ""
         macPayload.appDescription = meta.appStoreDescription
         macPayload.appStoreUrl = ItunesAPI.storeNeutralURL(meta.appStoreUrl)
+        if macPayload.developerWebsite.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            macPayload.developerWebsite = meta.developerWebsite
+        }
         appStoreIndicatesFree = meta.isFree
         isMetadataFromAppStore = true
         updatePriceCategory()
@@ -895,6 +918,7 @@ struct SubmitAppView: View {
         }
     }
 
+    @ViewBuilder
     private var searchResultsSection: some View {
         Section {
             TextField("Search App Store", text: $searchQuery)
@@ -926,6 +950,49 @@ struct SubmitAppView: View {
                     }
                 }
                 Button("Enter Details Manually") {
+                    startManualEntry()
+                }
+                .font(.caption)
+            }
+        } header: {
+            Text("Find the App on the App Store")
+        } footer: {
+            // A real, sizable share of Mac apps aren't in the Mac App
+            // Store at all (confirmed live against AppleVis's own
+            // directory — VMware Fusion, Xcode, 1Password, and others
+            // have no App Store link) — called out here rather than
+            // leaving "Enter Details Manually" looking like a fallback
+            // for a failed search. Discussed and confirmed directly.
+            if platform == .macos {
+                Text("Not every Mac app is in the Mac App Store. If this app isn't listed here, look under Not in the Mac App Store, or use Enter Details Manually.")
+            }
+        }
+        if platform == .macos, !isSearching, !homebrewResults.isEmpty {
+            Section {
+                ForEach(homebrewResults) { app in
+                    Button {
+                        selectHomebrew(app)
+                    } label: {
+                        VStack(alignment: .leading) {
+                            Text(app.name).foregroundStyle(.primary)
+                            if !app.summary.isEmpty {
+                                Text(app.summary).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .accessibilityHint(String(localized: "Fills in its name, version, and the developer's website. You can change them."))
+                }
+            } header: {
+                Text("Not in the Mac App Store")
+            } footer: {
+                Text("From Homebrew, a free catalogue of Mac apps. Check the details before you submit.")
+            }
+        }
+    }
+
+    /// "Enter Details Manually": nothing from the App Store, every field
+    /// typed in.
+    private func startManualEntry() {
                     selectedHit = ItunesSearchHit(appStoreId: "", appName: "", developerName: "", artworkUrl: "", appStoreUrl: "")
                     // Explicit reset, not just the @State default — reachable
                     // after backing out of a real selection, which already
@@ -954,22 +1021,17 @@ struct SubmitAppView: View {
                     SoundPlayer.shared.play(.pickerTick)
                     step = .details
                     focusStepAfterTransition()
-                }
-                .font(.caption)
-            }
-        } header: {
-            Text("Find the App on the App Store")
-        } footer: {
-            // A real, sizable share of Mac apps aren't in the Mac App
-            // Store at all (confirmed live against AppleVis's own
-            // directory — VMware Fusion, Xcode, 1Password, and others
-            // have no App Store link) — called out here rather than
-            // leaving "Enter Details Manually" looking like a fallback
-            // for a failed search. Discussed and confirmed directly.
-            if platform == .macos {
-                Text("Not every Mac app is in the Mac App Store. If this app isn't listed here, use Enter Details Manually below.")
-            }
-        }
+    }
+
+    /// A Mac app from Homebrew: entered by hand, with its name, version,
+    /// short description, and the developer's website filled in. Every
+    /// field stays editable (2026-10-09).
+    private func selectHomebrew(_ app: HomebrewApp) {
+        startManualEntry()
+        macPayload.appName = app.name
+        macPayload.appVersion = app.version
+        macPayload.appDescription = app.summary
+        macPayload.developerWebsite = app.homepage
     }
 
     private var detailsSection: some View {
@@ -986,7 +1048,7 @@ struct SubmitAppView: View {
                     // values are already correct and an accidental edit
                     // could only make them wrong. Reported directly.
                     WizardReviewRow(label: "App Name", value: payload.appName)
-                    WizardReviewRow(label: "App Store URL", value: payload.appStoreUrl)
+                    WizardReviewRow(label: "App Store URL", value: ItunesAPI.storeNeutralURL(payload.appStoreUrl))
                     WizardReviewRow(label: "Version", value: payload.appVersion)
                     WizardReviewRow(label: "Category", value: payload.category)
                 } else {
@@ -1116,10 +1178,8 @@ struct SubmitAppView: View {
             }
 
             Section {
-                TextField("Developer's Website (optional)", text: $payload.developerWebsite)
-                    .keyboardType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .accessibilityHint(String(localized: "Optional. The developer's own website, if they have one."))
+                WebAddressField(title: "Developer's Website (optional)", text: $payload.developerWebsite,
+                                hint: String(localized: "Optional. The developer's own website, if they have one."))
             } header: {
                 Text("Developer's Website")
             }
@@ -1281,6 +1341,9 @@ struct SubmitAppView: View {
         }
         if accessibilityCommentsLength < 20 {
             reasons.append(String(localized: "Write at least \(20 - accessibilityCommentsLength) more characters about accessibility to continue."))
+        }
+        if !WebAddress.isPlausible(payload.developerWebsite) {
+            reasons.append(String(localized: "Check the developer's website. It should look like www.example.com, or leave it blank."))
         }
         return reasons
     }
@@ -1495,7 +1558,7 @@ struct SubmitAppView: View {
             Section {
                 if isMetadataFromAppStore {
                     WizardReviewRow(label: "App Name", value: watchPayload.appName)
-                    WizardReviewRow(label: "App Store URL", value: watchPayload.appStoreUrl)
+                    WizardReviewRow(label: "App Store URL", value: ItunesAPI.storeNeutralURL(watchPayload.appStoreUrl))
                     WizardReviewRow(label: "Version", value: watchPayload.appVersion)
                 } else {
                     TextField("App Name", text: $watchPayload.appName)
@@ -1559,10 +1622,8 @@ struct SubmitAppView: View {
             }
 
             Section {
-                TextField("Developer's Website (optional)", text: $watchPayload.developerWebsite)
-                    .keyboardType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .accessibilityHint(String(localized: "Optional. The developer's own website, if they have one."))
+                WebAddressField(title: "Developer's Website (optional)", text: $watchPayload.developerWebsite,
+                                hint: String(localized: "Optional. The developer's own website, if they have one."))
             } header: {
                 Text("Developer's Website")
             }
@@ -1706,6 +1767,9 @@ struct SubmitAppView: View {
         if watchAccessibilityCommentsLength < 20 {
             reasons.append(String(localized: "Write at least \(20 - watchAccessibilityCommentsLength) more characters about accessibility to continue."))
         }
+        if !WebAddress.isPlausible(watchPayload.developerWebsite) {
+            reasons.append(String(localized: "Check the developer's website. It should look like www.example.com, or leave it blank."))
+        }
         return reasons
     }
 
@@ -1728,7 +1792,7 @@ struct SubmitAppView: View {
             Section {
                 if isMetadataFromAppStore {
                     WizardReviewRow(label: "App Name", value: macPayload.appName)
-                    WizardReviewRow(label: "App Store URL", value: macPayload.appStoreUrl)
+                    WizardReviewRow(label: "App Store URL", value: ItunesAPI.storeNeutralURL(macPayload.appStoreUrl))
                     WizardReviewRow(label: "Version", value: macPayload.appVersion)
                 } else {
                     TextField("App Name", text: $macPayload.appName)
@@ -1761,10 +1825,8 @@ struct SubmitAppView: View {
             // listing is already on file.
             if macPayload.appStoreUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Section {
-                    TextField("MacUpdate Link (optional)", text: $macPayload.macUpdateUrl)
-                        .keyboardType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .accessibilityHint(String(localized: "Optional. A link to this app's MacUpdate.com listing, if it has one."))
+                    WebAddressField(title: "MacUpdate Link (optional)", text: $macPayload.macUpdateUrl,
+                                    hint: String(localized: "Optional. A link to this app's MacUpdate.com listing, if it has one."))
                 } header: {
                     Text("MacUpdate Link")
                 }
@@ -1803,10 +1865,8 @@ struct SubmitAppView: View {
             }
 
             Section {
-                TextField("Developer's Website (optional)", text: $macPayload.developerWebsite)
-                    .keyboardType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .accessibilityHint(String(localized: "Optional. The developer's own website, if they have one."))
+                WebAddressField(title: "Developer's Website (optional)", text: $macPayload.developerWebsite,
+                                hint: String(localized: "Optional. The developer's own website, if they have one."))
             } header: {
                 Text("Developer's Website")
             }
@@ -1950,6 +2010,12 @@ struct SubmitAppView: View {
         if macAccessibilityCommentsLength < 20 {
             reasons.append(String(localized: "Write at least \(20 - macAccessibilityCommentsLength) more characters about accessibility to continue."))
         }
+        if !WebAddress.isPlausible(macPayload.developerWebsite) {
+            reasons.append(String(localized: "Check the developer's website. It should look like www.example.com, or leave it blank."))
+        }
+        if !WebAddress.isPlausible(macPayload.macUpdateUrl) {
+            reasons.append(String(localized: "Check the MacUpdate link. It should look like www.macupdate.com/app/mac/12345, or leave it blank."))
+        }
         return reasons
     }
 
@@ -1986,6 +2052,7 @@ struct SubmitAppView: View {
     private func search() async {
         guard !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty else {
             searchResults = []
+            homebrewResults = []
             return
         }
         isSearching = true
@@ -2005,14 +2072,24 @@ struct SubmitAppView: View {
         case .macos: results = await ItunesAPI.searchMacOS(searchQuery)
         default:     results = await ItunesAPI.search(searchQuery, entity: platform.itunesEntity)
         }
+        // Mac apps outside the Mac App Store, from Homebrew. Any already
+        // found on the App Store are left out (2026-10-09).
+        let homebrew: [HomebrewApp]
+        if platform == .macos {
+            let storeNames = Set(results.map { $0.appName.lowercased() })
+            homebrew = await HomebrewCatalog.shared.search(searchQuery).filter { !storeNames.contains($0.name.lowercased()) }
+        } else {
+            homebrew = []
+        }
         guard !Task.isCancelled else { return }
         searchResults = results
+        homebrewResults = homebrew
         isSearching = false
         UIAccessibility.post(
             notification: .announcement,
-            argument: results.isEmpty
+            argument: results.isEmpty && homebrew.isEmpty
                 ? String(localized: "No results")
-                : String(localized: "\(results.count) results found")
+                : String(localized: "\(results.count + homebrew.count) results found")
         )
     }
 
@@ -2121,9 +2198,7 @@ struct SubmitAppView: View {
     private func existingEntryLink(_ match: AppListing) -> some View {
         NavigationLink {
             AppDetailView(appId: match.id, platform: match.platform)
-                .onDisappear {
-                    Task { await retryAccessibilityFocus(into: $duplicateLinkFocus, returningTo: match.id) }
-                }
+                .notesReturnFocus(match.id, in: $returnFocus)
         } label: {
             Label(match.name, systemImage: "app.badge")
                 .font(.subheadline)
@@ -2197,7 +2272,7 @@ struct SubmitAppView: View {
                 WizardReviewRow(label: "Platform", value: platform.displayName)
                 storeCountryRow
                 WizardReviewRow(label: "App Name", value: payload.appName)
-                WizardReviewRow(label: "App Store URL", value: payload.appStoreUrl)
+                WizardReviewRow(label: "App Store URL", value: ItunesAPI.storeNeutralURL(payload.appStoreUrl))
                 WizardReviewRow(label: "Version", value: payload.appVersion)
                 WizardReviewRow(label: "Price", value: payload.price)
                 WizardReviewRow(label: "Category", value: payload.category)
@@ -2301,7 +2376,7 @@ struct SubmitAppView: View {
                 WizardReviewRow(label: "Platform", value: platform.displayName)
                 storeCountryRow
                 WizardReviewRow(label: "App Name", value: watchPayload.appName)
-                WizardReviewRow(label: "App Store URL", value: watchPayload.appStoreUrl)
+                WizardReviewRow(label: "App Store URL", value: ItunesAPI.storeNeutralURL(watchPayload.appStoreUrl))
                 WizardReviewRow(label: "Version", value: watchPayload.appVersion)
                 WizardReviewRow(label: "watchOS Version", value: watchPayload.watchosVersion)
                 WizardReviewRow(label: "Price", value: watchPayload.price)
@@ -2347,7 +2422,7 @@ struct SubmitAppView: View {
                 storeCountryRow
                 WizardReviewRow(label: "App Name", value: macPayload.appName)
                 if !macPayload.appStoreUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    WizardReviewRow(label: "App Store URL", value: macPayload.appStoreUrl)
+                    WizardReviewRow(label: "App Store URL", value: ItunesAPI.storeNeutralURL(macPayload.appStoreUrl))
                 } else if !macPayload.macUpdateUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     WizardReviewRow(label: "MacUpdate Link", value: macPayload.macUpdateUrl)
                 }

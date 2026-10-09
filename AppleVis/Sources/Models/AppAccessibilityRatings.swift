@@ -49,4 +49,26 @@ enum AppAccessibilityRatings {
     /// Performance/Button Labelling question the way iOS does — just this
     /// single field.
     static let usabilitySimpleScale = ["Fully Accessible", "Mostly Accessible", "Partially Accessible", "Inaccessible"]
+
+    /// One app's rating, on one scale for every platform, for Ask the
+    /// Mouse (2026-10-08).
+    enum Level: Int, Comparable {
+        case none = 0, unrated, partial, full
+        static func < (a: Level, b: Level) -> Bool { a.rawValue < b.rawValue }
+    }
+
+    /// iPhone apps go by VoiceOver Performance when it's set, since that's
+    /// the question about VoiceOver itself. Otherwise, and on Mac, Apple
+    /// Watch, and Apple TV, the Usability rating decides.
+    static func level(voiceOver: String?, usability: String?) -> Level {
+        func clean(_ s: String?) -> String { (s ?? "").trimmingCharacters(in: .whitespacesAndNewlines) }
+        let vo = clean(voiceOver), use = clean(usability)
+        if let index = voiceOverPerformance.firstIndex(where: { $0.value == vo }) {
+            return index == 0 ? .full : (index == voiceOverPerformance.count - 1 ? .none : .partial)
+        }
+        if use.isEmpty || use.hasPrefix("Not applicable") { return .unrated }
+        if use == usabilityIOS.last || use == usabilitySimpleScale.last { return .none }
+        if use.hasPrefix("The app is fully accessible") || use == usabilitySimpleScale.first { return .full }
+        return .partial
+    }
 }

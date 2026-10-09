@@ -22,7 +22,7 @@ struct QueueView: View {
                     ContentUnavailableView(
                         "Your Queue Is Empty",
                         systemImage: "list.number",
-                        description: Text("Add episodes from the Podcasts tab or from any episode detail page.")
+                        description: Text("Add episodes from Podcast in Discover, or from any episode's page.")
                     )
                     .accessibilityFocused($isTitleFocused)
                 } else {

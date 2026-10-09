@@ -60,7 +60,7 @@ struct ResumeAppleVisPodcastIntent: AppIntent {
 
 struct PlayLatestPodcastIntent: AppIntent {
     static var title: LocalizedStringResource = "Play Latest AppleVis Podcast"
-    static var description = IntentDescription("Opens AppleVis Podcasts and plays the latest episode.")
+    static var description = IntentDescription("Opens AppleVis and plays the latest podcast episode.")
     static var openAppWhenRun: Bool = true
 
     @MainActor

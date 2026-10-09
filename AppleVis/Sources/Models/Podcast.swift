@@ -55,6 +55,10 @@ nonisolated struct PodcastComment: Identifiable, Codable, Sendable {
     let subject: String
     let body: String
     let createdAt: Date
+    /// The comment this one replies to (Drupal's `pid`), when it was posted
+    /// with the website's Reply button or the app's Reply to this Comment.
+    /// The website shows it as "In reply to …" (2026-10-09).
+    var parentId: String? = nil
 }
 
 /// Single source of truth for formatting a duration, replacing five

@@ -90,14 +90,14 @@ struct SearchResultsView: View {
                     }
                 }
                 if !results.blogs.isEmpty {
-                    Section("Blogs (\(results.blogs.count))") {
+                    Section("Blog Posts (\(results.blogs.count))") {
                         ForEach(results.blogs) { post in
                             BlogPostRow(post: post)
                         }
                     }
                 }
                 if !results.podcasts.isEmpty {
-                    Section("Podcasts (\(results.podcasts.count))") {
+                    Section("Podcast Episodes (\(results.podcasts.count))") {
                         ForEach(results.podcasts) { episode in
                             PodcastEpisodeRow(episode: episode)
                         }

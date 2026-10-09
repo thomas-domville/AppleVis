@@ -57,9 +57,9 @@ struct CreditsView: View {
             featured: true
         ),
         CreditSection(
-            title: "Be My Eyes",
+            title: "Be My Eyes Foundation",
             icon: "heart",
-            body: "Thank you to Be My Eyes for supporting AppleVis and helping keep the lights on, so people can continue to learn, participate, and contribute."
+            body: "Thank you to the Be My Eyes Foundation. Its grants and donations fund AppleVis and help keep the lights on, so people can continue to learn, participate, and contribute. AppleVis is an independent nonprofit and makes its own decisions."
         ),
     ]
 

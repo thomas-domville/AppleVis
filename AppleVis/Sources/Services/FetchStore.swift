@@ -231,7 +231,7 @@ enum FetchLoader {
             let (excerpt, cut) = firstParagraph(detail.body)
             return FetchContent(
                 author: detail.authorName, postedAt: detail.publishedAt, preview: excerpt, previewIsExcerpt: cut,
-                comments: comments.map { comment($0.id, $0.authorName, $0.createdAt, $0.body, source: .blog($0)) },
+                comments: comments.map { comment($0.id, $0.authorName, $0.createdAt, $0.body, source: .blog($0), replyingTo: Self.parentName($0.parentId, in: detail.comments + comments, name: \.authorName)) },
                 seenBefore: before
             )
 
@@ -243,7 +243,7 @@ enum FetchLoader {
             let (excerpt, cut) = firstParagraph(detail.body)
             return FetchContent(
                 author: detail.authorName, postedAt: detail.createdAt, preview: excerpt, previewIsExcerpt: cut,
-                comments: comments.map { comment($0.id, $0.authorName, $0.createdAt, $0.body, source: .resource($0)) },
+                comments: comments.map { comment($0.id, $0.authorName, $0.createdAt, $0.body, source: .resource($0), replyingTo: Self.parentName($0.parentId, in: detail.comments + comments, name: \.authorName)) },
                 seenBefore: before
             )
 
@@ -257,7 +257,7 @@ enum FetchLoader {
             let (excerpt, cut) = firstParagraph(full.description)
             return FetchContent(
                 author: full.authorName, postedAt: full.publishedAt, preview: excerpt, previewIsExcerpt: cut,
-                comments: comments.map { comment($0.id, $0.authorName, $0.createdAt, $0.body, source: .podcast($0)) },
+                comments: comments.map { comment($0.id, $0.authorName, $0.createdAt, $0.body, source: .podcast($0), replyingTo: Self.parentName($0.parentId, in: firstComments + comments, name: \.authorName)) },
                 seenBefore: before
             )
 
@@ -268,10 +268,17 @@ enum FetchLoader {
             }
             return FetchContent(
                 author: detail.submittedBy, postedAt: detail.createdAt, preview: appSummary(detail), previewIsExcerpt: true,
-                comments: reviews.map { comment($0.id, $0.authorName, $0.createdAt, $0.body, source: .app($0)) },
+                comments: reviews.map { comment($0.id, $0.authorName, $0.createdAt, $0.body, source: .app($0), replyingTo: Self.parentName($0.parentId, in: detail.reviews + reviews, name: \.authorName)) },
                 seenBefore: before
             )
         }
+    }
+
+    /// Who a reply answers, from the comments already loaded, as forum
+    /// replies have always shown (2026-10-09).
+    static func parentName<C: Identifiable>(_ parentId: String?, in loaded: [C], name: (C) -> String) -> String? where C.ID == String {
+        guard let parentId else { return nil }
+        return loaded.first { $0.id == parentId }.map(name)
     }
 
     // MARK: Paging

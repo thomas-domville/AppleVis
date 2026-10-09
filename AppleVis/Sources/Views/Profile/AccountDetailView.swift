@@ -15,6 +15,10 @@ struct AccountDetailView: View {
     @State private var showSignOutConfirm = false
     @State private var accountSecurityMode: AccountSecurityWizard.Mode?
     @AccessibilityFocusState private var focusTarget: AnyHashable?
+    /// The row that opened a pushed screen: VoiceOver goes back to it after
+    /// a real Back, not when that screen pushes another (2026-10-09).
+    @State private var returnFocus: AnyHashable?
+    @State private var didFirstFocus = false
     private static let titleFocusID = AnyHashable("account.title")
 
     var body: some View {
@@ -90,9 +94,7 @@ struct AccountDetailView: View {
 
                 NavigationLink {
                     DeleteAccountView()
-                        .onDisappear {
-                            Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("deleteAccount")) }
-                        }
+                        .notesReturnFocus(AnyHashable("deleteAccount"), in: $returnFocus)
                 } label: {
                     Label("Delete Account", systemImage: "person.crop.circle.badge.minus")
                         .foregroundStyle(.red)
@@ -112,6 +114,7 @@ struct AccountDetailView: View {
         .listStyle(.insetGrouped)
         .themedList(preferences.colors)
         .navigationTitle("My Account")
+        .returnsFocusOnBack($returnFocus, into: $focusTarget)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showEditProfile) {
             EditProfileView()
@@ -137,7 +140,12 @@ struct AccountDetailView: View {
         .onChange(of: auth.user == nil) { _, signedOut in
             if signedOut { dismiss() }
         }
-        .task { await retryAccessibilityFocus(into: $focusTarget, returningTo: Self.titleFocusID) }
+        // First appearance only: after Back, the row you came from (2026-10-09).
+        .task {
+            guard !didFirstFocus else { return }
+            didFirstFocus = true
+            await retryAccessibilityFocus(into: $focusTarget, returningTo: Self.titleFocusID)
+        }
     }
 
     private func signOut() async {

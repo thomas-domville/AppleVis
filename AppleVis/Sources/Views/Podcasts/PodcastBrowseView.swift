@@ -33,7 +33,7 @@ struct PodcastBrowseView: View {
         } detail: { selection in
             EpisodeDetailView(episodeId: selection.id, focusFirstNewCommentOnAppear: selection.focusFirstNewComment)
         }
-        .navigationTitle("Podcasts")
+        .navigationTitle("AppleVis Podcast")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {

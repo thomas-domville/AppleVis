@@ -30,7 +30,9 @@ SHARE_CATALOG = os.path.join(ROOT, 'AppleVisShareExtension', 'Localizable.xcstri
 LANGS = ['ar', 'de', 'el', 'es', 'fa', 'fr', 'he', 'hi', 'id', 'it', 'ja', 'ko', 'nl', 'pl', 'pt', 'ru', 'sv', 'th', 'tr', 'uk', 'vi', 'zh-Hans']
 
 # Help articles are translated at runtime by Auto-Translate, by design.
-DESIGN_EXEMPT_FILES = {'HelpContent.swift'}
+# MouseQuickReference holds Help's own lines word for word and the phrases
+# questions are matched on, like Help and the How-To files (2026-10-09).
+DESIGN_EXEMPT_FILES = {'HelpContent.swift', 'MouseQuickReference.swift'}
 # Support report e-mailed to the AppleVis team, text the app adds to posts
 # on the English-language website, and conversation text prepared for Apple
 # Intelligence to read; all stay English on purpose.
@@ -64,7 +66,8 @@ TEAM_FACING = [
     # device keys matching MouseAppleCatalog.json's data
     ('MouseAppleCatalog.swift', r'^(iPad|iPhone|Apple Watch|AirPods|Apple TV|Mac|Mac VoiceOver)$'),
     # source labels handed to the on-device model by Ask the Mouse
-    ('AskTheMouse.swift', r"^(Members' comments on the guide|Forum discussion among members|Known bug in the AppleVis Bug Tracker|Members' comments on the app entry|AppleVis podcast episode \(people talking\)|AppleVis blog post|The person's own AppleVis app settings|still active$|First seen in: |Fixed in: |No member comments yet\.$)"),
+    ('AppGenres.swift', r"^(; also |Hant)$"),
+    ('AskTheMouse.swift', r"^(Members' comments on the guide|Forum discussion among members|Known bug in the AppleVis Bug Tracker|Members' comments on the app entry|AppleVis podcast episode \(people talking\)|AppleVis blog post|The person's own AppleVis app settings|still active$|First seen in: |Fixed in: |No member comments yet\.$|^ \(The Mouse answered: $|^\[Fully accessible: |^\[Partly accessible: |^\[Accessibility not rated\]$|^\[Not accessible\]$|^\[App Store category: |^ \(checked against Apple's documentation)"),
     ('GoldenApples.swift', r'^honorable mention$'),
     # About Me as told to the on-device model (MouseProfile.modelText)
     ('MouseMemory.swift', r'^(a braille display|a keyboard|hearing devices|About the person \(from their About Me\): )$'),
@@ -333,7 +336,7 @@ NON_PROSE_LABELS = {'systemImage', 'systemName', 'image', 'destination', 'value'
                     'forHTTPHeaderField', 'httpHeaderField', 'of', 'with', 'options', 'separator',
                     'accessibilityIdentifier', 'category', 'subsystem', 'mimeType', 'fileExtension'}
 SKIP_CALLS = {
-    'print', 'debugPrint', 'NSLog', 'os_log', 'assert', 'assertionFailure', 'precondition', 'preconditionFailure',
+    'navigationLog', 'print', 'debugPrint', 'NSLog', 'os_log', 'assert', 'assertionFailure', 'precondition', 'preconditionFailure',
     'fatalError', 'debug', 'info', 'notice', 'error', 'warning', 'fault', 'trace', 'critical', 'log',
     'URL', 'URLComponents', 'URLQueryItem', 'Image', 'Color', 'UIImage', 'UIColor', 'NSRegularExpression',
     'Regex', 'range', 'replacingOccurrences', 'components', 'hasPrefix', 'hasSuffix', 'contains', 'split',
@@ -672,7 +675,8 @@ def run(show_all=False, out_json=None, collect=None, quiet=False):
             if masked[m.start()] == ' ':
                 continue  # inside a comment
             findings['PLURAL'].append((rel, src.count('\n', 0, m.start()) + 1, m.group(0), ''))
-        if fname in DESIGN_EXEMPT_FILES or fname in TEAM_FACING_FILES:
+        # How-To Library files are Help too, translated at runtime.
+        if fname in DESIGN_EXEMPT_FILES or fname in TEAM_FACING_FILES or fname.startswith('HowTo'):
             continue
         for lit in lits:
             gap_before = len(findings['GAP'])

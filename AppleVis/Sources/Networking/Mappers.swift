@@ -268,7 +268,11 @@ enum Mappers {
         let commentInfo = a["comment_node_ios_app_directory"]
         let alias = a["path"]?.pathAlias
         let url = alias.map { "\(base)\($0)" } ?? "\(base)/node/\(node.id)"
-        let appStoreUrl = a["field_link2"]?["uri"]?.stringValue ?? a["field_link3"]?["uri"]?.stringValue ?? ""
+        // Only the App Store link. `field_link3` is the developer's
+        // website, not a second App Store link: it used to stand in when
+        // field_link2 was empty, which would send Open in App Store to the
+        // developer's site (2026-10-09).
+        let appStoreUrl = a["field_link2"]?["uri"]?.stringValue ?? ""
         let lastCommentTs = commentInfo?["last_comment_timestamp"]?.doubleValue ?? 0
 
         return AppListing(
@@ -290,6 +294,7 @@ enum Mappers {
             price: a["field_cost"]?.stringValue ?? "",
             supportedDevices: supportedDevices,
             voiceOverPerformance: a["field_voiceover"]?.stringValue,
+            usability: a["field_usability"]?.stringValue,
             summary: a["body"]?.richTextSummary ?? a["body"]?.richTextValue ?? "",
             url: url,
             isSaved: PersistenceStore.shared.isSaved(id: node.id)
@@ -340,6 +345,7 @@ enum Mappers {
             price: a["field_cost"]?.stringValue ?? "",
             supportedDevices: [],
             voiceOverPerformance: nil,
+            usability: a["field_usability_tv"]?.stringValue,
             summary: a["body"]?.richTextSummary ?? a["body"]?.richTextValue ?? "",
             url: url,
             isSaved: PersistenceStore.shared.isSaved(id: node.id)
@@ -366,7 +372,11 @@ enum Mappers {
         let commentInfo = a["comment_node_watch_directory"]
         let alias = a["path"]?.pathAlias
         let url = alias.map { "\(base)\($0)" } ?? "\(base)/node/\(node.id)"
-        let appStoreUrl = a["field_link2"]?["uri"]?.stringValue ?? a["field_link3"]?["uri"]?.stringValue ?? ""
+        // Only the App Store link. `field_link3` is the developer's
+        // website, not a second App Store link: it used to stand in when
+        // field_link2 was empty, which would send Open in App Store to the
+        // developer's site (2026-10-09).
+        let appStoreUrl = a["field_link2"]?["uri"]?.stringValue ?? ""
         let lastCommentTs = commentInfo?["last_comment_timestamp"]?.doubleValue ?? 0
 
         return AppListing(
@@ -388,6 +398,7 @@ enum Mappers {
             price: a["field_cost"]?.stringValue ?? "",
             supportedDevices: [],
             voiceOverPerformance: nil,
+            usability: a["field_usability_watch"]?.stringValue,
             summary: a["body"]?.richTextSummary ?? a["body"]?.richTextValue ?? "",
             url: url,
             isSaved: PersistenceStore.shared.isSaved(id: node.id)
@@ -439,6 +450,7 @@ enum Mappers {
             price: a["field_cost"]?.stringValue ?? "",
             supportedDevices: [],
             voiceOverPerformance: nil,
+            usability: a["field_usability"]?.stringValue,
             summary: a["body"]?.richTextSummary ?? a["body"]?.richTextValue ?? "",
             url: url,
             isSaved: PersistenceStore.shared.isSaved(id: node.id)
@@ -461,7 +473,8 @@ enum Mappers {
             body: a["comment_body"]?.richTextValue ?? "",
             rawBody: a["comment_body"]?.rawTextValue ?? "",
             bodyFormat: a["comment_body"]?.textFormat ?? drupalDefaultTextFormat,
-            createdAt: node.createdDate
+            createdAt: node.createdDate,
+            parentId: node.relationshipId("pid")
         )
     }
 

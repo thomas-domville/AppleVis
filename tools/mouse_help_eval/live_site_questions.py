@@ -54,7 +54,7 @@ BUNDLE = {'ios': 'ios_app_directory', 'mac': 'mac_app_directory', 'watch': 'watc
 FULL = {'ios': ('field_voiceover', '=', 'VoiceOver reads all page elements.'), 'mac': ('field_usability', 'STARTS_WITH', 'The app is fully accessible'),
         'watch': ('field_usability_watch', '=', 'Fully Accessible'), 'tv': ('field_usability_tv', '=', 'Fully Accessible')}
 
-def apps(keyword, platform='ios', category=None, full=False, limit=40):
+def apps(keyword, platform='ios', category=None, full=False, limit=40, names_only=False):
     q = {'sort': '-changed', 'page[limit]': str(limit)}
     words = [w.strip() for w in keyword.split(',') if w.strip()]
     keep = {'rpg', 'gps', 'ocr', 'pdf', 'vpn', 'mmo', 'rss', 'sms', 'tts'}  # AppEndpoints.shortKeywordsKept
@@ -63,7 +63,7 @@ def apps(keyword, platform='ios', category=None, full=False, limit=40):
     if words:
         q['filter[words][group][conjunction]'] = 'OR'
         for i, w in enumerate(words[:4]):
-            for field, path in (('title', 'title'), ('body', 'body.value')):
+            for field, path in (('title', 'title'),) + (() if names_only else (('body', 'body.value'),)):
                 q[f'filter[{field}{i}][condition][path]'] = path
                 q[f'filter[{field}{i}][condition][operator]'] = 'CONTAINS'
                 q[f'filter[{field}{i}][condition][value]'] = w

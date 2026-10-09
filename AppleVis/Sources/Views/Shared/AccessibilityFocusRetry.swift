@@ -157,3 +157,64 @@ func focusWizardStepHeading(_ binding: AccessibilityFocusState<Bool>.Binding) as
     let keyboardWasOpen = UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     await retryAccessibilityFocus(into: binding, delaysMs: keyboardWasOpen ? [350, 150, 250, 400] : [100, 150, 250, 400])
 }
+
+// MARK: - Back to the row that opened a screen
+
+/// Putting VoiceOver back on the row that opened a pushed screen used to
+/// hang off that screen's `.onDisappear`. But a pushed screen also
+/// "disappears" when something is pushed on top of it, not only on Back.
+/// So opening a Help article from Help fired Profile's "focus the Help row"
+/// and Home's "focus the Profile button", both on screens behind the one in
+/// view, and VoiceOver landed on hidden Profile or Home elements: the
+/// reported jump. Found investigating the Help navigation report
+/// (2026-10-09).
+///
+/// Now the pushed screen only notes which row opened it, and the screen
+/// behind restores focus when it appears again, which happens only after a
+/// real Back.
+extension View {
+    /// On a pushed screen: notes which row on the screen behind opened it.
+    func notesReturnFocus<T: Hashable>(_ target: T, in pending: Binding<T?>) -> some View {
+        onAppear { pending.wrappedValue = target }
+    }
+
+    /// On a pushed screen whose opener uses a plain `Bool` focus.
+    func notesReturnFocus(in pending: Binding<Bool>) -> some View {
+        onAppear { pending.wrappedValue = true }
+    }
+
+    /// On the screen behind, on its main content: when it shows again after
+    /// a real Back, VoiceOver goes back to the noted row.
+    func returnsFocusOnBack<T: Hashable>(_ pending: Binding<T?>, into binding: AccessibilityFocusState<T?>.Binding) -> some View {
+        onAppear {
+            guard let target = pending.wrappedValue else { return }
+            pending.wrappedValue = nil
+            Task { await retryAccessibilityFocus(into: binding, returningTo: target) }
+        }
+    }
+
+    /// The same, for a plain `Bool` focus.
+    func returnsFocusOnBack(_ pending: Binding<Bool>, into binding: AccessibilityFocusState<Bool>.Binding) -> some View {
+        onAppear {
+            guard pending.wrappedValue else { return }
+            pending.wrappedValue = false
+            Task { await retryAccessibilityFocus(into: binding) }
+        }
+    }
+}
+
+extension View {
+    /// Notes in the console when a screen appears and disappears, to check a
+    /// navigation report on a device: filter Console for "navigation".
+    /// Debug builds only; does nothing in TestFlight or the App Store
+    /// (2026-10-09).
+    func navigationLog(_ screen: String) -> some View {
+        #if DEBUG
+        return self
+            .onAppear { AppLog.navigation.debug("[Nav] \(screen, privacy: .public) appeared") }
+            .onDisappear { AppLog.navigation.debug("[Nav] \(screen, privacy: .public) disappeared") }
+        #else
+        return self
+        #endif
+    }
+}

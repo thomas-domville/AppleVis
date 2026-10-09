@@ -44,6 +44,9 @@ struct FetchHomeContent: View {
     /// Shared so marking something read can move VoiceOver on to what's
     /// next, even in another item.
     @AccessibilityFocusState private var focus: String?
+    /// The row that opened a page, so VoiceOver goes back to it after a
+    /// real Back, and not when that page opens another (2026-10-09).
+    @State private var returnRow: String?
 
     /// Only items with something to read: new, or with new comments.
     /// Activity with no new comment (an edit, say) used to show as "0 new
@@ -95,7 +98,8 @@ struct FetchHomeContent: View {
                     isBeingRead: listener.currentItemId == group.item.id,
                     onReachedEnd: { if markReadAtEnd { store.finishedIds.insert(group.item.id) } },
                     onMarkRead: { markRead(group) },
-                    focus: $focus
+                    focus: $focus,
+                    returnRow: $returnRow
                 )
                 .modifier(FetchMagicTap(groups: groups))
                 .modifier(FetchHeadingsRotor(groups: groups))
@@ -128,14 +132,18 @@ struct FetchHomeContent: View {
                 .font(.subheadline)
                 .accessibilityHint(String(localized: "Marks each item as read once you've gone past its last comment, when you leave Fetch."))
 
-            if !vm.newItems.isEmpty {
+            // Follows what Fetch shows, not everything in New: New can hold
+            // activity with nothing to read (an edit, say), which Fetch
+            // leaves out. Then Fetch said All Caught Up while Mark All as
+            // Read and the Reading List heading stayed above it (2026-10-08).
+            if !groups.isEmpty {
                 Button("Mark All as Read") {
                     listener.stop()
                     store.finishedIds = []
                     vm.markAllAsRead(vm.newItems, announce: false)
                     // The success sound, then straight to All Caught Up.
-                    let message = ActionCue.play(.success, orSay: String(localized: "All new activity marked as read."))
-                    moveFocus(to: Self.caughtUpID, queuedMessage: message)
+                    let message = ActionCue.play(.allCaughtUp, orSay: String(localized: "All new activity marked as read."))
+                    moveFocus(to: Self.caughtUpID, expecting: expectedLabel(for: Self.caughtUpID), queuedMessage: message)
                 }
                 .font(.subheadline)
                 .accessibilityHint(String(localized: "Clears everything from Fetch and New."))
@@ -262,6 +270,11 @@ struct FetchHomeContent: View {
     private func markRead(_ group: FetchListener.Group) {
         let target = focusTarget(replacing: group.item)
         store.finishedIds.remove(group.item.id)
+        // Listen to Fetch was reading this item: go on to the next one,
+        // rather than keep reading an item that has left the list.
+        if listener.status == .playing, listener.currentItemId == group.item.id {
+            listener.nextGroup()
+        }
         // Through the last comment Fetch loaded, which can be past Home's
         // count when more arrived since Home refreshed.
         let shownCount = group.isBrandNew ? group.item.commentCount : group.newCount
@@ -275,15 +288,41 @@ struct FetchHomeContent: View {
         // Instant: a sound and a tap say it worked, and VoiceOver moves on
         // at the same moment. Speaking "Group marked as read." first meant
         // waiting about a second and a half for it to finish. The last
-        // group gets the success sound, so "that was the last one" sounds
-        // different. With Confirmation Sounds and Haptic Feedback both off,
+        // group gets the All Caught Up sound, so "that was the last one"
+        // sounds different. With Confirmation Sounds and Haptic Feedback both off,
         // the words are still said, queued after the new heading so they
         // never hold it up. Requested directly (2026-10-07).
         let isLast = target == Self.caughtUpID
-        SoundPlayer.shared.play(isLast ? .success : .markedRead)
+        SoundPlayer.shared.play(isLast ? .allCaughtUp : .markedRead)
         let preferences = PreferencesStore.current
         let hasNoCue = !(preferences?.confirmationSoundsEnabled ?? true) && !(preferences?.hapticsEnabled ?? true)
-        moveFocus(to: target, queuedMessage: hasNoCue ? String(localized: "Group marked as read.") : nil)
+        moveFocus(to: target, expecting: expectedLabel(for: target),
+                  queuedMessage: hasNoCue ? String(localized: "Group marked as read.") : nil)
+    }
+
+    /// Words VoiceOver will be reading once it has really landed on the
+    /// target: the item's title for a heading (its label starts with it),
+    /// or All Caught Up's own sentence.
+    private func expectedLabel(for target: String) -> String? {
+        if target == Self.caughtUpID { return String(localized: "Goldie has fetched everything new. Check back later.") }
+        let prefix = "heading."
+        guard target.hasPrefix(prefix) else { return nil }
+        let id = String(target.dropFirst(prefix.count))
+        return groups.first { $0.item.id == id }?.item.title
+    }
+
+    /// Whether VoiceOver is really on the element whose label contains
+    /// `text`. Asking `focus` isn't enough: when the marked group was long,
+    /// VoiceOver often fell onto a Show Full Comment button or a link
+    /// several groups down, which has no focus id of its own, so `focus`
+    /// still read as the target and the retries stopped after one try that
+    /// hadn't worked. Shorter groups landed first time, so only long ones
+    /// went wrong. Reported directly (2026-10-09). Nil when VoiceOver
+    /// can't say where it is, so the caller falls back to `focus`.
+    private static func voiceOverIsOn(_ text: String) -> Bool? {
+        guard let element = UIAccessibility.focusedElement(using: .notificationVoiceOver) as? NSObject,
+              let label = element.accessibilityLabel, !label.isEmpty else { return nil }
+        return label.localizedCaseInsensitiveContains(text)
     }
 
     private func focusTarget(replacing item: FeedItem) -> String {
@@ -308,7 +347,7 @@ struct FetchHomeContent: View {
     ///
     /// No spoken message waits ahead of the move any more; `queuedMessage`
     /// is spoken after VoiceOver reads the new heading (2026-10-07).
-    private func moveFocus(to target: String, queuedMessage: String? = nil) {
+    private func moveFocus(to target: String, expecting expected: String? = nil, queuedMessage: String? = nil) {
         focus = nil
         Task {
             guard UIAccessibility.isVoiceOverRunning else { return }
@@ -316,12 +355,22 @@ struct FetchHomeContent: View {
             try? await Task.sleep(for: .milliseconds(50))
             scrollTo(Self.scrollID(for: target))
             var spoke = false
-            for delayMs in [80, 200, 350, 600] {
+            // Stops as soon as focus holds, so the later tries only matter
+            // on a slower device that builds the row late (2026-10-08).
+            for delayMs in [80, 200, 350, 600, 900, 1300] {
                 try? await Task.sleep(for: .milliseconds(delayMs))
-                // Landed and still there: done.
-                if spoke, focus == target { break }
+                // Landed and still there: done. Checked with VoiceOver
+                // itself when it can say, not just `focus` (2026-10-09).
+                if spoke {
+                    let landed = expected.flatMap { Self.voiceOverIsOn($0) } ?? (focus == target)
+                    if landed { break }
+                }
                 scrollTo(Self.scrollID(for: target))
+                // A real change each time: nil and the target in the same
+                // moment can be merged into no change at all, so a retry
+                // after a miss was sometimes never sent (2026-10-09).
                 focus = nil
+                try? await Task.sleep(for: .milliseconds(30))
                 focus = target
                 if !spoke, let queuedMessage {
                     UIAccessibility.post(
@@ -425,6 +474,7 @@ private struct FetchGroupRows: View {
     /// Fetch's shared focus. Also the row VoiceOver returns to after coming
     /// back from the page it opened.
     let focus: AccessibilityFocusState<String?>.Binding
+    let returnRow: Binding<String?>
 
     @ObservedObject private var store = FetchStore.shared
     @State private var showsOriginal = false
@@ -442,16 +492,22 @@ private struct FetchGroupRows: View {
     var body: some View {
         headingRow
             .id(FetchHeadingsRotor.headingID(item))
-            .task { await store.load(item, newCount: commentCount, since: group.isBrandNew ? nil : group.since) }
+            // Runs again whenever the group's comment counts change. It ran
+            // once per row, and the store keys each group by its counts, so
+            // when Home refreshed while Fetch was open and a busy topic had
+            // a new comment, the row looked under the new key, found
+            // nothing, and said "Loading 4 new comments…" for good while
+            // the groups below it loaded. Reported directly (2026-10-09).
+            .task(id: FetchStore.key(item, newCount: commentCount)) {
+                await store.load(item, newCount: commentCount, since: group.isBrandNew ? nil : group.since)
+            }
             .sheet(item: $replyingTo) { comment in
                 replySheet(for: comment)
             }
             .navigationDestination(item: $openingComment) { target in
                 FetchDestination(target: target)
-                    .onDisappear {
-                        if let rowId = target.commentId {
-                            Task { await retryAccessibilityFocus(into: focus, returningTo: rowId) }
-                        }
+                    .onAppear {
+                        if let rowId = target.commentId { returnRow.wrappedValue = rowId }
                     }
             }
 
@@ -494,15 +550,17 @@ private struct FetchGroupRows: View {
     }
 
     /// Opens `target`, and brings VoiceOver back to `rowId` on the way back.
+    /// It used to ask on the page's `onDisappear`, which also runs when that
+    /// page opens another, so VoiceOver went to a hidden Fetch row. Now the
+    /// first Fetch row to reappear after a real Back moves it (2026-10-09).
     private func link<Label: View>(_ target: FetchThreadTarget, rowId: String, @ViewBuilder label: () -> Label) -> some View {
         NavigationLink {
             FetchDestination(target: target)
-                .onDisappear {
-                    Task { await retryAccessibilityFocus(into: focus, returningTo: rowId) }
-                }
+                .notesReturnFocus(rowId, in: returnRow)
         } label: {
             label()
         }
+        .returnsFocusOnBack(returnRow, into: focus)
     }
 
     // MARK: Rows

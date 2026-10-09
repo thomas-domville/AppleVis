@@ -11,11 +11,12 @@ import Foundation
 @MainActor
 struct AskTheMouseMatchingTests {
 
-    private func app(_ name: String, summary: String = "", reviews: Int = 0, url: String = "", store: String? = nil) -> AppListing {
+    private func app(_ name: String, summary: String = "", reviews: Int = 0, url: String = "", store: String? = nil,
+                     voiceOver: String? = nil, usability: String? = nil) -> AppListing {
         AppListing(id: UUID().uuidString, name: name, developer: "", platform: .ios, category: "", categoryId: "",
                    reviewCount: reviews, lastUpdatedAt: Date(), lastActivityAt: Date(), createdAt: Date(),
                    submittedBy: "", submitterUid: "", appStoreUrl: store, iconUrl: nil, price: "",
-                   supportedDevices: [], voiceOverPerformance: nil, summary: summary, url: url, isSaved: false)
+                   supportedDevices: [], voiceOverPerformance: voiceOver, usability: usability, summary: summary, url: url, isSaved: false)
     }
 
     // MARK: Spelling and wording
@@ -67,6 +68,49 @@ struct AskTheMouseMatchingTests {
     func nameBeforeDescription() {
         let ranked = AskTheMouse.rankedApps([app("Board Games Hub", summary: "Includes solitaire"), app("Solitaire Pro")], keyword: "solitaire")
         #expect(ranked.first?.name == "Solitaire Pro")
+    }
+
+    // Only what the Mouse knows is good. Requested directly (2026-10-08).
+
+    @Test("Apps rated not accessible are never suggested")
+    func inaccessibleLeftOut() {
+        let ranked = AskTheMouse.rankedApps([
+            app("Solitaire Fun", voiceOver: "VoiceOver reads no page elements."),
+            app("Solitaire Classic", usability: "The app is totally inaccessible."),
+            app("Solitaire Watch", usability: "Inaccessible"),
+            app("Accessible Solitaire", voiceOver: "VoiceOver reads all page elements."),
+        ], keyword: "solitaire")
+        #expect(ranked.map(\.name) == ["Accessible Solitaire"])
+    }
+
+    @Test("Fully accessible apps come first among equally good matches")
+    func fullyAccessibleFirst() {
+        let ranked = AskTheMouse.rankedApps([
+            app("Poker Night", reviews: 50, voiceOver: "VoiceOver reads most page elements."),
+            app("Poker Unrated", reviews: 80),
+            app("Ears Video Poker", reviews: 7, voiceOver: "VoiceOver reads all page elements."),
+        ], keyword: "poker")
+        #expect(ranked.map(\.name) == ["Ears Video Poker", "Poker Night", "Poker Unrated"])
+    }
+
+    @Test("Ratings read the same on every platform")
+    func accessibilityLevels() {
+        typealias R = AppAccessibilityRatings
+        #expect(R.level(voiceOver: "VoiceOver reads all page elements.", usability: nil) == .full)
+        #expect(R.level(voiceOver: "VoiceOver reads a few page elements.", usability: nil) == .partial)
+        #expect(R.level(voiceOver: "VoiceOver reads no page elements.", usability: nil) == .none)
+        #expect(R.level(voiceOver: "Not applicable for this app", usability: "The app is fully accessible with VoiceOver and is easy to navigate and use.") == .full)
+        #expect(R.level(voiceOver: nil, usability: "Mostly Accessible") == .partial)
+        #expect(R.level(voiceOver: nil, usability: "Fully Accessible") == .full)
+        #expect(R.level(voiceOver: nil, usability: "Inaccessible") == .none)
+        #expect(R.level(voiceOver: nil, usability: nil) == .unrated)
+    }
+
+    @Test("Only apps named for the question count as a sure match")
+    func sureMatchIsName() {
+        #expect(AskTheMouse.appMatch(app("Solitaire Pro"), keyword: "solitaire") == 2)
+        #expect(AskTheMouse.appMatch(app("Board Games Hub", summary: "Includes solitaire"), keyword: "solitaire") == 1)
+        #expect(AskTheMouse.appMatch(app("Weather Now"), keyword: "solitaire") == 0)
     }
 
     // MARK: Apple's guide topics

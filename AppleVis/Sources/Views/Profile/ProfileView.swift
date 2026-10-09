@@ -11,7 +11,23 @@ struct ProfileView: View {
     @State private var showCommunityAgreement = false
     @State private var showContact = false
     @State private var showWelcomeTour = false
+    /// Replaying after the tour has been finished once offers its chapters,
+    /// so someone looking for one thing doesn't have to go through it all.
+    /// Suggested by a beta tester (2026-10-08).
+    @State private var showTourChapters = false
+    @State private var tourStartStep: Int?
     @State private var showSettings = false
+    /// The row that opened a pushed screen, so VoiceOver goes back to it
+    /// after a real Back (see `returnsFocusOnBack`), and whether the title
+    /// has had its first focus (2026-10-09).
+    @State private var returnFocus: AnyHashable?
+    @State private var didFocusTitle = false
+    /// Profile has its own navigation stack only as a sheet (Command-Comma).
+    /// Pushed from Home, Discover, or For You, it uses their stack: a stack
+    /// inside a stack isn't supported, and Help's article links could be
+    /// taken by the wrong one, which can look like a jump back to Home
+    /// (2026-10-09).
+    var isInSheet = false
     /// Set by Settings' Done button, so closing Settings also leaves
     /// Profile and goes straight back to browsing. Swiping the sheet away
     /// instead returns to Profile as before.
@@ -20,8 +36,17 @@ struct ProfileView: View {
     @AccessibilityFocusState private var focusTarget: AnyHashable?
     private static let titleFocusID = AnyHashable("profile.title")
 
+    @ViewBuilder
+    private func stackIfSheet<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        if isInSheet {
+            AppNavigationStack { content() }
+        } else {
+            content()
+        }
+    }
+
     var body: some View {
-        AppNavigationStack {
+        stackIfSheet {
             List {
                 if let user = auth.user {
                     signedInContent(user)
@@ -38,7 +63,15 @@ struct ProfileView: View {
             .listStyle(.insetGrouped)
             .themedList(preferences.colors)
             .navigationTitle("Profile")
-            .task { await retryAccessibilityFocus(into: $focusTarget, returningTo: Self.titleFocusID) }
+            // The title only the first time; after Back, the row you came
+            // from instead.
+            .task {
+                guard !didFocusTitle else { return }
+                didFocusTitle = true
+                await retryAccessibilityFocus(into: $focusTarget, returningTo: Self.titleFocusID)
+            }
+            .returnsFocusOnBack($returnFocus, into: $focusTarget)
+            .navigationLog("Profile")
         }
         .sheet(isPresented: $showSignIn) {
             SignInView()
@@ -78,8 +111,28 @@ struct ProfileView: View {
         .sheet(isPresented: $showWelcomeTour, onDismiss: {
             Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("welcomeTour")) }
         }) {
-            GuidedExperienceView(experience: GuidedExperienceRegistry.welcome)
+            GuidedExperienceView(experience: GuidedExperienceRegistry.welcome, startStep: tourStartStep)
         }
+        .confirmationDialog("Replay Welcome Tour", isPresented: $showTourChapters, titleVisibility: .visible) {
+            Button("Start from the Beginning") { replayTour(from: nil) }
+            ForEach(GuidedExperienceRegistry.welcome.replayChapters, id: \.firstStep) { chapter in
+                Button(LocalizedStringKey(chapter.title)) { replayTour(from: chapter.firstStep) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Choose where to start.")
+        }
+    }
+
+    /// Restarts the tour, from the beginning or from a chosen chapter.
+    private func replayTour(from step: Int?) {
+        // Force a true restart — without this, if the tour is currently
+        // `dismissed` (paused mid-tour via Explore This Screen) rather than
+        // `completed`, GuidedExperienceView's own resume logic would jump
+        // back into the middle of it instead of where was chosen.
+        GuidedExperienceStore.restart(GuidedExperienceRegistry.welcome.id)
+        tourStartStep = step
+        showWelcomeTour = true
     }
 
     // MARK: - Signed-in content
@@ -89,9 +142,7 @@ struct ProfileView: View {
         Section {
             NavigationLink {
                 AccountDetailView(user: user)
-                    .onDisappear {
-                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: Self.titleFocusID) }
-                    }
+                    .notesReturnFocus(Self.titleFocusID, in: $returnFocus)
             } label: {
                 HStack(spacing: 14) {
                     Circle()
@@ -150,9 +201,7 @@ struct ProfileView: View {
             // Discussed and requested directly.
             NavigationLink {
                 GuidelineViolationCheckView()
-                    .onDisappear {
-                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("guidelineCheck")) }
-                    }
+                    .notesReturnFocus(AnyHashable("guidelineCheck"), in: $returnFocus)
             } label: {
                 Label("Guideline Violation Check", systemImage: "text.magnifyingglass")
             }
@@ -161,9 +210,7 @@ struct ProfileView: View {
 
             NavigationLink {
                 AppEntryHealthCheckView()
-                    .onDisappear {
-                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("appHealthCheck")) }
-                    }
+                    .notesReturnFocus(AnyHashable("appHealthCheck"), in: $returnFocus)
             } label: {
                 Label("App Directory Health Check", systemImage: "checkmark.shield")
             }
@@ -171,9 +218,7 @@ struct ProfileView: View {
 
             NavigationLink {
                 DormantAccountsView()
-                    .onDisappear {
-                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("neverSignedIn")) }
-                    }
+                    .notesReturnFocus(AnyHashable("neverSignedIn"), in: $returnFocus)
             } label: {
                 Label("Never Signed In", systemImage: "person.crop.circle.badge.questionmark")
             }
@@ -231,9 +276,7 @@ struct ProfileView: View {
             // directly.
             NavigationLink {
                 HelpView()
-                    .onDisappear {
-                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("help")) }
-                    }
+                    .notesReturnFocus(AnyHashable("help"), in: $returnFocus)
             } label: {
                 Label("Help", systemImage: "questionmark.circle")
             }
@@ -242,9 +285,7 @@ struct ProfileView: View {
 
             NavigationLink {
                 WhatsNewView()
-                    .onDisappear {
-                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("whatsNew")) }
-                    }
+                    .notesReturnFocus(AnyHashable("whatsNew"), in: $returnFocus)
             } label: {
                 Label("What's New", systemImage: "sparkles")
             }
@@ -253,22 +294,21 @@ struct ProfileView: View {
 
             NavigationLink {
                 AboutView()
-                    .onDisappear {
-                        Task { await retryAccessibilityFocus(into: $focusTarget, returningTo: AnyHashable("about")) }
-                    }
+                    .notesReturnFocus(AnyHashable("about"), in: $returnFocus)
             } label: {
                 Label("About & Credits", systemImage: "info.circle")
             }
             .accessibilityFocused($focusTarget, equals: AnyHashable("about"))
 
             Button {
-                // Force a true restart — without this, if the tour is
-                // currently `dismissed` (paused mid-tour via Explore This
-                // Screen) rather than `completed`, GuidedExperienceView's
-                // own resume logic would jump back into the middle of it
-                // instead of actually replaying from step 1.
-                GuidedExperienceStore.restart(GuidedExperienceRegistry.welcome.id)
-                showWelcomeTour = true
+                // Someone who has been through the tour before can pick a
+                // chapter. A first-timer starts at the beginning as before.
+                let progress = GuidedExperienceStore.getProgress(GuidedExperienceRegistry.welcome.id)
+                if progress.completed || progress.replayCount > 0 {
+                    showTourChapters = true
+                } else {
+                    replayTour(from: nil)
+                }
             } label: {
                 Label("Replay Welcome Tour", systemImage: "arrow.clockwise")
             }
@@ -288,6 +328,27 @@ struct ProfileView: View {
             }
             .accessibilityFocused($focusTarget, equals: AnyHashable("contact"))
             .accessibilityLabel(String(localized: "Contact AppleVis"))
+
+            // AppleVis is a nonprofit under the Be My Eyes Foundation. Opens
+            // the Foundation's Donate Now section in Safari, outside the app:
+            // App Review 3.2.2(iv) allows a link out, and nothing is asked for
+            // here first. No tax wording, since the Foundation's US charity
+            // status is still pending. Requested directly (2026-10-09).
+            Link(destination: URL(string: "https://www.bemyeyesfoundation.org/#donate-now")!) {
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Support AppleVis")
+                        Text("Donate to the Be My Eyes Foundation")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "heart")
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(String(localized: "Support AppleVis. Donate to the Be My Eyes Foundation."))
+            .accessibilityHint(String(localized: "Opens the Be My Eyes Foundation's website in Safari, outside the app."))
 
             HStack {
                 Text("Version")

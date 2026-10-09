@@ -405,7 +405,9 @@ struct AppEndpoints {
             url: listing.url,
             reviews: reviews,
             isSaved: false,
-            lastCommentAt: listing.lastActivityAt
+            lastCommentAt: listing.lastActivityAt,
+            developerWebsite: a["field_link3"]?["uri"]?.stringValue,
+            otherComments: a["field_other_comments"]?.richTextValue
         )
     }
 
@@ -491,7 +493,8 @@ struct AppEndpoints {
                 url: listing.url,
                 reviews: reviews,
                 isSaved: false,
-                lastCommentAt: listing.lastActivityAt
+                lastCommentAt: listing.lastActivityAt,
+                otherComments: a["field_other_comments"]?.richTextValue
             )
         }
     }
@@ -557,7 +560,9 @@ struct AppEndpoints {
                 url: listing.url,
                 reviews: reviews,
                 isSaved: false,
-                lastCommentAt: listing.lastActivityAt
+                lastCommentAt: listing.lastActivityAt,
+                developerWebsite: a["field_link3"]?["uri"]?.stringValue,
+                otherComments: a["field_other_comments"]?.richTextValue
             )
         }
     }
@@ -627,7 +632,9 @@ struct AppEndpoints {
                 reviews: reviews,
                 isSaved: false,
                 macUpdateUrl: a["field_link_macupdate"]?["uri"]?.stringValue,
-                lastCommentAt: listing.lastActivityAt
+                lastCommentAt: listing.lastActivityAt,
+                developerWebsite: a["field_link3"]?["uri"]?.stringValue,
+                otherComments: a["field_other_comments"]?.richTextValue
             )
         }
     }
@@ -750,21 +757,30 @@ struct AppEndpoints {
     }
 
     @discardableResult
-    func submitReview(appId: String, subject: String = "Review", body: String, csrfToken: String, platform: AppPlatform) async throws -> AppReview {
+    func submitReview(appId: String, subject: String = "Review", body: String, csrfToken: String, platform: AppPlatform, replyToCommentId: String? = nil) async throws -> AppReview {
         let nodeType = Self.nodeType(for: platform)
         let commentBundle = Self.commentBundle(for: platform)
         let bundleId = Self.commentBundleId(for: platform)
         var attributes = bundleId.baseAttributes
         attributes["subject"] = AnyEncodable(subject.isEmpty ? "Review" : subject)
         attributes["comment_body"] = AnyEncodable(RichTextValue(value: body, format: drupalDefaultTextFormat))
+        // Your comment shows when you come back to the page, not a saved
+        // copy from before it (2026-10-09).
+        await OutdatedPages.shared.mark(OutdatedPages.appEntry(appId))
+        // A reply to a comment links to it, as the website's own Reply
+        // does, so the website shows "In reply to …" (2026-10-09).
+        var relationships: [String: JsonApiRelationshipRef] = [
+            "entity_id": JsonApiRelationshipRef(type: "node--\(nodeType)", id: appId),
+            "comment_type": bundleId.commentTypeRelationship,
+        ]
+        if let replyToCommentId {
+            relationships["pid"] = JsonApiRelationshipRef(type: "comment--\(commentBundle)", id: replyToCommentId)
+        }
         let response = try await client.jsonAPICreate(
             "comment/\(commentBundle)",
             type: "comment--\(commentBundle)",
             attributes: attributes,
-            relationships: [
-                "entity_id": JsonApiRelationshipRef(type: "node--\(nodeType)", id: appId),
-                "comment_type": bundleId.commentTypeRelationship,
-            ],
+            relationships: relationships,
             headers: ["X-CSRF-Token": csrfToken]
         )
         return Mappers.appReview(response.data, included: response.included ?? [])
@@ -789,7 +805,11 @@ struct AppEndpoints {
         var attributes: [String: AnyEncodable] = [
             "title": AnyEncodable(payload.appName),
             "status": AnyEncodable(true),
-            "field_link2": AnyEncodable(LinkValue(uri: payload.appStoreUrl, title: "")),
+            // Always the neutral link (https://apps.apple.com/app/id…), however
+            // it was found or typed, so new entries never need the Health
+            // Check's fix. A link without an App Store id is left as it is
+            // (2026-10-09).
+            "field_link2": AnyEncodable(LinkValue(uri: ItunesAPI.storeNeutralURL(payload.appStoreUrl), title: "")),
             "field_version": AnyEncodable(payload.appVersion),
             "field_cost": AnyEncodable(payload.price),
             "field_device_used": AnyEncodable(payload.supportedDevices),
@@ -941,7 +961,11 @@ struct AppEndpoints {
         var attributes: [String: AnyEncodable] = [
             "title": AnyEncodable(payload.appName),
             "status": AnyEncodable(true),
-            "field_link2": AnyEncodable(LinkValue(uri: payload.appStoreUrl, title: "")),
+            // Always the neutral link (https://apps.apple.com/app/id…), however
+            // it was found or typed, so new entries never need the Health
+            // Check's fix. A link without an App Store id is left as it is
+            // (2026-10-09).
+            "field_link2": AnyEncodable(LinkValue(uri: ItunesAPI.storeNeutralURL(payload.appStoreUrl), title: "")),
             "field_version": AnyEncodable(payload.appVersion),
             "field_cost": AnyEncodable(payload.price),
             "field_watchos_version": AnyEncodable(payload.watchosVersion.trimmingCharacters(in: .whitespaces)),
@@ -1003,7 +1027,7 @@ struct AppEndpoints {
             attributes["field_other_comments"] = AnyEncodable(RichTextValue(value: payload.otherComments, format: drupalDefaultTextFormat))
         }
         if !payload.appStoreUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            attributes["field_link2"] = AnyEncodable(LinkValue(uri: payload.appStoreUrl, title: ""))
+            attributes["field_link2"] = AnyEncodable(LinkValue(uri: ItunesAPI.storeNeutralURL(payload.appStoreUrl), title: ""))
         }
         if !payload.developerWebsite.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             attributes["field_link3"] = AnyEncodable(LinkValue(uri: payload.developerWebsite, title: ""))
@@ -1221,6 +1245,23 @@ struct SubmitMacAppPayload {
 private struct LinkValue: Encodable {
     let uri: String
     let title: String
+
+    /// The website's link fields only accept a full address. "www.sky.com"
+    /// was refused with "The path 'www.sky.com' is invalid", so a beta
+    /// tester couldn't submit an app (2026-10-08). An address typed without
+    /// "https://" now gets it added, for every link field.
+    init(uri: String, title: String) {
+        self.uri = Self.fullAddress(uri)
+        self.title = title
+    }
+
+    static func fullAddress(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("://"), !trimmed.lowercased().hasPrefix("mailto:") else { return trimmed }
+        var rest = Substring(trimmed)
+        while rest.hasPrefix("/") { rest = rest.dropFirst() }
+        return "https://" + rest
+    }
 }
 
 private struct RichTextBodyValue: Encodable {
@@ -1331,6 +1372,40 @@ extension AppEndpoints {
     private static let shortKeywordsKept: Set<String> = ["rpg", "gps", "ocr", "pdf", "vpn", "mmo", "rss", "sms", "tts"]
 
     func mouseSearch(keyword: String, fullyAccessibleOnly: Bool, category: String?, platform: AppPlatform = .ios, limit: Int = 40) async throws -> [AppListing] {
+        try await mouseSearchWithCategory(keyword: keyword, fullyAccessibleOnly: fullyAccessibleOnly, category: category,
+                                          platform: platform, limit: limit).apps
+    }
+
+    /// The same apps, and which of them the category search found, so
+    /// apps named for the keyword in the chosen category can lead.
+    func mouseSearchWithCategory(keyword: String, fullyAccessibleOnly: Bool, category: String?, platform: AppPlatform = .ios,
+                                 limit: Int = 40) async throws -> (apps: [AppListing], inCategory: Set<String>) {
+        // Apps named for the keyword first, from a search of names alone,
+        // then apps that match in their name or description. The site sends
+        // back at most 50, newest first, so for a broad word like "color"
+        // or "notes" the description matches filled the list and older apps
+        // named for it, such as ColorVisor, never came back. Found testing
+        // live questions (2026-10-09).
+        // The names search ignores the category: an app named for the
+        // keyword fits wherever it's filed. Dating apps are under Social
+        // Networking, not Lifestyle, and Instacart under Food and Drink, not
+        // Shopping, so a category Apple Intelligence chose left them out.
+        // A game question still drops apps that aren't games (AskTheMouse).
+        let hasWords = keyword.contains { $0.isLetter || $0.isNumber }
+        async let named: [AppListing] = hasWords
+            ? ((try? await mouseSearchPage(keyword: keyword, namesOnly: true, fullyAccessibleOnly: fullyAccessibleOnly,
+                                           category: nil, platform: platform, limit: limit)) ?? [])
+            : []
+        let anyMatch = try await mouseSearchPage(keyword: keyword, namesOnly: false, fullyAccessibleOnly: fullyAccessibleOnly,
+                                                 category: category, platform: platform, limit: limit)
+        let first = await named
+        var seen = Set(first.map(\.id))
+        let inCategory = category == nil ? Set<String>() : Set(anyMatch.map(\.id))
+        return (first + anyMatch.filter { seen.insert($0.id).inserted }, inCategory)
+    }
+
+    private func mouseSearchPage(keyword: String, namesOnly: Bool, fullyAccessibleOnly: Bool, category: String?,
+                                 platform: AppPlatform, limit: Int) async throws -> [AppListing] {
         var query: [String: String] = [
             "include": "uid",
             "sort": "-changed",
@@ -1362,6 +1437,7 @@ extension AppEndpoints {
                 query["filter[title\(index)][condition][operator]"] = "CONTAINS"
                 query["filter[title\(index)][condition][value]"] = word
                 query["filter[title\(index)][condition][memberOf]"] = "words"
+                if namesOnly { continue }
                 query["filter[body\(index)][condition][path]"] = "body.value"
                 query["filter[body\(index)][condition][operator]"] = "CONTAINS"
                 query["filter[body\(index)][condition][value]"] = word

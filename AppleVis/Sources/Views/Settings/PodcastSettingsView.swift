@@ -284,7 +284,7 @@ struct PodcastSettingsView: View {
             }
         }
         .themedList(preferences.colors)
-        .navigationTitle("Podcasts")
+        .navigationTitle("Podcast")
         .navigationBarTitleDisplayMode(.inline)
         .task { await retryAccessibilityFocus(into: $isTitleFocused) }
     }

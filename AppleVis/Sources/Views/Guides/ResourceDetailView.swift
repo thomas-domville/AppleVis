@@ -181,8 +181,14 @@ struct ResourceDetailView: View {
             }
             .accessibilityRotor("Replies to Me") {
                 ForEach(detail.comments.filter { comment in
-                    guard let name = auth.user?.name else { return false }
-                    return QuotedReply.isDirectedAt(name, body: comment.body)
+                    // The real reply link first, matched by account, as
+                    // forum replies are; the quote check only for older
+                    // replies that have no link (2026-10-09).
+                    guard let user = auth.user else { return false }
+                    if let pid = comment.parentId, let parent = detail.comments.first(where: { $0.id == pid }) {
+                        return parent.authorId == user.uuid
+                    }
+                    return QuotedReply.isDirectedAt(user.name, body: comment.body)
                 }) { comment in
                     AccessibilityRotorEntry(comment.authorName, id: comment.id)
                 }
@@ -254,7 +260,7 @@ struct ResourceDetailView: View {
                     },
                     onEdit: { newText in
                         guard let idx = self.detail?.comments.firstIndex(where: { $0.id == comment.id }) else { return }
-                        self.detail?.comments[idx] = ResourceComment(id: comment.id, authorName: comment.authorName, authorId: comment.authorId, subject: comment.subject, body: newText, rawBody: newText, bodyFormat: comment.bodyFormat, createdAt: comment.createdAt)
+                        self.detail?.comments[idx] = ResourceComment(id: comment.id, authorName: comment.authorName, authorId: comment.authorId, subject: comment.subject, body: newText, rawBody: newText, bodyFormat: comment.bodyFormat, createdAt: comment.createdAt, parentId: comment.parentId)
                     },
                     onReplyTo: {
                         guard auth.isSignedIn else {
@@ -263,7 +269,9 @@ struct ResourceDetailView: View {
                         }
                         quotedComment = comment
                     },
-                    focusBinding: $focusedCommentId
+                    focusBinding: $focusedCommentId,
+                    parentAuthorName: comment.parentId.flatMap { pid in detail.comments.first { $0.id == pid } }?.authorName,
+                    onJumpToParent: comment.parentId.flatMap { pid in detail.comments.first { $0.id == pid } }.map { parent in { pendingFocusCommentId = parent.id } }
                 )
                 .id(comment.id)
                 Divider().padding(.leading)
@@ -551,6 +559,11 @@ struct CommentRow: View {
     /// Set by the parent when it supports "Jump to Last Comment" — lets
     /// that action move VoiceOver focus here, not just scroll the viewport.
     var focusBinding: AccessibilityFocusState<String?>.Binding? = nil
+    /// The comment this one replies to, when it's on this page, as forum
+    /// replies show it. The website shows "In reply to …" (2026-10-09).
+    var parentAuthorName: String? = nil
+    /// Moves to that comment. Nil hides the line, so it never goes nowhere.
+    var onJumpToParent: (() -> Void)? = nil
 
     @EnvironmentObject private var auth: AuthStore
     @EnvironmentObject private var toast: ToastStore
@@ -596,11 +609,22 @@ struct CommentRow: View {
         var label = String(localized: "Comment \(index + 1) of \(total). \(authorName)")
             + ". \(date.formatted(.relative(presentation: .named)))."
         if let displaySubject { label += " " + String(localized: "Subject: \(displaySubject).") }
+        if let parentAuthorName { label += " " + String(localized: "Reply to \(parentAuthorName)'s comment.") }
         return label
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            // Same as forum replies: a separate stop, so VoiceOver can jump to
+            // the comment this one answers (2026-10-09).
+            if let parentAuthorName, let onJumpToParent {
+                Button(action: onJumpToParent) {
+                    Label(String(localized: "Replying to \(parentAuthorName)"), systemImage: "arrowshape.turn.up.left")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityHint(String(localized: "Jumps to the comment this one replies to."))
+            }
             HStack {
                 // Author names were inert plain Text everywhere except
                 // Forums, despite authorId already being available on this
@@ -759,6 +783,7 @@ struct ComposeResourceCommentView: View {
     let onPosted: (ResourceComment) -> Void
 
     @State private var commentText: String
+    @State private var subject = ""
     @State private var isSubmitting = false
     @State private var submitError: String?
     @State private var justRewrote = false
@@ -774,9 +799,11 @@ struct ComposeResourceCommentView: View {
         self.resourceId = resourceId
         self.title = title
         self.quotedComment = quotedComment
+        // Filled in like the website's reply form (2026-10-09).
+        _subject = State(initialValue: CommentSubject.replyPrefill(quotedComment?.subject))
         self.onPosted = onPosted
         if let quotedComment {
-            _commentText = State(initialValue: QuotedReply.prefix(authorName: quotedComment.authorName, body: quotedComment.body))
+            _commentText = State(initialValue: "")
         } else {
             _commentText = State(initialValue: "")
         }
@@ -792,10 +819,31 @@ struct ComposeResourceCommentView: View {
                 .padding(.top)
                 Text(quotedComment != nil ? "Replying to \(quotedComment!.authorName) — Re: \(title)" : "Re: \(title)")
                     .font(.subheadline).foregroundStyle(.secondary).padding()
+                // The comment being answered, for reading while you write. Not
+                // part of your comment any more: the reply links to it, and
+                // the website shows "In reply to …", as forum replies do.
+                // VoiceOver hears "Replying to …" in the header above, so this
+                // isn't a stop of its own (2026-10-09).
+                if let quotedComment {
+                    Text(quotedComment.body.strippingHTMLTags())
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                        .padding(.horizontal)
+                        .padding(.bottom, 8)
+                        .accessibilityHidden(true)
+                }
+                // Optional, like the website's own form. Left blank, the
+                // subject is made the way the website makes it: see
+                // CommentSubject. Reported by a beta tester (2026-10-09).
+                TextField("Subject (optional)", text: $subject)
+                    .textFieldStyle(.roundedBorder)
+                    .padding(.horizontal)
                 if intelligence.showTranslatePrompt {
                     TranslatePromptView(isProcessing: intelligence.isProcessing) {
                         Task {
-                            if let result = await intelligence.translate(subject: nil, body: commentText, isTopic: false) {
+                            if let result = await intelligence.translate(subject: subject.isEmpty ? nil : subject, body: commentText, isTopic: false) {
+                                if !subject.isEmpty { subject = result.subject ?? subject }
                                 commentText = result.body
                                 justRewrote = true
                             } else {
@@ -827,13 +875,22 @@ struct ComposeResourceCommentView: View {
                         .padding(.horizontal)
                         .transition(UIAccessibility.isReduceMotionEnabled ? .identity : .opacity.combined(with: .move(edge: .top)))
                 }
+                // The box had no label, so VoiceOver said only "text field".
+                // The visible label is for everyone; VoiceOver reads it as
+                // the box's own label. Reported by a beta tester (2026-10-09).
+                Text("Comment")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal)
+                    .padding(.top, 12)
+                    .accessibilityHidden(true)
                 TextEditor(text: $commentText)
+                    .accessibilityLabel(Text("Comment"))
                     .padding()
                     .rewriteFlash($justRewrote)
                     .guidelineReminderActions(guidelines)
                     .onChange(of: commentText) { _, newValue in
                         if guidelines.conversation == nil {
-                            guidelines.conversation = ConversationSource(commentBundle: CommentBundle.guide.rawValue, nodeId: resourceId)
+                            guidelines.conversation = ConversationSource(commentBundle: CommentBundle.guide.rawValue, nodeId: resourceId, replyingToCommentId: quotedComment?.id)
                         }
                         guidelines.textChanged(newValue, isReply: true)
                         intelligence.textChanged(
@@ -899,6 +956,7 @@ struct ComposeResourceCommentView: View {
     private func submit() async {
         guard let user = auth.user else { return }
         if let message = ContentSubmissionPolicy.blockingMessage(
+            subject: subject,
             body: commentText
         ) {
             submitError = message
@@ -908,7 +966,8 @@ struct ComposeResourceCommentView: View {
         isSubmitting = true; submitError = nil
         do {
             let comment = try await APIClient.shared.resources.submitComment(
-                resourceId: resourceId, body: commentText, csrfToken: user.csrfToken
+                subject: CommentSubject.make(typed: subject, body: commentText, replyingTo: quotedComment?.subject),
+                resourceId: resourceId, body: commentText, csrfToken: user.csrfToken, replyToCommentId: quotedComment?.id
             )
             toast.success(String(localized: "Comment posted"), sound: .reply)
             onPosted(comment)

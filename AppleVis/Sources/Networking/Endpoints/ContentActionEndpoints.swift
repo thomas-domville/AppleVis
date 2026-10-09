@@ -13,6 +13,8 @@ struct ContentActionEndpoints {
     /// `format` must be whatever the comment was actually stored in — see
     /// `editNode`'s identical doc comment for why.
     func editComment(commentType: String, commentId: String, newBody: String, format: String, csrfToken: String) async throws {
+        // The page shows the change when you come back to it (2026-10-09).
+        await OutdatedPages.shared.markKind(ofCommentType: commentType)
         try await client.jsonAPIUpdate(
             "comment/\(commentType)/\(commentId)",
             type: "comment--\(commentType)", id: commentId,
@@ -22,6 +24,7 @@ struct ContentActionEndpoints {
     }
 
     func deleteComment(commentType: String, commentId: String, csrfToken: String) async throws {
+        await OutdatedPages.shared.markKind(ofCommentType: commentType)
         try await client.jsonAPIDelete("comment/\(commentType)/\(commentId)", headers: ["X-CSRF-Token": csrfToken])
     }
 
@@ -29,6 +32,7 @@ struct ContentActionEndpoints {
     /// separate from the node they're attached to. Admin-only, distinct
     /// from delete: hides the comment from public view without removing it.
     func unpublishComment(commentType: String, commentId: String, csrfToken: String) async throws {
+        await OutdatedPages.shared.markKind(ofCommentType: commentType)
         try await client.jsonAPIUpdate(
             "comment/\(commentType)/\(commentId)", type: "comment--\(commentType)", id: commentId,
             attributes: ["status": AnyEncodable(false)], headers: ["X-CSRF-Token": csrfToken]

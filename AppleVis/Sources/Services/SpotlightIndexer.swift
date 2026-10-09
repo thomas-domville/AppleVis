@@ -53,20 +53,29 @@ enum SpotlightIndexer {
         index(kind: .podcastEpisode, id: episode.id, title: episode.title, contentDescription: episode.showTitle, url: episode.url)
     }
 
+    /// A description Spotlight can show: plain text, a few sentences. A
+    /// guide's or blog post's summary can be its whole body as HTML when
+    /// the site has no separate summary (2026-10-08).
+    private static func shortText(_ html: String) -> String {
+        let plain = HTMLText.plainText(fromHTML: html)
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return plain.count > 300 ? String(plain.prefix(300)) + "…" : plain
+    }
+
     static func index(_ app: AppListing) {
         index(kind: .appListing, id: app.id, title: app.name, contentDescription: "\(app.developer) · \(app.category)", url: app.url)
     }
 
     static func index(_ resource: Resource) {
-        index(kind: .resource, id: resource.id, title: resource.title, contentDescription: resource.summary, url: resource.url)
+        index(kind: .resource, id: resource.id, title: resource.title, contentDescription: shortText(resource.summary), url: resource.url)
     }
 
     static func index(_ post: BlogPost) {
-        index(kind: .blogPost, id: post.id, title: post.title, contentDescription: post.summary, url: post.url)
+        index(kind: .blogPost, id: post.id, title: post.title, contentDescription: shortText(post.summary), url: post.url)
     }
 
     static func index(_ bug: BugReport) {
-        index(kind: .bugReport, id: bug.id, title: bug.title, contentDescription: "\(bug.platform.displayName) · \(bug.status.displayName) · \(bug.summary)", url: bug.url)
+        index(kind: .bugReport, id: bug.id, title: bug.title, contentDescription: "\(bug.platform.displayName) · \(bug.status.displayName) · \(shortText(bug.summary))", url: bug.url)
     }
 
     // MARK: - Help, saved, and followed (2026-09-28)

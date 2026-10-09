@@ -228,6 +228,9 @@ struct ForumEndpoints {
         var attributes = CommentBundle.forumTopic.baseAttributes
         attributes["subject"] = AnyEncodable(subject)
         attributes["comment_body"] = AnyEncodable(RichTextValue(value: body, format: drupalDefaultTextFormat))
+        // Your comment shows when you come back to the page, not a saved
+        // copy from before it (2026-10-09).
+        await OutdatedPages.shared.mark(OutdatedPages.forumTopic(topicId))
         let response = try await client.jsonAPICreate(
             "comment/comment_forum",
             type: "comment--comment_forum",
@@ -251,8 +254,8 @@ struct ForumEndpoints {
         try await client.flags.follow(nodeUuid: nodeUuid, nodeType: "node--forum", entityId: entityId, token: token)
     }
 
-    func unfollow(nodeUuid: String, token: String) async throws {
-        try await client.flags.unfollow(nodeUuid: nodeUuid, token: token)
+    func unfollow(nodeUuid: String, entityId: Int = 0, token: String) async throws {
+        try await client.flags.unfollow(nodeUuid: nodeUuid, entityId: entityId, token: token)
     }
 }
 

@@ -11,7 +11,7 @@ enum BackgroundDownloadTask {
     static let identifier = "com.applevis.autodownload"
 
     static func register() {
-        BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: nil) { task in
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: .main) { task in
             guard let task = task as? BGProcessingTask else { task.setTaskCompleted(success: false); return }
             handle(task)
         }

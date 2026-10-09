@@ -49,13 +49,16 @@ struct PodcastEndpoints {
 
     /// Bundle confirmed: comment_node_podcast.
     func comments(episodeId: String) async throws -> [PodcastComment] {
-        let response = try await client.jsonAPIList(
-            "comment/comment_node_podcast",
-            query: ["filter[entity_id.id]": episodeId, "sort": "created", "page[limit]": "100", "include": "uid"]
-        )
+        // Live, past the phone's minute-old copy, right after a comment
+        // (2026-10-09).
+        let skipSaved = await OutdatedPages.shared.take("podcasts:comments:\(episodeId)")
+        let query = ["filter[entity_id.id]": episodeId, "sort": "created", "page[limit]": "100", "include": "uid"]
+        let response = skipSaved
+            ? try await HTTPCacheBypass.$isOn.withValue(true) { try await client.jsonAPIList("comment/comment_node_podcast", query: query) }
+            : try await client.jsonAPIList("comment/comment_node_podcast", query: query)
         return response.data.map { node in
             let c = Mappers.genericComment(node, included: response.included ?? [])
-            return PodcastComment(id: node.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
+            return PodcastComment(id: node.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt, parentId: node.relationshipId("pid"))
         }
     }
 
@@ -66,27 +69,36 @@ struct PodcastEndpoints {
         )
         return response.data.map { node in
             let c = Mappers.genericComment(node, included: response.included ?? [])
-            return PodcastComment(id: node.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
+            return PodcastComment(id: node.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt, parentId: node.relationshipId("pid"))
         }
     }
 
     @discardableResult
-    func submitComment(episodeId: String, body: String, csrfToken: String) async throws -> PodcastComment {
+    func submitComment(subject: String = "Comment", episodeId: String, body: String, csrfToken: String, replyToCommentId: String? = nil) async throws -> PodcastComment {
         var attributes = CommentBundle.podcastEpisode.baseAttributes
-        attributes["subject"] = AnyEncodable("Comment")
+        attributes["subject"] = AnyEncodable(subject)
         attributes["comment_body"] = AnyEncodable(RichTextValue(value: body, format: drupalDefaultTextFormat))
+        // Your comment shows when you come back to the page, not a saved
+        // copy from before it (2026-10-09).
+        await OutdatedPages.shared.mark(OutdatedPages.podcastEpisode(episodeId))
+        // A reply to a comment links to it, as the website's own Reply
+        // does, so the website shows "In reply to …" (2026-10-09).
+        var relationships: [String: JsonApiRelationshipRef] = [
+            "entity_id": JsonApiRelationshipRef(type: "node--podcast", id: episodeId),
+            "comment_type": CommentBundle.podcastEpisode.commentTypeRelationship,
+        ]
+        if let replyToCommentId {
+            relationships["pid"] = JsonApiRelationshipRef(type: "comment--comment_node_podcast", id: replyToCommentId)
+        }
         let response = try await client.jsonAPICreate(
             "comment/comment_node_podcast",
             type: "comment--comment_node_podcast",
             attributes: attributes,
-            relationships: [
-                "entity_id": JsonApiRelationshipRef(type: "node--podcast", id: episodeId),
-                "comment_type": CommentBundle.podcastEpisode.commentTypeRelationship,
-            ],
+            relationships: relationships,
             headers: ["X-CSRF-Token": csrfToken]
         )
         let c = Mappers.genericComment(response.data, included: response.included ?? [])
-        return PodcastComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt)
+        return PodcastComment(id: response.data.id, authorName: c.authorName, authorId: c.authorId, subject: c.subject, body: c.body, createdAt: c.createdAt, parentId: response.data.relationshipId("pid"))
     }
 
     func transcript(id: String) async throws -> String {

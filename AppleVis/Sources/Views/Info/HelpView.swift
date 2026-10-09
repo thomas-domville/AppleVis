@@ -11,12 +11,25 @@ struct HelpView: View {
 
     @State private var showAskTheMouse = false
     @AccessibilityFocusState private var isAskTheMouseFocused: Bool
+    /// After Back from an article, VoiceOver goes back to that article's row
+    /// rather than the intro, and the intro is focused only the first time
+    /// Help opens. Returning used to re-run the intro focus, and the search
+    /// and list position were the only things kept (2026-10-09).
+    @AccessibilityFocusState private var focusedArticleId: String?
+    @State private var returnArticleId: String?
+    @State private var didFocusIntro = false
 
     /// Searches every article's full text, not just titles and summaries,
     /// so something mentioned only inside an article can be found.
     /// Changed alongside Ask the Mouse (2026-09-28).
     private var filteredSections: [HelpSection] {
         MouseKnowledge.filterHelpSections(query)
+    }
+
+    private var quickAnswer: MouseQuickReference? {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 4 else { return nil }
+        return MouseQuickReference.match(trimmed, onMac: ProcessInfo.processInfo.isiOSAppOnMac)
     }
 
     /// Matches RN's "Read Help Summary" accessibility action format exactly:
@@ -67,6 +80,27 @@ struct HelpView: View {
                     .accessibilityHint(String(localized: "Searches the text of every help article."))
             }
 
+            // A gesture or braille command with an exact answer checked
+            // against Apple's documentation: the line itself, above the
+            // articles, with or without Apple Intelligence. Requested
+            // directly (2026-10-09).
+            if let reference = quickAnswer, let article = reference.article {
+                Section {
+                    NavigationLink(value: article) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            QuickAnswerLines(reference: reference)
+                            Text(String(localized: "From \(article.title)"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    .accessibilityHint(String(localized: "Opens this help article."))
+                } header: {
+                    Text("Quick Answer")
+                }
+            }
+
             if filteredSections.isEmpty {
                 Section {
                     VStack(alignment: .leading, spacing: 4) {
@@ -88,6 +122,7 @@ struct HelpView: View {
                                 articleRow(article)
                             }
                             .accessibilityLabel(articleAccessibilityLabel(article))
+                            .accessibilityFocused($focusedArticleId, equals: article.id)
                         }
                     } header: {
                         sectionHeader(section)
@@ -118,10 +153,13 @@ struct HelpView: View {
         }
         .themedList(preferences.colors)
         .navigationTitle("Help")
+        .navigationLog("Help")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(for: HelpArticle.self) { article in
             HelpArticleDetailView(article: article)
+                .notesReturnFocus(article.id, in: $returnArticleId)
         }
+        .returnsFocusOnBack($returnArticleId, into: $focusedArticleId)
         // Back to the Contact button after sending or cancelling. Reported directly.
         .sheet(isPresented: $showAskTheMouse, onDismiss: {
             Task { await retryAccessibilityFocus(into: $isAskTheMouseFocused) }
@@ -133,7 +171,11 @@ struct HelpView: View {
         }) {
             ContactView()
         }
-        .task { await retryAccessibilityFocus(into: $isIntroFocused) }
+        .task {
+            guard !didFocusIntro else { return }
+            didFocusIntro = true
+            await retryAccessibilityFocus(into: $isIntroFocused)
+        }
     }
 
     // MARK: - Intro card
@@ -207,5 +249,23 @@ struct HelpView: View {
             return "\(article.title), \(contentType.label). \(article.summary)"
         }
         return "\(article.title). \(article.summary)"
+    }
+}
+
+/// A quick answer's lines, in the reading language when Auto-Translate is
+/// on, like the articles themselves (2026-10-09).
+private struct QuickAnswerLines: View {
+    let reference: MouseQuickReference
+    @EnvironmentObject private var preferences: PreferencesStore
+    @State private var shown: (lines: [String], isTranslated: Bool)?
+
+    var body: some View {
+        let lines = shown?.lines ?? reference.lines
+        Text(verbatim: lines.joined(separator: "\n"))
+            .font(.subheadline)
+            .modifier(ContentAccessibilityLabel(isTranslated: shown?.isTranslated ?? false, text: lines.joined(separator: "\n")))
+            .task(id: reference.id + (preferences.effectiveContentLanguage ?? "")) {
+                shown = await reference.readableLines(in: preferences.effectiveContentLanguage)
+            }
     }
 }

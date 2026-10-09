@@ -138,9 +138,16 @@ struct MouseTurn: Identifiable {
     var isRestored = false
 
     var isSearching: Bool { step != nil }
+    /// Results the Mouse read and found answer the question, shown in
+    /// Other Sources. Results it didn't check aren't shown at all.
+    /// Requested directly (2026-10-08): only what it knows is good.
+    var hasCheckedResults: Bool {
+        moreGuides.contains { resultNotes[$0.id] != nil } || forums.contains { resultNotes[$0.id] != nil }
+            || podcasts.contains { resultNotes[$0.id] != nil } || blogs.contains { resultNotes[$0.id] != nil }
+            || bugs.contains { resultNotes[$0.id] != nil }
+    }
     var foundAnything: Bool {
-        answer != nil || !mainApps.isEmpty || !relatedApps.isEmpty || !moreGuides.isEmpty || !forums.isEmpty
-            || !podcasts.isEmpty || !blogs.isEmpty || !bugs.isEmpty || !otherApps.isEmpty || !saved.isEmpty
+        answer != nil || !mainApps.isEmpty || !relatedApps.isEmpty || hasCheckedResults
             || !helpUsed.isEmpty || !notesUsed.isEmpty || !commentsUsedOn.isEmpty || !forumsUsed.isEmpty
             || !bugsUsed.isEmpty || !podcastsUsed.isEmpty || !appCommentsUsedOn.isEmpty || !blogsUsed.isEmpty
     }
@@ -212,7 +219,16 @@ final class AskTheMouse: ObservableObject {
         let question = String(rawQuestion.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maxQuestionLength))
         guard !question.isEmpty, !isBusy else { return }
         // Newest first, so the latest answer sits right under the question field.
-        let earlier = turns.prefix(2).map(\.question)
+        let earlierQuestions = turns.prefix(2).map(\.question)
+        // The latest answer goes with its question, so "this command" or "it"
+        // in a follow-up means what the Mouse just talked about. Only the
+        // questions were passed, and "Is there a way to change this
+        // command?" after a braille question lost the braille part.
+        // Reported directly (2026-10-08).
+        let earlier = turns.prefix(2).enumerated().map { index, turn -> String in
+            guard index == 0, let answer = turn.answer, !answer.isEmpty else { return turn.question }
+            return turn.question + " (The Mouse answered: " + String(answer.prefix(300)) + ")"
+        }
         remember(question)
         // The same question within the hour, not as a follow-up: the answer
         // it got then, straight away. Requested directly (2026-09-29).
@@ -234,7 +250,7 @@ final class AskTheMouse: ObservableObject {
         }
         turns.insert(MouseTurn(question: question), at: 0)
         let turnId = turns[0].id
-        task = Task { await run(question, earlier: Array(earlier), turnId: turnId) }
+        task = Task { await run(question, earlier: Array(earlier), earlierQuestions: Array(earlierQuestions), turnId: turnId) }
     }
 
     /// Site searches from the last three hours, by search phrase, so asking
@@ -372,7 +388,32 @@ final class AskTheMouse: ObservableObject {
 
     // MARK: - Running a question
 
-    private func run(_ question: String, earlier: [String], turnId: UUID) async {
+    /// A follow-up that points back at the last question ("this command",
+    /// "it", "there") or is too short to stand alone ("And on the Mac?").
+    /// Its search then also uses the words of the question before it.
+    /// A short question with a subject of its own, like "How do I change
+    /// text size?", is a new topic: every question of six words or fewer
+    /// used to count, so it kept the Mac from "What about on a Mac?" before
+    /// it. Requested directly (2026-10-09).
+    static func refersBack(_ question: String) -> Bool {
+        let words = question.lowercased().split { !$0.isLetter && $0 != "'" }.map(String.init)
+        let pointers: Set<String> = ["this", "that", "it", "it's", "its", "these", "those", "there", "them", "they", "one"]
+        if words.contains(where: pointers.contains) { return true }
+        let ownWords = MouseKnowledge.terms(question).filter { !Self.followUpWords.contains($0) }
+        return words.count <= 6 && ownWords.count <= 1
+    }
+
+    /// Words that only change where or how, not what: "And on my Apple
+    /// Watch?", "With a braille display instead?".
+    private static let followUpWords: Set<String> = [
+        "mac", "macs", "macbook", "imac", "ipad", "iphone", "apple", "watch", "tv", "vision", "pro",
+        "braille", "display", "keyboard", "trackpad", "instead", "else", "also", "too", "again", "and", "now",
+    ]
+
+    private func run(_ question: String, earlier: [String], earlierQuestions: [String], turnId: UUID) async {
+        // The earlier question's subject, for a follow-up that leans on it.
+        let searchContext = earlierQuestions.first.flatMap { Self.refersBack(question) ? $0 : nil } ?? ""
+        let searchQuestion = searchContext.isEmpty ? question : question + " " + searchContext
         // Without a plan, only the question's main words go to the website,
         // never the whole question, as Help promises. It used to send the
         // question as typed. Found 2026-09-30.
@@ -381,7 +422,7 @@ final class AskTheMouse: ObservableObject {
         // Intelligence to choose a link from. Requested directly (2026-10-01).
         // A follow-up like "And on the Mac?" takes its subject from the
         // question before it. Found testing (2026-10-01).
-        let catalog = MouseAppleCatalog.candidates(for: question, phrases: Array(earlier.prefix(1)))
+        let catalog = MouseAppleCatalog.candidates(for: question, phrases: Array(earlierQuestions.prefix(1)))
         // The devices and features from About Me, when filled in.
         let aboutMe = MouseProfile.load().modelText
         var draftPlan = await IntelligenceService.mousePlan(for: question, earlier: earlier, catalog: catalog, aboutMe: aboutMe)
@@ -423,11 +464,24 @@ final class AskTheMouse: ObservableObject {
             return
         }
         let phrases = plan.searchPhrases.isEmpty ? [fallback] : plan.searchPhrases
-        let words = MouseKnowledge.terms(([question] + phrases).joined(separator: " "))
+        let words = MouseKnowledge.terms(([searchQuestion] + phrases).joined(separator: " "))
 
         // On the device: instant.
         set(turnId, step: .help)
-        let help = MouseKnowledge.searchHelp(question, phrases: phrases)
+        // An exact gesture or braille command ("what does a three-finger
+        // double-tap do?", "braille command for Notification Center"): the
+        // Help article that says it, checked against Apple's own page, is
+        // read first, and its line is always in what Apple Intelligence
+        // reads. Back Tap used to win "three-finger double-tap" on the
+        // words "double" and "tap". The device is the one the question
+        // names, else the one the question it follows on from named, else
+        // this one. Requested directly (2026-10-09).
+        let reference = MouseQuickReference.match(question, earlier: searchContext,
+                                                  onMac: ProcessInfo.processInfo.isiOSAppOnMac)
+        var help = MouseKnowledge.searchHelp(searchQuestion, phrases: phrases)
+        if let article = reference?.article {
+            help = [article] + help.filter { $0.id != article.id }
+        }
         var notes = plan.kind == .whatsNew ? MouseKnowledge.latestChanges() : MouseKnowledge.searchWhatsNew(question, phrases: phrases)
         notes += MouseKnowledge.searchTips(question, phrases: phrases)
         let lower = question.lowercased()
@@ -453,8 +507,8 @@ final class AskTheMouse: ObservableObject {
             && (lower.contains("podcast") || lower.contains("episode"))
         async let latestEpisodes: [PodcastEpisode] = wantsLatestPodcast
             ? ((try? await APIClient.shared.podcasts.episodes().items) ?? []) : []
-        async let appResults: [AppListing]? = plan.kind == .findApps
-            ? (try? APIClient.shared.apps.mouseSearch(
+        async let appResults: (apps: [AppListing], inCategory: Set<String>)? = plan.kind == .findApps
+            ? (try? APIClient.shared.apps.mouseSearchWithCategory(
                 keyword: plan.appKeyword.isEmpty ? searchPhrase : plan.appKeyword,
                 fullyAccessibleOnly: plan.fullyAccessibleOnly,
                 category: plan.appCategory,
@@ -486,7 +540,47 @@ final class AskTheMouse: ObservableObject {
         // the newest. "Card games" otherwise left classics like Ears
         // BlackJack (2020) out entirely. Found testing (2026-10-01).
         async let recommended: [String: Int] = plan.kind == .findApps ? Self.recommendationCounts() : [:]
-        let apps = Self.rankedApps(await appResults ?? [], keyword: plan.appKeyword.isEmpty ? searchPhrase : plan.appKeyword)
+        let found = await appResults
+        var apps = Self.rankedApps(found?.apps ?? [], keyword: plan.appKeyword.isEmpty ? searchPhrase : plan.appKeyword,
+                                   inCategory: found?.inCategory ?? [])
+        // A question that names a kind of game ("card games", "dice", "games
+        // for kids"): Apple's own type for each app, from its App Store
+        // listing (one request for the best 60). Apps of that type go first,
+        // and Apple Intelligence is told each app's type. A word in the
+        // description used to be the only way to tell. Requested directly
+        // (2026-10-09).
+        var appTypes: [String: String] = [:]
+        // Only for games: "music streaming apps" isn't asking for the Music
+        // game type.
+        let lowerQuestion = question.lowercased()
+        let asksForGames = (plan.appCategory ?? "").caseInsensitiveCompare("Games") == .orderedSame
+            || lowerQuestion.contains("game")
+        if plan.kind == .findApps, asksForGames {
+            let words = MouseKnowledge.terms(question) + plan.appKeyword.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            let typeId = await AppGenres.shared.gameTypeId(for: words, platform: plan.appPlatform)
+            let candidates = Array(apps.prefix(60))
+            let storeIds = candidates.compactMap { $0.appStoreUrl.flatMap(ItunesAPI.appStoreId(of:)) }
+            let found = await ItunesAPI.batchLookup(appStoreIds: Array(Set(storeIds)), entity: plan.appPlatform == .macos ? "macSoftware" : "software")
+            var genresByApp: [String: [String]] = [:]
+            for app in candidates {
+                if let id = app.appStoreUrl.flatMap(ItunesAPI.appStoreId(of:)), let genres = found[id]?.genreIds {
+                    genresByApp[app.id] = genres
+                    appTypes[app.id] = await AppGenres.shared.englishSummary(genreIds: genres, platform: plan.appPlatform)
+                }
+            }
+            if let typeId {
+                let ofType = apps.filter { genresByApp[$0.id]?.contains(typeId) == true }
+                apps = ofType + apps.filter { genresByApp[$0.id]?.contains(typeId) != true }
+            }
+            // Any game question, with or without a type named, never lists
+            // an app Apple doesn't file under Games. "Dice" found a German
+            // news app on the live site, and could find "dice the onions" in
+            // a recipe app. Apps without an App Store link stay, since their
+            // type isn't known. Requested directly (2026-10-09).
+            if let gamesId = await AppGenres.shared.gamesId(platform: plan.appPlatform) {
+                apps = apps.filter { genresByApp[$0.id].map { $0.contains(gamesId) } ?? true }
+            }
+        }
         let recommendations = await recommended
         if Task.isCancelled { return }
         set(turnId, step: .forums)
@@ -576,8 +670,18 @@ final class AskTheMouse: ObservableObject {
             // words already chose the article. Found testing (2026-10-05).
             let titleWords = Set(MouseKnowledge.terms(article.title))
             let focused = words.filter { !titleWords.contains($0) }
-            let text = MouseKnowledge.bestPassages(in: MouseKnowledge.helpPassageText(article), terms: focused.isEmpty ? words : focused, maxCharacters: 900)
-            sources.append(.init(id: "help-\(article.id)", title: article.title, text: article.summary + "\n" + text))
+            var text = MouseKnowledge.bestPassages(in: MouseKnowledge.helpPassageText(article), terms: focused.isEmpty ? words : focused, maxCharacters: 900)
+            var title = article.title
+            if let reference, reference.articleId == article.id {
+                // The exact lines first, word for word, so finger counts
+                // and dots are copied, not remembered.
+                let rest = text.components(separatedBy: "\n").filter { line in
+                    !reference.lines.contains { line.hasSuffix($0) }
+                }
+                text = (reference.lines + rest).joined(separator: "\n")
+                title += " (checked against Apple's documentation: give its finger counts, dots, and steps exactly)"
+            }
+            sources.append(.init(id: "help-\(article.id)", title: title, text: article.summary + "\n" + text))
         }
         for (guide, read) in zip(guides, guideTexts) where !read.text.isEmpty {
             guideFocus[guide.id] = MouseKnowledge.bestParagraph(in: read.text, terms: words)
@@ -678,12 +782,21 @@ final class AskTheMouse: ObservableObject {
             let items = apps.prefix(15).map { app in
                 IntelligenceService.MouseItem(
                     id: app.id, title: app.name,
-                    details: String(HTMLText.plainText(fromHTML: app.summary).prefix(200)) + (app.price.isEmpty ? "" : " (\(app.price))")
+                    details: Self.accessibilityNote(app) + " "
+                        + (appTypes[app.id].map { "[App Store category: \($0)] " } ?? "")
+                        + String(HTMLText.plainText(fromHTML: app.summary).prefix(200)) + (app.price.isEmpty ? "" : " (\(app.price))")
                         + Self.popularityNote(app, recommendations: recommendations[app.id]))
             }
             picks = await IntelligenceService.mousePicks(for: question, items: Array(items))
         }
         if Task.isCancelled { return }
+        // The checked lines, ready in case no answer was written below.
+        let fallbackLines: [String]?
+        if answer == nil, plan.kind != .findApps, let reference {
+            fallbackLines = await reference.readableLines(in: PreferencesStore.current?.effectiveContentLanguage).lines
+        } else {
+            fallbackLines = nil
+        }
 
         update(turnId) { turn in
             turn.guideFocus = guideFocus
@@ -725,29 +838,41 @@ final class AskTheMouse: ObservableObject {
                     turn.guidesUsed = guides.filter { used.contains("guide-\($0.id)") }
                     turn.forumsUsed = [forumTopic].compactMap { $0 }.filter { used.contains("forum-\($0.id)") }
                 }
-            } else if plan.kind != .findApps {
-                // No model answer (it failed or found nothing to read):
-                // still show the best matches rather than nothing.
-                turn.helpUsed = Array(help.prefix(2))
-                turn.guidesUsed = guides
-                turn.notesUsed = Array(notes.prefix(2))
-                turn.answered = !help.isEmpty || !guides.isEmpty || !notes.isEmpty
+            }
+            // No model answer (it failed or found nothing to read): the
+            // best matches used to be shown anyway, unchecked. Now the
+            // Mouse says it couldn't find it, and Need More Help offers the
+            // Forums and the web. Requested directly (2026-10-08).
+            // The one exception is a checked gesture or braille command:
+            // its Help lines, word for word, with the article as the
+            // source. Requested directly (2026-10-09).
+            if let fallbackLines, let article = reference?.article {
+                turn.answer = fallbackLines.joined(separator: "\n")
+                turn.answered = true
+                turn.helpUsed = [article]
             }
 
             if let picks {
-                turn.appsIntro = picks.intro.isEmpty ? nil : picks.intro
                 turn.mainHeading = picks.mainHeading.isEmpty ? nil : picks.mainHeading
-                turn.relatedHeading = picks.relatedHeading.isEmpty ? nil : picks.relatedHeading
                 let byId = Dictionary(apps.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-                for pick in picks.picks {
+                // Only apps the Mouse is sure fit what was asked. "Close"
+                // picks used to be listed under a second heading, which let
+                // loosely related apps in. Requested directly (2026-10-08).
+                for pick in picks.picks where pick.isMain {
                     guard let app = byId[pick.id] else { continue }
                     let entry = MouseTurn.PickedApp(app: app, blurb: Self.withAge(pick.blurb, updated: app.lastUpdatedAt),
                                                     honor: GoldenApples.best(for: app).map(GoldenApples.line),
                                                     recommendations: recommendations[app.id])
-                    if pick.isMain { turn.mainApps.append(entry) } else { turn.relatedApps.append(entry) }
+                    turn.mainApps.append(entry)
                 }
+                turn.appsIntro = picks.intro.isEmpty || turn.mainApps.isEmpty ? nil : picks.intro
             } else if !apps.isEmpty {
-                turn.mainApps = apps.prefix(10).map {
+                // Without Apple Intelligence's picks, only apps with the
+                // word in their name, which are sure to fit. Apps that only
+                // mention it somewhere in their description were listed
+                // too. Requested directly (2026-10-08).
+                let keyword = plan.appKeyword.isEmpty ? searchPhrase : plan.appKeyword
+                turn.mainApps = apps.filter { Self.appMatch($0, keyword: keyword) == 2 }.prefix(10).map {
                     MouseTurn.PickedApp(app: $0, blurb: Self.withAge(String(HTMLText.plainText(fromHTML: $0.summary).prefix(140)), updated: $0.lastUpdatedAt),
                                         honor: GoldenApples.best(for: $0).map(GoldenApples.line),
                                         recommendations: recommendations[$0.id])
@@ -877,10 +1002,11 @@ final class AskTheMouse: ObservableObject {
                 } else {
                     drop = true
                 }
-            } else if let quote = MouseKnowledge.bestSentence(in: passage, terms: words) {
-                // No Apple Intelligence line: the page's own best sentence.
-                note = .init(line: quote, isQuote: true, versionNote: versionNote, date: item.date)
             }
+            // Without Apple Intelligence's check, the page isn't shown: its
+            // best-matching sentence used to stand in, unchecked. Only
+            // results the Mouse knows answer the question are listed.
+            // Requested directly (2026-10-08).
             update(turnId) { turn in
                 if drop {
                     Self.remove(item, from: &turn)
@@ -976,41 +1102,87 @@ final class AskTheMouse: ObservableObject {
     /// Apps with the keyword (or its plural) in their name first, then in
     /// their description, keeping the directory's newest-first order within
     /// each.
-    static func rankedApps(_ apps: [AppListing], keyword: String) -> [AppListing] {
+    static func rankedApps(_ apps: [AppListing], keyword: String, inCategory: Set<String> = []) -> [AppListing] {
         let stems = keyword.lowercased().split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .map { $0.hasSuffix("s") ? String($0.dropLast()) : $0 }
+        // Apps rated not accessible at all are never suggested. Requested
+        // directly (2026-10-08).
+        let apps = apps.filter { accessibilityLevel($0) != .none }
         guard !stems.isEmpty else { return apps }
-        // Within each, Golden Apples honors, then how many member comments,
-        // so the community's favorites lead among equally good matches.
-        // Requested directly (2026-10-01).
+        // Within each, fully accessible apps first, then Golden Apples
+        // honors, then how many member comments, so the community's
+        // favorites lead among equally good matches. Requested directly
+        // (2026-10-01, accessibility first 2026-10-08).
         func tiebreak(_ app: AppListing) -> Int {
-            (GoldenApples.best(for: app)?.rank ?? 0) * 1000 + min(app.reviewCount, 999)
+            accessibilityLevel(app).rawValue * 1_000_000
+                + (GoldenApples.best(for: app)?.rank ?? 0) * 1000 + min(app.reviewCount, 999)
         }
-        // Whole words only, with plurals ("car" and "cars"), or the word
-        // inside a run-together name ("BlackJack", "Bardcard"). "Car" used
-        // to match "card", so card games led a question about car games.
-        // Found testing (2026-10-01).
+        func score(_ app: AppListing) -> Int { appMatch(app, keyword: keyword) }
+        let sorted = apps.enumerated()
+            .sorted {
+                if score($0.element) != score($1.element) { return score($0.element) > score($1.element) }
+                // In the category Apple Intelligence chose, first: with so
+                // many apps named "news", Google News fell out of the 15
+                // (2026-10-09).
+                let firstIn = inCategory.contains($0.element.id), secondIn = inCategory.contains($1.element.id)
+                if firstIn != secondIn { return firstIn }
+                if tiebreak($0.element) != tiebreak($1.element) { return tiebreak($0.element) > tiebreak($1.element) }
+                return $0.offset < $1.offset
+            }
+            .map(\.element)
+        // Apple Intelligence reads the first 15. At most 10 of them are apps
+        // named for the keyword, so the best of the rest still get in: once
+        // names were searched separately, "Flashlight" and "ColorDeBlind"
+        // crowded out Seeing AI for a color question, and BlindSquare for
+        // transit. Found testing live questions (2026-10-09).
+        let named = sorted.filter { score($0) == 2 }
+        let others = sorted.filter { score($0) < 2 }
+        let leadNamed = named.prefix(10)
+        let leadOthers = others.prefix(15 - leadNamed.count)
+        return Array(leadNamed) + Array(leadOthers) + Array(named.dropFirst(leadNamed.count)) + Array(others.dropFirst(leadOthers.count))
+    }
+
+    /// How well an app fits the keywords: 2 when one is in its name, 1 when
+    /// one is only in its description, 0 otherwise. Whole words only, with
+    /// plurals ("car" and "cars"), or the word inside a run-together name
+    /// ("BlackJack", "Bardcard"). "Car" used to match "card", so card games
+    /// led a question about car games. Found testing (2026-10-01).
+    static func appMatch(_ app: AppListing, keyword: String) -> Int {
+        let stems = keyword.lowercased().split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .map { $0.hasSuffix("s") ? String($0.dropLast()) : $0 }
         func matches(_ words: [String]) -> Bool {
             stems.contains { stem in
                 words.contains { $0 == stem || $0 == "\(stem)s" || $0 == "\(stem)es" }
             }
         }
-        func score(_ app: AppListing) -> Int {
-            let nameWords = normalizedForMatching(app.name).split(separator: " ").map(String.init)
-            let joined = nameWords.joined()
-            if matches(nameWords) || stems.contains(where: { $0.count >= 5 && joined.contains($0) }) { return 2 }
-            let summaryWords = normalizedForMatching(HTMLText.plainText(fromHTML: app.summary)).split(separator: " ").map(String.init)
-            return matches(summaryWords) ? 1 : 0
+        let nameWords = normalizedForMatching(app.name).split(separator: " ").map(String.init)
+        let joined = nameWords.joined()
+        if matches(nameWords) || stems.contains(where: { $0.count >= 5 && joined.contains($0) }) { return 2 }
+        let summaryWords = normalizedForMatching(HTMLText.plainText(fromHTML: app.summary)).split(separator: " ").map(String.init)
+        return matches(summaryWords) ? 1 : 0
+    }
+
+    static func accessibilityLevel(_ app: AppListing) -> AppAccessibilityRatings.Level {
+        AppAccessibilityRatings.level(voiceOver: app.voiceOverPerformance, usability: app.usability)
+    }
+
+    /// The app's rating in words Apple Intelligence can weigh, so it puts
+    /// fully accessible apps first and says when one is only partly
+    /// accessible (2026-10-08).
+    private static func accessibilityNote(_ app: AppListing) -> String {
+        let rating = [app.voiceOverPerformance, app.usability]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty && !$0.hasPrefix("Not applicable") } ?? ""
+        switch accessibilityLevel(app) {
+        case .full:    return "[Fully accessible: \(rating)]"
+        case .partial: return "[Partly accessible: \(rating)]"
+        case .unrated: return "[Accessibility not rated]"
+        case .none:    return "[Not accessible]"
         }
-        return apps.enumerated()
-            .sorted {
-                if score($0.element) != score($1.element) { return score($0.element) > score($1.element) }
-                if tiebreak($0.element) != tiebreak($1.element) { return tiebreak($0.element) > tiebreak($1.element) }
-                return $0.offset < $1.offset
-            }
-            .map(\.element)
     }
 
     /// How many members recommend each app, by app id, from AppleVis's
@@ -1160,7 +1332,7 @@ final class AskTheMouse: ObservableObject {
             // "commands" alike too, so "braille command" matches Apple's
             // "Common braille commands" page as a pair. Found testing
             // (2026-10-04).
-            "braill": "braille", "commands": "command",
+            "braill": "braille", "braile": "braille", "commands": "command",
         ]
         // "voice over" and "voice-over" are VoiceOver.
         return text.lowercased()

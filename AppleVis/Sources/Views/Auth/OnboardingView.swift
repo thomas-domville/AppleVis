@@ -73,7 +73,9 @@ struct OnboardingView: View {
                 Button("Skip Setup", role: .destructive) { finish() }
                 Button("Continue Setup", role: .cancel) {}
             } message: {
-                Text("You can change these settings anytime later in Settings.")
+                // Names what Skip keeps, so nothing is chosen out of
+                // sight. A beta tester asked for this (2026-10-08).
+                Text("AppleVis will use its starting settings: Apple topics only on Home and Forums, milder language masked, and What's New shown. You can change any of these anytime in Settings.")
             }
             .navigationTitle("Setup")
         }
@@ -754,7 +756,7 @@ private struct AppleTopicsStep: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Label("Apple Related covers Apple products and platforms, such as iPhone, Mac, Apple Watch, and apps.", systemImage: "apps.iphone")
                     Label("Non-Apple topics include Windows, Android, smart home tech, and general assistive technology discussions.", systemImage: "globe")
-                    Label("Podcasts, Guides, Apps, and Blogs are all about Apple already. Only Forums has non-Apple discussions to filter. You can change this at any time in Customize Home on the Home tab, or in Settings > Home Feed.", systemImage: "gearshape")
+                    Label("The Podcast, Guides, Apps, and the Blog are all about Apple already. Only Forums has non-Apple discussions to filter. You can change this at any time in Customize Home on the Home tab, or in Settings > Home Feed.", systemImage: "gearshape")
                 }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -767,7 +769,10 @@ private struct AppleTopicsStep: View {
                         onNext()
                     } label: {
                         VStack(spacing: 4) {
-                            RecommendedBadge()
+                            // "Default", not "Recommended": this is a reading
+                            // preference, and choosing everything isn't
+                            // wrong. A beta tester raised it (2026-10-08).
+                            RecommendedBadge(label: "Default")
                             Text("Apple Topics Only")
                                 .font(.headline)
                             Text("Home and Forums stay focused on Apple products and services.")
@@ -1300,8 +1305,10 @@ private struct ReadyStep: View {
 /// those steps say "this one's our default," matching what the highlighted
 /// `.borderedProminent` button already implies visually. Requested directly.
 private struct RecommendedBadge: View {
+    var label: LocalizedStringKey = "Recommended"
+
     var body: some View {
-        Text("Recommended")
+        Text(label)
             .font(.caption2)
             .fontWeight(.bold)
             .textCase(.uppercase)

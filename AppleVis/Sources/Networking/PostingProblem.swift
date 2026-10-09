@@ -145,13 +145,47 @@ final class PostingProblemLog: ObservableObject {
     }
 }
 
-/// Shown under a posting error: copies the short report so a member can
-/// paste it to us. Only appears when a post has just failed.
+/// Shown under a posting error: Send to AppleVis, and Copy Details for
+/// anyone who'd rather email us. Only appears when a post has just failed.
 struct PostingProblemDetailsButton: View {
     @ObservedObject private var log = PostingProblemLog.shared
     @State private var copied = false
+    @State private var showContact = false
+    @AccessibilityFocusState private var isSendFocused: Bool
 
     var body: some View {
+        if log.current != nil {
+            VStack(alignment: .leading, spacing: 10) {
+                // Opens Contact AppleVis over the form, as a Bug Report with
+                // the details of the post and the app and device info
+                // already included, so nothing has to be copied and pasted.
+                // What they wrote stays in the form behind it. Suggested
+                // directly after a beta tester's copied report found a bug
+                // (2026-10-09).
+                Button {
+                    showContact = true
+                } label: {
+                    Label("Send to AppleVis", systemImage: "paperplane")
+                }
+                .font(.subheadline)
+                .accessibilityHint(String(localized: "Opens Contact AppleVis with the details of what went wrong already included. What you wrote here stays as it is."))
+                .accessibilityFocused($isSendFocused)
+                copyButton
+            }
+            .sheet(isPresented: $showContact, onDismiss: {
+                Task { await retryAccessibilityFocus(into: $isSendFocused) }
+            }) {
+                ContactView(
+                    initialType: .bug,
+                    initialMessage: String(localized: "Something I tried to post in the AppleVis app didn't go through. The details are included below."),
+                    includesDeviceInfo: true
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var copyButton: some View {
         if let problem = log.current {
             Button {
                 UIPasteboard.general.string = problem.report

@@ -764,7 +764,8 @@ struct AppListingRow: View {
     }
 
     private var appStoreURL: URL? {
-        app.appStoreUrl.flatMap(URL.init)
+        // Only a real App Store link is called "Open in App Store" (2026-10-09).
+        app.appStoreUrl.flatMap { AppDetailView.isAppStoreLink($0) ? URL(string: $0) : nil }
     }
 
     private var newCount: Int {

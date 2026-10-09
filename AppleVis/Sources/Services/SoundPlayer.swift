@@ -64,6 +64,12 @@ enum AppSound: String {
     /// as read." Original sound. Confirmation tier. Requested directly
     /// (2026-10-07).
     case markedRead      = "marked_read"
+    /// Everything is read: the last item in Fetch or New, or Mark All as
+    /// Read. Goldie's nod, a happy two-note "wuff-wuff" on the mallet and a
+    /// soft bell, rather than the success sound, which means "sent" or
+    /// "saved". Chosen by ear (caught_up_2_goldie_wuff, 2026-10-08).
+    /// Confirmation tier.
+    case allCaughtUp     = "all_caught_up"
 
     /// The tab's own pop: 0 Home, 1 Discover, 2 For You.
     static func tabSound(for tab: Int) -> AppSound {
@@ -125,6 +131,15 @@ enum AppSound: String {
         case .mousePatter:
             // A light tap with each tick, for braille and DeafBlind users.
             return { UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.6) }
+        case .allCaughtUp:
+            // Two taps, matching the "wuff-wuff", for braille and DeafBlind
+            // users, who may not hear it.
+            return {
+                UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.8)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.13) {
+                    UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.9)
+                }
+            }
         case .markedRead:
             // The cue for braille and DeafBlind users, who may not hear it.
             return { UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: 0.8) }

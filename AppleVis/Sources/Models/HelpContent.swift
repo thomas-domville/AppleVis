@@ -147,12 +147,14 @@ enum HelpContent {
                         .heading("What you can do here"),
                         .bullets([
                             "See what's new on Home that you haven't read yet.",
-                            "Browse Forums, the AppleVis Blog, Guides, Podcasts, the App Directory, the Bug Tracker, search, and Be My Eyes in Discover.",
+                            "Browse Forums, the AppleVis Blog, Guides, the AppleVis Podcast, the App Directory, the Bug Tracker, search, and Be My Eyes in Discover.",
                             "Keep track of saved items, topics you follow, apps you've recommended, your podcast queue, and downloads in For You.",
                             "Listen to podcasts with background audio, a queue, chapters, and speed controls. Playback also works from the Lock Screen and the Dynamic Island.",
                             "Post topics, replies, and comments, submit apps, bugs, blog posts, and podcasts, and message other members. These need you to be signed in.",
                         ]),
                         .note("You can browse almost everything without an account. Posting, following, recommending, messaging other members, and personalized notifications all need you to be signed in to AppleVis."),
+                        .heading("Who owns and runs AppleVis"),
+                        .body("AppleVis was founded in 2010 by David Goodwin. Today it's an independent nonprofit. AppleVis makes all its own decisions, so in many ways it belongs to its community: the people who use it, write for it, and help each other on it. The Be My Eyes Foundation funds AppleVis through grants and donations. To learn more, or to donate, choose Support AppleVis in the About AppleVis section of Profile and Settings, or go to bemyeyesfoundation.org."),
                     ],
                     contentType: .guide,
                     relatedLinks: [
@@ -168,7 +170,7 @@ enum HelpContent {
                         .body("Home is the first screen you see. It shows a welcome, a summary of what's new that you haven't read yet, and a shortcut back to where you left off. Customize Home, at the top left, lets you choose which content types appear in your feed. Post, at the top right, starts a new forum topic or app entry, and Ask the Mouse, next to it, answers questions in your own words."),
                         .body("Home has four views: All, New, Fetch, and Nibbles. Choose one at the top of Home."),
                         .heading("Discover"),
-                        .body("Discover contains the rest of AppleVis: Forums, the AppleVis Blog, Guides, Podcasts, the App Directory, the Bug Tracker, Be My Eyes, RSS Feeds, and search. The ways to contribute to AppleVis are here too."),
+                        .body("Discover contains the rest of AppleVis: Forums, the AppleVis Blog, Guides, the AppleVis Podcast, the App Directory, the Bug Tracker, Be My Eyes, RSS Feeds, and search. The ways to contribute to AppleVis are here too."),
                         .heading("For You"),
                         .body("For You only shows what you've chosen to keep. It has five sections: Saved, Following, Recommended, Queue, and Downloads."),
                         .heading("Profile and Settings"),
@@ -176,7 +178,7 @@ enum HelpContent {
                         .body("Settings opens on top of Profile. When you've finished, choose Done at the top right of any Settings screen to go back to what you were doing."),
                         .body("Choose your name at the top of Profile to open My Account. There you can edit your profile and bio, change your password or email address, or sign out."),
                         .body("Settings controls how AppleVis looks, sounds, and behaves, including appearance, accessibility, sounds and haptics, notifications, podcasts, privacy, and Apple Intelligence features."),
-                        .body("Help, What's New, Replay Welcome Tour, and Contact AppleVis are in the About AppleVis section of Profile and Settings."),
+                        .body("Help, What's New, Replay Welcome Tour, Contact AppleVis, and Support AppleVis are in the About AppleVis section of Profile and Settings."),
                         .body("To message another member, open their profile. Private messages aren't sent from your own account screen."),
                         .heading("On iPad and iPhone Duo"),
                         .body("On iPad, on an open iPhone Duo, or in a wide window, some lists show the item you choose beside them, and there are more keyboard shortcuts. AppleVis on iPad and iPhone Duo explains how this works, including with VoiceOver."),
@@ -199,7 +201,7 @@ enum HelpContent {
                         .bullets([
                             "Forums: topics beside the list of topics.",
                             "App Directory: an app beside the list of apps in a category, or beside your search results. The list of platforms and categories doesn't do this, because there's nothing to show beside it yet.",
-                            "Podcasts: an episode beside the list of episodes. Anything that's playing keeps playing.",
+                            "Podcast: an episode beside the list of episodes. Anything that's playing keeps playing.",
                         ]),
                         .body("This happens on iPad in full screen, in a wide Stage Manager window, and on iPhone Duo when it's open."),
                         .body("When there isn't enough room, these lists work the way they always have. Choosing an item opens it, and Back returns to the list. This happens on iPhone, on iPhone Duo when it's closed, and in a narrow Split View window."),
@@ -234,7 +236,7 @@ enum HelpContent {
                             "Enter the same username and password you use on applevis.com.",
                             "Once you're signed in, Profile shows your account tools and a link to your public profile.",
                         ]),
-                        .note("For your security, the AppleVis website signs you out about every three weeks. Turn on Remember me when you sign in, and the app signs you back in for you. Without it, the app asks you to sign in again, and anything you were posting goes through once you have, so nothing you wrote is lost."),
+                        .note("For your security, the AppleVis website signs you out about every three weeks. Remember me, on the sign-in screen, is on unless you turn it off, so the app signs you back in for you. Your password is kept in this iPhone's Keychain and removed when you sign out. If you turn Remember me off, the app asks you to sign in again, and anything you were posting goes through once you have, so nothing you wrote is lost."),
                         .heading("What signing in lets you do"),
                         .bullets([
                             "Post forum topics, replies, and comments.",
@@ -253,7 +255,7 @@ enum HelpContent {
                     title: "Frequently Asked Questions",
                     summary: "Short answers to the questions members ask most.",
                     content: [
-                        .faq(question: "How do I search AppleVis?", answer: "Open Discover and use the search field. Type at least 2 characters. Results are grouped into Forum Topics, Apps, Guides, Blogs, Podcasts, and Bug Reports."),
+                        .faq(question: "How do I search AppleVis?", answer: "Open Discover and use the search field. Type at least 2 characters. Results are grouped into Forum Topics, Apps, Guides, Blog Posts, Podcast Episodes, and Bug Reports."),
                         .faq(question: "Where are my saved items?", answer: "Open For You and choose Saved."),
                         .faq(question: "What's the difference between Save and Follow?", answer: "Save is a bookmark, so you can find something again. Follow puts it in For You > Following and lets AppleVis notify you when there's new activity."),
                         .faq(question: "What's the difference between Recommend and Save?", answer: "Save is private and only for you. Recommend is a public thumbs-up on an app that tells other members you vouch for it. You can do both. Everything you've recommended is in For You > Recommended."),
@@ -302,7 +304,7 @@ enum HelpContent {
                             "Open Home. The welcome is a little different depending on whether you're signed in.",
                             "Read the summary of what's new if you want to catch up.",
                             "Choose Customize Home, at the top left, to pick which content types appear in your feed.",
-                            "Open Discover and look through Forums, the Blog, Guides, Podcasts, the App Directory, and the Bug Tracker.",
+                            "Open Discover and look through Forums, the Blog, Guides, the Podcast, the App Directory, and the Bug Tracker.",
                             "Open For You to see the Saved, Following, Recommended, Queue, and Downloads sections. They're empty until you add something.",
                             "Open Settings and look through the groups: General, Customisation, Alerts, Content, Data & Privacy, and Storage & Cache.",
                             "Open Profile and sign in when you're ready. You can also use Contact AppleVis if you have a question first.",
@@ -318,7 +320,7 @@ enum HelpContent {
                         .steps([
                             "Open Discover.",
                             "Use Search when you know roughly what you're looking for.",
-                            "Open Forums, the Blog, Guides, Podcasts, or the App Directory when you'd rather browse.",
+                            "Open Forums, the Blog, Guides, the Podcast, or the App Directory when you'd rather browse.",
                             "Use the pickers and filters to narrow the list by content type, tag, platform, category, or saved state.",
                             "When you reach the end of a list, more content loads automatically.",
                         ]),
@@ -341,7 +343,7 @@ enum HelpContent {
                         ]),
                         .tip("The same actions are available on every topic, post, app, and episode, whichever way you open them."),
                         .heading("With VoiceOver"),
-                        .body("When something leaves a list, such as an item you mark as read in New or Fetch, or one you unsave, unfollow, remove from your queue, or remove from your downloads, you hear two quick notes and feel a light tap. VoiceOver moves straight to the next item, or the one before it if there's nothing after. When it was the last one, you hear the success sound instead."),
+                        .body("When something leaves a list, such as an item you mark as read in New or Fetch, or one you unsave, unfollow, remove from your queue, or remove from your downloads, you hear two quick notes and feel a light tap. VoiceOver moves straight to the next item, or the one before it if there's nothing after. When it was the last one, you hear the success sound instead. In New and Fetch, the last one plays the All Caught Up sound: Goldie's happy two-note wuff and a soft bell."),
                         .body("If Confirmation Sounds and Haptic Feedback are both off, VoiceOver says what happened after it reads the next item."),
                     ]
                 ),
@@ -354,6 +356,7 @@ enum HelpContent {
                             "Sign in from Profile.",
                             "Open the forum topic, blog post, guide, podcast episode, or app page you want to respond to.",
                             "Choose Reply or Comment. To start a new topic, choose Post on Home. If nobody has commented yet, choose Be the First to Comment, or Be the First to Reply on a forum topic.",
+                            "Add a subject if you like. It's optional in the app. A reply to someone's comment starts with \"Re:\" and their subject, as on the website, and you can change it. Left blank, your first few words are used.",
                             "Write your draft.",
                             "Choose Rewrite if you'd like help with the wording or tone before you post.",
                             "If your draft isn't in English, AppleVis offers to translate it.",
@@ -365,18 +368,18 @@ enum HelpContent {
                 ),
                 HelpArticle(
                     id: "tutorial-podcast",
-                    title: "Play and Queue Podcasts",
+                    title: "Play and Queue Podcast Episodes",
                     summary: "Play episodes, build a queue, and control playback from anywhere.",
                     content: [
                         .steps([
-                            "Open Podcasts.",
+                            "Open Podcast in Discover.",
                             "Choose an episode and choose Play.",
                             "Control playback from the mini player at the bottom of any tab, the full player, the Lock Screen, the Dynamic Island, Control Center, or AirPods.",
-                            "To open the full player, choose the episode title in the mini player. To open it each time you play an episode from a list, turn on Open Player on Play in Settings > Podcasts.",
+                            "To open the full player, choose the episode title in the mini player. To open it each time you play an episode from a list, turn on Open Player on Play in Settings > Podcast.",
                             "Use Add to Queue or Play Next to choose what plays next. When an episode ends, the next one in your queue starts automatically.",
-                            "On AirPods, a double press skips forward and a triple press skips back. To make them play the next episode and go back to the start instead, change Headphone Controls in Settings > Podcasts.",
+                            "On AirPods, a double press skips forward and a triple press skips back. To make them play the next episode and go back to the start instead, change Headphone Controls in Settings > Podcast.",
                             "Download an episode to listen offline.",
-                            "Open Settings > Podcasts to adjust speed, skip intervals, the sleep timer, Voice Boost, Trim Silence, and auto-play.",
+                            "Open Settings > Podcast to adjust speed, skip intervals, the sleep timer, Voice Boost, Trim Silence, and auto-play.",
                         ]),
                         .note("While a podcast is playing, the Dynamic Island and Lock Screen show the episode title, progress, and playback state on supported iPhone models."),
                     ]
@@ -549,13 +552,13 @@ enum HelpContent {
                         .bullets([
                             "Mark This Group as Read, on an item's heading, marks the post and all its new comments as read. The whole group leaves Fetch, and VoiceOver moves to the next item's heading.",
                             "In Fetch, Mark This Group as Read is available on every comment and on the group heading. It marks the post and all its comments as read, matching the website.",
-                            "When a group is marked as read, you hear a short sound and feel a light tap, and VoiceOver moves straight to the next group's heading. If there's no group after it, VoiceOver moves to the one before. When the last group is marked as read, you hear the success sound and VoiceOver moves to All Caught Up.",
+                            "When a group is marked as read, you hear a short sound and feel a light tap, and VoiceOver moves straight to the next group's heading. If there's no group after it, VoiceOver moves to the one before. When the last group is marked as read, you hear the All Caught Up sound, Goldie's happy two-note wuff, and VoiceOver moves to All Caught Up.",
                             "If Confirmation Sounds and Haptic Feedback are both off, VoiceOver says Group marked as read after reading the next heading.",
                             "In Fetch, use the Reading List heading to reach Mark All as Read with one swipe left. Comment actions begin with Mark This Group as Read, and expansion comes last.",
                         ]),
                         .body("With VoiceOver, use the Actions rotor. You can also touch and hold a group heading or comment, or swipe right on a comment, to choose Mark This Group as Read."),
                         .body("If you turn on Mark as Read When Finished, items you've read to the end are marked as read when you leave Fetch. What you've read is kept on this device."),
-                        .note("When signed in and online, Mark as Read and Mark All as Read also update your read history on the website."),
+                        .note("When you're signed in, Mark as Read and Mark All as Read also update your read history on the website. If you're offline, the website catches up when you're back online."),
                     ]
                 ),
                 HelpArticle(
@@ -564,8 +567,10 @@ enum HelpContent {
                     summary: "How AppleVis welcomes you back and helps you catch up.",
                     content: [
                         .body("When you open AppleVis, Home greets you and returns you to where you left off. The greeting is a little different depending on whether you're signed in."),
+                        .body("With VoiceOver, if you start moving around Home before it finishes loading, VoiceOver stays where you are. To jump to where you left off at any time, use the Pick Up Where You Left Off action on the greeting at the top of Home."),
                         .body("Near the top, a summary shows new activity since you last read or marked each item as read. Unread items can accumulate across visits. Opening the app or dismissing the summary does not mark them as read."),
                         .body("Activate the summary to move through the feed. In All, it takes you to the item you last opened, so you can move back up through what's newer. In New, it goes to the first unread item. In Fetch, it goes to the first post. In Nibbles, it goes to the start of Nibbles."),
+                        .body("When you open AppleVis, Home shows the lists it saved last time straight away, then checks for anything newer. New activity is worked out from the newest lists, so the summary arrives once that check finishes."),
                         .body("If you leave AppleVis for more than five minutes, Home refreshes when you come back. VoiceOver stays where you were and says Home updated, followed by what's new."),
                         .body("With VoiceOver, if a refresh takes more than a moment, you hear a soft tick and feel a light tap every second until it finishes. If it takes a while, VoiceOver says Still refreshing. This works anywhere you pull down to refresh."),
                         .body("The same tick plays when you open a topic, app entry, episode, or anything else that's slow to load. If it takes a while, VoiceOver says Still loading. The tick stops as soon as the page appears."),
@@ -577,7 +582,7 @@ enum HelpContent {
                             "All shows everything your feed is set up to include.",
                             "New shows only new posts and comments that you haven't read yet. An item stays in New until you open it or mark it as read.",
                             "Fetch shows the same new items, grouped for reading: each post, then its new comments in full. Listen to Fetch reads it all aloud.",
-                            "Nibbles is a weekly or monthly summary of new accessible apps, podcast episodes, popular discussions, guides, and blog posts. You can share it.",
+                            "Nibbles is a weekly or monthly summary of new accessible apps, podcast episodes, popular discussions, guides, and blog posts. You can share it. To save data, it can be a little behind the very latest posts. Pull down to refresh it, and it catches up straight away.",
                             "Popular discussions are the forum topics with the most new comments during that week or month, not the most comments ever.",
                         ]),
                         .heading("Reading the badges"),
@@ -586,7 +591,12 @@ enum HelpContent {
                             "A number, like 3 NEW, counts the comments added since you last opened the item. If you've never opened it, it counts from when it first appeared on Home.",
                             "A new topic that already has replies shows both.",
                             "Counts keep adding up across visits until you open the item or mark it as read.",
+                            "The number on the Home tab is how many items are in New, of every type.",
                         ]),
+                        .heading("Pinned topics"),
+                        .body("Forum topics pinned on the website appear first in All, under the Pinned heading, until they're unpinned."),
+                        .heading("Moving by type with VoiceOver"),
+                        .body("The rotor has Forum Topics, Podcast Episodes, App Entries, Guides, and Blog Posts, so you can jump between items of one type. Only the types you show in Customize Home appear in the rotor. New Items moves through everything in New."),
                         .heading("Keeping it tidy"),
                         .bullets([
                             "Mark as Read clears an item's new-activity badge without opening it.",
@@ -606,7 +616,7 @@ enum HelpContent {
                             "Forums: community topics and replies.",
                             "AppleVis Blog: official posts and announcements.",
                             "Guides: tutorials, resources, and how-to articles.",
-                            "Podcasts: every AppleVis podcast, with filters, tags, a queue, downloads, and playback.",
+                            "Podcast: every episode of the AppleVis Podcast, with filters, tags, a queue, downloads, and playback.",
                             "App Directory: apps by platform (iPhone and iPad, Mac, Apple Watch, or Apple TV) and category, with accessibility comments from members.",
                             "Community Picks: the apps members recommend, newest first or most recommended.",
                             "Bug Tracker: active and resolved accessibility bugs reported by the community.",
@@ -686,7 +696,7 @@ enum HelpContent {
                     title: "Be My Eyes",
                     summary: "Open Call a Volunteer, Be My AI, or the Service Directory from AppleVis.",
                     content: [
-                        .body("AppleVis is a Be My Eyes company. The Be My Eyes section in Discover gives you quick access to three free visual assistance services."),
+                        .body("AppleVis is an independent nonprofit, funded by the Be My Eyes Foundation through grants and donations. The Be My Eyes section in Discover gives you quick access to three free visual assistance services."),
                         .heading("Available services"),
                         .bullets([
                             "Call a Volunteer: a live video call with a sighted volunteer who sees through your phone's camera. Available 24 hours a day in 185 languages.",
@@ -710,7 +720,7 @@ enum HelpContent {
                     title: "Filters, Tags, Categories, and Headings",
                     summary: "How to narrow down long lists.",
                     content: [
-                        .body("Filters and pickers shorten long lists. Podcasts can be filtered by content type and tag. The App Directory can be filtered by platform and category, and each category reads its count, for example \"Books, 26 apps.\""),
+                        .body("Filters and pickers shorten long lists. Podcast episodes can be filtered by content type and tag. The App Directory can be filtered by platform and category, and each category reads its count, for example \"Books, 26 apps.\""),
                         .note("With VoiceOver, you can move by heading wherever headings are available. The same headings are shown on screen."),
                     ]
                 ),
@@ -721,7 +731,7 @@ enum HelpContent {
                     content: [
                         .body("If you use an RSS reader, Discover has an RSS Feeds page with links you can add to it."),
                         .bullets([
-                            "Copy or share the main AppleVis feed, or a feed for just Apps, Blogs, Guides, Reviews, Forums, Apple-only forum posts, or Podcasts.",
+                            "Copy or share the main AppleVis feed, or a feed for just Apps, the Blog, Guides, Reviews, Forums, Apple-only forum posts, or the Podcast.",
                             "Every feed link works in any RSS reader.",
                         ]),
                         .steps([
@@ -785,8 +795,8 @@ enum HelpContent {
                             "Forum Topics: community discussions.",
                             "Apps: entries from the App Directory.",
                             "Guides: guides and tutorials.",
-                            "Blogs: posts from the AppleVis Blog.",
-                            "Podcasts: episodes from every AppleVis podcast.",
+                            "Blog Posts: posts from the AppleVis Blog.",
+                            "Podcast Episodes: episodes of the AppleVis Podcast.",
                             "Bug Reports: accessibility bugs in the tracker.",
                         ]),
                         .tip("If your search isn't in English, AppleVis may offer to translate it. Search works best in English."),
@@ -809,8 +819,8 @@ enum HelpContent {
                     title: "Forums and Following",
                     summary: "Browse forum topics, follow activity, and manage replies.",
                     content: [
-                        .note("When signed in and online, Mark as Read and Mark All as Read also update your read history on the website."),
-                        .note("Topics pinned on the website always appear at the top of Forums, and they update when you refresh. When signed in, Home and Forums recognize items you read on the website."),
+                        .note("When you're signed in, Mark as Read and Mark All as Read also update your read history on the website. If you're offline, the website catches up when you're back online."),
+                        .note("Topics pinned on the website always appear at the top of Forums, and they update when you refresh. When signed in, Home and Forums recognize items you read on the website. Following and Recommended in For You include what you follow and recommend on the website, and you can remove those from the app too."),
                         .bullets([
                             "Use Forums in Discover to browse topics.",
                             "Use the filter menu to show Recent, New, Unread, Since Last Visit, Following, or Saved topics.",
@@ -1051,6 +1061,7 @@ enum HelpContent {
                             "Confirm the two checkboxes on the Before You Begin screen, then choose Continue.",
                             "Choose the platform: iPhone and iPad, Mac, Apple Watch, or Apple TV.",
                             "Search by name or paste an App Store link. If the app isn't on the App Store, which is the case for some Mac apps, choose Enter Details Manually.",
+                            "For a Mac app, apps that aren't in the Mac App Store are listed too, under Not in the Mac App Store. They come from Homebrew, a free catalogue of Mac apps. Choosing one fills in its name, version, a short description, and the developer's website, and you can change any of them.",
                             "Select the right result and choose Next.",
                         ]),
                         .heading("Step 2: App Details"),
@@ -1058,6 +1069,7 @@ enum HelpContent {
                         .bullets([
                             "iPhone and iPad apps: separate ratings for VoiceOver Performance, Button Labelling, and Usability, plus the devices the app supports. The devices are ticked for you from the App Store, and you can untick any the app doesn't really support.",
                             "iPhone and iPad apps also ask for the iOS Version Tested. It's filled in with your device's iOS version. Change it if you tested the app on another device. Enter just the number, such as 26.0.1.",
+                            "Developer's Website is filled in from the App Store listing when it has one. You can change or clear it.",
                             "The description comes from the App Store, in English when the developer provides it. If it's only in another language, AppleVis translates it into English on your device and adds a line saying it was translated.",
                             "Mac, Apple Watch, and Apple TV apps: one combined Usability rating.",
                             "Every platform asks for Accessibility Comments. The minimum is 20 characters, but the more you share, the more useful it is to the next person.",
@@ -1065,7 +1077,7 @@ enum HelpContent {
                         .tip("Choose Rewrite under Accessibility Comments if you'd like help with what you've written."),
                         .body("When you're done, choose Next. Nothing is sent yet. Next takes you to step 3, where you can check everything first."),
                         .heading("Step 3: Review and Submit"),
-                        .body("Check everything, then choose Submit. A thank-you screen confirms it was sent. The AppleVis team reviews every submission before it appears in the directory."),
+                        .body("Check everything, then choose Submit. A thank-you screen confirms it was sent. Your app entry appears in the App Directory straight away, and on the website."),
                         .note("If the app looks like it's already in the App Directory, a warning lists the matching app entries. Choose one to open its page and check. When you go back, your submission is still there."),
                     ]
                 ),
@@ -1120,7 +1132,7 @@ enum HelpContent {
         ),
         HelpSection(
             id: "content",
-            title: "Apps, Podcasts, Blogs, and Guides",
+            title: "Apps, the Podcast, the Blog, and Guides",
             icon: "square.grid.2x2",
             description: "How each AppleVis content area works.",
             articles: [
@@ -1134,6 +1146,10 @@ enum HelpContent {
                             "Open an app's page to see its description, developer, category, ratings, and every accessibility comment members have left.",
                             "Accessibility Consensus is an AI-generated summary of what commenters report. It's useful before you read every comment.",
                             "Open in App Store takes you to the App Store to download or buy the app. Purchases are always handled by Apple, not AppleVis.",
+                            "Many Mac apps aren't in the Mac App Store. For those, Get It from the Developer opens the developer's website, where you download the app. Some also have a MacUpdate link.",
+                            "Additional Comments, after Accessibility Comments, has anything else the person who added the app wanted to say. Developer's Website, under the main button, opens the developer's site.",
+                            "Category, near the top, shows the app's category on one line, with its App Store type and any other category it's in, such as Games (Board, Family), also Social Networking. The types come from the App Store, so apps without an App Store link show only their category.",
+                            "In a category that has types, such as Games, the Type picker at the top shows All or one type, such as Card, Puzzle, or Word. Each type says how many apps are in it. The first time, it takes a moment to find each app's type.",
                             "Save or Follow an app to find it again in For You. Recommend gives it a public thumbs-up, and everything you've recommended is in For You > Recommended.",
                             "Share an App Store link into AppleVis from any app to look up or submit that app.",
                             "If an app's App Store link stops working, its page tells you the listing may no longer be available.",
@@ -1143,12 +1159,12 @@ enum HelpContent {
                 ),
                 HelpArticle(
                     id: "content-podcasts",
-                    title: "Podcasts",
+                    title: "Podcast",
                     summary: "Playback, queue, chapters, downloads, the Dynamic Island, AirPods, and settings.",
                     content: [
                         .bullets([
                             "Play, pause, seek, skip forward and back, and change speed from the player or the mini player at the bottom of the screen.",
-                            "The mini player stays at the bottom of the screen while an episode is loaded. Choose the episode title in it to open the full player. Open Player on Play, in Settings > Podcasts, opens the full player each time you play an episode from a list.",
+                            "The mini player stays at the bottom of the screen while an episode is loaded. Choose the episode title in it to open the full player. Open Player on Play, in Settings > Podcast, opens the full player each time you play an episode from a list.",
                             "Use Add to Queue or Play Next to choose what plays after the current episode.",
                             "Download episodes to listen offline.",
                             "AppleVis remembers where you stopped in each episode. To go back to the beginning, open the episode and use Start Over in Episode Tools.",
@@ -1156,15 +1172,15 @@ enum HelpContent {
                             "When an episode has chapters, move between them from the chapter list.",
                             "The Lock Screen shows the episode title, artwork, progress, and playback controls.",
                             "On supported iPhone models, the Dynamic Island shows the episode title and playback state while you use other apps.",
-                            "AirPods: press once to play or pause. A double press skips forward and a triple press skips back, by your skip intervals. Headphone Controls, in Settings > Podcasts, can make them play the next episode in your queue and go back to the start of the episode instead.",
+                            "AirPods: press once to play or pause. A double press skips forward and a triple press skips back, by your skip intervals. Headphone Controls, in Settings > Podcast, can make them play the next episode in your queue and go back to the start of the episode instead.",
                             "Control Center shows Now Playing, with artwork, title, and controls.",
                         ]),
-                        .tip("Adjust playback in Settings > Podcasts: speed, skip intervals, auto-play, Trim Silence, Voice Boost, an equaliser (Flat, Speech Clarity, Bass Boost, or Treble Boost), a sleep timer, resume rewind, and Auto-Download and Auto-Delete for downloads."),
+                        .tip("Adjust playback in Settings > Podcast: speed, skip intervals, auto-play, Trim Silence, Voice Boost, an equaliser (Flat, Speech Clarity, Bass Boost, or Treble Boost), a sleep timer, resume rewind, and Auto-Download and Auto-Delete for downloads."),
                     ]
                 ),
                 HelpArticle(
                     id: "content-blog-guides",
-                    title: "Blogs and Guides",
+                    title: "The Blog and Guides",
                     summary: "Read official updates, guides, tutorials, resources, and comments.",
                     content: [
                         .body("The AppleVis Blog has official posts and announcements. Guides has tutorials, how-to articles, resources, events, and developer content."),
@@ -1212,7 +1228,8 @@ enum HelpContent {
                     title: "Appearance",
                     summary: "Themes, Liquid Glass, spacing, contrast, and visual comfort.",
                     content: [
-                        .body("Appearance controls how AppleVis looks. Choose a theme from the System, Light, Dark, or High Contrast groups."),
+                        .body("Appearance controls how AppleVis looks. Choose a theme from the Accessibility, AppleVis, or Standard groups."),
+                        .body("The AppleVis group includes themes for the Mouse and for Goldie, the golden retriever from Fetch. Each comes in a light and a dark edition."),
                         .body("Card Density sets Comfortable or Compact spacing, depending on how much you want on screen at once."),
                         .body("Liquid Glass gives supported surfaces a see-through look. It switches to solid backgrounds when Reduce Transparency or a high-contrast theme is on."),
                     ]
@@ -1251,6 +1268,9 @@ enum HelpContent {
                             "New Guides: new guides and tutorials.",
                             "New Comments: comments on everything, not only what you follow. This can send a lot of notifications.",
                         ]),
+                        .heading("Catch-Up Reminders"),
+                        .body("Catch-Up Reminders are off until you turn them on. When they're on and you haven't opened AppleVis for a week, a gentle reminder says what's new. If you're still away, one more comes two weeks later. After that, there are no more until you've opened AppleVis again."),
+                        .body("Reminders arrive around the time of day you usually use AppleVis, never at night. When background refresh has run, they say how many posts and podcast episodes are new. Tapping one opens Home's New view."),
                         .note("You can also choose a notification sound and turn the app icon's badge on or off. Notifications must also be allowed for AppleVis in iPhone Settings. If they're off there, nothing arrives, whatever is turned on here."),
                     ]
                 ),
@@ -1311,7 +1331,7 @@ enum HelpContent {
                     title: "Profile and App Support",
                     summary: "Contact the AppleVis team using the guided contact form.",
                     content: [
-                        .body("Profile has a Contact AppleVis button that opens a guided contact form. You can send a bug report, feedback, a suggestion, or a recommendation to the AppleVis team without leaving the app."),
+                        .body("Profile has a Contact AppleVis button that opens a guided contact form. You can send a bug report, feedback, a suggestion, or a general enquiry to the AppleVis team without leaving the app."),
                         .tip("When you choose Bug Report, a switch appears for including system information. Turn it on to add your app version and iOS version automatically. This helps when reporting a crash or something unexpected."),
                     ]
                 ),
@@ -1336,7 +1356,7 @@ enum HelpContent {
                             "Translate is offered when your draft or search isn't in English. Needs Apple Intelligence.",
                             "Smarter Guideline Reminders skips a guideline reminder that clearly doesn't fit your draft. It never adds one. Needs Apple Intelligence.",
                         ]),
-                        .note("Apple Intelligence features need an iPhone 15 Pro, iPhone 15 Pro Max, or any iPhone 16 or iPhone 17 model, with iOS 26 or later and Apple Intelligence turned on in iOS Settings. See Apple Intelligence Features for details."),
+                        .note("Apple Intelligence features need an iPhone 15 Pro, iPhone 15 Pro Max, or any later iPhone, or an iPad with an M1 chip or later or an A17 Pro chip. Apple Intelligence must also be turned on in iOS Settings. See Apple Intelligence Features for details."),
                     ]
                 ),
                 HelpArticle(
@@ -1357,7 +1377,7 @@ enum HelpContent {
                             "\"Hey Siri, listen to AppleVis Fetch\" opens Fetch and starts reading everything new aloud. If there's nothing new, VoiceOver says you're all caught up.",
                             "\"Hey Siri, open AppleVis Nibbles\" opens Nibbles, the summary of recent activity, for the period you chose last.",
                         ]),
-                        .heading("Podcasts"),
+                        .heading("Podcast"),
                         .bullets([
                             "\"Hey Siri, resume my AppleVis podcast\" continues your last episode where you left off.",
                             "\"Hey Siri, play the latest AppleVis podcast\" plays the newest episode.",
@@ -1384,9 +1404,12 @@ enum HelpContent {
                         .body("AppleVis uses Apple Intelligence for several AI features. They all run on your device, and no text or content is sent to a server."),
                         .heading("Requirements"),
                         .bullets([
-                            "iPhone 15 Pro, iPhone 15 Pro Max, or any iPhone 16 or iPhone 17 model.",
+                            "iPhone 15 Pro, iPhone 15 Pro Max, or any later iPhone.",
+                            "Or an iPad with an M1 chip or later, such as iPad Pro or iPad Air, or an iPad mini with the A17 Pro chip.",
                             "iOS 26 or later.",
                             "Apple Intelligence turned on in iOS Settings > Apple Intelligence & Siri.",
+                            "Your device language and Siri language set to the same supported language. Apple Intelligence isn't available in every language or region yet.",
+                            "About 7 GB of free storage on your device.",
                         ]),
                         .heading("What it does in AppleVis"),
                         .bullets([
@@ -1444,10 +1467,15 @@ enum HelpContent {
                             "Tips from members, when they help. The Mouse also reads members' comments on the guides it uses, and for questions about Apple devices or other people's experiences, a matching forum discussion. When part of the answer comes from members, the Mouse says so, and the source says From members' comments on a guide or From a forum discussion.",
                             "Take Me There, when a screen can help. It opens that screen.",
                             "For some settings, an offer to change it for you. Nothing changes until you choose Yes, and you can undo it.",
-                            "Apps it found, for iPhone and iPad, Mac, Apple Watch, or Apple TV, depending on the device you ask about, grouped by how well they match what you asked, with a line about each. Apps that won, were runners-up, or were nominated in the AppleVis Golden Apple Awards say so and come first among equally good matches, followed by apps members have commented on most. Each app says how many member comments it has.",
-                            "More From AppleVis: related guides, forum topics, podcast episodes, blog posts, and bug reports. The Mouse reads the best few, and those that answer your question move to Other Sources. A page that doesn't answer it is left out, and pages that say the same thing are listed together. While it reads, the heading says The Mouse is reading these. When it's done, the heading says Not Checked, because the results still listed there haven't been read.",
+                            "Apps it found, for iPhone and iPad, Mac, Apple Watch, or Apple TV, depending on the device you ask about, with a line about each. Only apps the Mouse is sure fit what you asked are listed. Apps members rated not accessible are never suggested. Fully accessible apps come first among equally good matches, then apps that won, were runners-up, or were nominated in the AppleVis Golden Apple Awards, then apps members have commented on most. When an app is only partly accessible, or hasn't been rated, its line says so. Each app says how many member comments it has.",
+                            "Guides, forum topics, podcast episodes, blog posts, and bug reports beyond the answer's own sources. The Mouse reads the best few, and only those that answer your question are listed, in Other Sources. Pages that don't answer it, and pages it didn't get to read, aren't listed, so everything you see has been checked. Pages that say the same thing are listed together. While it reads, a line says The Mouse is reading these.",
                         ]),
                         .note("Guides and app entries that haven't been updated for a few years are marked, so you know to check that they're still current. A guide written for an older iOS than yours says so, such as Written for iOS 17."),
+                        .heading("Gestures, commands, and your device"),
+                        .body("For VoiceOver gestures and braille commands, such as what a three-finger double-tap does, the Mouse uses Help's own Quick Reference, checked against Apple's support pages. It gives the number of fingers, taps, and dots exactly as Help does."),
+                        .body("The Mouse answers for the device you're using unless you name another. Ask What about on a Mac? and it answers for a Mac, along with follow-ups like How do I change that? A new question goes back to your own device."),
+                        .body("The Mouse can't see your screen. If you ask what something on it is, it says so, tells you about AppleVis's own screens if that may be what you mean, and asks where you are."),
+                        .body("When you ask for a kind of game, such as dice games, only apps the App Store lists as games are suggested."),
                         .body("For a question about how AppleVis is working for you, such as Why don't I get notifications?, the Mouse looks at your AppleVis settings on that screen. If a setting explains it, the answer says which one and where to change it. The Mouse only looks. It never changes a setting unless you ask it to. The answer then shows I checked your app settings, which opens that screen."),
                         .body("Commands, gestures, and setting names are given exactly as the source writes them. When you open a guide from an answer, it opens at the paragraph the answer came from, with VoiceOver on it."),
                         .body("After an answer, the Mouse asks Did this answer your question? Your Yes or No stays on this device and helps the Mouse read the most useful kinds of source first. It also remembers which guides and forum discussions helped with which kinds of question. A guide that answered a similar question is read first next time, and one that didn't is passed over. If you ask the same question again within an hour, the answer appears straight away."),
@@ -1542,8 +1570,10 @@ enum HelpContent {
                         .body("Only the screen name and, where relevant, a public link are shared. No account details, tokens, or private data leave your device."),
                         .tip("To turn Handoff off for every app, use iOS Settings > General > AirPlay & Handoff > Handoff."),
                         .heading("Background Refresh"),
-                        .body("While it's in the background, AppleVis refreshes downloaded episode details and checks for activity in what you follow, so everything is current the next time you open it."),
-                        .tip("Turn this off in iOS Settings > General > Background App Refresh > AppleVis. Podcasts still play in the background either way. Only the regular refresh stops."),
+                        .body("Now and then, while AppleVis is closed, iOS lets it refresh Home. AppleVis saves Home's latest lists, picks up what you've read on the website, and sends any Mark as Read that couldn't reach the website earlier."),
+                        .body("When you open AppleVis, Home shows those saved lists straight away, then checks for anything newer."),
+                        .body("iOS decides when this happens, usually shortly before the times you tend to open AppleVis. It doesn't happen after you swipe AppleVis away in the App Switcher, or in Low Power Mode or Low Data Mode."),
+                        .tip("Turn this off in iOS Settings > General > Background App Refresh > AppleVis. Podcast episodes still play in the background either way. Only the regular refresh stops."),
                         .heading("AirPlay and the Route Picker"),
                         .body("The route picker in the podcast player sends audio to AirPlay speakers, HomePod, or Bluetooth devices, like any other audio app."),
                         .heading("iCloud Sync"),
@@ -2623,6 +2653,7 @@ enum HelpContent {
                         .bullets([
                             "Answer or end a call: two-finger double-tap.",
                             "During a call, the keypad shows first. Choose Hide for call options.",
+                            "Use other apps during a call: go to the Home Screen as usual. The call keeps going. To return to it, choose the call in the status bar, or in the Dynamic Island.",
                         ]),
                         .heading("Camera"),
                         .body("VoiceOver describes what's in the viewfinder. To take a photo or start or stop a video, two-finger double-tap. Choose the mode, such as Photo or Video, by selecting Camera Mode and swiping up or down."),
@@ -2655,6 +2686,7 @@ enum HelpContent {
                             "Close the window or tab: Command-W.",
                             "Quit the app: Command-Q.",
                             "Force quit an app that isn't responding: Option-Command-Escape.",
+                            "Lock the screen: Control-Command-Q. Unlock it with your password or Touch ID.",
                         ]),
                         .heading("Coming from Windows"),
                         .bullets([
@@ -2739,6 +2771,20 @@ enum HelpContent {
                 ),
             ]
         ),
+        // How-To Library (2026-10-08): one task per article, for iOS 27.
+        // Each group lives in its own file in Models/HowTo.
+        howToUsingAppleVis,
+        deviceGuides,
+        howToKnowYourDevice,
+        howToHomeScreen,
+        howToConnections,
+        howToCallsAlerts,
+        howToVoiceOver,
+        howToBraille,
+        howToAccessibility,
+        howToEveryday,
+        howToDevice,
+        howToAppleVisSettings,
         HelpSection(
             id: "troubleshooting",
             title: "Troubleshooting",
@@ -2800,8 +2846,8 @@ enum HelpContent {
                         .bullets([
                             "If the message names part of the form, such as the iOS version, change that part and try again.",
                             "If the message says AppleVis is having trouble, wait a little while and try again. It's not something you did.",
-                            "If it keeps happening, choose Copy Details for AppleVis under the message. This copies a short note of what went wrong. It doesn't include anything you wrote.",
-                            "Paste the note into an email, or open Contact AppleVis. For a day after the problem, the contact form also offers to include the details for you.",
+                            "If it keeps happening, choose Send to AppleVis under the message. It opens Contact AppleVis as a Bug Report, with a short note of what went wrong and your app and device info already included. It doesn't include anything you wrote, and what you wrote stays on screen behind it.",
+                            "If you'd rather email us, choose Copy Details for AppleVis and paste the note into your email. For a day after the problem, Contact AppleVis also offers to include the details for you.",
                         ]),
                     ],
                     contentType: .troubleshooting
