@@ -554,6 +554,7 @@ enum HelpContent {
                             "In Fetch, Mark This Group as Read is available on every comment and on the group heading. It marks the post and all its comments as read, matching the website.",
                             "When a group is marked as read, you hear a short sound and feel a light tap, and VoiceOver moves straight to the next group's heading. If there's no group after it, VoiceOver moves to the one before. When the last group is marked as read, you hear the All Caught Up sound, Goldie's happy two-note wuff, and VoiceOver moves to All Caught Up.",
                             "If Confirmation Sounds and Haptic Feedback are both off, VoiceOver says Group marked as read after reading the next heading.",
+                            "With VoiceOver, when you reach the last comment in a group, you hear a soft end-of-page sound and feel a light tap, so you can mark the group as read before moving on. VoiceOver and braille also say Last comment. For a new item with no comments, the post itself is last, and it says Last in this group.",
                             "In Fetch, use the Reading List heading to reach Mark All as Read with one swipe left. Comment actions begin with Mark This Group as Read, and expansion comes last.",
                         ]),
                         .body("With VoiceOver, use the Actions rotor. You can also touch and hold a group heading or comment, or swipe right on a comment, to choose Mark This Group as Read."),

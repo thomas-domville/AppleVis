@@ -465,6 +465,24 @@ extension FeedItem {
     }
 }
 
+/// The end-of-group sound, when VoiceOver lands on the last row of a group:
+/// the last new comment, or the post itself when there are no comments. It's
+/// easy to swipe past the last comment into the next group before marking
+/// this one as read. Only when focus arrives, not when the row scrolls into
+/// view, so it never plays for someone just scrolling. Requested directly
+/// (2026-10-10).
+private struct EndOfGroupCue: ViewModifier {
+    let isEnd: Bool
+    let rowId: String
+    let focus: AccessibilityFocusState<String?>.Binding
+
+    func body(content: Content) -> some View {
+        content.onChange(of: isEnd && focus.wrappedValue == rowId) { _, landed in
+            if landed { SoundPlayer.shared.play(.endOfGroup) }
+        }
+    }
+}
+
 private struct FetchGroupRows: View {
     let group: FetchListener.Group
     let isFinished: Bool
@@ -659,9 +677,11 @@ private struct FetchGroupRows: View {
         }
         .padding(.leading, 20)
         .accessibilityElement(children: .combine)
+        .accessibilityValue(isEnd ? Text("Last in this group.") : Text(""))
         .accessibilityFocused(focus, equals: rowId)
         .modifier(ExpandAction(rowId: rowId, clipped: clippedRows, expanded: $expandedRows))
         .onAppear { if isEnd { onReachedEnd() } }
+        .modifier(EndOfGroupCue(isEnd: isEnd, rowId: rowId, focus: focus))
     }
 
     // MARK: Long text
@@ -708,6 +728,7 @@ private struct FetchGroupRows: View {
     private func commentRows(_ comment: FetchComment, isEnd: Bool) -> some View {
         commentRow(comment, isLast: isEnd)
             .onAppear { if isEnd { onReachedEnd() } }
+            .modifier(EndOfGroupCue(isEnd: isEnd, rowId: comment.id, focus: focus))
     }
 
     private func commentRow(_ comment: FetchComment, isLast: Bool) -> some View {
@@ -719,6 +740,11 @@ private struct FetchGroupRows: View {
         spokenParts.append(comment.text)
         if comment.isTruncated {
             spokenParts.append(String(localized: "Continues."))
+        }
+        // Said and shown in braille after the comment, for anyone who
+        // doesn't hear the end-of-group sound (2026-10-10).
+        if isLast {
+            spokenParts.append(String(localized: "Last comment."))
         }
         return VStack(alignment: .leading, spacing: 6) {
             link(target, rowId: comment.id) {

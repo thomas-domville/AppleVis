@@ -88,6 +88,7 @@ extension HelpContent {
                         "When you've finished an item, choose Mark This Group as Read.",
                     ]),
                     .tip("With VoiceOver, set the rotor to Headings to move from item to item."),
+                    .tip("With VoiceOver, a soft end-of-page sound and Last comment tell you you've reached the end of an item. Mark This Group as Read is in the Actions rotor right there."),
                 ],
                 contentType: .tutorial,
                 relatedLinks: [RelatedLink(label: "Fetch", type: .guide, destination: .article("home-fetch"))]

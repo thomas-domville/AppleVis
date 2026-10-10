@@ -31,6 +31,22 @@ Every app sound is set to its loudness group by level_installed.py (run it after
 - Loading start: version 2 (about 8 dB quieter, gentle start). In the app.
 - Picker tick: version 2 (about 8 dB quieter, gentle start). In the app.
 
+## Chosen 2026-10-10: End of Group in Fetch, option 5 (page end). In the app as end_of_group.wav.
+
+### The options that were offered
+
+Plays when VoiceOver lands on the last row of a group in Fetch, so you know
+it's the last one before the next group. Quiet group (-18), made by
+make_end_of_group.py.
+
+- end_of_group_0_guideline_ding: the guideline ding as it is, for comparison.
+- end_of_group_1_ding_sibling: the ding, a little lower and longer.
+- end_of_group_2_two_bells_down: two soft bells stepping down.
+- end_of_group_3_felt_settle: one low felt-piano note, settling.
+- end_of_group_4_mallet_tock: a short wooden "tock".
+- end_of_group_5_page_end: a tiny paper fold, then a small low bell.
+- end_of_group_6_soft_blip_pair: two very small round blips on one note.
+
 ## Status
 
 Sound review complete (2026-10-07). Every app sound has been chosen by the

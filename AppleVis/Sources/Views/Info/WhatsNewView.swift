@@ -195,6 +195,12 @@ struct ChangeItem: Identifiable {
 
     static let current: [ChangeItem] = [
         ChangeItem(
+            systemImage: "text.badge.checkmark",
+            tag: .accessibility,
+            title: "Know When You've Reached the End of an Item",
+            description: "In Fetch, with VoiceOver, you hear a soft end-of-page sound and feel a light tap when you reach the last comment in a group, so you can mark it as read before moving on. VoiceOver and braille also say Last comment, or Last in this group for a new item with no comments."
+        ),
+        ChangeItem(
             systemImage: "magnifyingglass",
             tag: .improved,
             title: "Ask the Mouse Finds More",

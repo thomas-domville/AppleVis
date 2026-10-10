@@ -70,6 +70,12 @@ enum AppSound: String {
     /// "saved". Chosen by ear (caught_up_2_goldie_wuff, 2026-10-08).
     /// Confirmation tier.
     case allCaughtUp     = "all_caught_up"
+    /// VoiceOver reached the last row of a group in Fetch: the last new
+    /// comment, or the post itself when there are no comments. "End of the
+    /// page", a tiny paper fold and a small low bell, so you can mark the
+    /// group as read before moving on. Chosen by ear (end_of_group_5_page_end,
+    /// 2026-10-10). Confirmation tier.
+    case endOfGroup      = "end_of_group"
 
     /// The tab's own pop: 0 Home, 1 Discover, 2 For You.
     static func tabSound(for tab: Int) -> AppSound {
@@ -149,6 +155,9 @@ enum AppSound: String {
         case .guidelineDing:
             // The cue for braille and DeafBlind users, who may not hear it.
             return { UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 0.7) }
+        case .endOfGroup:
+            // A soft tap, for braille and DeafBlind users, who may not hear it.
+            return { UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.6) }
         case .tabChange, .tabChangeHome, .tabChangeDiscover, .tabChangeForYou,
              .articleOpen, .loadingStart, .pickerTick, .refresh,
              .screenClose, .searchComplete, .syncComplete, .tipPopup, .welcome:

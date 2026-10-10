@@ -15,6 +15,8 @@ TIER = {
     # waiting ticks: subtle under VoiceOver
     'refresh_tick': -22, 'mouse_patter': -22,
     'tip_popup': -18,
+    # Fetch's end of group: once per group, just under the tip (2026-10-10)
+    'end_of_group': -18,
     # frequent confirmation, a little under the rest
     'marked_read': -16, 'all_caught_up': -14, 'unsaved': -16, 'unfollowed': -16, 'unrecommended': -16,
     # medium: confirmations
